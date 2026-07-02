@@ -1,0 +1,212 @@
+<style>
+  .page-header { margin-bottom: 2rem; }
+  .page-header h1 { font-size: 1.5rem; }
+  .page-header .date { color: var(--muted); font-size: .9rem; }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .75rem; }
+  .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
+  .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1rem; }
+
+  pre.snippet { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; overflow-x: auto; margin-bottom: 1rem; white-space: pre; }
+
+  .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
+
+  details.ref { margin-bottom: 1rem; }
+  details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+  details.ref summary::before { content: "▶ "; }
+  details.ref[open] summary::before { content: "▼ "; }
+  .ref-body { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
+
+  textarea.answer { width: 100%; min-height: 120px; background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: .95rem; font-family: inherit; resize: vertical; line-height: 1.6; }
+  textarea.answer:focus { outline: none; border-color: var(--accent); }
+  textarea.code-answer { font-family: "Fira Code", "Cascadia Code", monospace; font-size: .85rem; min-height: 160px; }
+
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 1.5rem; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+  .progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
+
+  .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
+
+  /* Post-submission */
+  .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
+  .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
+  .review-section { margin-top: 1.5rem; }
+  .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .75rem; }
+  .review-block h4 { color: var(--accent); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+  .rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
+  .rating-btn { flex: 1; padding: .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
+  .rating-btn:hover { border-color: var(--accent); }
+  .rating-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+</style>
+
+<div class="page-header">
+  <h1>Today's Code Gym</h1>
+  <div class="date"><%= Date.current.strftime("%A, %B %-d") %></div>
+</div>
+
+<% if @generating %>
+  <div class="section" style="text-align:center;padding:3rem;">
+    <p style="color:var(--muted);margin-bottom:.5rem;">Generating your personalized exercise set…</p>
+    <p style="font-size:.85rem;color:var(--muted);">This takes about 10 seconds. <a href="<%= root_path %>">Refresh</a> in a moment.</p>
+  </div>
+
+<% elsif @exercise.nil? %>
+  <div class="section" style="text-align:center;padding:3rem;">
+    <p style="color:var(--muted);">No exercise set for today yet. The morning job runs at 8am on weekdays.</p>
+  </div>
+
+<% else %>
+  <% submitted = @response.persisted? && @response.submitted? %>
+
+  <%# Progress bar (only shown before submission) %>
+  <% unless submitted %>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <div class="progress-label" id="progress-label">0 of 3 answered</div>
+  <% end %>
+
+  <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
+    <% if @response.persisted? %>
+      <input type="hidden" name="_method" value="patch">
+    <% end %>
+
+    <%# ── Section 1: Code Review ─────────────────────────────────────── %>
+    <% cr = @exercise.code_review %>
+    <div class="section">
+      <div class="section-label">1 — Code Review</div>
+      <div class="question"><%= cr["question"] %></div>
+      <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
+
+      <% if submitted %>
+        <div class="answer-display"><%= @response.answers["code_review"].presence || "(skipped)" %></div>
+      <% else %>
+        <textarea name="response[answers][code_review]" class="answer" placeholder="What's the issue and how would you fix it?" data-field="code_review"><%= @response.answers["code_review"] %></textarea>
+      <% end %>
+    </div>
+
+    <%# ── Section 2: Pattern of the Month ─────────────────────────────── %>
+    <% pat = @exercise.pattern %>
+    <div class="section">
+      <div class="section-label">2 — Pattern of the Month: <%= pat["title"] %></div>
+      <div class="why-box"><strong>Why it exists:</strong> <%= pat["why"] %></div>
+      <div class="question"><%= pat["question"] %></div>
+
+      <details class="ref">
+        <summary>Reference — <%= pat["title"] %>: how it works</summary>
+        <div class="ref-body">
+          <p style="margin-bottom:.75rem"><strong><%= pat.dig("reference", "tagline") %></strong></p>
+          <p style="margin-bottom:.75rem"><%= pat.dig("reference", "explanation") %></p>
+          <pre class="snippet"><code><%= pat.dig("reference", "code_example") %></code></pre>
+          <p>🔭 <%= pat.dig("reference", "senior_lens") %></p>
+        </div>
+      </details>
+
+      <% if submitted %>
+        <div class="answer-display"><%= @response.answers["pattern"].presence || "(skipped)" %></div>
+      <% else %>
+        <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" data-field="pattern"><%= @response.answers["pattern"] %></textarea>
+      <% end %>
+    </div>
+
+    <%# ── Section 3: Coding Challenge ─────────────────────────────────── %>
+    <% ch = @exercise.challenge %>
+    <div class="section">
+      <div class="section-label">3 — Coding Challenge</div>
+      <div class="question"><%= ch["question"] %></div>
+      <% if ch["starter_code"].present? %>
+        <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
+      <% end %>
+
+      <% if submitted %>
+        <div class="answer-display"><%= @response.answers["challenge"].presence || "(skipped)" %></div>
+      <% else %>
+        <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" data-field="challenge"><%= @response.answers["challenge"] %></textarea>
+      <% end %>
+    </div>
+
+    <%# ── Submit / Review ─────────────────────────────────────────────── %>
+    <% if submitted %>
+      <div class="submit-row">
+        <span class="submitted-badge">✓ Submitted</span>
+        <% unless @response.reviewed? %>
+          <%= button_to "Get Claude review →", review_response_path(@response), method: :post, class: "btn btn-primary btn-sm" %>
+        <% end %>
+      </div>
+
+      <%# Feedback widget %>
+      <div style="margin-top:1.5rem">
+        <p style="font-size:.85rem;color:var(--muted);margin-bottom:.5rem;">How was today's difficulty?</p>
+        <%= form_with url: feedback_response_path(@response), method: :patch, data: { turbo: false } do |ff| %>
+          <div class="rating-row">
+            <%= ff.button "Too easy", name: "response[rating]", value: "too_easy",   class: "rating-btn #{@response.rating == 'too_easy' ? 'active' : ''}" %>
+            <%= ff.button "Just right", name: "response[rating]", value: "right_level", class: "rating-btn #{@response.rating == 'right_level' ? 'active' : ''}" %>
+            <%= ff.button "Too hard",  name: "response[rating]", value: "too_hard",   class: "rating-btn #{@response.rating == 'too_hard' ? 'active' : ''}" %>
+          </div>
+          <textarea name="response[feedback_text]" class="answer" style="min-height:70px;margin-top:.75rem" placeholder="Optional: anything specific to adjust next time?"><%= @response.feedback_text %></textarea>
+          <%= ff.submit "Save feedback", class: "btn btn-ghost btn-sm", style: "margin-top:.5rem" %>
+        <% end %>
+      </div>
+
+      <%# AI Review display %>
+      <% if @response.reviewed? %>
+        <div class="review-section">
+          <h3 style="font-size:1rem;margin-bottom:.75rem">Claude's Review</h3>
+          <% @response.ai_review.each do |section, feedback| %>
+            <div class="review-block">
+              <h4><%= section.humanize %></h4>
+              <p style="font-size:.9rem;line-height:1.7"><%= feedback["summary"] %></p>
+              <% if feedback["improved_code"].present? %>
+                <pre class="snippet" style="margin-top:.75rem"><code><%= feedback["improved_code"] %></code></pre>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+    <% else %>
+      <div class="submit-row">
+        <%= f.hidden_field :submit, value: "1" %>
+        <%= f.submit "Submit answers →", class: "btn btn-primary" %>
+        <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# Auto-save script %>
+  <% unless submitted %>
+    <script>
+      const form = document.getElementById("gym-form");
+      const textareas = form.querySelectorAll("textarea[data-field]");
+      const progressFill = document.getElementById("progress-fill");
+      const progressLabel = document.getElementById("progress-label");
+
+      function updateProgress() {
+        const filled = [...textareas].filter(t => t.value.trim().length > 10).length;
+        progressFill.style.width = (filled / 3 * 100) + "%";
+        progressLabel.textContent = filled === 3 ? "✓ All answered — ready to submit!" : `${filled} of 3 answered`;
+      }
+
+      let saveTimer;
+      function autoSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(async () => {
+          const answers = {};
+          textareas.forEach(t => answers[t.dataset.field] = t.value);
+          await fetch(form.action, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
+            body: JSON.stringify({ response: { answers } })
+          });
+        }, 800);
+      }
+
+      textareas.forEach(t => {
+        t.addEventListener("input", () => { updateProgress(); autoSave(); });
+      });
+
+      updateProgress();
+    </script>
+  <% end %>
+<% end %>

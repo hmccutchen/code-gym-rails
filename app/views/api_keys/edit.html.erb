@@ -1,0 +1,24 @@
+<style>
+  .setup-wrap { max-width: 480px; margin: 5rem auto; }
+  .setup-wrap h1 { margin-bottom: .5rem; }
+  .setup-wrap p  { color: var(--muted); margin-bottom: 2rem; }
+  .form-field { margin-bottom: 1rem; }
+  .form-field label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
+  .form-field input { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 1rem; font-family: monospace; }
+  .form-field input:focus { outline: none; border-color: var(--accent); }
+  .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
+</style>
+
+<div class="setup-wrap">
+  <h1>Add your Anthropic API key</h1>
+  <p>Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency.</p>
+
+  <%= form_with url: setup_path, method: :patch do |f| %>
+    <div class="form-field">
+      <%= f.label :api_key, "Anthropic API key" %>
+      <%= f.password_field :api_key, placeholder: "sk-ant-api03-...", autocomplete: "off" %>
+      <p class="hint">Get yours at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>. Starts with <code>sk-ant-</code>.</p>
+    </div>
+    <%= f.submit "Save key →", class: "btn btn-primary" %>
+  <% end %>
+</div>

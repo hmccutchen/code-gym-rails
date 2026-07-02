@@ -1,0 +1,14 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "bundle exec rails server -b 0.0.0.0 -p $PORT"
+healthcheckPath = "/up"
+healthcheckTimeout = 30
+
+[[services]]
+name = "web"
+
+[[services]]
+name = "worker"
+startCommand = "bundle exec rake solid_queue:start"
