@@ -19,7 +19,7 @@ Currently the file has no `action_mailer` SMTP configuration, and `ApplicationMa
 Changes:
 - Add `config.action_mailer.smtp_settings`, populated from `ENV["SMTP_HOST"]`, `ENV["SMTP_PORT"]`, `ENV["SMTP_USERNAME"]`, `ENV["SMTP_PASSWORD"]`, with `authentication: :plain` and `enable_starttls_auto: true`.
 - Add `config.action_mailer.default_url_options`, derived from `ENV["APP_HOST"]` (a full URL per `.env.example`, e.g. `https://your-app.railway.app`). Parse out the host; force `protocol: "https"` explicitly, since mailer-generated URLs are built outside the request cycle and `config.force_ssl` does not apply to them.
-- Add `config.action_mailer.default_options = { from: ENV.fetch("MAIL_FROM", "code-gym@example.com") }`, and update `ApplicationMailer` to drop its hardcoded `from`.
+- Change `ApplicationMailer`'s hardcoded `default from: "from@example.com"` to `default from: ENV.fetch("MAIL_FROM", "from@example.com")`. This is a single source of truth that works in every environment (dev/test fall back to the literal default since `MAIL_FROM` won't be set there), so no separate `config.action_mailer.default_options` is needed in `production.rb`.
 - Set `config.action_mailer.raise_delivery_errors = true`. `UserMailer.magic_link` is sent via `deliver_later`, so delivery happens inside a Solid Queue job — without this, SMTP failures fail silently instead of showing up as a failed/retried job.
 - Use `ENV[...]` (not `ENV.fetch` without a default) for the SMTP settings so a missing var doesn't crash boot/eager-load; a misconfigured SMTP setting should fail at send time, not at process start.
 
@@ -35,16 +35,16 @@ healthcheckPath = "/up"
 healthcheckTimeout = 30
 ```
 
-Add a `releaseCommand`, Railway's native pre-traffic release hook (equivalent to Heroku's release phase):
+Add a `preDeployCommand`, Railway's native pre-traffic deploy hook (equivalent to Heroku's release phase — confirmed against Railway's config-as-code reference docs; note this field is *not* called `releaseCommand`, which is Heroku's term and would be silently ignored by Railway):
 ```toml
 [deploy]
 startCommand = "bundle exec rails server -b 0.0.0.0 -p $PORT"
-releaseCommand = "bundle exec rails db:migrate"
+preDeployCommand = ["bundle exec rails db:migrate"]
 healthcheckPath = "/up"
 healthcheckTimeout = 30
 ```
 
-This runs once per deploy, before the new version takes traffic — as opposed to chaining `db:migrate &&` into `startCommand`, which would re-run on every process boot/restart of every instance. `releaseCommand` only applies to the `[[services]] name = "web"` block; the `worker` service's `startCommand` (`bundle exec rake solid_queue:start`) is unaffected.
+This runs once per deploy, in a separate container, before the new version takes traffic — as opposed to chaining `db:migrate &&` into `startCommand`, which would re-run on every process boot/restart of every instance. `preDeployCommand` only applies to the top-level `[deploy]` block, which (per this file's existing structure) governs the `web` service; the `worker` service's `[[services]]` entry has its own `startCommand` override and is unaffected.
 
 ## 3. Railway SMTP env vars
 
@@ -55,7 +55,7 @@ Key finding: `UserMailer.magic_link(...).deliver_later` enqueues through Solid Q
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_HOST`
 
 The plan step will produce:
-- `railway variables set` commands scoped to `--service web` and `--service worker`, for the user to run via `!`.
+- `railway variable set -s <service>` commands (confirmed against Railway's CLI docs — the command is singular `variable`, not `variables`) scoped to `web` and `worker`, for the user to run via `!`.
 - A dashboard-based fallback (which fields to fill in under each service's Variables tab) in case the user prefers the UI or doesn't have the CLI installed.
 - A recommendation to use Resend per CLAUDE.md's suggestion, but the config itself is provider-agnostic — any SMTP provider's credentials work.
 
@@ -63,4 +63,4 @@ The plan step will produce:
 
 - Seeding the first user (CLAUDE.md item 4).
 - Installing/authenticating the Railway CLI on this machine.
-- Actually running the `railway variables set` commands — the user runs those themselves.
+- Actually running the `railway variable set` commands — the user runs those themselves.
