@@ -11,6 +11,6 @@ development:
 test:
   <<: *default
 
+# No database key: cache entries live in the primary database (single Railway postgres).
 production:
-  database: cache
   <<: *default
