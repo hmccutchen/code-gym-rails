@@ -39,6 +39,16 @@ Rails.application.configure do
   # Set host to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "example.com" }
 
+  # Enqueue jobs to an in-memory array so specs can assert on them
+  # (rspec-rails' have_enqueued_* matchers require the :test adapter).
+  config.active_job.queue_adapter = :test
+
+  # Deterministic throwaway keys so `encrypts :api_key` works in tests
+  # without needing the real credentials.
+  config.active_record.encryption.primary_key = "test" * 8
+  config.active_record.encryption.deterministic_key = "test" * 8
+  config.active_record.encryption.key_derivation_salt = "test" * 8
+
   # Print deprecation notices to the stderr.
   config.active_support.deprecation = :stderr
 
