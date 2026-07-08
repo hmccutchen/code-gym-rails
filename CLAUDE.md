@@ -83,6 +83,16 @@ bin/dev  # starts web + solid_queue worker
 
 In development, magic link emails open in the browser via `letter_opener` gem (no SMTP needed).
 
+## Tests
+
+RSpec (`spec/` — models, requests, mailers). Run with:
+
+```bash
+bundle exec rspec
+```
+
+CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
+
 ## File Map
 
 - `app/services/claude_service.rb` — all Claude API logic, prompt building, response parsing
