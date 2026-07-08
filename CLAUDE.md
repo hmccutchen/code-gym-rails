@@ -60,9 +60,9 @@ User interacts:
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
 ## What Still Needs Work
-1. **Email (magic links won't work yet)**: Need to set SMTP env vars in Railway. Recommended: [Resend](https://resend.com) (free tier). Add to Railway env vars: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_HOST`.
-2. **`config/environments/production.rb`**: Add SMTP config (see `.env.example` for the keys).
-3. **`db:migrate` on Railway**: First deploy needs `rails db:migrate` to run. Add `bundle exec rails db:migrate &&` before the start command, or use a Railway deploy command.
+1. ~~Email (magic links won't work yet)~~ — `production.rb` and `ApplicationMailer` now read SMTP settings from `ENV`. You still need to set the actual values on the live Railway project: see `docs/deploy/railway-smtp-setup.md`.
+2. ~~`config/environments/production.rb`~~ — done. `smtp_settings`, `default_url_options`, and `raise_delivery_errors` are wired up from `ENV`.
+3. ~~`db:migrate` on Railway~~ — done. `railway.toml` now runs `bundle exec rails db:migrate` via `preDeployCommand` on every deploy, before the new version takes traffic.
 4. **Seed a first user**: After deploy, run `rails console` on Railway and create the first user manually, then invite teammates.
 
 ## Local Development
