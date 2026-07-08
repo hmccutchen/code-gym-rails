@@ -13,7 +13,7 @@ Rails.application.routes.draw do
   root "dashboard#show"
 
   # Submit/update today's answers
-  resources :responses, only: [:create] do
+  resources :responses, only: [ :create ] do
     member do
       patch :feedback   # rating + feedback_text after submission
       post  :review     # trigger Claude inline review

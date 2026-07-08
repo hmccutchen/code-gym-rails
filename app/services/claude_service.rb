@@ -44,7 +44,7 @@ class ClaudeService
     system_prompt = build_system_prompt
     user_prompt   = build_exercise_prompt(user)
 
-    response = call(system: system_prompt, messages: [{ role: "user", content: user_prompt }])
+    response = call(system: system_prompt, messages: [ { role: "user", content: user_prompt } ])
 
     # Log usage
     log_usage(user, response, purpose: "generate_exercise")
@@ -59,7 +59,7 @@ class ClaudeService
 
     response = call(
       system: "You are a senior Rails engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. Be honest and constructive. Return JSON.",
-      messages: [{ role: "user", content: prompt }]
+      messages: [ { role: "user", content: prompt } ]
     )
 
     log_usage(user, response, purpose: "review_response")
@@ -186,7 +186,7 @@ class ClaudeService
       f.headers["x-api-key"]         = @api_key
       f.headers["anthropic-version"] = "2023-06-01"
       f.headers["content-type"]      = "application/json"
-      f.request :retry, max: 2, interval: 1, retry_statuses: [529]
+      f.request :retry, max: 2, interval: 1, retry_statuses: [ 529 ]
       f.adapter :net_http
     end
   end
