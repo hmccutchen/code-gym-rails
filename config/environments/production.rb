@@ -53,21 +53,25 @@ Rails.application.configure do
   config.active_job.queue_adapter = :solid_queue
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
-  # Ignore bad email addresses and do not raise email delivery errors.
-  # Set this to true and configure the email server for immediate delivery to raise delivery errors.
-  # config.action_mailer.raise_delivery_errors = false
+  # Raise delivery errors so failed sends surface as failed/retried Solid Queue jobs
+  # (UserMailer.magic_link is sent via deliver_later) instead of failing silently.
+  config.action_mailer.raise_delivery_errors = true
 
-  # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: "example.com" }
+  # Set host to be used by links generated in mailer templates (e.g. the magic link
+  # verify_auth_url). Mailer views render outside the request cycle, so config.force_ssl
+  # has no effect here -- protocol is forced to https explicitly.
+  app_host = URI.parse(ENV.fetch("APP_HOST", "https://example.com"))
+  config.action_mailer.default_url_options = { host: app_host.host, protocol: "https" }
 
-  # Specify outgoing SMTP server. Remember to add smtp/* credentials via rails credentials:edit.
-  # config.action_mailer.smtp_settings = {
-  #   user_name: Rails.application.credentials.dig(:smtp, :user_name),
-  #   password: Rails.application.credentials.dig(:smtp, :password),
-  #   address: "smtp.example.com",
-  #   port: 587,
-  #   authentication: :plain
-  # }
+  # Outgoing SMTP server, configured via Railway env vars (see docs/deploy/railway-smtp-setup.md).
+  config.action_mailer.smtp_settings = {
+    address:              ENV["SMTP_HOST"],
+    port:                 ENV["SMTP_PORT"]&.to_i,
+    user_name:            ENV["SMTP_USERNAME"],
+    password:             ENV["SMTP_PASSWORD"],
+    authentication:       :plain,
+    enable_starttls_auto: true
+  }
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).
