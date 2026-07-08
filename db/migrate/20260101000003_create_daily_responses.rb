@@ -14,6 +14,6 @@ class CreateDailyResponses < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :daily_responses, [:user_id, :date], unique: true
+    add_index :daily_responses, [ :user_id, :date ], unique: true
   end
 end

@@ -1,5 +1,5 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [:feedback, :review]
+  before_action :set_response, only: [ :feedback, :review ]
 
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
@@ -53,7 +53,7 @@ class ResponsesController < ApplicationController
   end
 
   def response_params
-    params.require(:response).permit(:submit, answers: [:code_review, :pattern, :challenge])
+    params.require(:response).permit(:submit, answers: [ :code_review, :pattern, :challenge ])
   end
 
   def feedback_params

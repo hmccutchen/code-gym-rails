@@ -3,6 +3,10 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "bundle exec rails server -b 0.0.0.0 -p $PORT"
+# Runs once per deploy, in a separate container, before the new version takes traffic.
+# This is Railway's actual field name -- "releaseCommand" (Heroku's term) does not exist
+# in Railway's schema and would be silently ignored.
+preDeployCommand = ["bundle exec rails db:migrate"]
 healthcheckPath = "/up"
 healthcheckTimeout = 30
 

@@ -10,6 +10,6 @@ class CreateApiUsages < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :api_usages, [:user_id, :date]
+    add_index :api_usages, [ :user_id, :date ]
   end
 end
