@@ -61,8 +61,8 @@ User interacts:
 - Project: `zesty-enthusiasm` (ID: `5b53ac62-bdb2-4e8d-a7f2-7a457b06ba4e`)
 - Web service: `web-production-246e40.up.railway.app`
 - Services: web, worker, postgres
-- Web start command: `bundle exec puma -C config/puma.rb` (Railway auto-detected)
-- Worker start command: `bundle exec rake solid_queue:start`
+- Web start command: `bundle exec puma -C config/puma.rb` (set in `railway.toml`; don't use `rails server -p $PORT` — Railway start commands run in exec form, so `$PORT` is never shell-expanded, while puma reads `PORT` from ENV)
+- Worker start command: `bundle exec rake solid_queue:start` (set in `railway.worker.toml`; the worker service's Settings → Config-as-code file path must point at `/railway.worker.toml`, otherwise it inherits the web config and fails healthchecks)
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
 ## What Still Needs Work
