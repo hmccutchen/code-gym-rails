@@ -10,8 +10,6 @@ test:
 
 production:
   adapter: solid_cable
-  connects_to:
-    database:
-      writing: cable
+  # No connects_to: messages live in the primary database (single Railway postgres).
   polling_interval: 0.1.seconds
   message_retention: 1.day

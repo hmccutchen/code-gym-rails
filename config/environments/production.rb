@@ -50,8 +50,9 @@ Rails.application.configure do
   config.cache_store = :solid_cache_store
 
   # Replace the default in-process and non-durable queuing backend for Active Job.
+  # Solid Queue runs against the primary database (no connects_to override):
+  # Railway provides a single postgres, and the solid_* tables live there.
   config.active_job.queue_adapter = :solid_queue
-  config.solid_queue.connects_to = { database: { writing: :queue } }
 
   # Raise delivery errors so failed sends surface as failed/retried Solid Queue jobs
   # (UserMailer.magic_link is sent via deliver_later) instead of failing silently.

@@ -1,18 +1,20 @@
 [build]
 builder = "nixpacks"
 
+# Config for the WEB service only. The worker service must point at
+# railway.worker.toml (dashboard: worker service -> Settings -> Config-as-code
+# file path). Railway has no per-service sections in one file -- a config file
+# applies wholesale to every service that reads it, and config-as-code
+# overrides dashboard settings.
+
 [deploy]
-startCommand = "bundle exec rails server -b 0.0.0.0 -p $PORT"
+# Puma reads PORT from ENV in config/puma.rb. Do not use
+# "rails server -p $PORT": start commands run in exec form (no shell), so
+# $PORT is passed as a literal string and the server fails to bind.
+startCommand = "bundle exec puma -C config/puma.rb"
 # Runs once per deploy, in a separate container, before the new version takes traffic.
 # This is Railway's actual field name -- "releaseCommand" (Heroku's term) does not exist
 # in Railway's schema and would be silently ignored.
 preDeployCommand = ["bundle exec rails db:migrate"]
 healthcheckPath = "/up"
 healthcheckTimeout = 30
-
-[[services]]
-name = "web"
-
-[[services]]
-name = "worker"
-startCommand = "bundle exec rake solid_queue:start"

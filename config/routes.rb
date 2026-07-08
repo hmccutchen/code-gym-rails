@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  # Railway healthcheck target (railway.toml healthcheckPath). Returns 200 once the
+  # app has booted; served by Rails' built-in health controller, no auth required.
+  get "up" => "rails/health#show", as: :rails_health_check
+
   # Auth (magic link)
   get  "login",        to: "sessions#new"
   post "login",        to: "sessions#create"

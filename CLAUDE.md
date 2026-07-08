@@ -61,21 +61,14 @@ User interacts:
 - Project: `zesty-enthusiasm` (ID: `5b53ac62-bdb2-4e8d-a7f2-7a457b06ba4e`)
 - Web service: `web-production-246e40.up.railway.app`
 - Services: web, worker, postgres
-- Web start command: `bundle exec puma -C config/puma.rb` (Railway auto-detected)
-- Worker start command: `bundle exec rake solid_queue:start`
+- Web start command: `bundle exec puma -C config/puma.rb` (set in `railway.toml`; don't use `rails server -p $PORT` — Railway start commands run in exec form, so `$PORT` is never shell-expanded, while puma reads `PORT` from ENV)
+- Worker start command: `bundle exec rake solid_queue:start` (set in `railway.worker.toml`; the worker service's Settings → Config-as-code file path must point at `/railway.worker.toml`, otherwise it inherits the web config and fails healthchecks)
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
 ## What Still Needs Work
-<<<<<<< Updated upstream
 1. ~~Email (magic links won't work yet)~~ — `production.rb` and `ApplicationMailer` now read SMTP settings from `ENV`. You still need to set the actual values on the live Railway project: see `docs/deploy/railway-smtp-setup.md`.
 2. ~~`config/environments/production.rb`~~ — done. `smtp_settings`, `default_url_options`, and `raise_delivery_errors` are wired up from `ENV`.
 3. ~~`db:migrate` on Railway~~ — done. `railway.toml` now runs `bundle exec rails db:migrate` via `preDeployCommand` on every deploy, before the new version takes traffic.
-=======
-
-1. **Email (magic links won't work yet)**: Need to set SMTP env vars in Railway. Recommended: [Resend](https://resend.com) (free tier). Add to Railway env vars: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_HOST`.
-2. **`config/environments/production.rb`**: Add SMTP config (see `.env.example` for the keys).
-3. **`db:migrate` on Railway**: First deploy needs `rails db:migrate` to run. Add `bundle exec rails db:migrate &&` before the start command, or use a Railway deploy command.
->>>>>>> Stashed changes
 4. **Seed a first user**: After deploy, run `rails console` on Railway and create the first user manually, then invite teammates.
 
 ## Local Development

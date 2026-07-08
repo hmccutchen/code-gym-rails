@@ -1,0 +1,12 @@
+# Config for the WORKER service (Solid Queue). One-time dashboard step required:
+# worker service -> Settings -> Config-as-code file path -> /railway.worker.toml
+# Without that, the worker reads railway.toml and inherits the web startCommand
+# plus an HTTP healthcheck it can never pass (it runs no HTTP server).
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "bundle exec rake solid_queue:start"
+# No healthcheckPath: the worker exposes no HTTP server.
+# No preDeployCommand: migrations already run once via the web service's pre-deploy step.
