@@ -1,9 +1,11 @@
 # Code Gym Rails — Project Context for Claude Code
 
 ## What This Is
+
 A team Rails app for daily personalized coding exercises. Each engineer logs in (magic link, no passwords), adds their own Anthropic API key, and gets a Claude-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline Claude review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
 
 ## Stack
+
 - **Rails 8.0.5** + PostgreSQL
 - **Solid Queue** — background jobs + recurring 8am weekday cron (no Redis needed)
 - **Faraday** — Claude API calls (not the official SDK)
@@ -13,6 +15,7 @@ A team Rails app for daily personalized coding exercises. Each engineer logs in 
 - **Nixpacks** — auto-detected build from `railway.toml`
 
 ## Architecture
+
 ```
 User logs in (magic link email)
   └→ enters their own Anthropic API key (stored encrypted per-user)
@@ -37,14 +40,16 @@ User interacts:
 ```
 
 ## Models
-| Model | Key fields |
-|-------|-----------|
-| `User` | email, name, skill_level, focus_areas (jsonb), encrypted_api_key |
-| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, challenge) |
+
+| Model             | Key fields                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| `User`          | email, name, skill_level, focus_areas (jsonb), encrypted_api_key                           |
+| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, challenge)                        |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), rating enum, feedback_text, ai_review (jsonb) |
-| `ApiUsage` | user_id, tokens_in, tokens_out, purpose, date |
+| `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                              |
 
 ## Key Design Decisions
+
 - **Per-user API keys**: Each user provides their own Anthropic key. Zero shared cost. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption). Keys needed: `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY`, `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY`, `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT`.
 - **Magic link auth**: No passwords. `User#generate_login_token!` creates a BCrypt digest, emails a token, `User#find_by_login_token` does constant-time compare. Tokens expire in 15 minutes.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
@@ -52,6 +57,7 @@ User interacts:
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(user:, date:)` so auto-saves never create duplicates.
 
 ## Railway Deployment
+
 - Project: `zesty-enthusiasm` (ID: `5b53ac62-bdb2-4e8d-a7f2-7a457b06ba4e`)
 - Web service: `web-production-246e40.up.railway.app`
 - Services: web, worker, postgres
@@ -60,12 +66,20 @@ User interacts:
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
 ## What Still Needs Work
+<<<<<<< Updated upstream
 1. ~~Email (magic links won't work yet)~~ — `production.rb` and `ApplicationMailer` now read SMTP settings from `ENV`. You still need to set the actual values on the live Railway project: see `docs/deploy/railway-smtp-setup.md`.
 2. ~~`config/environments/production.rb`~~ — done. `smtp_settings`, `default_url_options`, and `raise_delivery_errors` are wired up from `ENV`.
 3. ~~`db:migrate` on Railway~~ — done. `railway.toml` now runs `bundle exec rails db:migrate` via `preDeployCommand` on every deploy, before the new version takes traffic.
+=======
+
+1. **Email (magic links won't work yet)**: Need to set SMTP env vars in Railway. Recommended: [Resend](https://resend.com) (free tier). Add to Railway env vars: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_HOST`.
+2. **`config/environments/production.rb`**: Add SMTP config (see `.env.example` for the keys).
+3. **`db:migrate` on Railway**: First deploy needs `rails db:migrate` to run. Add `bundle exec rails db:migrate &&` before the start command, or use a Railway deploy command.
+>>>>>>> Stashed changes
 4. **Seed a first user**: After deploy, run `rails console` on Railway and create the first user manually, then invite teammates.
 
 ## Local Development
+
 ```bash
 cp .env.example .env
 # fill in DATABASE_URL, SECRET_KEY_BASE, and the ACTIVE_RECORD_ENCRYPTION_* keys
@@ -77,6 +91,7 @@ bin/dev  # starts web + solid_queue worker
 In development, magic link emails open in the browser via `letter_opener` gem (no SMTP needed).
 
 ## File Map
+
 - `app/services/claude_service.rb` — all Claude API logic, prompt building, response parsing
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation
 - `app/controllers/responses_controller.rb` — auto-save, review, feedback endpoints
