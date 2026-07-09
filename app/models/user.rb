@@ -45,7 +45,7 @@ class User < ApplicationRecord
 
   # ── API key ───────────────────────────────────────────────────────────────
   def api_key_present?
-    encrypted_api_key.present?
+    api_key.present?
   end
 
   # ── Usage helpers ─────────────────────────────────────────────────────────

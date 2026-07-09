@@ -5,7 +5,7 @@ class GenerateDailyExercisesJob < ApplicationJob
   #   1. Cron (no args) — generates for ALL users at 8am weekdays
   #   2. On-demand (user_id:) — generates for one user when they first open the app
   def perform(user_id: nil)
-    users = user_id ? User.where(id: user_id) : User.where.not(encrypted_api_key: nil)
+    users = user_id ? User.where(id: user_id) : User.where.not(api_key: nil)
 
     users.find_each do |user|
       next if DailyExercise.exists?(user: user, date: Date.current)

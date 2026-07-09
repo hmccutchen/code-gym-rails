@@ -50,7 +50,7 @@ User interacts:
 
 ## Key Design Decisions
 
-- **Per-user API keys**: Each user provides their own Anthropic key. Zero shared cost. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption). Keys needed: `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY`, `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY`, `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT`.
+- **Per-user API keys**: Each user provides their own Anthropic key. Zero shared cost. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Magic link auth**: No passwords. `User#generate_login_token!` creates a BCrypt digest, emails a token, `User#find_by_login_token` does constant-time compare. Tokens expire in 15 minutes.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Personalization loop**: `user.recent_performance(days: 7)` returns last 10 sessions with dates, completion rates, ratings, and feedback text. This is embedded verbatim in the Claude prompt so each day's exercises adjust to the user's trajectory.
