@@ -64,15 +64,10 @@ Rails.application.configure do
   app_host = URI.parse(ENV.fetch("APP_HOST", "https://example.com"))
   config.action_mailer.default_url_options = { host: app_host.host, protocol: "https" }
 
-  # Outgoing SMTP server, configured via Railway env vars (see docs/deploy/railway-smtp-setup.md).
-  config.action_mailer.smtp_settings = {
-    address:              ENV["SMTP_HOST"],
-    port:                 ENV["SMTP_PORT"]&.to_i,
-    user_name:            ENV["SMTP_USERNAME"],
-    password:             ENV["SMTP_PASSWORD"],
-    authentication:       :plain,
-    enable_starttls_auto: true
-  }
+  # Deliver via Resend's HTTP API (see docs/deploy/railway-smtp-setup.md).
+  # Railway blocks outbound SMTP on plans below Pro, so smtp_settings would
+  # time out at TCP connect -- the API key is set in config/initializers/resend.rb.
+  config.action_mailer.delivery_method = :resend
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).

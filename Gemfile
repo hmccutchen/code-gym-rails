@@ -20,6 +20,9 @@ gem "jbuilder"
 # Magic-link login tokens are digested with BCrypt (User#generate_login_token!)
 gem "bcrypt", "~> 3.1.7"
 
+# Email delivery via Resend's HTTP API (Railway blocks outbound SMTP below Pro)
+gem "resend"
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
