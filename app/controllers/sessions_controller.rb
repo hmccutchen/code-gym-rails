@@ -43,6 +43,23 @@ class SessionsController < ApplicationController
     redirect_to session.delete(:return_to) || root_path, notice: "Welcome back, #{user.name}!"
   end
 
+  # GET /test_login?secret=...&email=...
+  # Interim owner-only bypass while magic-link email requires a verified
+  # sending domain. Gated by the TEST_LOGIN_SECRET env var; every failure
+  # mode is an identical bare 404 so the route is invisible when disabled
+  # and reveals nothing when probed.
+  def test_login
+    configured = ENV["TEST_LOGIN_SECRET"]
+    return head :not_found if configured.blank?
+    return head :not_found unless ActiveSupport::SecurityUtils.secure_compare(params[:secret].to_s, configured)
+
+    user = User.find_by(email: params[:email].to_s.strip.downcase)
+    return head :not_found if user.nil?
+
+    session[:user_id] = user.id
+    redirect_to root_path, notice: "Logged in as #{user.name} (test login)."
+  end
+
   # DELETE /logout
   def destroy
     session.delete(:user_id)

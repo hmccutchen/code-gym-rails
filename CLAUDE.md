@@ -70,6 +70,7 @@ User interacts:
 2. ~~`config/environments/production.rb`~~ — done. Resend delivery, `default_url_options`, and `raise_delivery_errors` are wired up from `ENV`.
 3. ~~`db:migrate` on Railway~~ — done. `railway.toml` now runs `bundle exec rails db:migrate` via `preDeployCommand` on every deploy, before the new version takes traffic.
 4. **Seed a first user**: After deploy, run `rails console` on Railway and create the first user manually, then invite teammates.
+5. **Remove `/test_login` after buying a domain**: once a sending domain is verified in Resend and `MAIL_FROM` is updated, unset `TEST_LOGIN_SECRET` on the Railway web service (instantly disables the route) and delete the route, `SessionsController#test_login`, and `spec/requests/test_login_spec.rb`.
 
 ## Local Development
 
