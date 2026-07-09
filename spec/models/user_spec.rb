@@ -24,6 +24,31 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "api key encryption" do
+    it "persists the api key across reloads" do
+      user = create_user
+      user.update!(api_key: "sk-ant-secret123")
+
+      expect(user.reload.api_key).to eq("sk-ant-secret123")
+      expect(user.api_key_present?).to be true
+    end
+
+    it "stores the key encrypted, not in plaintext" do
+      user = create_user
+      user.update!(api_key: "sk-ant-secret123")
+
+      raw = ActiveRecord::Base.connection.select_value(
+        "SELECT api_key FROM users WHERE id = #{user.id}"
+      )
+      expect(raw).to be_present
+      expect(raw).not_to include("sk-ant-secret123")
+    end
+
+    it "reports api_key_present? false when no key is set" do
+      expect(create_user.api_key_present?).to be false
+    end
+  end
+
   describe "magic link tokens" do
     it "generates a token that can be looked up" do
       user = create_user
