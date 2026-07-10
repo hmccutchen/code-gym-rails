@@ -87,4 +87,34 @@ RSpec.describe User, type: :model do
       expect(user.reload.login_token_digest).not_to include(raw_token)
     end
   end
+
+  describe "#recent_performance concepts" do
+    it "includes each session's concept_tags map, empty for untagged history" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            concept_tags: { "code_review" => "memoization" })
+
+      perf = user.recent_performance
+      expect(perf.first[:concepts]).to eq({ "code_review" => "memoization" })
+    end
+
+    it "never yields nil concept_tags (column is NOT NULL with {} default)" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 })
+
+      expect(user.recent_performance.first[:concepts]).to eq({})
+
+      expect {
+        DailyResponse.connection.execute(
+          "UPDATE daily_responses SET concept_tags = NULL"
+        )
+      }.to raise_error(ActiveRecord::StatementInvalid, /null value/i)
+    end
+  end
 end

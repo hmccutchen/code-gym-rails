@@ -1,0 +1,7 @@
+<% if note.present? %>
+  <% locked = !submitted && answer.to_s.strip.length <= 10 %>
+  <details class="hint<%= " locked" if locked %>" data-hint-for="<%= field %>">
+    <summary>Need a nudge? 💡</summary>
+    <div class="hint-body"><%= note %></div>
+  </details>
+<% end %>

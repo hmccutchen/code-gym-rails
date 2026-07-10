@@ -66,6 +66,7 @@ class User < ApplicationRecord
           date:          r.date.to_s,
           rating:        r.rating,
           feedback:      r.feedback_text,
+          concepts:      r.concept_tags,
           sections_answered: r.answers.count { |_, v| v.to_s.length > 10 }
         }
       end

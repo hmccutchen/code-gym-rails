@@ -38,6 +38,19 @@
   .rating-btn { flex: 1; padding: .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
   .rating-btn:hover { border-color: var(--accent); }
   .rating-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .feedback-quiet { margin-top: 1.5rem; opacity: .75; }
+  .feedback-quiet .feedback-title { font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
+  .feedback-prominent { margin-top: 1.5rem; border-color: var(--accent); }
+  .feedback-prominent .feedback-title { font-size: 1rem; font-weight: 600; margin-bottom: .75rem; }
+  .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
+  .review-item { font-size: .9rem; line-height: 1.7; margin-top: .4rem; }
+
+  details.hint { margin-bottom: 1rem; }
+  details.hint summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+  details.hint summary::before { content: "▶ "; }
+  details.hint[open] summary::before { content: "▼ "; }
+  details.hint.locked { pointer-events: none; opacity: .45; }
+  .hint-body { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; border-radius: 0 6px 6px 0; margin-top: .5rem; line-height: 1.6; }
 </style>
 
 <div class="page-header">
@@ -79,6 +92,8 @@
       <div class="question"><%= cr["question"] %></div>
       <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
 
+      <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: submitted, answer: @response.answers["code_review"] %>
+
       <% if submitted %>
         <div class="answer-display"><%= @response.answers["code_review"].presence || "(skipped)" %></div>
       <% else %>
@@ -103,6 +118,8 @@
         </div>
       </details>
 
+      <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: submitted, answer: @response.answers["pattern"] %>
+
       <% if submitted %>
         <div class="answer-display"><%= @response.answers["pattern"].presence || "(skipped)" %></div>
       <% else %>
@@ -119,6 +136,8 @@
         <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
       <% end %>
 
+      <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: submitted, answer: @response.answers["challenge"] %>
+
       <% if submitted %>
         <div class="answer-display"><%= @response.answers["challenge"].presence || "(skipped)" %></div>
       <% else %>
@@ -126,51 +145,50 @@
       <% end %>
     </div>
 
-    <%# ── Submit / Review ─────────────────────────────────────────────── %>
-    <% if submitted %>
-      <div class="submit-row">
-        <span class="submitted-badge">✓ Submitted</span>
-        <% unless @response.reviewed? %>
-          <%= button_to "Get Claude review →", review_response_path(@response), method: :post, class: "btn btn-primary btn-sm" %>
-        <% end %>
-      </div>
-
-      <%# Feedback widget %>
-      <div style="margin-top:1.5rem">
-        <p style="font-size:.85rem;color:var(--muted);margin-bottom:.5rem;">How was today's difficulty?</p>
-        <%= form_with url: feedback_response_path(@response), method: :patch, data: { turbo: false } do |ff| %>
-          <div class="rating-row">
-            <%= ff.button "Too easy", name: "response[rating]", value: "too_easy",   class: "rating-btn #{@response.rating == 'too_easy' ? 'active' : ''}" %>
-            <%= ff.button "Just right", name: "response[rating]", value: "right_level", class: "rating-btn #{@response.rating == 'right_level' ? 'active' : ''}" %>
-            <%= ff.button "Too hard",  name: "response[rating]", value: "too_hard",   class: "rating-btn #{@response.rating == 'too_hard' ? 'active' : ''}" %>
-          </div>
-          <textarea name="response[feedback_text]" class="answer" style="min-height:70px;margin-top:.75rem" placeholder="Optional: anything specific to adjust next time?"><%= @response.feedback_text %></textarea>
-          <%= ff.submit "Save feedback", class: "btn btn-ghost btn-sm", style: "margin-top:.5rem" %>
-        <% end %>
-      </div>
-
-      <%# AI Review display %>
-      <% if @response.reviewed? %>
-        <div class="review-section">
-          <h3 style="font-size:1rem;margin-bottom:.75rem">Claude's Review</h3>
-          <% @response.ai_review.each do |section, feedback| %>
-            <div class="review-block">
-              <h4><%= section.humanize %></h4>
-              <p style="font-size:.9rem;line-height:1.7"><%= feedback["summary"] %></p>
-              <% if feedback["improved_code"].present? %>
-                <pre class="snippet" style="margin-top:.75rem"><code><%= feedback["improved_code"] %></code></pre>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-      <% end %>
-
-    <% else %>
+    <%# ── Submit (unsubmitted state only) ─────────────────────────────── %>
+    <% unless submitted %>
       <div class="submit-row">
         <%= f.hidden_field :submit, value: "1" %>
         <%= f.submit "Submit answers →", class: "btn btn-primary" %>
         <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
       </div>
+    <% end %>
+  <% end %>
+
+  <%# ── Post-submission: badge, review, feedback (outside the main form —
+       nested forms are invalid HTML and break the inner submits) ───────── %>
+  <% if submitted %>
+    <div class="submit-row">
+      <span class="submitted-badge">✓ Submitted</span>
+      <% unless @response.reviewed? %>
+        <%= button_to "Get Claude review →", review_response_path(@response), method: :post, class: "btn btn-primary btn-sm" %>
+      <% end %>
+    </div>
+
+    <% if @response.reviewed? %>
+      <div class="review-section">
+        <h3 style="font-size:1rem;margin-bottom:.75rem">Claude's Review</h3>
+        <% @response.ai_review.each do |section, fb| %>
+          <% next unless fb.is_a?(Hash) %>
+          <div class="review-block">
+            <h4><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h4>
+            <% { "correct" => "What you got right",
+                 "missed" => "What you missed",
+                 "better_questions" => "Questions to ask yourself",
+                 "next_step" => "Next step" }.each do |key, label| %>
+              <% if fb[key].present? %>
+                <p class="review-item"><strong><%= label %>:</strong> <%= fb[key] %></p>
+              <% end %>
+            <% end %>
+            <% if fb["improved_code"].present? %>
+              <pre class="snippet" style="margin-top:.75rem"><code><%= fb["improved_code"] %></code></pre>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <%= render "responses/feedback_form", response: @response, style: :prominent %>
+    <% else %>
+      <%= render "responses/feedback_form", response: @response, style: :quiet %>
     <% end %>
   <% end %>
 
@@ -186,6 +204,10 @@
         const filled = [...textareas].filter(t => t.value.trim().length > 10).length;
         progressFill.style.width = (filled / 3 * 100) + "%";
         progressLabel.textContent = filled === 3 ? "✓ All answered — ready to submit!" : `${filled} of 3 answered`;
+        document.querySelectorAll("details.hint[data-hint-for]").forEach(d => {
+          const t = form.querySelector(`textarea[data-field="${d.dataset.hintFor}"]`);
+          if (t) d.classList.toggle("locked", t.value.trim().length <= 10);
+        });
       }
 
       let saveTimer;

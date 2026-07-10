@@ -13,7 +13,8 @@ class ResponsesController < ApplicationController
 
     @response.assign_attributes(
       answers:      response_params[:answers] || @response.answers,
-      submitted_at: response_params[:submit] == "1" ? Time.current : @response.submitted_at
+      submitted_at: response_params[:submit] == "1" ? Time.current : @response.submitted_at,
+      concept_tags: exercise_concept_tags(exercise)
     )
 
     if @response.save
@@ -58,5 +59,11 @@ class ResponsesController < ApplicationController
 
   def feedback_params
     params.require(:response).permit(:rating, :feedback_text)
+  end
+
+  def exercise_concept_tags(exercise)
+    %w[code_review pattern challenge]
+      .index_with { |section| exercise.problem_set.dig(section, "concept") }
+      .compact
   end
 end
