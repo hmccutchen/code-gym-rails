@@ -13,12 +13,14 @@ class ClaudeService
     {
       "code_review": {
         "question": "string — what to find/fix",
-        "snippet":  "string — Ruby/Rails code, ~10-15 lines"
+        "snippet":  "string — Ruby/Rails code, ~10-15 lines",
+        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer"
       },
       "pattern": {
         "title":    "string — pattern name",
         "why":      "string — one sentence on why the pattern exists",
         "question": "string — conceptual question to answer",
+        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
         "reference": {
           "tagline":      "string — bold one-liner",
           "explanation":  "string — 2-3 sentences",
@@ -29,7 +31,8 @@ class ClaudeService
       "challenge": {
         "title":        "string",
         "question":     "string — what to implement",
-        "starter_code": "string — optional skeleton (empty string if none)"
+        "starter_code": "string — optional skeleton (empty string if none)",
+        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer"
       }
     }
   SCHEMA
@@ -110,6 +113,7 @@ class ClaudeService
       - The code_review snippet must be realistic Rails code — not toy examples.
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
+      - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
 
       Return JSON matching this schema exactly:
       #{EXERCISE_SCHEMA}

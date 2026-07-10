@@ -84,4 +84,31 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(resp.reload.rating).to eq("too_hard")
     expect(resp.feedback_text).to eq("less SQL please")
   end
+
+  describe "teaching hints" do
+    it "renders a locked hint before submission when a teaching_note exists" do
+      ps = base_problem_set
+      ps["code_review"]["teaching_note"] = "Count the queries per iteration"
+      create_exercise(problem_set: ps)
+      get root_path
+      expect(response.body).to include("Need a nudge?")
+      expect(response.body).to include("Count the queries per iteration")
+      expect(response.body).to include('class="hint locked"')
+    end
+
+    it "renders the hint unlocked after submission" do
+      ps = base_problem_set
+      ps["pattern"]["teaching_note"] = "Think about single responsibility"
+      create_response(create_exercise(problem_set: ps))
+      get root_path
+      expect(response.body).to include("Think about single responsibility")
+      expect(response.body).not_to include('class="hint locked"')
+    end
+
+    it "renders no hint markup for exercises without teaching notes" do
+      create_exercise
+      get root_path
+      expect(response.body).not_to include("Need a nudge?")
+    end
+  end
 end
