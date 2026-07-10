@@ -74,7 +74,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include("What about locks?")
     expect(response.body).to include("Read about advisory locks")
     expect(response.body).to include("improved_code_marker")
-    expect(response.body).to include("solid")
+    expect(response.body).to include('class="review-rating">solid</span>')
   end
 
   it "round-trips rating and feedback text through the feedback action" do
