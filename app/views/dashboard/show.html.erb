@@ -4,11 +4,14 @@
   .page-header .date { color: var(--muted); font-size: .9rem; }
 
   .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
-  .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .75rem; }
+  .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .95rem; }
   .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
-  .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1rem; }
+  .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1.25rem; }
 
-  pre.snippet { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; overflow-x: auto; margin-bottom: 1rem; white-space: pre; }
+  /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
+     allows breaks at spaces/newlines, so snippets wrap on phones instead of
+     forcing horizontal scroll. */
+  pre.snippet { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
 
   .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
 
@@ -25,6 +28,8 @@
   .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 1.5rem; }
   .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
   .progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
+  .progress-sticky { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .progress-sticky .progress-bar { margin-bottom: 0; }
 
   .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
 
@@ -72,12 +77,15 @@
 <% else %>
   <% submitted = @response.persisted? && @response.submitted? %>
 
-  <%# Progress bar (only shown before submission) %>
+  <%# Progress bar (only shown before submission; sticky so progress stays
+      visible while scrolling the three sections on small screens) %>
   <% unless submitted %>
-    <div class="progress-bar">
-      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    <div class="progress-sticky">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <div class="progress-label" id="progress-label">0 of 3 answered</div>
     </div>
-    <div class="progress-label" id="progress-label">0 of 3 answered</div>
   <% end %>
 
   <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
