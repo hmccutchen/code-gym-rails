@@ -196,6 +196,13 @@ class ClaudeService
   # Claude occasionally invents tags; keep the vocabulary closed so
   # aggregation over concept history stays clean.
   def normalize_concepts(problem_set)
+    # Valid JSON isn't necessarily an object; raise the rescuable Error class
+    # so GenerateDailyExercisesJob's per-user rescue keeps one bad response
+    # from aborting the whole batch.
+    unless problem_set.is_a?(Hash)
+      raise Error, "Claude returned #{problem_set.class} instead of a JSON object for the problem set"
+    end
+
     problem_set.each_value do |section|
       next unless section.is_a?(Hash) && section.key?("concept")
       section["concept"] = "other" unless CONCEPTS.include?(section["concept"])

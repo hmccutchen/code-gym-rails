@@ -33,6 +33,12 @@ RSpec.describe ClaudeService do
   end
 
   describe "#normalize_concepts" do
+    it "raises ClaudeService::Error for valid JSON that is not an object" do
+      expect {
+        service.send(:normalize_concepts, [ "not", "a", "problem set" ])
+      }.to raise_error(ClaudeService::Error, /Array instead of a JSON object/)
+    end
+
     it "keeps on-list concepts and maps off-list ones to 'other'" do
       set = {
         "code_review" => { "concept" => "n_plus_one" },
