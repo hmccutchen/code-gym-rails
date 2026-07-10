@@ -8,19 +8,33 @@ class ClaudeService
   API_URL = "https://api.anthropic.com/v1/messages"
   MODEL   = "claude-sonnet-4-5"
 
+  # Fixed concept vocabulary. Embedded in the generation prompt; anything
+  # Claude returns outside this list is normalized to "other" so per-user
+  # concept history stays aggregatable.
+  CONCEPTS = %w[
+    n_plus_one transaction_safety memoization service_objects scope_chaining
+    idempotency authorization background_jobs caching validations
+    callbacks_vs_service query_objects policy_objects indexing concurrency
+    error_handling
+  ].freeze
+
+  RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
+
   # JSON schema the morning job expects Claude to return for a problem set
   EXERCISE_SCHEMA = <<~SCHEMA
     {
       "code_review": {
         "question": "string — what to find/fix",
         "snippet":  "string — Ruby/Rails code, ~10-15 lines",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer"
+        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+        "concept": "string — exactly one concept from the provided vocabulary"
       },
       "pattern": {
         "title":    "string — pattern name",
         "why":      "string — one sentence on why the pattern exists",
         "question": "string — conceptual question to answer",
         "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+        "concept": "string — exactly one concept from the provided vocabulary",
         "reference": {
           "tagline":      "string — bold one-liner",
           "explanation":  "string — 2-3 sentences",
@@ -32,7 +46,8 @@ class ClaudeService
         "title":        "string",
         "question":     "string — what to implement",
         "starter_code": "string — optional skeleton (empty string if none)",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer"
+        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+        "concept": "string — exactly one concept from the provided vocabulary"
       }
     }
   SCHEMA
@@ -53,7 +68,7 @@ class ClaudeService
     log_usage(user, response, purpose: "generate_exercise")
 
     # Parse the JSON block out of the response
-    parse_json_response(response.dig("content", 0, "text"))
+    normalize_concepts(parse_json_response(response.dig("content", 0, "text")))
   end
 
   # ── Review a submitted response inline ───────────────────────────────────
@@ -87,9 +102,11 @@ class ClaudeService
       "No history yet — this is their first exercise set."
     else
       history.map { |h|
-        rating_label = { 0 => "too easy", 1 => "right level", 2 => "too hard" }[h[:rating]] || "unrated"
+        rating_label = RATING_LABELS[h[:rating]] || "unrated"
         feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/3 sections answered | #{rating_label}#{feedback}"
+        concepts     = h[:concepts].respond_to?(:values) ? h[:concepts].values.compact.uniq : []
+        concept_text = concepts.any? ? " | concepts: #{concepts.join(', ')}" : ""
+        "#{h[:date]}: #{h[:sections_answered]}/3 sections answered | #{rating_label}#{concept_text}#{feedback}"
       }.join("\n")
     end
 
@@ -114,6 +131,10 @@ class ClaudeService
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
+      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{CONCEPTS.join(", ")}
+      - Mastery loop: for any concept whose most recent rating was "too hard", reintroduce that concept in this set with a different code example and framing — same underlying concept, never a repeat of the same snippet. Keep reintroducing it in every subsequent set until the user rates a set containing it "right level" or "too easy"; that rating is the mastery signal that ends reinforcement for that concept.
+      - Concepts most recently rated "too easy" must not repeat within the same week.
+      - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
       #{EXERCISE_SCHEMA}
@@ -170,6 +191,16 @@ class ClaudeService
     JSON.parse(clean)
   rescue JSON::ParserError => e
     raise Error, "Claude returned invalid JSON: #{e.message}\n\nRaw: #{text}"
+  end
+
+  # Claude occasionally invents tags; keep the vocabulary closed so
+  # aggregation over concept history stays clean.
+  def normalize_concepts(problem_set)
+    problem_set.each_value do |section|
+      next unless section.is_a?(Hash) && section.key?("concept")
+      section["concept"] = "other" unless CONCEPTS.include?(section["concept"])
+    end
+    problem_set
   end
 
   def log_usage(user, response, purpose:)
