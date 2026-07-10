@@ -100,5 +100,21 @@ RSpec.describe User, type: :model do
       perf = user.recent_performance
       expect(perf.first[:concepts]).to eq({ "code_review" => "memoization" })
     end
+
+    it "never yields nil concept_tags (column is NOT NULL with {} default)" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 })
+
+      expect(user.recent_performance.first[:concepts]).to eq({})
+
+      expect {
+        DailyResponse.connection.execute(
+          "UPDATE daily_responses SET concept_tags = NULL"
+        )
+      }.to raise_error(ActiveRecord::StatementInvalid, /null value/i)
+    end
   end
 end

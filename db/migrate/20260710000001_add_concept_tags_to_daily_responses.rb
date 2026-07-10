@@ -4,6 +4,6 @@
 # problem_set regeneration.
 class AddConceptTagsToDailyResponses < ActiveRecord::Migration[8.0]
   def change
-    add_column :daily_responses, :concept_tags, :jsonb, default: {}
+    add_column :daily_responses, :concept_tags, :jsonb, default: {}, null: false
   end
 end

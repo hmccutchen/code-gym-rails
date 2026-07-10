@@ -48,7 +48,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_10_000001) do
     t.jsonb "ai_review"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.jsonb "concept_tags", default: {}
+    t.jsonb "concept_tags", default: {}, null: false
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id"
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
