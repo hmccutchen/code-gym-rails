@@ -15,9 +15,9 @@
 
   <%= form_with url: setup_path, method: :patch do |f| %>
     <div class="form-field">
-      <%= f.label :api_key, "Anthropic API key" %>
-      <%= f.password_field :api_key, placeholder: "sk-ant-api03-...", autocomplete: "off" %>
-      <p class="hint">Get yours at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>. Starts with <code>sk-ant-</code>.</p>
+      <%= f.label :api_key, "API key" %>
+      <%= f.password_field :api_key, placeholder: "sk-ant-... or AIza...", autocomplete: "off" %>
+      <p class="hint">Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>) or a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AIza</code>).</p>
     </div>
     <%= f.submit "Save key →", class: "btn btn-primary" %>
   <% end %>
