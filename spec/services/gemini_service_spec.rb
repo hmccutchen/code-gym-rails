@@ -1,52 +1,55 @@
 require "rails_helper"
 
-RSpec.describe ClaudeService do
-  let(:service) { described_class.new("sk-ant-test") }
+RSpec.describe GeminiService do
+  let(:service) { described_class.new("AIzaTestKey") }
 
   describe "#build_connection" do
-    it "sets Anthropic auth headers" do
+    it "sets the Gemini auth header" do
       conn = service.send(:build_connection)
-      expect(conn.headers["x-api-key"]).to eq("sk-ant-test")
-      expect(conn.headers["anthropic-version"]).to eq("2023-06-01")
+      expect(conn.headers["x-goog-api-key"]).to eq("AIzaTestKey")
     end
   end
 
   describe "#call" do
-    it "posts the Anthropic-shaped request body and normalizes the response" do
+    it "posts the Gemini-shaped request body and extracts text + usage from the model_output step" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
-          "content" => [ { "type" => "text", "text" => "hello" } ],
-          "usage"   => { "input_tokens" => 10, "output_tokens" => 20 }
+          "steps" => [
+            { "type" => "thought" },
+            { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hello" } ] }
+          ],
+          "usage" => { "total_input_tokens" => 8, "total_output_tokens" => 12 }
         }.to_json)
       fake_conn = instance_double(Faraday::Connection)
       service.instance_variable_set(:@conn, fake_conn)
 
       expect(fake_conn).to receive(:post) do |url, body|
-        expect(url).to eq(ClaudeService::API_URL)
+        expect(url).to eq(GeminiService::API_URL)
         parsed = JSON.parse(body)
-        expect(parsed["model"]).to eq(ClaudeService::MODEL)
-        expect(parsed["system"]).to eq("sys")
-        expect(parsed["messages"]).to eq([ { "role" => "user", "content" => "prompt text" } ])
+        expect(parsed["model"]).to eq(GeminiService::MODEL)
+        expect(parsed["system_instruction"]).to eq("sys")
+        expect(parsed["input"]).to eq("prompt text")
+        expect(parsed["store"]).to eq(false)
         fake_response
       end
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
-      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20)
+      expect(result).to eq(text: "hello", input_tokens: 8, output_tokens: 12)
     end
 
     it "raises AiService::Error on a non-success response" do
-      fake_response = instance_double(Faraday::Response, success?: false, status: 500, body: "boom")
+      fake_response = instance_double(Faraday::Response, success?: false, status: 503, body: "overloaded")
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, /Claude API error 500/)
+      }.to raise_error(AiService::Error, /Gemini API error 503/)
     end
 
     it "does not leak the raw response body into the exception message" do
       huge_body = "error detail " * 100
-      fake_response = instance_double(Faraday::Response, success?: false, status: 500, body: huge_body)
+      fake_response = instance_double(Faraday::Response, success?: false, status: 503, body: huge_body)
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
       service.instance_variable_set(:@conn, fake_conn)
 
@@ -56,13 +59,13 @@ RSpec.describe ClaudeService do
     end
 
     it "logs a truncated snippet of the raw response body server-side" do
-      huge_body = "y" * 1000
-      fake_response = instance_double(Faraday::Response, success?: false, status: 500, body: huge_body)
+      huge_body = "z" * 1000
+      fake_response = instance_double(Faraday::Response, success?: false, status: 503, body: huge_body)
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
       service.instance_variable_set(:@conn, fake_conn)
 
       expect(Rails.logger).to receive(:error) do |msg|
-        expect(msg).to include("Claude API error 500 body")
+        expect(msg).to include("Gemini API error 503 body")
         expect(msg).to include("truncated, #{huge_body.bytesize} bytes total")
       end
 

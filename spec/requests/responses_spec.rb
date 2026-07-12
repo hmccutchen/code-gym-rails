@@ -92,4 +92,42 @@ RSpec.describe "Responses", type: :request do
       expect(flash[:notice]).to eq("Review sent to dev@example.com.")
     end
   end
+
+  describe "POST /responses/:id/review" do
+    def create_submitted_response
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" },
+                       "pattern" => { "title" => "t", "question" => "q" },
+                       "challenge" => { "title" => "t", "question" => "q" } },
+        generated_at: Time.current
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+    end
+
+    it "saves the ai_review from the user's configured provider" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+    end
+
+    it "redirects with an alert when the provider raises" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_raise(AiService::Error, "rate limited")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("Couldn't generate the review: rate limited")
+    end
+  end
 end
