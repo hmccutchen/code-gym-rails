@@ -8,11 +8,6 @@
   .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
   .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1.25rem; }
 
-  /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
-     allows breaks at spaces/newlines, so snippets wrap on phones instead of
-     forcing horizontal scroll. */
-  pre.snippet { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
-
   .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
 
   details.ref { margin-bottom: 1rem; }
@@ -37,8 +32,6 @@
   .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
   .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
   .review-section { margin-top: 1.5rem; }
-  .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .75rem; }
-  .review-block h4 { color: var(--accent); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
   .rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
   .rating-btn { flex: 1; padding: .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
   .rating-btn:hover { border-color: var(--accent); }
@@ -47,8 +40,6 @@
   .feedback-quiet .feedback-title { font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
   .feedback-prominent { margin-top: 1.5rem; border-color: var(--accent); }
   .feedback-prominent .feedback-title { font-size: 1rem; font-weight: 600; margin-bottom: .75rem; }
-  .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
-  .review-item { font-size: .9rem; line-height: 1.7; margin-top: .4rem; }
 
   details.hint { margin-bottom: 1rem; }
   details.hint summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
@@ -176,23 +167,7 @@
     <% if @response.reviewed? %>
       <div class="review-section">
         <h3 style="font-size:1rem;margin-bottom:.75rem">Claude's Review</h3>
-        <% @response.ai_review.each do |section, fb| %>
-          <% next unless fb.is_a?(Hash) %>
-          <div class="review-block">
-            <h4><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h4>
-            <% { "correct" => "What you got right",
-                 "missed" => "What you missed",
-                 "better_questions" => "Questions to ask yourself",
-                 "next_step" => "Next step" }.each do |key, label| %>
-              <% if fb[key].present? %>
-                <p class="review-item"><strong><%= label %>:</strong> <%= fb[key] %></p>
-              <% end %>
-            <% end %>
-            <% if fb["improved_code"].present? %>
-              <pre class="snippet" style="margin-top:.75rem"><code><%= fb["improved_code"] %></code></pre>
-            <% end %>
-          </div>
-        <% end %>
+        <%= render "shared/ai_review", response: @response %>
       </div>
       <%= render "responses/feedback_form", response: @response, style: :prominent %>
     <% else %>

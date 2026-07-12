@@ -1,0 +1,14 @@
+<% response.ai_review.each do |section, fb| %>
+  <% next unless fb.is_a?(Hash) %>
+  <div class="review-block">
+    <h4><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h4>
+    <% DailyResponse::AI_REVIEW_FIELDS.each do |key, label| %>
+      <% if fb[key].present? %>
+        <p class="review-item"><strong><%= label %>:</strong> <%= fb[key] %></p>
+      <% end %>
+    <% end %>
+    <% if fb["improved_code"].present? %>
+      <pre class="snippet" style="margin-top:.75rem"><code><%= fb["improved_code"] %></code></pre>
+    <% end %>
+  </div>
+<% end %>
