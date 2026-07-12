@@ -112,4 +112,20 @@ RSpec.describe AiService do
       expect(usage.purpose).to eq("generate_exercise")
     end
   end
+
+  describe ".for" do
+    it "returns a ClaudeService for an anthropic user" do
+      user.update!(api_key: "sk-ant-test", provider: "anthropic")
+      expect(AiService.for(user)).to be_a(ClaudeService)
+    end
+
+    it "returns a GeminiService for a gemini user" do
+      user.update!(api_key: "AIzaTest", provider: "gemini")
+      expect(AiService.for(user)).to be_a(GeminiService)
+    end
+
+    it "raises AiService::Error when the user has no recognized provider" do
+      expect { AiService.for(user) }.to raise_error(AiService::Error, /no recognized AI provider/)
+    end
+  end
 end
