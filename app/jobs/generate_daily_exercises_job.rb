@@ -17,13 +17,15 @@ class GenerateDailyExercisesJob < ApplicationJob
   private
 
   def generate_for(user)
-    problem_set = AiService.for(user).generate_exercise(user)
+    language    = user.language_for_today
+    problem_set = AiService.for(user).generate_exercise(user, language: language)
 
     DailyExercise.create!(
       user:         user,
       date:         Date.current,
       problem_set:  problem_set,
-      generated_at: Time.current
+      generated_at: Time.current,
+      language:     language
     )
 
     Rails.logger.info("Generated exercise for #{user.email} on #{Date.current}")
