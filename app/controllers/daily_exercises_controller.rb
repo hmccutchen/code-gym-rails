@@ -10,9 +10,8 @@ class DailyExercisesController < ApplicationController
       return redirect_to root_path, alert: "You've already generated a new set today."
     end
 
-    exercise.daily_response&.destroy
-
     problem_set = AiService.for(current_user).generate_exercise(current_user)
+    exercise.daily_response&.destroy
     exercise.update!(
       problem_set:    problem_set,
       generated_at:   Time.current,

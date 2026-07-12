@@ -57,5 +57,20 @@ RSpec.describe "DailyExercises", type: :request do
       expect(flash[:alert]).to eq("Couldn't generate a new set: rate limited")
       expect(exercise.reload.regenerated_at).to be_nil
     end
+
+    it "preserves the existing DailyResponse when the AI call fails" do
+      exercise = create_exercise
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                       answers: { "code_review" => "important work" })
+
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "timeout")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post regenerate_path
+
+      expect(DailyResponse.exists?(response.id)).to be(true)
+      expect(response.reload.answers).to eq("code_review" => "important work")
+    end
   end
 end
