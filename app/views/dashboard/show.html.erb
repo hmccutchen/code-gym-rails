@@ -166,7 +166,10 @@
 
     <% if @response.reviewed? %>
       <div class="review-section">
-        <h3 style="font-size:1rem;margin-bottom:.75rem">Claude's Review</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <h3 style="font-size:1rem">Claude's Review</h3>
+          <%= button_to "Email me this review", email_review_response_path(@response), method: :post, class: "btn btn-ghost btn-sm" %>
+        </div>
         <%= render "shared/ai_review", response: @response %>
       </div>
       <%= render "responses/feedback_form", response: @response, style: :prominent %>

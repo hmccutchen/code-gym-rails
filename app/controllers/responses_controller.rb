@@ -1,5 +1,5 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [ :feedback, :review ]
+  before_action :set_response, only: [ :feedback, :review, :email_review ]
 
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
@@ -45,6 +45,14 @@ class ResponsesController < ApplicationController
     redirect_to root_path, notice: "Review ready!"
   rescue ClaudeService::Error => e
     redirect_to root_path, alert: "Claude API error: #{e.message}"
+  end
+
+  # POST /responses/:id/email_review — email the completed review to the user
+  def email_review
+    return redirect_to root_path, alert: "No review to email yet." unless @response.reviewed?
+
+    ReviewMailer.send_review(@response).deliver_later
+    redirect_to root_path, notice: "Review sent to #{current_user.email}."
   end
 
   private

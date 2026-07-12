@@ -22,8 +22,9 @@ Rails.application.routes.draw do
   # Submit/update today's answers
   resources :responses, only: [ :create ] do
     member do
-      patch :feedback   # rating + feedback_text after submission
-      post  :review     # trigger Claude inline review
+      patch :feedback     # rating + feedback_text after submission
+      post  :review       # trigger Claude inline review
+      post  :email_review # email the completed review to the user
     end
   end
 end

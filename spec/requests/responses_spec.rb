@@ -36,4 +36,60 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.last.concept_tags).to eq({})
     end
   end
+
+  describe "POST /responses/:id/email_review" do
+    def create_reviewed_response(owner, reviewed: true)
+      exercise = DailyExercise.create!(
+        user: owner, date: Date.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } },
+        generated_at: Time.current
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20 },
+        submitted_at: Time.current,
+        ai_review: reviewed ? { "code_review" => { "rating" => "solid", "correct" => "Spotted it" } } : nil
+      )
+    end
+
+    it "requires login" do
+      daily_response = create_reviewed_response(user)
+      delete logout_path
+      post email_review_response_path(daily_response)
+      expect(response).to redirect_to(login_path)
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      daily_response = create_reviewed_response(other)
+
+      post email_review_response_path(daily_response)
+
+      # set_response scopes to current_user.daily_responses -> RecordNotFound,
+      # which test env's show_exceptions = :rescuable renders as a 404.
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "redirects with an alert when there is no review yet" do
+      daily_response = create_reviewed_response(user, reviewed: false)
+
+      expect {
+        post email_review_response_path(daily_response)
+      }.not_to have_enqueued_mail(ReviewMailer, :send_review)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("No review to email yet.")
+    end
+
+    it "enqueues the review email and confirms with the user's address" do
+      daily_response = create_reviewed_response(user)
+
+      expect {
+        post email_review_response_path(daily_response)
+      }.to have_enqueued_mail(ReviewMailer, :send_review).with(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq("Review sent to dev@example.com.")
+    end
+  end
 end
