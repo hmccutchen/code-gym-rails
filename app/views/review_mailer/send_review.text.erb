@@ -1,0 +1,25 @@
+Hi <%= @response.user.name %>,
+
+Here's your Code Gym review from <%= @response.date.strftime("%A, %B %-d, %Y") %>.
+
+<% @response.ai_review.each do |section, fb| -%>
+<% next unless fb.is_a?(Hash) -%>
+== <%= section.humanize %> ==
+
+<% if fb["rating"].present? -%>
+Rating: <%= fb["rating"] %>
+
+<% end -%>
+<% DailyResponse::AI_REVIEW_FIELDS.each do |key, label| -%>
+<% next if fb[key].blank? -%>
+<%= label %>: <%= fb[key] %>
+
+<% end -%>
+<% if fb["improved_code"].present? -%>
+Improved code:
+
+<%= fb["improved_code"] %>
+
+<% end -%>
+<% end -%>
+— Code Gym

@@ -1,0 +1,60 @@
+require "rails_helper"
+
+RSpec.describe ReviewMailer, type: :mailer do
+  describe "#send_review" do
+    let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+
+    let(:exercise) do
+      user.daily_exercises.create!(
+        date: Date.new(2026, 7, 10),
+        generated_at: Time.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+    end
+
+    let(:daily_response) do
+      user.daily_responses.create!(
+        daily_exercise: exercise,
+        date: Date.new(2026, 7, 10),
+        answers: { "code_review" => "Found the N+1 in the loop" },
+        submitted_at: Time.current,
+        ai_review: {
+          "code_review" => {
+            "rating"           => "solid",
+            "correct"          => "You spotted the N+1 query",
+            "missed"           => "The missing index on user_id",
+            "better_questions" => "What happens under concurrent writes?",
+            "next_step"        => "Read about partial indexes",
+            "improved_code"    => "User.includes(:posts)"
+          }
+        }
+      )
+    end
+
+    let(:mail) { ReviewMailer.send_review(daily_response) }
+
+    it "addresses the user with a dated subject" do
+      expect(mail.to).to eq([ "dev@example.com" ])
+      expect(mail.subject).to eq("Your Code Gym review — Friday, July 10")
+    end
+
+    it "renders every populated field with its label" do
+      body = mail.body.encoded
+      expect(body).to include("Code review")
+      expect(body).to include("Rating: solid")
+      expect(body).to include("What you got right: You spotted the N+1 query")
+      expect(body).to include("What you missed: The missing index on user_id")
+      expect(body).to include("Questions to ask yourself: What happens under concurrent writes?")
+      expect(body).to include("Next step: Read about partial indexes")
+      expect(body).to include("Improved code:")
+      expect(body).to include("User.includes(:posts)")
+    end
+
+    it "skips blank fields" do
+      daily_response.ai_review["code_review"]["improved_code"] = ""
+      daily_response.ai_review["code_review"]["missed"] = ""
+      expect(mail.body.encoded).not_to include("Improved code:")
+      expect(mail.body.encoded).not_to include("What you missed:")
+    end
+  end
+end

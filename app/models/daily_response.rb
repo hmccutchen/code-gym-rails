@@ -6,11 +6,26 @@ class DailyResponse < ApplicationRecord
 
   validates :date, uniqueness: { scope: :user_id }
 
+  # Ordered field → label map for rendering ai_review sections — shared by the
+  # shared/_ai_review partial and ReviewMailer so the copy lives in one place.
+  # "rating" (badge) and "improved_code" (code block) render separately.
+  AI_REVIEW_FIELDS = {
+    "correct"          => "What you got right",
+    "missed"           => "What you missed",
+    "better_questions" => "Questions to ask yourself",
+    "next_step"        => "Next step"
+  }.freeze
+
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
+  # Answer keys with substantive content — same >10-char heuristic the
+  # dashboard progress bar uses.
+  def answered_sections
+    answers.select { |_, v| v.to_s.strip.length > 10 }.keys
+  end
+
   def completeness
-    filled = answers.count { |_, v| v.to_s.strip.length > 10 }
-    (filled / 3.0 * 100).round
+    (answered_sections.size / 3.0 * 100).round
   end
 end
