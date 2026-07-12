@@ -106,6 +106,18 @@ RSpec.describe AiService do
       expect(prompt).to include("too hard")
       expect(prompt).not_to include("unrated")
     end
+
+    it "uses the JS/React vocabulary and JavaScript/React labeling when language is javascript" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include(AiService::JS_CONCEPTS.join(", "))
+      expect(prompt).to include("JavaScript/React code")
+      expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
+    end
+
+    it "defaults to ruby_rails vocabulary when no language is given" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+    end
   end
 
   describe "#normalize_concepts" do
@@ -125,6 +137,16 @@ RSpec.describe AiService do
       expect(out["code_review"]["concept"]).to eq("n_plus_one")
       expect(out["pattern"]["concept"]).to eq("other")
       expect(out["challenge"]).not_to have_key("concept")
+    end
+
+    it "validates against the JS vocabulary when language is javascript" do
+      set = {
+        "code_review" => { "concept" => "closures" },
+        "pattern" => { "concept" => "n_plus_one" }
+      }
+      out = service.send(:normalize_concepts, set, "javascript")
+      expect(out["code_review"]["concept"]).to eq("closures")
+      expect(out["pattern"]["concept"]).to eq("other")
     end
   end
 
@@ -160,7 +182,7 @@ RSpec.describe AiService do
   end
 
   describe "#generate_exercise" do
-    it "logs usage and normalizes concepts from the provider's response" do
+    it "logs usage and normalizes concepts from the provider's response using the resolved language" do
       set = { "code_review" => { "concept" => "bogus" } }
       svc = double_class.new(canned_text: set.to_json, input_tokens: 5, output_tokens: 7)
 
@@ -171,6 +193,25 @@ RSpec.describe AiService do
       expect(usage.tokens_in).to eq(5)
       expect(usage.tokens_out).to eq(7)
       expect(usage.purpose).to eq("generate_exercise")
+    end
+
+    it "normalizes against the JS vocabulary when an explicit javascript language is passed" do
+      set = { "code_review" => { "concept" => "closures" } }
+      svc = double_class.new(canned_text: set.to_json)
+
+      result = svc.generate_exercise(user, language: "javascript")
+
+      expect(result["code_review"]["concept"]).to eq("closures")
+    end
+
+    it "defaults language to the user's language_for_today when not passed explicitly" do
+      user.update!(language: "javascript")
+      set = { "code_review" => { "concept" => "closures" } }
+      svc = double_class.new(canned_text: set.to_json)
+
+      result = svc.generate_exercise(user)
+
+      expect(result["code_review"]["concept"]).to eq("closures")
     end
   end
 

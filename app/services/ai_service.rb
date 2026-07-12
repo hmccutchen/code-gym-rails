@@ -53,11 +53,11 @@ class AiService
   end
 
   # ── Generate a personalized daily exercise set ────────────────────────────
-  def generate_exercise(user)
-    result = call(system: build_system_prompt, prompt: build_exercise_prompt(user))
+  def generate_exercise(user, language: user.language_for_today)
+    result = call(system: build_system_prompt(language), prompt: build_exercise_prompt(user, language))
 
     log_usage(user, result, purpose: "generate_exercise")
-    normalize_concepts(parse_json_response(result[:text]))
+    normalize_concepts(parse_json_response(result[:text]), language)
   end
 
   # ── Review a submitted response inline ───────────────────────────────────
@@ -141,7 +141,7 @@ class AiService
     SCHEMA
   end
 
-  def build_exercise_prompt(user)
+  def build_exercise_prompt(user, language = "ruby_rails")
     history = user.recent_performance(days: 10)
 
     history_text = if history.empty?
@@ -156,7 +156,9 @@ class AiService
       }.join("\n")
     end
 
-    focus = user.focus_areas.any? ? user.focus_areas.join(", ") : "general Rails patterns"
+    focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general Rails patterns"
+    label       = LANGUAGE_LABELS.fetch(language, LANGUAGE_LABELS["ruby_rails"])
+    concepts    = language == "javascript" ? JS_CONCEPTS : RAILS_CONCEPTS
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -173,17 +175,17 @@ class AiService
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
-      - The code_review snippet must be realistic Rails code — not toy examples.
+      - The code_review snippet must be realistic #{label} code — not toy examples.
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
-      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{RAILS_CONCEPTS.join(", ")}
+      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
       - Mastery loop: for any concept whose most recent rating was "too hard", reintroduce that concept in this set with a different code example and framing — same underlying concept, never a repeat of the same snippet. Keep reintroducing it in every subsequent set until the user rates a set containing it "right level" or "too easy"; that rating is the mastery signal that ends reinforcement for that concept.
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{exercise_schema_for("ruby_rails")}
+      #{exercise_schema_for(language)}
     PROMPT
   end
 
@@ -236,14 +238,16 @@ class AiService
 
   # A provider occasionally invents tags; keep the vocabulary closed so
   # aggregation over concept history stays clean.
-  def normalize_concepts(problem_set)
+  def normalize_concepts(problem_set, language = "ruby_rails")
     unless problem_set.is_a?(Hash)
       raise Error, "Provider returned #{problem_set.class} instead of a JSON object for the problem set"
     end
 
+    concepts = language == "javascript" ? JS_CONCEPTS : RAILS_CONCEPTS
+
     problem_set.each_value do |section|
       next unless section.is_a?(Hash) && section.key?("concept")
-      section["concept"] = "other" unless RAILS_CONCEPTS.include?(section["concept"])
+      section["concept"] = "other" unless concepts.include?(section["concept"])
     end
     problem_set
   end
