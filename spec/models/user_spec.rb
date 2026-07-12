@@ -38,6 +38,23 @@ RSpec.describe User, type: :model do
       expect(user).not_to be_valid
       expect(user.errors[:provider]).to be_present
     end
+
+    it "defaults language to ruby_rails" do
+      user = create_user
+      expect(user.language).to eq("ruby_rails")
+    end
+
+    it "accepts ruby_rails, javascript, or mixed as the language" do
+      expect(User.new(email: "d@example.com", name: "D", language: "ruby_rails")).to be_valid
+      expect(User.new(email: "e@example.com", name: "E", language: "javascript")).to be_valid
+      expect(User.new(email: "f@example.com", name: "F", language: "mixed")).to be_valid
+    end
+
+    it "rejects an unrecognized language" do
+      user = User.new(email: "g@example.com", name: "G", language: "python")
+      expect(user).not_to be_valid
+      expect(user.errors[:language]).to be_present
+    end
   end
 
   describe "api key encryption" do

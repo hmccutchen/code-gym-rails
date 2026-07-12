@@ -7,11 +7,14 @@ class User < ApplicationRecord
   # Requires RAILS_MASTER_KEY / credentials to be set (standard Rails setup).
   encrypts :api_key
 
+  LANGUAGES = %w[ruby_rails javascript mixed].freeze
+
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
   validates :skill_level, inclusion: { in: %w[beginner developing solid strong] }
   validates :provider, inclusion: { in: %w[anthropic gemini] }, allow_nil: true
+  validates :language, inclusion: { in: LANGUAGES }
 
   before_save { email.downcase! }
 
