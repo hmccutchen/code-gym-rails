@@ -37,38 +37,6 @@ class AiService
   # free of large/undesired provider content.
   RAW_SNIPPET_LIMIT = 500
 
-  # JSON schema every provider is asked to return for a problem set
-  EXERCISE_SCHEMA = <<~SCHEMA
-    {
-      "code_review": {
-        "question": "string — what to find/fix",
-        "snippet":  "string — Ruby/Rails code, ~10-15 lines",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-        "concept": "string — exactly one concept from the provided vocabulary"
-      },
-      "pattern": {
-        "title":    "string — pattern name",
-        "why":      "string — one sentence on why the pattern exists",
-        "question": "string — conceptual question to answer",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-        "concept": "string — exactly one concept from the provided vocabulary",
-        "reference": {
-          "tagline":      "string — bold one-liner",
-          "explanation":  "string — 2-3 sentences",
-          "code_example": "string — annotated Ruby, ~15 lines",
-          "senior_lens":  "string — when to reach for it / tradeoffs"
-        }
-      },
-      "challenge": {
-        "title":        "string",
-        "question":     "string — what to implement",
-        "starter_code": "string — optional skeleton (empty string if none)",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-        "concept": "string — exactly one concept from the provided vocabulary"
-      }
-    }
-  SCHEMA
-
   def initialize(api_key)
     @api_key = api_key
     @conn    = build_connection
@@ -116,13 +84,61 @@ class AiService
     raise NotImplementedError, "#{self.class} must implement #build_connection"
   end
 
-  def build_system_prompt
-    <<~PROMPT
-      You are a senior Rails engineering coach generating personalized daily exercise sets.
-      Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
-      Focus on real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects.
-      Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
-    PROMPT
+  def build_system_prompt(language = "ruby_rails")
+    if language == "javascript"
+      <<~PROMPT
+        You are a senior JavaScript/React engineering coach generating personalized daily exercise sets.
+        Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
+        Focus on real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders.
+        Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
+      PROMPT
+    else
+      <<~PROMPT
+        You are a senior Rails engineering coach generating personalized daily exercise sets.
+        Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
+        Focus on real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects.
+        Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
+      PROMPT
+    end
+  end
+
+  # JSON schema every provider is asked to return for a problem set. The
+  # code-bearing fields' label switches with `language` so instructions never
+  # assume Ruby idioms when generating JS — the structure itself never
+  # changes across languages.
+  def exercise_schema_for(language = "ruby_rails")
+    label = LANGUAGE_LABELS.fetch(language, LANGUAGE_LABELS["ruby_rails"])
+
+    <<~SCHEMA
+      {
+        "code_review": {
+          "question": "string — what to find/fix",
+          "snippet":  "string — #{label} code, ~10-15 lines",
+          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary"
+        },
+        "pattern": {
+          "title":    "string — pattern name",
+          "why":      "string — one sentence on why the pattern exists",
+          "question": "string — conceptual question to answer",
+          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "reference": {
+            "tagline":      "string — bold one-liner",
+            "explanation":  "string — 2-3 sentences",
+            "code_example": "string — annotated #{label} code, ~15 lines",
+            "senior_lens":  "string — when to reach for it / tradeoffs"
+          }
+        },
+        "challenge": {
+          "title":        "string",
+          "question":     "string — what to implement",
+          "starter_code": "string — optional skeleton (empty string if none)",
+          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary"
+        }
+      }
+    SCHEMA
   end
 
   def build_exercise_prompt(user)
@@ -167,7 +183,7 @@ class AiService
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{EXERCISE_SCHEMA}
+      #{exercise_schema_for("ruby_rails")}
     PROMPT
   end
 

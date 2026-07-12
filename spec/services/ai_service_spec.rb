@@ -27,10 +27,45 @@ RSpec.describe AiService do
 
   let(:service) { double_class.new }
 
-  describe "EXERCISE_SCHEMA" do
-    it "defines a teaching_note and a concept for each of the three sections" do
-      expect(AiService::EXERCISE_SCHEMA.scan('"teaching_note"').size).to eq(3)
-      expect(AiService::EXERCISE_SCHEMA.scan('"concept"').size).to eq(3)
+  describe "#exercise_schema_for" do
+    it "defines a teaching_note and a concept for each of the three sections, for any language" do
+      %w[ruby_rails javascript].each do |language|
+        schema = service.send(:exercise_schema_for, language)
+        expect(schema.scan('"teaching_note"').size).to eq(3)
+        expect(schema.scan('"concept"').size).to eq(3)
+      end
+    end
+
+    it "labels code fields with Ruby/Rails for ruby_rails" do
+      schema = service.send(:exercise_schema_for, "ruby_rails")
+      expect(schema).to include("Ruby/Rails code")
+    end
+
+    it "labels code fields with JavaScript/React for javascript" do
+      schema = service.send(:exercise_schema_for, "javascript")
+      expect(schema).to include("JavaScript/React code")
+    end
+
+    it "defaults to ruby_rails when no language is given" do
+      expect(service.send(:exercise_schema_for)).to eq(service.send(:exercise_schema_for, "ruby_rails"))
+    end
+  end
+
+  describe "#build_system_prompt" do
+    it "focuses on Rails patterns for ruby_rails" do
+      prompt = service.send(:build_system_prompt, "ruby_rails")
+      expect(prompt).to include("senior Rails engineering coach")
+      expect(prompt).to include("N+1 queries")
+    end
+
+    it "focuses on JavaScript/React patterns for javascript" do
+      prompt = service.send(:build_system_prompt, "javascript")
+      expect(prompt).to include("senior JavaScript/React engineering coach")
+      expect(prompt).to include("hooks")
+    end
+
+    it "defaults to ruby_rails when no language is given" do
+      expect(service.send(:build_system_prompt)).to eq(service.send(:build_system_prompt, "ruby_rails"))
     end
   end
 
