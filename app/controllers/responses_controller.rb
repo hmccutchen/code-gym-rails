@@ -38,13 +38,12 @@ class ResponsesController < ApplicationController
     return redirect_to root_path, alert: "Submit your answers first." unless @response.submitted?
     return redirect_to root_path, notice: "Already reviewed." if @response.reviewed?
 
-    service  = ClaudeService.new(current_user.api_key)
-    ai_review = service.review_response(current_user, @response.daily_exercise, @response)
+    ai_review = AiService.for(current_user).review_response(current_user, @response.daily_exercise, @response)
 
     @response.update!(ai_review: ai_review)
     redirect_to root_path, notice: "Review ready!"
-  rescue ClaudeService::Error => e
-    redirect_to root_path, alert: "Claude API error: #{e.message}"
+  rescue AiService::Error => e
+    redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
   end
 
   # POST /responses/:id/email_review — email the completed review to the user
