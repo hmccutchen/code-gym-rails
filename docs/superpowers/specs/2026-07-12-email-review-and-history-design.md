@@ -1,5 +1,7 @@
 # Email-Me-This-Review Button + Aggregated History Page
 
+> **Revision note (2026-07-12):** this spec was drafted against a stale local `main`. `origin/main` (PR #13, feedback-teaching-tagging) has since fixed the §0 `summary` renderer bug with an inline field map and shipped `concept_tags` for real. §0 therefore becomes a behavior-preserving *extraction* of that inline map (constant + shared partial, `rating`/`improved_code` handled specially, no legacy `"summary"` key), and §2 renders concept tags directly without the `respond_to?` guard. Everything else stands. See the implementation plan's revision note for details.
+
 ## Context
 
 Two read-mostly features on top of existing data:
