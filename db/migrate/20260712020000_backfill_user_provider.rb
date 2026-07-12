@@ -5,17 +5,24 @@
 class BackfillUserProvider < ActiveRecord::Migration[8.0]
   def up
     User.where.not(api_key: nil).find_each do |user|
-      key = user.api_key # decrypts transparently via `encrypts :api_key`
-      provider =
-        case key
-        when /\Ask-ant-/ then "anthropic"
-        when /\AAIza/    then "gemini"
-        end
+      # Skip users who already have a provider set (idempotent)
+      next if user.provider.present?
 
-      if provider
-        user.update_column(:provider, provider)
-      else
-        Rails.logger.warn("BackfillUserProvider: unrecognized key format for user #{user.id}")
+      begin
+        key = user.api_key # decrypts transparently via `encrypts :api_key`
+        provider =
+          case key
+          when /\Ask-ant-/ then "anthropic"
+          when /\AAIza/    then "gemini"
+          end
+
+        if provider
+          user.update_column(:provider, provider)
+        else
+          Rails.logger.warn("BackfillUserProvider: unrecognized key format for user #{user.id}")
+        end
+      rescue ActiveRecord::Encryption::Errors::Decryption => e
+        Rails.logger.error("BackfillUserProvider: decryption failed for user #{user.id}: #{e.message}")
       end
     end
   end
