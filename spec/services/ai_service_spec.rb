@@ -96,6 +96,24 @@ RSpec.describe AiService do
         service.send(:parse_json_response, "not json")
       }.to raise_error(AiService::Error, /invalid JSON/)
     end
+
+    it "does not leak the raw provider text into the exception message" do
+      huge_text = "garbage " * 200
+      expect {
+        service.send(:parse_json_response, huge_text)
+      }.to raise_error(AiService::Error) { |e| expect(e.message).not_to include(huge_text) }
+    end
+
+    it "logs a truncated snippet of the raw provider text server-side" do
+      huge_text = "x" * 1000
+      expect(Rails.logger).to receive(:error) do |msg|
+        expect(msg).to include("Invalid JSON from provider")
+        expect(msg).to include("truncated, #{huge_text.bytesize} bytes total")
+        expect(msg.length).to be < huge_text.length
+      end
+
+      expect { service.send(:parse_json_response, huge_text) }.to raise_error(AiService::Error)
+    end
   end
 
   describe "#generate_exercise" do

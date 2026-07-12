@@ -17,7 +17,10 @@ class GeminiService < AiService
 
     resp = @conn.post(API_URL, body.to_json)
 
-    raise AiService::Error, "Gemini API error #{resp.status}: #{resp.body}" unless resp.success?
+    unless resp.success?
+      log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
+      raise AiService::Error, "Gemini API error #{resp.status}"
+    end
 
     parsed       = JSON.parse(resp.body)
     model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }

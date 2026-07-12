@@ -17,7 +17,10 @@ class ClaudeService < AiService
 
     resp = @conn.post(API_URL, body.to_json)
 
-    raise AiService::Error, "Claude API error #{resp.status}: #{resp.body}" unless resp.success?
+    unless resp.success?
+      log_raw_snippet("Claude API error #{resp.status} body", resp.body)
+      raise AiService::Error, "Claude API error #{resp.status}"
+    end
 
     parsed = JSON.parse(resp.body)
     usage  = parsed["usage"] || {}

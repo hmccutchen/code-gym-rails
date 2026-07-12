@@ -43,5 +43,30 @@ RSpec.describe ClaudeService do
         service.send(:call, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::Error, /Claude API error 500/)
     end
+
+    it "does not leak the raw response body into the exception message" do
+      huge_body = "error detail " * 100
+      fake_response = instance_double(Faraday::Response, success?: false, status: 500, body: huge_body)
+      fake_conn = instance_double(Faraday::Connection, post: fake_response)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt")
+      }.to raise_error(AiService::Error) { |e| expect(e.message).not_to include(huge_body) }
+    end
+
+    it "logs a truncated snippet of the raw response body server-side" do
+      huge_body = "y" * 1000
+      fake_response = instance_double(Faraday::Response, success?: false, status: 500, body: huge_body)
+      fake_conn = instance_double(Faraday::Connection, post: fake_response)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(Rails.logger).to receive(:error) do |msg|
+        expect(msg).to include("Claude API error 500 body")
+        expect(msg).to include("truncated, #{huge_body.bytesize} bytes total")
+      end
+
+      expect { service.send(:call, system: "sys", prompt: "prompt") }.to raise_error(AiService::Error)
+    end
   end
 end

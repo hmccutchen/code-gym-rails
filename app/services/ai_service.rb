@@ -15,6 +15,12 @@ class AiService
 
   RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
 
+  # Max bytes of raw provider output logged server-side when a provider
+  # response can't be used (invalid JSON, non-success HTTP status). Keeps
+  # exception messages — which surface in flash alerts and error trackers —
+  # free of large/undesired provider content.
+  RAW_SNIPPET_LIMIT = 500
+
   # JSON schema every provider is asked to return for a problem set
   EXERCISE_SCHEMA = <<~SCHEMA
     {
@@ -181,7 +187,19 @@ class AiService
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
     JSON.parse(clean)
   rescue JSON::ParserError => e
-    raise Error, "Provider returned invalid JSON: #{e.message}\n\nRaw: #{text}"
+    log_raw_snippet("Invalid JSON from provider", text)
+    raise Error, "Provider returned invalid JSON: #{e.message}"
+  end
+
+  # Logs a truncated snippet of raw provider output server-side instead of
+  # embedding it in an exception message — exception messages surface in
+  # flash alerts and error trackers, where large/undesired content would
+  # leak to users and bloat logs.
+  def log_raw_snippet(label, content)
+    text = content.to_s
+    snippet = text.byteslice(0, RAW_SNIPPET_LIMIT)
+    snippet += "... (truncated, #{text.bytesize} bytes total)" if text.bytesize > RAW_SNIPPET_LIMIT
+    Rails.logger.error("#{label}: #{snippet}")
   end
 
   # A provider occasionally invents tags; keep the vocabulary closed so
