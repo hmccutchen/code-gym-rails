@@ -48,4 +48,3 @@ RSpec.describe BackfillUserProvider do
     expect(user.reload.provider).to eq("anthropic")
   end
 end
-
