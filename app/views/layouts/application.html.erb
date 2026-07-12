@@ -52,6 +52,7 @@
       <% if logged_in? %>
         <div class="nav-links">
           <span><%= current_user.name %></span>
+          <%= link_to "History", history_path %>
           <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost btn-sm" %>
         </div>
       <% end %>

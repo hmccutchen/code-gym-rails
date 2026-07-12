@@ -19,6 +19,9 @@ Rails.application.routes.draw do
   # Core app
   root "dashboard#show"
 
+  # Past sessions, newest first
+  get "history", to: "history#index"
+
   # Submit/update today's answers
   resources :responses, only: [ :create ] do
     member do

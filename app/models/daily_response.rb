@@ -19,8 +19,13 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
+  # Answer keys with substantive content — same >10-char heuristic the
+  # dashboard progress bar uses.
+  def answered_sections
+    answers.select { |_, v| v.to_s.strip.length > 10 }.keys
+  end
+
   def completeness
-    filled = answers.count { |_, v| v.to_s.strip.length > 10 }
-    (filled / 3.0 * 100).round
+    (answered_sections.size / 3.0 * 100).round
   end
 end

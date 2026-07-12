@@ -1,0 +1,54 @@
+<style>
+  .page-header { margin-bottom: 2rem; }
+  .page-header h1 { font-size: 1.5rem; }
+  .page-header .count { color: var(--muted); font-size: .9rem; }
+
+  .history-entry { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .history-entry h2 { font-size: 1.05rem; margin-bottom: .5rem; }
+  .history-meta { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
+  .history-pill { border: 1px solid var(--border); border-radius: 4px; padding: .15rem .5rem; }
+  .history-tag { border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; padding: .15rem .5rem; font-size: .8rem; }
+
+  details.review summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+  details.review summary::before { content: "▶ "; }
+  details.review[open] summary::before { content: "▼ "; }
+  .no-review { font-size: .85rem; color: var(--muted); }
+</style>
+
+<div class="page-header">
+  <h1>History</h1>
+  <div class="count"><%= pluralize(@responses.size, "submitted session") %></div>
+</div>
+
+<% if @responses.empty? %>
+  <div class="history-entry" style="text-align:center;padding:3rem;">
+    <p style="color:var(--muted);">No submitted sessions yet. <%= link_to "Back to today's gym", root_path %></p>
+  </div>
+<% end %>
+
+<% @responses.each_with_index do |daily_response, i| %>
+  <div class="history-entry">
+    <h2><%= daily_response.date.strftime("%A, %B %-d, %Y") %></h2>
+
+    <div class="history-meta">
+      <span class="history-pill">
+        <%= daily_response.answered_sections.size %>/3 sections<% if daily_response.answered_sections.any? %> — <%= daily_response.answered_sections.map(&:humanize).join(", ") %><% end %>
+      </span>
+      <% if daily_response.rating.present? %>
+        <span class="history-pill">Rated: <%= daily_response.rating.humanize %></span>
+      <% end %>
+      <% daily_response.concept_tags.values.compact.uniq.each do |tag| %>
+        <span class="history-tag"><%= tag.humanize %></span>
+      <% end %>
+    </div>
+
+    <% if daily_response.reviewed? %>
+      <details class="review" <%= "open" if i.zero? %>>
+        <summary>Claude's review</summary>
+        <%= render "shared/ai_review", response: daily_response %>
+      </details>
+    <% else %>
+      <p class="no-review">No AI review requested.</p>
+    <% end %>
+  </div>
+<% end %>
