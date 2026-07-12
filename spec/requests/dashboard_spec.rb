@@ -111,4 +111,27 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("Need a nudge?")
     end
   end
+
+  describe "regenerate button" do
+    it "shows a light confirm when there are no answers yet" do
+      create_exercise
+      get root_path
+      expect(response.body).to include("Generate new set")
+      expect(response.body).to include("Generate a new set for today?")
+    end
+
+    it "shows a strong warning once the user has draft or submitted answers" do
+      create_response(create_exercise)
+      get root_path
+      expect(response.body).to include("erase your answers so far")
+    end
+
+    it "shows the already-regenerated message once capped, and hides the button" do
+      exercise = create_exercise
+      exercise.update!(regenerated_at: Time.current)
+      get root_path
+      expect(response.body).to include("You've already generated a new set today.")
+      expect(response.body).not_to include("Generate new set")
+    end
+  end
 end

@@ -22,6 +22,9 @@ Rails.application.routes.draw do
   # Past sessions, newest first
   get "history", to: "history#index"
 
+  # Manually re-run today's exercise generation (capped at once/day in the controller)
+  post "regenerate", to: "daily_exercises#regenerate"
+
   # Submit/update today's answers
   resources :responses, only: [ :create ] do
     member do

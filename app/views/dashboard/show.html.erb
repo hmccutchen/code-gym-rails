@@ -68,6 +68,19 @@
 <% else %>
   <% submitted = @response.persisted? && @response.submitted? %>
 
+  <div class="regenerate-row" style="margin-bottom:1.5rem;">
+    <% if @exercise.regenerated_at.present? %>
+      <p class="hint">You've already generated a new set today.</p>
+    <% else %>
+      <% has_progress = @response.persisted? && (@response.submitted? || @response.answers.values.any?(&:present?)) %>
+      <% confirm_msg = has_progress ?
+           "This will replace today's problems and erase your answers so far. This can't be undone. Continue?" :
+           "Generate a new set for today?" %>
+      <%= button_to "Generate new set", regenerate_path, method: :post,
+            class: "btn btn-ghost btn-sm", data: { turbo_confirm: confirm_msg } %>
+    <% end %>
+  </div>
+
   <%# Progress bar (only shown before submission; sticky so progress stays
       visible while scrolling the three sections on small screens) %>
   <% unless submitted %>
