@@ -4,7 +4,6 @@ class HistoryController < ApplicationController
   def index
     @responses = current_user.daily_responses
                              .where.not(submitted_at: nil)
-                             .includes(:daily_exercise)
                              .order(date: :desc)
   end
 end
