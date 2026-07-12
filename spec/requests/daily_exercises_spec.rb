@@ -60,8 +60,8 @@ RSpec.describe "DailyExercises", type: :request do
 
     it "preserves the existing DailyResponse when the AI call fails" do
       exercise = create_exercise
-      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                                       answers: { "code_review" => "important work" })
+      daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                              answers: { "code_review" => "important work" })
 
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "timeout")
@@ -69,8 +69,8 @@ RSpec.describe "DailyExercises", type: :request do
 
       post regenerate_path
 
-      expect(DailyResponse.exists?(response.id)).to be(true)
-      expect(response.reload.answers).to eq("code_review" => "important work")
+      expect(DailyResponse.exists?(daily_response.id)).to be(true)
+      expect(daily_response.reload.answers).to eq("code_review" => "important work")
     end
   end
 end
