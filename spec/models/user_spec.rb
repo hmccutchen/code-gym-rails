@@ -22,6 +22,22 @@ RSpec.describe User, type: :model do
       user = User.create!(email: "MiXeD@Example.COM", name: "Dev")
       expect(user.reload.email).to eq("mixed@example.com")
     end
+
+    it "allows a nil provider" do
+      user = User.new(email: "dev@example.com", name: "Dev", provider: nil)
+      expect(user).to be_valid
+    end
+
+    it "accepts anthropic or gemini as the provider" do
+      expect(User.new(email: "a@example.com", name: "A", provider: "anthropic")).to be_valid
+      expect(User.new(email: "b@example.com", name: "B", provider: "gemini")).to be_valid
+    end
+
+    it "rejects an unrecognized provider" do
+      user = User.new(email: "c@example.com", name: "C", provider: "openai")
+      expect(user).not_to be_valid
+      expect(user.errors[:provider]).to be_present
+    end
   end
 
   describe "api key encryption" do
