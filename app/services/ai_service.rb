@@ -3,15 +3,31 @@ require "json"
 class AiService
   class Error < StandardError; end
 
-  # Fixed concept vocabulary. Embedded in the generation prompt; anything a
-  # provider returns outside this list is normalized to "other" so per-user
-  # concept history stays aggregatable.
-  CONCEPTS = %w[
+  # Fixed concept vocabularies, one per generation language. Embedded in the
+  # generation prompt; anything a provider returns outside the active list is
+  # normalized to "other" so per-user concept history stays aggregatable.
+  # Kept closed rather than AI-extensible so history stays clean — see
+  # docs/superpowers/specs/2026-07-12-language-preference-design.md.
+  RAILS_CONCEPTS = %w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling
   ].freeze
+
+  JS_CONCEPTS = %w[
+    callback_hell promise_chaining closures prototype_chain event_loop_blocking
+    this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
+    memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
+    controlled_vs_uncontrolled
+  ].freeze
+
+  # Human-readable labels used in prompts to name the day's language without
+  # assuming Ruby idioms when generating JS.
+  LANGUAGE_LABELS = {
+    "ruby_rails" => "Ruby/Rails",
+    "javascript" => "JavaScript/React"
+  }.freeze
 
   RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
 
@@ -145,7 +161,7 @@ class AiService
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
-      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{CONCEPTS.join(", ")}
+      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{RAILS_CONCEPTS.join(", ")}
       - Mastery loop: for any concept whose most recent rating was "too hard", reintroduce that concept in this set with a different code example and framing — same underlying concept, never a repeat of the same snippet. Keep reintroducing it in every subsequent set until the user rates a set containing it "right level" or "too easy"; that rating is the mastery signal that ends reinforcement for that concept.
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
@@ -211,7 +227,7 @@ class AiService
 
     problem_set.each_value do |section|
       next unless section.is_a?(Hash) && section.key?("concept")
-      section["concept"] = "other" unless CONCEPTS.include?(section["concept"])
+      section["concept"] = "other" unless RAILS_CONCEPTS.include?(section["concept"])
     end
     problem_set
   end

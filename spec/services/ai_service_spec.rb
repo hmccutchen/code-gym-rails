@@ -34,11 +34,19 @@ RSpec.describe AiService do
     end
   end
 
-  describe "CONCEPTS" do
+  describe "RAILS_CONCEPTS" do
     it "is a frozen 16-entry vocabulary" do
-      expect(AiService::CONCEPTS.size).to eq(16)
-      expect(AiService::CONCEPTS).to be_frozen
-      expect(AiService::CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+      expect(AiService::RAILS_CONCEPTS.size).to eq(16)
+      expect(AiService::RAILS_CONCEPTS).to be_frozen
+      expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+    end
+  end
+
+  describe "JS_CONCEPTS" do
+    it "is a frozen 14-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(14)
+      expect(AiService::JS_CONCEPTS).to be_frozen
+      expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
   end
 
@@ -57,7 +65,7 @@ RSpec.describe AiService do
                             concept_tags: { "code_review" => "n_plus_one" })
 
       prompt = service.send(:build_exercise_prompt, user)
-      expect(prompt).to include(AiService::CONCEPTS.join(", "))
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
       expect(prompt).to include("mastery signal")
       expect(prompt).to include("concepts: n_plus_one")
       expect(prompt).to include("too hard")
