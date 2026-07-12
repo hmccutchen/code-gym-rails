@@ -11,12 +11,15 @@ class DailyExercisesController < ApplicationController
     end
 
     problem_set = AiService.for(current_user).generate_exercise(current_user)
-    exercise.daily_response&.destroy
-    exercise.update!(
-      problem_set:    problem_set,
-      generated_at:   Time.current,
-      regenerated_at: Time.current
-    )
+
+    ActiveRecord::Base.transaction do
+      exercise.daily_response&.destroy
+      exercise.update!(
+        problem_set:    problem_set,
+        generated_at:   Time.current,
+        regenerated_at: Time.current
+      )
+    end
 
     redirect_to root_path, notice: "New set generated!"
   rescue AiService::Error => e

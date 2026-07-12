@@ -72,5 +72,23 @@ RSpec.describe "DailyExercises", type: :request do
       expect(DailyResponse.exists?(daily_response.id)).to be(true)
       expect(daily_response.reload.answers).to eq("code_review" => "important work")
     end
+
+    it "does not destroy the existing DailyResponse when exercise.update! fails" do
+      exercise = create_exercise
+      daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                              answers: { "code_review" => "important work" })
+
+      # A nil problem_set fails DailyExercise's presence validation, forcing
+      # exercise.update! to raise ActiveRecord::RecordInvalid inside the transaction.
+      fake_service = instance_double(ClaudeService, generate_exercise: nil)
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post regenerate_path
+
+      expect(DailyResponse.exists?(daily_response.id)).to be(true)
+      expect(daily_response.reload.answers).to eq("code_review" => "important work")
+      expect(exercise.reload.regenerated_at).to be_nil
+      expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
+    end
   end
 end
