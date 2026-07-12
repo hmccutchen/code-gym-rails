@@ -150,4 +150,47 @@ RSpec.describe User, type: :model do
       }.to raise_error(ActiveRecord::StatementInvalid, /null value/i)
     end
   end
+
+  describe "#language_for_today" do
+    it "returns ruby_rails unchanged when the preference is ruby_rails" do
+      user = create_user
+      expect(user.language_for_today).to eq("ruby_rails")
+    end
+
+    it "returns javascript unchanged when the preference is javascript" do
+      user = User.create!(email: "js@example.com", name: "JS", language: "javascript")
+      expect(user.language_for_today).to eq("javascript")
+    end
+
+    it "defaults mixed to ruby_rails when there is no prior exercise" do
+      user = User.create!(email: "mixed@example.com", name: "Mixed", language: "mixed")
+      expect(user.language_for_today).to eq("ruby_rails")
+    end
+
+    it "flips from ruby_rails to javascript for mixed users based on the most recent prior exercise" do
+      user = User.create!(email: "mixed2@example.com", name: "Mixed2", language: "mixed")
+      DailyExercise.create!(user: user, date: Date.yesterday, problem_set: { "code_review" => {} },
+                            generated_at: Time.current, language: "ruby_rails")
+
+      expect(user.language_for_today).to eq("javascript")
+    end
+
+    it "flips from javascript to ruby_rails for mixed users based on the most recent prior exercise" do
+      user = User.create!(email: "mixed3@example.com", name: "Mixed3", language: "mixed")
+      DailyExercise.create!(user: user, date: Date.yesterday, problem_set: { "code_review" => {} },
+                            generated_at: Time.current, language: "javascript")
+
+      expect(user.language_for_today).to eq("ruby_rails")
+    end
+
+    it "ignores today's own exercise row when resolving alternation (regenerate-safe)" do
+      user = User.create!(email: "mixed4@example.com", name: "Mixed4", language: "mixed")
+      DailyExercise.create!(user: user, date: 2.days.ago.to_date, problem_set: { "code_review" => {} },
+                            generated_at: Time.current, language: "ruby_rails")
+      DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
+                            generated_at: Time.current, language: "javascript")
+
+      expect(user.language_for_today).to eq("javascript")
+    end
+  end
 end

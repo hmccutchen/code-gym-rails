@@ -4,6 +4,7 @@ class DailyExercise < ApplicationRecord
 
   validates :date, :problem_set, :generated_at, presence: true
   validates :date, uniqueness: { scope: :user_id }
+  validates :language, inclusion: { in: User::LANGUAGES }
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
 

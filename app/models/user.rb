@@ -75,4 +75,19 @@ class User < ApplicationRecord
         }
       end
   end
+
+  # ── Language preference ────────────────────────────────────────────────────
+  # Resolves the day's actual generation language. Pinned preferences return
+  # themselves. "mixed" alternates by flipping the most recent PRIOR
+  # exercise's language (excluding today's own row, so calling this multiple
+  # times for the same day — e.g. on regenerate — stays consistent as long as
+  # callers pass the result through rather than recomputing mid-day).
+  def language_for_today
+    return language unless language == "mixed"
+
+    last = daily_exercises.where.not(date: Date.current).order(date: :desc).first
+    return "ruby_rails" unless last
+
+    last.language == "ruby_rails" ? "javascript" : "ruby_rails"
+  end
 end
