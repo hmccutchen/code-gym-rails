@@ -36,6 +36,20 @@ RSpec.describe "DailyExercises", type: :request do
       expect(flash[:notice]).to eq("New set generated!")
     end
 
+    it "regenerates using the exercise's own stored language, not the user's current mixed alternation" do
+      user.update!(language: "mixed")
+      exercise = create_exercise
+      exercise.update!(language: "javascript")
+
+      fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => { "question" => "new" } })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post regenerate_path
+
+      expect(fake_service).to have_received(:generate_exercise).with(user, language: "javascript")
+      expect(exercise.reload.language).to eq("javascript")
+    end
+
     it "blocks a second regeneration the same day" do
       create_exercise(regenerated_at: Time.current)
 
