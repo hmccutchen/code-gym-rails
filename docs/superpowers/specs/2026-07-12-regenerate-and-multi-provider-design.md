@@ -219,18 +219,56 @@ provider-agnostic:
   end
   ```
 
+**`#call` interface (resolved):** rather than have the base class dig into a
+provider-shaped raw response, `#call(system:, prompt:)` returns a normalized
+`Hash` with symbol keys `{ text:, input_tokens:, output_tokens: }`. Each
+subclass is fully responsible for producing this shape from its own API's
+response envelope; `AiService#log_usage` and `#generate_exercise`/
+`#review_response` only ever read the normalized keys. This removes any
+ambiguity about which class reads which raw field.
+
 `app/services/claude_service.rb` — shrinks to just the Anthropic-specific
 parts: `MODEL`, `API_URL`, `build_connection` (Faraday + `x-api-key` /
-`anthropic-version` headers), and `#call` (posts
-`{model, max_tokens, system, messages}`, returns the raw parsed response for
-the base class's `resp.dig("content", 0, "text")` / `resp["usage"]` reads —
-**exact split of "what `#call` returns" vs. "what the base class reads" is an
-implementation detail**, as long as the Anthropic-shaped envelope is fully
-contained in `ClaudeService`).
+`anthropic-version` headers), and `#call`, which posts
+`{model, max_tokens, system, messages: [{role: "user", content: prompt}]}` to
+`POST https://api.anthropic.com/v1/messages` and maps the response to
+`{ text: parsed.dig("content", 0, "text"), input_tokens: parsed["usage"]["input_tokens"], output_tokens: parsed["usage"]["output_tokens"] }`
+(unchanged from today's `ClaudeService`, just reshaped into the normalized
+return value).
 
-`app/services/gemini_service.rb` — new class, same shape: `MODEL =
-"gemini-3.5-flash"`, its own `API_URL`, `build_connection`, and `#call`
-adapted to Gemini's request/response shape.
+`app/services/gemini_service.rb` — new class: `MODEL = "gemini-3.5-flash"`,
+`API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"`
+(Gemini's current Interactions API — verified against
+`ai.google.dev/gemini-api/docs/get-started` and
+`ai.google.dev/gemini-api/docs/interactions-overview`, which lists
+`gemini-3.5-flash` as a supported model ID). `#call` posts
+`{model: MODEL, system_instruction: system, input: prompt, store: false}`
+with header `x-goog-api-key: <key>` (no separate API-version header, unlike
+Anthropic), and maps the response by finding the `steps` entry where
+`type == "model_output"`, joining that step's `content` entries where
+`type == "text"`, and reading `usage.total_input_tokens` /
+`usage.total_output_tokens`:
+
+```ruby
+parsed["steps"].to_a.find { |s| s["type"] == "model_output" }
+```
+
+`store: false` opts out of Gemini's server-side conversation retention
+(irrelevant here — each call is a single-turn, stateless request; nothing
+ever uses `previous_interaction_id`). Gemini's native structured-output
+support (`response_format` with a JSON Schema) is **intentionally not used**
+— `EXERCISE_SCHEMA` is a human-readable description embedded in the prompt
+text, not a real JSON Schema object, so wiring it into `response_format`
+would require maintaining two schema representations. Both providers instead
+rely on the same prompt-embedded schema text plus `parse_json_response`'s
+markdown-fence-stripping fallback, which already tolerates minor formatting
+differences between providers.
+
+Retry status codes (verified against
+`ai.google.dev/gemini-api/docs/troubleshooting`): Anthropic keeps its
+existing retry on `529` (overloaded); Gemini's `build_connection` retries on
+`429` (rate limit) and `503` (temporarily overloaded) — both documented as
+retry-worthy transient errors.
 
 Call sites switch from `ClaudeService.new(user.api_key)` to
 `AiService.for(user)`, and from `rescue ClaudeService::Error` to `rescue
@@ -238,36 +276,9 @@ AiService::Error`:
 
 - `GenerateDailyExercisesJob#generate_for`
 - `ResponsesController#review`
-- `DailyExercisesController#regenerate` (new, from part 1 above)
-
-### Open question — Gemini request/response mapping
-
-This spec fixes the **class boundary** (`GeminiService` owns 100% of
-Gemini's request/response shape; nothing Gemini-specific leaks into
-`AiService`) but deliberately does **not** lock the exact mapping, since
-Anthropic's and Gemini's APIs differ in ways that need to be checked against
-current provider docs at implementation time, not guessed here:
-
-- **System prompt convention** — Anthropic takes a top-level `system` string;
-  Gemini uses a separate `systemInstruction` object in the request body.
-- **JSON-mode/schema enforcement** — Anthropic relies on prompt instructions
-  only (`EXERCISE_SCHEMA` is embedded as text and Claude is asked to "return
-  ONLY valid JSON"). Gemini has native structured-output support
-  (`generationConfig.responseMimeType: "application/json"` and optionally
-  `responseSchema`) that may be worth using instead of prompt-only
-  enforcement — but that's an implementation choice, not assumed here.
-  `parse_json_response`'s fence-stripping fallback in the base class still
-  applies either way, so behavior is safe even if Gemini occasionally wraps
-  output in markdown fences.
-- **Response envelope** — Anthropic: `content[0].text` /
-  `usage.input_tokens` / `usage.output_tokens`. Gemini:
-  `candidates[0].content.parts[0].text` and a differently-shaped
-  `usageMetadata` (e.g. `promptTokenCount` / `candidatesTokenCount`) — exact
-  field names to be confirmed against Gemini's current API reference during
-  implementation.
-- **Retry-worthy status codes** — `ClaudeService` retries on Anthropic's
-  `529` (overloaded). Gemini's equivalent (if any) should be looked up
-  separately rather than assumed to be the same code.
+- `DailyExercisesController#regenerate` (new, from part 1 above — note this
+  means the regenerate button now **depends on** `AiService.for` existing;
+  see corrected build order below)
 
 ### Compatibility
 
@@ -301,8 +312,11 @@ current provider docs at implementation time, not guessed here:
   - `ClaudeService` — only its `#call` request shape (Faraday double,
     correct headers/body) and response parsing (`content[0].text`,
     `usage`).
-  - `GeminiService` — same shape of spec, once the request/response mapping
-    is implemented; not written until that open question is resolved.
+  - `GeminiService` — same shape of spec: its `#call` posts the
+    `system_instruction`/`input`/`store` body to the Interactions API
+    endpoint and correctly extracts text from the `model_output` step and
+    token counts from `usage.total_input_tokens`/`total_output_tokens`
+    (mocked Faraday, no real network calls).
   - `AiService.for` — dispatches to `ClaudeService`/`GeminiService` based on
     `user.provider`; raises `AiService::Error` for nil/unrecognized.
 - **Migration/data spec or one-off script check** — backfill migration sets
@@ -313,11 +327,13 @@ current provider docs at implementation time, not guessed here:
 1. `AiService` base class extraction (pure refactor of existing
    `ClaudeService` — no behavior change, existing specs must still pass).
 2. `provider` column + `ApiKeysController` detection + backfill migration.
-3. `GeminiService` (blocked on resolving the open question above).
+3. `GeminiService` (request/response mapping now resolved above).
 4. `AiService.for` factory + call-site swaps
    (job/`ResponsesController#review`).
 5. Regenerate button (`regenerated_at` column, `DailyExercisesController`,
-   dashboard UI) — independent of steps 1–4, can ship first or in parallel.
+   dashboard UI). **Depends on step 4** — the regenerate action calls
+   `AiService.for(current_user)`, not `ClaudeService.new` directly, so it
+   must be built after the factory exists, not in parallel with steps 1–4.
 
 ## Out of scope
 
@@ -326,5 +342,6 @@ current provider docs at implementation time, not guessed here:
 - A provider dropdown or any UI acknowledging which provider a user is on
   (beyond the inline rejection error) — auto-detection stays invisible.
 - Per-provider `ApiUsage` breakdown/reporting.
-- Rate-limit/retry-code parity between providers — flagged above, not solved
-  here.
+- Gemini's native structured-output/JSON-schema enforcement and
+  `previous_interaction_id` multi-turn state — deliberately not used (see
+  service architecture section above).
