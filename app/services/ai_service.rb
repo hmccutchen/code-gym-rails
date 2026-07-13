@@ -156,8 +156,8 @@ class AiService
       }.join("\n")
     end
 
-    focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general Rails patterns"
     label       = LANGUAGE_LABELS.fetch(language, LANGUAGE_LABELS["ruby_rails"])
+    focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
     concepts    = language == "javascript" ? JS_CONCEPTS : RAILS_CONCEPTS
 
     <<~PROMPT
