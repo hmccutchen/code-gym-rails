@@ -1,9 +1,12 @@
 class ApiKeysController < ApplicationController
   skip_before_action :require_api_key
 
+  # Gemini keys: Google is transitioning from the legacy "AIza..." format to
+  # a new "AQ...." format (rolling out through 2026, with AIza rejected
+  # entirely in September 2026) -- accept both during the overlap.
   PROVIDER_PATTERNS = {
     "anthropic" => /\Ask-ant-/,
-    "gemini"    => /\AAIza/
+    "gemini"    => /\A(AIza|AQ\.)/
   }.freeze
 
   # GET /setup
