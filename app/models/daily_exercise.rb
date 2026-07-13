@@ -2,9 +2,16 @@ class DailyExercise < ApplicationRecord
   belongs_to :user
   has_one    :daily_response, dependent: :destroy
 
+  # Concrete, generatable languages only -- excludes "mixed", which is a
+  # per-user meta-preference (see User::LANGUAGES) that User#language_for_today
+  # always resolves down to one of these before a DailyExercise is created or
+  # regenerated. Persisting "mixed" here would let an invalid value flow back
+  # into AiService#generate_exercise via DailyExercisesController#regenerate.
+  LANGUAGES = %w[ruby_rails javascript].freeze
+
   validates :date, :problem_set, :generated_at, presence: true
   validates :date, uniqueness: { scope: :user_id }
-  validates :language, inclusion: { in: User::LANGUAGES }
+  validates :language, inclusion: { in: LANGUAGES }
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
 
