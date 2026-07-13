@@ -695,7 +695,7 @@ Replace the full method (from `def build_exercise_prompt(user)` through its matc
 
 ```ruby
   def build_exercise_prompt(user, language = "ruby_rails")
-    history = user.recent_performance(days: 10)
+    history = user.recent_performance
 
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
