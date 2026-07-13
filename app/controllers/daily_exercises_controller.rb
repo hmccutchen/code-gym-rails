@@ -1,4 +1,15 @@
 class DailyExercisesController < ApplicationController
+  # POST /generate — manually trigger on-demand generation for today, for the
+  # case where DashboardController#show's automatic weekday trigger didn't
+  # fire (weekends). No-ops (just redirects) if today's exercise already
+  # exists, so a duplicate click can't enqueue a second generation.
+  def generate
+    return redirect_to root_path if current_user.daily_exercises.for_date.exists?
+
+    GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
+    redirect_to root_path, flash: { generating: true }
+  end
+
   # POST /regenerate — manually re-run today's exercise generation, capped
   # at once per day via regenerated_at. Replaces the existing DailyExercise
   # row's contents in place; never creates a second row for the same day.

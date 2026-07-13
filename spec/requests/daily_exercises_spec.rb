@@ -105,4 +105,27 @@ RSpec.describe "DailyExercises", type: :request do
       expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
     end
   end
+
+  describe "POST /generate" do
+    include ActiveJob::TestHelper
+
+    it "enqueues generation and redirects with the generating flash when there's no exercise yet" do
+      expect {
+        post generate_path
+      }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:generating]).to be true
+    end
+
+    it "no-ops if today's exercise already exists" do
+      create_exercise
+
+      expect {
+        post generate_path
+      }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+      expect(response).to redirect_to(root_path)
+    end
+  end
 end

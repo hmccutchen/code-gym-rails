@@ -28,6 +28,10 @@ Rails.application.routes.draw do
   # Manually re-run today's exercise generation (capped at once/day in the controller)
   post "regenerate", to: "daily_exercises#regenerate"
 
+  # Manually trigger on-demand generation when the automatic weekday trigger
+  # in DashboardController#show intentionally didn't fire (weekends).
+  post "generate", to: "daily_exercises#generate"
+
   # Submit/update today's answers
   resources :responses, only: [ :create ] do
     member do

@@ -1,6 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard feedback and review display", type: :request do
+  include ActiveJob::TestHelper
   let(:user) { create_user_with_key }
 
   def base_problem_set
@@ -144,6 +145,39 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
       expect(response.body).to include("You've already generated a new set today.")
       expect(response.body).not_to include("Generate new set")
+    end
+  end
+
+  describe "on-demand generation and the weekday guard" do
+    around do |example|
+      # A known Monday and a known Saturday, so weekday?/weekend? are unambiguous
+      # regardless of when the suite runs.
+      travel_to(anchor_date) { example.run }
+    end
+
+    context "on a weekday" do
+      let(:anchor_date) { Date.new(2026, 7, 13) } # Monday
+
+      it "auto-enqueues generation and shows the generating state" do
+        expect {
+          get root_path
+        }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
+
+        expect(response.body).to include("Generating your personalized exercise set")
+      end
+    end
+
+    context "on a weekend" do
+      let(:anchor_date) { Date.new(2026, 7, 18) } # Saturday
+
+      it "does not auto-enqueue generation and shows the weekend message instead" do
+        expect {
+          get root_path
+        }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+        expect(response.body).to include("No exercises are generated automatically on weekends")
+        expect(response.body).to include("Generate today&#39;s set anyway")
+      end
     end
   end
 end
