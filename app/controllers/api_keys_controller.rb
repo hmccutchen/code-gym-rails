@@ -20,7 +20,10 @@ class ApiKeysController < ApplicationController
       return
     end
 
-    current_user.update!(api_key: key, provider: provider)
+    attrs = { api_key: key, provider: provider }
+    attrs[:language] = params[:language] if User::LANGUAGES.include?(params[:language])
+
+    current_user.update!(attrs)
     redirect_to root_path, notice: "API key saved. You're all set!"
   end
 end

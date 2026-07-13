@@ -29,6 +29,35 @@ RSpec.describe "ApiKeys", type: :request do
       expect(user.provider).to eq("gemini")
     end
 
+    it "saves a valid language preference alongside the API key" do
+      login(user)
+
+      patch setup_path, params: { api_key: "sk-ant-api03-abc123", language: "javascript" }
+
+      expect(response).to redirect_to(root_path)
+      expect(user.reload.language).to eq("javascript")
+    end
+
+    it "ignores an invalid language value without blocking the API key save" do
+      login(user)
+
+      patch setup_path, params: { api_key: "sk-ant-api03-abc123", language: "python" }
+
+      expect(response).to redirect_to(root_path)
+      expect(user.reload.language).to eq("ruby_rails")
+      expect(user.api_key).to eq("sk-ant-api03-abc123")
+    end
+
+    it "defaults to the user's current language when no language param is given" do
+      login(user)
+      user.update!(language: "mixed")
+
+      patch setup_path, params: { api_key: "sk-ant-api03-abc123" }
+
+      expect(response).to redirect_to(root_path)
+      expect(user.reload.language).to eq("mixed")
+    end
+
     it "rejects a key that doesn't look like either provider's key" do
       login(user)
 
