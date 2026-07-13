@@ -3,6 +3,9 @@ Rails.application.routes.draw do
   # app has booted; served by Rails' built-in health controller, no auth required.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Turbo Stream broadcasts (exercise-generation live updates) ride over this.
+  mount ActionCable.server => "/cable"
+
   # Auth (magic link)
   get  "login",        to: "sessions#new"
   post "login",        to: "sessions#create"
