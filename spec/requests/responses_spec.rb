@@ -37,6 +37,22 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  describe "POST /responses re-submission of a persisted draft" do
+    it "updates the same record and submits it, without needing a PATCH route" do
+      create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
+
+      post responses_path, params: { response: { answers: { code_review: "a" * 20 } } }
+      expect(DailyResponse.count).to eq(1)
+
+      post responses_path, params: { response: { answers: { code_review: "b" * 20 }, submit: "1" } }
+
+      expect(response).to have_http_status(:ok)
+      expect(DailyResponse.count).to eq(1)
+      expect(DailyResponse.last.answers["code_review"]).to eq("b" * 20)
+      expect(DailyResponse.last.submitted_at).to be_present
+    end
+  end
+
   describe "POST /responses/:id/email_review" do
     def create_reviewed_response(owner, reviewed: true)
       exercise = DailyExercise.create!(

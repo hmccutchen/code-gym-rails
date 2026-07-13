@@ -67,6 +67,11 @@ RSpec.describe AiService do
     it "defaults to ruby_rails when no language is given" do
       expect(service.send(:build_system_prompt)).to eq(service.send(:build_system_prompt, "ruby_rails"))
     end
+
+    it "raises instead of silently falling back on an unsupported language" do
+      expect { service.send(:build_system_prompt, "mixed") }
+        .to raise_error(AiService::Error, /Unsupported generation language/)
+    end
   end
 
   describe "RAILS_CONCEPTS" do
@@ -212,6 +217,51 @@ RSpec.describe AiService do
       result = svc.generate_exercise(user)
 
       expect(result["code_review"]["concept"]).to eq("closures")
+    end
+  end
+
+  describe "#review_response" do
+    def sample_exercise(language)
+      DailyExercise.new(
+        language: language,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern" => { "title" => "t", "question" => "q" },
+          "challenge" => { "question" => "q" }
+        }
+      )
+    end
+
+    it "names Rails in the system prompt for a ruby_rails exercise" do
+      spy_class = Class.new(double_class) do
+        attr_reader :last_system
+
+        def call(system:, prompt:)
+          @last_system = system
+          super
+        end
+      end
+      svc = spy_class.new
+
+      svc.review_response(user, sample_exercise("ruby_rails"), instance_double(DailyResponse, answers: {}))
+
+      expect(svc.last_system).to include("senior Rails engineer")
+    end
+
+    it "names JavaScript/React in the system prompt for a javascript exercise" do
+      spy_class = Class.new(double_class) do
+        attr_reader :last_system
+
+        def call(system:, prompt:)
+          @last_system = system
+          super
+        end
+      end
+      svc = spy_class.new
+
+      svc.review_response(user, sample_exercise("javascript"), instance_double(DailyResponse, answers: {}))
+
+      expect(svc.last_system).to include("senior JavaScript/React engineer")
     end
   end
 

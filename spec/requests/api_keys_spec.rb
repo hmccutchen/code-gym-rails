@@ -68,5 +68,26 @@ RSpec.describe "ApiKeys", type: :request do
       expect(user.reload.api_key_present?).to be false
       expect(user.provider).to be_nil
     end
+
+    it "updates only the language when the api_key field is blank and a key already exists" do
+      user.update!(api_key: "sk-ant-existing", provider: "anthropic")
+      login(user)
+
+      patch setup_path, params: { api_key: "", language: "javascript" }
+
+      expect(response).to redirect_to(root_path)
+      expect(user.reload.language).to eq("javascript")
+      expect(user.api_key).to eq("sk-ant-existing")
+    end
+
+    it "rejects a language-only update when no key has been set yet" do
+      login(user)
+
+      patch setup_path, params: { api_key: "", language: "javascript" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("Add your API key")
+      expect(user.reload.language).to eq("ruby_rails")
+    end
   end
 end

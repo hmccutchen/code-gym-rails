@@ -60,11 +60,13 @@ class User < ApplicationRecord
   end
 
   # ── Recent performance for prompt context ─────────────────────────────────
-  def recent_performance(days: 7)
+  # Last N sessions by count, not a calendar window — matches the "last 10
+  # sessions" contract embedded verbatim in AiService's generation prompt.
+  def recent_performance(limit: 10)
     daily_responses
       .includes(:daily_exercise)
-      .where("date >= ?", days.days.ago.to_date)
       .order(date: :desc)
+      .limit(limit)
       .map do |r|
         {
           date:          r.date.to_s,

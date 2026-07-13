@@ -92,11 +92,10 @@
     </div>
   <% end %>
 
+  <%# Always a real POST — ResponsesController#create is idempotent via
+      find_or_initialize_by, so resumed/persisted drafts save the same way.
+      There is no PATCH /responses route; spoofing one here 404s the form. %>
   <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
-    <% if @response.persisted? %>
-      <input type="hidden" name="_method" value="patch">
-    <% end %>
-
     <%# ── Section 1: Code Review ─────────────────────────────────────── %>
     <% cr = @exercise.code_review %>
     <div class="section">

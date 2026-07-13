@@ -22,11 +22,23 @@ class AiService
     controlled_vs_uncontrolled
   ].freeze
 
-  # Human-readable labels used in prompts to name the day's language without
-  # assuming Ruby idioms when generating JS.
-  LANGUAGE_LABELS = {
-    "ruby_rails" => "Ruby/Rails",
-    "javascript" => "JavaScript/React"
+  # Single source of truth per concrete generation language ("mixed" is a
+  # user-level meta-preference that always resolves to one of these before it
+  # reaches AiService — see User#language_for_today). Adding a language means
+  # adding one entry here, not hunting down every ternary in this file.
+  LANGUAGE_CONFIG = {
+    "ruby_rails" => {
+      label:    "Ruby/Rails",
+      concepts: RAILS_CONCEPTS,
+      coach:    "Rails",
+      focus:    "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
+    },
+    "javascript" => {
+      label:    "JavaScript/React",
+      concepts: JS_CONCEPTS,
+      coach:    "JavaScript/React",
+      focus:    "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
+    }
   }.freeze
 
   RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
@@ -62,8 +74,10 @@ class AiService
 
   # ── Review a submitted response inline ───────────────────────────────────
   def review_response(user, exercise, daily_response)
+    coach = config_for(exercise.language)[:coach]
+
     result = call(
-      system: "You are a senior Rails engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. Be honest and constructive. Return JSON.",
+      system: "You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. Be honest and constructive. Return JSON.",
       prompt: build_review_prompt(exercise, daily_response)
     )
 
@@ -72,6 +86,15 @@ class AiService
   end
 
   private
+
+  # Looks up the fixed per-language config, failing loudly on anything
+  # outside RAILS_CONCEPTS/JS_CONCEPTS's languages (e.g. "mixed", or a typo)
+  # instead of silently degrading to Ruby/Rails behavior.
+  def config_for(language)
+    LANGUAGE_CONFIG.fetch(language) do
+      raise Error, "Unsupported generation language: #{language.inspect}"
+    end
+  end
 
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
@@ -85,21 +108,14 @@ class AiService
   end
 
   def build_system_prompt(language = "ruby_rails")
-    if language == "javascript"
-      <<~PROMPT
-        You are a senior JavaScript/React engineering coach generating personalized daily exercise sets.
-        Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
-        Focus on real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders.
-        Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
-      PROMPT
-    else
-      <<~PROMPT
-        You are a senior Rails engineering coach generating personalized daily exercise sets.
-        Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
-        Focus on real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects.
-        Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
-      PROMPT
-    end
+    config = config_for(language)
+
+    <<~PROMPT
+      You are a senior #{config[:coach]} engineering coach generating personalized daily exercise sets.
+      Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
+      Focus on #{config[:focus]}
+      Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
+    PROMPT
   end
 
   # JSON schema every provider is asked to return for a problem set. The
@@ -107,7 +123,7 @@ class AiService
   # assume Ruby idioms when generating JS — the structure itself never
   # changes across languages.
   def exercise_schema_for(language = "ruby_rails")
-    label = LANGUAGE_LABELS.fetch(language, LANGUAGE_LABELS["ruby_rails"])
+    label = config_for(language)[:label]
 
     <<~SCHEMA
       {
@@ -142,7 +158,7 @@ class AiService
   end
 
   def build_exercise_prompt(user, language = "ruby_rails")
-    history = user.recent_performance(days: 10)
+    history = user.recent_performance
 
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
@@ -156,9 +172,10 @@ class AiService
       }.join("\n")
     end
 
-    label       = LANGUAGE_LABELS.fetch(language, LANGUAGE_LABELS["ruby_rails"])
+    config      = config_for(language)
+    label       = config[:label]
     focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
-    concepts    = language == "javascript" ? JS_CONCEPTS : RAILS_CONCEPTS
+    concepts    = config[:concepts]
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -243,7 +260,7 @@ class AiService
       raise Error, "Provider returned #{problem_set.class} instead of a JSON object for the problem set"
     end
 
-    concepts = language == "javascript" ? JS_CONCEPTS : RAILS_CONCEPTS
+    concepts = config_for(language)[:concepts]
 
     problem_set.each_value do |section|
       next unless section.is_a?(Hash) && section.key?("concept")

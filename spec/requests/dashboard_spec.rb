@@ -52,6 +52,18 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to include('class="feedback-prominent')
   end
 
+  it "always renders the answer form as a plain POST, even for a persisted draft" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false)
+
+    get root_path
+
+    form_html = response.body[/<form[^>]*id="gym-form".*?<\/form>/m]
+    expect(form_html).to be_present
+    expect(form_html).to match(/method="post"/)
+    expect(form_html).not_to include('name="_method"')
+  end
+
   it "shows the quiet feedback widget after submission, before review" do
     create_response(create_exercise)
     get root_path
