@@ -6,6 +6,7 @@ RSpec.describe GenerateDailyExercisesJob do
   it "creates a DailyExercise from the provider's generated problem set" do
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
     described_class.new.perform(user_id: user.id)
 
@@ -27,6 +28,7 @@ RSpec.describe GenerateDailyExercisesJob do
     user.update!(language: "javascript")
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
     described_class.new.perform(user_id: user.id)
 
@@ -38,6 +40,7 @@ RSpec.describe GenerateDailyExercisesJob do
     user.update!(language: "javascript")
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
     described_class.new.perform(user_id: user.id)
 
@@ -53,5 +56,34 @@ RSpec.describe GenerateDailyExercisesJob do
 
     expect(Rails.logger).to receive(:info).with(/Skipped duplicate generation/)
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
+  end
+
+  it "broadcasts the rendered exercise partial to the user's stream on success" do
+    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to) do |streamable, target:, partial:, locals:|
+      expect(streamable).to eq(user)
+      expect(target).to eq("dashboard-content")
+      expect(partial).to eq("dashboard/exercise")
+      expect(locals[:exercise]).to be_a(DailyExercise)
+      expect(locals[:exercise].user).to eq(user)
+      expect(locals[:response]).to be_a(DailyResponse)
+      expect(locals[:response]).not_to be_persisted
+    end
+
+    described_class.new.perform(user_id: user.id)
+  end
+
+  it "broadcasts a friendly failure partial to the user's stream when AiService::Error is raised" do
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Rails.logger).to receive(:error)
+
+    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
+      .with(user, target: "dashboard-content", partial: "dashboard/generation_failed", locals: { message: "boom" })
+
+    described_class.new.perform(user_id: user.id)
   end
 end
