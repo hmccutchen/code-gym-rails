@@ -186,6 +186,37 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#extract_provider_message" do
+    it "returns the provider's error.message when the body is a matching JSON error object" do
+      body = {
+        "type"  => "error",
+        "error" => { "type" => "insufficient_quota", "message" => "Your credit balance is too low to access the Anthropic API." }
+      }.to_json
+
+      expect(service.send(:extract_provider_message, body, fallback: "fallback text"))
+        .to eq("Your credit balance is too low to access the Anthropic API.")
+    end
+
+    it "falls back when the body is not JSON" do
+      expect(service.send(:extract_provider_message, "not json", fallback: "fallback text"))
+        .to eq("fallback text")
+    end
+
+    it "falls back when the JSON body has no error.message" do
+      body = { "type" => "error", "error" => { "type" => "overloaded_error" } }.to_json
+
+      expect(service.send(:extract_provider_message, body, fallback: "fallback text"))
+        .to eq("fallback text")
+    end
+
+    it "falls back when error.message is blank" do
+      body = { "error" => { "message" => "" } }.to_json
+
+      expect(service.send(:extract_provider_message, body, fallback: "fallback text"))
+        .to eq("fallback text")
+    end
+  end
+
   describe "#generate_exercise" do
     it "logs usage and normalizes concepts from the provider's response using the resolved language" do
       set = { "code_review" => { "concept" => "bogus" } }

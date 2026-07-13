@@ -19,7 +19,7 @@ class ClaudeService < AiService
 
     unless resp.success?
       log_raw_snippet("Claude API error #{resp.status} body", resp.body)
-      raise AiService::Error, "Claude API error #{resp.status}"
+      raise AiService::Error, extract_provider_message(resp.body, fallback: "Claude API error #{resp.status}")
     end
 
     parsed = JSON.parse(resp.body)
