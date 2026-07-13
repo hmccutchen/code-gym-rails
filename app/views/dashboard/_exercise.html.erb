@@ -9,7 +9,10 @@
          "This will replace today's problems and erase your answers so far. This can't be undone. Continue?" :
          "Generate a new set for today?" %>
     <%= button_to "Generate new set", regenerate_path, method: :post,
-          class: "btn btn-ghost btn-sm", data: { turbo_confirm: confirm_msg } %>
+          class: "btn btn-ghost btn-sm",
+          data: { turbo_confirm: confirm_msg, regenerate_target: "button" },
+          form: { data: { controller: "regenerate",
+                          action: "turbo:submit-start->regenerate#start turbo:submit-end->regenerate#stop" } } %>
   <% end %>
 </div>
 
