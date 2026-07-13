@@ -18,8 +18,8 @@
   <%= form_with url: setup_path, method: :patch do |f| %>
     <div class="form-field">
       <%= f.label :api_key, "API key" %>
-      <%= f.password_field :api_key, placeholder: "sk-ant-... or AIza...", autocomplete: "off" %>
-      <p class="hint">Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>) or a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AIza</code>).</p>
+      <%= f.password_field :api_key, placeholder: "sk-ant-... or AQ...., AIza...", autocomplete: "off" %>
+      <p class="hint">Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>) or a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>).</p>
     </div>
     <div class="form-field">
       <%= f.label :language, "Exercise language" %>

@@ -29,6 +29,16 @@ RSpec.describe "ApiKeys", type: :request do
       expect(user.provider).to eq("gemini")
     end
 
+    it "saves a valid Gemini key in Google's newer AQ. format and detects the provider" do
+      login(user)
+
+      patch setup_path, params: { api_key: "AQ.Ab8RN6J5yPUsY9SwLxAS2DYq_cYQFIhR9xG8C0Dz3D9CdyL-qg" }
+
+      expect(response).to redirect_to(root_path)
+      expect(user.reload.api_key).to eq("AQ.Ab8RN6J5yPUsY9SwLxAS2DYq_cYQFIhR9xG8C0Dz3D9CdyL-qg")
+      expect(user.provider).to eq("gemini")
+    end
+
     it "saves a valid language preference alongside the API key" do
       login(user)
 
