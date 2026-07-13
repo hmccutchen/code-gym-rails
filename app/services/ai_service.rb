@@ -3,15 +3,43 @@ require "json"
 class AiService
   class Error < StandardError; end
 
-  # Fixed concept vocabulary. Embedded in the generation prompt; anything a
-  # provider returns outside this list is normalized to "other" so per-user
-  # concept history stays aggregatable.
-  CONCEPTS = %w[
+  # Fixed concept vocabularies, one per generation language. Embedded in the
+  # generation prompt; anything a provider returns outside the active list is
+  # normalized to "other" so per-user concept history stays aggregatable.
+  # Kept closed rather than AI-extensible so history stays clean — see
+  # docs/superpowers/specs/2026-07-12-language-preference-design.md.
+  RAILS_CONCEPTS = %w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling
   ].freeze
+
+  JS_CONCEPTS = %w[
+    callback_hell promise_chaining closures prototype_chain event_loop_blocking
+    this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
+    memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
+    controlled_vs_uncontrolled
+  ].freeze
+
+  # Single source of truth per concrete generation language ("mixed" is a
+  # user-level meta-preference that always resolves to one of these before it
+  # reaches AiService — see User#language_for_today). Adding a language means
+  # adding one entry here, not hunting down every ternary in this file.
+  LANGUAGE_CONFIG = {
+    "ruby_rails" => {
+      label:    "Ruby/Rails",
+      concepts: RAILS_CONCEPTS,
+      coach:    "Rails",
+      focus:    "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
+    },
+    "javascript" => {
+      label:    "JavaScript/React",
+      concepts: JS_CONCEPTS,
+      coach:    "JavaScript/React",
+      focus:    "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
+    }
+  }.freeze
 
   RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
 
@@ -20,38 +48,6 @@ class AiService
   # exception messages — which surface in flash alerts and error trackers —
   # free of large/undesired provider content.
   RAW_SNIPPET_LIMIT = 500
-
-  # JSON schema every provider is asked to return for a problem set
-  EXERCISE_SCHEMA = <<~SCHEMA
-    {
-      "code_review": {
-        "question": "string — what to find/fix",
-        "snippet":  "string — Ruby/Rails code, ~10-15 lines",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-        "concept": "string — exactly one concept from the provided vocabulary"
-      },
-      "pattern": {
-        "title":    "string — pattern name",
-        "why":      "string — one sentence on why the pattern exists",
-        "question": "string — conceptual question to answer",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-        "concept": "string — exactly one concept from the provided vocabulary",
-        "reference": {
-          "tagline":      "string — bold one-liner",
-          "explanation":  "string — 2-3 sentences",
-          "code_example": "string — annotated Ruby, ~15 lines",
-          "senior_lens":  "string — when to reach for it / tradeoffs"
-        }
-      },
-      "challenge": {
-        "title":        "string",
-        "question":     "string — what to implement",
-        "starter_code": "string — optional skeleton (empty string if none)",
-        "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-        "concept": "string — exactly one concept from the provided vocabulary"
-      }
-    }
-  SCHEMA
 
   def initialize(api_key)
     @api_key = api_key
@@ -69,17 +65,19 @@ class AiService
   end
 
   # ── Generate a personalized daily exercise set ────────────────────────────
-  def generate_exercise(user)
-    result = call(system: build_system_prompt, prompt: build_exercise_prompt(user))
+  def generate_exercise(user, language: user.language_for_today)
+    result = call(system: build_system_prompt(language), prompt: build_exercise_prompt(user, language))
 
     log_usage(user, result, purpose: "generate_exercise")
-    normalize_concepts(parse_json_response(result[:text]))
+    normalize_concepts(parse_json_response(result[:text]), language)
   end
 
   # ── Review a submitted response inline ───────────────────────────────────
   def review_response(user, exercise, daily_response)
+    coach = config_for(exercise.language)[:coach]
+
     result = call(
-      system: "You are a senior Rails engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. Be honest and constructive. Return JSON.",
+      system: "You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. Be honest and constructive. Return JSON.",
       prompt: build_review_prompt(exercise, daily_response)
     )
 
@@ -88,6 +86,15 @@ class AiService
   end
 
   private
+
+  # Looks up the fixed per-language config, failing loudly on anything
+  # outside RAILS_CONCEPTS/JS_CONCEPTS's languages (e.g. "mixed", or a typo)
+  # instead of silently degrading to Ruby/Rails behavior.
+  def config_for(language)
+    LANGUAGE_CONFIG.fetch(language) do
+      raise Error, "Unsupported generation language: #{language.inspect}"
+    end
+  end
 
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
@@ -100,17 +107,58 @@ class AiService
     raise NotImplementedError, "#{self.class} must implement #build_connection"
   end
 
-  def build_system_prompt
+  def build_system_prompt(language = "ruby_rails")
+    config = config_for(language)
+
     <<~PROMPT
-      You are a senior Rails engineering coach generating personalized daily exercise sets.
+      You are a senior #{config[:coach]} engineering coach generating personalized daily exercise sets.
       Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
-      Focus on real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects.
+      Focus on #{config[:focus]}
       Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
     PROMPT
   end
 
-  def build_exercise_prompt(user)
-    history = user.recent_performance(days: 10)
+  # JSON schema every provider is asked to return for a problem set. The
+  # code-bearing fields' label switches with `language` so instructions never
+  # assume Ruby idioms when generating JS — the structure itself never
+  # changes across languages.
+  def exercise_schema_for(language = "ruby_rails")
+    label = config_for(language)[:label]
+
+    <<~SCHEMA
+      {
+        "code_review": {
+          "question": "string — what to find/fix",
+          "snippet":  "string — #{label} code, ~10-15 lines",
+          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary"
+        },
+        "pattern": {
+          "title":    "string — pattern name",
+          "why":      "string — one sentence on why the pattern exists",
+          "question": "string — conceptual question to answer",
+          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "reference": {
+            "tagline":      "string — bold one-liner",
+            "explanation":  "string — 2-3 sentences",
+            "code_example": "string — annotated #{label} code, ~15 lines",
+            "senior_lens":  "string — when to reach for it / tradeoffs"
+          }
+        },
+        "challenge": {
+          "title":        "string",
+          "question":     "string — what to implement",
+          "starter_code": "string — optional skeleton (empty string if none)",
+          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary"
+        }
+      }
+    SCHEMA
+  end
+
+  def build_exercise_prompt(user, language = "ruby_rails")
+    history = user.recent_performance
 
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
@@ -124,7 +172,10 @@ class AiService
       }.join("\n")
     end
 
-    focus = user.focus_areas.any? ? user.focus_areas.join(", ") : "general Rails patterns"
+    config      = config_for(language)
+    label       = config[:label]
+    focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
+    concepts    = config[:concepts]
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -141,17 +192,17 @@ class AiService
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
-      - The code_review snippet must be realistic Rails code — not toy examples.
+      - The code_review snippet must be realistic #{label} code — not toy examples.
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
-      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{CONCEPTS.join(", ")}
+      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
       - Mastery loop: for any concept whose most recent rating was "too hard", reintroduce that concept in this set with a different code example and framing — same underlying concept, never a repeat of the same snippet. Keep reintroducing it in every subsequent set until the user rates a set containing it "right level" or "too easy"; that rating is the mastery signal that ends reinforcement for that concept.
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{EXERCISE_SCHEMA}
+      #{exercise_schema_for(language)}
     PROMPT
   end
 
@@ -204,14 +255,16 @@ class AiService
 
   # A provider occasionally invents tags; keep the vocabulary closed so
   # aggregation over concept history stays clean.
-  def normalize_concepts(problem_set)
+  def normalize_concepts(problem_set, language = "ruby_rails")
     unless problem_set.is_a?(Hash)
       raise Error, "Provider returned #{problem_set.class} instead of a JSON object for the problem set"
     end
 
+    concepts = config_for(language)[:concepts]
+
     problem_set.each_value do |section|
       next unless section.is_a?(Hash) && section.key?("concept")
-      section["concept"] = "other" unless CONCEPTS.include?(section["concept"])
+      section["concept"] = "other" unless concepts.include?(section["concept"])
     end
     problem_set
   end

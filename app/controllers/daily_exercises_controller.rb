@@ -10,7 +10,7 @@ class DailyExercisesController < ApplicationController
       return redirect_to root_path, alert: "You've already generated a new set today."
     end
 
-    problem_set = AiService.for(current_user).generate_exercise(current_user)
+    problem_set = AiService.for(current_user).generate_exercise(current_user, language: exercise.language)
 
     ActiveRecord::Base.transaction do
       exercise.daily_response&.destroy

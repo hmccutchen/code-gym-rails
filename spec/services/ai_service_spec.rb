@@ -27,18 +27,66 @@ RSpec.describe AiService do
 
   let(:service) { double_class.new }
 
-  describe "EXERCISE_SCHEMA" do
-    it "defines a teaching_note and a concept for each of the three sections" do
-      expect(AiService::EXERCISE_SCHEMA.scan('"teaching_note"').size).to eq(3)
-      expect(AiService::EXERCISE_SCHEMA.scan('"concept"').size).to eq(3)
+  describe "#exercise_schema_for" do
+    it "defines a teaching_note and a concept for each of the three sections, for any language" do
+      %w[ruby_rails javascript].each do |language|
+        schema = service.send(:exercise_schema_for, language)
+        expect(schema.scan('"teaching_note"').size).to eq(3)
+        expect(schema.scan('"concept"').size).to eq(3)
+      end
+    end
+
+    it "labels code fields with Ruby/Rails for ruby_rails" do
+      schema = service.send(:exercise_schema_for, "ruby_rails")
+      expect(schema).to include("Ruby/Rails code")
+    end
+
+    it "labels code fields with JavaScript/React for javascript" do
+      schema = service.send(:exercise_schema_for, "javascript")
+      expect(schema).to include("JavaScript/React code")
+    end
+
+    it "defaults to ruby_rails when no language is given" do
+      expect(service.send(:exercise_schema_for)).to eq(service.send(:exercise_schema_for, "ruby_rails"))
     end
   end
 
-  describe "CONCEPTS" do
+  describe "#build_system_prompt" do
+    it "focuses on Rails patterns for ruby_rails" do
+      prompt = service.send(:build_system_prompt, "ruby_rails")
+      expect(prompt).to include("senior Rails engineering coach")
+      expect(prompt).to include("N+1 queries")
+    end
+
+    it "focuses on JavaScript/React patterns for javascript" do
+      prompt = service.send(:build_system_prompt, "javascript")
+      expect(prompt).to include("senior JavaScript/React engineering coach")
+      expect(prompt).to include("hooks")
+    end
+
+    it "defaults to ruby_rails when no language is given" do
+      expect(service.send(:build_system_prompt)).to eq(service.send(:build_system_prompt, "ruby_rails"))
+    end
+
+    it "raises instead of silently falling back on an unsupported language" do
+      expect { service.send(:build_system_prompt, "mixed") }
+        .to raise_error(AiService::Error, /Unsupported generation language/)
+    end
+  end
+
+  describe "RAILS_CONCEPTS" do
     it "is a frozen 16-entry vocabulary" do
-      expect(AiService::CONCEPTS.size).to eq(16)
-      expect(AiService::CONCEPTS).to be_frozen
-      expect(AiService::CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+      expect(AiService::RAILS_CONCEPTS.size).to eq(16)
+      expect(AiService::RAILS_CONCEPTS).to be_frozen
+      expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+    end
+  end
+
+  describe "JS_CONCEPTS" do
+    it "is a frozen 14-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(14)
+      expect(AiService::JS_CONCEPTS).to be_frozen
+      expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
   end
 
@@ -57,11 +105,23 @@ RSpec.describe AiService do
                             concept_tags: { "code_review" => "n_plus_one" })
 
       prompt = service.send(:build_exercise_prompt, user)
-      expect(prompt).to include(AiService::CONCEPTS.join(", "))
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
       expect(prompt).to include("mastery signal")
       expect(prompt).to include("concepts: n_plus_one")
       expect(prompt).to include("too hard")
       expect(prompt).not_to include("unrated")
+    end
+
+    it "uses the JS/React vocabulary and JavaScript/React labeling when language is javascript" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include(AiService::JS_CONCEPTS.join(", "))
+      expect(prompt).to include("JavaScript/React code")
+      expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
+    end
+
+    it "defaults to ruby_rails vocabulary when no language is given" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
     end
   end
 
@@ -82,6 +142,16 @@ RSpec.describe AiService do
       expect(out["code_review"]["concept"]).to eq("n_plus_one")
       expect(out["pattern"]["concept"]).to eq("other")
       expect(out["challenge"]).not_to have_key("concept")
+    end
+
+    it "validates against the JS vocabulary when language is javascript" do
+      set = {
+        "code_review" => { "concept" => "closures" },
+        "pattern" => { "concept" => "n_plus_one" }
+      }
+      out = service.send(:normalize_concepts, set, "javascript")
+      expect(out["code_review"]["concept"]).to eq("closures")
+      expect(out["pattern"]["concept"]).to eq("other")
     end
   end
 
@@ -117,7 +187,7 @@ RSpec.describe AiService do
   end
 
   describe "#generate_exercise" do
-    it "logs usage and normalizes concepts from the provider's response" do
+    it "logs usage and normalizes concepts from the provider's response using the resolved language" do
       set = { "code_review" => { "concept" => "bogus" } }
       svc = double_class.new(canned_text: set.to_json, input_tokens: 5, output_tokens: 7)
 
@@ -128,6 +198,70 @@ RSpec.describe AiService do
       expect(usage.tokens_in).to eq(5)
       expect(usage.tokens_out).to eq(7)
       expect(usage.purpose).to eq("generate_exercise")
+    end
+
+    it "normalizes against the JS vocabulary when an explicit javascript language is passed" do
+      set = { "code_review" => { "concept" => "closures" } }
+      svc = double_class.new(canned_text: set.to_json)
+
+      result = svc.generate_exercise(user, language: "javascript")
+
+      expect(result["code_review"]["concept"]).to eq("closures")
+    end
+
+    it "defaults language to the user's language_for_today when not passed explicitly" do
+      user.update!(language: "javascript")
+      set = { "code_review" => { "concept" => "closures" } }
+      svc = double_class.new(canned_text: set.to_json)
+
+      result = svc.generate_exercise(user)
+
+      expect(result["code_review"]["concept"]).to eq("closures")
+    end
+  end
+
+  describe "#review_response" do
+    def sample_exercise(language)
+      DailyExercise.new(
+        language: language,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern" => { "title" => "t", "question" => "q" },
+          "challenge" => { "question" => "q" }
+        }
+      )
+    end
+
+    it "names Rails in the system prompt for a ruby_rails exercise" do
+      spy_class = Class.new(double_class) do
+        attr_reader :last_system
+
+        def call(system:, prompt:)
+          @last_system = system
+          super
+        end
+      end
+      svc = spy_class.new
+
+      svc.review_response(user, sample_exercise("ruby_rails"), instance_double(DailyResponse, answers: {}))
+
+      expect(svc.last_system).to include("senior Rails engineer")
+    end
+
+    it "names JavaScript/React in the system prompt for a javascript exercise" do
+      spy_class = Class.new(double_class) do
+        attr_reader :last_system
+
+        def call(system:, prompt:)
+          @last_system = system
+          super
+        end
+      end
+      svc = spy_class.new
+
+      svc.review_response(user, sample_exercise("javascript"), instance_double(DailyResponse, answers: {}))
+
+      expect(svc.last_system).to include("senior JavaScript/React engineer")
     end
   end
 

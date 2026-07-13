@@ -7,11 +7,14 @@ class User < ApplicationRecord
   # Requires RAILS_MASTER_KEY / credentials to be set (standard Rails setup).
   encrypts :api_key
 
+  LANGUAGES = %w[ruby_rails javascript mixed].freeze
+
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
   validates :skill_level, inclusion: { in: %w[beginner developing solid strong] }
   validates :provider, inclusion: { in: %w[anthropic gemini] }, allow_nil: true
+  validates :language, inclusion: { in: LANGUAGES }
 
   before_save { email.downcase! }
 
@@ -57,11 +60,13 @@ class User < ApplicationRecord
   end
 
   # ── Recent performance for prompt context ─────────────────────────────────
-  def recent_performance(days: 7)
+  # Last N sessions by count, not a calendar window — matches the "last 10
+  # sessions" contract embedded verbatim in AiService's generation prompt.
+  def recent_performance(limit: 10)
     daily_responses
       .includes(:daily_exercise)
-      .where("date >= ?", days.days.ago.to_date)
       .order(date: :desc)
+      .limit(limit)
       .map do |r|
         {
           date:          r.date.to_s,
@@ -71,5 +76,20 @@ class User < ApplicationRecord
           sections_answered: r.answers.count { |_, v| v.to_s.length > 10 }
         }
       end
+  end
+
+  # ── Language preference ────────────────────────────────────────────────────
+  # Resolves the day's actual generation language. Pinned preferences return
+  # themselves. "mixed" alternates by flipping the most recent PRIOR
+  # exercise's language (excluding today's own row, so calling this multiple
+  # times for the same day — e.g. on regenerate — stays consistent as long as
+  # callers pass the result through rather than recomputing mid-day).
+  def language_for_today
+    return language unless language == "mixed"
+
+    last = daily_exercises.where.not(date: Date.current).order(date: :desc).first
+    return "ruby_rails" unless last
+
+    last.language == "ruby_rails" ? "javascript" : "ruby_rails"
   end
 end
