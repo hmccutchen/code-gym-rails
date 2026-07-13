@@ -66,8 +66,10 @@ Rails.application.configure do
 
   # Allow the app's own origin to open ActionCable WebSocket connections
   # (Turbo Stream broadcasts for exercise-generation live updates). Reuses
-  # the same APP_HOST env var as the mailer config above.
-  config.action_cable.allowed_request_origins = [ app_host.host, "https://#{app_host.host}" ]
+  # the same APP_HOST env var as the mailer config above. Browser Origin
+  # headers always include the scheme, so only the full "https://host" form
+  # is ever matched.
+  config.action_cable.allowed_request_origins = [ "https://#{app_host.host}" ]
 
   # Deliver via Resend's HTTP API (see docs/deploy/railway-smtp-setup.md).
   # Railway blocks outbound SMTP on plans below Pro, so smtp_settings would
