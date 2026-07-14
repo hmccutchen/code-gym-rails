@@ -6,8 +6,7 @@ class AiService
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
-  # Kept closed rather than AI-extensible so history stays clean — see
-  # docs/superpowers/specs/2026-07-12-language-preference-design.md.
+  # Kept closed rather than AI-extensible so history stays clean.
   RAILS_CONCEPTS = %w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
@@ -69,7 +68,7 @@ class AiService
     result = call(system: build_system_prompt(language), prompt: build_exercise_prompt(user, language))
 
     log_usage(user, result, purpose: "generate_exercise")
-    normalize_concepts(parse_json_response(result[:text]), language)
+    normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
   end
 
   # ── Review a submitted response inline ───────────────────────────────────
@@ -82,7 +81,7 @@ class AiService
     )
 
     log_usage(user, result, purpose: "review_response")
-    parse_json_response(result[:text])
+    parse_json_object(result[:text], subject: "review")
   end
 
   private
@@ -233,6 +232,17 @@ class AiService
     PROMPT
   end
 
+  # Both callers persist the result into a jsonb column and then index into it
+  # by key, so a non-Hash payload has to fail here rather than downstream: an
+  # array saved to ai_review is still truthy, which flips DailyResponse#reviewed?
+  # and leaves the user an empty review they can't regenerate.
+  def parse_json_object(text, subject:)
+    parsed = parse_json_response(text)
+    return parsed if parsed.is_a?(Hash)
+
+    raise Error, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
+  end
+
   def parse_json_response(text)
     # Strip any accidental markdown fences
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
@@ -271,10 +281,6 @@ class AiService
   # A provider occasionally invents tags; keep the vocabulary closed so
   # aggregation over concept history stays clean.
   def normalize_concepts(problem_set, language = "ruby_rails")
-    unless problem_set.is_a?(Hash)
-      raise Error, "Provider returned #{problem_set.class} instead of a JSON object for the problem set"
-    end
-
     concepts = config_for(language)[:concepts]
 
     problem_set.each_value do |section|
