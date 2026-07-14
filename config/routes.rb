@@ -3,6 +3,9 @@ Rails.application.routes.draw do
   # app has booted; served by Rails' built-in health controller, no auth required.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Turbo Stream broadcasts (exercise-generation live updates) ride over this.
+  mount ActionCable.server => "/cable"
+
   # Auth (magic link)
   get  "login",        to: "sessions#new"
   post "login",        to: "sessions#create"
@@ -24,6 +27,10 @@ Rails.application.routes.draw do
 
   # Manually re-run today's exercise generation (capped at once/day in the controller)
   post "regenerate", to: "daily_exercises#regenerate"
+
+  # Manually trigger on-demand generation when the automatic weekday trigger
+  # in DashboardController#show intentionally didn't fire (weekends).
+  post "generate", to: "daily_exercises#generate"
 
   # Submit/update today's answers
   resources :responses, only: [ :create ] do

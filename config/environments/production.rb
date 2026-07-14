@@ -64,6 +64,13 @@ Rails.application.configure do
   app_host = URI.parse(ENV.fetch("APP_HOST", "https://example.com"))
   config.action_mailer.default_url_options = { host: app_host.host, protocol: "https" }
 
+  # Allow the app's own origin to open ActionCable WebSocket connections
+  # (Turbo Stream broadcasts for exercise-generation live updates). Reuses
+  # the same APP_HOST env var as the mailer config above. Browser Origin
+  # headers always include the scheme, so only the full "https://host" form
+  # is ever matched.
+  config.action_cable.allowed_request_origins = [ "https://#{app_host.host}" ]
+
   # Deliver via Resend's HTTP API (see docs/deploy/railway-smtp-setup.md).
   # Railway blocks outbound SMTP on plans below Pro, so smtp_settings would
   # time out at TCP connect -- the API key is set in config/initializers/resend.rb.

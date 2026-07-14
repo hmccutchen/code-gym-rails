@@ -20,7 +20,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     language    = user.language_for_today
     problem_set = AiService.for(user).generate_exercise(user, language: language)
 
-    DailyExercise.create!(
+    exercise = DailyExercise.create!(
       user:         user,
       date:         Date.current,
       problem_set:  problem_set,
@@ -28,9 +28,22 @@ class GenerateDailyExercisesJob < ApplicationJob
       language:     language
     )
 
+    Turbo::StreamsChannel.broadcast_replace_to(
+      user,
+      target:  "dashboard-content",
+      partial: "dashboard/exercise",
+      locals:  { exercise: exercise, response: DailyResponse.new(user: user, daily_exercise: exercise, date: Date.current) }
+    )
+
     Rails.logger.info("Generated exercise for #{user.email} on #{Date.current}")
   rescue AiService::Error => e
     Rails.logger.error("Failed to generate exercise for #{user.email}: #{e.message}")
+    Turbo::StreamsChannel.broadcast_replace_to(
+      user,
+      target:  "dashboard-content",
+      partial: "dashboard/generation_failed",
+      locals:  { message: e.message }
+    )
     # Don't re-raise — one failure shouldn't block other users in the batch
   rescue ActiveRecord::RecordNotUnique
     # Lost a race against a concurrent generation for this user/date (e.g. two
