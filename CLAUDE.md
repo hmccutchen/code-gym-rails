@@ -2,15 +2,16 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in (magic link, no passwords), adds their own Anthropic API key, and gets a Claude-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline Claude review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (magic link, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline AI review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
 
 ## Stack
 
 - **Rails 8.0.5** + PostgreSQL
 - **Solid Queue** — background jobs + recurring 8am weekday cron (no Redis needed)
-- **Faraday** — Claude API calls (not the official SDK)
+- **Turbo Streams** over Solid Cable — live dashboard updates when generation finishes
+- **Faraday** — provider API calls (not the official SDKs)
 - **BCrypt** — magic link token digests
-- **ActiveRecord Encryption** — encrypts each user's Anthropic API key at rest
+- **ActiveRecord Encryption** — encrypts each user's provider API key at rest
 - **Railway** — hosting (web + worker services, postgres service)
 - **Nixpacks** — auto-detected build from `railway.toml`
 
@@ -18,43 +19,53 @@ A team Rails app for daily personalized coding exercises. Each engineer logs in 
 
 ```
 User logs in (magic link email)
-  └→ enters their own Anthropic API key (stored encrypted per-user)
+  └→ enters their own Anthropic or Gemini API key (stored encrypted per-user;
+     the key's prefix determines user.provider)
 
 8am weekdays (Solid Queue cron via config/recurring.yml):
   GenerateDailyExercisesJob
-    └→ ClaudeService#generate_exercise(user)
-         reads: user.recent_performance (last 10 sessions + ratings + feedback)
-         calls: Claude API (claude-sonnet-4-5) with personalized prompt
-         saves: DailyExercise { problem_set: jsonb }
+    └→ AiService.for(user) → ClaudeService | GeminiService
+         reads: user.recent_performance (last 10 sessions + ratings + feedback + concepts)
+         calls: the user's provider with a personalized prompt, in the user's
+                chosen language (user.language_for_today)
+         saves: DailyExercise { problem_set: jsonb, language }
+         broadcasts: Turbo Stream replace of #dashboard-content (success or failure)
 
 User opens dashboard:
   └→ DashboardController#show
-       shows today's DailyExercise (or triggers on-demand generation if missing)
+       shows today's DailyExercise, or triggers on-demand generation if missing
+       (weekdays only; weekends offer a manual "generate anyway" button)
        3 sections: Code Review snippet, Pattern of the Month, Coding Challenge
 
 User interacts:
-  └→ ResponsesController#create → auto-save answers (debounced fetch, idempotent)
-  └→ ResponsesController#review → ClaudeService#review_response → ai_review saved
-  └→ ResponsesController#feedback → saves rating (too_easy/right_level/too_hard) + text
-       (this feedback is included in tomorrow's generation prompt)
+  └→ ResponsesController#create      → auto-save answers (debounced fetch, idempotent)
+  └→ ResponsesController#review      → AiService#review_response → ai_review saved
+  └→ ResponsesController#feedback    → saves rating (too_easy/right_level/too_hard) + text
+  └→ ResponsesController#email_review→ mails the completed review to the user
+  └→ DailyExercisesController#regenerate → replaces today's set in place (once/day)
+  └→ HistoryController#index         → past submitted sessions
+       (feedback + concept tags are included in tomorrow's generation prompt)
 ```
 
 ## Models
 
-| Model             | Key fields                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------ |
-| `User`          | email, name, skill_level, focus_areas (jsonb), encrypted_api_key                           |
-| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, challenge)                        |
-| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), rating enum, feedback_text, ai_review (jsonb) |
-| `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                              |
+| Model             | Key fields                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language                     |
+| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, challenge), language, generated_at, regenerated_at |
+| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), rating enum, feedback_text, ai_review (jsonb), concept_tags (jsonb) |
+| `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
 
 ## Key Design Decisions
 
-- **Per-user API keys**: Each user provides their own Anthropic key. Zero shared cost. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
+- **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
+- **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement only `#call` and `#build_connection`. Adding a provider means adding a subclass, not editing the base.
 - **Magic link auth**: No passwords. `User#generate_login_token!` creates a BCrypt digest, emails a token, `User#find_by_login_token` does constant-time compare. Tokens expire in 15 minutes.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
-- **Personalization loop**: `user.recent_performance(days: 7)` returns last 10 sessions with dates, completion rates, ratings, and feedback text. This is embedded verbatim in the Claude prompt so each day's exercises adjust to the user's trajectory.
-- **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(user:, date:)` so auto-saves never create duplicates.
+- **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
+- **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory.
+- **One "answered" rule**: a section counts as answered when its trimmed text exceeds 10 characters. `DailyResponse#answered_sections` is the single source of truth — the progress bar, history, and the generation prompt all derive from it.
+- **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 
 ## Railway Deployment
 
@@ -86,7 +97,7 @@ In development, magic link emails open in the browser via `letter_opener` gem (n
 
 ## Tests
 
-RSpec (`spec/` — models, requests, mailers). Run with:
+RSpec (`spec/` — models, requests, services, jobs, mailers). Run with:
 
 ```bash
 bundle exec rspec
@@ -96,10 +107,12 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 
 ## File Map
 
-- `app/services/claude_service.rb` — all Claude API logic, prompt building, response parsing
-- `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation
-- `app/controllers/responses_controller.rb` — auto-save, review, feedback endpoints
+- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging
+- `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call + connection only
+- `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation + Turbo broadcasts
+- `app/controllers/responses_controller.rb` — auto-save, review, feedback, email-review endpoints
+- `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/sessions_controller.rb` — magic link create + verify
-- `app/models/user.rb` — auth methods, `recent_performance`, encryption
+- `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, encryption
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway

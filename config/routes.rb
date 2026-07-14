@@ -15,7 +15,7 @@ Rails.application.routes.draw do
   get "test_login", to: "sessions#test_login"
   delete "logout",     to: "sessions#destroy", as: :logout
 
-  # First-time setup: enter Anthropic API key
+  # First-time setup: enter an Anthropic or Gemini API key
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
 
