@@ -215,6 +215,16 @@ RSpec.describe AiService do
       expect(service.send(:extract_provider_message, body, fallback: "fallback text"))
         .to eq("fallback text")
     end
+
+    it "falls back when the body is nil instead of raising" do
+      expect(service.send(:extract_provider_message, nil, fallback: "fallback text"))
+        .to eq("fallback text")
+    end
+
+    it "falls back when the body is not a String instead of raising" do
+      expect(service.send(:extract_provider_message, 123, fallback: "fallback text"))
+        .to eq("fallback text")
+    end
   end
 
   describe "#generate_exercise" do

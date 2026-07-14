@@ -250,8 +250,8 @@ class AiService
   # and Gemini nest their error detail the same way:
   # {"error": {"type": "...", "message": "..."}}.
   def extract_provider_message(body, fallback:)
-    parsed  = JSON.parse(body)
-    message = parsed.dig("error", "message")
+    parsed  = JSON.parse(body.to_s)
+    message = parsed.is_a?(Hash) ? parsed.dig("error", "message") : nil
     message.presence || fallback
   rescue JSON::ParserError
     fallback
