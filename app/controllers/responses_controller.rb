@@ -18,9 +18,15 @@ class ResponsesController < ApplicationController
     )
 
     if @response.save
-      render json: { status: "saved", completeness: @response.completeness }
+      respond_to do |format|
+        format.json { render json: { status: "saved", completeness: @response.completeness } }
+        format.html { redirect_to root_path }
+      end
     else
-      render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity
+      respond_to do |format|
+        format.json { render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity }
+        format.html { redirect_to root_path, alert: "Couldn't save your answers." }
+      end
     end
   end
 

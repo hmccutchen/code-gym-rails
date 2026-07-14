@@ -18,7 +18,9 @@ RSpec.describe "Responses", type: :request do
         "challenge" => { "title" => "t", "question" => "q", "concept" => "service_objects" }
       )
 
-      post responses_path, params: { response: { answers: { code_review: "a" * 20 } } }
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
       expect(DailyResponse.last.concept_tags).to eq(
@@ -31,7 +33,9 @@ RSpec.describe "Responses", type: :request do
                       "pattern" => { "title" => "t", "why" => "w", "question" => "q" },
                       "challenge" => { "title" => "t", "question" => "q" })
 
-      post responses_path, params: { response: { answers: { code_review: "a" * 20 } } }
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(DailyResponse.last.concept_tags).to eq({})
     end
@@ -41,15 +45,40 @@ RSpec.describe "Responses", type: :request do
     it "updates the same record and submits it, without needing a PATCH route" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
 
-      post responses_path, params: { response: { answers: { code_review: "a" * 20 } } }
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       expect(DailyResponse.count).to eq(1)
 
-      post responses_path, params: { response: { answers: { code_review: "b" * 20 }, submit: "1" } }
+      post responses_path,
+        params: { response: { answers: { code_review: "b" * 20 }, submit: "1" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
       expect(DailyResponse.count).to eq(1)
       expect(DailyResponse.last.answers["code_review"]).to eq("b" * 20)
       expect(DailyResponse.last.submitted_at).to be_present
+    end
+  end
+
+  describe "POST /responses format handling" do
+    it "returns JSON for the JS auto-save/submit fetch calls (Accept: application/json)" do
+      create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response.media_type).to eq("application/json")
+      expect(JSON.parse(response.body)).to include("status" => "saved")
+    end
+
+    it "redirects instead of dumping raw JSON when the browser submits the form natively (no JS)" do
+      create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
+
+      post responses_path, params: { response: { answers: { code_review: "a" * 20 } } }
+
+      expect(response).to redirect_to(root_path)
     end
   end
 
