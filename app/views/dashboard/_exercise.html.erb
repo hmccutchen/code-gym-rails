@@ -134,6 +134,12 @@
 <%# Auto-save script %>
 <% unless submitted %>
   <script>
+  // Wrapped in an IIFE: Turbo re-executes <script> tags whenever this
+  // partial is replaced (e.g. GenerateDailyExercisesJob's broadcast on a
+  // regenerate, or a later day's cron firing while the tab stays open).
+  // Top-level const/let would redeclare on the second run and throw
+  // "Identifier has already been declared", killing autosave/submit/progress.
+  (() => {
     const form = document.getElementById("gym-form");
     const textareas = form.querySelectorAll("textarea[data-field]");
     const progressFill = document.getElementById("progress-fill");
@@ -211,5 +217,6 @@
     });
 
     updateProgress();
+  })();
   </script>
 <% end %>
