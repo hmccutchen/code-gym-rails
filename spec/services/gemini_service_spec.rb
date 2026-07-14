@@ -47,6 +47,23 @@ RSpec.describe GeminiService do
       }.to raise_error(AiService::Error, /Gemini API error 503/)
     end
 
+    it "surfaces the provider's own error message when the body includes one" do
+      body = {
+        "error" => {
+          "code"    => 429,
+          "message" => "Resource has been exhausted (e.g. check quota).",
+          "status"  => "RESOURCE_EXHAUSTED"
+        }
+      }.to_json
+      fake_response = instance_double(Faraday::Response, success?: false, status: 429, body: body)
+      fake_conn = instance_double(Faraday::Connection, post: fake_response)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt")
+      }.to raise_error(AiService::Error, "Resource has been exhausted (e.g. check quota).")
+    end
+
     it "does not leak the raw response body into the exception message" do
       huge_body = "error detail " * 100
       fake_response = instance_double(Faraday::Response, success?: false, status: 503, body: huge_body)

@@ -19,7 +19,7 @@ class GeminiService < AiService
 
     unless resp.success?
       log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
-      raise AiService::Error, "Gemini API error #{resp.status}"
+      raise AiService::Error, extract_provider_message(resp.body, fallback: "Gemini API error #{resp.status}")
     end
 
     parsed       = JSON.parse(resp.body)

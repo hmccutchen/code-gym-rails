@@ -242,6 +242,21 @@ class AiService
     raise Error, "Provider returned invalid JSON: #{e.message}"
   end
 
+  # Extracts a provider's own explanation for a failed HTTP response, when
+  # one is available, so users see actionable detail (e.g. "credit balance
+  # too low") instead of a bare status code. Falls back to `fallback`
+  # whenever the body isn't parseable JSON or lacks the expected shape (5xx
+  # HTML error pages, empty bodies, unrecognized formats). Both Anthropic
+  # and Gemini nest their error detail the same way:
+  # {"error": {"type": "...", "message": "..."}}.
+  def extract_provider_message(body, fallback:)
+    parsed  = JSON.parse(body.to_s)
+    message = parsed.is_a?(Hash) ? parsed.dig("error", "message") : nil
+    message.presence || fallback
+  rescue JSON::ParserError
+    fallback
+  end
+
   # Logs a truncated snippet of raw provider output server-side instead of
   # embedding it in an exception message — exception messages surface in
   # flash alerts and error trackers, where large/undesired content would
