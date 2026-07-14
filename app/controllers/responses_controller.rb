@@ -17,10 +17,23 @@ class ResponsesController < ApplicationController
       concept_tags: exercise_concept_tags(exercise)
     )
 
-    if @response.save
-      render json: { status: "saved", completeness: @response.completeness }
-    else
-      render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity
+    saved = @response.save
+
+    respond_to do |format|
+      format.json do
+        if saved
+          render json: { status: "saved", completeness: @response.completeness }
+        else
+          render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity
+        end
+      end
+      format.html do
+        if saved
+          redirect_to root_path
+        else
+          redirect_to root_path, alert: "Couldn't save your answers."
+        end
+      end
     end
   end
 

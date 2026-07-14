@@ -304,6 +304,41 @@ RSpec.describe AiService do
 
       expect(svc.last_system).to include("senior JavaScript/React engineer")
     end
+
+    it "returns the AI service's stubbed feedback for the submitted answers to each JSON question" do
+      exercise = sample_exercise("ruby_rails")
+      daily_response = instance_double(DailyResponse, answers: {
+        "code_review" => "It's an N+1 query — fix with includes.",
+        "pattern"     => "Extract a scope object.",
+        "challenge"   => "def foo; end"
+      })
+
+      feedback = {
+        "code_review" => { "rating" => "solid", "correct" => "Spotted the N+1", "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" },
+        "pattern"     => { "rating" => "developing", "correct" => "", "missed" => "Missed the edge case", "better_questions" => "", "next_step" => "", "improved_code" => "" },
+        "challenge"   => { "rating" => "strong", "correct" => "Works as specified", "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" }
+      }
+
+      spy_class = Class.new(double_class) do
+        attr_reader :last_prompt
+
+        def call(system:, prompt:)
+          @last_prompt = prompt
+          super
+        end
+      end
+      svc = spy_class.new(canned_text: feedback.to_json)
+
+      result = svc.review_response(user, exercise, daily_response)
+
+      expect(result).to eq(feedback)
+      expect(svc.last_prompt).to include(exercise.code_review["question"])
+      expect(svc.last_prompt).to include("It's an N+1 query — fix with includes.")
+      expect(svc.last_prompt).to include(exercise.pattern["question"])
+      expect(svc.last_prompt).to include("Extract a scope object.")
+      expect(svc.last_prompt).to include(exercise.challenge["question"])
+      expect(svc.last_prompt).to include("def foo; end")
+    end
   end
 
   describe ".for" do

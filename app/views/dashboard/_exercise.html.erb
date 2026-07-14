@@ -163,7 +163,11 @@
         textareas.forEach(t => answers[t.dataset.field] = t.value);
         await fetch(form.action, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
           body: JSON.stringify({ response: { answers } })
         });
       }, 800);
@@ -183,7 +187,10 @@
     // no authenticity_token and fail CSRF verification. Routing through
     // fetch with the meta tag's token — always valid, since the meta tag
     // itself is only ever rendered during a real page load — sidesteps
-    // that entirely.
+    // that entirely. The explicit Accept header tells ResponsesController#create
+    // to respond with JSON here; without it, request.format resolves to
+    // :html (matching a native browser fallback) and the controller
+    // redirects instead — see spec/requests/responses_spec.rb "format handling".
     const submitButton = form.querySelector('input[type="submit"]');
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -198,7 +205,11 @@
       try {
         const response = await fetch(form.action, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
           body: JSON.stringify({ response: { answers, submit: "1" } })
         });
 
