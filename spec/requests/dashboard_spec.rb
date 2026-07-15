@@ -148,6 +148,30 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "review button label" do
+    it "names the user's provider on the get-review button" do
+      user = create_user_with_key(email: "gem@example.com", name: "Gem")
+      user.update!(provider: "gemini")
+      login_as(user)
+
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current,
+        problem_set: base_problem_set,
+        generated_at: Time.current
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "An answer with plenty of substance" },
+        submitted_at: Time.current
+      )
+
+      get root_path
+
+      expect(response.body).to include("Get Gemini review →")
+      expect(response.body).not_to include("Get Claude review →")
+    end
+  end
+
   describe "on-demand generation and the weekday guard" do
     around do |example|
       # A known Monday and a known Saturday, so weekday?/weekend? are unambiguous
