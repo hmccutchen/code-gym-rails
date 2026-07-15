@@ -208,4 +208,24 @@ RSpec.describe User, type: :model do
       expect(user.language_for_today).to eq("javascript")
     end
   end
+
+  describe "#provider_label" do
+    it "returns Claude for the anthropic provider" do
+      user = create_user
+      user.provider = "anthropic"
+      expect(user.provider_label).to eq("Claude")
+    end
+
+    it "returns Gemini for the gemini provider" do
+      user = create_user
+      user.provider = "gemini"
+      expect(user.provider_label).to eq("Gemini")
+    end
+
+    it "falls back to AI when the provider is nil" do
+      user = create_user
+      user.provider = nil
+      expect(user.provider_label).to eq("AI")
+    end
+  end
 end

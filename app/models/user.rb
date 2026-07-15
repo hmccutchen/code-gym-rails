@@ -81,4 +81,9 @@ class User < ApplicationRecord
 
     last.language == "ruby_rails" ? "javascript" : "ruby_rails"
   end
+
+  # ── Display ────────────────────────────────────────────────────────────────
+  def provider_label
+    I18n.t("providers.#{provider.presence || 'unknown'}")
+  end
 end

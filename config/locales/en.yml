@@ -29,3 +29,16 @@
 
 en:
   hello: "Hello world"
+  providers:
+    anthropic: "Claude"
+    gemini: "Gemini"
+    unknown: "AI"
+  review:
+    get_button: "Get %{provider} review →"
+    heading: "%{provider}'s Review"
+    history_summary: "%{provider}'s review"
+  profile:
+    name:
+      saved: "Saved ✓"
+      error: "Couldn't save"
+      aria_label: "Your display name"
