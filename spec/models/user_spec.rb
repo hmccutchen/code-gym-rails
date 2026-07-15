@@ -121,6 +121,21 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_performance sections_answered" do
+    it "counts a section answered on the same terms the dashboard and history do" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      daily_response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "Found the N+1 in the loop", "pattern" => " " * 20, "challenge" => "short" }
+      )
+
+      expect(user.recent_performance.first[:sections_answered])
+        .to eq(daily_response.answered_sections.size)
+    end
+  end
+
   describe "#recent_performance concepts" do
     it "includes each session's concept_tags map, empty for untagged history" do
       user = create_user

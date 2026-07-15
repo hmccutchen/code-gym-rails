@@ -22,5 +22,15 @@ RSpec.describe DailyResponse, type: :model do
       expect(daily_response.answered_sections).to eq([ "code_review" ])
       expect(daily_response.completeness).to eq(33)
     end
+
+    it "does not count whitespace-only answers, however long" do
+      daily_response = user.daily_responses.create!(
+        daily_exercise: exercise,
+        date: Date.current,
+        answers: { "code_review" => " " * 20 }
+      )
+
+      expect(daily_response.answered_sections).to be_empty
+    end
   end
 end

@@ -26,6 +26,6 @@ class ApplicationController < ActionController::Base
     return if current_user.api_key_present?
     return if controller_name == "api_keys" || controller_name == "sessions"
 
-    redirect_to setup_path, notice: "Add your Anthropic API key to get started."
+    redirect_to setup_path, notice: "Add your API key to get started."
   end
 end

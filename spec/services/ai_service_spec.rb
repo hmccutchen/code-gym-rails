@@ -126,12 +126,6 @@ RSpec.describe AiService do
   end
 
   describe "#normalize_concepts" do
-    it "raises AiService::Error for valid JSON that is not an object" do
-      expect {
-        service.send(:normalize_concepts, [ "not", "a", "problem set" ])
-      }.to raise_error(AiService::Error, /Array instead of a JSON object/)
-    end
-
     it "keeps on-list concepts and maps off-list ones to 'other'" do
       set = {
         "code_review" => { "concept" => "n_plus_one" },
@@ -228,6 +222,14 @@ RSpec.describe AiService do
   end
 
   describe "#generate_exercise" do
+    it "raises rather than returning a problem set that isn't a JSON object" do
+      svc = double_class.new(canned_text: '["not", "a", "problem set"]')
+
+      expect {
+        svc.generate_exercise(user)
+      }.to raise_error(AiService::Error, /Array instead of a JSON object/)
+    end
+
     it "logs usage and normalizes concepts from the provider's response using the resolved language" do
       set = { "code_review" => { "concept" => "bogus" } }
       svc = double_class.new(canned_text: set.to_json, input_tokens: 5, output_tokens: 7)
@@ -338,6 +340,17 @@ RSpec.describe AiService do
       expect(svc.last_prompt).to include("Extract a scope object.")
       expect(svc.last_prompt).to include(exercise.challenge["question"])
       expect(svc.last_prompt).to include("def foo; end")
+    end
+
+    # A review that isn't a JSON object would still be truthy once persisted to
+    # ai_review, which flips DailyResponse#reviewed? and permanently retires the
+    # "Get review" button — leaving the user with an empty review and no retry.
+    it "raises rather than returning a review that isn't a JSON object" do
+      svc = double_class.new(canned_text: '["not", "an", "object"]')
+
+      expect {
+        svc.review_response(user, sample_exercise("ruby_rails"), instance_double(DailyResponse, answers: {}))
+      }.to raise_error(AiService::Error, /instead of a JSON object/)
     end
   end
 

@@ -3,8 +3,8 @@ class User < ApplicationRecord
   has_many :daily_responses, dependent: :destroy
   has_many :api_usages,      dependent: :destroy
 
-  # Encrypt Anthropic API key at rest using Rails 7+ ActiveRecord Encryption.
-  # Requires RAILS_MASTER_KEY / credentials to be set (standard Rails setup).
+  # Encrypt the user's provider API key at rest. Requires RAILS_MASTER_KEY /
+  # credentials to be set (standard Rails setup).
   encrypts :api_key
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
@@ -43,20 +43,9 @@ class User < ApplicationRecord
     update!(login_token_digest: nil, login_token_sent_at: nil)
   end
 
-  def login_token_expired?
-    login_token_sent_at.nil? || login_token_sent_at < TOKEN_EXPIRY.ago
-  end
-
   # ── API key ───────────────────────────────────────────────────────────────
   def api_key_present?
     api_key.present?
-  end
-
-  # ── Usage helpers ─────────────────────────────────────────────────────────
-  def monthly_token_usage(month = Date.current.beginning_of_month)
-    api_usages
-      .where(date: month..month.end_of_month)
-      .sum(:tokens_in) + api_usages.where(date: month..month.end_of_month).sum(:tokens_out)
   end
 
   # ── Recent performance for prompt context ─────────────────────────────────
@@ -73,7 +62,7 @@ class User < ApplicationRecord
           rating:        r.rating,
           feedback:      r.feedback_text,
           concepts:      r.concept_tags,
-          sections_answered: r.answers.count { |_, v| v.to_s.length > 10 }
+          sections_answered: r.answered_sections.size
         }
       end
   end
