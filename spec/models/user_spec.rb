@@ -227,5 +227,14 @@ RSpec.describe User, type: :model do
       user.provider = nil
       expect(user.provider_label).to eq("AI")
     end
+
+    it "falls back to AI for an unexpected provider value (e.g. legacy data)" do
+      # Validations block writing this normally, but rows can reach the DB via
+      # update_column/insert_all/raw SQL — the label must stay stable, never a
+      # user-visible "translation missing".
+      user = create_user
+      user.provider = "openai"
+      expect(user.provider_label).to eq("AI")
+    end
   end
 end
