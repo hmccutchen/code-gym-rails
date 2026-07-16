@@ -59,4 +59,17 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("1/3 sections")
     end
   end
+
+  describe "review summary label" do
+    it "names the user's provider on the history review summary" do
+      user.update!(provider: "gemini")
+      login_as(user)
+      create_session_for(user, date: Date.current, reviewed: true)
+
+      get history_path
+
+      expect(response.body).to include("Gemini&#39;s review")
+      expect(response.body).not_to include("Claude&#39;s review")
+    end
+  end
 end

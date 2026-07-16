@@ -43,15 +43,97 @@
     .review-block h4 { color: var(--accent); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
     .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
     .review-item { font-size: .9rem; line-height: 1.7; margin-top: .4rem; }
+
+    .name-editor-input {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      font-size: inherit;
+      font-family: inherit;
+      padding: .15rem .3rem;
+      width: 9rem;
+      border-radius: 6px;
+    }
+    .name-editor-input:focus {
+      outline: 1px solid var(--accent);
+      outline-offset: 0;
+      background: rgba(124, 106, 247, .06);
+      border-color: var(--border);
+    }
+    .name-editor-status { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
   </style>
 </head>
 <body>
   <nav>
     <div class="container inner">
-      <span class="brand">⚡ Code Gym</span>
+      <% if logged_in? %>
+        <%= link_to "⚡ Code Gym", root_path, class: "brand" %>
+      <% else %>
+        <span class="brand">⚡ Code Gym</span>
+      <% end %>
       <% if logged_in? %>
         <div class="nav-links">
-          <span><%= current_user.name %></span>
+          <span class="name-editor">
+            <input type="text"
+                   id="nav-name-input"
+                   class="name-editor-input"
+                   value="<%= current_user.name %>"
+                   aria-label="<%= t("profile.name.aria_label") %>">
+            <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
+          </span>
+          <%# Inline autosave: this app loads no Stimulus/importmap JS (the layout
+              emits no javascript_importmap_tags), so the working convention here is
+              an inline script, same as the answer autosave in dashboard/_exercise.
+              Copy still comes from I18n; the CSRF token comes from the meta tag. %>
+          <script>
+            (function () {
+              const input  = document.getElementById("nav-name-input");
+              const status = document.getElementById("nav-name-status");
+              if (!input) return;
+
+              let lastSaved = input.value;
+              const savedText = "<%= j t("profile.name.saved") %>";
+              const errorText = "<%= j t("profile.name.error") %>";
+              let statusTimer;
+
+              function flash(message) {
+                status.textContent = message;
+                clearTimeout(statusTimer);
+                statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
+              }
+
+              input.addEventListener("blur", async () => {
+                const name = input.value.trim();
+                if (name === lastSaved) return;
+                if (name === "") { input.value = lastSaved; return; }
+
+                try {
+                  const response = await fetch("<%= profile_path %>", {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Accept": "application/json",
+                      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ user: { name } })
+                  });
+
+                  if (response.ok) {
+                    const data = await response.json();
+                    input.value = data.name;
+                    lastSaved = data.name;
+                    flash(savedText);
+                  } else {
+                    input.value = lastSaved;
+                    flash(errorText);
+                  }
+                } catch {
+                  input.value = lastSaved;
+                  flash(errorText);
+                }
+              });
+            })();
+          </script>
           <%= link_to "History", history_path %>
           <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost btn-sm" %>
         </div>

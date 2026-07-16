@@ -81,4 +81,12 @@ class User < ApplicationRecord
 
     last.language == "ruby_rails" ? "javascript" : "ruby_rails"
   end
+
+  # ── Display ────────────────────────────────────────────────────────────────
+  def provider_label
+    # default: falls back to the "unknown" key ("AI") for any provider value
+    # without its own translation — including legacy/invalid data that bypassed
+    # validation — so the UI never shows a "translation missing" string.
+    I18n.t("providers.#{provider.presence || 'unknown'}", default: :"providers.unknown")
+  end
 end
