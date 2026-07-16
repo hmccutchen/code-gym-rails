@@ -179,9 +179,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include('data-controller="name-editor"')
-      expect(response.body).to include("data-name-editor-url-value=\"#{profile_path}\"")
+      # The field itself, seeded with the current name.
+      expect(response.body).to include('id="nav-name-input"')
       expect(response.body).to include('value="Editable"')
+      # The inline autosave script PATCHes the profile endpoint on blur. (This
+      # app loads no Stimulus module JS, so the wiring is an inline script, not
+      # a data-controller — see the layout comment.)
+      expect(response.body).to include('fetch("' + profile_path + '", {')
+      expect(response.body).to include('addEventListener("blur"')
     end
   end
 

@@ -73,19 +73,67 @@
       <% end %>
       <% if logged_in? %>
         <div class="nav-links">
-          <span class="name-editor"
-                data-controller="name-editor"
-                data-name-editor-url-value="<%= profile_path %>"
-                data-name-editor-saved-text-value="<%= t("profile.name.saved") %>"
-                data-name-editor-error-text-value="<%= t("profile.name.error") %>">
+          <span class="name-editor">
             <input type="text"
+                   id="nav-name-input"
                    class="name-editor-input"
                    value="<%= current_user.name %>"
-                   aria-label="<%= t("profile.name.aria_label") %>"
-                   data-name-editor-target="input"
-                   data-action="blur->name-editor#save">
-            <span class="name-editor-status" aria-live="polite" data-name-editor-target="status"></span>
+                   aria-label="<%= t("profile.name.aria_label") %>">
+            <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
           </span>
+          <%# Inline autosave: this app loads no Stimulus/importmap JS (the layout
+              emits no javascript_importmap_tags), so the working convention here is
+              an inline script, same as the answer autosave in dashboard/_exercise.
+              Copy still comes from I18n; the CSRF token comes from the meta tag. %>
+          <script>
+            (function () {
+              const input  = document.getElementById("nav-name-input");
+              const status = document.getElementById("nav-name-status");
+              if (!input) return;
+
+              let lastSaved = input.value;
+              const savedText = "<%= j t("profile.name.saved") %>";
+              const errorText = "<%= j t("profile.name.error") %>";
+              let statusTimer;
+
+              function flash(message) {
+                status.textContent = message;
+                clearTimeout(statusTimer);
+                statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
+              }
+
+              input.addEventListener("blur", async () => {
+                const name = input.value.trim();
+                if (name === lastSaved) return;
+                if (name === "") { input.value = lastSaved; return; }
+
+                try {
+                  const response = await fetch("<%= profile_path %>", {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Accept": "application/json",
+                      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ user: { name } })
+                  });
+
+                  if (response.ok) {
+                    const data = await response.json();
+                    input.value = data.name;
+                    lastSaved = data.name;
+                    flash(savedText);
+                  } else {
+                    input.value = lastSaved;
+                    flash(errorText);
+                  }
+                } catch {
+                  input.value = lastSaved;
+                  flash(errorText);
+                }
+              });
+            })();
+          </script>
           <%= link_to "History", history_path %>
           <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost btn-sm" %>
         </div>
