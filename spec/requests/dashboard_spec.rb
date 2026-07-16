@@ -172,6 +172,19 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "editable nav name" do
+    it "renders the name as an editable field wired to the profile endpoint" do
+      user = create_user_with_key(email: "edit@example.com", name: "Editable")
+      login_as(user)
+
+      get root_path
+
+      expect(response.body).to include('data-controller="name-editor"')
+      expect(response.body).to include("data-name-editor-url-value=\"#{profile_path}\"")
+      expect(response.body).to include('value="Editable"')
+    end
+  end
+
   describe "on-demand generation and the weekday guard" do
     around do |example|
       # A known Monday and a known Saturday, so weekday?/weekend? are unambiguous

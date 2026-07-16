@@ -51,7 +51,19 @@
       <span class="brand">⚡ Code Gym</span>
       <% if logged_in? %>
         <div class="nav-links">
-          <span><%= current_user.name %></span>
+          <span class="name-editor"
+                data-controller="name-editor"
+                data-name-editor-url-value="<%= profile_path %>"
+                data-name-editor-saved-text-value="<%= t("profile.name.saved") %>"
+                data-name-editor-error-text-value="<%= t("profile.name.error") %>">
+            <input type="text"
+                   class="name-editor-input"
+                   value="<%= current_user.name %>"
+                   aria-label="<%= t("profile.name.aria_label") %>"
+                   data-name-editor-target="input"
+                   data-action="blur->name-editor#save">
+            <span class="name-editor-status" aria-live="polite" data-name-editor-target="status"></span>
+          </span>
           <%= link_to "History", history_path %>
           <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost btn-sm" %>
         </div>
