@@ -66,7 +66,11 @@
 <body>
   <nav>
     <div class="container inner">
-      <span class="brand">⚡ Code Gym</span>
+      <% if logged_in? %>
+        <%= link_to "⚡ Code Gym", root_path, class: "brand" %>
+      <% else %>
+        <span class="brand">⚡ Code Gym</span>
+      <% end %>
       <% if logged_in? %>
         <div class="nav-links">
           <span class="name-editor"

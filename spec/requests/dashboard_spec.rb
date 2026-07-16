@@ -185,6 +185,16 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "brand title link" do
+    it "links the brand title back to the dashboard when logged in" do
+      login_as(create_user_with_key(email: "brand@example.com", name: "Brand"))
+
+      get root_path
+
+      expect(response.body).to match(%r{<a class="brand" href="/">⚡ Code Gym</a>})
+    end
+  end
+
   describe "on-demand generation and the weekday guard" do
     around do |example|
       # A known Monday and a known Saturday, so weekday?/weekend? are unambiguous
