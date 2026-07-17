@@ -10,8 +10,6 @@ class User < ApplicationRecord
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
-  VALID_TIME_ZONES  = (ActiveSupport::TimeZone.all.map(&:name) +
-                       ActiveSupport::TimeZone::MAPPING.values).freeze
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
@@ -19,7 +17,7 @@ class User < ApplicationRecord
   validates :skill_level, inclusion: { in: %w[beginner developing solid strong] }
   validates :provider, inclusion: { in: %w[anthropic gemini] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
-  validates :time_zone, inclusion: { in: VALID_TIME_ZONES }, allow_nil: true
+  validate :time_zone_must_be_loadable
 
   before_save { email.downcase! }
 
@@ -100,5 +98,12 @@ class User < ApplicationRecord
     # without its own translation — including legacy/invalid data that bypassed
     # validation — so the UI never shows a "translation missing" string.
     I18n.t("providers.#{provider.presence || 'unknown'}", default: :"providers.unknown")
+  end
+
+  private
+
+  def time_zone_must_be_loadable
+    return if time_zone.blank? # blank/nil = not yet detected; allowed
+    errors.add(:time_zone, "is not a valid time zone") if Time.find_zone(time_zone).nil?
   end
 end

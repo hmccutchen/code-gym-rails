@@ -135,5 +135,23 @@ RSpec.describe GenerateDailyExercisesJob do
         expect(DailyExercise.where(user: pac).count).to eq(1)
       end
     end
+
+    it "gates each user independently by their own zone within the same batch run" do
+      # 2026-07-13 15:00 UTC == 08:00 PDT Monday (at 8am local, generated)
+      #                      == 07:00 AKDT Monday (before 8am local, not generated)
+      alaska = User.create!(email: "alaska@example.com", name: "Alaska", provider: "anthropic",
+                             api_key: "sk-ant-test", time_zone: "America/Anchorage")
+      stub_generation_for(pac)
+      stub_generation_for(alaska)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        described_class.new.perform
+
+        pac_local_today = Time.use_zone("America/Los_Angeles") { Date.current }
+        expect(DailyExercise.exists?(user: pac, date: pac_local_today)).to be true
+
+        expect(DailyExercise.where(user: alaska).count).to eq(0)
+      end
+    end
   end
 end

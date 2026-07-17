@@ -228,6 +228,11 @@ RSpec.describe User, type: :model do
       expect(User.new(email: "z3@example.com", name: "Z", time_zone: nil)).to be_valid
     end
 
+    it "accepts IANA zones outside Rails' MAPPING subset (regression: Alaska/Michigan browsers and manual select)" do
+      expect(User.new(email: "z5@example.com", name: "Z", time_zone: "America/Anchorage")).to be_valid
+      expect(User.new(email: "z6@example.com", name: "Z", time_zone: "America/Detroit")).to be_valid
+    end
+
     it "rejects a garbage zone" do
       user = User.new(email: "z4@example.com", name: "Z", time_zone: "Mars/Phobos")
       expect(user).not_to be_valid
