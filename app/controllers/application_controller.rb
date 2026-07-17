@@ -1,10 +1,15 @@
 class ApplicationController < ActionController::Base
   before_action :require_login
   before_action :require_api_key
+  around_action :use_time_zone
 
   helper_method :current_user, :logged_in?
 
   private
+
+  def use_time_zone(&block)
+    Time.use_zone(current_user&.effective_time_zone || User::DEFAULT_TIME_ZONE, &block)
+  end
 
   def current_user
     @current_user ||= User.find_by(id: session[:user_id])
