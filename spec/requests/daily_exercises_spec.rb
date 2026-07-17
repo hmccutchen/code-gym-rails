@@ -72,6 +72,28 @@ RSpec.describe "DailyExercises", type: :request do
       expect(exercise.reload.regenerated_at).to be_nil
     end
 
+    it "shows a Settings-pointing alert when the provider raises AuthenticationError" do
+      create_exercise
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:generate_exercise).and_raise(AiService::AuthenticationError, "invalid x-api-key")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post regenerate_path
+
+      expect(flash[:alert]).to eq("Your API key was rejected — check it in Settings. (invalid x-api-key)")
+    end
+
+    it "shows a try-again alert when the provider raises RateLimitError" do
+      create_exercise
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:generate_exercise).and_raise(AiService::RateLimitError, "rate limited")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post regenerate_path
+
+      expect(flash[:alert]).to eq("The AI provider is rate-limiting requests — try again shortly.")
+    end
+
     it "preserves the existing DailyResponse when the AI call fails" do
       exercise = create_exercise
       daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,

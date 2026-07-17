@@ -55,6 +55,22 @@ class GenerateDailyExercisesJob < ApplicationJob
     )
 
     Rails.logger.info("Generated exercise for #{user.email} on #{Date.current}")
+  rescue AiService::AuthenticationError => e
+    Rails.logger.error("Auth failure generating exercise for #{user.email}: #{e.message}")
+    Turbo::StreamsChannel.broadcast_replace_to(
+      user,
+      target:  "dashboard-content",
+      partial: "dashboard/generation_failed",
+      locals:  { message: "Your API key was rejected — check it in Settings. (#{e.message})" }
+    )
+  rescue AiService::RateLimitError => e
+    Rails.logger.warn("Rate limited generating exercise for #{user.email}: #{e.message}")
+    Turbo::StreamsChannel.broadcast_replace_to(
+      user,
+      target:  "dashboard-content",
+      partial: "dashboard/generation_failed",
+      locals:  { message: "The AI provider is rate-limiting requests — try again shortly." }
+    )
   rescue AiService::Error => e
     Rails.logger.error("Failed to generate exercise for #{user.email}: #{e.message}")
     Turbo::StreamsChannel.broadcast_replace_to(

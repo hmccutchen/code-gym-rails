@@ -174,5 +174,27 @@ RSpec.describe "Responses", type: :request do
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("Couldn't generate the review: rate limited")
     end
+
+    it "shows a Settings-pointing alert when the provider raises AuthenticationError" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_raise(AiService::AuthenticationError, "invalid x-api-key")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(flash[:alert]).to eq("Your API key was rejected — check it in Settings. (invalid x-api-key)")
+    end
+
+    it "shows a try-again alert when the provider raises RateLimitError" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_raise(AiService::RateLimitError, "rate limited")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(flash[:alert]).to eq("The AI provider is rate-limiting requests — try again shortly.")
+    end
   end
 end

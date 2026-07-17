@@ -3,10 +3,68 @@ require "rails_helper"
 RSpec.describe GeminiService do
   let(:service) { described_class.new("AIzaTestKey") }
 
+  # Builds a connection with the service's real retry configuration but a
+  # Faraday test adapter, so retry/backoff behavior can be exercised without
+  # a real network call. `responses` is a queue of [status, body] pairs
+  # popped one per request against API_URL.
+  def stubbed_connection(responses)
+    Faraday.new do |f|
+      f.request :retry, GeminiService::RETRY_OPTIONS
+      f.adapter :test do |stub|
+        stub.post(GeminiService::API_URL) do
+          status, body = responses.shift
+          [ status, {}, body ]
+        end
+      end
+    end
+  end
+
+  def success_body(text: "hello")
+    {
+      "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => text } ] } ],
+      "usage" => { "total_input_tokens" => 1, "total_output_tokens" => 1 }
+    }.to_json
+  end
+
   describe "#build_connection" do
     it "sets the Gemini auth header" do
       conn = service.send(:build_connection)
       expect(conn.headers["x-goog-api-key"]).to eq("AIzaTestKey")
+    end
+  end
+
+  describe "retry/backoff" do
+    it "retries a 429 and eventually succeeds" do
+      responses = [ [ 429, "" ], [ 200, success_body ] ]
+      service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+      result = service.send(:call, system: "sys", prompt: "prompt")
+
+      expect(result[:text]).to eq("hello")
+      expect(responses).to be_empty
+    end
+
+    it "raises RateLimitError once retries are exhausted on a persistent 429" do
+      responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
+      service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt")
+      }.to raise_error(AiService::RateLimitError)
+      # 3 total attempts (max: 2 retries) — one response left unused.
+      expect(responses.size).to eq(1)
+    end
+
+    it "raises AuthenticationError immediately on a 401, without retrying" do
+      responses = [ [ 401, { "error" => { "message" => "API key not valid" } }.to_json ], [ 200, success_body ] ]
+      service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt")
+      }.to raise_error(AiService::AuthenticationError, "API key not valid")
+      # The 401 isn't in retry_statuses, so only one request is made — the
+      # second stubbed response is never consumed.
+      expect(responses.size).to eq(1)
     end
   end
 

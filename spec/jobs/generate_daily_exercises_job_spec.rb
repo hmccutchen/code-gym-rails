@@ -24,6 +24,34 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
   end
 
+  it "broadcasts a Settings-pointing message when AiService::AuthenticationError is raised" do
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::AuthenticationError, "invalid x-api-key")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    expect(Rails.logger).to receive(:error).with(/Auth failure generating exercise.*invalid x-api-key/)
+    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+      user, target: "dashboard-content", partial: "dashboard/generation_failed",
+      locals: { message: "Your API key was rejected — check it in Settings. (invalid x-api-key)" }
+    )
+
+    described_class.new.perform(user_id: user.id)
+  end
+
+  it "broadcasts a try-again message when AiService::RateLimitError is raised" do
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::RateLimitError, "rate limited")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    expect(Rails.logger).to receive(:warn).with(/Rate limited generating exercise.*rate limited/)
+    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+      user, target: "dashboard-content", partial: "dashboard/generation_failed",
+      locals: { message: "The AI provider is rate-limiting requests — try again shortly." }
+    )
+
+    described_class.new.perform(user_id: user.id)
+  end
+
   it "persists the resolved language on the created DailyExercise" do
     user.update!(language: "javascript")
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
