@@ -55,6 +55,10 @@ class ResponsesController < ApplicationController
 
     @response.update!(ai_review: ai_review)
     redirect_to root_path, notice: "Review ready!"
+  rescue AiService::AuthenticationError => e
+    redirect_to root_path, alert: "Your API key was rejected — check it in Settings. (#{e.message})"
+  rescue AiService::RateLimitError => e
+    redirect_to root_path, alert: "The AI provider is rate-limiting requests — try again shortly."
   rescue AiService::Error => e
     redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
   end

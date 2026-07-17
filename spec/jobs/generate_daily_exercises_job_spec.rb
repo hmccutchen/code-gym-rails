@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GenerateDailyExercisesJob do
-  let(:user) { User.create!(email: "cronuser@example.com", name: "Cron", provider: "anthropic", api_key: "sk-ant-test") }
+  let(:user) { User.create!(email: "cronuser@example.com", name: "Cron", provider: "anthropic", api_key: "sk-ant-test", time_zone: "UTC") }
 
   it "creates a DailyExercise from the provider's generated problem set" do
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
@@ -22,6 +22,34 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(Rails.logger).to receive(:error).with(/Failed to generate exercise.*boom/)
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
+  end
+
+  it "broadcasts a Settings-pointing message when AiService::AuthenticationError is raised" do
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::AuthenticationError, "invalid x-api-key")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    expect(Rails.logger).to receive(:error).with(/Auth failure generating exercise.*invalid x-api-key/)
+    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+      user, target: "dashboard-content", partial: "dashboard/generation_failed",
+      locals: { message: "Your API key was rejected — check it in Settings. (invalid x-api-key)" }
+    )
+
+    described_class.new.perform(user_id: user.id)
+  end
+
+  it "broadcasts a try-again message when AiService::RateLimitError is raised" do
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::RateLimitError, "rate limited")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    expect(Rails.logger).to receive(:warn).with(/Rate limited generating exercise.*rate limited/)
+    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+      user, target: "dashboard-content", partial: "dashboard/generation_failed",
+      locals: { message: "The AI provider is rate-limiting requests — try again shortly." }
+    )
+
+    described_class.new.perform(user_id: user.id)
   end
 
   it "persists the resolved language on the created DailyExercise" do
@@ -85,5 +113,73 @@ RSpec.describe GenerateDailyExercisesJob do
       .with(user, target: "dashboard-content", partial: "dashboard/generation_failed", locals: { message: "boom" })
 
     described_class.new.perform(user_id: user.id)
+  end
+
+  describe "hourly batch (no user_id), zone-gated" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    def stub_generation_for(u)
+      svc = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+      allow(AiService).to receive(:for).with(u).and_return(svc)
+      allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
+    end
+
+    let(:pac) { User.create!(email: "pac@example.com", name: "Pac", provider: "anthropic", api_key: "sk-ant-test", time_zone: "America/Los_Angeles") }
+
+    it "does not generate before 8am local" do
+      stub_generation_for(pac)
+      # 2026-07-13 14:00 UTC == 07:00 PDT (Monday, before 8am local)
+      travel_to(Time.utc(2026, 7, 13, 14, 0)) do
+        described_class.new.perform
+        local_today = Time.use_zone("America/Los_Angeles") { Date.current }
+        expect(DailyExercise.exists?(user: pac, date: local_today)).to be false
+      end
+    end
+
+    it "generates at/after 8am local on a weekday" do
+      stub_generation_for(pac)
+      # 2026-07-13 15:00 UTC == 08:00 PDT (Monday, at 8am local)
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        described_class.new.perform
+        local_today = Time.use_zone("America/Los_Angeles") { Date.current }
+        expect(DailyExercise.exists?(user: pac, date: local_today)).to be true
+      end
+    end
+
+    it "does not generate on a local weekend" do
+      stub_generation_for(pac)
+      # 2026-07-18 17:00 UTC == 10:00 PDT Saturday
+      travel_to(Time.utc(2026, 7, 18, 17, 0)) do
+        described_class.new.perform
+        expect(DailyExercise.where(user: pac).count).to eq(0)
+      end
+    end
+
+    it "creates exactly one exercise when the batch runs twice in the same hour" do
+      stub_generation_for(pac)
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        described_class.new.perform
+        described_class.new.perform
+        expect(DailyExercise.where(user: pac).count).to eq(1)
+      end
+    end
+
+    it "gates each user independently by their own zone within the same batch run" do
+      # 2026-07-13 15:00 UTC == 08:00 PDT Monday (at 8am local, generated)
+      #                      == 07:00 AKDT Monday (before 8am local, not generated)
+      alaska = User.create!(email: "alaska@example.com", name: "Alaska", provider: "anthropic",
+                             api_key: "sk-ant-test", time_zone: "America/Anchorage")
+      stub_generation_for(pac)
+      stub_generation_for(alaska)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        described_class.new.perform
+
+        pac_local_today = Time.use_zone("America/Los_Angeles") { Date.current }
+        expect(DailyExercise.exists?(user: pac, date: pac_local_today)).to be true
+
+        expect(DailyExercise.where(user: alaska).count).to eq(0)
+      end
+    end
   end
 end

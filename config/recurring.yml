@@ -1,11 +1,14 @@
 # Solid Queue recurring tasks (Rails 8 built-in scheduler)
-# Runs GenerateDailyExercisesJob every weekday at 8am UTC.
-# Adjust the cron expression for your team's timezone if needed.
+# Runs GenerateDailyExercisesJob every hour; the job itself gates generation
+# per-user, only firing for a given user once it's 8am on a weekday in that
+# user's own effective time zone (falling back to the team default zone for
+# users who haven't set one).
+# Adjust the cron expression below if you need a different polling frequency.
 
 production:
   generate_daily_exercises:
     class: GenerateDailyExercisesJob
-    schedule: "0 8 * * 1-5"   # 8am UTC, Mon–Fri
+    schedule: "0 * * * *"   # hourly; the job gates each user to 8am in their own zone
     description: "Generate personalized daily Code Gym exercises for all users"
 
 development:

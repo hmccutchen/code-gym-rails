@@ -33,6 +33,10 @@ class DailyExercisesController < ApplicationController
     end
 
     redirect_to root_path, notice: "New set generated!"
+  rescue AiService::AuthenticationError => e
+    redirect_to root_path, alert: "Your API key was rejected — check it in Settings. (#{e.message})"
+  rescue AiService::RateLimitError => e
+    redirect_to root_path, alert: "The AI provider is rate-limiting requests — try again shortly."
   rescue AiService::Error => e
     redirect_to root_path, alert: "Couldn't generate a new set: #{e.message}"
   end

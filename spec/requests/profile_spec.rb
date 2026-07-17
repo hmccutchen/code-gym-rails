@@ -17,7 +17,7 @@ RSpec.describe "Profile", type: :request do
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).to eq("name" => "Renamed")
+      expect(JSON.parse(response.body)).to eq("name" => "Renamed", "time_zone" => "UTC")
       expect(user.reload.name).to eq("Renamed")
     end
 
@@ -32,6 +32,44 @@ RSpec.describe "Profile", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)["errors"]).to be_present
       expect(user.reload.name).to eq(original)
+    end
+
+    it "updates the time_zone and returns 200" do
+      login_as(user)
+      patch profile_path,
+            params: { user: { time_zone: "America/Los_Angeles" } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.time_zone).to eq("America/Los_Angeles")
+    end
+
+    it "strips surrounding whitespace from a time_zone before validating" do
+      login_as(user)
+      patch profile_path,
+            params: { user: { time_zone: "  America/Los_Angeles  " } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.time_zone).to eq("America/Los_Angeles")
+    end
+
+    it "stores a blank time_zone as nil (leaves it to auto-detect)" do
+      user.update!(time_zone: "America/Chicago")
+      login_as(user)
+      patch profile_path,
+            params: { user: { time_zone: "" } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.time_zone).to be_nil
+    end
+
+    it "rejects an invalid time_zone with 422 and no change" do
+      user.update!(time_zone: "America/Chicago")
+      login_as(user)
+      patch profile_path,
+            params: { user: { time_zone: "Mars/Phobos" } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(user.reload.time_zone).to eq("America/Chicago")
     end
   end
 end

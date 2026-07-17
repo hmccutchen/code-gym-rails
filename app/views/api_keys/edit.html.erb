@@ -32,4 +32,38 @@
     </div>
     <%= f.submit "Save key →", class: "btn btn-primary" %>
   <% end %>
+
+  <div class="form-field">
+    <label for="tz-select">Time zone</label>
+    <%= select_tag "tz_select",
+          options_for_select(
+            [ [ "Eastern", "America/New_York" ],
+              [ "Central", "America/Chicago" ],
+              [ "Mountain", "America/Denver" ],
+              [ "Mountain (Arizona, no DST)", "America/Phoenix" ],
+              [ "Pacific", "America/Los_Angeles" ],
+              [ "Alaska", "America/Anchorage" ],
+              [ "Hawaii", "Pacific/Honolulu" ] ],
+            current_user.time_zone),
+          include_blank: "— detect automatically —",
+          id: "tz-select" %>
+    <p class="hint">Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser's zone.</p>
+  </div>
+  <script>
+    (function () {
+      const sel = document.getElementById("tz-select");
+      if (!sel) return;
+      sel.addEventListener("change", () => {
+        fetch("<%= profile_path %>", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ user: { time_zone: sel.value } })
+        });
+      });
+    })();
+  </script>
 </div>

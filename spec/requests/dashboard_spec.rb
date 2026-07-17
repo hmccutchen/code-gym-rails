@@ -217,6 +217,23 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
         expect(response.body).to include("Generating your personalized exercise set")
       end
+
+      # Regression lock-in: the dashboard must live-update once generation
+      # finishes rather than requiring a manual refresh. The placeholder's
+      # wrapper id must match what GenerateDailyExercisesJob broadcasts a
+      # replace against, and the page must actually subscribe to that user's
+      # Turbo Stream — otherwise the job's broadcast has nothing to update.
+      it "wraps the placeholder in the dashboard-content id the job broadcasts a replace to" do
+        get root_path
+
+        expect(response.body).to match(%r{<div id="dashboard-content">.*Generating your personalized exercise set.*</div>}m)
+      end
+
+      it "subscribes to the current user's Turbo Stream so the job's broadcast can reach this page" do
+        get root_path
+
+        expect(response.body).to include(Turbo::StreamsChannel.signed_stream_name(user))
+      end
     end
 
     context "on a weekend" do

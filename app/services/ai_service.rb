@@ -3,6 +3,19 @@ require "json"
 class AiService
   class Error < StandardError; end
 
+  # Bad/revoked API key (HTTP 401/403) — user-actionable: they need to fix
+  # their key in Settings. Never worth retrying.
+  class AuthenticationError < Error; end
+
+  # Transient rate limiting (HTTP 429) that survived Faraday's own retries.
+  # User-actionable in the sense of "try again shortly", but not a bug.
+  class RateLimitError < Error; end
+
+  # Malformed JSON or a payload with the wrong shape (e.g. an Array where a
+  # Hash was expected). Not user-actionable — almost always a real bug in
+  # our prompt/schema or a provider-side change.
+  class InvalidResponseError < Error; end
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
@@ -240,7 +253,7 @@ class AiService
     parsed = parse_json_response(text)
     return parsed if parsed.is_a?(Hash)
 
-    raise Error, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
+    raise InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
   end
 
   def parse_json_response(text)
@@ -249,7 +262,7 @@ class AiService
     JSON.parse(clean)
   rescue JSON::ParserError => e
     log_raw_snippet("Invalid JSON from provider", text)
-    raise Error, "Provider returned invalid JSON: #{e.message}"
+    raise InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
   end
 
   # Extracts a provider's own explanation for a failed HTTP response, when
@@ -273,7 +286,10 @@ class AiService
   # leak to users and bloat logs.
   def log_raw_snippet(label, content)
     text = content.to_s
-    snippet = text.byteslice(0, RAW_SNIPPET_LIMIT)
+    # .scrub guards against byteslice cutting a multi-byte UTF-8 character in
+    # half at the truncation boundary, which would otherwise leave an invalid
+    # byte sequence in the log line.
+    snippet = text.byteslice(0, RAW_SNIPPET_LIMIT).scrub
     snippet += "... (truncated, #{text.bytesize} bytes total)" if text.bytesize > RAW_SNIPPET_LIMIT
     Rails.logger.error("#{label}: #{snippet}")
   end

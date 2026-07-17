@@ -64,4 +64,21 @@ RSpec.describe "Sessions", type: :request do
       expect(response).to redirect_to(login_path)
     end
   end
+
+  describe "stale CSRF token (e.g. after a deploy restart)" do
+    around do |example|
+      original = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+      example.run
+    ensure
+      ActionController::Base.allow_forgery_protection = original
+    end
+
+    it "redirects to login with a friendly flash instead of a raw 422" do
+      post login_path, params: { email: "x@example.com", authenticity_token: "stale-bogus-token" }
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq("Your session expired — please try again.")
+    end
+  end
 end

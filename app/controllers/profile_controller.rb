@@ -6,7 +6,7 @@ class ProfileController < ApplicationController
   # PATCH /profile — inline name autosave (JSON)
   def update
     if current_user.update(profile_params)
-      render json: { name: current_user.name }
+      render json: { name: current_user.name, time_zone: current_user.time_zone }
     else
       render json: { errors: current_user.errors.full_messages },
              status: :unprocessable_entity
@@ -16,6 +16,9 @@ class ProfileController < ApplicationController
   private
 
   def profile_params
-    params.require(:user).permit(:name).transform_values { |v| v.to_s.strip }
+    permitted = params.require(:user).permit(:name, :time_zone)
+    permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
+    permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
+    permitted
   end
 end

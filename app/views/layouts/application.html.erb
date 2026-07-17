@@ -134,6 +134,25 @@
               });
             })();
           </script>
+          <% if current_user.time_zone.blank? %>
+            <%# One-shot: only rendered while the zone is unset, so it never
+                clobbers a later manual choice. Posts the browser's IANA zone. %>
+            <script>
+              (function () {
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (!tz) return;
+                fetch("<%= profile_path %>", {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+                  },
+                  body: JSON.stringify({ user: { time_zone: tz } })
+                });
+              })();
+            </script>
+          <% end %>
           <%= link_to "History", history_path %>
           <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost btn-sm" %>
         </div>

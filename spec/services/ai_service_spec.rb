@@ -161,6 +161,12 @@ RSpec.describe AiService do
       }.to raise_error(AiService::Error, /invalid JSON/)
     end
 
+    it "raises the more specific InvalidResponseError subclass for invalid JSON" do
+      expect {
+        service.send(:parse_json_response, "not json")
+      }.to raise_error(AiService::InvalidResponseError)
+    end
+
     it "does not leak the raw provider text into the exception message" do
       huge_text = "garbage " * 200
       expect {
@@ -177,6 +183,19 @@ RSpec.describe AiService do
       end
 
       expect { service.send(:parse_json_response, huge_text) }.to raise_error(AiService::Error)
+    end
+
+    it "scrubs an invalid byte sequence left by truncating mid-character, instead of raising" do
+      # A 3-byte UTF-8 character ("€") straddling byte offset RAW_SNIPPET_LIMIT
+      # (500) so byteslice cuts it in half, leaving an invalid trailing byte.
+      text = ("a" * 499) + "€" + ("b" * 10)
+
+      expect(Rails.logger).to receive(:error) do |msg|
+        expect(msg.encoding).to eq(Encoding::UTF_8)
+        expect(msg.valid_encoding?).to be true
+      end
+
+      expect { service.send(:parse_json_response, text) }.to raise_error(AiService::Error)
     end
   end
 
@@ -227,7 +246,7 @@ RSpec.describe AiService do
 
       expect {
         svc.generate_exercise(user)
-      }.to raise_error(AiService::Error, /Array instead of a JSON object/)
+      }.to raise_error(AiService::InvalidResponseError, /Array instead of a JSON object/)
     end
 
     it "logs usage and normalizes concepts from the provider's response using the resolved language" do
@@ -350,7 +369,7 @@ RSpec.describe AiService do
 
       expect {
         svc.review_response(user, sample_exercise("ruby_rails"), instance_double(DailyResponse, answers: {}))
-      }.to raise_error(AiService::Error, /instead of a JSON object/)
+      }.to raise_error(AiService::InvalidResponseError, /instead of a JSON object/)
     end
   end
 
