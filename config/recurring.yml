@@ -5,7 +5,7 @@
 production:
   generate_daily_exercises:
     class: GenerateDailyExercisesJob
-    schedule: "0 8 * * 1-5"   # 8am UTC, Mon–Fri
+    schedule: "0 * * * *"   # hourly; the job gates each user to 8am in their own zone
     description: "Generate personalized daily Code Gym exercises for all users"
 
 development:

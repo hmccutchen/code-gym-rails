@@ -2,19 +2,38 @@ class GenerateDailyExercisesJob < ApplicationJob
   queue_as :default
 
   # Called two ways:
-  #   1. Cron (no args) — generates for ALL users at 8am weekdays
+  #   1. Cron (no args) — runs hourly; generates for users whose local time is
+  #      a weekday morning at/after 8am, one exercise per local day
   #   2. On-demand (user_id:) — generates for one user when they first open the app
   def perform(user_id: nil)
-    users = user_id ? User.where(id: user_id) : User.where.not(api_key: nil)
-
-    users.find_each do |user|
-      next if DailyExercise.exists?(user: user, date: Date.current)
-
-      generate_for(user)
+    if user_id
+      # On-demand: the dashboard already gated weekday; generate in the user's
+      # zone with no hour gate (a user opening the app early still gets today's).
+      User.where(id: user_id).find_each do |user|
+        Time.use_zone(user.effective_time_zone) { generate_now(user) }
+      end
+    else
+      # Hourly batch: each user in their own zone, gated to local weekday morning.
+      User.where.not(api_key: nil).find_each do |user|
+        Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
+      end
     end
   end
 
   private
+
+  # Batch gate: local weekday, local hour >= 8, and not already generated today.
+  def generate_if_due(user)
+    return unless Date.current.on_weekday?
+    return unless Time.current.hour >= 8
+    generate_now(user)
+  end
+
+  # Generate today's (local) exercise unless it already exists.
+  def generate_now(user)
+    return if DailyExercise.exists?(user: user, date: Date.current)
+    generate_for(user)
+  end
 
   def generate_for(user)
     language    = user.language_for_today
