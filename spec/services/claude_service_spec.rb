@@ -53,6 +53,16 @@ RSpec.describe ClaudeService do
       expect(responses.size).to eq(1)
     end
 
+    it "raises RateLimitError (not a generic Error) once retries are exhausted on a persistent 529" do
+      responses = [ [ 529, "" ], [ 529, "" ], [ 529, "" ], [ 529, "" ] ]
+      service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt")
+      }.to raise_error(AiService::RateLimitError)
+      expect(responses.size).to eq(1)
+    end
+
     it "raises AuthenticationError immediately on a 401, without retrying" do
       responses = [ [ 401, { "error" => { "message" => "invalid x-api-key" } }.to_json ], [ 200, success_body ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))

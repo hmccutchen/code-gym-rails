@@ -41,7 +41,7 @@ class ClaudeService < AiService
       message      = extract_provider_message(resp.body, fallback: "Claude API error #{resp.status}")
       error_class  = case resp.status
       when 401, 403 then AiService::AuthenticationError
-      when 429      then AiService::RateLimitError
+      when 429, 529 then AiService::RateLimitError # 529 is Anthropic's own "overloaded" status — same transient/retry semantics as 429
       else               AiService::Error
       end
       raise error_class, message
