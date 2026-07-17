@@ -60,4 +60,27 @@ RSpec.describe "Per-user timezone", type: :request do
       expect(resp.daily_exercise).to eq(exercise)
     end
   end
+
+  describe "auto-detect + manual override UI" do
+    it "renders the detect-once script only when the zone is blank" do
+      blank = create_user_with_key(email: "blank@example.com", name: "Blank", time_zone: nil)
+      login_as(blank)
+      get root_path
+      expect(response.body).to include("resolvedOptions().timeZone")
+    end
+
+    it "does not render the detect script once a zone is set" do
+      set = create_user_with_key(email: "set@example.com", name: "Set", time_zone: "America/Chicago")
+      login_as(set)
+      get root_path
+      expect(response.body).not_to include("resolvedOptions().timeZone")
+    end
+
+    it "shows a timezone select on the setup page, outside the api-keys form" do
+      login_as(create_user_with_key(email: "setup@example.com", name: "Setup"))
+      get setup_path
+      expect(response.body).to include('id="tz-select"')
+      expect(response.body).to include("America/Los_Angeles")
+    end
+  end
 end
