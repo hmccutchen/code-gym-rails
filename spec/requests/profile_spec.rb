@@ -43,6 +43,15 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.time_zone).to eq("America/Los_Angeles")
     end
 
+    it "strips surrounding whitespace from a time_zone before validating" do
+      login_as(user)
+      patch profile_path,
+            params: { user: { time_zone: "  America/Los_Angeles  " } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.time_zone).to eq("America/Los_Angeles")
+    end
+
     it "stores a blank time_zone as nil (leaves it to auto-detect)" do
       user.update!(time_zone: "America/Chicago")
       login_as(user)

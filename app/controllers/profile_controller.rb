@@ -18,7 +18,7 @@ class ProfileController < ApplicationController
   def profile_params
     permitted = params.require(:user).permit(:name, :time_zone)
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
-    permitted[:time_zone] = permitted[:time_zone].presence if permitted.key?(:time_zone)
+    permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
     permitted
   end
 end
