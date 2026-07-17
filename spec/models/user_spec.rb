@@ -209,6 +209,32 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#effective_time_zone and time_zone validation" do
+    it "returns the stored zone when set" do
+      user = create_user
+      user.time_zone = "America/Los_Angeles"
+      expect(user.effective_time_zone).to eq("America/Los_Angeles")
+    end
+
+    it "falls back to America/New_York when the zone is blank" do
+      user = create_user
+      user.time_zone = nil
+      expect(user.effective_time_zone).to eq("America/New_York")
+    end
+
+    it "accepts an IANA zone name and a Rails friendly name, and nil" do
+      expect(User.new(email: "z1@example.com", name: "Z", time_zone: "America/Chicago")).to be_valid
+      expect(User.new(email: "z2@example.com", name: "Z", time_zone: "Pacific Time (US & Canada)")).to be_valid
+      expect(User.new(email: "z3@example.com", name: "Z", time_zone: nil)).to be_valid
+    end
+
+    it "rejects a garbage zone" do
+      user = User.new(email: "z4@example.com", name: "Z", time_zone: "Mars/Phobos")
+      expect(user).not_to be_valid
+      expect(user.errors[:time_zone]).to be_present
+    end
+  end
+
   describe "#provider_label" do
     it "returns Claude for the anthropic provider" do
       user = create_user

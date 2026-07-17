@@ -9,12 +9,17 @@ class User < ApplicationRecord
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
 
+  DEFAULT_TIME_ZONE = "America/New_York".freeze
+  VALID_TIME_ZONES  = (ActiveSupport::TimeZone.all.map(&:name) +
+                       ActiveSupport::TimeZone::MAPPING.values).freeze
+
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
   validates :skill_level, inclusion: { in: %w[beginner developing solid strong] }
   validates :provider, inclusion: { in: %w[anthropic gemini] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
+  validates :time_zone, inclusion: { in: VALID_TIME_ZONES }, allow_nil: true
 
   before_save { email.downcase! }
 
@@ -80,6 +85,13 @@ class User < ApplicationRecord
     return "ruby_rails" unless last
 
     last.language == "ruby_rails" ? "javascript" : "ruby_rails"
+  end
+
+  # ── Timezone ────────────────────────────────────────────────────────────────
+  # Resolved zone for computing this user's "today". Blank until the browser
+  # detects it or the user sets it manually, so fall back to the team default.
+  def effective_time_zone
+    time_zone.presence || DEFAULT_TIME_ZONE
   end
 
   # ── Display ────────────────────────────────────────────────────────────────
