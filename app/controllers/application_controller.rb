@@ -3,9 +3,17 @@ class ApplicationController < ActionController::Base
   before_action :require_api_key
   around_action :use_time_zone
 
+  # A stale CSRF token (e.g. a login page left open across a deploy restart)
+  # would otherwise surface as a raw 422. Send the user back to log in fresh.
+  rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_token
+
   helper_method :current_user, :logged_in?
 
   private
+
+  def handle_invalid_token
+    redirect_to login_path, alert: "Your session expired — please try again."
+  end
 
   def use_time_zone(&block)
     Time.use_zone(current_user&.effective_time_zone || User::DEFAULT_TIME_ZONE, &block)
