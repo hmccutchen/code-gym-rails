@@ -1,0 +1,20 @@
+<%# Per-concept durable reference, shown after the AI review. First exposure
+    (count 1) is expanded; repeat exposure is collapsed with a refresher line
+    so repetition reads as deliberate reinforcement. `entry` is a hash from
+    ConceptReferencesHelper#concept_references_for. %>
+<% ref   = entry[:reference] %>
+<% count = entry[:count] %>
+<% first = count <= 1 %>
+<details class="ref"<%= " open".html_safe if first %>>
+  <% if first %>
+    <summary>Reference — <%= entry[:concept] %>: how it works</summary>
+  <% else %>
+    <summary>Reference — <%= entry[:concept] %> · This is your <%= count.ordinalize %> time seeing it — quick refresher</summary>
+  <% end %>
+  <div class="ref-body">
+    <p style="margin-bottom:.75rem"><strong><%= ref.tagline %></strong></p>
+    <p style="margin-bottom:.75rem"><%= ref.explanation %></p>
+    <pre class="snippet"><code><%= ref.code_example %></code></pre>
+    <p>🔭 <%= ref.senior_lens %></p>
+  </div>
+</details>

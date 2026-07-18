@@ -249,4 +249,74 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       end
     end
   end
+
+  describe "concept reference block on the dashboard" do
+    def exercise_with_concept
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern" => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization",
+                          "reference" => { "tagline" => "pt", "explanation" => "pe", "code_example" => "pc", "senior_lens" => "pl" } },
+          "challenge" => { "title" => "t", "question" => "q", "concept" => "service_objects" }
+        }
+      )
+    end
+
+    def reviewed_response(ex, date: Date.current)
+      DailyResponse.create!(
+        user: user, daily_exercise: ex, date: date,
+        answers: { "code_review" => "a" * 20 },
+        concept_tags: { "code_review" => "n_plus_one" },
+        submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+    end
+
+    it "shows the concept reference, expanded, on first exposure" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+        tagline: "Avoid N+1", explanation: "expl", code_example: "code", senior_lens: "lens")
+      ex = exercise_with_concept
+      reviewed_response(ex)
+
+      get root_path
+      expect(response.body).to include("Avoid N+1")
+      expect(response.body).to match(/<details[^>]*open[^>]*>\s*<summary>Reference — n_plus_one/i)
+    end
+
+    it "collapses with a refresher line on repeat exposure" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+        tagline: "Avoid N+1", explanation: "expl", code_example: "code", senior_lens: "lens")
+      # A prior submitted response with the same concept makes today the 2nd exposure.
+      prior_ex = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current,
+        language: "ruby_rails", problem_set: { "code_review" => {} })
+      DailyResponse.create!(user: user, daily_exercise: prior_ex, date: Date.current - 1,
+        answers: {}, concept_tags: { "code_review" => "n_plus_one" }, submitted_at: Time.current)
+      ex = exercise_with_concept
+      reviewed_response(ex)
+
+      get root_path
+      expect(response.body).to include("2nd time seeing")
+      expect(response.body).not_to match(/<details[^>]*open[^>]*>\s*<summary>Reference — n_plus_one/i)
+    end
+
+    it "renders no reference block when the concept has no cached reference" do
+      ex = exercise_with_concept
+      reviewed_response(ex)
+      get root_path
+      expect(response.body).not_to include("Reference — n_plus_one")
+    end
+
+    it "does not show any concept reference before the response is reviewed" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+        tagline: "Avoid N+1", explanation: "expl", code_example: "code", senior_lens: "lens")
+      ex = exercise_with_concept
+      DailyResponse.create!(user: user, daily_exercise: ex, date: Date.current,
+        answers: { "code_review" => "a" * 20 }, concept_tags: { "code_review" => "n_plus_one" },
+        submitted_at: Time.current) # submitted but NOT reviewed
+
+      get root_path
+      expect(response.body).not_to include("Avoid N+1")
+    end
+  end
 end
