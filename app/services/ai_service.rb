@@ -97,6 +97,21 @@ class AiService
     parse_json_object(result[:text], subject: "review")
   end
 
+  # ── Generate the one-time cached reference for a single concept ───────────
+  # Provider-agnostic; called once per (concept, language) by
+  # GenerateConceptReferenceJob and cached in the concept_references table.
+  def generate_concept_reference(user, concept, language)
+    config = config_for(language) # raises loudly on "mixed"/typos, same as elsewhere
+
+    result = call(
+      system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
+      prompt: build_concept_reference_prompt(concept, config)
+    )
+
+    log_usage(user, result, purpose: "generate_concept_reference")
+    parse_json_object(result[:text], subject: "concept reference")
+  end
+
   private
 
   # Looks up the fixed per-language config, failing loudly on anything
@@ -242,6 +257,27 @@ class AiService
       Their answer: #{answers["challenge"].presence || "(skipped)"}
 
       Return JSON with keys: "code_review", "pattern", "challenge" — each matching the schema above.
+    PROMPT
+  end
+
+  # Prompt for a single concept's durable reference. Mirrors the four-field
+  # shape of the pattern-section `reference` so ConceptReference and the
+  # pattern reference render identically.
+  def build_concept_reference_prompt(concept, config)
+    label = config[:label]
+
+    <<~PROMPT
+      Write a durable reference for the #{config[:coach]} concept: "#{concept}".
+      This is a stable explanation an engineer returns to across repeat exposure —
+      not tied to any single problem. Be precise and senior-level.
+
+      Return JSON matching this schema exactly:
+      {
+        "tagline":      "string — bold one-liner",
+        "explanation":  "string — 2-3 sentences",
+        "code_example": "string — annotated #{label} code, ~15 lines",
+        "senior_lens":  "string — when to reach for it / tradeoffs"
+      }
     PROMPT
   end
 
