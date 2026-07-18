@@ -197,4 +197,49 @@ RSpec.describe "Responses", type: :request do
       expect(flash[:alert]).to eq("The AI provider is rate-limiting requests — try again shortly.")
     end
   end
+
+  describe "POST /responses concept reference generation" do
+    include ActiveJob::TestHelper
+
+    def submit_with_concepts
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern" => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "challenge" => { "title" => "t", "question" => "q", "concept" => "n_plus_one" }
+      )
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+    end
+
+    it "enqueues one job per distinct concept lacking a reference on submission" do
+      expect { submit_with_concepts }
+        .to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+        .and have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "memoization", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+    end
+
+    it "does not enqueue for a concept that already has a reference" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "x")
+      expect { submit_with_concepts }
+        .not_to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+    end
+
+    it "does not enqueue on a non-submitting auto-save" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern" => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "challenge" => { "title" => "t", "question" => "q", "concept" => "service_objects" }
+      )
+      expect {
+        post responses_path,
+          params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+          headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+    end
+  end
 end

@@ -19,6 +19,8 @@ class ResponsesController < ApplicationController
 
     saved = @response.save
 
+    enqueue_concept_references(exercise) if saved && response_params[:submit] == "1"
+
     respond_to do |format|
       format.json do
         if saved
@@ -89,5 +91,17 @@ class ResponsesController < ApplicationController
     %w[code_review pattern challenge]
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
+  end
+
+  # On submission, kick off lazy one-time generation for each distinct concept
+  # in today's exercise that has no cached reference yet. The job itself
+  # re-checks existence and is best-effort, so a duplicate enqueue is harmless.
+  def enqueue_concept_references(exercise)
+    language = exercise.language
+    concepts = exercise_concept_tags(exercise).values.uniq
+    concepts.each do |concept|
+      next if ConceptReference.exists?(concept: concept, language: language)
+      GenerateConceptReferenceJob.perform_later(concept: concept, language: language, user_id: current_user.id)
+    end
   end
 end
