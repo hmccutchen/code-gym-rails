@@ -55,6 +55,8 @@ class AiService
 
   RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
 
+  CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
+
   # Max bytes of raw provider output logged server-side when a provider
   # response can't be used (invalid JSON, non-success HTTP status). Keeps
   # exception messages — which surface in flash alerts and error trackers —
@@ -95,6 +97,29 @@ class AiService
 
     log_usage(user, result, purpose: "review_response")
     parse_json_object(result[:text], subject: "review")
+  end
+
+  # ── Generate the one-time cached reference for a single concept ───────────
+  def generate_concept_reference(user, concept, language)
+    config = config_for(language)
+
+    result = call(
+      system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
+      prompt: build_concept_reference_prompt(concept, config)
+    )
+
+    log_usage(user, result, purpose: "generate_concept_reference")
+    reference = parse_json_object(result[:text], subject: "concept reference")
+
+    # Caching keys off (concept, language), so a row missing any field would
+    # persist a partially-blank reference forever and block regeneration.
+    # Failing here lets the job swallow it and retry on the next submission.
+    missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].to_s.strip.present? }
+    if missing.any?
+      raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
+    end
+
+    reference
   end
 
   private
@@ -242,6 +267,25 @@ class AiService
       Their answer: #{answers["challenge"].presence || "(skipped)"}
 
       Return JSON with keys: "code_review", "pattern", "challenge" — each matching the schema above.
+    PROMPT
+  end
+
+  # Mirrors the pattern-section `reference` shape so both render identically.
+  def build_concept_reference_prompt(concept, config)
+    label = config[:label]
+
+    <<~PROMPT
+      Write a durable reference for the #{config[:coach]} concept: "#{concept}".
+      This is a stable explanation an engineer returns to across repeat exposure —
+      not tied to any single problem. Be precise and senior-level.
+
+      Return JSON matching this schema exactly:
+      {
+        "tagline":      "string — bold one-liner",
+        "explanation":  "string — 2-3 sentences",
+        "code_example": "string — annotated #{label} code, ~15 lines",
+        "senior_lens":  "string — when to reach for it / tradeoffs"
+      }
     PROMPT
   end
 

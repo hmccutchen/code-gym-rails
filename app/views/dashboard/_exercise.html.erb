@@ -119,6 +119,9 @@
         <%= button_to "Email me this review", email_review_response_path(response), method: :post, class: "btn btn-ghost btn-sm" %>
       </div>
       <%= render "shared/ai_review", response: response %>
+      <% concept_references_for(response).each do |entry| %>
+        <%= render "shared/concept_reference", entry: entry %>
+      <% end %>
     </div>
     <%= render "responses/feedback_form", response: response, style: :prominent %>
   <% else %>

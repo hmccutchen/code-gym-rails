@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_17_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_18_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -24,6 +24,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_17_000000) do
     t.datetime "updated_at", null: false
     t.index ["user_id", "date"], name: "index_api_usages_on_user_id_and_date"
     t.index ["user_id"], name: "index_api_usages_on_user_id"
+  end
+
+  create_table "concept_references", force: :cascade do |t|
+    t.string "concept", null: false
+    t.string "language", null: false
+    t.text "tagline"
+    t.text "explanation"
+    t.text "code_example"
+    t.text "senior_lens"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["concept", "language"], name: "index_concept_references_on_concept_and_language", unique: true
   end
 
   create_table "daily_exercises", force: :cascade do |t|
