@@ -93,9 +93,9 @@ class ResponsesController < ApplicationController
       .compact
   end
 
-  # On submission, kick off lazy one-time generation for each distinct concept
-  # in today's exercise that has no cached reference yet. The job itself
-  # re-checks existence and is best-effort, so a duplicate enqueue is harmless.
+  # Kick off generation for each distinct concept lacking a cached reference.
+  # The exists? check only avoids obvious no-op jobs; the job re-checks, so a
+  # racing duplicate enqueue is harmless.
   def enqueue_concept_references(exercise)
     language = exercise.language
     concepts = exercise_concept_tags(exercise).values.uniq

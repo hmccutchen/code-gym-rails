@@ -55,9 +55,6 @@ class AiService
 
   RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
 
-  # The four fields every cached concept reference must carry. Used both to
-  # shape the generation prompt and to reject an underspecified provider
-  # payload before it's persisted (see #generate_concept_reference).
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
   # Max bytes of raw provider output logged server-side when a provider
@@ -103,10 +100,8 @@ class AiService
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
-  # Provider-agnostic; called once per (concept, language) by
-  # GenerateConceptReferenceJob and cached in the concept_references table.
   def generate_concept_reference(user, concept, language)
-    config = config_for(language) # raises loudly on "mixed"/typos, same as elsewhere
+    config = config_for(language)
 
     result = call(
       system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
@@ -116,11 +111,9 @@ class AiService
     log_usage(user, result, purpose: "generate_concept_reference")
     reference = parse_json_object(result[:text], subject: "concept reference")
 
-    # A valid JSON object isn't enough: the reference is cached once per
-    # (concept, language) and the cache key doubles as the "already generated"
-    # guard, so a payload missing any of the four fields would persist a
-    # partially-blank reference forever and block regeneration. Fail here so
-    # the job swallows it (best-effort) and retries on the next submission.
+    # Caching keys off (concept, language), so a row missing any field would
+    # persist a partially-blank reference forever and block regeneration.
+    # Failing here lets the job swallow it and retry on the next submission.
     missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].to_s.strip.present? }
     if missing.any?
       raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
@@ -277,9 +270,7 @@ class AiService
     PROMPT
   end
 
-  # Prompt for a single concept's durable reference. Mirrors the four-field
-  # shape of the pattern-section `reference` so ConceptReference and the
-  # pattern reference render identically.
+  # Mirrors the pattern-section `reference` shape so both render identically.
   def build_concept_reference_prompt(concept, config)
     label = config[:label]
 

@@ -1,6 +1,5 @@
-<%# Per-concept durable reference, shown after the AI review. First exposure
-    (count 1) is expanded; repeat exposure is collapsed with a refresher line
-    so repetition reads as deliberate reinforcement. `entry` is a hash from
+<%# First exposure is expanded; repeat exposure collapses to a refresher so
+    repetition reads as deliberate reinforcement. `entry` comes from
     ConceptReferencesHelper#concept_references_for. %>
 <% ref   = entry[:reference] %>
 <% count = entry[:count] %>

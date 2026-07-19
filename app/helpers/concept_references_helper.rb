@@ -1,17 +1,12 @@
 module ConceptReferencesHelper
-  # concept_tags is always built from these three fixed section keys
-  # (see ResponsesController#exercise_concept_tags), so an exposure query can
-  # match the concept against each key's value directly in SQL rather than
-  # loading every row and filtering in Ruby.
+  # The fixed keys concept_tags is built from (ResponsesController#exercise_concept_tags),
+  # which lets the exposure query match in SQL instead of filtering in Ruby.
   CONCEPT_TAG_SECTIONS = %w[code_review pattern challenge].freeze
 
-  # Exposure count for a concept = the number of the user's SUBMITTED responses
-  # whose concept_tags values include the concept. Filters on submitted_at
-  # because auto-saved drafts also populate concept_tags; counting bare rows
-  # would inflate the count. Inclusive of the current response (the reference
-  # only ever renders on an already-submitted response), so count == 1 means
-  # first exposure. Each row is counted at most once, so a concept appearing in
-  # two sections of one response is a single exposure.
+  # How many of the user's submitted responses were tagged with the concept.
+  # Drafts are excluded — they auto-save concept_tags before submission, which
+  # would inflate the count. Counts the current (already-submitted) response
+  # too, so 1 means first exposure; each response counts at most once.
   def concept_exposure_count(user, concept)
     conditions = CONCEPT_TAG_SECTIONS.map { |section| "concept_tags ->> ? = ?" }.join(" OR ")
     bindings   = CONCEPT_TAG_SECTIONS.flat_map { |section| [ section, concept ] }
@@ -22,11 +17,9 @@ module ConceptReferencesHelper
         .count
   end
 
-  # For a response, returns one entry per distinct tagged concept that has a
-  # cached ConceptReference in the response's language:
-  #   [{ concept:, reference:, count: }, ...]
-  # Concepts without a cached reference (not generated yet, "other", or an old
-  # response with empty concept_tags) are skipped — the view renders nothing.
+  # One [{ concept:, reference:, count: }] entry per distinct tagged concept
+  # that has a cached reference in the response's language. Concepts without a
+  # cached reference are skipped, so old/untagged responses render nothing.
   def concept_references_for(response)
     language = response.daily_exercise.language
     concepts = response.concept_tags.values.compact.uniq

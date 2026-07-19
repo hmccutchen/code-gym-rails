@@ -1,19 +1,14 @@
 class GenerateConceptReferenceJob < ApplicationJob
   queue_as :default
 
-  # Lazily generate the one-time cached reference for a single concept, using
-  # the triggering user's API key. Enqueued from ResponsesController#create on
-  # submission, once per concept lacking a reference. Best-effort: any failure
-  # is logged and swallowed so a missing reference simply renders as nothing
-  # and gets retried the next time anyone submits that concept.
+  # Best-effort: any failure is logged and swallowed, so a missing reference
+  # renders as nothing and is retried the next time anyone submits the concept.
   def perform(concept:, language:, user_id:)
-    # "other" is the catch-all AiService#normalize_concepts falls back to for
-    # any off-vocabulary concept — it isn't a real concept, so there's nothing
-    # meaningful to generate a reference for. Second line of defense behind
-    # the enqueue-side skip in ResponsesController#enqueue_concept_references.
+    # "other" is the off-vocabulary catch-all from AiService#normalize_concepts,
+    # not a real concept worth a reference.
     return if concept == "other"
 
-    # Re-check after the enqueue/run gap — another user may have generated it.
+    # Another job may have generated it in the enqueue/run gap.
     return if ConceptReference.exists?(concept: concept, language: language)
 
     user = User.find_by(id: user_id)
@@ -32,11 +27,9 @@ class GenerateConceptReferenceJob < ApplicationJob
 
     Rails.logger.info("Generated concept reference for #{concept}/#{language}")
   rescue ActiveRecord::RecordNotUnique
-    # Lost the race against a concurrent job for the same concept/language.
-    # The other one won; nothing to do.
+    # A concurrent job won the race; nothing to do.
     Rails.logger.info("Skipped duplicate concept reference for #{concept}/#{language}")
   rescue AiService::Error => e
-    # Best-effort: bad key, rate limit, invalid JSON. Don't surface to the user.
     Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language}: #{e.message}")
   end
 end
