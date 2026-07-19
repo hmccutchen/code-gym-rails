@@ -1,15 +1,25 @@
 module ConceptReferencesHelper
+  # concept_tags is always built from these three fixed section keys
+  # (see ResponsesController#exercise_concept_tags), so an exposure query can
+  # match the concept against each key's value directly in SQL rather than
+  # loading every row and filtering in Ruby.
+  CONCEPT_TAG_SECTIONS = %w[code_review pattern challenge].freeze
+
   # Exposure count for a concept = the number of the user's SUBMITTED responses
   # whose concept_tags values include the concept. Filters on submitted_at
   # because auto-saved drafts also populate concept_tags; counting bare rows
   # would inflate the count. Inclusive of the current response (the reference
   # only ever renders on an already-submitted response), so count == 1 means
-  # first exposure. A concept in two sections of one response is one exposure.
+  # first exposure. Each row is counted at most once, so a concept appearing in
+  # two sections of one response is a single exposure.
   def concept_exposure_count(user, concept)
+    conditions = CONCEPT_TAG_SECTIONS.map { |section| "concept_tags ->> ? = ?" }.join(" OR ")
+    bindings   = CONCEPT_TAG_SECTIONS.flat_map { |section| [ section, concept ] }
+
     user.daily_responses
         .where.not(submitted_at: nil)
-        .select { |r| r.concept_tags.values.include?(concept) }
-        .size
+        .where(conditions, *bindings)
+        .count
   end
 
   # For a response, returns one entry per distinct tagged concept that has a

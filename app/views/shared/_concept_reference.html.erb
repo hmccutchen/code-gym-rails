@@ -5,7 +5,7 @@
 <% ref   = entry[:reference] %>
 <% count = entry[:count] %>
 <% first = count <= 1 %>
-<details class="ref"<%= " open".html_safe if first %>>
+<details class="ref"<%= " open" if first %>>
   <% if first %>
     <summary>Reference — <%= entry[:concept] %>: how it works</summary>
   <% else %>

@@ -55,6 +55,11 @@ class AiService
 
   RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
 
+  # The four fields every cached concept reference must carry. Used both to
+  # shape the generation prompt and to reject an underspecified provider
+  # payload before it's persisted (see #generate_concept_reference).
+  CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
+
   # Max bytes of raw provider output logged server-side when a provider
   # response can't be used (invalid JSON, non-success HTTP status). Keeps
   # exception messages — which surface in flash alerts and error trackers —
@@ -109,7 +114,19 @@ class AiService
     )
 
     log_usage(user, result, purpose: "generate_concept_reference")
-    parse_json_object(result[:text], subject: "concept reference")
+    reference = parse_json_object(result[:text], subject: "concept reference")
+
+    # A valid JSON object isn't enough: the reference is cached once per
+    # (concept, language) and the cache key doubles as the "already generated"
+    # guard, so a payload missing any of the four fields would persist a
+    # partially-blank reference forever and block regeneration. Fail here so
+    # the job swallows it (best-effort) and retries on the next submission.
+    missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].to_s.strip.present? }
+    if missing.any?
+      raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
+    end
+
+    reference
   end
 
   private

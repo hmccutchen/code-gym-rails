@@ -422,6 +422,30 @@ RSpec.describe AiService do
       }.to raise_error(AiService::InvalidResponseError)
     end
 
+    it "raises InvalidResponseError when a required field is missing" do
+      partial = { tagline: "t", explanation: "e", code_example: "c" }.to_json # no senior_lens
+      service = double_class.new(canned_text: partial)
+      expect {
+        service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+    end
+
+    it "raises InvalidResponseError when a required field is blank" do
+      blank = { tagline: "t", explanation: "e", code_example: "c", senior_lens: "   " }.to_json
+      service = double_class.new(canned_text: blank)
+      expect {
+        service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+    end
+
+    it "does not persist a row when a field is missing (job swallows, retries later)" do
+      partial = { tagline: "t", explanation: "e", code_example: "c" }.to_json
+      allow(AiService).to receive(:for).and_return(double_class.new(canned_text: partial))
+      expect {
+        GenerateConceptReferenceJob.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+      }.not_to change(ConceptReference, :count)
+    end
+
     it "raises on an unsupported language rather than defaulting" do
       service = double_class.new(canned_text: valid_json)
       expect {
