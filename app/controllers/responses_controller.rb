@@ -100,6 +100,7 @@ class ResponsesController < ApplicationController
     language = exercise.language
     concepts = exercise_concept_tags(exercise).values.uniq
     concepts.each do |concept|
+      next if concept == "other"
       next if ConceptReference.exists?(concept: concept, language: language)
       GenerateConceptReferenceJob.perform_later(concept: concept, language: language, user_id: current_user.id)
     end

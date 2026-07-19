@@ -58,6 +58,13 @@ RSpec.describe GenerateConceptReferenceJob do
     }.not_to change(ConceptReference, :count)
   end
 
+  it "is a no-op for the 'other' concept (does not call the provider)" do
+    expect(AiService).not_to receive(:for)
+    expect {
+      described_class.perform_now(concept: "other", language: "ruby_rails", user_id: user.id)
+    }.not_to change(ConceptReference, :count)
+  end
+
   it "swallows a unique-index race without raising" do
     stub_service
     # Simulate another job winning the race between the existence check and create!

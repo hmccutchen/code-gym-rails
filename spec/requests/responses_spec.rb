@@ -241,5 +241,19 @@ RSpec.describe "Responses", type: :request do
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
     end
+
+    it "does not enqueue for the 'other' concept" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "other" },
+        "pattern" => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "challenge" => { "title" => "t", "question" => "q", "concept" => "other" }
+      )
+      expect {
+        post responses_path,
+          params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+          headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "other", language: "ruby_rails", user_id: user.id)
+    end
   end
 end

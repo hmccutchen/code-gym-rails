@@ -7,6 +7,12 @@ class GenerateConceptReferenceJob < ApplicationJob
   # is logged and swallowed so a missing reference simply renders as nothing
   # and gets retried the next time anyone submits that concept.
   def perform(concept:, language:, user_id:)
+    # "other" is the catch-all AiService#normalize_concepts falls back to for
+    # any off-vocabulary concept — it isn't a real concept, so there's nothing
+    # meaningful to generate a reference for. Second line of defense behind
+    # the enqueue-side skip in ResponsesController#enqueue_concept_references.
+    return if concept == "other"
+
     # Re-check after the enqueue/run gap — another user may have generated it.
     return if ConceptReference.exists?(concept: concept, language: language)
 
