@@ -452,6 +452,43 @@ RSpec.describe AiService do
       )
     end
 
+    context "architecture third section" do
+      def arch_exercise
+        DailyExercise.new(
+          language: "ruby_rails",
+          problem_set: {
+            "code_review" => { "question" => "cr?", "snippet" => "code" },
+            "pattern"     => { "title" => "P", "question" => "pat?" },
+            "architecture" => { "title" => "A", "question" => "Pick a datastore approach?",
+                                "scenario" => "10x traffic spike expected" }
+          }
+        )
+      end
+
+      it "evaluates tradeoff reasoning, constraints, and alternatives — not correctness" do
+        resp = DailyResponse.new(answers: { "architecture" => "I'd shard because..." })
+        prompt = service.send(:build_review_prompt, arch_exercise, resp)
+        expect(prompt).to include("Pick a datastore approach?")
+        expect(prompt).to include("10x traffic spike expected")
+        expect(prompt.downcase).to include("tradeoff")
+        expect(prompt.downcase).to include("alternatives")
+        expect(prompt).to include('"architecture"')   # asks for the architecture key back
+        expect(prompt).not_to include("Coding Challenge:")
+      end
+    end
+
+    it "keeps the existing challenge criteria when the third section is a challenge" do
+      ex = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?", "snippet" => "code" },
+        "pattern"     => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "Implement uniq_by" }
+      })
+      resp = DailyResponse.new(answers: { "challenge" => "def uniq_by..." })
+      prompt = service.send(:build_review_prompt, ex, resp)
+      expect(prompt).to include("Coding Challenge: Implement uniq_by")
+      expect(prompt).to include('"challenge"')
+    end
+
     it "names Rails in the system prompt for a ruby_rails exercise" do
       spy_class = Class.new(double_class) do
         attr_reader :last_system

@@ -315,6 +315,29 @@ class AiService
 
   def build_review_prompt(exercise, daily_response)
     answers = daily_response.answers
+    arch    = exercise.architecture
+
+    third_block =
+      if arch
+        <<~ARCH.chomp
+          Architecture decision (#{arch["title"]}): #{arch["question"]}
+          Scenario/constraints: #{arch["scenario"]}
+          Their answer: #{answers["architecture"].presence || "(skipped)"}
+
+          Evaluate the architecture answer on the DEPTH of its reasoning, not a single correct answer:
+          - Did they weigh real tradeoffs between the options?
+          - Did they address the stated constraints (scale, team, reliability, tech debt)?
+          - Did they consider alternatives rather than asserting one option?
+          For this section "improved_code" must be an empty string.
+        ARCH
+      else
+        <<~CH.chomp
+          Coding Challenge: #{exercise.challenge["question"]}
+          Their answer: #{answers["challenge"].presence || "(skipped)"}
+        CH
+      end
+
+    third_key = arch ? "architecture" : "challenge"
 
     <<~PROMPT
       Review these Code Gym answers. For each section, return a JSON object with:
@@ -333,10 +356,9 @@ class AiService
       Pattern question (#{exercise.pattern["title"]}): #{exercise.pattern["question"]}
       Their answer: #{answers["pattern"].presence || "(skipped)"}
 
-      Coding Challenge: #{exercise.challenge["question"]}
-      Their answer: #{answers["challenge"].presence || "(skipped)"}
+      #{third_block}
 
-      Return JSON with keys: "code_review", "pattern", "challenge" — each matching the schema above.
+      Return JSON with keys: "code_review", "pattern", "#{third_key}" — each matching the schema above.
     PROMPT
   end
 
