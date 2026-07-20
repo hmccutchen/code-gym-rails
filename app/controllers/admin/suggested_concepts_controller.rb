@@ -1,4 +1,3 @@
-# app/controllers/admin/suggested_concepts_controller.rb
 module Admin
   class SuggestedConceptsController < Admin::BaseController
     def index

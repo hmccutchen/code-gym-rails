@@ -1,4 +1,3 @@
-# spec/requests/admin/suggested_concepts_spec.rb
 require "rails_helper"
 
 RSpec.describe "Admin::SuggestedConcepts", type: :request do

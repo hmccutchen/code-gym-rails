@@ -7,9 +7,8 @@ class SuggestedConcept < ApplicationRecord
   validates :normalized_name, :display_name, presence: true
   validates :status, inclusion: { in: STATUSES }
 
-  # The only write entry point for recording an off-vocabulary suggestion.
-  # Returns nil (no-op) for a blank name or a literal "other" — "other" is
-  # AiService's own catch-all, not a real suggestion worth tracking.
+  # The only write entry point for an off-vocabulary suggestion. Skips a
+  # literal "other" — that's AiService's own catch-all, not a real suggestion.
   def self.record!(language:, name:)
     normalized = name.to_s.strip.downcase.squeeze(" ")
     return nil if normalized.blank? || normalized == "other"
