@@ -103,16 +103,20 @@ class ResponsesController < ApplicationController
       .compact
   end
 
-  # Kick off generation for each distinct concept lacking a cached reference.
-  # The exists? check only avoids obvious no-op jobs; the job re-checks, so a
-  # racing duplicate enqueue is harmless.
+  # Kick off generation for each distinct (concept, language-bucket) lacking a
+  # cached reference. The architecture section is language-independent, so its
+  # concept is bucketed under "architecture"; every other section uses the
+  # exercise's language. The exists? check only avoids obvious no-op jobs; the
+  # job re-checks, so a racing duplicate enqueue is harmless.
   def enqueue_concept_references(exercise)
-    language = exercise.language
-    concepts = exercise_concept_tags(exercise).values.uniq
-    concepts.each do |concept|
+    enqueued = Set.new
+    exercise_concept_tags(exercise).each do |section, concept|
       next if concept == "other"
-      next if ConceptReference.exists?(concept: concept, language: language)
+      language = section == "architecture" ? "architecture" : exercise.language
+      pair = [concept, language]
+      next if enqueued.include?(pair) || ConceptReference.exists?(concept: concept, language: language)
       GenerateConceptReferenceJob.perform_later(concept: concept, language: language, user_id: current_user.id)
+      enqueued << pair
     end
   end
 end

@@ -274,6 +274,25 @@ RSpec.describe "Responses", type: :request do
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "other", language: "ruby_rails", user_id: user.id)
     end
+
+    it "enqueues the architecture concept under the 'architecture' language bucket" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" }
+      )
+
+      expect {
+        post responses_path,
+          params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+          headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "service_boundaries", language: "architecture", user_id: user.id)
+        .exactly(:once)
+        .and have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+    end
   end
 
   describe "GET /responses/:id (review page)" do
