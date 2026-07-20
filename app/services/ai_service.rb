@@ -34,6 +34,17 @@ class AiService
     controlled_vs_uncontrolled
   ].freeze
 
+  # Language-INDEPENDENT architecture/design-reasoning vocabulary. Unlike
+  # RAILS_CONCEPTS/JS_CONCEPTS this is NOT tied to the user's language: these
+  # concepts transcend any one stack. Used only by the architecture third
+  # section and its concept references (pseudo-language "architecture").
+  ARCHITECTURE_CONCEPTS = %w[
+    sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
+    caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
+    api_versioning event_driven_vs_request_response data_ownership
+    idempotency_at_scale observability_tradeoffs
+  ].freeze
+
   # Single source of truth per concrete generation language ("mixed" is a
   # user-level meta-preference that always resolves to one of these before it
   # reaches AiService — see User#language_for_today). Adding a language means
@@ -50,6 +61,12 @@ class AiService
       concepts: JS_CONCEPTS,
       coach:    "JavaScript/React",
       focus:    "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
+    },
+    "architecture" => {
+      label:    "language-agnostic",
+      concepts: ARCHITECTURE_CONCEPTS,
+      coach:    "software architecture",
+      focus:    "system-design tradeoffs: service boundaries, consistency, failure modes, scale, coupling."
     }
   }.freeze
 
@@ -279,6 +296,12 @@ class AiService
   # Mirrors the pattern-section `reference` shape so both render identically.
   def build_concept_reference_prompt(concept, config)
     label = config[:label]
+    code_example_desc =
+      if config[:coach] == "software architecture"
+        "illustrative pseudocode or a short language-agnostic snippet, ~15 lines"
+      else
+        "annotated #{label} code, ~15 lines"
+      end
 
     <<~PROMPT
       Write a durable reference for the #{config[:coach]} concept: "#{concept}".
@@ -289,7 +312,7 @@ class AiService
       {
         "tagline":      "string — bold one-liner",
         "explanation":  "string — 2-3 sentences",
-        "code_example": "string — annotated #{label} code, ~15 lines",
+        "code_example": "string — #{code_example_desc}",
         "senior_lens":  "string — when to reach for it / tradeoffs"
       }
     PROMPT

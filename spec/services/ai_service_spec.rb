@@ -95,6 +95,34 @@ RSpec.describe AiService do
     end
   end
 
+  describe "ARCHITECTURE_CONCEPTS" do
+    it "is a frozen 13-entry language-independent vocabulary" do
+      expect(AiService::ARCHITECTURE_CONCEPTS.size).to eq(13)
+      expect(AiService::ARCHITECTURE_CONCEPTS).to be_frozen
+      expect(AiService::ARCHITECTURE_CONCEPTS).to include("service_boundaries", "failure_mode_design", "idempotency_at_scale")
+    end
+
+    it "is not mixed into any per-language generation vocabulary" do
+      expect(AiService::RAILS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+      expect(AiService::JS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+    end
+  end
+
+  describe "#build_concept_reference_prompt (architecture)" do
+    it "frames code_example as language-agnostic pseudocode for the architecture config" do
+      config = service.send(:config_for, "architecture")
+      prompt = service.send(:build_concept_reference_prompt, "service_boundaries", config)
+      expect(prompt).to include("software architecture")
+      expect(prompt.downcase).to include("pseudocode")
+    end
+
+    it "still frames code_example as annotated language code for a normal language config" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
+      expect(prompt).to include("annotated Ruby/Rails code")
+    end
+  end
+
   describe "#build_exercise_prompt" do
     it "instructs that teaching notes hint without giving the answer" do
       prompt = service.send(:build_exercise_prompt, user)
