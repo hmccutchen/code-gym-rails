@@ -45,6 +45,7 @@ class ResponsesController < ApplicationController
   # Owner-scoped via set_response (current_user.daily_responses), so another
   # user's id raises RecordNotFound -> 404. Review stays manual/on-demand.
   def show
+    return redirect_to root_path unless @response.submitted?
     @exercise = @response.daily_exercise
   end
 

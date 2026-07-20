@@ -305,6 +305,19 @@ RSpec.describe "Responses", type: :request do
 
       expect(response.body).not_to include("Reference — N plus one: how it works")
     end
+
+    it "redirects a still-unsubmitted draft away from the review page" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } }
+      )
+      draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                    answers: { "code_review" => "a" * 20 }, submitted_at: nil)
+
+      get response_path(draft)
+
+      expect(response).to redirect_to(root_path)
+    end
   end
 
   describe "POST /responses redirect targets on final submit" do
