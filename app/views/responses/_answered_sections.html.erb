@@ -1,0 +1,55 @@
+<%# Read-only render of a submitted day's three sections: label, scenario,
+    question, snippet, the user's answer, and (always) the concept-reference
+    dropdown when one is cached. Shared by the dashboard submitted state and
+    the responses#show review page. Locals: exercise, response. %>
+<% cr = exercise.code_review %>
+<div class="section">
+  <div class="section-label">1 — Code Review</div>
+  <% if cr["scenario"].present? %><div class="section-scenario"><%= cr["scenario"] %></div><% end %>
+  <div class="question"><%= cr["question"] %></div>
+  <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
+  <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
+    <%= render "shared/concept_reference", reference: ref %>
+  <% end %>
+  <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: true, answer: response.answers["code_review"] %>
+  <div class="answer-display"><%= response.answers["code_review"].presence || "(skipped)" %></div>
+</div>
+
+<% pat = exercise.pattern %>
+<div class="section">
+  <div class="section-label">2 — Pattern of the Month: <%= pat["title"] %></div>
+  <% if pat["scenario"].present? %><div class="section-scenario"><%= pat["scenario"] %></div><% end %>
+  <div class="why-box"><strong>Why it exists:</strong> <%= pat["why"] %></div>
+  <div class="question"><%= pat["question"] %></div>
+
+  <details class="ref">
+    <summary>Reference — <%= pat["title"] %>: how it works</summary>
+    <div class="ref-body">
+      <p style="margin-bottom:.75rem"><strong><%= pat.dig("reference", "tagline") %></strong></p>
+      <p style="margin-bottom:.75rem"><%= pat.dig("reference", "explanation") %></p>
+      <pre class="snippet"><code><%= pat.dig("reference", "code_example") %></code></pre>
+      <p>🔭 <%= pat.dig("reference", "senior_lens") %></p>
+    </div>
+  </details>
+  <% if (ref = concept_reference_for(pat["concept"], exercise.language)) %>
+    <%= render "shared/concept_reference", reference: ref %>
+  <% end %>
+
+  <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: true, answer: response.answers["pattern"] %>
+  <div class="answer-display"><%= response.answers["pattern"].presence || "(skipped)" %></div>
+</div>
+
+<% ch = exercise.challenge %>
+<div class="section">
+  <div class="section-label">3 — Coding Challenge</div>
+  <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
+  <div class="question"><%= ch["question"] %></div>
+  <% if ch["starter_code"].present? %>
+    <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
+  <% end %>
+  <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
+    <%= render "shared/concept_reference", reference: ref %>
+  <% end %>
+  <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, answer: response.answers["challenge"] %>
+  <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
+</div>

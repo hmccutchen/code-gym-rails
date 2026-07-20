@@ -166,6 +166,35 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_performance scenarios" do
+    it "includes each session's scenarios read from the stored problem_set" do
+      user = create_user
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "scenario" => "billing reconciliation" },
+          "pattern"     => {},
+          "challenge"   => { "scenario" => "search ranking" }
+        }
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 })
+
+      expect(user.recent_performance.first[:scenarios])
+        .to eq([ "billing reconciliation", "search ranking" ])
+    end
+
+    it "is nil-safe: yields [] for rows whose problem_set lacks scenario" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 })
+
+      expect(user.recent_performance.first[:scenarios]).to eq([])
+    end
+  end
+
   describe "#language_for_today" do
     it "returns ruby_rails unchanged when the preference is ruby_rails" do
       user = create_user

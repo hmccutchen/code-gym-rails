@@ -36,7 +36,7 @@ Rails.application.routes.draw do
   post "generate", to: "daily_exercises#generate"
 
   # Submit/update today's answers
-  resources :responses, only: [ :create ] do
+  resources :responses, only: [ :create, :show ] do
     member do
       patch :feedback     # rating + feedback_text after submission
       post  :review       # trigger Claude inline review

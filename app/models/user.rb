@@ -60,11 +60,16 @@ class User < ApplicationRecord
       .order(date: :desc)
       .limit(limit)
       .map do |r|
+        problem_set = r.daily_exercise&.problem_set || {}
+        scenarios = %w[code_review pattern challenge].filter_map do |section|
+          problem_set.dig(section, "scenario").presence
+        end
         {
           date:          r.date.to_s,
           rating:        r.rating,
           feedback:      r.feedback_text,
           concepts:      r.concept_tags,
+          scenarios:     scenarios,
           sections_answered: r.answered_sections.size
         }
       end
