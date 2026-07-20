@@ -54,6 +54,31 @@ RSpec.describe AiService do
       schema = service.send(:exercise_schema_for)
       expect(schema.scan(/"scenario"/).size).to eq(3)
     end
+
+    it "includes the challenge block by default (third: :challenge)" do
+      schema = service.send(:exercise_schema_for, "ruby_rails")
+      expect(schema).to include("\"challenge\"")
+      expect(schema).to include("starter_code")
+      expect(schema).not_to include("\"architecture\"")
+    end
+
+    it "swaps in the architecture block with options + tradeoffs when third: :architecture" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+      expect(schema).to include("\"architecture\"")
+      expect(schema).to include("\"options\"")
+      expect(schema).to include("\"tradeoffs\"")
+      expect(schema).not_to include("\"challenge\"")
+      expect(schema).not_to include("starter_code")
+    end
+  end
+
+  describe "#roll_third_section" do
+    it "returns :architecture ~75% and :challenge ~25% (both reachable)" do
+      allow(service).to receive(:rand).and_return(0.10)
+      expect(service.send(:roll_third_section)).to eq(:architecture)
+      allow(service).to receive(:rand).and_return(0.90)
+      expect(service.send(:roll_third_section)).to eq(:challenge)
+    end
   end
 
   describe "#build_system_prompt" do
@@ -160,6 +185,19 @@ RSpec.describe AiService do
     it "instructs varying the concrete business-domain scenario across sessions" do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt.downcase).to include("business-domain scenario")
+    end
+
+    it "lists the architecture vocabulary for the architecture section when third: :architecture" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
+      expect(prompt).to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))   # still governs code_review/pattern
+      expect(prompt.downcase).to include("architecture")
+    end
+
+    it "lists only the language vocabulary when third: :challenge" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge)
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
     end
 
     it "includes recent problem framings pulled from the stored problem_set" do

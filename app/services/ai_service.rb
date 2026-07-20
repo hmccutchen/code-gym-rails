@@ -97,7 +97,9 @@ class AiService
 
   # ── Generate a personalized daily exercise set ────────────────────────────
   def generate_exercise(user, language: user.language_for_today)
-    result = call(system: build_system_prompt(language), prompt: build_exercise_prompt(user, language))
+    third  = roll_third_section
+    result = call(system: build_system_prompt(language),
+                  prompt: build_exercise_prompt(user, language, third: third))
 
     log_usage(user, result, purpose: "generate_exercise")
     normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
@@ -150,6 +152,14 @@ class AiService
     end
   end
 
+  # Which third section this set gets: architecture-reasoning 75% of the time,
+  # a traditional coding challenge 25%. Extracted so tests can stub it — never
+  # assert on real randomness. The chosen kind is not tracked separately; the
+  # persisted third key (problem_set["architecture"] vs ["challenge"]) is the record.
+  def roll_third_section
+    rand < 0.75 ? :architecture : :challenge
+  end
+
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
   def call(system:, prompt:)
@@ -176,8 +186,39 @@ class AiService
   # code-bearing fields' label switches with `language` so instructions never
   # assume Ruby idioms when generating JS — the structure itself never
   # changes across languages.
-  def exercise_schema_for(language = "ruby_rails")
+  def exercise_schema_for(language = "ruby_rails", third: :challenge)
     label = config_for(language)[:label]
+
+    third_section =
+      if third == :architecture
+        <<~ARCH.chomp
+          "architecture": {
+              "title":     "string — short name for the decision",
+              "scenario":  "string — realistic production scenario with real constraints (team size, scale, reliability needs, existing tech debt)",
+              "question":  "string — asks for a decision + justification",
+              "options":   ["string — a viable approach", "string — another viable approach"],
+              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+              "concept": "string — exactly one concept from the architecture vocabulary",
+              "reference": {
+                "tagline":     "string — bold one-liner",
+                "explanation": "string — 2-3 sentences",
+                "tradeoffs":   ["string — a tradeoff", "string — a tradeoff", "string — a tradeoff"],
+                "senior_lens": "string — how a senior frames the decision"
+              }
+            }
+        ARCH
+      else
+        <<~CH.chomp
+          "challenge": {
+              "title":        "string",
+              "question":     "string — what to implement",
+              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+              "starter_code": "string — optional skeleton (empty string if none)",
+              "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary"
+            }
+        CH
+      end
 
     <<~SCHEMA
       {
@@ -202,19 +243,12 @@ class AiService
             "senior_lens":  "string — when to reach for it / tradeoffs"
           }
         },
-        "challenge": {
-          "title":        "string",
-          "question":     "string — what to implement",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          "starter_code": "string — optional skeleton (empty string if none)",
-          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary"
-        }
+        #{third_section}
       }
     SCHEMA
   end
 
-  def build_exercise_prompt(user, language = "ruby_rails")
+  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge)
     history = user.recent_performance
 
     history_text = if history.empty?
@@ -236,6 +270,20 @@ class AiService
     focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
     concepts    = config[:concepts]
 
+    third_guidance =
+      if third == :architecture
+        <<~ARCH.chomp
+          - The third section is an ARCHITECTURE decision, not a coding task. Give a realistic production scenario with concrete constraints (team size, scale, reliability needs, existing tech debt), present 2-3 viable options, and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
+          - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
+          - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
+        ARCH
+      else
+        <<~CH.chomp
+          - The challenge starter_code should give enough scaffold to get started without giving away the answer.
+          - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
+        CH
+      end
+
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
 
@@ -252,17 +300,16 @@ class AiService
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
       - The code_review snippet must be realistic #{label} code — not toy examples.
-      - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
-      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
+      #{third_guidance}
       - Mastery loop: for any concept whose most recent rating was "too hard", reintroduce that concept in this set with a different code example and framing — same underlying concept, never a repeat of the same snippet. Keep reintroducing it in every subsequent set until the user rates a set containing it "right level" or "too easy"; that rating is the mastery signal that ends reinforcement for that concept.
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{exercise_schema_for(language)}
+      #{exercise_schema_for(language, third: third)}
     PROMPT
   end
 
