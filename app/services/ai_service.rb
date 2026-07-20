@@ -420,17 +420,27 @@ class AiService
   # vocabulary growth — this never changes what's persisted to the response
   # itself, which still gets "other".
   def normalize_concepts(problem_set, language = "ruby_rails")
-    concepts = config_for(language)[:concepts]
-
-    problem_set.each_value do |section|
+    problem_set.each do |section_key, section|
       next unless section.is_a?(Hash) && section.key?("concept")
+      bucket, vocab = concept_vocabulary_for(section_key, language)
       original = section["concept"]
-      unless concepts.include?(original)
+      unless vocab.include?(original)
         section["concept"] = "other"
-        record_suggested_concept(language, original)
+        record_suggested_concept(bucket, original)
       end
     end
     problem_set
+  end
+
+  # The (suggestion-bucket, vocabulary) a section's concept is validated against.
+  # The architecture section is language-independent — always ARCHITECTURE_CONCEPTS,
+  # bucketed under "architecture"; every other section follows the generation language.
+  private def concept_vocabulary_for(section_key, language)
+    if section_key == "architecture"
+      [ "architecture", ARCHITECTURE_CONCEPTS ]
+    else
+      [ language, config_for(language)[:concepts] ]
+    end
   end
 
   # Never allowed to break generation — a bug here is a lost analytics

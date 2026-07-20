@@ -278,6 +278,33 @@ RSpec.describe AiService do
       expect { result = service.send(:normalize_concepts, set) }.not_to raise_error
       expect(result["pattern"]["concept"]).to eq("other")
     end
+
+    it "validates the architecture section against ARCHITECTURE_CONCEPTS regardless of language" do
+      set = {
+        "code_review"  => { "concept" => "n_plus_one" },
+        "architecture" => { "concept" => "service_boundaries" }
+      }
+      out = service.send(:normalize_concepts, set, "javascript")
+      expect(out["architecture"]["concept"]).to eq("service_boundaries")   # in arch vocab, kept
+      expect(out["code_review"]["concept"]).to eq("other")                 # not in JS vocab
+    end
+
+    it "maps an off-list architecture concept to 'other' and records it under the 'architecture' bucket" do
+      set = { "architecture" => { "concept" => "Microservices Everywhere!!" } }
+
+      expect {
+        service.send(:normalize_concepts, set, "ruby_rails")
+      }.to change(SuggestedConcept, :count).by(1)
+
+      expect(set["architecture"]["concept"]).to eq("other")
+      expect(SuggestedConcept.last.language).to eq("architecture")
+    end
+
+    it "does not treat a Rails concept as valid in the architecture section" do
+      set = { "architecture" => { "concept" => "n_plus_one" } }
+      out = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(out["architecture"]["concept"]).to eq("other")
+    end
   end
 
   describe "#parse_json_response" do
