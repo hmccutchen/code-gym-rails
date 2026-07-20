@@ -36,7 +36,7 @@
             <td><%= concept.first_seen_at.strftime("%b %-d") %></td>
             <td><%= concept.last_seen_at.strftime("%b %-d") %></td>
             <td>
-              <% if ConceptReference.exists?(language: concept.language, concept: concept.normalized_name) %>
+              <% if @referenced_keys.include?([ concept.language, concept.normalized_name ]) %>
                 <span class="has-reference">Yes</span>
               <% else %>
                 <span class="no-reference">No</span>

@@ -43,6 +43,22 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       expect(response.body).not_to include("promoted_one")
       expect(response.body).not_to include("dismissed_one")
     end
+
+    it "flags whether each suggestion already has a matching ConceptReference" do
+      login_as(admin)
+      SuggestedConcept.record!(language: "ruby_rails", name: "has_ref")
+      SuggestedConcept.record!(language: "ruby_rails", name: "no_ref")
+      ConceptReference.create!(language: "ruby_rails", concept: "has_ref")
+
+      get admin_suggested_concepts_path
+
+      rows = Nokogiri::HTML(response.body).css(".suggested-table tbody tr")
+      has_ref_row = rows.find { |row| row.text.include?("has_ref") }
+      no_ref_row  = rows.find { |row| row.text.include?("no_ref") }
+
+      expect(has_ref_row.at_css(".has-reference")).to be_present
+      expect(no_ref_row.at_css(".no-reference")).to be_present
+    end
   end
 
   describe "PATCH /admin/suggested_concepts/:id/promote" do

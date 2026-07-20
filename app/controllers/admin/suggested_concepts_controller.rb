@@ -2,6 +2,8 @@ module Admin
   class SuggestedConceptsController < Admin::BaseController
     def index
       @suggested_concepts = SuggestedConcept.where(status: "pending").order(occurrences: :desc)
+      @referenced_keys = ConceptReference.where(language: @suggested_concepts.map(&:language))
+                                          .pluck(:language, :concept).to_set
     end
 
     def promote
