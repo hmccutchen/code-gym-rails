@@ -61,6 +61,19 @@ RSpec.describe SuggestedConcept do
       end
     end
 
+    it "does not lose an increment when two processes load the row before either writes back" do
+      concept = SuggestedConcept.record!(language: "ruby_rails", name: "n+1 queries!!")
+
+      stale_a = SuggestedConcept.find(concept.id)
+      stale_b = SuggestedConcept.find(concept.id)
+      allow(SuggestedConcept).to receive(:find_or_initialize_by).and_return(stale_a, stale_b)
+
+      SuggestedConcept.record!(language: "ruby_rails", name: "n+1 queries!!")
+      SuggestedConcept.record!(language: "ruby_rails", name: "n+1 queries!!")
+
+      expect(concept.reload.occurrences).to eq(3)
+    end
+
     it "treats the same normalized_name in different languages as separate rows" do
       SuggestedConcept.record!(language: "ruby_rails", name: "closures")
       SuggestedConcept.record!(language: "javascript", name: "closures")

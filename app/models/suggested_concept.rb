@@ -29,7 +29,8 @@ class SuggestedConcept < ApplicationRecord
       )
       concept.save!
     else
-      concept.update!(occurrences: concept.occurrences + 1, last_seen_at: Time.current)
+      where(id: concept.id).update_all([ "occurrences = occurrences + 1, last_seen_at = ?", Time.current ])
+      concept.reload
     end
 
     concept
