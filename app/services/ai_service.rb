@@ -339,15 +339,30 @@ class AiService
   end
 
   # A provider occasionally invents tags; keep the vocabulary closed so
-  # aggregation over concept history stays clean.
+  # aggregation over concept history stays clean. Off-list concepts are
+  # still recorded (via SuggestedConcept) as a background signal for future
+  # vocabulary growth — this never changes what's persisted to the response
+  # itself, which still gets "other".
   def normalize_concepts(problem_set, language = "ruby_rails")
     concepts = config_for(language)[:concepts]
 
     problem_set.each_value do |section|
       next unless section.is_a?(Hash) && section.key?("concept")
-      section["concept"] = "other" unless concepts.include?(section["concept"])
+      original = section["concept"]
+      unless concepts.include?(original)
+        section["concept"] = "other"
+        record_suggested_concept(language, original)
+      end
     end
     problem_set
+  end
+
+  # Never allowed to break generation — a bug here is a lost analytics
+  # signal, not a reason to fail the request.
+  def record_suggested_concept(language, name)
+    SuggestedConcept.record!(language: language, name: name)
+  rescue => e
+    Rails.logger.warn("SuggestedConcept recording failed: #{e.message}")
   end
 
   def log_usage(user, result, purpose:)

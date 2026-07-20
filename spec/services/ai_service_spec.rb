@@ -147,6 +147,44 @@ RSpec.describe AiService do
       expect(out["code_review"]["concept"]).to eq("closures")
       expect(out["pattern"]["concept"]).to eq("other")
     end
+
+    it "records a SuggestedConcept for an off-list concept" do
+      set = { "pattern" => { "concept" => "N+1 Queries!!" } }
+
+      expect {
+        service.send(:normalize_concepts, set)
+      }.to change(SuggestedConcept, :count).by(1)
+
+      concept = SuggestedConcept.last
+      expect(concept.language).to eq("ruby_rails")
+      expect(concept.display_name).to eq("N+1 Queries!!")
+    end
+
+    it "does not record a SuggestedConcept for an on-list concept" do
+      set = { "code_review" => { "concept" => "n_plus_one" } }
+
+      expect {
+        service.send(:normalize_concepts, set)
+      }.not_to change(SuggestedConcept, :count)
+    end
+
+    it "does not record a SuggestedConcept for a section with no concept key" do
+      set = { "challenge" => { "question" => "no concept key" } }
+
+      expect {
+        service.send(:normalize_concepts, set)
+      }.not_to change(SuggestedConcept, :count)
+    end
+
+    it "swallows a recording failure and still returns the normalized problem set" do
+      allow(SuggestedConcept).to receive(:record!).and_raise(StandardError, "db down")
+      set = { "pattern" => { "concept" => "N+1 Queries!!" } }
+
+      result = nil
+      expect(Rails.logger).to receive(:warn).with(/SuggestedConcept recording failed.*db down/)
+      expect { result = service.send(:normalize_concepts, set) }.not_to raise_error
+      expect(result["pattern"]["concept"]).to eq("other")
+    end
   end
 
   describe "#parse_json_response" do
