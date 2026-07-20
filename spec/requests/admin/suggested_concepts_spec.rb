@@ -82,6 +82,16 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
 
       expect(concept.reload.status).to eq("pending")
     end
+
+    it "returns 404 for a non-existent suggestion" do
+      login_as(admin)
+      bad_id = SuggestedConcept.maximum(:id).to_i + 1
+
+      expect {
+        patch promote_admin_suggested_concept_path(id: bad_id)
+      }.not_to change(SuggestedConcept, :count)
+      expect(response).to have_http_status(:not_found)
+    end
   end
 
   describe "PATCH /admin/suggested_concepts/:id/dismiss" do
@@ -95,6 +105,25 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       expect(concept.status).to eq("dismissed")
       expect(concept.reviewed_at).to be_present
       expect(concept.reviewed_by).to eq(admin)
+    end
+
+    it "is not accessible to a non-admin" do
+      login_as(member)
+      concept = SuggestedConcept.record!(language: "ruby_rails", name: "one_off_typo")
+
+      patch dismiss_admin_suggested_concept_path(concept)
+
+      expect(concept.reload.status).to eq("pending")
+    end
+
+    it "returns 404 for a non-existent suggestion" do
+      login_as(admin)
+      bad_id = SuggestedConcept.maximum(:id).to_i + 1
+
+      expect {
+        patch dismiss_admin_suggested_concept_path(id: bad_id)
+      }.not_to change(SuggestedConcept, :count)
+      expect(response).to have_http_status(:not_found)
     end
   end
 end
