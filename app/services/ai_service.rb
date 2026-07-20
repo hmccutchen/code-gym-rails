@@ -168,12 +168,14 @@ class AiService
           "question": "string — what to find/fix",
           "snippet":  "string — #{label} code, ~10-15 lines",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary"
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'"
         },
         "pattern": {
           "title":    "string — pattern name",
           "why":      "string — one sentence on why the pattern exists",
           "question": "string — conceptual question to answer",
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
           "reference": {
@@ -186,6 +188,7 @@ class AiService
         "challenge": {
           "title":        "string",
           "question":     "string — what to implement",
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "starter_code": "string — optional skeleton (empty string if none)",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary"
@@ -205,7 +208,9 @@ class AiService
         feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
         concepts     = h[:concepts].respond_to?(:values) ? h[:concepts].values.compact.uniq : []
         concept_text = concepts.any? ? " | concepts: #{concepts.join(', ')}" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/3 sections answered | #{rating_label}#{concept_text}#{feedback}"
+        framings     = h[:scenarios].presence || []
+        framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
+        "#{h[:date]}: #{h[:sections_answered]}/3 sections answered | #{rating_label}#{concept_text}#{framing_text}#{feedback}"
       }.join("\n")
     end
 
@@ -232,6 +237,7 @@ class AiService
       - The code_review snippet must be realistic #{label} code — not toy examples.
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
+      - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
       - Mastery loop: for any concept whose most recent rating was "too hard", reintroduce that concept in this set with a different code example and framing — same underlying concept, never a repeat of the same snippet. Keep reintroducing it in every subsequent set until the user rates a set containing it "right level" or "too easy"; that rating is the mastery signal that ends reinforcement for that concept.

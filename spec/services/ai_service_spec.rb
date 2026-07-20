@@ -49,6 +49,11 @@ RSpec.describe AiService do
     it "defaults to ruby_rails when no language is given" do
       expect(service.send(:exercise_schema_for)).to eq(service.send(:exercise_schema_for, "ruby_rails"))
     end
+
+    it "defines a scenario field for each of the three sections" do
+      schema = service.send(:exercise_schema_for)
+      expect(schema.scan(/"scenario"/).size).to eq(3)
+    end
   end
 
   describe "#build_system_prompt" do
@@ -122,6 +127,28 @@ RSpec.describe AiService do
     it "defaults to ruby_rails vocabulary when no language is given" do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+    end
+
+    it "instructs varying the concrete business-domain scenario across sessions" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt.downcase).to include("business-domain scenario")
+    end
+
+    it "includes recent problem framings pulled from the stored problem_set" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current - 1, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "scenario" => "inventory restocking" },
+          "pattern"     => { "scenario" => "invoice totals" },
+          "challenge"   => { "scenario" => "route planner" }
+        }
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1,
+                            answers: { "code_review" => "x" * 20 })
+
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("framings:")
+      expect(prompt).to include("inventory restocking")
     end
   end
 
