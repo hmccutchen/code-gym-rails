@@ -1,0 +1,23 @@
+<%# Submitted badge, on-demand review trigger, the AI review, and the feedback
+    widget. Shared by the dashboard submitted state and responses#show. Review
+    stays manual: the button only appears when unreviewed; nothing auto-triggers.
+    Local: response. %>
+<div class="submit-row">
+  <span class="submitted-badge">✓ Submitted</span>
+  <% unless response.reviewed? %>
+    <%= button_to t("review.get_button", provider: response.user.provider_label), review_response_path(response), method: :post, class: "btn btn-primary btn-sm" %>
+  <% end %>
+</div>
+
+<% if response.reviewed? %>
+  <div class="review-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <h3 style="font-size:1rem"><%= t("review.heading", provider: response.user.provider_label) %></h3>
+      <%= button_to "Email me this review", email_review_response_path(response), method: :post, class: "btn btn-ghost btn-sm" %>
+    </div>
+    <%= render "shared/ai_review", response: response %>
+  </div>
+  <%= render "responses/feedback_form", response: response, style: :prominent %>
+<% else %>
+  <%= render "responses/feedback_form", response: response, style: :quiet %>
+<% end %>

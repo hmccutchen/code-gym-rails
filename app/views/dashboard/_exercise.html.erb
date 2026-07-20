@@ -16,127 +16,85 @@
   <% end %>
 </div>
 
-<%# Progress bar (only shown before submission; sticky so progress stays
-    visible while scrolling the three sections on small screens) %>
-<% unless submitted %>
+<% if submitted %>
+  <%= render "responses/answered_sections", exercise: exercise, response: response %>
+  <%= render "responses/submission", response: response %>
+<% else %>
+  <%# Progress bar (sticky so progress stays visible while scrolling the three
+      sections on small screens) %>
   <div class="progress-sticky">
     <div class="progress-bar">
       <div class="progress-fill" id="progress-fill" style="width:0%"></div>
     </div>
     <div class="progress-label" id="progress-label">0 of 3 answered</div>
   </div>
-<% end %>
 
-<%# Always POST, never PATCH — ResponsesController#create is idempotent via
-    find_or_initialize_by, so resumed drafts save the same way, and there is no
-    PATCH /responses route to spoof. The script below submits it via fetch; see
-    there for why it never submits natively. %>
-<%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
-  <%# ── Section 1: Code Review ─────────────────────────────────────── %>
-  <% cr = exercise.code_review %>
-  <div class="section">
-    <div class="section-label">1 — Code Review</div>
-    <div class="question"><%= cr["question"] %></div>
-    <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
-
-    <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: submitted, answer: response.answers["code_review"] %>
-
-    <% if submitted %>
-      <div class="answer-display"><%= response.answers["code_review"].presence || "(skipped)" %></div>
-    <% else %>
+  <%# Always POST, never PATCH — ResponsesController#create is idempotent via
+      find_or_initialize_by. The script below submits it via fetch. %>
+  <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
+    <% cr = exercise.code_review %>
+    <div class="section">
+      <div class="section-label">1 — Code Review</div>
+      <% if cr["scenario"].present? %><div class="section-scenario"><%= cr["scenario"] %></div><% end %>
+      <div class="question"><%= cr["question"] %></div>
+      <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
+      <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
+        <%= render "shared/concept_reference", reference: ref %>
+      <% end %>
+      <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: false, answer: response.answers["code_review"] %>
       <textarea name="response[answers][code_review]" class="answer" placeholder="What's the issue and how would you fix it?" data-field="code_review"><%= response.answers["code_review"] %></textarea>
-    <% end %>
-  </div>
+    </div>
 
-  <%# ── Section 2: Pattern of the Month ─────────────────────────────── %>
-  <% pat = exercise.pattern %>
-  <div class="section">
-    <div class="section-label">2 — Pattern of the Month: <%= pat["title"] %></div>
-    <div class="why-box"><strong>Why it exists:</strong> <%= pat["why"] %></div>
-    <div class="question"><%= pat["question"] %></div>
+    <% pat = exercise.pattern %>
+    <div class="section">
+      <div class="section-label">2 — Pattern of the Month: <%= pat["title"] %></div>
+      <% if pat["scenario"].present? %><div class="section-scenario"><%= pat["scenario"] %></div><% end %>
+      <div class="why-box"><strong>Why it exists:</strong> <%= pat["why"] %></div>
+      <div class="question"><%= pat["question"] %></div>
 
-    <details class="ref">
-      <summary>Reference — <%= pat["title"] %>: how it works</summary>
-      <div class="ref-body">
-        <p style="margin-bottom:.75rem"><strong><%= pat.dig("reference", "tagline") %></strong></p>
-        <p style="margin-bottom:.75rem"><%= pat.dig("reference", "explanation") %></p>
-        <pre class="snippet"><code><%= pat.dig("reference", "code_example") %></code></pre>
-        <p>🔭 <%= pat.dig("reference", "senior_lens") %></p>
-      </div>
-    </details>
+      <details class="ref">
+        <summary>Reference — <%= pat["title"] %>: how it works</summary>
+        <div class="ref-body">
+          <p style="margin-bottom:.75rem"><strong><%= pat.dig("reference", "tagline") %></strong></p>
+          <p style="margin-bottom:.75rem"><%= pat.dig("reference", "explanation") %></p>
+          <pre class="snippet"><code><%= pat.dig("reference", "code_example") %></code></pre>
+          <p>🔭 <%= pat.dig("reference", "senior_lens") %></p>
+        </div>
+      </details>
+      <% if (ref = concept_reference_for(pat["concept"], exercise.language)) %>
+        <%= render "shared/concept_reference", reference: ref %>
+      <% end %>
 
-    <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: submitted, answer: response.answers["pattern"] %>
-
-    <% if submitted %>
-      <div class="answer-display"><%= response.answers["pattern"].presence || "(skipped)" %></div>
-    <% else %>
+      <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: false, answer: response.answers["pattern"] %>
       <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" data-field="pattern"><%= response.answers["pattern"] %></textarea>
-    <% end %>
-  </div>
+    </div>
 
-  <%# ── Section 3: Coding Challenge ─────────────────────────────────── %>
-  <% ch = exercise.challenge %>
-  <div class="section">
-    <div class="section-label">3 — Coding Challenge</div>
-    <div class="question"><%= ch["question"] %></div>
-    <% if ch["starter_code"].present? %>
-      <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
-    <% end %>
-
-    <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: submitted, answer: response.answers["challenge"] %>
-
-    <% if submitted %>
-      <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
-    <% else %>
+    <% ch = exercise.challenge %>
+    <div class="section">
+      <div class="section-label">3 — Coding Challenge</div>
+      <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
+      <div class="question"><%= ch["question"] %></div>
+      <% if ch["starter_code"].present? %>
+        <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
+      <% end %>
+      <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
+        <%= render "shared/concept_reference", reference: ref %>
+      <% end %>
+      <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: false, answer: response.answers["challenge"] %>
       <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" data-field="challenge"><%= response.answers["challenge"] %></textarea>
-    <% end %>
-  </div>
+    </div>
 
-  <%# ── Submit (unsubmitted state only) ─────────────────────────────── %>
-  <% unless submitted %>
     <div class="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
       <%= f.submit "Submit answers →", class: "btn btn-primary" %>
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
   <% end %>
-<% end %>
 
-<%# ── Post-submission: badge, review, feedback (outside the main form —
-     nested forms are invalid HTML and break the inner submits) ───────── %>
-<% if submitted %>
-  <div class="submit-row">
-    <span class="submitted-badge">✓ Submitted</span>
-    <% unless response.reviewed? %>
-      <%= button_to t("review.get_button", provider: current_user.provider_label), review_response_path(response), method: :post, class: "btn btn-primary btn-sm" %>
-    <% end %>
-  </div>
-
-  <% if response.reviewed? %>
-    <div class="review-section">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-        <h3 style="font-size:1rem"><%= t("review.heading", provider: current_user.provider_label) %></h3>
-        <%= button_to "Email me this review", email_review_response_path(response), method: :post, class: "btn btn-ghost btn-sm" %>
-      </div>
-      <%= render "shared/ai_review", response: response %>
-      <% concept_references_for(response).each do |entry| %>
-        <%= render "shared/concept_reference", entry: entry %>
-      <% end %>
-    </div>
-    <%= render "responses/feedback_form", response: response, style: :prominent %>
-  <% else %>
-    <%= render "responses/feedback_form", response: response, style: :quiet %>
-  <% end %>
-<% end %>
-
-<%# Auto-save script %>
-<% unless submitted %>
   <script>
-  // Wrapped in an IIFE: Turbo re-executes <script> tags whenever this
-  // partial is replaced (e.g. GenerateDailyExercisesJob's broadcast on a
-  // regenerate, or a later day's cron firing while the tab stays open).
-  // Top-level const/let would redeclare on the second run and throw
-  // "Identifier has already been declared", killing autosave/submit/progress.
+  // Wrapped in an IIFE: Turbo re-executes <script> tags whenever this partial is
+  // replaced (regenerate broadcast, or a later day's cron firing while the tab
+  // stays open). Top-level const/let would redeclare on the second run.
   (() => {
     const form = document.getElementById("gym-form");
     const textareas = form.querySelectorAll("textarea[data-field]");
@@ -175,13 +133,8 @@
       t.addEventListener("input", () => { updateProgress(); autoSave(); });
     });
 
-    // Submit goes through fetch with the page's CSRF meta tag, never the form's
-    // own hidden authenticity_token. When a background job delivers this partial
-    // over a Turbo Stream broadcast there is no request session to embed a token
-    // from, so a native submit would fail CSRF verification; the meta tag is only
-    // ever rendered during a real page load, so its token is always valid.
-    // The explicit Accept header is what makes #create answer with JSON rather
-    // than redirect — see spec/requests/responses_spec.rb "format handling".
+    // Submit goes through fetch with the page's CSRF meta tag. On success we
+    // navigate to the review page whose URL the server returns in `redirect`.
     const submitButton = form.querySelector('input[type="submit"]');
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -194,7 +147,7 @@
       submitButton.value = "Submitting…";
 
       try {
-        const response = await fetch(form.action, {
+        const res = await fetch(form.action, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -204,8 +157,9 @@
           body: JSON.stringify({ response: { answers, submit: "1" } })
         });
 
-        if (response.ok) {
-          window.location.reload();
+        if (res.ok) {
+          const data = await res.json();
+          window.location = data.redirect || "/";
         } else {
           submitButton.disabled = false;
           submitButton.value = "Submit answers →";
