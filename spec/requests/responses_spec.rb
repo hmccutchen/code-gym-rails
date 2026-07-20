@@ -28,6 +28,25 @@ RSpec.describe "Responses", type: :request do
       )
     end
 
+    it "tags and saves an architecture third section's concept and answer" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" }
+      )
+
+      post responses_path,
+        params: { response: { answers: { architecture: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      resp = DailyResponse.last
+      expect(resp.answers["architecture"]).to eq("a" * 20)
+      expect(resp.concept_tags).to eq(
+        "code_review" => "n_plus_one", "pattern" => "memoization", "architecture" => "service_boundaries"
+      )
+    end
+
     it "stores an empty map for exercises that predate tagging" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" },
                       "pattern" => { "title" => "t", "why" => "w", "question" => "q" },

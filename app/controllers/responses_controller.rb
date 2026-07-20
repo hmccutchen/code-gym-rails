@@ -90,7 +90,7 @@ class ResponsesController < ApplicationController
   end
 
   def response_params
-    params.require(:response).permit(:submit, answers: [ :code_review, :pattern, :challenge ])
+    params.require(:response).permit(:submit, answers: [ :code_review, :pattern, :challenge, :architecture ])
   end
 
   def feedback_params
@@ -98,7 +98,7 @@ class ResponsesController < ApplicationController
   end
 
   def exercise_concept_tags(exercise)
-    %w[code_review pattern challenge]
+    %w[code_review pattern challenge architecture]
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
   end

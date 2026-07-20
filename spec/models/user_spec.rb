@@ -193,6 +193,19 @@ RSpec.describe User, type: :model do
 
       expect(user.recent_performance.first[:scenarios]).to eq([])
     end
+
+    it "includes the architecture section's scenario when the third section is architecture" do
+      user = create_user
+      ex = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "scenario" => "billing" },
+          "pattern"     => {},
+          "architecture" => { "scenario" => "multi-region failover" }
+        })
+      DailyResponse.create!(user: user, daily_exercise: ex, date: Date.current, answers: {})
+
+      expect(user.recent_performance.first[:scenarios]).to eq([ "billing", "multi-region failover" ])
+    end
   end
 
   describe "#language_for_today" do

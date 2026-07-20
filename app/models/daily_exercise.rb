@@ -19,4 +19,5 @@ class DailyExercise < ApplicationRecord
   def code_review  = problem_set["code_review"]&.with_indifferent_access
   def pattern      = problem_set["pattern"]&.with_indifferent_access
   def challenge    = problem_set["challenge"]&.with_indifferent_access
+  def architecture = problem_set["architecture"]&.with_indifferent_access
 end
