@@ -1,19 +1,12 @@
-<%# First exposure is expanded; repeat exposure collapses to a refresher so
-    repetition reads as deliberate reinforcement. `entry` comes from
-    ConceptReferencesHelper#concept_references_for. %>
-<% ref   = entry[:reference] %>
-<% count = entry[:count] %>
-<% first = count <= 1 %>
-<details class="ref"<%= " open" if first %>>
-  <% if first %>
-    <summary>Reference — <%= entry[:concept] %>: how it works</summary>
-  <% else %>
-    <summary>Reference — <%= entry[:concept] %> · This is your <%= count.ordinalize %> time seeing it — quick refresher</summary>
-  <% end %>
+<%# Always-collapsed reference dropdown for a section's concept. Rendered near
+    the section's question whenever a cached ConceptReference exists — no
+    submission gate, no exposure-count logic. `reference` is a ConceptReference. %>
+<details class="ref">
+  <summary>Reference — <%= reference.concept.humanize %>: how it works</summary>
   <div class="ref-body">
-    <p style="margin-bottom:.75rem"><strong><%= ref.tagline %></strong></p>
-    <p style="margin-bottom:.75rem"><%= ref.explanation %></p>
-    <pre class="snippet"><code><%= ref.code_example %></code></pre>
-    <p>🔭 <%= ref.senior_lens %></p>
+    <p style="margin-bottom:.75rem"><strong><%= reference.tagline %></strong></p>
+    <p style="margin-bottom:.75rem"><%= reference.explanation %></p>
+    <pre class="snippet"><code><%= reference.code_example %></code></pre>
+    <p>🔭 <%= reference.senior_lens %></p>
   </div>
 </details>
