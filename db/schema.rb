@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_18_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_19_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -208,6 +208,22 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_18_000000) do
     t.index ["expires_at"], name: "index_solid_queue_semaphores_on_expires_at"
     t.index ["key", "value"], name: "index_solid_queue_semaphores_on_key_and_value"
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
+  end
+
+  create_table "suggested_concepts", force: :cascade do |t|
+    t.string "language", null: false
+    t.string "normalized_name", null: false
+    t.string "display_name", null: false
+    t.integer "occurrences", default: 1, null: false
+    t.datetime "first_seen_at", null: false
+    t.datetime "last_seen_at", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "reviewed_at"
+    t.bigint "reviewed_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["language", "normalized_name"], name: "index_suggested_concepts_on_language_and_normalized_name", unique: true
+    t.index ["status"], name: "index_suggested_concepts_on_status"
   end
 
   create_table "users", force: :cascade do |t|
