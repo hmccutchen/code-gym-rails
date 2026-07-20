@@ -1,0 +1,54 @@
+<style>
+  .suggested-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  .suggested-table th, .suggested-table td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border); font-size: .9rem; }
+  .suggested-table th { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+  .suggested-table .actions { display: flex; gap: .5rem; }
+  .has-reference { color: var(--green); font-size: .8rem; }
+  .no-reference { color: var(--muted); font-size: .8rem; }
+</style>
+
+<div class="page-header">
+  <h1>Suggested Concepts</h1>
+</div>
+
+<div class="section">
+  <% if @suggested_concepts.empty? %>
+    <p style="color: var(--muted);">No pending suggestions.</p>
+  <% else %>
+    <table class="suggested-table">
+      <thead>
+        <tr>
+          <th>Concept</th>
+          <th>Language</th>
+          <th>Occurrences</th>
+          <th>First seen</th>
+          <th>Last seen</th>
+          <th>Reference?</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @suggested_concepts.each do |concept| %>
+          <tr>
+            <td><%= concept.display_name %></td>
+            <td><%= concept.language %></td>
+            <td><%= concept.occurrences %></td>
+            <td><%= concept.first_seen_at.strftime("%b %-d") %></td>
+            <td><%= concept.last_seen_at.strftime("%b %-d") %></td>
+            <td>
+              <% if @referenced_keys.include?([ concept.language, concept.normalized_name ]) %>
+                <span class="has-reference">Yes</span>
+              <% else %>
+                <span class="no-reference">No</span>
+              <% end %>
+            </td>
+            <td class="actions">
+              <%= button_to "Promote", promote_admin_suggested_concept_path(concept), method: :patch, class: "btn btn-ghost btn-sm" %>
+              <%= button_to "Dismiss", dismiss_admin_suggested_concept_path(concept), method: :patch, class: "btn btn-ghost btn-sm" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

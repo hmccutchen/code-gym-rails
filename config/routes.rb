@@ -43,4 +43,13 @@ Rails.application.routes.draw do
       post  :email_review # email the completed review to the user
     end
   end
+
+  namespace :admin do
+    resources :suggested_concepts, only: [ :index ] do
+      member do
+        patch :promote
+        patch :dismiss
+      end
+    end
+  end
 end
