@@ -45,13 +45,15 @@ User interacts:
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day)
   └→ HistoryController#index         → past submitted sessions
        (feedback + concept tags are included in tomorrow's generation prompt)
+  └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
+       the account in place while preserving all exercise/response/usage history
 ```
 
 ## Models
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language                     |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, anonymized_at (nullable — set on self-service deletion) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, challenge), language, generated_at, regenerated_at |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), rating enum, feedback_text, ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
@@ -113,6 +115,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/controllers/responses_controller.rb` — auto-save, review, feedback, email-review endpoints
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/sessions_controller.rb` — magic link create + verify
-- `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, encryption
+- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
+- `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway

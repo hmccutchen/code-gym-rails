@@ -21,6 +21,8 @@ class User < ApplicationRecord
 
   before_save { email.downcase! }
 
+  scope :active, -> { where(anonymized_at: nil) }
+
   TOKEN_EXPIRY = 15.minutes
 
   # ── Magic link ────────────────────────────────────────────────────────────
@@ -37,13 +39,44 @@ class User < ApplicationRecord
     # We can't query by the digest directly since each BCrypt hash is salted,
     # so we do a two-step lookup: find candidates sent within the expiry window,
     # then verify the digest in Ruby.
-    candidates = where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
-                   .where.not(login_token_digest: nil)
+    candidates = active.where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
+                       .where.not(login_token_digest: nil)
     candidates.find { |u| BCrypt::Password.new(u.login_token_digest) == raw_token }
   end
 
   def clear_login_token!
     update!(login_token_digest: nil, login_token_sent_at: nil)
+  end
+
+  # ── Account deletion ──────────────────────────────────────────────────────
+  # Self-service deletion anonymizes in place rather than destroying: the
+  # user's exercises, responses (answers, ai_review, concept_tags) and API
+  # usage stay linked by user_id for aggregate stats, but nothing on the row
+  # identifies a person any more. Never call destroy here — the association
+  # `dependent: :destroy` would take that history with it.
+  def anonymized?
+    anonymized_at.present?
+  end
+
+  # Idempotent under concurrency: `with_lock` takes a row lock and reloads
+  # before the check, so two in-flight calls (double-click, retry from another
+  # tab) serialize — the second sees `anonymized?` already true, returns false,
+  # and never overwrites the original `anonymized_at`. Returns true only on the
+  # call that actually anonymized the row.
+  def anonymize!
+    with_lock do
+      return false if anonymized?
+
+      update!(
+        email:               "deleted-user-#{id}@anonymized.local",
+        name:                "Deleted user",
+        api_key:             nil,
+        login_token_digest:  nil,
+        login_token_sent_at: nil,
+        anonymized_at:       Time.current
+      )
+    end
+    true
   end
 
   # ── API key ───────────────────────────────────────────────────────────────

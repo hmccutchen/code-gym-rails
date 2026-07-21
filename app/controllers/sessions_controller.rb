@@ -12,7 +12,9 @@ class SessionsController < ApplicationController
     email = params[:email].to_s.strip.downcase
     name  = params[:name].to_s.strip
 
-    user = User.find_by(email: email)
+    # `active` only: an anonymized row's email was rewritten anyway, so this
+    # falls through to account creation and the person gets a fresh account.
+    user = User.active.find_by(email: email)
 
     if user.nil?
       # First-time user — create account

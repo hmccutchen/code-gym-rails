@@ -33,6 +33,10 @@ en:
     anthropic: "Claude"
     gemini: "Gemini"
     unknown: "AI"
+  languages:
+    ruby_rails: "Ruby / Rails"
+    javascript: "JavaScript"
+    mixed: "Mixed"
   review:
     get_button: "Get %{provider} review →"
     heading: "%{provider}'s Review"

@@ -9,12 +9,14 @@ class GenerateDailyExercisesJob < ApplicationJob
     if user_id
       # On-demand: the dashboard already gated weekday; generate in the user's
       # zone with no hour gate (a user opening the app early still gets today's).
-      User.where(id: user_id).find_each do |user|
+      # `active` guards a job enqueued before deletion or retried afterward, so
+      # an anonymized user is never processed.
+      User.active.where(id: user_id).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_now(user) }
       end
     else
       # Hourly batch: each user in their own zone, gated to local weekday morning.
-      User.where.not(api_key: nil).find_each do |user|
+      User.active.where.not(api_key: nil).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
       end
     end

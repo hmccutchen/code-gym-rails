@@ -115,6 +115,16 @@ RSpec.describe GenerateDailyExercisesJob do
     described_class.new.perform(user_id: user.id)
   end
 
+  it "skips an anonymized user on the on-demand path" do
+    user.anonymize!
+    expect(AiService).not_to receive(:for)
+    expect(Turbo::StreamsChannel).not_to receive(:broadcast_replace_to)
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
+  end
+
   describe "hourly batch (no user_id), zone-gated" do
     include ActiveSupport::Testing::TimeHelpers
 

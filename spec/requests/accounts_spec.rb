@@ -1,0 +1,103 @@
+require "rails_helper"
+
+RSpec.describe "Accounts", type: :request do
+  describe "GET /account" do
+    it "shows the identity summary, log out control and settings link" do
+      user = create_user_with_key(email: "dev@example.com", name: "Dev")
+      login_as(user)
+
+      get account_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("dev@example.com")
+      expect(response.body).to include("Log out")
+      expect(response.body).to include(setup_path)
+    end
+
+    # `AccountsController` skips `require_api_key` on purpose: without that
+    # skip a keyless user is bounced to /setup and — with the nav log-out
+    # button gone — has no way to log out at all.
+    it "renders for a user who has not added an API key yet" do
+      user = User.create!(email: "keyless@example.com", name: "Keyless")
+      login_as(user)
+
+      get account_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("keyless@example.com")
+    end
+
+    it "redirects to login when logged out" do
+      get account_path
+
+      expect(response).to redirect_to(login_path)
+    end
+  end
+
+  describe "nav" do
+    it "links to the account page instead of showing a log out button" do
+      login_as(create_user_with_key)
+
+      get history_path
+
+      expect(response.body).to include(account_path)
+      expect(response.body).to include("Account")
+    end
+  end
+
+  describe "DELETE /account" do
+    it "anonymizes the user, clears the session and redirects to login" do
+      user = create_user_with_key(email: "leaving@example.com", name: "Leaving")
+      login_as(user)
+
+      delete account_path
+
+      expect(response).to redirect_to(login_path)
+      follow_redirect!
+      expect(response.body).to include("Your account has been deleted.")
+
+      user.reload
+      expect(user).to be_anonymized
+      expect(user.email).to eq("deleted-user-#{user.id}@anonymized.local")
+      expect(user.api_key).to be_nil
+
+      # Session is gone: a follow-up request is no longer authenticated.
+      get history_path
+      expect(response).to redirect_to(login_path)
+    end
+
+    it "does nothing when logged out" do
+      user = create_user_with_key(email: "safe@example.com")
+
+      delete account_path
+
+      expect(response).to redirect_to(login_path)
+      expect(user.reload).not_to be_anonymized
+    end
+
+    it "is a safe redirect, not an error, when submitted twice" do
+      user = create_user_with_key(email: "twice@example.com")
+      login_as(user)
+
+      delete account_path
+      first_stamp = user.reload.anonymized_at
+
+      delete account_path
+
+      expect(response).to redirect_to(login_path)
+      expect(user.reload.anonymized_at).to eq(first_stamp)
+    end
+  end
+
+  describe "the danger zone" do
+    it "renders the delete control and the confirmation copy" do
+      login_as(create_user_with_key)
+
+      get account_path
+
+      expect(response.body).to include("Danger zone")
+      expect(response.body).to include("Delete my account")
+      expect(response.body).to include("It cannot be undone.")
+    end
+  end
+end
