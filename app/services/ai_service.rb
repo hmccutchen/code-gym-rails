@@ -196,7 +196,7 @@ class AiService
               "title":     "string — short name for the decision",
               "scenario":  "string — realistic production scenario with real constraints (team size, scale, reliability needs, existing tech debt)",
               "question":  "string — asks for a decision + justification",
-              "options":   ["string — a viable approach", "string — another viable approach"],
+              "options":   ["string — a viable approach", "string — another viable approach", "string — a third viable approach"],
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the architecture vocabulary",
               "reference": {

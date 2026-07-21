@@ -3,6 +3,8 @@ class SuggestedConcept < ApplicationRecord
 
   belongs_to :reviewed_by, class_name: "User", optional: true
 
+  # "architecture" is a valid bucket here because it's a LANGUAGE_CONFIG key
+  # (not a real language) — keep that in mind if LANGUAGE_CONFIG is ever refactored.
   validates :language, inclusion: { in: AiService::LANGUAGE_CONFIG.keys }
   validates :normalized_name, :display_name, presence: true
   validates :status, inclusion: { in: STATUSES }

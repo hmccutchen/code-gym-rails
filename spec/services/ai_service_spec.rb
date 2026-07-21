@@ -438,6 +438,14 @@ RSpec.describe AiService do
 
       expect(result["code_review"]["concept"]).to eq("closures")
     end
+
+    it "threads the rolled third-section kind into the exercise prompt" do
+      set = { "code_review" => { "concept" => "n_plus_one" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(svc).to receive(:roll_third_section).and_return(:architecture)
+      expect(svc).to receive(:build_exercise_prompt).with(user, anything, third: :architecture).and_call_original
+      svc.generate_exercise(user)
+    end
   end
 
   describe "#review_response" do

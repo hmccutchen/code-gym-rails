@@ -1,0 +1,34 @@
+<%# Architecture third section, shared by the dashboard form (submitted: false)
+    and the read-only review page (submitted: true). Locals: arch, response, submitted. %>
+<div class="section">
+  <div class="section-label">3 — Architecture Decision: <%= arch["title"] %></div>
+  <% if arch["scenario"].present? %><div class="section-scenario"><%= arch["scenario"] %></div><% end %>
+  <div class="question"><%= arch["question"] %></div>
+  <% if arch["options"].present? %>
+    <ul class="arch-options">
+      <% arch["options"].each do |opt| %><li><%= opt %></li><% end %>
+    </ul>
+  <% end %>
+  <% if arch["reference"].present? %>
+    <details class="ref">
+      <summary>Reference — <%= arch["title"] %>: tradeoffs</summary>
+      <div class="ref-body">
+        <p style="margin-bottom:.75rem"><strong><%= arch.dig("reference", "tagline") %></strong></p>
+        <p style="margin-bottom:.75rem"><%= arch.dig("reference", "explanation") %></p>
+        <% if arch.dig("reference", "tradeoffs").present? %>
+          <ul><% arch.dig("reference", "tradeoffs").each do |t| %><li><%= t %></li><% end %></ul>
+        <% end %>
+        <p>🔭 <%= arch.dig("reference", "senior_lens") %></p>
+      </div>
+    </details>
+  <% end %>
+  <% if (ref = concept_reference_for(arch["concept"], "architecture")) %>
+    <%= render "shared/concept_reference", reference: ref %>
+  <% end %>
+  <%= render "dashboard/teaching_hint", note: arch["teaching_note"], field: "architecture", submitted: submitted, answer: response.answers["architecture"] %>
+  <% if submitted %>
+    <div class="answer-display"><%= response.answers["architecture"].presence || "(skipped)" %></div>
+  <% else %>
+    <textarea name="response[answers][architecture]" class="answer" placeholder="Your decision and why — weigh the tradeoffs…" data-field="architecture"><%= response.answers["architecture"] %></textarea>
+  <% end %>
+</div>
