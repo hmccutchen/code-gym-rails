@@ -1,0 +1,20 @@
+<style>
+  .account-wrap { max-width: 480px; margin: 5rem auto; }
+  .account-wrap h1 { margin-bottom: .5rem; }
+  .account-id { color: var(--muted); font-size: .9rem; margin-bottom: 2rem; }
+  .account-id .email { color: var(--text); font-family: monospace; display: block; margin-bottom: .2rem; }
+  .account-actions { display: flex; align-items: center; gap: 1.25rem; }
+</style>
+
+<div class="account-wrap">
+  <h1>Account</h1>
+  <p class="account-id">
+    <span class="email"><%= current_user.email %></span>
+    <%= current_user.provider_label %> · <%= t("languages.#{current_user.language}") %>
+  </p>
+
+  <div class="account-actions">
+    <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost" %>
+    <%= link_to "Settings →", setup_path %>
+  </div>
+</div>
