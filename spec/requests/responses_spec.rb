@@ -47,6 +47,23 @@ RSpec.describe "Responses", type: :request do
       )
     end
 
+    it "ignores an answer for a third section this exercise does not have" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" }
+      )
+
+      post responses_path,
+        params: { response: { answers: { architecture: "a" * 20, challenge: "b" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.answers).to have_key("architecture")
+      expect(resp.answers).not_to have_key("challenge")
+      expect(resp.completeness).to be <= 100
+    end
+
     it "stores an empty map for exercises that predate tagging" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" },
                       "pattern" => { "title" => "t", "why" => "w", "question" => "q" },
