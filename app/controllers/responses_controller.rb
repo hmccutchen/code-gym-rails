@@ -109,7 +109,7 @@ class ResponsesController < ApplicationController
   # exercise's language. The exists? check only avoids obvious no-op jobs; the
   # job re-checks, so a racing duplicate enqueue is harmless.
   def enqueue_concept_references(exercise)
-    enqueued = Set.new
+    enqueued = []
     exercise_concept_tags(exercise).each do |section, concept|
       next if concept == "other"
       language = section == "architecture" ? "architecture" : exercise.language

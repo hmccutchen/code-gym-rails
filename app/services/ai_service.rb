@@ -366,7 +366,7 @@ class AiService
   def build_concept_reference_prompt(concept, config)
     label = config[:label]
     code_example_desc =
-      if config[:coach] == "software architecture"
+      if config[:concepts] == ARCHITECTURE_CONCEPTS
         "illustrative pseudocode or a short language-agnostic snippet, ~15 lines"
       else
         "annotated #{label} code, ~15 lines"
