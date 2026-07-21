@@ -113,7 +113,7 @@ class ResponsesController < ApplicationController
     exercise_concept_tags(exercise).each do |section, concept|
       next if concept == "other"
       language = section == "architecture" ? "architecture" : exercise.language
-      pair = [concept, language]
+      pair = [ concept, language ]
       next if enqueued.include?(pair) || ConceptReference.exists?(concept: concept, language: language)
       GenerateConceptReferenceJob.perform_later(concept: concept, language: language, user_id: current_user.id)
       enqueued << pair
