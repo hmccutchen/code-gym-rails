@@ -55,24 +55,25 @@ class User < ApplicationRecord
   # Last N sessions by count, not a calendar window — matches the "last 10
   # sessions" contract embedded verbatim in AiService's generation prompt.
   def recent_performance(limit: 10)
-    daily_responses
-      .includes(:daily_exercise)
-      .order(date: :desc)
-      .limit(limit)
-      .map do |r|
-        problem_set = r.daily_exercise&.problem_set || {}
-        scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
-          problem_set.dig(section, "scenario").presence
-        end
-        {
-          date:          r.date.to_s,
-          rating:        r.rating,
-          feedback:      r.feedback_text,
-          concepts:      r.concept_tags,
-          scenarios:     scenarios,
-          sections_answered: r.answered_sections.size
-        }
+    recent_daily_responses(limit).map do |r|
+      problem_set = r.daily_exercise&.problem_set || {}
+      scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
+        problem_set.dig(section, "scenario").presence
       end
+      # AI-assessed rating per tagged section, empty when the response was
+      # never reviewed — surfaced alongside the day's self-rating so
+      # AiService can show both signals side by side in the prompt.
+      section_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
+      {
+        date:          r.date.to_s,
+        rating:        r.rating,
+        feedback:      r.feedback_text,
+        concepts:      r.concept_tags,
+        scenarios:     scenarios,
+        sections_answered: r.answered_sections.size,
+        section_ratings: section_ratings
+      }
+    end
   end
 
   # ── Language preference ────────────────────────────────────────────────────
@@ -106,6 +107,12 @@ class User < ApplicationRecord
   end
 
   private
+
+  # Shared by #recent_performance and #concepts_needing_reinforcement so
+  # neither issues its own duplicate "last N sessions" query.
+  def recent_daily_responses(limit)
+    daily_responses.includes(:daily_exercise).order(date: :desc).limit(limit)
+  end
 
   def time_zone_must_be_loadable
     return if time_zone.blank? # blank/nil = not yet detected; allowed

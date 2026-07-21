@@ -208,6 +208,31 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_performance section_ratings" do
+    it "surfaces each section's AI-assessed rating alongside the self-rating, nil-safe when unreviewed" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+                            ai_review: { "code_review" => { "rating" => "developing" } })
+
+      expect(user.recent_performance.first[:section_ratings]).to eq({ "code_review" => "developing" })
+    end
+
+    it "is an empty hash when the response was never reviewed" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      expect(user.recent_performance.first[:section_ratings]).to eq({})
+    end
+  end
+
   describe "#language_for_today" do
     it "returns ruby_rails unchanged when the preference is ruby_rails" do
       user = create_user
