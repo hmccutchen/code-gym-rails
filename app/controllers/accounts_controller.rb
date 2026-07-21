@@ -6,4 +6,14 @@ class AccountsController < ApplicationController
 
   # GET /account
   def show; end
+
+  # DELETE /account
+  # Synchronous and irreversible. Double-submission is safe twice over: once
+  # anonymized, `current_user` returns nil so `require_login` redirects before
+  # this ever runs, and `anonymize!` no-ops regardless.
+  def destroy
+    current_user.anonymize!
+    reset_session
+    redirect_to login_path, notice: "Your account has been deleted."
+  end
 end

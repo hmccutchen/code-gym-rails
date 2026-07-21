@@ -44,4 +44,60 @@ RSpec.describe "Accounts", type: :request do
       expect(response.body).to include("Account")
     end
   end
+
+  describe "DELETE /account" do
+    it "anonymizes the user, clears the session and redirects to login" do
+      user = create_user_with_key(email: "leaving@example.com", name: "Leaving")
+      login_as(user)
+
+      delete account_path
+
+      expect(response).to redirect_to(login_path)
+      follow_redirect!
+      expect(response.body).to include("Your account has been deleted.")
+
+      user.reload
+      expect(user).to be_anonymized
+      expect(user.email).to eq("deleted-user-#{user.id}@anonymized.local")
+      expect(user.api_key).to be_nil
+
+      # Session is gone: a follow-up request is no longer authenticated.
+      get history_path
+      expect(response).to redirect_to(login_path)
+    end
+
+    it "does nothing when logged out" do
+      user = create_user_with_key(email: "safe@example.com")
+
+      delete account_path
+
+      expect(response).to redirect_to(login_path)
+      expect(user.reload).not_to be_anonymized
+    end
+
+    it "is a safe redirect, not an error, when submitted twice" do
+      user = create_user_with_key(email: "twice@example.com")
+      login_as(user)
+
+      delete account_path
+      first_stamp = user.reload.anonymized_at
+
+      delete account_path
+
+      expect(response).to redirect_to(login_path)
+      expect(user.reload.anonymized_at).to eq(first_stamp)
+    end
+  end
+
+  describe "the danger zone" do
+    it "renders the delete control and the confirmation copy" do
+      login_as(create_user_with_key)
+
+      get account_path
+
+      expect(response.body).to include("Danger zone")
+      expect(response.body).to include("Delete my account")
+      expect(response.body).to include("It cannot be undone.")
+    end
+  end
 end

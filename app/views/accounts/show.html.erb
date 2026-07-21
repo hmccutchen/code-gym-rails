@@ -4,6 +4,11 @@
   .account-id { color: var(--muted); font-size: .9rem; margin-bottom: 2rem; }
   .account-id .email { color: var(--text); font-family: monospace; display: block; margin-bottom: .2rem; }
   .account-actions { display: flex; align-items: center; gap: 1.25rem; }
+  .danger-zone { margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 2rem; }
+  .danger-zone h2 { font-size: 1rem; color: var(--red); margin-bottom: .4rem; }
+  .danger-zone p { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
+  .btn-danger:hover { background: var(--red); color: var(--bg); }
 </style>
 
 <div class="account-wrap">
@@ -17,4 +22,27 @@
     <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost" %>
     <%= link_to "Settings →", setup_path %>
   </div>
+
+  <div class="danger-zone">
+    <h2>Danger zone</h2>
+    <p>Deleting your account permanently removes your name, email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone.</p>
+    <%= button_to "Delete my account", account_path, method: :delete,
+          class: "btn btn-danger", form: { id: "delete-account-form" } %>
+  </div>
 </div>
+
+<%# This app loads no Stimulus/importmap JS (the layout emits no
+    javascript_importmap_tags), so `turbo_confirm` is inert here — an inline
+    script is the working convention, same as the setup page's timezone
+    select and the dashboard's answer autosave. %>
+<script>
+  (function () {
+    const form = document.getElementById("delete-account-form");
+    if (!form) return;
+    form.addEventListener("submit", (event) => {
+      if (!confirm("Delete your account? This permanently removes your name and email and logs you out. It cannot be undone.")) {
+        event.preventDefault();
+      }
+    });
+  })();
+</script>
