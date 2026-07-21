@@ -90,6 +90,36 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('class="review-rating">solid</span>')
   end
 
+  it "shows a calibration note when the self-rating was favorable but the AI rated that section beginner/developing" do
+    resp = create_response(create_exercise, ai_review: sample_review)
+    resp.update!(rating: :right_level)
+    # sample_review's "pattern" section is rated "developing" — the disagreement case
+    get root_path
+    expect(response.body).to include("You rated this")
+    expect(response.body).to include("just right")
+  end
+
+  it "shows the calibration note exactly once, only for the section the AI rated poorly" do
+    resp = create_response(create_exercise, ai_review: sample_review)
+    resp.update!(rating: :right_level)
+    # code_review is "solid" and challenge is "strong" in sample_review — no note for those
+    get root_path
+    expect(response.body.scan("You rated this").size).to eq(1)
+  end
+
+  it "does not show the calibration note when the response was never self-rated" do
+    create_response(create_exercise, ai_review: sample_review)
+    get root_path
+    expect(response.body).not_to include("You rated this")
+  end
+
+  it "does not show the calibration note when self-rating is too_hard, even if a section was rated poorly" do
+    resp = create_response(create_exercise, ai_review: sample_review)
+    resp.update!(rating: :too_hard)
+    get root_path
+    expect(response.body).not_to include("You rated this")
+  end
+
   it "round-trips rating and feedback text through the feedback action" do
     resp = create_response(create_exercise)
     patch feedback_response_path(resp),

@@ -2,6 +2,9 @@
   <% next unless fb.is_a?(Hash) %>
   <div class="review-block">
     <h4><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h4>
+    <% if response.self_rating_favorable? && response.ai_rating_unfavorable?(section) %>
+      <p class="calibration-note"><%= t("review.calibration_note", rating: response.self_rating_label) %></p>
+    <% end %>
     <% DailyResponse::AI_REVIEW_FIELDS.each do |key, label| %>
       <% if fb[key].present? %>
         <p class="review-item"><strong><%= label %>:</strong> <%= fb[key] %></p>
