@@ -58,19 +58,24 @@ class User < ApplicationRecord
     anonymized_at.present?
   end
 
-  # Idempotent: a repeat call (double-click, retry) returns false and changes
-  # nothing. Returns true only on the call that actually anonymized the row.
+  # Idempotent under concurrency: `with_lock` takes a row lock and reloads
+  # before the check, so two in-flight calls (double-click, retry from another
+  # tab) serialize — the second sees `anonymized?` already true, returns false,
+  # and never overwrites the original `anonymized_at`. Returns true only on the
+  # call that actually anonymized the row.
   def anonymize!
-    return false if anonymized?
+    with_lock do
+      return false if anonymized?
 
-    update!(
-      email:               "deleted-user-#{id}@anonymized.local",
-      name:                "Deleted user",
-      api_key:             nil,
-      login_token_digest:  nil,
-      login_token_sent_at: nil,
-      anonymized_at:       Time.current
-    )
+      update!(
+        email:               "deleted-user-#{id}@anonymized.local",
+        name:                "Deleted user",
+        api_key:             nil,
+        login_token_digest:  nil,
+        login_token_sent_at: nil,
+        anonymized_at:       Time.current
+      )
+    end
     true
   end
 
