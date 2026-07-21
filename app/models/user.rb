@@ -89,7 +89,7 @@ class User < ApplicationRecord
 
     recent_daily_responses(limit).each do |r|
       r.concept_tags.each do |section, concept|
-        next if concept.blank? || resolved.key?(concept)
+        next if concept.blank? || concept == "other" || resolved.key?(concept)
         resolved[concept] = true
 
         next if r.rating.nil? && r.ai_rating_for(section).nil? # out of scope, no info

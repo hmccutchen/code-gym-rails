@@ -315,6 +315,16 @@ RSpec.describe User, type: :model do
 
       expect(user.concepts_needing_reinforcement).to eq([])
     end
+
+    it "excludes the 'other' sentinel concept, even when unfavorable, since it isn't in any real vocabulary" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            concept_tags: { "code_review" => "other" })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
   end
 
   describe "#language_for_today" do
