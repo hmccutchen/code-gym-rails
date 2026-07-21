@@ -208,6 +208,125 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_performance section_ratings" do
+    it "surfaces each section's AI-assessed rating alongside the self-rating, nil-safe when unreviewed" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+                            ai_review: { "code_review" => { "rating" => "developing" } })
+
+      expect(user.recent_performance.first[:section_ratings]).to eq({ "code_review" => "developing" })
+    end
+
+    it "is an empty hash when the response was never reviewed" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      expect(user.recent_performance.first[:section_ratings]).to eq({})
+    end
+  end
+
+  describe "#concepts_needing_reinforcement" do
+    it "flags a concept whose most recent self-rating was too_hard, even with no AI review" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+    end
+
+    it "flags a concept the AI rated beginner/developing even when the self-rating was favorable (the core gap this fix closes)" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :right_level,
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "developing" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+    end
+
+    it "keeps reinforcing when self-rating is unfavorable even if the AI review was favorable" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "solid" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+    end
+
+    it "excludes a concept once both self-rating and AI review explicitly agree it's solid" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :too_easy,
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "strong" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
+
+    it "does not treat an unreviewed section as mastered, even with a favorable self-rating" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :right_level,
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+    end
+
+    it "excludes a concept with no self-rating and no AI review at all, same as an unrated concept today" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
+
+    it "resolves each concept on its most recent occurrence, ignoring older history" do
+      user = create_user
+      older_exercise = DailyExercise.create!(user: user, date: Date.current - 1,
+                                              problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: older_exercise, date: Date.current - 1,
+                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      newer_exercise = DailyExercise.create!(user: user, date: Date.current,
+                                              problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: newer_exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :too_easy,
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "strong" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
+
+    it "excludes the 'other' sentinel concept, even when unfavorable, since it isn't in any real vocabulary" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            concept_tags: { "code_review" => "other" })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
+  end
+
   describe "#language_for_today" do
     it "returns ruby_rails unchanged when the preference is ruby_rails" do
       user = create_user

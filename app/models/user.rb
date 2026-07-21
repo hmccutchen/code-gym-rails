@@ -55,24 +55,51 @@ class User < ApplicationRecord
   # Last N sessions by count, not a calendar window — matches the "last 10
   # sessions" contract embedded verbatim in AiService's generation prompt.
   def recent_performance(limit: 10)
-    daily_responses
-      .includes(:daily_exercise)
-      .order(date: :desc)
-      .limit(limit)
-      .map do |r|
-        problem_set = r.daily_exercise&.problem_set || {}
-        scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
-          problem_set.dig(section, "scenario").presence
-        end
-        {
-          date:          r.date.to_s,
-          rating:        r.rating,
-          feedback:      r.feedback_text,
-          concepts:      r.concept_tags,
-          scenarios:     scenarios,
-          sections_answered: r.answered_sections.size
-        }
+    recent_daily_responses(limit).map do |r|
+      problem_set = r.daily_exercise&.problem_set || {}
+      scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
+        problem_set.dig(section, "scenario").presence
       end
+      # AI-assessed rating per tagged section, empty when the response was
+      # never reviewed — surfaced alongside the day's self-rating so
+      # AiService can show both signals side by side in the prompt.
+      section_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
+      {
+        date:          r.date.to_s,
+        rating:        r.rating,
+        feedback:      r.feedback_text,
+        concepts:      r.concept_tags,
+        scenarios:     scenarios,
+        sections_answered: r.answered_sections.size,
+        section_ratings: section_ratings
+      }
+    end
+  end
+
+  # Concepts still needing reinforcement, resolved on each concept's single
+  # most-recent occurrence — not cumulative history, so a concept mastered
+  # weeks ago never resurfaces because of an old bad day. Mastery requires
+  # both signals to explicitly agree the user is solid; an absent signal
+  # never counts toward mastery (uncertain data defaults to reinforcement).
+  # Total absence of both signals is out of scope, same as an unrated
+  # concept today. See docs/superpowers/specs/2026-07-20-mastery-loop-combined-signal-design.md.
+  def concepts_needing_reinforcement(limit: 10)
+    resolved = {}
+    reinforcement = []
+
+    recent_daily_responses(limit).each do |r|
+      r.concept_tags.each do |section, concept|
+        next if concept.blank? || concept == "other" || resolved.key?(concept)
+        resolved[concept] = true
+
+        next if r.rating.nil? && r.ai_rating_for(section).nil? # out of scope, no info
+
+        mastered = r.self_rating_favorable? && r.ai_rating_favorable?(section)
+        reinforcement << concept unless mastered
+      end
+    end
+
+    reinforcement
   end
 
   # ── Language preference ────────────────────────────────────────────────────
@@ -106,6 +133,12 @@ class User < ApplicationRecord
   end
 
   private
+
+  # Shared by #recent_performance and #concepts_needing_reinforcement so
+  # neither issues its own duplicate "last N sessions" query.
+  def recent_daily_responses(limit)
+    daily_responses.includes(:daily_exercise).order(date: :desc).limit(limit)
+  end
 
   def time_zone_must_be_loadable
     return if time_zone.blank? # blank/nil = not yet detected; allowed
