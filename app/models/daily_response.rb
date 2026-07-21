@@ -4,6 +4,11 @@ class DailyResponse < ApplicationRecord
 
   enum :rating, { too_easy: 0, right_level: 1, too_hard: 2 }, prefix: true
 
+  SELF_RATING_LABELS = { "too_easy" => "too easy", "right_level" => "just right", "too_hard" => "too hard" }.freeze
+
+  AI_RATING_FAVORABLE   = %w[solid strong].freeze
+  AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
+
   validates :date, uniqueness: { scope: :user_id }
 
   # Ordered field → label map for rendering ai_review sections — shared by the
@@ -18,6 +23,14 @@ class DailyResponse < ApplicationRecord
 
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
+
+  def self_rating_label       = SELF_RATING_LABELS[rating]
+  def self_rating_favorable?  = rating_right_level? || rating_too_easy?
+  def self_rating_unfavorable? = rating_too_hard?
+
+  def ai_rating_for(section)        = ai_review&.dig(section.to_s, "rating")
+  def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
+  def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 
   # Answer keys with substantive content — same >10-char heuristic the
   # dashboard progress bar uses.
