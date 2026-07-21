@@ -39,8 +39,8 @@ class User < ApplicationRecord
     # We can't query by the digest directly since each BCrypt hash is salted,
     # so we do a two-step lookup: find candidates sent within the expiry window,
     # then verify the digest in Ruby.
-    candidates = where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
-                   .where.not(login_token_digest: nil)
+    candidates = active.where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
+                       .where.not(login_token_digest: nil)
     candidates.find { |u| BCrypt::Password.new(u.login_token_digest) == raw_token }
   end
 

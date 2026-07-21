@@ -19,8 +19,10 @@ class ApplicationController < ActionController::Base
     Time.use_zone(current_user&.effective_time_zone || User::DEFAULT_TIME_ZONE, &block)
   end
 
+  # Scoped to `active` so an anonymized user's still-open session (another tab,
+  # another device) stops resolving at its very next request.
   def current_user
-    @current_user ||= User.find_by(id: session[:user_id])
+    @current_user ||= User.active.find_by(id: session[:user_id])
   end
 
   def logged_in?

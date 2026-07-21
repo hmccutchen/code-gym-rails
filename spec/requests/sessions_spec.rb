@@ -81,4 +81,43 @@ RSpec.describe "Sessions", type: :request do
       expect(flash[:alert]).to eq("Your session expired — please try again.")
     end
   end
+
+  describe "anonymized users" do
+    it "rejects a session cookie belonging to an anonymized user" do
+      user = create_user_with_key(email: "gone@example.com")
+      login_as(user)
+      get history_path
+      expect(response).to have_http_status(:ok)
+
+      user.anonymize!
+
+      get history_path
+      expect(response).to redirect_to(login_path)
+    end
+
+    it "creates a brand-new user when the original email is used again" do
+      user = create_user_with_key(email: "gone@example.com")
+      user.anonymize!
+
+      expect {
+        post login_path, params: { email: "gone@example.com", name: "Gone" }
+      }.to change(User, :count).by(1)
+
+      new_user = User.find_by(email: "gone@example.com")
+      expect(new_user.id).not_to eq(user.id)
+      expect(new_user.daily_exercises).to be_empty
+      expect(new_user.api_key).to be_nil
+    end
+
+    it "refuses a magic-link token issued before deletion" do
+      user = create_user_with_key(email: "gone@example.com")
+      raw_token = user.generate_login_token!
+      user.anonymize!
+
+      get verify_auth_path(token: raw_token)
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to match(/invalid or expired/i)
+    end
+  end
 end

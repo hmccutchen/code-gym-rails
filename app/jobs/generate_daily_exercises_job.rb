@@ -14,7 +14,7 @@ class GenerateDailyExercisesJob < ApplicationJob
       end
     else
       # Hourly batch: each user in their own zone, gated to local weekday morning.
-      User.where.not(api_key: nil).find_each do |user|
+      User.active.where.not(api_key: nil).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
       end
     end
