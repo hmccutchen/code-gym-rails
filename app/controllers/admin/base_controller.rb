@@ -1,9 +1,6 @@
 module Admin
-  # Shared gate for every admin-only controller. Gating is a plain env-var
-  # allowlist (ADMIN_EMAILS, comma-separated) rather than a persisted role on
-  # User — this mirrors the existing TEST_LOGIN_SECRET pattern used for the
-  # owner-only login bypass, and avoids a migration for what's currently a
-  # single-purpose internal tool.
+  # User, avoiding a migration for what's currently a single-purpose
+  # internal tool.
   class BaseController < ApplicationController
     before_action :require_admin!
 

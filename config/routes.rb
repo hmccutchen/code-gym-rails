@@ -10,9 +10,6 @@ Rails.application.routes.draw do
   get  "login",        to: "sessions#new"
   post "login",        to: "sessions#create"
   get  "auth/verify",  to: "sessions#verify", as: :verify_auth
-  # Interim owner-only login bypass (active only when TEST_LOGIN_SECRET is set).
-  # Remove after a sending domain is verified -- see CLAUDE.md "What Still Needs Work".
-  get "test_login", to: "sessions#test_login"
   delete "logout",     to: "sessions#destroy", as: :logout
 
   # First-time setup: enter an Anthropic or Gemini API key
