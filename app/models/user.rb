@@ -76,6 +76,32 @@ class User < ApplicationRecord
     end
   end
 
+  # Concepts still needing reinforcement, resolved on each concept's single
+  # most-recent occurrence — not cumulative history, so a concept mastered
+  # weeks ago never resurfaces because of an old bad day. Mastery requires
+  # both signals to explicitly agree the user is solid; an absent signal
+  # never counts toward mastery (uncertain data defaults to reinforcement).
+  # Total absence of both signals is out of scope, same as an unrated
+  # concept today. See docs/superpowers/specs/2026-07-20-mastery-loop-combined-signal-design.md.
+  def concepts_needing_reinforcement(limit: 10)
+    resolved = {}
+    reinforcement = []
+
+    recent_daily_responses(limit).each do |r|
+      r.concept_tags.each do |section, concept|
+        next if concept.blank? || resolved.key?(concept)
+        resolved[concept] = true
+
+        next if r.rating.nil? && r.ai_rating_for(section).nil? # out of scope, no info
+
+        mastered = r.self_rating_favorable? && r.ai_rating_favorable?(section)
+        reinforcement << concept unless mastered
+      end
+    end
+
+    reinforcement
+  end
+
   # ── Language preference ────────────────────────────────────────────────────
   # Resolves the day's actual generation language. Pinned preferences return
   # themselves. "mixed" alternates by flipping the most recent PRIOR
