@@ -39,17 +39,46 @@
   <div class="answer-display"><%= response.answers["pattern"].presence || "(skipped)" %></div>
 </div>
 
-<% ch = exercise.challenge %>
-<div class="section">
-  <div class="section-label">3 — Coding Challenge</div>
-  <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
-  <div class="question"><%= ch["question"] %></div>
-  <% if ch["starter_code"].present? %>
-    <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
-  <% end %>
-  <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
-    <%= render "shared/concept_reference", reference: ref %>
-  <% end %>
-  <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, answer: response.answers["challenge"] %>
-  <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
-</div>
+<% if (arch = exercise.architecture) %>
+  <div class="section">
+    <div class="section-label">3 — Architecture Decision: <%= arch["title"] %></div>
+    <% if arch["scenario"].present? %><div class="section-scenario"><%= arch["scenario"] %></div><% end %>
+    <div class="question"><%= arch["question"] %></div>
+    <% if arch["options"].present? %>
+      <ul class="arch-options">
+        <% arch["options"].each do |opt| %><li><%= opt %></li><% end %>
+      </ul>
+    <% end %>
+    <details class="ref">
+      <summary>Reference — <%= arch["title"] %>: tradeoffs</summary>
+      <div class="ref-body">
+        <p style="margin-bottom:.75rem"><strong><%= arch.dig("reference", "tagline") %></strong></p>
+        <p style="margin-bottom:.75rem"><%= arch.dig("reference", "explanation") %></p>
+        <% if arch.dig("reference", "tradeoffs").present? %>
+          <ul><% arch.dig("reference", "tradeoffs").each do |t| %><li><%= t %></li><% end %></ul>
+        <% end %>
+        <p>🔭 <%= arch.dig("reference", "senior_lens") %></p>
+      </div>
+    </details>
+    <% if (ref = concept_reference_for(arch["concept"], "architecture")) %>
+      <%= render "shared/concept_reference", reference: ref %>
+    <% end %>
+    <%= render "dashboard/teaching_hint", note: arch["teaching_note"], field: "architecture", submitted: true, answer: response.answers["architecture"] %>
+    <div class="answer-display"><%= response.answers["architecture"].presence || "(skipped)" %></div>
+  </div>
+<% else %>
+  <% ch = exercise.challenge %>
+  <div class="section">
+    <div class="section-label">3 — Coding Challenge</div>
+    <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
+    <div class="question"><%= ch["question"] %></div>
+    <% if ch["starter_code"].present? %>
+      <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
+    <% end %>
+    <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
+      <%= render "shared/concept_reference", reference: ref %>
+    <% end %>
+    <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, answer: response.answers["challenge"] %>
+    <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
+  </div>
+<% end %>

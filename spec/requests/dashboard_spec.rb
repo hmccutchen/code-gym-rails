@@ -292,5 +292,30 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).not_to include("Reference — N plus one: how it works")
     end
+
+    it "renders the architecture third section with options, tradeoffs, and its concept dropdown" do
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one", "scenario" => "billing" },
+          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization",
+                             "reference" => { "tagline" => "x", "explanation" => "y", "code_example" => "z", "senior_lens" => "w" } },
+          "architecture" => { "title" => "Datastore choice", "scenario" => "10x traffic", "question" => "Pick an approach",
+                              "options" => [ "Shard Postgres", "Add a cache" ], "concept" => "scaling_bottlenecks",
+                              "reference" => { "tagline" => "Scale reads first", "explanation" => "e",
+                                               "tradeoffs" => [ "cost vs latency", "complexity vs speed" ], "senior_lens" => "l" } }
+        })
+      ConceptReference.create!(concept: "scaling_bottlenecks", language: "architecture",
+                               tagline: "Find the bottleneck", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("10x traffic")            # scenario
+      expect(response.body).to include("Shard Postgres")         # an option
+      expect(response.body).to include("cost vs latency")        # a tradeoff
+      expect(response.body).to include("name=\"response[answers][architecture]\"")   # prose textarea
+      expect(response.body).to include("Reference — Scaling bottlenecks: how it works")  # arch-bucket dropdown
+      expect(response.body).not_to include("# Your implementation")  # not the challenge textarea
+    end
   end
 end

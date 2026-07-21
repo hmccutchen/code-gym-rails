@@ -344,6 +344,27 @@ RSpec.describe "Responses", type: :request do
       expect(response.body).not_to include("Reference — N plus one: how it works")
     end
 
+    it "renders a submitted architecture answer read-only on the review page" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "architecture" => { "title" => "Datastore", "scenario" => "10x traffic", "question" => "Pick",
+                              "options" => [ "Shard", "Cache" ], "concept" => "scaling_bottlenecks",
+                              "reference" => { "tagline" => "t", "explanation" => "e",
+                                               "tradeoffs" => [ "a", "b" ], "senior_lens" => "l" } }
+        })
+      resp = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                   answers: { "architecture" => "I would shard because scale" }, submitted_at: Time.current)
+
+      get response_path(resp)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("I would shard because scale")
+      expect(response.body).to include("10x traffic")
+    end
+
     it "redirects a still-unsubmitted draft away from the review page" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current,
