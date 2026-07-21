@@ -32,4 +32,15 @@ RSpec.describe DailyExercise, type: :model do
     expect(DailyExercise.new(user: user, date: Date.current, problem_set: { "code_review" => {} },
                              generated_at: Time.current, language: "javascript")).to be_valid
   end
+
+  describe "#architecture" do
+    it "reads the architecture blob with indifferent access, nil when absent" do
+      user = User.create!(email: "arch@example.com", name: "Arch")
+      with_arch = DailyExercise.new(problem_set: { "architecture" => { "concept" => "service_boundaries" } })
+      without    = DailyExercise.new(problem_set: { "challenge" => { "concept" => "n_plus_one" } })
+
+      expect(with_arch.architecture[:concept]).to eq("service_boundaries")
+      expect(without.architecture).to be_nil
+    end
+  end
 end

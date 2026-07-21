@@ -39,17 +39,21 @@
   <div class="answer-display"><%= response.answers["pattern"].presence || "(skipped)" %></div>
 </div>
 
-<% ch = exercise.challenge %>
-<div class="section">
-  <div class="section-label">3 — Coding Challenge</div>
-  <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
-  <div class="question"><%= ch["question"] %></div>
-  <% if ch["starter_code"].present? %>
-    <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
-  <% end %>
-  <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
-    <%= render "shared/concept_reference", reference: ref %>
-  <% end %>
-  <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, answer: response.answers["challenge"] %>
-  <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
-</div>
+<% if (arch = exercise.architecture) %>
+  <%= render "responses/architecture_section", arch: arch, response: response, submitted: true %>
+<% else %>
+  <% ch = exercise.challenge %>
+  <div class="section">
+    <div class="section-label">3 — Coding Challenge</div>
+    <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
+    <div class="question"><%= ch["question"] %></div>
+    <% if ch["starter_code"].present? %>
+      <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
+    <% end %>
+    <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
+      <%= render "shared/concept_reference", reference: ref %>
+    <% end %>
+    <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, answer: response.answers["challenge"] %>
+    <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
+  </div>
+<% end %>

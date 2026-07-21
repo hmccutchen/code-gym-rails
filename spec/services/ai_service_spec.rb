@@ -54,6 +54,31 @@ RSpec.describe AiService do
       schema = service.send(:exercise_schema_for)
       expect(schema.scan(/"scenario"/).size).to eq(3)
     end
+
+    it "includes the challenge block by default (third: :challenge)" do
+      schema = service.send(:exercise_schema_for, "ruby_rails")
+      expect(schema).to include("\"challenge\"")
+      expect(schema).to include("starter_code")
+      expect(schema).not_to include("\"architecture\"")
+    end
+
+    it "swaps in the architecture block with options + tradeoffs when third: :architecture" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+      expect(schema).to include("\"architecture\"")
+      expect(schema).to include("\"options\"")
+      expect(schema).to include("\"tradeoffs\"")
+      expect(schema).not_to include("\"challenge\"")
+      expect(schema).not_to include("starter_code")
+    end
+  end
+
+  describe "#roll_third_section" do
+    it "returns :architecture ~75% and :challenge ~25% (both reachable)" do
+      allow(service).to receive(:rand).and_return(0.10)
+      expect(service.send(:roll_third_section)).to eq(:architecture)
+      allow(service).to receive(:rand).and_return(0.90)
+      expect(service.send(:roll_third_section)).to eq(:challenge)
+    end
   end
 
   describe "#build_system_prompt" do
@@ -95,6 +120,34 @@ RSpec.describe AiService do
     end
   end
 
+  describe "ARCHITECTURE_CONCEPTS" do
+    it "is a frozen 13-entry language-independent vocabulary" do
+      expect(AiService::ARCHITECTURE_CONCEPTS.size).to eq(13)
+      expect(AiService::ARCHITECTURE_CONCEPTS).to be_frozen
+      expect(AiService::ARCHITECTURE_CONCEPTS).to include("service_boundaries", "failure_mode_design", "idempotency_at_scale")
+    end
+
+    it "is not mixed into any per-language generation vocabulary" do
+      expect(AiService::RAILS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+      expect(AiService::JS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+    end
+  end
+
+  describe "#build_concept_reference_prompt (architecture)" do
+    it "frames code_example as language-agnostic pseudocode for the architecture config" do
+      config = service.send(:config_for, "architecture")
+      prompt = service.send(:build_concept_reference_prompt, "service_boundaries", config)
+      expect(prompt).to include("software architecture")
+      expect(prompt.downcase).to include("pseudocode")
+    end
+
+    it "still frames code_example as annotated language code for a normal language config" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
+      expect(prompt).to include("annotated Ruby/Rails code")
+    end
+  end
+
   describe "#build_exercise_prompt" do
     it "instructs that teaching notes hint without giving the answer" do
       prompt = service.send(:build_exercise_prompt, user)
@@ -132,6 +185,19 @@ RSpec.describe AiService do
     it "instructs varying the concrete business-domain scenario across sessions" do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt.downcase).to include("business-domain scenario")
+    end
+
+    it "lists the architecture vocabulary for the architecture section when third: :architecture" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
+      expect(prompt).to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))   # still governs code_review/pattern
+      expect(prompt.downcase).to include("architecture")
+    end
+
+    it "lists only the language vocabulary when third: :challenge" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge)
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
     end
 
     it "includes recent problem framings pulled from the stored problem_set" do
@@ -211,6 +277,33 @@ RSpec.describe AiService do
       expect(Rails.logger).to receive(:warn).with(/SuggestedConcept recording failed.*db down/)
       expect { result = service.send(:normalize_concepts, set) }.not_to raise_error
       expect(result["pattern"]["concept"]).to eq("other")
+    end
+
+    it "validates the architecture section against ARCHITECTURE_CONCEPTS regardless of language" do
+      set = {
+        "code_review"  => { "concept" => "n_plus_one" },
+        "architecture" => { "concept" => "service_boundaries" }
+      }
+      out = service.send(:normalize_concepts, set, "javascript")
+      expect(out["architecture"]["concept"]).to eq("service_boundaries")   # in arch vocab, kept
+      expect(out["code_review"]["concept"]).to eq("other")                 # not in JS vocab
+    end
+
+    it "maps an off-list architecture concept to 'other' and records it under the 'architecture' bucket" do
+      set = { "architecture" => { "concept" => "Microservices Everywhere!!" } }
+
+      expect {
+        service.send(:normalize_concepts, set, "ruby_rails")
+      }.to change(SuggestedConcept, :count).by(1)
+
+      expect(set["architecture"]["concept"]).to eq("other")
+      expect(SuggestedConcept.last.language).to eq("architecture")
+    end
+
+    it "does not treat a Rails concept as valid in the architecture section" do
+      set = { "architecture" => { "concept" => "n_plus_one" } }
+      out = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(out["architecture"]["concept"]).to eq("other")
     end
   end
 
@@ -345,6 +438,14 @@ RSpec.describe AiService do
 
       expect(result["code_review"]["concept"]).to eq("closures")
     end
+
+    it "threads the rolled third-section kind into the exercise prompt" do
+      set = { "code_review" => { "concept" => "n_plus_one" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(svc).to receive(:roll_third_section).and_return(:architecture)
+      expect(svc).to receive(:build_exercise_prompt).with(user, anything, third: :architecture).and_call_original
+      svc.generate_exercise(user)
+    end
   end
 
   describe "#review_response" do
@@ -357,6 +458,43 @@ RSpec.describe AiService do
           "challenge" => { "question" => "q" }
         }
       )
+    end
+
+    context "architecture third section" do
+      def arch_exercise
+        DailyExercise.new(
+          language: "ruby_rails",
+          problem_set: {
+            "code_review" => { "question" => "cr?", "snippet" => "code" },
+            "pattern"     => { "title" => "P", "question" => "pat?" },
+            "architecture" => { "title" => "A", "question" => "Pick a datastore approach?",
+                                "scenario" => "10x traffic spike expected" }
+          }
+        )
+      end
+
+      it "evaluates tradeoff reasoning, constraints, and alternatives — not correctness" do
+        resp = DailyResponse.new(answers: { "architecture" => "I'd shard because..." })
+        prompt = service.send(:build_review_prompt, arch_exercise, resp)
+        expect(prompt).to include("Pick a datastore approach?")
+        expect(prompt).to include("10x traffic spike expected")
+        expect(prompt.downcase).to include("tradeoff")
+        expect(prompt.downcase).to include("alternatives")
+        expect(prompt).to include('"architecture"')   # asks for the architecture key back
+        expect(prompt).not_to include("Coding Challenge:")
+      end
+    end
+
+    it "keeps the existing challenge criteria when the third section is a challenge" do
+      ex = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?", "snippet" => "code" },
+        "pattern"     => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "Implement uniq_by" }
+      })
+      resp = DailyResponse.new(answers: { "challenge" => "def uniq_by..." })
+      prompt = service.send(:build_review_prompt, ex, resp)
+      expect(prompt).to include("Coding Challenge: Implement uniq_by")
+      expect(prompt).to include('"challenge"')
     end
 
     it "names Rails in the system prompt for a ruby_rails exercise" do

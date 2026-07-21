@@ -28,6 +28,42 @@ RSpec.describe "Responses", type: :request do
       )
     end
 
+    it "tags and saves an architecture third section's concept and answer" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" }
+      )
+
+      post responses_path,
+        params: { response: { answers: { architecture: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      resp = DailyResponse.last
+      expect(resp.answers["architecture"]).to eq("a" * 20)
+      expect(resp.concept_tags).to eq(
+        "code_review" => "n_plus_one", "pattern" => "memoization", "architecture" => "service_boundaries"
+      )
+    end
+
+    it "ignores an answer for a third section this exercise does not have" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" }
+      )
+
+      post responses_path,
+        params: { response: { answers: { architecture: "a" * 20, challenge: "b" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.answers).to have_key("architecture")
+      expect(resp.answers).not_to have_key("challenge")
+      expect(resp.completeness).to be <= 100
+    end
+
     it "stores an empty map for exercises that predate tagging" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" },
                       "pattern" => { "title" => "t", "why" => "w", "question" => "q" },
@@ -255,6 +291,25 @@ RSpec.describe "Responses", type: :request do
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "other", language: "ruby_rails", user_id: user.id)
     end
+
+    it "enqueues the architecture concept under the 'architecture' language bucket" do
+      create_exercise(
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" }
+      )
+
+      expect {
+        post responses_path,
+          params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+          headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "service_boundaries", language: "architecture", user_id: user.id)
+        .exactly(:once)
+        .and have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+    end
   end
 
   describe "GET /responses/:id (review page)" do
@@ -304,6 +359,27 @@ RSpec.describe "Responses", type: :request do
       get response_path(resp)
 
       expect(response.body).not_to include("Reference — N plus one: how it works")
+    end
+
+    it "renders a submitted architecture answer read-only on the review page" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "architecture" => { "title" => "Datastore", "scenario" => "10x traffic", "question" => "Pick",
+                              "options" => [ "Shard", "Cache" ], "concept" => "scaling_bottlenecks",
+                              "reference" => { "tagline" => "t", "explanation" => "e",
+                                               "tradeoffs" => [ "a", "b" ], "senior_lens" => "l" } }
+        })
+      resp = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                   answers: { "architecture" => "I would shard because scale" }, submitted_at: Time.current)
+
+      get response_path(resp)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("I would shard because scale")
+      expect(response.body).to include("10x traffic")
     end
 
     it "redirects a still-unsubmitted draft away from the review page" do

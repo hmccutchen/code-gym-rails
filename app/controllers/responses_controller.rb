@@ -11,8 +11,14 @@ class ResponsesController < ApplicationController
       date: Date.current
     )
 
+    # Only persist answers for sections this exercise actually has. Strong params
+    # permit both `challenge` and `architecture` (the two possible third keys), so
+    # without this a crafted request could store both and push
+    # DailyResponse#answered_sections / #completeness past 3 sections / 100%.
+    submitted_answers = response_params[:answers]&.slice(*exercise.problem_set.keys)
+
     @response.assign_attributes(
-      answers:      response_params[:answers] || @response.answers,
+      answers:      submitted_answers.presence || @response.answers,
       submitted_at: response_params[:submit] == "1" ? Time.current : @response.submitted_at,
       concept_tags: exercise_concept_tags(exercise)
     )
@@ -90,7 +96,7 @@ class ResponsesController < ApplicationController
   end
 
   def response_params
-    params.require(:response).permit(:submit, answers: [ :code_review, :pattern, :challenge ])
+    @response_params ||= params.require(:response).permit(:submit, answers: [ :code_review, :pattern, :challenge, :architecture ])
   end
 
   def feedback_params
@@ -98,21 +104,25 @@ class ResponsesController < ApplicationController
   end
 
   def exercise_concept_tags(exercise)
-    %w[code_review pattern challenge]
+    %w[code_review pattern challenge architecture]
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
   end
 
-  # Kick off generation for each distinct concept lacking a cached reference.
-  # The exists? check only avoids obvious no-op jobs; the job re-checks, so a
-  # racing duplicate enqueue is harmless.
+  # Kick off generation for each distinct (concept, language-bucket) lacking a
+  # cached reference. The architecture section is language-independent, so its
+  # concept is bucketed under "architecture"; every other section uses the
+  # exercise's language. The exists? check only avoids obvious no-op jobs; the
+  # job re-checks, so a racing duplicate enqueue is harmless.
   def enqueue_concept_references(exercise)
-    language = exercise.language
-    concepts = exercise_concept_tags(exercise).values.uniq
-    concepts.each do |concept|
+    enqueued = []
+    exercise_concept_tags(exercise).each do |section, concept|
       next if concept == "other"
-      next if ConceptReference.exists?(concept: concept, language: language)
+      language = section == "architecture" ? "architecture" : exercise.language
+      pair = [ concept, language ]
+      next if enqueued.include?(pair) || ConceptReference.exists?(concept: concept, language: language)
       GenerateConceptReferenceJob.perform_later(concept: concept, language: language, user_id: current_user.id)
+      enqueued << pair
     end
   end
 end
