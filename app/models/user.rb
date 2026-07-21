@@ -21,6 +21,8 @@ class User < ApplicationRecord
 
   before_save { email.downcase! }
 
+  scope :active, -> { where(anonymized_at: nil) }
+
   TOKEN_EXPIRY = 15.minutes
 
   # ── Magic link ────────────────────────────────────────────────────────────
@@ -44,6 +46,32 @@ class User < ApplicationRecord
 
   def clear_login_token!
     update!(login_token_digest: nil, login_token_sent_at: nil)
+  end
+
+  # ── Account deletion ──────────────────────────────────────────────────────
+  # Self-service deletion anonymizes in place rather than destroying: the
+  # user's exercises, responses (answers, ai_review, concept_tags) and API
+  # usage stay linked by user_id for aggregate stats, but nothing on the row
+  # identifies a person any more. Never call destroy here — the association
+  # `dependent: :destroy` would take that history with it.
+  def anonymized?
+    anonymized_at.present?
+  end
+
+  # Idempotent: a repeat call (double-click, retry) returns false and changes
+  # nothing. Returns true only on the call that actually anonymized the row.
+  def anonymize!
+    return false if anonymized?
+
+    update!(
+      email:               "deleted-user-#{id}@anonymized.local",
+      name:                "Deleted user",
+      api_key:             nil,
+      login_token_digest:  nil,
+      login_token_sent_at: nil,
+      anonymized_at:       Time.current
+    )
+    true
   end
 
   # ── API key ───────────────────────────────────────────────────────────────

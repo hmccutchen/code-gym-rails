@@ -429,4 +429,88 @@ RSpec.describe User, type: :model do
       expect(user.provider_label).to eq("AI")
     end
   end
+
+  describe "#anonymize!" do
+    it "replaces or clears every identifying field" do
+      user = create_user(email: "real@example.com", name: "Real Person")
+      user.update!(api_key: "sk-ant-secret", provider: "anthropic")
+      user.generate_login_token!
+
+      expect(user.anonymize!).to be true
+
+      user.reload
+      expect(user.email).to eq("deleted-user-#{user.id}@anonymized.local")
+      expect(user.name).to eq("Deleted user")
+      expect(user.api_key).to be_nil
+      expect(user.login_token_digest).to be_nil
+      expect(user.login_token_sent_at).to be_nil
+      expect(user.anonymized_at).to be_present
+      expect(user).to be_anonymized
+    end
+
+    it "keeps non-identifying fields for aggregate stats" do
+      user = create_user
+      user.update!(provider: "gemini", time_zone: "America/Chicago",
+                   language: "javascript", skill_level: "strong",
+                   focus_areas: [ "testing" ])
+
+      user.anonymize!
+
+      user.reload
+      expect(user.provider).to eq("gemini")
+      expect(user.time_zone).to eq("America/Chicago")
+      expect(user.language).to eq("javascript")
+      expect(user.skill_level).to eq("strong")
+      expect(user.focus_areas).to eq([ "testing" ])
+    end
+
+    it "is a safe no-op when called a second time" do
+      user = create_user
+      user.anonymize!
+      first_stamp = user.reload.anonymized_at
+
+      expect(user.anonymize!).to be false
+
+      user.reload
+      expect(user.anonymized_at).to eq(first_stamp)
+      expect(user.email).to eq("deleted-user-#{user.id}@anonymized.local")
+    end
+
+    it "leaves exercise history, responses and usage fully intact" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => { "question" => "Find the bug" } },
+                                       generated_at: Time.current)
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                       answers: { "code_review" => "N+1 query in the loop" },
+                                       concept_tags: { "code_review" => "n_plus_one" },
+                                       ai_review: { "code_review" => { "rating" => "solid" } },
+                                       rating: :right_level, feedback_text: "good one",
+                                       submitted_at: Time.current)
+      usage = ApiUsage.create!(user: user, tokens_in: 100, tokens_out: 50,
+                               purpose: "generate_exercise", date: Date.current)
+
+      expect { user.anonymize! }.not_to change(DailyResponse, :count)
+
+      expect(exercise.reload.user_id).to eq(user.id)
+      expect(response.reload.user_id).to eq(user.id)
+      expect(response.answers).to eq({ "code_review" => "N+1 query in the loop" })
+      expect(response.concept_tags).to eq({ "code_review" => "n_plus_one" })
+      expect(response.ai_review).to eq({ "code_review" => { "rating" => "solid" } })
+      expect(response.feedback_text).to eq("good one")
+      expect(usage.reload.user_id).to eq(user.id)
+      expect(ApiUsage.where(user_id: user.id).count).to eq(1)
+    end
+  end
+
+  describe ".active" do
+    it "excludes anonymized users and includes normal ones" do
+      normal = create_user(email: "normal@example.com")
+      deleted = create_user(email: "deleted@example.com")
+      deleted.anonymize!
+
+      expect(User.active).to include(normal)
+      expect(User.active).not_to include(deleted)
+    end
+  end
 end
