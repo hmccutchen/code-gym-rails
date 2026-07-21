@@ -164,10 +164,29 @@ RSpec.describe AiService do
 
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
-      expect(prompt).to include("mastery signal")
-      expect(prompt).to include("concepts: n_plus_one")
-      expect(prompt).to include("too hard")
+      expect(prompt).to include("Mastery loop")
+      expect(prompt).to include("code_review→n_plus_one (unreviewed)")
+      expect(prompt).to include("self: too hard")
+      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one")
       expect(prompt).not_to include("unrated")
+    end
+
+    it "shows the AI's per-section rating alongside the concept when the response was reviewed" do
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, rating: :right_level,
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "developing" } })
+
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("code_review→n_plus_one (ai: developing)")
+      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one")
+    end
+
+    it "reports no concepts needing reinforcement when history is empty" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("Concepts needing reinforcement right now: none")
     end
 
     it "uses the JS/React vocabulary and JavaScript/React labeling when language is javascript" do
