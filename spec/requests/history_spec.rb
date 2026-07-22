@@ -94,6 +94,25 @@ RSpec.describe "History", type: :request do
       expect(response.body.scan(/<details class="answers" open>/).size).to eq(1)
       expect(response.body.scan(/<details class="answers">/).size).to eq(1)
     end
+
+    it "renders an entry whose stored problem_set is missing sections, without breaking the page" do
+      sparse = DailyExercise.create!(
+        user: user, date: 5.days.ago.to_date, generated_at: Time.current,
+        problem_set: { "code_review" => { "question" => "only-section", "snippet" => "s" } }
+      )
+      DailyResponse.create!(user: user, daily_exercise: sparse, date: 5.days.ago.to_date,
+                            answers: { "code_review" => "Answer with plenty of substance" },
+                            submitted_at: Time.current)
+      intact = create_session_for(user, date: 1.day.ago.to_date)
+
+      login_as(user)
+      get history_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("only-section")
+      # The malformed row must not take the rest of the page down with it.
+      expect(response.body).to include("q-#{intact.date}")
+    end
   end
 
   describe "review summary label" do
