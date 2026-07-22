@@ -330,6 +330,40 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("Reference — N plus one: how it works")
     end
 
+    it "renders a section's concept-reference dropdown read-only after submission" do
+      exercise = exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("Reference — N plus one: how it works")
+      expect(response.body).to include("Avoid the loop query")
+    end
+
+    it "renders a submitted architecture answer read-only" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "architecture" => { "title" => "Datastore", "scenario" => "10x traffic", "question" => "Pick",
+                              "options" => [ "Shard", "Cache" ], "concept" => "scaling_bottlenecks",
+                              "reference" => { "tagline" => "t", "explanation" => "e",
+                                               "tradeoffs" => [ "a", "b" ], "senior_lens" => "l" } }
+        })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "architecture" => "I would shard because scale" }, submitted_at: Time.current)
+
+      get root_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("I would shard because scale")
+      expect(response.body).to include("10x traffic")
+    end
+
     it "renders the architecture third section with options, tradeoffs, and its concept dropdown" do
       DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",

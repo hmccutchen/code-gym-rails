@@ -237,7 +237,7 @@ RSpec.describe "Responses", type: :request do
         post email_review_response_path(daily_response)
       }.not_to have_enqueued_mail(ReviewMailer, :send_review)
 
-      expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
+      expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("No review to email yet.")
     end
 
@@ -248,7 +248,7 @@ RSpec.describe "Responses", type: :request do
         post email_review_response_path(daily_response)
       }.to have_enqueued_mail(ReviewMailer, :send_review).with(daily_response)
 
-      expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
+      expect(response).to redirect_to(root_path)
       expect(flash[:notice]).to eq("Review sent to dev@example.com.")
     end
   end

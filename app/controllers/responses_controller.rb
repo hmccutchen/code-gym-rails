@@ -76,18 +76,22 @@ class ResponsesController < ApplicationController
     redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
   end
 
-  # POST /responses/:id/email_review — email the completed review to the user
+  # POST /responses/:id/email_review — email the completed review to the user.
+  # Both redirects go to root_path: the email button only ever renders on the
+  # dashboard's submitted state (_submission.html.erb), not on history, so
+  # that's the only page where the user can repeat or confirm the action.
   def email_review
-    return redirect_to history_anchor, alert: "No review to email yet." unless @response.reviewed?
+    return redirect_to root_path, alert: "No review to email yet." unless @response.reviewed?
 
     ReviewMailer.send_review(@response).deliver_later
-    redirect_to history_anchor, notice: "Review sent to #{current_user.email}."
+    redirect_to root_path, notice: "Review sent to #{current_user.email}."
   end
 
   private
 
   # Errors send the user back to the dashboard, where the retry button lives.
-  # Everything else lands on the history entry for the day in question.
+  # review's non-error redirects land on the history entry for the day in
+  # question; email_review always goes to root_path (see above).
   def history_anchor
     history_path(anchor: "response-#{@response.id}")
   end
