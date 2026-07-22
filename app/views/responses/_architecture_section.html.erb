@@ -1,5 +1,7 @@
 <%# Architecture third section, shared by the dashboard form (submitted: false)
-    and the read-only review page (submitted: true). Locals: arch, response, submitted. %>
+    and the read-only render of a submitted day (submitted: true), which appears
+    on the dashboard after submitting and on every history entry.
+    Locals: arch, response, submitted. %>
 <div class="section">
   <div class="section-label">3 — Architecture Decision: <%= arch["title"] %></div>
   <% if arch["scenario"].present? %><div class="section-scenario"><%= arch["scenario"] %></div><% end %>

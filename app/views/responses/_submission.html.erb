@@ -1,7 +1,8 @@
 <%# Submitted badge, the day's self-rating, the on-demand review trigger, the AI
-    review, and the email button. Rendered by the dashboard's submitted state and
-    by each history entry. Review stays manual: the button only appears when
-    unreviewed; nothing auto-triggers it. Local: response. %>
+    review, and the email button. Rendered by the dashboard's submitted state
+    only — the history page renders responses/_answered_sections plus its own
+    review disclosure, never this partial. Review stays manual: the button only
+    appears when unreviewed; nothing auto-triggers it. Local: response. %>
 <div class="submit-row">
   <span class="submitted-badge">✓ Submitted</span>
   <% if response.rating.present? %>

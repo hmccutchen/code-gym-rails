@@ -175,7 +175,8 @@
     feedbackText.addEventListener("input", autoSave);
 
     // Submit goes through fetch with the page's CSRF meta tag. On success we
-    // navigate to the review page whose URL the server returns in `redirect`.
+    // navigate to the URL the server returns in `redirect` — the dashboard,
+    // which re-renders as the submitted state with the review button.
     const submitButton = form.querySelector('input[type="submit"]');
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
