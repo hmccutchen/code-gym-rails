@@ -88,8 +88,6 @@
       </div>
     <% end %>
 
-    <%# Rating is answered as part of finishing the day's work — it autosaves on
-        click and reveals the Submit button. A set cannot be submitted unrated. %>
     <div class="section rating-section">
       <p class="feedback-title">How was today's difficulty?</p>
       <div class="rating-row">
@@ -100,12 +98,13 @@
       <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px;margin-top:.75rem" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
     </div>
 
-    <div class="submit-row" id="submit-row"<%= " style=\"display:none\"".html_safe if response.rating.blank? %>>
+    <% unrated = response.rating.blank? %>
+    <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
-      <%= f.submit "Submit answers →", class: "btn btn-primary" %>
+      <%= f.submit "Submit answers →", id: "submit-answers", class: "btn btn-primary", disabled: unrated %>
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
-    <p class="progress-label" id="rating-nudge"<%= " style=\"display:none\"".html_safe if response.rating.present? %>>Rate today's difficulty to finish up.</p>
+    <p class="progress-label" id="rating-nudge"<%= " hidden".html_safe unless unrated %>>Rate today's difficulty to finish up.</p>
   <% end %>
 
   <script>
@@ -119,7 +118,7 @@
     const progressLabel = document.getElementById("progress-label");
     const ratingButtons = form.querySelectorAll("button[data-rating]");
     const feedbackText  = document.getElementById("feedback-text");
-    const submitRow     = document.getElementById("submit-row");
+    const submitButton  = document.getElementById("submit-answers");
     const ratingNudge   = document.getElementById("rating-nudge");
     const activeRating  = form.querySelector("button.rating-btn.active");
     let rating = activeRating ? activeRating.dataset.rating : null;
@@ -166,8 +165,8 @@
       btn.addEventListener("click", () => {
         rating = btn.dataset.rating;
         ratingButtons.forEach(b => b.classList.toggle("active", b === btn));
-        submitRow.style.display = "flex";
-        ratingNudge.style.display = "none";
+        submitButton.disabled = false;
+        ratingNudge.hidden = true;
         autoSave();
       });
     });
@@ -177,7 +176,6 @@
     // Submit goes through fetch with the page's CSRF meta tag. On success we
     // navigate to the URL the server returns in `redirect` — the dashboard,
     // which re-renders as the submitted state with the review button.
-    const submitButton = form.querySelector('input[type="submit"]');
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       clearTimeout(saveTimer);
