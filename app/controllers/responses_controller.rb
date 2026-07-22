@@ -24,14 +24,13 @@ class ResponsesController < ApplicationController
     )
 
     # Rating and notes ride along in the same autosave/submit payload as the
-    # answers. Assign only when the key is present: an autosave fired before the
-    # user picks a rating must not clear a rating they already picked. An
-    # off-enum value is ignored rather than raising ArgumentError — the UI can
-    # only ever send the three valid values.
-    if response_params.key?(:rating)
-      value = response_params[:rating].presence
-      @response.rating = value if value.nil? || DailyResponse.ratings.key?(value)
-    end
+    # answers. A rating is only ever set, never cleared: the UI offers no way to
+    # un-rate, and the autosave fires continuously — including from a stale tab
+    # whose in-page state predates a rating saved elsewhere. Assigning only on a
+    # valid enum value makes a saved rating unclearable by construction, and
+    # sidesteps the ArgumentError an off-enum value would otherwise raise.
+    rating = response_params[:rating].presence
+    @response.rating = rating if rating && DailyResponse.ratings.key?(rating)
     @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
 
     saved = @response.save
