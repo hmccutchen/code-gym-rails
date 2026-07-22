@@ -74,14 +74,14 @@ Add to `spec/services/ai_service_spec.rb` inside the existing `describe "#build_
 
 ```ruby
     it "instructs a short architecture scenario with a hard constraint cap" do
-      prompt = service.send(:build_exercise_prompt, user, third: :architecture)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
       expect(prompt).to include("~50 words maximum")
       expect(prompt).to include("exactly 2-3 concrete constraints")
       expect(prompt).to include("Fewer constraints, not fuzzier ones")
     end
 
     it "no longer enumerates team size, budget, and timeline as things to include" do
-      prompt = service.send(:build_exercise_prompt, user, third: :architecture)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
       expect(prompt).not_to include("team size, scale, reliability needs, existing tech debt")
     end
 ```
