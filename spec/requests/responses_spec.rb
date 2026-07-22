@@ -130,6 +130,30 @@ RSpec.describe "Responses", type: :request do
       expect(response).to have_http_status(:ok)
       expect(DailyResponse.last.rating).to be_nil
     end
+
+    it "does not clear a saved rating when the payload sends an explicit null" do
+      exercise = create_exercise(section)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: {}, rating: :too_easy)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: nil } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(DailyResponse.last.rating).to eq("too_easy")
+    end
+
+    it "does not clear a saved rating when the payload sends an empty string" do
+      exercise = create_exercise(section)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: {}, rating: :too_easy)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: "" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(DailyResponse.last.rating).to eq("too_easy")
+    end
   end
 
   describe "POST /responses re-submission of a persisted draft" do
