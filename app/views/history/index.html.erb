@@ -12,6 +12,12 @@
   details.review summary::before { content: "▶ "; }
   details.review[open] summary::before { content: "▼ "; }
   .no-review { font-size: .85rem; color: var(--muted); }
+
+  details.answers { margin: .75rem 0; }
+  details.answers summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+  details.answers summary::before { content: "▶ "; }
+  details.answers[open] summary::before { content: "▼ "; }
+  details.answers .section { margin-top: 1rem; }
 </style>
 
 <div class="page-header">
@@ -26,7 +32,7 @@
 <% end %>
 
 <% @responses.each_with_index do |daily_response, i| %>
-  <div class="history-entry">
+  <div class="history-entry" id="response-<%= daily_response.id %>">
     <h2><%= daily_response.date.strftime("%A, %B %-d, %Y") %></h2>
 
     <div class="history-meta">
@@ -40,6 +46,14 @@
         <span class="history-tag"><%= tag.humanize %></span>
       <% end %>
     </div>
+
+    <%# Same partial the dashboard's submitted state renders — history is the one
+        destination for viewing any day's response, so there is no second
+        rendering to keep in sync. Collapsed by default; newest entry open. %>
+    <details class="answers"<%= " open".html_safe if i.zero? %>>
+      <summary>Problems &amp; answers</summary>
+      <%= render "responses/answered_sections", exercise: daily_response.daily_exercise, response: daily_response %>
+    </details>
 
     <% if daily_response.reviewed? %>
       <details class="review" <%= "open" if i.zero? %>>
