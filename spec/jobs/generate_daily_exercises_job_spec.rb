@@ -32,7 +32,7 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(Rails.logger).to receive(:error).with(/Auth failure generating exercise.*invalid x-api-key/)
     expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
       user, target: "dashboard-content", partial: "dashboard/generation_failed",
-      locals: { message: "Your API key was rejected — check it in Settings. (invalid x-api-key)" }
+      locals: { message: "Your API key was rejected — check it in Settings." }
     )
 
     described_class.new.perform(user_id: user.id)
