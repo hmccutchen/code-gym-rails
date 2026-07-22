@@ -38,12 +38,19 @@ User opens dashboard:
        3 sections: Code Review snippet, Pattern of the Month, Coding Challenge
 
 User interacts:
-  └→ ResponsesController#create      → auto-save answers (debounced fetch, idempotent)
-  └→ ResponsesController#review      → AiService#review_response → ai_review saved
-  └→ ResponsesController#feedback    → saves rating (too_easy/right_level/too_hard) + text
-  └→ ResponsesController#email_review→ mails the completed review to the user
+  └→ ResponsesController#create      → auto-saves answers + difficulty rating +
+       feedback text in one debounced fetch (idempotent). The rating renders at
+       the end of the problem set and gates the Submit button — a set cannot be
+       submitted unrated. Final submit returns to the dashboard.
+  └→ ResponsesController#review      → AiService#review_response → ai_review saved,
+       then redirects to /history anchored at that day. Synchronous; the button
+       disables and relabels while it runs. Still manual/on-demand.
+  └→ ResponsesController#email_review→ mails the completed review to the user,
+       then returns to the dashboard (where the button lives)
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day)
-  └→ HistoryController#index         → past submitted sessions
+  └→ HistoryController#index         → every submitted session, newest first —
+       the single destination for viewing any day's problems, answers, and
+       review, today's included. There is no per-day review page.
        (feedback + concept tags are included in tomorrow's generation prompt)
   └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
        the account in place while preserving all exercise/response/usage history
@@ -67,6 +74,7 @@ User interacts:
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory.
 - **One "answered" rule**: a section counts as answered when its trimmed text exceeds 10 characters. `DailyResponse#answered_sections` is the single source of truth — the progress bar, history, and the generation prompt all derive from it.
+- **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, revealing the Submit button (hidden, not disabled, until then). Answers and rating land in one `ResponsesController#create` call. The AI review stays a separate, manual step afterward — cost-conscious by design. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one.
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 
 ## Railway Deployment
@@ -112,7 +120,8 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call + connection only
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation + Turbo broadcasts
-- `app/controllers/responses_controller.rb` — auto-save, review, feedback, email-review endpoints
+- `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
+- `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/sessions_controller.rb` — magic link create + verify
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
