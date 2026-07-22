@@ -36,12 +36,12 @@ Rails.application.routes.draw do
   # in DashboardController#show intentionally didn't fire (weekends).
   post "generate", to: "daily_exercises#generate"
 
-  # Submit/update today's answers
-  resources :responses, only: [ :create, :show ] do
+  # Submit/update today's answers. Rating rides along in #create's payload; there
+  # is no per-day show page — /history renders every submitted day, today included.
+  resources :responses, only: [ :create ] do
     member do
-      patch :feedback     # rating + feedback_text after submission
-      post  :review       # trigger Claude inline review
-      post  :email_review # email the completed review to the user
+      post :review       # trigger the inline AI review
+      post :email_review # email the completed review to the user
     end
   end
 
