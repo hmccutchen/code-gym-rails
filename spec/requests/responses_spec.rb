@@ -266,6 +266,35 @@ RSpec.describe "Responses", type: :request do
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
     end
 
+    it "refuses to review an unsubmitted draft and sends the user back to the form" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } },
+        generated_at: Time.current
+      )
+      draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                    answers: { "code_review" => "a" * 20 }, submitted_at: nil)
+      expect(AiService).not_to receive(:for)
+
+      post review_response_path(draft)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("Submit your answers first.")
+      expect(draft.reload.ai_review).to be_nil
+    end
+
+    it "does not re-review an already-reviewed day, and lands on its history entry" do
+      daily_response = create_submitted_response
+      daily_response.update!(ai_review: { "code_review" => { "rating" => "solid" } })
+      expect(AiService).not_to receive(:for)
+
+      post review_response_path(daily_response)
+
+      expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
+      expect(flash[:notice]).to eq("Already reviewed.")
+      expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+    end
+
     it "saves the ai_review from the user's configured provider" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
