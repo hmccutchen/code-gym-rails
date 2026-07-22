@@ -3,19 +3,6 @@
   .page-header h1 { font-size: 1.5rem; }
   .page-header .date { color: var(--muted); font-size: .9rem; }
 
-  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
-  .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .95rem; }
-  .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
-  .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1.25rem; }
-
-  .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
-
-  details.ref { margin-bottom: 1rem; }
-  details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
-  details.ref summary::before { content: "▶ "; }
-  details.ref[open] summary::before { content: "▼ "; }
-  .ref-body { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
-
   textarea.answer { width: 100%; min-height: 120px; background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: .95rem; font-family: inherit; resize: vertical; line-height: 1.6; }
   textarea.answer:focus { outline: none; border-color: var(--accent); }
   textarea.code-answer { font-family: "Fira Code", "Cascadia Code", monospace; font-size: .85rem; min-height: 160px; }
@@ -26,29 +13,12 @@
   .progress-sticky { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
   .progress-sticky .progress-bar { margin-bottom: 0; }
 
-  .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
-
-  /* Post-submission */
-  .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
-  .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
-  .review-section { margin-top: 1.5rem; }
   .rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
   .rating-btn { flex: 1; padding: .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
   .rating-btn:hover { border-color: var(--accent); }
   .rating-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .rating-section .feedback-title { font-size: 1rem; font-weight: 600; margin-bottom: .25rem; }
   #rating-nudge { margin-top: -1rem; margin-bottom: 1.5rem; }
-  .feedback-quiet { margin-top: 1.5rem; opacity: .75; }
-  .feedback-quiet .feedback-title { font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
-  .feedback-prominent { margin-top: 1.5rem; border-color: var(--accent); }
-  .feedback-prominent .feedback-title { font-size: 1rem; font-weight: 600; margin-bottom: .75rem; }
-
-  details.hint { margin-bottom: 1rem; }
-  details.hint summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
-  details.hint summary::before { content: "▶ "; }
-  details.hint[open] summary::before { content: "▼ "; }
-  details.hint.locked { pointer-events: none; opacity: .45; }
-  .hint-body { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; border-radius: 0 6px 6px 0; margin-top: .5rem; line-height: 1.6; }
 </style>
 
 <div class="page-header">
