@@ -23,6 +23,17 @@ class ResponsesController < ApplicationController
       concept_tags: exercise_concept_tags(exercise)
     )
 
+    # Rating and notes ride along in the same autosave/submit payload as the
+    # answers. Assign only when the key is present: an autosave fired before the
+    # user picks a rating must not clear a rating they already picked. An
+    # off-enum value is ignored rather than raising ArgumentError — the UI can
+    # only ever send the three valid values.
+    if response_params.key?(:rating)
+      value = response_params[:rating].presence
+      @response.rating = value if value.nil? || DailyResponse.ratings.key?(value)
+    end
+    @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
+
     saved = @response.save
 
     enqueue_concept_references(exercise) if saved && response_params[:submit] == "1"
@@ -96,7 +107,9 @@ class ResponsesController < ApplicationController
   end
 
   def response_params
-    @response_params ||= params.require(:response).permit(:submit, answers: [ :code_review, :pattern, :challenge, :architecture ])
+    @response_params ||= params.require(:response).permit(
+      :submit, :rating, :feedback_text, answers: [ :code_review, :pattern, :challenge, :architecture ]
+    )
   end
 
   def feedback_params

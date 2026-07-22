@@ -77,6 +77,61 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  describe "POST /responses rating + feedback_text" do
+    let(:section) { { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } } }
+
+    it "saves rating and feedback_text from an auto-save payload" do
+      create_exercise(section)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 },
+                              rating: "right_level", feedback_text: "more SQL please" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.rating).to eq("right_level")
+      expect(resp.feedback_text).to eq("more SQL please")
+      expect(resp.submitted_at).to be_nil
+    end
+
+    it "saves rating alongside answers on final submit" do
+      create_exercise(section)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: "too_hard", submit: "1" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.rating).to eq("too_hard")
+      expect(resp.submitted_at).to be_present
+    end
+
+    it "does not clear an existing rating when the payload omits the key" do
+      exercise = create_exercise(section)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: {}, rating: :too_easy, feedback_text: "keep me")
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.rating).to eq("too_easy")
+      expect(resp.feedback_text).to eq("keep me")
+    end
+
+    it "ignores a rating value outside the enum instead of raising" do
+      create_exercise(section)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: "bogus" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      expect(DailyResponse.last.rating).to be_nil
+    end
+  end
+
   describe "POST /responses re-submission of a persisted draft" do
     it "updates the same record and submits it, without needing a PATCH route" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
