@@ -1,9 +1,0 @@
-<div class="page-header" style="margin-bottom:1.5rem;">
-  <h1 style="font-size:1.5rem;">Your submission — <%= @response.date.strftime("%A, %B %-d, %Y") %></h1>
-  <p style="color:var(--muted);font-size:.9rem;">
-    <%= link_to "← Back to today's gym", root_path %> · <%= link_to "History", history_path %>
-  </p>
-</div>
-
-<%= render "responses/answered_sections", exercise: @exercise, response: @response %>
-<%= render "responses/submission", response: @response %>

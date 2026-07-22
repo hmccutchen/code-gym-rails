@@ -1,11 +1,17 @@
-<%# Submitted badge, on-demand review trigger, the AI review, and the feedback
-    widget. Shared by the dashboard submitted state and responses#show. Review
-    stays manual: the button only appears when unreviewed; nothing auto-triggers.
-    Local: response. %>
+<%# Submitted badge, the day's self-rating, the on-demand review trigger, the AI
+    review, and the email button. Rendered by the dashboard's submitted state and
+    by each history entry. Review stays manual: the button only appears when
+    unreviewed; nothing auto-triggers it. Local: response. %>
 <div class="submit-row">
   <span class="submitted-badge">✓ Submitted</span>
+  <% if response.rating.present? %>
+    <span class="history-pill">Rated: <%= response.self_rating_label %></span>
+  <% end %>
   <% unless response.reviewed? %>
-    <%= button_to t("review.get_button", provider: response.user.provider_label), review_response_path(response), method: :post, class: "btn btn-primary btn-sm" %>
+    <%= button_to t("review.get_button", provider: response.user.provider_label),
+          review_response_path(response), method: :post,
+          class: "btn btn-primary btn-sm",
+          form: { class: "review-form", data: { turbo: false } } %>
   <% end %>
 </div>
 
@@ -17,7 +23,24 @@
     </div>
     <%= render "shared/ai_review", response: response %>
   </div>
-  <%= render "responses/feedback_form", response: response, style: :prominent %>
-<% else %>
-  <%= render "responses/feedback_form", response: response, style: :quiet %>
 <% end %>
+
+<script>
+// The review call is synchronous — the request blocks for as long as the
+// provider takes. Disable the button and swap its label so the wait reads as
+// progress rather than a dead click. History renders one of these per entry, so
+// wire each form once. Inline script, matching the gym-form convention; Stimulus
+// is not wired in this app.
+(() => {
+  document.querySelectorAll("form.review-form:not([data-review-wired])").forEach(form => {
+    form.dataset.reviewWired = "1";
+    form.addEventListener("submit", () => {
+      const button = form.querySelector('input[type="submit"]');
+      if (!button) return;
+      // Deferred a tick: disabling synchronously inside the submit handler can
+      // cancel the submission in some browsers.
+      setTimeout(() => { button.disabled = true; button.value = "Generating review…"; }, 0);
+    });
+  });
+})();
+</script>

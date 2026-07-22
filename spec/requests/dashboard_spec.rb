@@ -46,13 +46,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   before { login_as(user) }
 
-  it "shows no feedback widget before submission" do
-    create_exercise
-    get root_path
-    expect(response.body).not_to include('class="feedback-quiet"')
-    expect(response.body).not_to include('class="feedback-prominent')
-  end
-
   it "renders the rating widget at the end of the unsubmitted problem set" do
     create_exercise
     get root_path
@@ -94,18 +87,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(form_html).not_to include('name="_method"')
   end
 
-  it "shows the quiet feedback widget after submission, before review" do
-    create_response(create_exercise)
+  it "shows the day's rating as a read-only pill after submission" do
+    create_response(create_exercise).update!(rating: :right_level)
     get root_path
-    expect(response.body).to include('class="feedback-quiet"')
-    expect(response.body).not_to include('class="feedback-prominent')
-  end
-
-  it "shows the prominent feedback card after the review, not the quiet one" do
-    create_response(create_exercise, ai_review: sample_review)
-    get root_path
-    expect(response.body).to include('class="feedback-prominent')
-    expect(response.body).not_to include('class="feedback-quiet"')
+    expect(response.body).to include("Rated: just right")
+    expect(response.body).not_to include('data-rating="too_hard"')
   end
 
   it "renders the review with the keys review_response actually returns" do
@@ -147,14 +133,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     resp.update!(rating: :too_hard)
     get root_path
     expect(response.body).not_to include("You rated this")
-  end
-
-  it "round-trips rating and feedback text through the feedback action" do
-    resp = create_response(create_exercise)
-    patch feedback_response_path(resp),
-          params: { response: { rating: "too_hard", feedback_text: "less SQL please" } }
-    expect(resp.reload.rating).to eq("too_hard")
-    expect(resp.feedback_text).to eq("less SQL please")
   end
 
   describe "teaching hints" do
