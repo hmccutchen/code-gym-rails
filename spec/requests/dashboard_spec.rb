@@ -53,6 +53,35 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to include('class="feedback-prominent')
   end
 
+  it "renders the rating widget at the end of the unsubmitted problem set" do
+    create_exercise
+    get root_path
+    expect(response.body).to include('data-rating="too_easy"')
+    expect(response.body).to include('data-rating="right_level"')
+    expect(response.body).to include('data-rating="too_hard"')
+    expect(response.body).to include("How was today's difficulty?")
+  end
+
+  it "hides the submit row and shows the nudge when the draft has no rating" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false)
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-row"[^>]*style="display:none"/)
+    expect(response.body).to include("Rate today's difficulty to finish up.")
+  end
+
+  it "shows the submit row and marks the active button when the draft is already rated" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false).update!(rating: :right_level)
+
+    get root_path
+
+    expect(response.body).not_to match(/id="submit-row"[^>]*style="display:none"/)
+    expect(response.body).to include('class="rating-btn active" data-rating="right_level"')
+  end
+
   it "always renders the answer form as a plain POST, even for a persisted draft" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
