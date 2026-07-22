@@ -194,8 +194,8 @@ class AiService
         <<~ARCH.chomp
           "architecture": {
               "title":     "string — short name for the decision",
-              "scenario":  "string — realistic production scenario with real constraints (team size, scale, reliability needs, existing tech debt)",
-              "question":  "string — asks for a decision + justification",
+              "scenario":  "string — 2-3 sentences, ~50 words max. Exactly 2-3 concrete constraints total, no more",
+              "question":  "string — ONE sentence asking for a decision + justification",
               "options":   ["string — a viable approach", "string — another viable approach", "string — an optional third approach (omit for 2)"],
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the architecture vocabulary",
@@ -281,7 +281,10 @@ class AiService
     third_guidance =
       if third == :architecture
         <<~ARCH.chomp
-          - The third section is an ARCHITECTURE decision, not a coding task. Give a realistic production scenario with concrete constraints (team size, scale, reliability needs, existing tech debt), present 2-3 viable options, and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
+          - The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
+          - Keep the architecture scenario SHORT: 2-3 sentences, ~50 words maximum, and exactly 2-3 concrete constraints total. Usually the observable symptom plus one hard technical constraint is enough — pick only the constraints the decision actually turns on, and leave the rest out. Do NOT stack scale figures, team size, infrastructure detail, budget, and timeline into one scenario.
+          - Short does not mean vague: name real numbers and real systems for the 2-3 constraints you do include. Fewer constraints, not fuzzier ones.
+          - The architecture question itself is one sentence — do not restate the scenario in it.
           - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
           - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
         ARCH

@@ -70,6 +70,18 @@ RSpec.describe AiService do
       expect(schema).not_to include("\"challenge\"")
       expect(schema).not_to include("starter_code")
     end
+
+    it "caps the architecture scenario at 2-3 sentences and 2-3 constraints" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+      expect(schema).to include("2-3 sentences")
+      expect(schema).to include("2-3 concrete constraints")
+      expect(schema).not_to include("team size")
+    end
+
+    it "caps the architecture question at one sentence" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+      expect(schema).to include("ONE sentence")
+    end
   end
 
   describe "#roll_third_section" do
@@ -234,6 +246,18 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include("framings:")
       expect(prompt).to include("inventory restocking")
+    end
+
+    it "instructs a short architecture scenario with a hard constraint cap" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
+      expect(prompt).to include("~50 words maximum")
+      expect(prompt).to include("exactly 2-3 concrete constraints")
+      expect(prompt).to include("Fewer constraints, not fuzzier ones")
+    end
+
+    it "no longer enumerates team size, budget, and timeline as things to include" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
+      expect(prompt).not_to include("team size, scale, reliability needs, existing tech debt")
     end
   end
 
