@@ -46,11 +46,44 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   before { login_as(user) }
 
-  it "shows no feedback widget before submission" do
+  it "renders the rating widget at the end of the unsubmitted problem set" do
     create_exercise
     get root_path
-    expect(response.body).not_to include('class="feedback-quiet"')
-    expect(response.body).not_to include('class="feedback-prominent')
+    expect(response.body).to include('data-rating="too_easy"')
+    expect(response.body).to include('data-rating="right_level"')
+    expect(response.body).to include('data-rating="too_hard"')
+    expect(response.body).to include("How was today's difficulty?")
+  end
+
+  it "disables the submit button and explains why when the draft has no rating" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false)
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
+    expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
+    expect(response.body).to include("Rate today's difficulty to finish up.")
+  end
+
+  it "enables the submit button and marks the active rating when the draft is already rated" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false).update!(rating: :right_level)
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(response.body).to match(/id="rating-nudge"[^>]*hidden/)
+    expect(response.body).to include('class="rating-btn active" data-rating="right_level"')
+  end
+
+  it "keeps the submit button visible even when it is disabled" do
+    create_exercise
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
+    expect(response.body).not_to match(/id="submit-row"[^>]*style="display:none"/)
   end
 
   it "always renders the answer form as a plain POST, even for a persisted draft" do
@@ -65,18 +98,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(form_html).not_to include('name="_method"')
   end
 
-  it "shows the quiet feedback widget after submission, before review" do
-    create_response(create_exercise)
+  it "shows the day's rating as a read-only pill after submission" do
+    create_response(create_exercise).update!(rating: :right_level)
     get root_path
-    expect(response.body).to include('class="feedback-quiet"')
-    expect(response.body).not_to include('class="feedback-prominent')
-  end
-
-  it "shows the prominent feedback card after the review, not the quiet one" do
-    create_response(create_exercise, ai_review: sample_review)
-    get root_path
-    expect(response.body).to include('class="feedback-prominent')
-    expect(response.body).not_to include('class="feedback-quiet"')
+    expect(response.body).to include("Rated: just right")
+    expect(response.body).not_to include('data-rating="too_hard"')
   end
 
   it "renders the review with the keys review_response actually returns" do
@@ -118,14 +144,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     resp.update!(rating: :too_hard)
     get root_path
     expect(response.body).not_to include("You rated this")
-  end
-
-  it "round-trips rating and feedback text through the feedback action" do
-    resp = create_response(create_exercise)
-    patch feedback_response_path(resp),
-          params: { response: { rating: "too_hard", feedback_text: "less SQL please" } }
-    expect(resp.reload.rating).to eq("too_hard")
-    expect(resp.feedback_text).to eq("less SQL please")
   end
 
   describe "teaching hints" do
@@ -321,6 +339,40 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
 
       expect(response.body).not_to include("Reference — N plus one: how it works")
+    end
+
+    it "renders a section's concept-reference dropdown read-only after submission" do
+      exercise = exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("Reference — N plus one: how it works")
+      expect(response.body).to include("Avoid the loop query")
+    end
+
+    it "renders a submitted architecture answer read-only" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "architecture" => { "title" => "Datastore", "scenario" => "10x traffic", "question" => "Pick",
+                              "options" => [ "Shard", "Cache" ], "concept" => "scaling_bottlenecks",
+                              "reference" => { "tagline" => "t", "explanation" => "e",
+                                               "tradeoffs" => [ "a", "b" ], "senior_lens" => "l" } }
+        })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "architecture" => "I would shard because scale" }, submitted_at: Time.current)
+
+      get root_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("I would shard because scale")
+      expect(response.body).to include("10x traffic")
     end
 
     it "renders the architecture third section with options, tradeoffs, and its concept dropdown" do

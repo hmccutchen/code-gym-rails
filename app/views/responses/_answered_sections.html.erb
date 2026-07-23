@@ -1,8 +1,8 @@
 <%# Read-only render of a submitted day's three sections: label, scenario,
     question, snippet, the user's answer, and (always) the concept-reference
-    dropdown when one is cached. Shared by the dashboard submitted state and
-    the responses#show review page. Locals: exercise, response. %>
-<% cr = exercise.code_review %>
+    dropdown when one is cached. Shared by the dashboard's submitted state and
+    each entry on the history page. Locals: exercise, response. %>
+<% if (cr = exercise.code_review) %>
 <div class="section">
   <div class="section-label">1 — Code Review</div>
   <% if cr["scenario"].present? %><div class="section-scenario"><%= cr["scenario"] %></div><% end %>
@@ -14,8 +14,9 @@
   <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: true, answer: response.answers["code_review"] %>
   <div class="answer-display"><%= response.answers["code_review"].presence || "(skipped)" %></div>
 </div>
+<% end %>
 
-<% pat = exercise.pattern %>
+<% if (pat = exercise.pattern) %>
 <div class="section">
   <div class="section-label">2 — Pattern of the Month: <%= pat["title"] %></div>
   <% if pat["scenario"].present? %><div class="section-scenario"><%= pat["scenario"] %></div><% end %>
@@ -38,11 +39,11 @@
   <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: true, answer: response.answers["pattern"] %>
   <div class="answer-display"><%= response.answers["pattern"].presence || "(skipped)" %></div>
 </div>
+<% end %>
 
 <% if (arch = exercise.architecture) %>
   <%= render "responses/architecture_section", arch: arch, response: response, submitted: true %>
-<% else %>
-  <% ch = exercise.challenge %>
+<% elsif (ch = exercise.challenge) %>
   <div class="section">
     <div class="section-label">3 — Coding Challenge</div>
     <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>

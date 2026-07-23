@@ -63,7 +63,7 @@ class GenerateDailyExercisesJob < ApplicationJob
       user,
       target:  "dashboard-content",
       partial: "dashboard/generation_failed",
-      locals:  { message: "Your API key was rejected — check it in Settings. (#{e.message})" }
+      locals:  { message: "Your API key was rejected — check it in Settings." }
     )
   rescue AiService::RateLimitError => e
     Rails.logger.warn("Rate limited generating exercise for #{user.email}: #{e.message}")

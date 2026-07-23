@@ -77,6 +77,85 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  describe "POST /responses rating + feedback_text" do
+    let(:section) { { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } } }
+
+    it "saves rating and feedback_text from an auto-save payload" do
+      create_exercise(section)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 },
+                              rating: "right_level", feedback_text: "more SQL please" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.rating).to eq("right_level")
+      expect(resp.feedback_text).to eq("more SQL please")
+      expect(resp.submitted_at).to be_nil
+    end
+
+    it "saves rating alongside answers on final submit" do
+      create_exercise(section)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: "too_hard", submit: "1" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.rating).to eq("too_hard")
+      expect(resp.submitted_at).to be_present
+    end
+
+    it "does not clear an existing rating when the payload omits the key" do
+      exercise = create_exercise(section)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: {}, rating: :too_easy, feedback_text: "keep me")
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.rating).to eq("too_easy")
+      expect(resp.feedback_text).to eq("keep me")
+    end
+
+    it "ignores a rating value outside the enum instead of raising" do
+      create_exercise(section)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: "bogus" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      expect(DailyResponse.last.rating).to be_nil
+    end
+
+    it "does not clear a saved rating when the payload sends an explicit null" do
+      exercise = create_exercise(section)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: {}, rating: :too_easy)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: nil } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(DailyResponse.last.rating).to eq("too_easy")
+    end
+
+    it "does not clear a saved rating when the payload sends an empty string" do
+      exercise = create_exercise(section)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: {}, rating: :too_easy)
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 }, rating: "" } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(DailyResponse.last.rating).to eq("too_easy")
+    end
+  end
+
   describe "POST /responses re-submission of a persisted draft" do
     it "updates the same record and submits it, without needing a PATCH route" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
@@ -158,7 +237,7 @@ RSpec.describe "Responses", type: :request do
         post email_review_response_path(daily_response)
       }.not_to have_enqueued_mail(ReviewMailer, :send_review)
 
-      expect(response).to redirect_to(response_path(daily_response))
+      expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("No review to email yet.")
     end
 
@@ -169,7 +248,7 @@ RSpec.describe "Responses", type: :request do
         post email_review_response_path(daily_response)
       }.to have_enqueued_mail(ReviewMailer, :send_review).with(daily_response)
 
-      expect(response).to redirect_to(response_path(daily_response))
+      expect(response).to redirect_to(root_path)
       expect(flash[:notice]).to eq("Review sent to dev@example.com.")
     end
   end
@@ -187,6 +266,35 @@ RSpec.describe "Responses", type: :request do
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
     end
 
+    it "refuses to review an unsubmitted draft and sends the user back to the form" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } },
+        generated_at: Time.current
+      )
+      draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                    answers: { "code_review" => "a" * 20 }, submitted_at: nil)
+      expect(AiService).not_to receive(:for)
+
+      post review_response_path(draft)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("Submit your answers first.")
+      expect(draft.reload.ai_review).to be_nil
+    end
+
+    it "does not re-review an already-reviewed day, and lands on its history entry" do
+      daily_response = create_submitted_response
+      daily_response.update!(ai_review: { "code_review" => { "rating" => "solid" } })
+      expect(AiService).not_to receive(:for)
+
+      post review_response_path(daily_response)
+
+      expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
+      expect(flash[:notice]).to eq("Already reviewed.")
+      expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+    end
+
     it "saves the ai_review from the user's configured provider" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
@@ -195,7 +303,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(response).to redirect_to(response_path(daily_response))
+      expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
       expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
     end
 
@@ -207,11 +315,11 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(response).to redirect_to(response_path(daily_response))
+      expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("Couldn't generate the review: rate limited")
     end
 
-    it "shows a Settings-pointing alert when the provider raises AuthenticationError" do
+    it "shows a Settings-pointing alert without leaking the provider message when the provider raises AuthenticationError" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:review_response).and_raise(AiService::AuthenticationError, "invalid x-api-key")
@@ -219,7 +327,8 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(flash[:alert]).to eq("Your API key was rejected — check it in Settings. (invalid x-api-key)")
+      expect(flash[:alert]).to eq("Your API key was rejected — check it in Settings.")
+      expect(flash[:alert]).not_to include("x-api-key")
     end
 
     it "shows a try-again alert when the provider raises RateLimitError" do
@@ -312,99 +421,15 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  describe "GET /responses/:id (review page)" do
-    def submitted_response_for(owner)
-      exercise = DailyExercise.create!(
-        user: owner, date: Date.current, generated_at: Time.current,
-        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
-                       "pattern" => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
-                       "challenge" => { "title" => "t", "question" => "q", "concept" => "service_objects" } }
-      )
-      DailyResponse.create!(user: owner, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
-    end
-
-    it "renders the current user's own submitted response" do
-      resp = submitted_response_for(user)
-
-      get response_path(resp)
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("✓ Submitted")
-    end
-
-    it "404s for another user's response id (owner scoping)" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
-      resp = submitted_response_for(other)
-
-      get response_path(resp)
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "renders a section's concept-reference dropdown on the review page when one is cached" do
-      resp = submitted_response_for(user)
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-                               tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
-
-      get response_path(resp)
-
-      expect(response.body).to include("Reference — N plus one: how it works")
-      expect(response.body).to include("Avoid the loop query")
-    end
-
-    it "renders no concept-reference dropdown on the review page when none is cached" do
-      resp = submitted_response_for(user)
-
-      get response_path(resp)
-
-      expect(response.body).not_to include("Reference — N plus one: how it works")
-    end
-
-    it "renders a submitted architecture answer read-only on the review page" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-        problem_set: {
-          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
-          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
-          "architecture" => { "title" => "Datastore", "scenario" => "10x traffic", "question" => "Pick",
-                              "options" => [ "Shard", "Cache" ], "concept" => "scaling_bottlenecks",
-                              "reference" => { "tagline" => "t", "explanation" => "e",
-                                               "tradeoffs" => [ "a", "b" ], "senior_lens" => "l" } }
-        })
-      resp = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                                   answers: { "architecture" => "I would shard because scale" }, submitted_at: Time.current)
-
-      get response_path(resp)
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("I would shard because scale")
-      expect(response.body).to include("10x traffic")
-    end
-
-    it "redirects a still-unsubmitted draft away from the review page" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current,
-        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } }
-      )
-      draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                                    answers: { "code_review" => "a" * 20 }, submitted_at: nil)
-
-      get response_path(draft)
-
-      expect(response).to redirect_to(root_path)
-    end
-  end
-
   describe "POST /responses redirect targets on final submit" do
-    it "returns the review-page URL in the JSON redirect key on submit" do
+    it "returns the dashboard URL in the JSON redirect key on submit" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" })
 
       post responses_path,
         params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      expect(JSON.parse(response.body)["redirect"]).to eq(response_path(DailyResponse.last))
+      expect(JSON.parse(response.body)["redirect"]).to eq(root_path)
     end
 
     it "does not include a redirect key on a non-submitting auto-save" do
@@ -417,12 +442,12 @@ RSpec.describe "Responses", type: :request do
       expect(JSON.parse(response.body)).not_to have_key("redirect")
     end
 
-    it "redirects a native (no-JS) final submit to the review page" do
+    it "redirects a native (no-JS) final submit back to the dashboard" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
 
       post responses_path, params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }
 
-      expect(response).to redirect_to(response_path(DailyResponse.last))
+      expect(response).to redirect_to(root_path)
     end
   end
 end

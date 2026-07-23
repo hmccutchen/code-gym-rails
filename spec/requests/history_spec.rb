@@ -6,7 +6,11 @@ RSpec.describe "History", type: :request do
   def create_session_for(owner, date:, submitted: true, reviewed: false, rating: nil, concept_tags: {})
     exercise = DailyExercise.create!(
       user: owner, date: date,
-      problem_set: { "code_review" => { "question" => "q-#{date}", "snippet" => "s" } },
+      problem_set: {
+        "code_review" => { "question" => "q-#{date}", "snippet" => "s" },
+        "pattern" => { "title" => "Pat-#{date}", "question" => "pattern-q-#{date}" },
+        "challenge" => { "question" => "challenge-q-#{date}" }
+      },
       generated_at: Time.current
     )
     DailyResponse.create!(
@@ -57,6 +61,57 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("Spotted the issue on #{3.days.ago.to_date}")
       expect(response.body).to include("No AI review requested.")
       expect(response.body).to include("1/3 sections")
+    end
+
+    it "renders each entry's problems and the user's answers" do
+      session = create_session_for(user, date: 1.day.ago.to_date)
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("q-#{session.date}")
+      expect(response.body).to include("Answer with plenty of substance")
+      expect(response.body).to include("Problems &amp; answers")
+    end
+
+    it "anchors each entry by response id" do
+      session = create_session_for(user, date: 1.day.ago.to_date)
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include(%(id="response-#{session.id}"))
+    end
+
+    it "opens the newest entry's problems and leaves older ones closed" do
+      create_session_for(user, date: 1.day.ago.to_date)
+      create_session_for(user, date: 3.days.ago.to_date)
+
+      login_as(user)
+      get history_path
+
+      # Two entries, exactly one open problems block — the first.
+      expect(response.body.scan(/<details class="answers" open>/).size).to eq(1)
+      expect(response.body.scan(/<details class="answers">/).size).to eq(1)
+    end
+
+    it "renders an entry whose stored problem_set is missing sections, without breaking the page" do
+      sparse = DailyExercise.create!(
+        user: user, date: 5.days.ago.to_date, generated_at: Time.current,
+        problem_set: { "code_review" => { "question" => "only-section", "snippet" => "s" } }
+      )
+      DailyResponse.create!(user: user, daily_exercise: sparse, date: 5.days.ago.to_date,
+                            answers: { "code_review" => "Answer with plenty of substance" },
+                            submitted_at: Time.current)
+      intact = create_session_for(user, date: 1.day.ago.to_date)
+
+      login_as(user)
+      get history_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("only-section")
+      # The malformed row must not take the rest of the page down with it.
+      expect(response.body).to include("q-#{intact.date}")
     end
   end
 
