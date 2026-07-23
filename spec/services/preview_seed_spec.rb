@@ -71,6 +71,24 @@ RSpec.describe PreviewSeed do
       expect(real.skill_level).to eq("strong")
       expect(real.language).to eq("javascript")
     end
+
+    it "never overwrites an existing provider" do
+      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      real.update!(api_key: "AIzaSyReal", provider: "gemini")
+      set_target
+
+      PreviewSeed.run!
+
+      expect(real.reload.provider).to eq("gemini")
+    end
+
+    it "does not touch users other than the named one" do
+      bystander = User.create!(email: "someone-else@example.com", name: "Bystander",
+                               skill_level: "beginner")
+      set_target
+
+      expect { PreviewSeed.run! }.not_to change { bystander.reload.attributes }
+    end
   end
 
   describe "the seeded content" do
@@ -159,6 +177,18 @@ RSpec.describe PreviewSeed do
       expect(exercise.language).to eq("javascript")
       expect(user.daily_responses.find_by(date: Date.current).answers["code_review"])
         .to eq("my real answer here")
+    end
+
+    it "does not fabricate a response against a real user's pre-existing exercise" do
+      user = User.create!(email: "reviewer@example.com", name: "Real Person")
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: 1.day.ago, language: "javascript",
+        problem_set: { "code_review" => { "question" => "REAL", "snippet" => "s" } }
+      )
+
+      PreviewSeed.run!
+
+      expect(user.daily_responses.find_by(date: Date.current)).to be_nil
     end
 
     it "seeds dates in the user's own time zone, not UTC" do

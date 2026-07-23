@@ -64,6 +64,11 @@ class PreviewSeed
       e.generated_at = Time.current
     end
 
+    # Only attach a demo response to an exercise this seeder created. If a real
+    # user already has an exercise on this date (the misconfiguration case), never
+    # fabricate a response against their real problem set.
+    return unless exercise.previously_new_record?
+
     DailyResponse.find_or_create_by(user: user, daily_exercise: exercise, date: date) do |response|
       response.concept_tags = problem_set.transform_values { |section| section["concept"] }.compact
       yield response
