@@ -4,6 +4,12 @@
 # too. Four rules make that safe: no variable means no action; rows are created
 # only when absent and never updated or deleted; a non-blank attribute is never
 # reassigned; and nothing outside the single named account is touched.
+#
+# preDeployCommand fires on every deploy, so a preview app open across a date
+# boundary accumulates rows as the seeded dates roll forward — harmless in a
+# throwaway environment, and the price of never touching a row we already own.
+# Writes use the bang finders so a malformed fixture aborts the deploy loudly
+# rather than seeding nothing while reporting success.
 class PreviewSeed
   EMAIL_VAR     = "PREVIEW_SEED_EMAIL"
   DUMMY_API_KEY = "sk-ant-preview-not-a-real-key"
@@ -36,7 +42,7 @@ class PreviewSeed
     user
   end
 
-  # find_or_create_by's block runs only on create, which is what keeps rule 2
+  # find_or_create_by!'s block runs only on create, which is what keeps rule 2
   # ("never overwrite") true for every row below.
   def seed_days(user)
     seed_day(user, Date.current, architecture_set) do |response|
@@ -58,7 +64,7 @@ class PreviewSeed
   end
 
   def seed_day(user, date, problem_set)
-    exercise = DailyExercise.find_or_create_by(user: user, date: date) do |e|
+    exercise = DailyExercise.find_or_create_by!(user: user, date: date) do |e|
       e.problem_set  = problem_set
       e.language     = "ruby_rails"
       e.generated_at = Time.current
@@ -69,14 +75,14 @@ class PreviewSeed
     # fabricate a response against their real problem set.
     return unless exercise.previously_new_record?
 
-    DailyResponse.find_or_create_by(user: user, daily_exercise: exercise, date: date) do |response|
+    DailyResponse.find_or_create_by!(user: user, daily_exercise: exercise, date: date) do |response|
       response.concept_tags = problem_set.transform_values { |section| section["concept"] }.compact
       yield response
     end
   end
 
   def seed_concept_reference
-    ConceptReference.find_or_create_by(concept: "n_plus_one", language: "ruby_rails") do |reference|
+    ConceptReference.find_or_create_by!(concept: "n_plus_one", language: "ruby_rails") do |reference|
       reference.tagline      = "Load the association once, not once per row."
       reference.explanation  = "A query inside a loop issues one statement per record. Eager loading fetches them in a single additional query."
       reference.code_example = "orders = Order.includes(:customer)\norders.each { |order| puts order.customer.name }"

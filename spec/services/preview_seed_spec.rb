@@ -200,5 +200,15 @@ RSpec.describe PreviewSeed do
       local_today = Time.use_zone(user.effective_time_zone) { Date.current }
       expect(user.daily_exercises.pluck(:date)).to include(local_today)
     end
+
+    # The bang finders make a bad fixture abort the deploy loudly rather than
+    # seeding nothing while preDeployCommand reports success. A blank problem_set
+    # fails DailyExercise's presence validation; the non-bang finder would return
+    # an unsaved record and let run! finish, so this discriminates bang from not.
+    it "raises rather than silently seeding nothing when a fixture is invalid" do
+      allow_any_instance_of(PreviewSeed).to receive(:architecture_set).and_return({})
+
+      expect { PreviewSeed.run! }.to raise_error(ActiveRecord::RecordInvalid)
+    end
   end
 end
