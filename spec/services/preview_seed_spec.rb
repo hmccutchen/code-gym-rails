@@ -89,19 +89,35 @@ RSpec.describe PreviewSeed do
 
       expect { PreviewSeed.run! }.not_to change { bystander.reload.attributes }
     end
+
+    # Seeding is create-only: a real user who signed up but never added a key
+    # (api_key / provider still nil) must not have the dummy key filled in.
+    it "does not fill blank attributes on an existing user" do
+      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      set_target
+
+      PreviewSeed.run!
+
+      real.reload
+      expect(real.api_key).to be_blank
+      expect(real.provider).to be_nil
+    end
   end
 
   describe "the seeded content" do
+    before { set_target }
+
     # Pin to noon UTC: this suite runs Rails in UTC while the default reviewer
     # falls back to User::DEFAULT_TIME_ZONE ("America/New_York"), so bare
     # Date.current here and Date.current inside seed_days' Time.use_zone can
     # land on different calendar days for a few hours around UTC midnight.
     # Freezing to local noon keeps both sides on the same day regardless of
-    # when CI runs. (The Kiritimati test below is unaffected either way: it
-    # compares against the same frozen instant on both sides.)
-    before do
-      set_target
-      travel_to Time.current.change(hour: 12)
+    # when CI runs. The block form restores the clock even if an example raises,
+    # so a frozen time never leaks into later specs. (The Kiritimati test below
+    # is unaffected either way: it compares against the same frozen instant on
+    # both sides.)
+    around do |example|
+      travel_to(Time.current.change(hour: 12)) { example.run }
     end
 
     it "seeds today as an unrated draft so the submit gate is reviewable" do

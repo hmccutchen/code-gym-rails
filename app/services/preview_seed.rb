@@ -1,9 +1,9 @@
 # Demo content for a Railway PR app, whose database starts empty.
 #
 # railway.toml's preDeployCommand is shared with production, so this runs there
-# too. Four rules make that safe: no variable means no action; rows are created
-# only when absent and never updated or deleted; a non-blank attribute is never
-# reassigned; and nothing outside the single named account is touched.
+# too. Three rules make that safe: no variable means no action; rows are created
+# only when absent and never updated or deleted; and nothing outside the single
+# named account is touched.
 #
 # preDeployCommand fires on every deploy, so a preview app open across a date
 # boundary accumulates rows as the seeded dates roll forward — harmless in a
@@ -31,15 +31,18 @@ class PreviewSeed
     @target_email ||= ENV[EMAIL_VAR].to_s.strip.downcase
   end
 
+  # create_with applies the demo defaults on the create path only. An existing
+  # account — a real user, or a previously-seeded one — is returned untouched,
+  # so seeding never modifies a row it did not create, including a real user who
+  # signed up but has not added an API key yet (api_key / provider still nil).
   def find_or_create_user
-    user = User.find_or_initialize_by(email: target_email)
-    user.name        = "Preview Reviewer" if user.name.blank?
-    user.skill_level = "solid"            if user.skill_level.blank?
-    user.language    = "ruby_rails"       if user.language.blank?
-    user.provider    = "anthropic"        if user.provider.blank?
-    user.api_key     = DUMMY_API_KEY      if user.api_key.blank?
-    user.save!
-    user
+    User.create_with(
+      name:        "Preview Reviewer",
+      skill_level: "solid",
+      language:    "ruby_rails",
+      provider:    "anthropic",
+      api_key:     DUMMY_API_KEY
+    ).find_or_create_by!(email: target_email)
   end
 
   # find_or_create_by!'s block runs only on create, which is what keeps rule 2
