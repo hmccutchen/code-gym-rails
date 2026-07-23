@@ -23,18 +23,10 @@ class ResponsesController < ApplicationController
       concept_tags: exercise_concept_tags(exercise)
     )
 
-    # Rating and notes ride along in the same autosave/submit payload as the
-    # answers. A rating is only ever set, never cleared: the UI offers no way to
-    # un-rate, and the autosave fires continuously — including from a stale tab
-    # whose in-page state predates a rating saved elsewhere. Assigning only on a
-    # valid enum value makes a saved rating unclearable by construction, and
-    # sidesteps the ArgumentError an off-enum value would otherwise raise.
-    rating = response_params[:rating].presence
-    if rating && %w[too_easy right_level too_hard].include?(rating)
-      @response.section_ratings = {
-        "code_review" => rating, "pattern" => rating, "challenge" => rating
-      }
-    end
+    incoming_ratings = (response_params[:section_ratings] || {})
+                         .slice(*exercise.problem_set.keys)
+                         .select { |_, value| DailyResponse::SELF_RATINGS.include?(value) }
+    @response.section_ratings = @response.section_ratings.merge(incoming_ratings)
     @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
 
     saved = @response.save
@@ -106,7 +98,9 @@ class ResponsesController < ApplicationController
 
   def response_params
     @response_params ||= params.require(:response).permit(
-      :submit, :rating, :feedback_text, answers: [ :code_review, :pattern, :challenge, :architecture ]
+      :submit, :feedback_text,
+      answers: [ :code_review, :pattern, :challenge, :architecture ],
+      section_ratings: [ :code_review, :pattern, :challenge, :architecture ]
     )
   end
 

@@ -70,8 +70,6 @@ class AiService
     }
   }.freeze
 
-  RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
-
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
   # Max bytes of raw provider output logged server-side when a provider
@@ -249,18 +247,17 @@ class AiService
       "No history yet — this is their first exercise set."
     else
       history.map { |h|
-        rating_label = RATING_LABELS[h[:rating]] || "unrated"
-        feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
         pairs = h[:concepts].respond_to?(:each_pair) ? h[:concepts].each_pair.filter_map { |section, concept|
           next if concept.blank?
-          ai_rating = h[:section_ratings][section]
-          ai_text   = ai_rating ? "(ai: #{ai_rating})" : "(unreviewed)"
-          "#{section}\u2192#{concept} #{ai_text}"
+          self_r = h[:self_ratings][section].presence || "unrated"
+          ai_r   = h[:ai_ratings][section].presence  || "unreviewed"
+          "#{section}→#{concept} (self: #{self_r}, ai: #{ai_r})"
         } : []
         concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""
         framings     = h[:scenarios].presence || []
         framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/3 sections answered | self: #{rating_label}#{concept_text}#{framing_text}#{feedback}"
+        feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
+        "#{h[:date]}: #{h[:sections_answered]}/3 answered#{concept_text}#{framing_text}#{feedback}"
       }.join("\n")
     end
 

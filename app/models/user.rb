@@ -93,22 +93,15 @@ class User < ApplicationRecord
       scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
         problem_set.dig(section, "scenario").presence
       end
-      # AI-assessed rating per tagged section, empty when the response was
-      # never reviewed — surfaced alongside the day's self-rating so
-      # AiService can show both signals side by side in the prompt.
-      ai_section_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
-      # Self-assessed rating: if all sections have the same rating, use that;
-      # otherwise use nil if ratings are mixed/absent.
-      self_ratings = r.section_ratings.presence || {}
-      self_rating = self_ratings.values.uniq.length == 1 ? self_ratings.values.first : nil
+      ai_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
       {
-        date:          r.date.to_s,
-        rating:        self_rating,
-        feedback:      r.feedback_text,
-        concepts:      r.concept_tags,
-        scenarios:     scenarios,
+        date:              r.date.to_s,
+        feedback:          r.feedback_text,
+        concepts:          r.concept_tags,
+        scenarios:         scenarios,
         sections_answered: r.answered_sections.size,
-        section_ratings: ai_section_ratings
+        self_ratings:      r.section_ratings,
+        ai_ratings:        ai_ratings
       }
     end
   end
@@ -129,7 +122,7 @@ class User < ApplicationRecord
         next if concept.blank? || concept == "other" || resolved.key?(concept)
         resolved[concept] = true
 
-        next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil? # out of scope, no info
+        next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil? # out of scope
 
         mastered = r.self_rating_favorable?(section) && r.ai_rating_favorable?(section)
         reinforcement << concept unless mastered

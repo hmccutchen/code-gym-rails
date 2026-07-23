@@ -218,7 +218,7 @@ RSpec.describe User, type: :model do
                             concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
-      expect(user.recent_performance.first[:section_ratings]).to eq({ "code_review" => "developing" })
+      expect(user.recent_performance.first[:ai_ratings]).to eq({ "code_review" => "developing" })
     end
 
     it "is an empty hash when the response was never reviewed" do
@@ -229,7 +229,25 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.recent_performance.first[:section_ratings]).to eq({})
+      expect(user.recent_performance.first[:ai_ratings]).to eq({})
+    end
+  end
+
+  describe "#recent_performance per-section ratings" do
+    it "emits self_ratings and ai_ratings per entry, without a whole-day rating key" do
+      user = User.create!(email: "rp@example.com", name: "RP")
+      exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+        problem_set: { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } })
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "x" * 20 },
+        section_ratings: { "code_review" => "right_level" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+        ai_review: { "code_review" => { "rating" => "developing" } })
+
+      entry = user.recent_performance.first
+      expect(entry).not_to have_key(:rating)
+      expect(entry[:self_ratings]).to eq("code_review" => "right_level")
+      expect(entry[:ai_ratings]).to eq("code_review" => "developing")
     end
   end
 
