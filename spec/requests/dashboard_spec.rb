@@ -49,10 +49,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   it "renders the rating widget at the end of the unsubmitted problem set" do
     create_exercise
     get root_path
+    expect(response.body).to include('data-rating-for="code_review"')
+    expect(response.body).to include('data-rating-for="pattern"')
+    expect(response.body).to include('data-rating-for="challenge"')
     expect(response.body).to include('data-rating="too_easy"')
     expect(response.body).to include('data-rating="right_level"')
     expect(response.body).to include('data-rating="too_hard"')
-    expect(response.body).to include("How was today's difficulty?")
   end
 
   it "disables the submit button and explains why when the draft has no rating" do
@@ -63,7 +65,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
-    expect(response.body).to include("Rate today's difficulty to finish up.")
+    expect(response.body).to include("Rate every section's difficulty to finish up.")
   end
 
   it "enables the submit button and marks the active rating when the draft is already rated" do
@@ -76,7 +78,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
     expect(response.body).to match(/id="rating-nudge"[^>]*hidden/)
-    expect(response.body).to include('class="rating-btn active" data-rating="right_level"')
+    expect(response.body).to include('data-rating-for="code_review" data-rating="right_level">Just right</button>')
   end
 
   it "keeps the submit button visible even when it is disabled" do
@@ -105,8 +107,10 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level"
     })
     get root_path
-    expect(response.body).to include("Rated: just right")
-    expect(response.body).not_to include('data-rating="too_hard"')
+    expect(response.body).to include("Code review: just right")
+    expect(response.body).to include("Pattern: just right")
+    expect(response.body).to include("Challenge: just right")
+    expect(response.body).not_to include('data-rating-for="code_review"')
   end
 
   it "renders the review with the keys review_response actually returns" do

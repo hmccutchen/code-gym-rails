@@ -43,6 +43,11 @@
       <% end %>
       <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: false, answer: response.answers["code_review"] %>
       <textarea name="response[answers][code_review]" class="answer" placeholder="What's the issue and how would you fix it?" data-field="code_review"><%= response.answers["code_review"] %></textarea>
+      <div class="rating-row" data-rating-for="code_review">
+        <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+          <button type="button" class="rating-btn<%= " active" if response.self_rating_for("code_review") == value %>" data-rating-for="code_review" data-rating="<%= value %>"><%= label.upcase_first %></button>
+        <% end %>
+      </div>
     </div>
 
     <% pat = exercise.pattern %>
@@ -58,6 +63,11 @@
 
       <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: false, answer: response.answers["pattern"] %>
       <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" data-field="pattern"><%= response.answers["pattern"] %></textarea>
+      <div class="rating-row" data-rating-for="pattern">
+        <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+          <button type="button" class="rating-btn<%= " active" if response.self_rating_for("pattern") == value %>" data-rating-for="pattern" data-rating="<%= value %>"><%= label.upcase_first %></button>
+        <% end %>
+      </div>
     </div>
 
     <% if (arch = exercise.architecture) %>
@@ -76,26 +86,28 @@
         <% end %>
         <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: false, answer: response.answers["challenge"] %>
         <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" data-field="challenge"><%= response.answers["challenge"] %></textarea>
+        <div class="rating-row" data-rating-for="challenge">
+          <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+            <button type="button" class="rating-btn<%= " active" if response.self_rating_for("challenge") == value %>" data-rating-for="challenge" data-rating="<%= value %>"><%= label.upcase_first %></button>
+          <% end %>
+        </div>
       </div>
     <% end %>
 
     <div class="section rating-section">
-      <p class="feedback-title">How was today's difficulty?</p>
-      <div class="rating-row">
-        <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
-          <button type="button" class="rating-btn<%= " active" if response.section_ratings.values.all?(value) %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
-        <% end %>
-      </div>
-      <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px;margin-top:.75rem" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
+      <p class="feedback-title">Anything to adjust next time?</p>
+      <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
     </div>
 
-    <% unrated = response.section_ratings.blank? %>
+    <% rated_sections = response.section_ratings.keys %>
+    <% section_keys   = exercise.problem_set.keys %>
+    <% all_rated      = (section_keys - rated_sections).empty? %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
-      <%= f.submit "Submit answers →", id: "submit-answers", class: "btn btn-primary", disabled: unrated %>
+      <%= f.submit "Submit answers →", id: "submit-answers", class: "btn btn-primary", disabled: !all_rated %>
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
-    <p class="progress-label" id="rating-nudge"<%= " hidden".html_safe unless unrated %>>Rate today's difficulty to finish up.</p>
+    <p class="progress-label" id="rating-nudge"<%= " hidden".html_safe if all_rated %>>Rate every section's difficulty to finish up.</p>
   <% end %>
 
   <script>
@@ -107,12 +119,24 @@
     const textareas = form.querySelectorAll("textarea[data-field]");
     const progressFill = document.getElementById("progress-fill");
     const progressLabel = document.getElementById("progress-label");
-    const ratingButtons = form.querySelectorAll("button[data-rating]");
+    const ratingButtons = form.querySelectorAll("button[data-rating-for]");
     const feedbackText  = document.getElementById("feedback-text");
     const submitButton  = document.getElementById("submit-answers");
     const ratingNudge   = document.getElementById("rating-nudge");
-    const activeRating  = form.querySelector("button.rating-btn.active");
-    let rating = activeRating ? activeRating.dataset.rating : null;
+    const sectionFields = [...form.querySelectorAll("textarea[data-field]")].map(t => t.dataset.field);
+
+    const ratings = {};
+    form.querySelectorAll("button.rating-btn.active").forEach(b => { ratings[b.dataset.ratingFor] = b.dataset.rating; });
+
+    function allRated() {
+      return sectionFields.every(section => ratings[section]);
+    }
+
+    function refreshSubmit() {
+      const ready = allRated();
+      submitButton.disabled = !ready;
+      ratingNudge.hidden = ready;
+    }
 
     function updateProgress() {
       const filled = [...textareas].filter(t => t.value.trim().length > 10).length;
@@ -128,7 +152,7 @@
       const answers = {};
       textareas.forEach(t => answers[t.dataset.field] = t.value);
       return { response: Object.assign(
-        { answers: answers, rating: rating, feedback_text: feedbackText.value }, extra || {}
+        { answers: answers, section_ratings: ratings, feedback_text: feedbackText.value }, extra || {}
       ) };
     }
 
@@ -154,10 +178,11 @@
 
     ratingButtons.forEach(btn => {
       btn.addEventListener("click", () => {
-        rating = btn.dataset.rating;
-        ratingButtons.forEach(b => b.classList.toggle("active", b === btn));
-        submitButton.disabled = false;
-        ratingNudge.hidden = true;
+        const section = btn.dataset.ratingFor;
+        ratings[section] = btn.dataset.rating;
+        form.querySelectorAll(`button[data-rating-for="${section}"]`)
+            .forEach(b => b.classList.toggle("active", b === btn));
+        refreshSubmit();
         autoSave();
       });
     });
@@ -201,6 +226,7 @@
     });
 
     updateProgress();
+    refreshSubmit();
   })();
   </script>
 <% end %>

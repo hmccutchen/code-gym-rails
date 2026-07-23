@@ -5,8 +5,8 @@
     appears when unreviewed; nothing auto-triggers it. Local: response. %>
 <div class="submit-row">
   <span class="submitted-badge">✓ Submitted</span>
-  <% if response.section_ratings.present? && response.section_ratings.values.uniq.length == 1 %>
-    <span class="history-pill">Rated: <%= DailyResponse::SELF_RATING_LABELS[response.section_ratings.values.first] %></span>
+  <% response.section_ratings.each do |section, value| %>
+    <span class="history-pill"><%= section.humanize %>: <%= DailyResponse::SELF_RATING_LABELS[value] %></span>
   <% end %>
   <% unless response.reviewed? %>
     <%= button_to t("review.get_button", provider: response.user.provider_label),

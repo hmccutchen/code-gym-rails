@@ -53,16 +53,16 @@ class PreviewSeed
     end
 
     seed_day(user, Date.current - 1, challenge_set) do |response|
-      response.answers      = submitted_answers
-      response.submitted_at = Time.current
-      response.legacy_rating = "right_level"
-      response.ai_review    = sample_review
+      response.answers        = submitted_answers
+      response.submitted_at   = Time.current
+      response.section_ratings = { "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level" }
+      response.ai_review      = sample_review
     end
 
     seed_day(user, Date.current - 3, challenge_set) do |response|
-      response.answers      = submitted_answers
-      response.submitted_at = Time.current
-      response.legacy_rating = "too_hard"
+      response.answers        = submitted_answers
+      response.submitted_at   = Time.current
+      response.section_ratings = { "code_review" => "too_hard", "pattern" => "too_hard", "challenge" => "too_hard" }
     end
   end
 

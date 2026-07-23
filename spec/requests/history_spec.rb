@@ -57,14 +57,16 @@ RSpec.describe "History", type: :request do
     end
 
     it "shows rating, concept tags, review content for reviewed entries, and a fallback otherwise" do
-      create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard",
+      create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: { "code_review" => "too_hard", "pattern" => "too_hard", "challenge" => "too_hard" },
                          concept_tags: { "code_review" => "n_plus_one" })
       create_session_for(user, date: 1.day.ago.to_date)
 
       login_as(user)
       get history_path
 
-      expect(response.body).to include("Too hard")
+      expect(response.body).to include("Code review: too hard")
+      expect(response.body).to include("Pattern: too hard")
+      expect(response.body).to include("Challenge: too hard")
       expect(response.body).to include("N plus one")
       expect(response.body).to include("What you got right")
       expect(response.body).to include("Spotted the issue on #{3.days.ago.to_date}")

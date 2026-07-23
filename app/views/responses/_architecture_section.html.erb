@@ -32,5 +32,10 @@
     <div class="answer-display"><%= response.answers["architecture"].presence || "(skipped)" %></div>
   <% else %>
     <textarea name="response[answers][architecture]" class="answer" placeholder="Your decision and why — weigh the tradeoffs…" data-field="architecture"><%= response.answers["architecture"] %></textarea>
+    <div class="rating-row" data-rating-for="architecture">
+      <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+        <button type="button" class="rating-btn<%= " active" if response.self_rating_for("architecture") == value %>" data-rating-for="architecture" data-rating="<%= value %>"><%= label.upcase_first %></button>
+      <% end %>
+    </div>
   <% end %>
 </div>
