@@ -13,12 +13,20 @@ RSpec.describe "History", type: :request do
       },
       generated_at: Time.current
     )
+    # If a rating is provided and section_ratings is not explicitly set, use the rating for all sections
+    final_section_ratings = if section_ratings.present?
+      section_ratings
+    elsif rating.present? || legacy_rating.present?
+      val = rating || legacy_rating
+      { "code_review" => val, "pattern" => val, "challenge" => val }
+    else
+      {}
+    end
     DailyResponse.create!(
       user: owner, daily_exercise: exercise, date: date,
       answers: { "code_review" => "Answer with plenty of substance" },
       submitted_at: submitted ? Time.current : nil,
-      legacy_rating: legacy_rating || rating,
-      section_ratings: section_ratings || {},
+      section_ratings: final_section_ratings,
       concept_tags: concept_tags,
       ai_review: reviewed ? { "code_review" => { "rating" => "solid", "correct" => "Spotted the issue on #{date}" } } : nil
     )

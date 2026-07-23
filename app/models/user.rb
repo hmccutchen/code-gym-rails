@@ -96,15 +96,19 @@ class User < ApplicationRecord
       # AI-assessed rating per tagged section, empty when the response was
       # never reviewed — surfaced alongside the day's self-rating so
       # AiService can show both signals side by side in the prompt.
-      section_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
+      ai_section_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
+      # Self-assessed rating: if all sections have the same rating, use that;
+      # otherwise use nil if ratings are mixed/absent.
+      self_ratings = r.section_ratings.presence || {}
+      self_rating = self_ratings.values.uniq.length == 1 ? self_ratings.values.first : nil
       {
         date:          r.date.to_s,
-        rating:        r.legacy_rating,
+        rating:        self_rating,
         feedback:      r.feedback_text,
         concepts:      r.concept_tags,
         scenarios:     scenarios,
         sections_answered: r.answered_sections.size,
-        section_ratings: section_ratings
+        section_ratings: ai_section_ratings
       }
     end
   end

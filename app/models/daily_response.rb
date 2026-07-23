@@ -25,10 +25,7 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
-  def self_rating_for(section)
-    # First check section_ratings (new system), then fall back to legacy_rating (backward compat)
-    section_ratings[section.to_s] || (section_ratings.empty? && legacy_rating ? legacy_rating : nil)
-  end
+  def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
   def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"
   def self_rating_label(section)       = SELF_RATING_LABELS[self_rating_for(section)]

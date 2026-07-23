@@ -181,7 +181,7 @@ RSpec.describe AiService do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: {}, legacy_rating: "too_hard",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard", "pattern" => "too_hard", "challenge" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
       prompt = service.send(:build_exercise_prompt, user)
@@ -197,7 +197,7 @@ RSpec.describe AiService do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, section_ratings: {}, legacy_rating: "right_level",
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
