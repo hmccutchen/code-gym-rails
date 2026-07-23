@@ -68,6 +68,7 @@ User interacts:
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory.
 - **One "answered" rule**: a section counts as answered when its trimmed text exceeds 10 characters. `DailyResponse#answered_sections` is the single source of truth — the progress bar, history, and the generation prompt all derive from it.
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
+- **Preview apps**: a Railway PR environment starts with an empty database, so `PreviewSeed` (`app/services/preview_seed.rb`) seeds three days of demo content for the single account named by `PREVIEW_SEED_EMAIL`. It runs from `preDeployCommand` in every environment including production, and is safe there because it no-ops without that variable, only ever creates rows (never updates or deletes), and never reassigns a non-blank attribute. `PreviewMail` additionally sends mail inline when the variable is set, so magic-link login does not depend on the worker service. **`PREVIEW_SEED_EMAIL` must be set on the PR-environment template only** — set at the shared or base level, Railway propagates it into production. There is no login bypass: PR apps authenticate with real magic links.
 
 ## Railway Deployment
 
@@ -117,5 +118,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/controllers/sessions_controller.rb` — magic link create + verify
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
+- `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PREVIEW_SEED_EMAIL`
+- `app/services/preview_mail.rb` — inline mail delivery in preview apps, so login never needs a worker
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway
