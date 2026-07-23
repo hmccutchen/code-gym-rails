@@ -1,7 +1,8 @@
 class User < ApplicationRecord
   has_many :daily_exercises, dependent: :destroy
-  has_many :daily_responses, dependent: :destroy
+  has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :api_usages,      dependent: :destroy
+  has_many :concept_masteries, dependent: :destroy
 
   # Encrypt the user's provider API key at rest. Requires RAILS_MASTER_KEY /
   # credentials to be set (standard Rails setup).

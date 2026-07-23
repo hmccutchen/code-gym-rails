@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_23_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_23_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -24,6 +24,20 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_23_000000) do
     t.datetime "updated_at", null: false
     t.index ["user_id", "date"], name: "index_api_usages_on_user_id_and_date"
     t.index ["user_id"], name: "index_api_usages_on_user_id"
+  end
+
+  create_table "concept_masteries", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "concept", null: false
+    t.string "language", null: false
+    t.integer "tier", default: 0, null: false
+    t.integer "streak", default: 0, null: false
+    t.integer "cooldown_remaining", default: 0, null: false
+    t.string "last_rating"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "concept", "language"], name: "index_concept_masteries_on_user_id_and_concept_and_language", unique: true
+    t.index ["user_id"], name: "index_concept_masteries_on_user_id"
   end
 
   create_table "concept_references", force: :cascade do |t|
@@ -246,6 +260,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_23_000000) do
   end
 
   add_foreign_key "api_usages", "users"
+  add_foreign_key "concept_masteries", "users"
   add_foreign_key "daily_exercises", "users"
   add_foreign_key "daily_responses", "daily_exercises"
   add_foreign_key "daily_responses", "users"
