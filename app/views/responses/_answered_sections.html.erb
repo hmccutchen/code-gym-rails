@@ -23,15 +23,6 @@
   <div class="why-box"><strong>Why it exists:</strong> <%= pat["why"] %></div>
   <div class="question"><%= pat["question"] %></div>
 
-  <details class="ref">
-    <summary>Reference — <%= pat["title"] %>: how it works</summary>
-    <div class="ref-body">
-      <p style="margin-bottom:.75rem"><strong><%= pat.dig("reference", "tagline") %></strong></p>
-      <p style="margin-bottom:.75rem"><%= pat.dig("reference", "explanation") %></p>
-      <pre class="snippet"><code><%= pat.dig("reference", "code_example") %></code></pre>
-      <p>🔭 <%= pat.dig("reference", "senior_lens") %></p>
-    </div>
-  </details>
   <% if (ref = concept_reference_for(pat["concept"], exercise.language)) %>
     <%= render "shared/concept_reference", reference: ref %>
   <% end %>

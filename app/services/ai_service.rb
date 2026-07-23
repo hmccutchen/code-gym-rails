@@ -235,13 +235,7 @@ class AiService
           "question": "string — conceptual question to answer",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          "reference": {
-            "tagline":      "string — bold one-liner",
-            "explanation":  "string — 2-3 sentences",
-            "code_example": "string — annotated #{label} code, ~15 lines",
-            "senior_lens":  "string — when to reach for it / tradeoffs"
-          }
+          "concept": "string — exactly one concept from the provided vocabulary"
         },
         #{third_section}
       }

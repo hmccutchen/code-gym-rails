@@ -82,6 +82,16 @@ RSpec.describe AiService do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
       expect(schema).to include("ONE sentence")
     end
+
+    it "no longer asks the model for a pattern.reference block" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+      pattern = JSON.parse(schema)["pattern"]
+
+      expect(pattern.keys).to contain_exactly(
+        "title", "why", "question", "scenario", "teaching_note", "concept"
+      )
+      expect(pattern).not_to have_key("reference")
+    end
   end
 
   describe "#roll_third_section" do
