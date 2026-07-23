@@ -68,7 +68,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   it "enables the submit button and marks the active rating when the draft is already rated" do
     exercise = create_exercise
-    create_response(exercise, submitted: false).update!(rating: :right_level)
+    create_response(exercise, submitted: false).update!(section_ratings: {}, legacy_rating: "right_level")
 
     get root_path
 
@@ -99,7 +99,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   it "shows the day's rating as a read-only pill after submission" do
-    create_response(create_exercise).update!(rating: :right_level)
+    create_response(create_exercise).update!(section_ratings: {}, legacy_rating: "right_level")
     get root_path
     expect(response.body).to include("Rated: just right")
     expect(response.body).not_to include('data-rating="too_hard"')
@@ -118,7 +118,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   it "shows a calibration note when the self-rating was favorable but the AI rated that section beginner/developing" do
     resp = create_response(create_exercise, ai_review: sample_review)
-    resp.update!(rating: :right_level)
+    resp.update!(section_ratings: {}, legacy_rating: "right_level")
     # sample_review's "pattern" section is rated "developing" — the disagreement case
     get root_path
     expect(response.body).to include("You rated this")
@@ -127,7 +127,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   it "shows the calibration note exactly once, only for the section the AI rated poorly" do
     resp = create_response(create_exercise, ai_review: sample_review)
-    resp.update!(rating: :right_level)
+    resp.update!(section_ratings: {}, legacy_rating: "right_level")
     # code_review is "solid" and challenge is "strong" in sample_review — no note for those
     get root_path
     expect(response.body.scan("You rated this").size).to eq(1)
@@ -141,7 +141,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   it "does not show the calibration note when self-rating is too_hard, even if a section was rated poorly" do
     resp = create_response(create_exercise, ai_review: sample_review)
-    resp.update!(rating: :too_hard)
+    resp.update!(section_ratings: {}, legacy_rating: "too_hard")
     get root_path
     expect(response.body).not_to include("You rated this")
   end

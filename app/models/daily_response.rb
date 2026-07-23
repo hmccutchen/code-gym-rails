@@ -1,13 +1,14 @@
 class DailyResponse < ApplicationRecord
-  belongs_to :user
+  belongs_to :user, inverse_of: :daily_responses
   belongs_to :daily_exercise
 
-  enum :rating, { too_easy: 0, right_level: 1, too_hard: 2 }, prefix: true
-
+  SELF_RATINGS = %w[too_easy right_level too_hard].freeze
   SELF_RATING_LABELS = { "too_easy" => "too easy", "right_level" => "just right", "too_hard" => "too hard" }.freeze
 
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
+
+  attribute :legacy_rating, :string
 
   validates :date, uniqueness: { scope: :user_id }
 
@@ -24,9 +25,13 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
-  def self_rating_label       = SELF_RATING_LABELS[rating]
-  def self_rating_favorable?  = rating_right_level? || rating_too_easy?
-  def self_rating_unfavorable? = rating_too_hard?
+  def self_rating_for(section)
+    # First check section_ratings (new system), then fall back to legacy_rating (backward compat)
+    section_ratings[section.to_s] || (section_ratings.empty? && legacy_rating ? legacy_rating : nil)
+  end
+  def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
+  def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"
+  def self_rating_label(section)       = SELF_RATING_LABELS[self_rating_for(section)]
 
   def ai_rating_for(section)        = ai_review&.dig(section.to_s, "rating")
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))

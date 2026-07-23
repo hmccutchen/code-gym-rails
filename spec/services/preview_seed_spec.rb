@@ -125,7 +125,7 @@ RSpec.describe PreviewSeed do
       response = user.daily_responses.find_by(date: Date.current)
 
       expect(response).not_to be_submitted
-      expect(response.rating).to be_nil
+      expect(response.legacy_rating).to be_nil
       expect(response.answers["code_review"].length).to be > 10
     end
 
@@ -143,7 +143,7 @@ RSpec.describe PreviewSeed do
 
       expect(response).to be_submitted
       expect(response).to be_reviewed
-      expect(response.rating).to eq("right_level")
+      expect(response.legacy_rating).to eq("right_level")
       expect(response.daily_exercise.challenge).to be_present
     end
 

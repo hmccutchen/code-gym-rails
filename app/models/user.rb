@@ -99,7 +99,7 @@ class User < ApplicationRecord
       section_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
       {
         date:          r.date.to_s,
-        rating:        r.rating,
+        rating:        r.legacy_rating,
         feedback:      r.feedback_text,
         concepts:      r.concept_tags,
         scenarios:     scenarios,
@@ -125,9 +125,9 @@ class User < ApplicationRecord
         next if concept.blank? || concept == "other" || resolved.key?(concept)
         resolved[concept] = true
 
-        next if r.rating.nil? && r.ai_rating_for(section).nil? # out of scope, no info
+        next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil? # out of scope, no info
 
-        mastered = r.self_rating_favorable? && r.ai_rating_favorable?(section)
+        mastered = r.self_rating_favorable?(section) && r.ai_rating_favorable?(section)
         reinforcement << concept unless mastered
       end
     end

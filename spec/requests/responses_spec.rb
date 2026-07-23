@@ -89,7 +89,7 @@ RSpec.describe "Responses", type: :request do
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       resp = DailyResponse.last
-      expect(resp.rating).to eq("right_level")
+      expect(resp.legacy_rating).to eq("right_level")
       expect(resp.feedback_text).to eq("more SQL please")
       expect(resp.submitted_at).to be_nil
     end
@@ -102,21 +102,21 @@ RSpec.describe "Responses", type: :request do
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       resp = DailyResponse.last
-      expect(resp.rating).to eq("too_hard")
+      expect(resp.legacy_rating).to eq("too_hard")
       expect(resp.submitted_at).to be_present
     end
 
     it "does not clear an existing rating when the payload omits the key" do
       exercise = create_exercise(section)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: {}, rating: :too_easy, feedback_text: "keep me")
+                            answers: {}, section_ratings: {}, legacy_rating: "too_easy", feedback_text: "keep me")
 
       post responses_path,
         params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       resp = DailyResponse.last
-      expect(resp.rating).to eq("too_easy")
+      expect(resp.legacy_rating).to eq("too_easy")
       expect(resp.feedback_text).to eq("keep me")
     end
 
@@ -128,31 +128,31 @@ RSpec.describe "Responses", type: :request do
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
-      expect(DailyResponse.last.rating).to be_nil
+      expect(DailyResponse.last.legacy_rating).to be_nil
     end
 
     it "does not clear a saved rating when the payload sends an explicit null" do
       exercise = create_exercise(section)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: {}, rating: :too_easy)
+                            answers: {}, section_ratings: {}, legacy_rating: "too_easy")
 
       post responses_path,
         params: { response: { answers: { code_review: "a" * 20 }, rating: nil } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      expect(DailyResponse.last.rating).to eq("too_easy")
+      expect(DailyResponse.last.legacy_rating).to eq("too_easy")
     end
 
     it "does not clear a saved rating when the payload sends an empty string" do
       exercise = create_exercise(section)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: {}, rating: :too_easy)
+                            answers: {}, section_ratings: {}, legacy_rating: "too_easy")
 
       post responses_path,
         params: { response: { answers: { code_review: "a" * 20 }, rating: "" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      expect(DailyResponse.last.rating).to eq("too_easy")
+      expect(DailyResponse.last.legacy_rating).to eq("too_easy")
     end
   end
 

@@ -83,13 +83,13 @@
       <p class="feedback-title">How was today's difficulty?</p>
       <div class="rating-row">
         <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
-          <button type="button" class="rating-btn<%= " active" if response.rating == value %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
+          <button type="button" class="rating-btn<%= " active" if response.legacy_rating == value %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
         <% end %>
       </div>
       <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px;margin-top:.75rem" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
     </div>
 
-    <% unrated = response.rating.blank? %>
+    <% unrated = response.legacy_rating.blank? %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
       <%= f.submit "Submit answers →", id: "submit-answers", class: "btn btn-primary", disabled: unrated %>

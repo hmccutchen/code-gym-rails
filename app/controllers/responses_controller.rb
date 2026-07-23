@@ -30,7 +30,7 @@ class ResponsesController < ApplicationController
     # valid enum value makes a saved rating unclearable by construction, and
     # sidesteps the ArgumentError an off-enum value would otherwise raise.
     rating = response_params[:rating].presence
-    @response.rating = rating if rating && DailyResponse.ratings.key?(rating)
+    @response.legacy_rating = rating if rating && %w[too_easy right_level too_hard].include?(rating)
     @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
 
     saved = @response.save

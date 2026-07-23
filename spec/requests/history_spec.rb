@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "History", type: :request do
   let(:user) { create_user_with_key }
 
-  def create_session_for(owner, date:, submitted: true, reviewed: false, rating: nil, concept_tags: {})
+  def create_session_for(owner, date:, submitted: true, reviewed: false, rating: nil, concept_tags: {}, section_ratings: nil, legacy_rating: nil)
     exercise = DailyExercise.create!(
       user: owner, date: date,
       problem_set: {
@@ -17,7 +17,8 @@ RSpec.describe "History", type: :request do
       user: owner, daily_exercise: exercise, date: date,
       answers: { "code_review" => "Answer with plenty of substance" },
       submitted_at: submitted ? Time.current : nil,
-      rating: rating,
+      legacy_rating: legacy_rating || rating,
+      section_ratings: section_ratings || {},
       concept_tags: concept_tags,
       ai_review: reviewed ? { "code_review" => { "rating" => "solid", "correct" => "Spotted the issue on #{date}" } } : nil
     )
@@ -31,7 +32,7 @@ RSpec.describe "History", type: :request do
 
     it "lists only the current user's submitted responses, newest first" do
       other = create_user_with_key(email: "other@example.com", name: "Other")
-      old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, rating: :too_hard)
+      old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")
       newer = create_session_for(user, date: 1.day.ago.to_date)
       create_session_for(user, date: Date.current, submitted: false)   # draft — excluded
       create_session_for(other, date: 2.days.ago.to_date)              # other user — excluded
@@ -48,7 +49,7 @@ RSpec.describe "History", type: :request do
     end
 
     it "shows rating, concept tags, review content for reviewed entries, and a fallback otherwise" do
-      create_session_for(user, date: 3.days.ago.to_date, reviewed: true, rating: :too_hard,
+      create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard",
                          concept_tags: { "code_review" => "n_plus_one" })
       create_session_for(user, date: 1.day.ago.to_date)
 
