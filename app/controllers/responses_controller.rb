@@ -1,6 +1,11 @@
 class ResponsesController < ApplicationController
   before_action :set_response, only: [ :review, :email_review ]
 
+  # How long a claimed-but-unfinished review blocks a retry. The provider call
+  # has no configured timeout, so a crash or hang mid-review must not lock the
+  # user out forever — after this window a new request may reclaim the row.
+  REVIEW_CLAIM_STALE_AFTER = 3.minutes
+
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
     exercise = current_user.daily_exercises.for_date.first
@@ -59,19 +64,25 @@ class ResponsesController < ApplicationController
   def review
     return redirect_to root_path, alert: "Submit your answers first." unless @response.submitted?
     return redirect_to history_anchor, notice: "Already reviewed." if @response.reviewed?
+    unless claim_review!
+      return redirect_to root_path, alert: "A review is already being generated for this — check back in a moment."
+    end
 
     ai_review = AiService.for(current_user).review_response(current_user, @response.daily_exercise, @response)
 
     ActiveRecord::Base.transaction do
-      @response.update!(ai_review: ai_review)
+      @response.update!(ai_review: ai_review, reviewing_since: nil)
       ConceptMastery.record_review!(@response)
     end
     redirect_to history_anchor, notice: "Review ready!"
   rescue AiService::AuthenticationError
+    release_review_claim!
     redirect_to root_path, alert: "Your API key was rejected — check it in Settings."
   rescue AiService::RateLimitError
+    release_review_claim!
     redirect_to root_path, alert: "The AI provider is rate-limiting requests — try again shortly."
   rescue AiService::Error => e
+    release_review_claim!
     redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
   end
 
@@ -97,6 +108,27 @@ class ResponsesController < ApplicationController
 
   def set_response
     @response = current_user.daily_responses.find(params[:id])
+  end
+
+  # Atomic claim against a concurrent double-review (e.g. an impatient second
+  # click while the first request is still waiting on the provider): a single
+  # UPDATE ... WHERE is serialized by Postgres row locking, so only one
+  # concurrent caller can affect the row — the loser gets 0 rows and backs off
+  # instead of racing into a second provider call and ConceptMastery write.
+  def claim_review!
+    claimed = DailyResponse.where(id: @response.id, ai_review: nil)
+                           .where("reviewing_since IS NULL OR reviewing_since < ?", REVIEW_CLAIM_STALE_AFTER.ago)
+                           .update_all(reviewing_since: Time.current) == 1
+    # update_all bypasses @response's in-memory attributes — reload so the
+    # later update!(reviewing_since: nil) sees a real change to persist
+    # (otherwise AR's dirty-tracking thinks it's already nil and skips the
+    # column in the UPDATE, leaving the claimed timestamp stuck in the DB).
+    @response.reload if claimed
+    claimed
+  end
+
+  def release_review_claim!
+    @response.update_column(:reviewing_since, nil)
   end
 
   def response_params

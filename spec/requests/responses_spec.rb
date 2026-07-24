@@ -343,6 +343,62 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  describe "POST /responses/:id/review concurrent-claim guard" do
+    def submitted_response(reviewing_since: nil)
+      exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+                            reviewing_since: reviewing_since)
+    end
+
+    it "refuses to start a second review while one is already in flight" do
+      resp = submitted_response(reviewing_since: Time.current)
+      expect(AiService).not_to receive(:for)
+
+      post review_response_path(resp)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("A review is already being generated for this — check back in a moment.")
+      expect(resp.reload.ai_review).to be_nil
+      expect(resp.reviewing_since).to be_present
+    end
+
+    it "reclaims the review after the in-flight marker goes stale" do
+      resp = submitted_response(reviewing_since: 10.minutes.ago)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(resp.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+      expect(resp.reviewing_since).to be_nil
+    end
+
+    it "clears the claim on success so a stray marker never lingers" do
+      resp = submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(resp.reload.reviewing_since).to be_nil
+    end
+
+    it "clears the claim when the provider raises, so an immediate retry can proceed" do
+      resp = submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_raise(AiService::Error, "boom")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(resp.reload.reviewing_since).to be_nil
+    end
+  end
+
   describe "POST /responses concept reference generation" do
     include ActiveJob::TestHelper
 
