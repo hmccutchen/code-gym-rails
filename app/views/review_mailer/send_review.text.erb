@@ -15,7 +15,7 @@ Rating: <%= fb["rating"] %>
 <%= label %>: <%= fb[key] %>
 
 <% end -%>
-<% if fb["improved_code"].present? -%>
+<% if fb["improved_code"].present? && @response.improved_code_visible?(section) -%>
 Improved code:
 
 <%= fb["improved_code"] %>

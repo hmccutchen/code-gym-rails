@@ -34,21 +34,29 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
-  describe "#self_rating_favorable? and #self_rating_unfavorable?" do
-    it "treats right_level and too_easy as favorable, too_hard as unfavorable, nil as neither" do
-      favorable_right_level = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, answers: {}, rating: :right_level)
-      favorable_too_easy    = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 1, answers: {}, rating: :too_easy)
-      unfavorable           = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 2, answers: {}, rating: :too_hard)
-      unrated               = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 3, answers: {})
+  describe "per-section self-rating predicates" do
+    def response_with(section_ratings)
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+                                   answers: {}, section_ratings: section_ratings)
+    end
 
-      expect(favorable_right_level.self_rating_favorable?).to be(true)
-      expect(favorable_too_easy.self_rating_favorable?).to be(true)
-      expect(unfavorable.self_rating_favorable?).to be(false)
-      expect(unrated.self_rating_favorable?).to be(false)
+    it "treats right_level and too_easy as favorable, too_hard as unfavorable" do
+      r = response_with("code_review" => "right_level", "pattern" => "too_easy", "challenge" => "too_hard")
 
-      expect(unfavorable.self_rating_unfavorable?).to be(true)
-      expect(favorable_right_level.self_rating_unfavorable?).to be(false)
-      expect(unrated.self_rating_unfavorable?).to be(false)
+      expect(r.self_rating_favorable?("code_review")).to be(true)
+      expect(r.self_rating_favorable?("pattern")).to be(true)
+      expect(r.self_rating_favorable?("challenge")).to be(false)
+      expect(r.self_rating_unfavorable?("challenge")).to be(true)
+      expect(r.self_rating_unfavorable?("code_review")).to be(false)
+    end
+
+    it "is nil-safe for a section with no rating" do
+      r = response_with("code_review" => "right_level")
+
+      expect(r.self_rating_for("pattern")).to be_nil
+      expect(r.self_rating_favorable?("pattern")).to be(false)
+      expect(r.self_rating_unfavorable?("pattern")).to be(false)
+      expect(r.self_rating_label("code_review")).to eq("just right")
     end
   end
 
@@ -80,11 +88,36 @@ RSpec.describe DailyResponse, type: :model do
 
   describe "#self_rating_label" do
     it "matches the feedback form's copy and is nil when unrated" do
-      right_level = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, answers: {}, rating: :right_level)
+      right_level = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, answers: {}, section_ratings: { "code_review" => "right_level" })
       unrated     = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 1, answers: {})
 
-      expect(right_level.self_rating_label).to eq("just right")
-      expect(unrated.self_rating_label).to be_nil
+      expect(right_level.self_rating_label("code_review")).to eq("just right")
+      expect(unrated.self_rating_label("code_review")).to be_nil
+    end
+  end
+
+  describe "#improved_code_visible?" do
+    def submit(concept:, date:)
+      ex = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "concept" => concept } })
+      user.daily_responses.create!(daily_exercise: ex, date: date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => concept })
+    end
+
+    it "hides improved_code on the first exposure and reveals it on the second" do
+      first  = submit(concept: "n_plus_one", date: Date.current - 3)
+      second = submit(concept: "n_plus_one", date: Date.current - 1)
+
+      expect(first.improved_code_visible?("code_review")).to be(false)
+      expect(second.improved_code_visible?("code_review")).to be(true)
+    end
+
+    it "is ungated for a blank or 'other' concept" do
+      ex = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "concept" => "other" } })
+      r = user.daily_responses.create!(daily_exercise: ex, date: Date.current, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "other" })
+      expect(r.improved_code_visible?("code_review")).to be(true)
     end
   end
 end

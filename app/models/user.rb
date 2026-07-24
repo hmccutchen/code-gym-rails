@@ -1,7 +1,8 @@
 class User < ApplicationRecord
   has_many :daily_exercises, dependent: :destroy
-  has_many :daily_responses, dependent: :destroy
+  has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :api_usages,      dependent: :destroy
+  has_many :concept_masteries, dependent: :destroy
 
   # Encrypt the user's provider API key at rest. Requires RAILS_MASTER_KEY /
   # credentials to be set (standard Rails setup).
@@ -93,18 +94,15 @@ class User < ApplicationRecord
       scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
         problem_set.dig(section, "scenario").presence
       end
-      # AI-assessed rating per tagged section, empty when the response was
-      # never reviewed — surfaced alongside the day's self-rating so
-      # AiService can show both signals side by side in the prompt.
-      section_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
+      ai_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
       {
-        date:          r.date.to_s,
-        rating:        r.rating,
-        feedback:      r.feedback_text,
-        concepts:      r.concept_tags,
-        scenarios:     scenarios,
+        date:              r.date.to_s,
+        feedback:          r.feedback_text,
+        concepts:          r.concept_tags,
+        scenarios:         scenarios,
         sections_answered: r.answered_sections.size,
-        section_ratings: section_ratings
+        self_ratings:      r.section_ratings,
+        ai_ratings:        ai_ratings
       }
     end
   end
@@ -118,21 +116,52 @@ class User < ApplicationRecord
   # concept today. See docs/superpowers/specs/2026-07-20-mastery-loop-combined-signal-design.md.
   def concepts_needing_reinforcement(limit: 10)
     resolved = {}
-    reinforcement = []
+    result   = []
 
     recent_daily_responses(limit).each do |r|
       r.concept_tags.each do |section, concept|
         next if concept.blank? || concept == "other" || resolved.key?(concept)
         resolved[concept] = true
 
-        next if r.rating.nil? && r.ai_rating_for(section).nil? # out of scope, no info
+        next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil? # out of scope
 
-        mastered = r.self_rating_favorable? && r.ai_rating_favorable?(section)
-        reinforcement << concept unless mastered
+        next if r.self_rating_favorable?(section) && r.ai_rating_favorable?(section) # mastered
+
+        bucket = section == "architecture" ? "architecture" : r.daily_exercise&.language
+        tier   = concept_masteries.find_by(concept: concept, language: bucket)&.tier || "standard"
+        next if tier == "paused"
+
+        result << { concept: concept, tier: tier }
       end
     end
 
-    reinforcement
+    result
+  end
+
+  # Single-query, memoized index of every submitted response's concept exposures,
+  # keyed [concept, bucket] => the distinct dates the concept appeared (in query
+  # order, not sorted — callers only ever count them). Built once per User
+  # instance so a page rendering many responses (history) never queries per section.
+  def concept_exposure_index
+    @concept_exposure_index ||= begin
+      index = Hash.new { |hash, key| hash[key] = [] }
+      daily_responses.where.not(submitted_at: nil).joins(:daily_exercise)
+                     .pluck(:date, :concept_tags, "daily_exercises.language")
+                     .each do |date, tags, language|
+        (tags || {}).each do |section, concept|
+          next if concept.blank? || concept == "other"
+          bucket = section == "architecture" ? "architecture" : language
+          # Union, not append: a concept tagged on multiple sections the same
+          # day is one exposure, not one per section (matches ConceptMastery#record_review!).
+          index[[ concept, bucket ]] |= [ date ]
+        end
+      end
+      index
+    end
+  end
+
+  def concept_exposure_count(concept, bucket, on_or_before:)
+    concept_exposure_index.fetch([ concept, bucket ], []).count { |d| d <= on_or_before }
   end
 
   # ── Language preference ────────────────────────────────────────────────────

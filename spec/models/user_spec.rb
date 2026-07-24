@@ -218,7 +218,7 @@ RSpec.describe User, type: :model do
                             concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
-      expect(user.recent_performance.first[:section_ratings]).to eq({ "code_review" => "developing" })
+      expect(user.recent_performance.first[:ai_ratings]).to eq({ "code_review" => "developing" })
     end
 
     it "is an empty hash when the response was never reviewed" do
@@ -229,7 +229,25 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 },
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.recent_performance.first[:section_ratings]).to eq({})
+      expect(user.recent_performance.first[:ai_ratings]).to eq({})
+    end
+  end
+
+  describe "#recent_performance per-section ratings" do
+    it "emits self_ratings and ai_ratings per entry, without a whole-day rating key" do
+      user = User.create!(email: "rp@example.com", name: "RP")
+      exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+        problem_set: { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } })
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "x" * 20 },
+        section_ratings: { "code_review" => "right_level" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+        ai_review: { "code_review" => { "rating" => "developing" } })
+
+      entry = user.recent_performance.first
+      expect(entry).not_to have_key(:rating)
+      expect(entry[:self_ratings]).to eq("code_review" => "right_level")
+      expect(entry[:ai_ratings]).to eq("code_review" => "developing")
     end
   end
 
@@ -238,39 +256,39 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "flags a concept the AI rated beginner/developing even when the self-rating was favorable (the core gap this fix closes)" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :right_level,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "keeps reinforcing when self-rating is unfavorable even if the AI review was favorable" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "solid" } })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "excludes a concept once both self-rating and AI review explicitly agree it's solid" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :too_easy,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "strong" } })
 
@@ -281,10 +299,10 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :right_level,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "excludes a concept with no self-rating and no AI review at all, same as an unrated concept today" do
@@ -302,14 +320,14 @@ RSpec.describe User, type: :model do
       older_exercise = DailyExercise.create!(user: user, date: Date.current - 1,
                                               problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: older_exercise, date: Date.current - 1,
-                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "beginner" } })
 
       newer_exercise = DailyExercise.create!(user: user, date: Date.current,
                                               problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: newer_exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :too_easy,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "strong" } })
 
@@ -320,10 +338,41 @@ RSpec.describe User, type: :model do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
                             concept_tags: { "code_review" => "other" })
 
       expect(user.concepts_needing_reinforcement).to eq([])
+    end
+  end
+
+  describe "#concepts_needing_reinforcement with tiers" do
+    let(:user) { User.create!(email: "cn@example.com", name: "CN") }
+
+    def reinforce_response(concept:, self_rating:, ai_rating:, date:)
+      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "concept" => concept } })
+      response = user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => self_rating },
+        concept_tags: { "code_review" => concept },
+        ai_review: { "code_review" => { "rating" => ai_rating } })
+      ConceptMastery.record_review!(response)
+      response
+    end
+
+    it "annotates each concept with its tier and excludes mastered concepts" do
+      reinforce_response(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current)
+      reinforce_response(concept: "memoization", self_rating: "right_level", ai_rating: "strong", date: Date.current - 1)
+
+      result = user.concepts_needing_reinforcement
+      expect(result).to include(concept: "n_plus_one", tier: "standard")
+      expect(result.map { |h| h[:concept] }).not_to include("memoization") # mastered
+    end
+
+    it "excludes paused concepts entirely" do
+      reinforce_response(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current)
+      user.concept_masteries.find_by(concept: "n_plus_one").update!(tier: :paused, cooldown_remaining: 2)
+
+      expect(user.concepts_needing_reinforcement.map { |h| h[:concept] }).not_to include("n_plus_one")
     end
   end
 
@@ -485,7 +534,7 @@ RSpec.describe User, type: :model do
                                        answers: { "code_review" => "N+1 query in the loop" },
                                        concept_tags: { "code_review" => "n_plus_one" },
                                        ai_review: { "code_review" => { "rating" => "solid" } },
-                                       rating: :right_level, feedback_text: "good one",
+                                       section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level", feedback_text: "good one",
                                        submitted_at: Time.current)
       usage = ApiUsage.create!(user: user, tokens_in: 100, tokens_out: 50,
                                purpose: "generate_exercise", date: Date.current)
@@ -511,6 +560,74 @@ RSpec.describe User, type: :model do
 
       expect(User.active).to include(normal)
       expect(User.active).not_to include(deleted)
+    end
+  end
+
+  describe "#concept_exposure_count" do
+    let(:user) { User.create!(email: "ex@example.com", name: "Ex") }
+
+    def submit(concept:, date:, language: "ruby_rails", section: "code_review")
+      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: language,
+        problem_set: { section => { "concept" => concept } })
+      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: { section => "x" * 20 }, concept_tags: { section => concept })
+    end
+
+    it "counts occurrences within the same language bucket, on or before the given date" do
+      submit(concept: "n_plus_one", date: Date.current - 5)
+      submit(concept: "n_plus_one", date: Date.current - 2)
+
+      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: Date.current - 5)).to eq(1)
+      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: Date.current)).to eq(2)
+    end
+
+    it "does not count occurrences from a different language bucket" do
+      submit(concept: "closures", date: Date.current - 1, language: "javascript")
+      expect(user.concept_exposure_count("closures", "ruby_rails", on_or_before: Date.current)).to eq(0)
+      expect(user.concept_exposure_count("closures", "javascript", on_or_before: Date.current)).to eq(1)
+    end
+
+    it "counts a concept tagged on two sections of the same day as one exposure" do
+      date = Date.current
+      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "concept" => "n_plus_one" },
+          "pattern"     => { "concept" => "n_plus_one" }
+        })
+      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20, "pattern" => "x" * 20 },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" })
+
+      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
+    end
+  end
+
+  describe "exposure index query budget" do
+    def count_queries
+      count = 0
+      sub = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        count += 1 unless payload[:name].to_s =~ /SCHEMA|TRANSACTION/ || payload[:sql] =~ /^\s*(BEGIN|COMMIT|ROLLBACK)/
+      end
+      yield
+      count
+    ensure
+      ActiveSupport::Notifications.unsubscribe(sub)
+    end
+
+    it "renders improved_code visibility for many responses with a single index query" do
+      user = User.create!(email: "budget@example.com", name: "B")
+      3.times do |i|
+        ex = user.daily_exercises.create!(date: Date.current - i, generated_at: Time.current, language: "ruby_rails",
+          problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+        user.daily_responses.create!(daily_exercise: ex, date: Date.current - i, submitted_at: Time.current,
+          answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "n_plus_one" })
+      end
+
+      reloaded  = User.find(user.id)
+      responses = reloaded.daily_responses.includes(:daily_exercise).to_a # exercises + user preloaded
+
+      queries = count_queries { responses.each { |r| r.improved_code_visible?("code_review") } }
+      expect(queries).to eq(1) # the exposure index, built once and shared (inverse_of)
     end
   end
 end

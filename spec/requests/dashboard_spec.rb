@@ -49,10 +49,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   it "renders the rating widget at the end of the unsubmitted problem set" do
     create_exercise
     get root_path
+    expect(response.body).to include('data-rating-for="code_review"')
+    expect(response.body).to include('data-rating-for="pattern"')
+    expect(response.body).to include('data-rating-for="challenge"')
     expect(response.body).to include('data-rating="too_easy"')
     expect(response.body).to include('data-rating="right_level"')
     expect(response.body).to include('data-rating="too_hard"')
-    expect(response.body).to include("How was today's difficulty?")
   end
 
   it "disables the submit button and explains why when the draft has no rating" do
@@ -63,18 +65,20 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
-    expect(response.body).to include("Rate today's difficulty to finish up.")
+    expect(response.body).to include("Rate every section's difficulty to finish up.")
   end
 
   it "enables the submit button and marks the active rating when the draft is already rated" do
     exercise = create_exercise
-    create_response(exercise, submitted: false).update!(rating: :right_level)
+    create_response(exercise, submitted: false).update!(section_ratings: {
+      "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level"
+    })
 
     get root_path
 
     expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
     expect(response.body).to match(/id="rating-nudge"[^>]*hidden/)
-    expect(response.body).to include('class="rating-btn active" data-rating="right_level"')
+    expect(response.body).to include('data-rating-for="code_review" data-rating="right_level">Just right</button>')
   end
 
   it "keeps the submit button visible even when it is disabled" do
@@ -99,10 +103,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   it "shows the day's rating as a read-only pill after submission" do
-    create_response(create_exercise).update!(rating: :right_level)
+    create_response(create_exercise).update!(section_ratings: {
+      "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level"
+    })
     get root_path
-    expect(response.body).to include("Rated: just right")
-    expect(response.body).not_to include('data-rating="too_hard"')
+    expect(response.body).to include("Code review: just right")
+    expect(response.body).to include("Pattern: just right")
+    expect(response.body).to include("Challenge: just right")
+    expect(response.body).not_to include('data-rating-for="code_review"')
   end
 
   it "renders the review with the keys review_response actually returns" do
@@ -118,7 +126,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   it "shows a calibration note when the self-rating was favorable but the AI rated that section beginner/developing" do
     resp = create_response(create_exercise, ai_review: sample_review)
-    resp.update!(rating: :right_level)
+    resp.update!(section_ratings: {
+      "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level"
+    })
     # sample_review's "pattern" section is rated "developing" — the disagreement case
     get root_path
     expect(response.body).to include("You rated this")
@@ -127,7 +137,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   it "shows the calibration note exactly once, only for the section the AI rated poorly" do
     resp = create_response(create_exercise, ai_review: sample_review)
-    resp.update!(rating: :right_level)
+    resp.update!(section_ratings: {
+      "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level"
+    })
     # code_review is "solid" and challenge is "strong" in sample_review — no note for those
     get root_path
     expect(response.body.scan("You rated this").size).to eq(1)
@@ -141,7 +153,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   it "does not show the calibration note when self-rating is too_hard, even if a section was rated poorly" do
     resp = create_response(create_exercise, ai_review: sample_review)
-    resp.update!(rating: :too_hard)
+    resp.update!(section_ratings: {
+      "code_review" => "too_hard", "pattern" => "too_hard", "challenge" => "too_hard"
+    })
     get root_path
     expect(response.body).not_to include("You rated this")
   end

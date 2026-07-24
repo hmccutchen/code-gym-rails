@@ -82,6 +82,16 @@ RSpec.describe AiService do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
       expect(schema).to include("ONE sentence")
     end
+
+    it "no longer asks the model for a pattern.reference block" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+      pattern = JSON.parse(schema)["pattern"]
+
+      expect(pattern.keys).to contain_exactly(
+        "title", "why", "question", "scenario", "teaching_note", "concept"
+      )
+      expect(pattern).not_to have_key("reference")
+    end
   end
 
   describe "#roll_third_section" do
@@ -167,38 +177,55 @@ RSpec.describe AiService do
       expect(prompt.downcase).to include("never the full answer")
     end
 
-    it "embeds the vocabulary, the mastery loop, and per-session concepts with correct rating labels" do
+    it "embeds per-session concepts with per-section self and AI ratings" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :too_hard,
+                            answers: { "code_review" => "x" * 20 },
+                            section_ratings: { "code_review" => "too_hard" },
                             concept_tags: { "code_review" => "n_plus_one" })
 
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
       expect(prompt).to include("Mastery loop")
-      expect(prompt).to include("code_review→n_plus_one (unreviewed)")
-      expect(prompt).to include("self: too hard")
-      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one")
-      expect(prompt).not_to include("unrated")
+      expect(prompt).to include("code_review→n_plus_one (self: too_hard, ai: unreviewed)")
+      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (standard)")
     end
 
-    it "shows the AI's per-section rating alongside the concept when the response was reviewed" do
+    it "shows the AI's per-section rating alongside the self rating when reviewed" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "x" * 20 }, rating: :right_level,
+                            answers: { "code_review" => "x" * 20 },
+                            section_ratings: { "code_review" => "right_level" },
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
       prompt = service.send(:build_exercise_prompt, user)
-      expect(prompt).to include("code_review→n_plus_one (ai: developing)")
-      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one")
+      expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: developing)")
     end
 
     it "reports no concepts needing reinforcement when history is empty" do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include("Concepts needing reinforcement right now: none")
+    end
+
+    it "lists reinforcement concepts with their tier and omits paused ones" do
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            section_ratings: { "code_review" => "too_hard" },
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (standard)")
+    end
+
+    it "includes reduced-tier generation guidance and the tiered mastery-loop instruction" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("(reduced)")            # from the guidance text
+      expect(prompt).to include("exits reinforcement only on full mastery")
     end
 
     it "uses the JS/React vocabulary and JavaScript/React labeling when language is javascript" do

@@ -39,8 +39,8 @@
       <span class="history-pill">
         <%= daily_response.answered_sections.size %>/3 sections<% if daily_response.answered_sections.any? %> — <%= daily_response.answered_sections.map(&:humanize).join(", ") %><% end %>
       </span>
-      <% if daily_response.rating.present? %>
-        <span class="history-pill">Rated: <%= daily_response.rating.humanize %></span>
+      <% daily_response.section_ratings.each do |section, value| %>
+        <span class="history-pill"><%= section.humanize %>: <%= DailyResponse::SELF_RATING_LABELS[value] %></span>
       <% end %>
       <% daily_response.concept_tags.values.compact.uniq.each do |tag| %>
         <span class="history-tag"><%= tag.humanize %></span>

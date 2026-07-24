@@ -77,82 +77,45 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  describe "POST /responses rating + feedback_text" do
+  describe "POST /responses section_ratings + feedback_text" do
     let(:section) { { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } } }
 
-    it "saves rating and feedback_text from an auto-save payload" do
+    it "saves section_ratings and feedback_text from an auto-save payload" do
       create_exercise(section)
 
       post responses_path,
         params: { response: { answers: { code_review: "a" * 20 },
-                              rating: "right_level", feedback_text: "more SQL please" } }.to_json,
+                              section_ratings: { code_review: "right_level" },
+                              feedback_text: "more SQL please" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       resp = DailyResponse.last
-      expect(resp.rating).to eq("right_level")
+      expect(resp.section_ratings).to eq("code_review" => "right_level")
       expect(resp.feedback_text).to eq("more SQL please")
-      expect(resp.submitted_at).to be_nil
     end
 
-    it "saves rating alongside answers on final submit" do
-      create_exercise(section)
-
-      post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, rating: "too_hard", submit: "1" } }.to_json,
-        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
-
-      resp = DailyResponse.last
-      expect(resp.rating).to eq("too_hard")
-      expect(resp.submitted_at).to be_present
-    end
-
-    it "does not clear an existing rating when the payload omits the key" do
+    it "merges set-only: a later payload never clears an already-saved section rating" do
       exercise = create_exercise(section)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: {}, rating: :too_easy, feedback_text: "keep me")
+                            answers: {}, section_ratings: { "code_review" => "too_easy" })
 
       post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        params: { response: { answers: { code_review: "a" * 20 }, section_ratings: {} } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      resp = DailyResponse.last
-      expect(resp.rating).to eq("too_easy")
-      expect(resp.feedback_text).to eq("keep me")
+      expect(DailyResponse.last.section_ratings).to eq("code_review" => "too_easy")
     end
 
-    it "ignores a rating value outside the enum instead of raising" do
+    it "ignores a value outside the self-rating set instead of raising" do
       create_exercise(section)
 
       post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, rating: "bogus" } }.to_json,
+        params: { response: { answers: { code_review: "a" * 20 },
+                              section_ratings: { code_review: "bogus" } } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
-      expect(DailyResponse.last.rating).to be_nil
-    end
-
-    it "does not clear a saved rating when the payload sends an explicit null" do
-      exercise = create_exercise(section)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: {}, rating: :too_easy)
-
-      post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, rating: nil } }.to_json,
-        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
-
-      expect(DailyResponse.last.rating).to eq("too_easy")
-    end
-
-    it "does not clear a saved rating when the payload sends an empty string" do
-      exercise = create_exercise(section)
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: {}, rating: :too_easy)
-
-      post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, rating: "" } }.to_json,
-        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
-
-      expect(DailyResponse.last.rating).to eq("too_easy")
+      expect(DailyResponse.last.section_ratings).to eq({})
     end
   end
 
@@ -340,6 +303,99 @@ RSpec.describe "Responses", type: :request do
       post review_response_path(daily_response)
 
       expect(flash[:alert]).to eq("The AI provider is rate-limiting requests — try again shortly.")
+    end
+  end
+
+  describe "POST /responses/:id/review mastery write" do
+    let(:section) { { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } } }
+
+    def submitted_response
+      exercise = create_exercise(section)
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+        section_ratings: { "code_review" => "too_hard" },
+        concept_tags: { "code_review" => "n_plus_one" })
+    end
+
+    before do
+      fake = instance_double(ClaudeService, review_response: {
+        "code_review" => { "rating" => "developing", "correct" => "ok",
+                           "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" }
+      })
+      allow(AiService).to receive(:for).and_return(fake)
+    end
+
+    it "writes ConceptMastery state in the same transaction as the review" do
+      resp = submitted_response
+      post review_response_path(resp)
+
+      expect(resp.reload.ai_review).to be_present
+      expect(user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")).to be_present
+    end
+
+    it "rolls back the review if the mastery write fails" do
+      resp = submitted_response
+      allow(ConceptMastery).to receive(:record_review!).and_raise(ActiveRecord::RecordInvalid.new(ConceptMastery.new))
+
+      post review_response_path(resp)
+
+      expect(resp.reload.ai_review).to be_nil
+    end
+  end
+
+  describe "POST /responses/:id/review concurrent-claim guard" do
+    def submitted_response(reviewing_since: nil)
+      exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+                            reviewing_since: reviewing_since)
+    end
+
+    it "refuses to start a second review while one is already in flight" do
+      resp = submitted_response(reviewing_since: Time.current)
+      expect(AiService).not_to receive(:for)
+
+      post review_response_path(resp)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("A review is already being generated for this — check back in a moment.")
+      expect(resp.reload.ai_review).to be_nil
+      expect(resp.reviewing_since).to be_present
+    end
+
+    it "reclaims the review after the in-flight marker goes stale" do
+      resp = submitted_response(reviewing_since: 10.minutes.ago)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(resp.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+      expect(resp.reviewing_since).to be_nil
+    end
+
+    it "clears the claim on success so a stray marker never lingers" do
+      resp = submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(resp.reload.reviewing_since).to be_nil
+    end
+
+    it "clears the claim when the provider raises, so an immediate retry can proceed" do
+      resp = submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_raise(AiService::Error, "boom")
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(resp.reload.reviewing_since).to be_nil
     end
   end
 

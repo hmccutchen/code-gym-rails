@@ -70,8 +70,6 @@ class AiService
     }
   }.freeze
 
-  RATING_LABELS = { "too_easy" => "too easy", "right_level" => "right level", "too_hard" => "too hard" }.freeze
-
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
   # Max bytes of raw provider output logged server-side when a provider
@@ -235,13 +233,7 @@ class AiService
           "question": "string — conceptual question to answer",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          "reference": {
-            "tagline":      "string — bold one-liner",
-            "explanation":  "string — 2-3 sentences",
-            "code_example": "string — annotated #{label} code, ~15 lines",
-            "senior_lens":  "string — when to reach for it / tradeoffs"
-          }
+          "concept": "string — exactly one concept from the provided vocabulary"
         },
         #{third_section}
       }
@@ -255,23 +247,23 @@ class AiService
       "No history yet — this is their first exercise set."
     else
       history.map { |h|
-        rating_label = RATING_LABELS[h[:rating]] || "unrated"
-        feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
         pairs = h[:concepts].respond_to?(:each_pair) ? h[:concepts].each_pair.filter_map { |section, concept|
           next if concept.blank?
-          ai_rating = h[:section_ratings][section]
-          ai_text   = ai_rating ? "(ai: #{ai_rating})" : "(unreviewed)"
-          "#{section}\u2192#{concept} #{ai_text}"
+          self_r = h[:self_ratings][section].presence || "unrated"
+          ai_r   = h[:ai_ratings][section].presence  || "unreviewed"
+          "#{section}→#{concept} (self: #{self_r}, ai: #{ai_r})"
         } : []
         concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""
         framings     = h[:scenarios].presence || []
         framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/3 sections answered | self: #{rating_label}#{concept_text}#{framing_text}#{feedback}"
+        feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
+        "#{h[:date]}: #{h[:sections_answered]}/3 answered#{concept_text}#{framing_text}#{feedback}"
       }.join("\n")
     end
 
     reinforcement_list = user.concepts_needing_reinforcement
-    reinforcement_text = reinforcement_list.any? ? reinforcement_list.join(", ") : "none"
+    reinforcement_text = reinforcement_list.any? ?
+      reinforcement_list.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
 
     config      = config_for(language)
     label       = config[:label]
@@ -317,7 +309,8 @@ class AiService
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       #{third_guidance}
-      - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above in this set, with a different code example and framing — same underlying concept, never a repeat of the same snippet. A concept only stops needing reinforcement once both signals agree the user is solid: their self-rating was "right level"/"too easy" and the AI review rated that section "solid"/"strong". If the two signals disagree, or one is missing (e.g. never reviewed), keep reinforcing — do not treat that as mastery.
+      - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
+      - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
