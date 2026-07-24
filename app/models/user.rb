@@ -150,7 +150,9 @@ class User < ApplicationRecord
         (tags || {}).each do |section, concept|
           next if concept.blank? || concept == "other"
           bucket = section == "architecture" ? "architecture" : language
-          index[[ concept, bucket ]] << date
+          # Union, not append: a concept tagged on multiple sections the same
+          # day is one exposure, not one per section (matches ConceptMastery#record_review!).
+          index[[ concept, bucket ]] |= [ date ]
         end
       end
       index

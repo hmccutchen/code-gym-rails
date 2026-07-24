@@ -586,6 +586,20 @@ RSpec.describe User, type: :model do
       expect(user.concept_exposure_count("closures", "ruby_rails", on_or_before: Date.current)).to eq(0)
       expect(user.concept_exposure_count("closures", "javascript", on_or_before: Date.current)).to eq(1)
     end
+
+    it "counts a concept tagged on two sections of the same day as one exposure" do
+      date = Date.current
+      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "concept" => "n_plus_one" },
+          "pattern"     => { "concept" => "n_plus_one" }
+        })
+      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20, "pattern" => "x" * 20 },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" })
+
+      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
+    end
   end
 
   describe "exposure index query budget" do
