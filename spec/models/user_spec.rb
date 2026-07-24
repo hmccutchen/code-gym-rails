@@ -698,6 +698,13 @@ RSpec.describe User, type: :model do
       end
     end
 
+    it "gives no credit for weekend submissions (streak counts weekdays only)" do
+      travel_to(wednesday) do
+        submit_on(Date.current - 3) # Sunday, via the manual weekend generate
+        expect(user.current_streak).to eq(0)
+      end
+    end
+
     it "computes 'today' in the caller's zone" do
       # 02:30 UTC Wednesday is Tuesday evening in Los Angeles: the local
       # streak ends on local-today (Tue), not the UTC day.

@@ -191,9 +191,10 @@ class User < ApplicationRecord
     return 0 if submitted.empty?
 
     exercised = daily_exercises.pluck(:date).to_set
+    earliest = submitted.min
     streak = 0
     day = Date.current
-    while day >= submitted.min
+    while day >= earliest
       if day.on_weekend?
         # skipped
       elsif submitted.include?(day)
