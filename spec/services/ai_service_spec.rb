@@ -189,7 +189,7 @@ RSpec.describe AiService do
       expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
       expect(prompt).to include("Mastery loop")
       expect(prompt).to include("code_review→n_plus_one (self: too_hard, ai: unreviewed)")
-      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one")
+      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (standard)")
     end
 
     it "shows the AI's per-section rating alongside the self rating when reviewed" do
@@ -208,6 +208,24 @@ RSpec.describe AiService do
     it "reports no concepts needing reinforcement when history is empty" do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include("Concepts needing reinforcement right now: none")
+    end
+
+    it "lists reinforcement concepts with their tier and omits paused ones" do
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 },
+                            section_ratings: { "code_review" => "too_hard" },
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (standard)")
+    end
+
+    it "includes reduced-tier generation guidance and the tiered mastery-loop instruction" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("(reduced)")            # from the guidance text
+      expect(prompt).to include("exits reinforcement only on full mastery")
     end
 
     it "uses the JS/React vocabulary and JavaScript/React labeling when language is javascript" do

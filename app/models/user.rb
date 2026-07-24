@@ -116,7 +116,7 @@ class User < ApplicationRecord
   # concept today. See docs/superpowers/specs/2026-07-20-mastery-loop-combined-signal-design.md.
   def concepts_needing_reinforcement(limit: 10)
     resolved = {}
-    reinforcement = []
+    result   = []
 
     recent_daily_responses(limit).each do |r|
       r.concept_tags.each do |section, concept|
@@ -125,12 +125,17 @@ class User < ApplicationRecord
 
         next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil? # out of scope
 
-        mastered = r.self_rating_favorable?(section) && r.ai_rating_favorable?(section)
-        reinforcement << concept unless mastered
+        next if r.self_rating_favorable?(section) && r.ai_rating_favorable?(section) # mastered
+
+        bucket = section == "architecture" ? "architecture" : r.daily_exercise&.language
+        tier   = concept_masteries.find_by(concept: concept, language: bucket)&.tier || "standard"
+        next if tier == "paused"
+
+        result << { concept: concept, tier: tier }
       end
     end
 
-    reinforcement
+    result
   end
 
   # ── Language preference ────────────────────────────────────────────────────

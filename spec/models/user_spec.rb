@@ -259,7 +259,7 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "flags a concept the AI rated beginner/developing even when the self-rating was favorable (the core gap this fix closes)" do
@@ -270,7 +270,7 @@ RSpec.describe User, type: :model do
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "keeps reinforcing when self-rating is unfavorable even if the AI review was favorable" do
@@ -281,7 +281,7 @@ RSpec.describe User, type: :model do
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "solid" } })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "excludes a concept once both self-rating and AI review explicitly agree it's solid" do
@@ -302,7 +302,7 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ "n_plus_one" ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
     it "excludes a concept with no self-rating and no AI review at all, same as an unrated concept today" do
@@ -342,6 +342,37 @@ RSpec.describe User, type: :model do
                             concept_tags: { "code_review" => "other" })
 
       expect(user.concepts_needing_reinforcement).to eq([])
+    end
+  end
+
+  describe "#concepts_needing_reinforcement with tiers" do
+    let(:user) { User.create!(email: "cn@example.com", name: "CN") }
+
+    def reinforce_response(concept:, self_rating:, ai_rating:, date:)
+      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "concept" => concept } })
+      response = user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => self_rating },
+        concept_tags: { "code_review" => concept },
+        ai_review: { "code_review" => { "rating" => ai_rating } })
+      ConceptMastery.record_review!(response)
+      response
+    end
+
+    it "annotates each concept with its tier and excludes mastered concepts" do
+      reinforce_response(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current)
+      reinforce_response(concept: "memoization", self_rating: "right_level", ai_rating: "strong", date: Date.current - 1)
+
+      result = user.concepts_needing_reinforcement
+      expect(result).to include(concept: "n_plus_one", tier: "standard")
+      expect(result.map { |h| h[:concept] }).not_to include("memoization") # mastered
+    end
+
+    it "excludes paused concepts entirely" do
+      reinforce_response(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current)
+      user.concept_masteries.find_by(concept: "n_plus_one").update!(tier: :paused, cooldown_remaining: 2)
+
+      expect(user.concepts_needing_reinforcement.map { |h| h[:concept] }).not_to include("n_plus_one")
     end
   end
 

@@ -262,7 +262,8 @@ class AiService
     end
 
     reinforcement_list = user.concepts_needing_reinforcement
-    reinforcement_text = reinforcement_list.any? ? reinforcement_list.join(", ") : "none"
+    reinforcement_text = reinforcement_list.any? ?
+      reinforcement_list.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
 
     config      = config_for(language)
     label       = config[:label]
@@ -308,7 +309,8 @@ class AiService
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       #{third_guidance}
-      - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above in this set, with a different code example and framing — same underlying concept, never a repeat of the same snippet. A concept only stops needing reinforcement once both signals agree the user is solid: their self-rating was "right level"/"too easy" and the AI review rated that section "solid"/"strong". If the two signals disagree, or one is missing (e.g. never reviewed), keep reinforcing — do not treat that as mastery.
+      - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
+      - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
