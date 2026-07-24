@@ -17,7 +17,6 @@ class SessionsController < ApplicationController
     user = User.active.find_by(email: email)
 
     if user.nil?
-      # First-time user — create account
       user = User.create!(email: email, name: name.presence || email.split("@").first)
     end
 

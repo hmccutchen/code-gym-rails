@@ -208,6 +208,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("You've already generated a new set today.")
       expect(response.body).not_to include("Generate new set")
     end
+
+    it "wires the loading-form contract with the confirm message" do
+      create_exercise
+      get root_path
+      expect(response.body).to include('data-loading-form="true"')
+      expect(response.body).to include('data-loading-label="Generating…"')
+      expect(response.body).to include("data-confirm-message")
+    end
   end
 
   describe "review button label" do
@@ -278,6 +286,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
 
         expect(response.body).to include("Generating your personalized exercise set")
+        expect(response.body).to include('class="spinner"')
       end
 
       # Regression lock-in: the dashboard must live-update once generation
@@ -308,6 +317,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
         expect(response.body).to include("No exercises are generated automatically on weekends")
         expect(response.body).to include("Generate today&#39;s set anyway")
+      end
+
+      it "wires the weekend generate button as a loading form" do
+        get root_path
+        expect(response.body).to include('data-loading-form="true"')
+        expect(response.body).to include('data-loading-label="Generating…"')
       end
     end
   end

@@ -15,7 +15,6 @@ class DailyExercise < ApplicationRecord
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
 
-  # Convenience accessors into the JSONB problem_set blob
   def code_review  = problem_set["code_review"]&.with_indifferent_access
   def pattern      = problem_set["pattern"]&.with_indifferent_access
   def challenge    = problem_set["challenge"]&.with_indifferent_access

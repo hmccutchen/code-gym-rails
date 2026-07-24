@@ -53,7 +53,11 @@
     form.addEventListener("submit", () => {
       // Deferred a tick: disabling synchronously inside the submit handler can
       // cancel the submission in some browsers.
-      setTimeout(() => { button.disabled = true; setLabel("Generating review…"); }, 0);
+      setTimeout(() => {
+        button.disabled = true;
+        button.classList.add("btn-loading");
+        setLabel("Generating review…");
+      }, 0);
     });
 
     // A review that errors out redirects to root_path. If the user then
@@ -64,6 +68,7 @@
     window.addEventListener("pageshow", (event) => {
       if (!event.persisted) return;
       button.disabled = false;
+      button.classList.remove("btn-loading");
       setLabel(originalLabel);
     });
   });
