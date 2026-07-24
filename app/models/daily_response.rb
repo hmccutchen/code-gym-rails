@@ -43,4 +43,14 @@ class DailyResponse < ApplicationRecord
   def completeness
     (answered_sections.size / 3.0 * 100).round
   end
+
+  # improved_code is revealed only from a concept's SECOND exposure onward — the
+  # first time a concept appears, the corrected answer stays hidden (mirrors the
+  # attempt-gated teaching_note). Ungated for blank/"other" (no concept to track).
+  def improved_code_visible?(section)
+    concept = concept_tags[section.to_s]
+    return true if concept.blank? || concept == "other"
+    bucket = section.to_s == "architecture" ? "architecture" : daily_exercise.language
+    user.concept_exposure_count(concept, bucket, on_or_before: date) >= 2
+  end
 end

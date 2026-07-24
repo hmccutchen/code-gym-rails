@@ -138,6 +138,29 @@ class User < ApplicationRecord
     result
   end
 
+  # Single-query, memoized index of every submitted response's concept exposures,
+  # keyed [concept, bucket] => sorted dates. Built once per User instance so a
+  # page rendering many responses (history) never issues a query per section.
+  def concept_exposure_index
+    @concept_exposure_index ||= begin
+      index = Hash.new { |hash, key| hash[key] = [] }
+      daily_responses.where.not(submitted_at: nil).joins(:daily_exercise)
+                     .pluck(:date, :concept_tags, "daily_exercises.language")
+                     .each do |date, tags, language|
+        (tags || {}).each do |section, concept|
+          next if concept.blank? || concept == "other"
+          bucket = section == "architecture" ? "architecture" : language
+          index[[ concept, bucket ]] << date
+        end
+      end
+      index
+    end
+  end
+
+  def concept_exposure_count(concept, bucket, on_or_before:)
+    concept_exposure_index.fetch([ concept, bucket ], []).count { |d| d <= on_or_before }
+  end
+
   # ── Language preference ────────────────────────────────────────────────────
   # Resolves the day's actual generation language. Pinned preferences return
   # themselves. "mixed" alternates by flipping the most recent PRIOR

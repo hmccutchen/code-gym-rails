@@ -562,4 +562,58 @@ RSpec.describe User, type: :model do
       expect(User.active).not_to include(deleted)
     end
   end
+
+  describe "#concept_exposure_count" do
+    let(:user) { User.create!(email: "ex@example.com", name: "Ex") }
+
+    def submit(concept:, date:, language: "ruby_rails", section: "code_review")
+      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: language,
+        problem_set: { section => { "concept" => concept } })
+      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: { section => "x" * 20 }, concept_tags: { section => concept })
+    end
+
+    it "counts occurrences within the same language bucket, on or before the given date" do
+      submit(concept: "n_plus_one", date: Date.current - 5)
+      submit(concept: "n_plus_one", date: Date.current - 2)
+
+      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: Date.current - 5)).to eq(1)
+      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: Date.current)).to eq(2)
+    end
+
+    it "does not count occurrences from a different language bucket" do
+      submit(concept: "closures", date: Date.current - 1, language: "javascript")
+      expect(user.concept_exposure_count("closures", "ruby_rails", on_or_before: Date.current)).to eq(0)
+      expect(user.concept_exposure_count("closures", "javascript", on_or_before: Date.current)).to eq(1)
+    end
+  end
+
+  describe "exposure index query budget" do
+    def count_queries
+      count = 0
+      sub = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        count += 1 unless payload[:name].to_s =~ /SCHEMA|TRANSACTION/ || payload[:sql] =~ /^\s*(BEGIN|COMMIT|ROLLBACK)/
+      end
+      yield
+      count
+    ensure
+      ActiveSupport::Notifications.unsubscribe(sub)
+    end
+
+    it "renders improved_code visibility for many responses with a single index query" do
+      user = User.create!(email: "budget@example.com", name: "B")
+      3.times do |i|
+        ex = user.daily_exercises.create!(date: Date.current - i, generated_at: Time.current, language: "ruby_rails",
+          problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+        user.daily_responses.create!(daily_exercise: ex, date: Date.current - i, submitted_at: Time.current,
+          answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "n_plus_one" })
+      end
+
+      reloaded  = User.find(user.id)
+      responses = reloaded.daily_responses.includes(:daily_exercise).to_a # exercises + user preloaded
+
+      queries = count_queries { responses.each { |r| r.improved_code_visible?("code_review") } }
+      expect(queries).to eq(1) # the exposure index, built once and shared (inverse_of)
+    end
+  end
 end

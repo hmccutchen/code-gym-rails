@@ -95,4 +95,29 @@ RSpec.describe DailyResponse, type: :model do
       expect(unrated.self_rating_label("code_review")).to be_nil
     end
   end
+
+  describe "#improved_code_visible?" do
+    def submit(concept:, date:)
+      ex = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "concept" => concept } })
+      user.daily_responses.create!(daily_exercise: ex, date: date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => concept })
+    end
+
+    it "hides improved_code on the first exposure and reveals it on the second" do
+      first  = submit(concept: "n_plus_one", date: Date.current - 3)
+      second = submit(concept: "n_plus_one", date: Date.current - 1)
+
+      expect(first.improved_code_visible?("code_review")).to be(false)
+      expect(second.improved_code_visible?("code_review")).to be(true)
+    end
+
+    it "is ungated for a blank or 'other' concept" do
+      ex = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "concept" => "other" } })
+      r = user.daily_responses.create!(daily_exercise: ex, date: Date.current, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "other" })
+      expect(r.improved_code_visible?("code_review")).to be(true)
+    end
+  end
 end
