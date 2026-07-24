@@ -337,7 +337,8 @@ RSpec.describe "Responses", type: :request do
       resp = submitted_response
       allow(ConceptMastery).to receive(:record_review!).and_raise(ActiveRecord::RecordInvalid.new(ConceptMastery.new))
 
-      expect { post review_response_path(resp) }.to raise_error(ActiveRecord::RecordInvalid)
+      post review_response_path(resp)
+
       expect(resp.reload.ai_review).to be_nil
     end
   end
