@@ -317,6 +317,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).to include("No exercises are generated automatically on weekends")
         expect(response.body).to include("Generate today&#39;s set anyway")
       end
+
+      it "wires the weekend generate button as a loading form" do
+        get root_path
+        expect(response.body).to include('data-loading-form="true"')
+        expect(response.body).to include('data-loading-label="Generating…"')
+      end
     end
   end
 
