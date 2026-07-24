@@ -8,11 +8,14 @@
     <% confirm_msg = has_progress ?
          "This will replace today's problems and erase your answers so far. This can't be undone. Continue?" :
          "Generate a new set for today?" %>
+    <%# turbo_confirm would be inert here — Turbo JS is not loaded. The
+        layout's loading-form script provides the confirm and the in-flight
+        spinner; the request then blocks synchronously on the provider
+        (10–30s) until the redirect lands. %>
     <%= button_to "Generate new set", regenerate_path, method: :post,
           class: "btn btn-ghost btn-sm",
-          data: { turbo_confirm: confirm_msg, regenerate_target: "button" },
-          form: { data: { controller: "regenerate",
-                          action: "turbo:submit-start->regenerate#start turbo:submit-end->regenerate#stop" } } %>
+          form: { data: { loading_form: true, loading_label: "Generating…",
+                          confirm_message: confirm_msg } } %>
   <% end %>
 </div>
 
