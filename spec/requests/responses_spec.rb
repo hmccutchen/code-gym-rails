@@ -306,6 +306,42 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  describe "POST /responses/:id/review mastery write" do
+    let(:section) { { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } } }
+
+    def submitted_response
+      exercise = create_exercise(section)
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+        section_ratings: { "code_review" => "too_hard" },
+        concept_tags: { "code_review" => "n_plus_one" })
+    end
+
+    before do
+      fake = instance_double(ClaudeService, review_response: {
+        "code_review" => { "rating" => "developing", "correct" => "ok",
+                           "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" }
+      })
+      allow(AiService).to receive(:for).and_return(fake)
+    end
+
+    it "writes ConceptMastery state in the same transaction as the review" do
+      resp = submitted_response
+      post review_response_path(resp)
+
+      expect(resp.reload.ai_review).to be_present
+      expect(user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")).to be_present
+    end
+
+    it "rolls back the review if the mastery write fails" do
+      resp = submitted_response
+      allow(ConceptMastery).to receive(:record_review!).and_raise(ActiveRecord::RecordInvalid.new(ConceptMastery.new))
+
+      expect { post review_response_path(resp) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect(resp.reload.ai_review).to be_nil
+    end
+  end
+
   describe "POST /responses concept reference generation" do
     include ActiveJob::TestHelper
 

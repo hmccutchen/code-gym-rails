@@ -62,7 +62,10 @@ class ResponsesController < ApplicationController
 
     ai_review = AiService.for(current_user).review_response(current_user, @response.daily_exercise, @response)
 
-    @response.update!(ai_review: ai_review)
+    ActiveRecord::Base.transaction do
+      @response.update!(ai_review: ai_review)
+      ConceptMastery.record_review!(@response)
+    end
     redirect_to history_anchor, notice: "Review ready!"
   rescue AiService::AuthenticationError
     redirect_to root_path, alert: "Your API key was rejected — check it in Settings."
