@@ -2,6 +2,7 @@
   .page-header { margin-bottom: 2rem; }
   .page-header h1 { font-size: 1.5rem; }
   .page-header .date { color: var(--muted); font-size: .9rem; }
+  .page-header .streak { margin-left: .5rem; }
 
   textarea.answer { width: 100%; min-height: 120px; background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: .95rem; font-family: inherit; resize: vertical; line-height: 1.6; }
   textarea.answer:focus { outline: none; border-color: var(--accent); }
@@ -23,7 +24,12 @@
 
 <div class="page-header">
   <h1>Today's Code Gym</h1>
-  <div class="date"><%= Date.current.strftime("%A, %B %-d") %></div>
+  <div class="date">
+    <%= Date.current.strftime("%A, %B %-d") %>
+    <% if (streak = current_user.current_streak).positive? %>
+      <span class="streak">🔥 <%= streak %>-day streak</span>
+    <% end %>
+  </div>
 </div>
 
 <%= turbo_stream_from current_user %>

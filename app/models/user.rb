@@ -179,6 +179,33 @@ class User < ApplicationRecord
     last.language == "ruby_rails" ? "javascript" : "ruby_rails"
   end
 
+  # ── Daily streak ───────────────────────────────────────────────────────────
+  # Consecutive weekdays with a submitted response, derived on read by walking
+  # back from today (in the caller's zone — controllers and jobs wrap calls in
+  # Time.use_zone). Weekends never break the chain, and neither does today
+  # while it is still unsubmitted; only a past weekday whose exercise went
+  # unsubmitted resets it. A weekday with no exercise at all (pre-signup,
+  # failed generation) neither counts nor breaks.
+  def current_streak
+    submitted = daily_responses.where.not(submitted_at: nil).pluck(:date).to_set
+    return 0 if submitted.empty?
+
+    exercised = daily_exercises.pluck(:date).to_set
+    streak = 0
+    day = Date.current
+    while day >= submitted.min
+      if day.on_weekend?
+        # skipped
+      elsif submitted.include?(day)
+        streak += 1
+      elsif exercised.include?(day) && day != Date.current
+        break
+      end
+      day -= 1
+    end
+    streak
+  end
+
   # ── Timezone ────────────────────────────────────────────────────────────────
   # Resolved zone for computing this user's "today". Blank until the browser
   # detects it or the user sets it manually, so fall back to the team default.

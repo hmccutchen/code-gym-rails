@@ -429,4 +429,39 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("# Your implementation")  # not the challenge textarea
     end
   end
+
+  describe "streak display" do
+    # A Wednesday, so the streak days are plain weekdays.
+    let(:wednesday) { Time.utc(2026, 7, 22, 12) }
+
+    def submit_on(date)
+      exercise = DailyExercise.create!(user: user, date: date,
+                                       problem_set: base_problem_set, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+    end
+
+    it "shows the streak in the header when positive" do
+      travel_to(wednesday) do
+        submit_on(Date.current)
+        submit_on(Date.current - 1)
+
+        get root_path
+
+        expect(response.body).to include("🔥 2-day streak")
+      end
+    end
+
+    it "omits the streak entirely at zero" do
+      travel_to(wednesday) do
+        submit_on(Date.current - 2) # Mon submitted, Tue's exercise missed
+        DailyExercise.create!(user: user, date: Date.current - 1,
+                              problem_set: base_problem_set, generated_at: Time.current)
+
+        get root_path
+
+        expect(response.body).not_to include("🔥")
+      end
+    end
+  end
 end
