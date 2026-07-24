@@ -286,6 +286,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
 
         expect(response.body).to include("Generating your personalized exercise set")
+        expect(response.body).to include('class="spinner"')
       end
 
       # Regression lock-in: the dashboard must live-update once generation
