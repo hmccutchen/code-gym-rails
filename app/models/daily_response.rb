@@ -8,8 +8,6 @@ class DailyResponse < ApplicationRecord
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
 
-  attribute :legacy_rating, :string
-
   validates :date, uniqueness: { scope: :user_id }
 
   # Ordered field → label map for rendering ai_review sections — shared by the

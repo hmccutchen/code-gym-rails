@@ -139,8 +139,9 @@ class User < ApplicationRecord
   end
 
   # Single-query, memoized index of every submitted response's concept exposures,
-  # keyed [concept, bucket] => sorted dates. Built once per User instance so a
-  # page rendering many responses (history) never issues a query per section.
+  # keyed [concept, bucket] => the distinct dates the concept appeared (in query
+  # order, not sorted — callers only ever count them). Built once per User
+  # instance so a page rendering many responses (history) never queries per section.
   def concept_exposure_index
     @concept_exposure_index ||= begin
       index = Hash.new { |hash, key| hash[key] = [] }
