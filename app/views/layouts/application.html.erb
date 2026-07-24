@@ -35,6 +35,24 @@
     .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
     .btn-sm { padding: .3rem .8rem; font-size: .8rem; }
+    /* Loading state for buttons whose click starts a wait. Two consumers:
+       forms tagged data-loading-form (shared script at the bottom of this
+       layout) and the fetch-driven submit/review handlers, which toggle the
+       class themselves. pointer-events guards the gap before `disabled`
+       lands (it is applied a tick late — see the shared script). */
+    .btn-loading { opacity: .6; pointer-events: none; }
+    .btn-loading::before {
+      content: ""; display: inline-block; width: .8em; height: .8em;
+      margin-right: .5em; vertical-align: -.1em;
+      border: 2px solid currentColor; border-top-color: transparent;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    .spinner {
+      display: inline-block; width: 2rem; height: 2rem;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
        allows breaks at spaces/newlines, so snippets wrap on phones instead of
@@ -202,5 +220,49 @@
 
     <%= yield %>
   </div>
+  <%# Loading feedback for plain form POSTs. Turbo JS is not loaded in this
+      app, so button_to forms are full-page submissions — Turbo attributes
+      (turbo_confirm, turbo_submits_with) are inert, and any feedback (or
+      confirmation) must be wired here. A form opts in with data-loading-form;
+      data-confirm-message gates submission behind a native confirm, and
+      data-loading-label is the in-flight button label. %>
+  <script>
+    (() => {
+      document.querySelectorAll("form[data-loading-form]").forEach(form => {
+        const button = form.querySelector('button[type="submit"], input[type="submit"]');
+        if (!button) return;
+
+        // button_to (with Rails 8's button_to_generates_button_tag default)
+        // renders a <button>, not an <input> — the two need different
+        // properties for their label, so read/write whichever is present.
+        const isButtonTag = button.tagName === "BUTTON";
+        const originalLabel = isButtonTag ? button.textContent : button.value;
+        const setLabel = (text) => { if (isButtonTag) { button.textContent = text; } else { button.value = text; } };
+
+        form.addEventListener("submit", (event) => {
+          const message = form.dataset.confirmMessage;
+          if (message && !window.confirm(message)) { event.preventDefault(); return; }
+
+          // Deferred a tick: disabling synchronously inside the submit
+          // handler can cancel the submission in some browsers.
+          setTimeout(() => {
+            button.disabled = true;
+            button.classList.add("btn-loading");
+            if (form.dataset.loadingLabel) setLabel(form.dataset.loadingLabel);
+          }, 0);
+        });
+
+        // A bfcache Back-restore would resurrect the page mid-"loading" —
+        // button dead until a manual reload (same hazard the review button
+        // handles). Reset to idle.
+        window.addEventListener("pageshow", (event) => {
+          if (!event.persisted) return;
+          button.disabled = false;
+          button.classList.remove("btn-loading");
+          setLabel(originalLabel);
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
