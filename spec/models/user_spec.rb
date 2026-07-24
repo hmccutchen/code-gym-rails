@@ -630,4 +630,91 @@ RSpec.describe User, type: :model do
       expect(queries).to eq(1) # the exposure index, built once and shared (inverse_of)
     end
   end
+
+  describe "#current_streak" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    let(:user) { create_user }
+
+    # A Wednesday, so "today" and the two prior weekdays sit inside one week.
+    let(:wednesday) { Time.utc(2026, 7, 22, 12) }
+
+    def exercise_on(date)
+      user.daily_exercises.create!(date: date, generated_at: Time.current,
+                                   problem_set: { "code_review" => { "question" => "q" } })
+    end
+
+    def submit_on(date)
+      user.daily_responses.create!(daily_exercise: exercise_on(date), date: date,
+                                   submitted_at: Time.current, answers: {})
+    end
+
+    it "is 0 with no submissions" do
+      travel_to(wednesday) { expect(user.current_streak).to eq(0) }
+    end
+
+    it "counts consecutive submitted weekdays ending today" do
+      travel_to(wednesday) do
+        submit_on(Date.current)     # Wed
+        submit_on(Date.current - 1) # Tue
+        submit_on(Date.current - 2) # Mon
+        expect(user.current_streak).to eq(3)
+      end
+    end
+
+    it "bridges weekends: Friday to Monday is continuous" do
+      travel_to(wednesday) do
+        submit_on(Date.current)     # Wed
+        submit_on(Date.current - 1) # Tue
+        submit_on(Date.current - 2) # Mon
+        submit_on(Date.current - 5) # previous Fri
+        expect(user.current_streak).to eq(4)
+      end
+    end
+
+    it "resets at a weekday whose exercise went unsubmitted" do
+      travel_to(wednesday) do
+        submit_on(Date.current)          # Wed
+        exercise_on(Date.current - 1)    # Tue: exercise existed, never submitted
+        submit_on(Date.current - 2)      # Mon
+        expect(user.current_streak).to eq(1)
+      end
+    end
+
+    it "does not break on today while it is still unsubmitted" do
+      travel_to(wednesday) do
+        exercise_on(Date.current)   # Wed: in progress
+        submit_on(Date.current - 1) # Tue
+        submit_on(Date.current - 2) # Mon
+        expect(user.current_streak).to eq(2)
+      end
+    end
+
+    it "skips a weekday where no exercise existed at all" do
+      travel_to(wednesday) do
+        submit_on(Date.current)     # Wed
+        submit_on(Date.current - 2) # Mon; Tue has no exercise (generation failed)
+        expect(user.current_streak).to eq(2)
+      end
+    end
+
+    it "gives no credit for weekend submissions (streak counts weekdays only)" do
+      travel_to(wednesday) do
+        submit_on(Date.current - 3) # Sunday, via the manual weekend generate
+        expect(user.current_streak).to eq(0)
+      end
+    end
+
+    it "computes 'today' in the caller's zone" do
+      # 02:30 UTC Wednesday is Tuesday evening in Los Angeles: the local
+      # streak ends on local-today (Tue), not the UTC day.
+      travel_to(Time.utc(2026, 7, 22, 2, 30)) do
+        Time.use_zone("America/Los_Angeles") do
+          submit_on(Date.current)     # local Tue
+          submit_on(Date.current - 1) # local Mon
+          expect(user.current_streak).to eq(2)
+        end
+      end
+    end
+  end
 end
