@@ -1,17 +1,28 @@
 require "rails_helper"
 
 RSpec.describe GenerateDailyExercisesJob do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:user) { User.create!(email: "cronuser@example.com", name: "Cron", provider: "anthropic", api_key: "sk-ant-test", time_zone: "UTC") }
 
   it "creates a DailyExercise from the provider's generated problem set" do
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
     described_class.new.perform(user_id: user.id)
 
     exercise = DailyExercise.find_by(user: user, date: Date.current)
     expect(exercise.problem_set).to eq("code_review" => {})
+  end
+
+  it "does not touch last_generation_error fields on success" do
+    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(user.reload.last_generation_error_date).to be_nil
+    expect(user.last_generation_error).to be_nil
   end
 
   it "logs and continues when AiService::Error is raised" do
@@ -24,39 +35,65 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
   end
 
-  it "broadcasts a Settings-pointing message when AiService::AuthenticationError is raised" do
+  it "persists a Settings-pointing error when AiService::AuthenticationError is raised" do
     fake_service = instance_double(ClaudeService)
     allow(fake_service).to receive(:generate_exercise).and_raise(AiService::AuthenticationError, "invalid x-api-key")
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
     expect(Rails.logger).to receive(:error).with(/Auth failure generating exercise.*invalid x-api-key/)
-    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
-      user, target: "dashboard-content", partial: "dashboard/generation_failed",
-      locals: { message: "Your API key was rejected — check it in Settings." }
-    )
-
     described_class.new.perform(user_id: user.id)
+
+    user.reload
+    expect(user.last_generation_error_date).to eq(Date.current)
+    expect(user.last_generation_error).to eq("Your API key was rejected — check it in Settings.")
   end
 
-  it "broadcasts a try-again message when AiService::RateLimitError is raised" do
+  it "persists a try-again error when AiService::RateLimitError is raised" do
     fake_service = instance_double(ClaudeService)
     allow(fake_service).to receive(:generate_exercise).and_raise(AiService::RateLimitError, "rate limited")
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
     expect(Rails.logger).to receive(:warn).with(/Rate limited generating exercise.*rate limited/)
-    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
-      user, target: "dashboard-content", partial: "dashboard/generation_failed",
-      locals: { message: "The AI provider is rate-limiting requests — try again shortly." }
-    )
+    described_class.new.perform(user_id: user.id)
+
+    user.reload
+    expect(user.last_generation_error_date).to eq(Date.current)
+    expect(user.last_generation_error).to eq("The AI provider is rate-limiting requests — try again shortly.")
+  end
+
+  it "persists the raw message when a generic AiService::Error is raised" do
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
+
+    user.reload
+    expect(user.last_generation_error_date).to eq(Date.current)
+    expect(user.last_generation_error).to eq("boom")
+  end
+
+  it "persists the failure date in the user's own time zone" do
+    pac = User.create!(email: "pac2@example.com", name: "Pac", provider: "anthropic",
+                       api_key: "sk-ant-test", time_zone: "America/Los_Angeles")
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
+    allow(AiService).to receive(:for).with(pac).and_return(fake_service)
+    allow(Rails.logger).to receive(:error)
+
+    # 2026-07-13 06:00 UTC == 2026-07-12 23:00 PDT — still July 12th in LA.
+    travel_to(Time.utc(2026, 7, 13, 6, 0)) do
+      described_class.new.perform(user_id: pac.id)
+    end
+
+    expect(pac.reload.last_generation_error_date).to eq(Date.new(2026, 7, 12))
   end
 
   it "persists the resolved language on the created DailyExercise" do
     user.update!(language: "javascript")
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
     described_class.new.perform(user_id: user.id)
 
@@ -68,7 +105,6 @@ RSpec.describe GenerateDailyExercisesJob do
     user.update!(language: "javascript")
     fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
 
     described_class.new.perform(user_id: user.id)
 
@@ -84,41 +120,12 @@ RSpec.describe GenerateDailyExercisesJob do
 
     expect(Rails.logger).to receive(:info).with(/Skipped duplicate generation/)
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
-  end
-
-  it "broadcasts the rendered exercise partial to the user's stream on success" do
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to) do |streamable, target:, partial:, locals:|
-      expect(streamable).to eq(user)
-      expect(target).to eq("dashboard-content")
-      expect(partial).to eq("dashboard/exercise")
-      expect(locals[:exercise]).to be_a(DailyExercise)
-      expect(locals[:exercise].user).to eq(user)
-      expect(locals[:response]).to be_a(DailyResponse)
-      expect(locals[:response]).not_to be_persisted
-    end
-
-    described_class.new.perform(user_id: user.id)
-  end
-
-  it "broadcasts a friendly failure partial to the user's stream when AiService::Error is raised" do
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(Rails.logger).to receive(:error)
-
-    expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
-      .with(user, target: "dashboard-content", partial: "dashboard/generation_failed", locals: { message: "boom" })
-
-    described_class.new.perform(user_id: user.id)
+    expect(user.reload.last_generation_error_date).to be_nil
   end
 
   it "skips an anonymized user on the on-demand path" do
     user.anonymize!
     expect(AiService).not_to receive(:for)
-    expect(Turbo::StreamsChannel).not_to receive(:broadcast_replace_to)
 
     described_class.new.perform(user_id: user.id)
 
@@ -126,19 +133,15 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   describe "hourly batch (no user_id), zone-gated" do
-    include ActiveSupport::Testing::TimeHelpers
-
     def stub_generation_for(u)
       svc = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
       allow(AiService).to receive(:for).with(u).and_return(svc)
-      allow(Turbo::StreamsChannel).to receive(:broadcast_replace_to)
     end
 
     let(:pac) { User.create!(email: "pac@example.com", name: "Pac", provider: "anthropic", api_key: "sk-ant-test", time_zone: "America/Los_Angeles") }
 
     it "does not generate before 8am local" do
       stub_generation_for(pac)
-      # 2026-07-13 14:00 UTC == 07:00 PDT (Monday, before 8am local)
       travel_to(Time.utc(2026, 7, 13, 14, 0)) do
         described_class.new.perform
         local_today = Time.use_zone("America/Los_Angeles") { Date.current }
@@ -148,7 +151,6 @@ RSpec.describe GenerateDailyExercisesJob do
 
     it "generates at/after 8am local on a weekday" do
       stub_generation_for(pac)
-      # 2026-07-13 15:00 UTC == 08:00 PDT (Monday, at 8am local)
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
         described_class.new.perform
         local_today = Time.use_zone("America/Los_Angeles") { Date.current }
@@ -158,7 +160,6 @@ RSpec.describe GenerateDailyExercisesJob do
 
     it "does not generate on a local weekend" do
       stub_generation_for(pac)
-      # 2026-07-18 17:00 UTC == 10:00 PDT Saturday
       travel_to(Time.utc(2026, 7, 18, 17, 0)) do
         described_class.new.perform
         expect(DailyExercise.where(user: pac).count).to eq(0)
@@ -175,8 +176,6 @@ RSpec.describe GenerateDailyExercisesJob do
     end
 
     it "gates each user independently by their own zone within the same batch run" do
-      # 2026-07-13 15:00 UTC == 08:00 PDT Monday (at 8am local, generated)
-      #                      == 07:00 AKDT Monday (before 8am local, not generated)
       alaska = User.create!(email: "alaska@example.com", name: "Alaska", provider: "anthropic",
                              api_key: "sk-ant-test", time_zone: "America/Anchorage")
       stub_generation_for(pac)

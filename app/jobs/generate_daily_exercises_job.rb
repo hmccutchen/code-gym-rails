@@ -37,11 +37,15 @@ class GenerateDailyExercisesJob < ApplicationJob
     generate_for(user)
   end
 
+  # On completion (success or failure), the dashboard learns the outcome by
+  # polling GET /dashboard/status (DashboardController#status) and reloading
+  # — this app loads no Turbo/Stimulus JS, so a live broadcast here would
+  # have no subscriber.
   def generate_for(user)
     language    = user.language_for_today
     problem_set = AiService.for(user).generate_exercise(user, language: language)
 
-    exercise = DailyExercise.create!(
+    DailyExercise.create!(
       user:         user,
       date:         Date.current,
       problem_set:  problem_set,
@@ -49,38 +53,16 @@ class GenerateDailyExercisesJob < ApplicationJob
       language:     language
     )
 
-    Turbo::StreamsChannel.broadcast_replace_to(
-      user,
-      target:  "dashboard-content",
-      partial: "dashboard/exercise",
-      locals:  { exercise: exercise, response: DailyResponse.new(user: user, daily_exercise: exercise, date: Date.current) }
-    )
-
     Rails.logger.info("Generated exercise for #{user.email} on #{Date.current}")
   rescue AiService::AuthenticationError => e
     Rails.logger.error("Auth failure generating exercise for #{user.email}: #{e.message}")
-    Turbo::StreamsChannel.broadcast_replace_to(
-      user,
-      target:  "dashboard-content",
-      partial: "dashboard/generation_failed",
-      locals:  { message: "Your API key was rejected — check it in Settings." }
-    )
+    persist_failure(user, "Your API key was rejected — check it in Settings.")
   rescue AiService::RateLimitError => e
     Rails.logger.warn("Rate limited generating exercise for #{user.email}: #{e.message}")
-    Turbo::StreamsChannel.broadcast_replace_to(
-      user,
-      target:  "dashboard-content",
-      partial: "dashboard/generation_failed",
-      locals:  { message: "The AI provider is rate-limiting requests — try again shortly." }
-    )
+    persist_failure(user, "The AI provider is rate-limiting requests — try again shortly.")
   rescue AiService::Error => e
     Rails.logger.error("Failed to generate exercise for #{user.email}: #{e.message}")
-    Turbo::StreamsChannel.broadcast_replace_to(
-      user,
-      target:  "dashboard-content",
-      partial: "dashboard/generation_failed",
-      locals:  { message: e.message }
-    )
+    persist_failure(user, e.message)
     # Don't re-raise — one failure shouldn't block other users in the batch
   rescue ActiveRecord::RecordNotUnique
     # Lost a race against a concurrent generation for this user/date (e.g. two
@@ -90,5 +72,9 @@ class GenerateDailyExercisesJob < ApplicationJob
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
     Rails.logger.info("Skipped duplicate generation for #{user.email} on #{Date.current} (already generated concurrently)")
+  end
+
+  def persist_failure(user, message)
+    user.update!(last_generation_error_date: Date.current, last_generation_error: message)
   end
 end
