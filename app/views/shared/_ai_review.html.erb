@@ -27,6 +27,17 @@
     <% if improved_code.present? && section != "architecture" && response.improved_code_visible?(section) %>
       <pre class="snippet" style="margin-top:.75rem"><code><%= improved_code %></code></pre>
     <% end %>
+    <div class="alternates" data-section="<%= section %>">
+      <% Array(response.review_alternates[section]).each do |alt| %>
+        <p class="alternate-item"><%= alt %></p>
+      <% end %>
+      <% if Array(response.review_alternates[section]).size < ResponsesController::MAX_ALTERNATES_PER_SECTION %>
+        <button type="button" class="btn btn-ghost btn-sm explain-differently"
+                data-url="<%= explain_differently_response_path(response) %>"
+                data-section="<%= section %>">Explain this differently</button>
+      <% end %>
+      <span class="alternate-status" aria-live="polite"></span>
+    </div>
     <div class="self-explanation">
       <label for="self-exp-<%= response.id %>-<%= section %>">In one sentence, why does this fix work?</label>
       <textarea id="self-exp-<%= response.id %>-<%= section %>"
@@ -68,6 +79,39 @@
         status.textContent = "Saved";
       } catch {
         status.textContent = "Couldn't save — try again";
+      }
+    });
+  });
+
+  document.querySelectorAll(".explain-differently:not([data-alt-wired])").forEach(button => {
+    button.dataset.altWired = "1";
+    const container = button.parentElement;
+    const status = container.querySelector(".alternate-status");
+
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(button.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: button.dataset.section })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        const p = document.createElement("p");
+        p.className = "alternate-item";
+        p.textContent = data.alternate;
+        container.insertBefore(p, button);
+        status.textContent = "";
+        if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't generate that — try again";
+        button.disabled = false;
       }
     });
   });

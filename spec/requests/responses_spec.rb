@@ -581,4 +581,89 @@ RSpec.describe "Responses", type: :request do
       expect(r.reload.self_explanations).to eq({})
     end
   end
+
+  describe "POST /responses/:id/explain_differently" do
+    let(:user) { create_user_with_key }
+
+    def reviewed_response_for(owner)
+      exercise = DailyExercise.create!(
+        user: owner, date: Date.current - 5, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: Date.current - 5,
+        answers: { "code_review" => "an answer with substance" },
+        submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid", "missed" => [ "the index" ] } }
+      )
+    end
+
+    def stub_alternate(text = "A different framing")
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:explain_differently).and_return(text)
+      fake
+    end
+
+    it "appends an alternate and persists it" do
+      r = reviewed_response_for(user)
+      stub_alternate("First alternate")
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:ok)
+      expect(r.reload.review_alternates["code_review"]).to eq([ "First alternate" ])
+    end
+
+    it "appends rather than replacing on a second call" do
+      r = reviewed_response_for(user)
+      stub_alternate("Second alternate")
+      r.update!(review_alternates: { "code_review" => [ "First alternate" ] })
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(r.reload.review_alternates["code_review"]).to eq([ "First alternate", "Second alternate" ])
+    end
+
+    it "returns 422 at the cap and does not call the provider" do
+      r = reviewed_response_for(user)
+      r.update!(review_alternates: { "code_review" => [ "one", "two" ] })
+      fake = stub_alternate
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:explain_differently)
+      expect(r.reload.review_alternates["code_review"]).to eq([ "one", "two" ])
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects a section absent from the exercise's problem_set" do
+      r = reviewed_response_for(user)
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "challenge" }
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "leaves the stored array untouched when the provider fails" do
+      r = reviewed_response_for(user)
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:explain_differently).and_raise(AiService::RateLimitError, "slow down")
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:service_unavailable)
+      expect(r.reload.review_alternates).to eq({})
+    end
+  end
 end

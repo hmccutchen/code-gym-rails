@@ -139,6 +139,43 @@ class AiService
     reference
   end
 
+  # ── Reframe one section's feedback a different way ───────────────────────
+  # Returns a plain string, not JSON: there is no structure to parse, and routing
+  # it through parse_json_object would add a failure mode for no benefit.
+  def explain_differently(user, exercise, daily_response, section:, prior_alternates: [])
+    coach   = config_for(exercise.language)[:coach]
+    review  = daily_response.ai_review&.dig(section) || {}
+    missed  = DailyResponse.review_points(review["missed"])
+
+    prior = if prior_alternates.any?
+      "Framings already given (do NOT reprise these angles or analogies):\n" +
+        prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
+    else
+      "No alternate framing has been given yet."
+    end
+
+    result = call(
+      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.",
+      prompt: <<~PROMPT
+        The engineer was asked: #{exercise.problem_set.dig(section, "question")}
+        Their answer: #{daily_response.answers[section].presence || "(skipped)"}
+
+        What they missed:
+        #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
+
+        #{prior}
+
+        Explain the SAME point again using a genuinely different approach — a
+        different analogy, a different level of abstraction, or a concrete worked
+        scenario instead of a principle. Do not repeat the original wording.
+        Two short paragraphs at most.
+      PROMPT
+    )
+
+    log_usage(user, result, purpose: "explain_differently")
+    result[:text].to_s.strip
+  end
+
   private
 
   # Looks up the fixed per-language config, failing loudly on anything

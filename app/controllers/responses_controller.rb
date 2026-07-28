@@ -1,11 +1,16 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [ :review, :email_review, :self_explanation ]
-  before_action :require_reviewed_section!, only: [ :self_explanation ]
+  before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently ]
+  before_action :require_reviewed_section!, only: [ :self_explanation, :explain_differently ]
 
   # How long a claimed-but-unfinished review blocks a retry. The provider call
   # has no configured timeout, so a crash or hang mid-review must not lock the
   # user out forever — after this window a new request may reclaim the row.
   REVIEW_CLAIM_STALE_AFTER = 3.minutes
+
+  # How many alternate framings a single section may accumulate. Enforced here as
+  # well as in the view: the view stops offering the button at the cap, but only
+  # the server bound holds against a crafted request.
+  MAX_ALTERNATES_PER_SECTION = 2
 
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
@@ -111,6 +116,28 @@ class ResponsesController < ApplicationController
     else
       render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # POST /responses/:id/explain_differently — one section's feedback, reframed.
+  # Synchronous like #review; the caller posts via fetch and appends in place.
+  def explain_differently
+    existing = Array(@response.review_alternates[@section])
+    if existing.size >= MAX_ALTERNATES_PER_SECTION
+      return render json: { status: "error", error: "You've already asked for #{MAX_ALTERNATES_PER_SECTION} alternate explanations here." },
+                    status: :unprocessable_entity
+    end
+
+    alternate = AiService.for(current_user).explain_differently(
+      current_user, @response.daily_exercise, @response,
+      section: @section, prior_alternates: existing
+    )
+
+    @response.review_alternates = @response.review_alternates.merge(@section => existing + [ alternate ])
+    @response.save!
+
+    render json: { status: "ok", alternate: alternate, remaining: MAX_ALTERNATES_PER_SECTION - existing.size - 1 }
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
   end
 
   private

@@ -51,6 +51,7 @@ Rails.application.routes.draw do
       post :review       # trigger the inline AI review
       post :email_review # email the completed review to the user
       patch :self_explanation # save the user's own restatement of why a fix works
+      post :explain_differently # regenerate one section's feedback with a new framing
     end
   end
 
