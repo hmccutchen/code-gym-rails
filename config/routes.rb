@@ -36,6 +36,11 @@ Rails.application.routes.draw do
   # in DashboardController#show intentionally didn't fire (weekends).
   post "generate", to: "daily_exercises#generate"
 
+  # Polled by the dashboard while an async generation job is in flight (see
+  # dashboard/_generating.html.erb) — this app has no live Turbo/ActionCable
+  # connection to push completion, so the page checks in instead.
+  get "dashboard/status", to: "dashboard#status", as: :dashboard_status
+
   # Submit/update today's answers. Rating rides along in #create's payload; there
   # is no per-day show page — /history renders every submitted day, today included.
   resources :responses, only: [ :create ] do
