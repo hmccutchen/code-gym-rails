@@ -533,9 +533,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
       expect(response.body).to match(/<details class="ref" open>\s*<summary>Reference — Scaling bottlenecks: how it works/)
 
+      # Deliberately omit concept_tags here: exposure count for "scaling_bottlenecks"
+      # stays at 0, so first_exposure? would still be true if evaluated. Any
+      # remaining collapse must come from the view's `!submitted` guard alone.
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "architecture" => "a" * 20 }, submitted_at: Time.current,
-                            concept_tags: { "architecture" => "scaling_bottlenecks" })
+                            answers: { "architecture" => "a" * 20 }, submitted_at: Time.current)
 
       get root_path
       expect(response.body).to match(/<details class="ref">\s*<summary>Reference — Scaling bottlenecks: how it works/)
