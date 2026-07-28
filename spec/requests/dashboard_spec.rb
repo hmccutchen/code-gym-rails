@@ -469,6 +469,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include("Reference — N plus one: how it works")
       expect(response.body).to include("Avoid the loop query")
+      expect(response.body).not_to include('<details class="ref" open>')
     end
 
     it "renders a submitted architecture answer read-only" do
