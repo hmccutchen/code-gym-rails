@@ -416,6 +416,32 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("Avoid the loop query")
     end
 
+    it "auto-expands the dropdown on a concept's first-ever exposure" do
+      exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to match(/<details class="ref" open>\s*<summary>Reference — N plus one: how it works/)
+    end
+
+    it "keeps the dropdown collapsed on a repeat exposure to the same concept" do
+      prior_exercise = DailyExercise.create!(user: user, date: Date.current - 1, language: "ruby_rails",
+                                             problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: prior_exercise, date: Date.current - 1,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+                            concept_tags: { "code_review" => "n_plus_one" })
+      exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to match(/<details class="ref">\s*<summary>Reference — N plus one: how it works/)
+      expect(response.body).not_to include('<details class="ref" open>')
+    end
+
     it "renders the section scenario label" do
       exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
 
@@ -443,6 +469,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include("Reference — N plus one: how it works")
       expect(response.body).to include("Avoid the loop query")
+      expect(response.body).not_to include('<details class="ref" open>')
     end
 
     it "renders a submitted architecture answer read-only" do
@@ -489,6 +516,33 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("name=\"response[answers][architecture]\"")   # prose textarea
       expect(response.body).to include("Reference — Scaling bottlenecks: how it works")  # arch-bucket dropdown
       expect(response.body).not_to include("# Your implementation")  # not the challenge textarea
+    end
+
+    it "auto-expands the architecture section's dropdown on first exposure, but not once submitted" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one", "scenario" => "billing" },
+          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization",
+                             "reference" => { "tagline" => "x", "explanation" => "y", "code_example" => "z", "senior_lens" => "w" } },
+          "architecture" => { "title" => "Datastore choice", "scenario" => "10x traffic", "question" => "Pick an approach",
+                              "options" => [ "Shard Postgres", "Add a cache" ], "concept" => "scaling_bottlenecks" }
+        })
+      ConceptReference.create!(concept: "scaling_bottlenecks", language: "architecture",
+                               tagline: "Find the bottleneck", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+      expect(response.body).to match(/<details class="ref" open>\s*<summary>Reference — Scaling bottlenecks: how it works/)
+
+      # Deliberately omit concept_tags here: exposure count for "scaling_bottlenecks"
+      # stays at 0, so first_exposure? would still be true if evaluated. Any
+      # remaining collapse must come from the view's `!submitted` guard alone.
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "architecture" => "a" * 20 }, submitted_at: Time.current)
+
+      get root_path
+      expect(response.body).to match(/<details class="ref">\s*<summary>Reference — Scaling bottlenecks: how it works/)
+      expect(response.body).not_to include('<details class="ref" open>')
     end
   end
 

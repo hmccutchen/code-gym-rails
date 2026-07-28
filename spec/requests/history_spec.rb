@@ -74,6 +74,29 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("1/3 sections")
     end
 
+    it "renders a submitted entry's concept-reference dropdown read-only" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern" => { "title" => "Pat", "question" => "pattern-q" },
+          "challenge" => { "question" => "challenge-q" }
+        },
+        generated_at: Time.current
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+                            answers: { "code_review" => "Answer with plenty of substance" },
+                            submitted_at: Time.current)
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("Reference — N plus one: how it works")
+      expect(response.body).not_to include('<details class="ref" open>')
+    end
+
     it "renders each entry's problems and the user's answers" do
       session = create_session_for(user, date: 1.day.ago.to_date)
 
