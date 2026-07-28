@@ -1,6 +1,24 @@
 require "rails_helper"
 
 RSpec.describe DailyResponse, type: :model do
+  describe ".review_points" do
+    it "strips entries and drops blanks from an array" do
+      expect(DailyResponse.review_points([ "  Spotted the N+1  ", "", "Missed the index", nil ]))
+        .to eq([ "Spotted the N+1", "Missed the index" ])
+    end
+
+    it "wraps a legacy string in a single-item array" do
+      expect(DailyResponse.review_points("One dense paragraph covering several points"))
+        .to eq([ "One dense paragraph covering several points" ])
+    end
+
+    it "returns an empty array for nil, a blank string, and an empty array" do
+      expect(DailyResponse.review_points(nil)).to eq([])
+      expect(DailyResponse.review_points("   ")).to eq([])
+      expect(DailyResponse.review_points([])).to eq([])
+    end
+  end
+
   let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
 
   let(:exercise) do

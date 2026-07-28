@@ -10,15 +10,32 @@ class DailyResponse < ApplicationRecord
 
   validates :date, uniqueness: { scope: :user_id }
 
-  # Ordered field → label map for rendering ai_review sections — shared by the
-  # shared/_ai_review partial and ReviewMailer so the copy lives in one place.
+  # Ordered field → {label, list} map for rendering ai_review sections — shared by
+  # the shared/_ai_review partial and ReviewMailer so the copy lives in one place.
+  # `list: true` fields hold multiple discrete points and render as a real list;
+  # next_step is deliberately one thing to study, so it stays a single string.
   # "rating" (badge) and "improved_code" (code block) render separately.
   AI_REVIEW_FIELDS = {
-    "correct"          => "What you got right",
-    "missed"           => "What you missed",
-    "better_questions" => "Questions to ask yourself",
-    "next_step"        => "Next step"
+    "correct"          => { label: "What you got right",        list: true  },
+    "missed"           => { label: "What you missed",           list: true  },
+    "better_questions" => { label: "Questions to ask yourself", list: true  },
+    "next_step"        => { label: "Next step",                 list: false }
   }.freeze
+
+  # Reads a review field as a list of discrete points regardless of how it was
+  # stored. Reviews generated before the schema moved to arrays hold a single
+  # string; those render as a one-item list rather than being backfilled, since
+  # ai_review is jsonb and old rows are still perfectly readable. A class method
+  # rather than a helper because the mailer's text template needs it too, and
+  # helpers aren't included in mailer views by default — same reason
+  # AI_REVIEW_FIELDS lives here.
+  def self.review_points(value)
+    case value
+    when Array then value.map { |v| v.to_s.strip }.reject(&:blank?)
+    when nil   then []
+    else            [ value.to_s.strip ].reject(&:blank?)
+    end
+  end
 
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?

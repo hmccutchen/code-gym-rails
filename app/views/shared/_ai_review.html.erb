@@ -5,9 +5,19 @@
     <% if response.self_rating_favorable?(section) && response.ai_rating_unfavorable?(section) %>
       <p class="calibration-note"><%= t("review.calibration_note", rating: response.self_rating_label(section)) %></p>
     <% end %>
-    <% DailyResponse::AI_REVIEW_FIELDS.each do |key, label| %>
-      <% if fb[key].present? %>
-        <p class="review-item"><strong><%= label %>:</strong> <%= fb[key] %></p>
+    <% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| %>
+      <% if field[:list] %>
+        <% points = DailyResponse.review_points(fb[key]) %>
+        <% if points.any? %>
+          <div class="review-item">
+            <strong><%= field[:label] %>:</strong>
+            <ul class="review-points">
+              <% points.each do |point| %><li><%= point %></li><% end %>
+            </ul>
+          </div>
+        <% end %>
+      <% elsif fb[key].present? %>
+        <p class="review-item"><strong><%= field[:label] %>:</strong> <%= fb[key] %></p>
       <% end %>
     <% end %>
     <% if fb["improved_code"].present? && response.improved_code_visible?(section) %>

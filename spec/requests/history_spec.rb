@@ -147,6 +147,31 @@ RSpec.describe "History", type: :request do
       # The malformed row must not take the rest of the page down with it.
       expect(response.body).to include("q-#{intact.date}")
     end
+
+    it "renders an array-shaped review field as a list, one item per point" do
+      session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      session.update!(ai_review: {
+        "code_review" => {
+          "rating"  => "solid",
+          "missed"  => [ "The missing index on user_id", "No transaction around the writes" ]
+        }
+      })
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("<li>The missing index on user_id</li>")
+      expect(response.body).to include("<li>No transaction around the writes</li>")
+    end
+
+    it "renders a legacy string-shaped review field as a single-item list" do
+      create_session_for(user, date: 2.days.ago.to_date, reviewed: true)
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("<li>Spotted the issue on #{2.days.ago.to_date}</li>")
+    end
   end
 
   describe "review summary label" do
