@@ -348,11 +348,16 @@ class AiService
     <<~PROMPT
       Review these Code Gym answers. For each section, return a JSON object with:
       - "rating": "beginner" | "developing" | "solid" | "strong"
-      - "correct": string — what they got right
-      - "missed": string — what they missed or got wrong
-      - "better_questions": string — questions they should have asked themselves
+      - "correct": array of strings — each entry one distinct thing they got right
+      - "missed": array of strings — each entry one distinct thing they missed or got wrong
+      - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
       - "improved_code": string — corrected/improved code (for code sections only; empty string otherwise)
+
+      Each array entry must be ONE self-contained idea in one or two sentences.
+      Never pack several points into one entry, and never number points inside an
+      entry ("1) ... 2) ...") — separate ideas belong in separate entries. Use an
+      empty array when there is nothing to say for that field.
 
       Exercise:
       Code Review question: #{exercise.code_review["question"]}

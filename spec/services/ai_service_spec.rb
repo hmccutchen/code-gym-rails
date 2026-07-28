@@ -530,6 +530,22 @@ RSpec.describe AiService do
       )
     end
 
+    it "asks for correct/missed/better_questions as arrays and next_step as a string" do
+      ex = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?", "snippet" => "code" },
+        "pattern"     => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "Implement uniq_by" }
+      })
+      resp = DailyResponse.new(answers: { "code_review" => "It's an N+1" })
+      prompt = service.send(:build_review_prompt, ex, resp)
+
+      expect(prompt).to include('"correct": array of strings')
+      expect(prompt).to include('"missed": array of strings')
+      expect(prompt).to include('"better_questions": array of strings')
+      expect(prompt).to include('"next_step": string')
+      expect(prompt).to match(/separate ideas belong in separate entries/i)
+    end
+
     context "architecture third section" do
       def arch_exercise
         DailyExercise.new(
