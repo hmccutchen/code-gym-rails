@@ -103,13 +103,27 @@ class ResponsesController < ApplicationController
   # nothing. Writing to an arbitrarily old response is intentional — /history is
   # where reviews live, so this is where the prompt is answered.
   def self_explanation
-    @response.self_explanations = @response.self_explanations.merge(
-      @section => params[:text].to_s.strip
-    )
-    if @response.save
+    text = params[:text].to_s.strip
+    saved = true
+    errors = nil
+
+    # No AI call here, so the lock is held only for a fast read-merge-write —
+    # unlike explain_differently/follow_ups there's nothing slow to keep
+    # outside it. Without this, two tabs saving different sections at once
+    # each hold their own stale in-memory hash, and the last save wins,
+    # silently dropping the other tab's section.
+    @response.with_lock do
+      @response.self_explanations = @response.self_explanations.merge(
+        @section => text
+      )
+      saved = @response.save
+      errors = @response.errors.full_messages.to_sentence unless saved
+    end
+
+    if saved
       render json: { status: "saved" }
     else
-      render_section_error(@response.errors.full_messages.to_sentence)
+      render_section_error(errors)
     end
   end
 

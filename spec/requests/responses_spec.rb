@@ -591,6 +591,29 @@ RSpec.describe "Responses", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)).to eq("status" => "error", "error" => "Answers is invalid")
     end
+
+    it "doesn't drop another section's explanation written concurrently by a second tab" do
+      r = reviewed_response_for(user)
+      # Simulates a second tab's request for a different section committing in
+      # the gap between this request loading @response (in set_response) and
+      # this request taking the row lock. Without with_lock's reload, the merge
+      # would still be operating on the pre-concurrent-write in-memory hash and
+      # would overwrite "pattern" on save.
+      allow_any_instance_of(DailyResponse).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+        DailyResponse.where(id: r.id)
+          .update_all(%(self_explanations = self_explanations || '{"pattern":"concurrent"}'::jsonb))
+        original.call(*args, &block)
+      end
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "Because it batches the query" }
+
+      expect(response).to have_http_status(:ok)
+      expect(r.reload.self_explanations).to eq(
+        "code_review" => "Because it batches the query",
+        "pattern" => "concurrent"
+      )
+    end
   end
 
   describe "POST /responses/:id/explain_differently" do
