@@ -516,6 +516,31 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("Reference — Scaling bottlenecks: how it works")  # arch-bucket dropdown
       expect(response.body).not_to include("# Your implementation")  # not the challenge textarea
     end
+
+    it "auto-expands the architecture section's dropdown on first exposure, but not once submitted" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one", "scenario" => "billing" },
+          "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization",
+                             "reference" => { "tagline" => "x", "explanation" => "y", "code_example" => "z", "senior_lens" => "w" } },
+          "architecture" => { "title" => "Datastore choice", "scenario" => "10x traffic", "question" => "Pick an approach",
+                              "options" => [ "Shard Postgres", "Add a cache" ], "concept" => "scaling_bottlenecks" }
+        })
+      ConceptReference.create!(concept: "scaling_bottlenecks", language: "architecture",
+                               tagline: "Find the bottleneck", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+      expect(response.body).to match(/<details class="ref" open>\s*<summary>Reference — Scaling bottlenecks: how it works/)
+
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "architecture" => "a" * 20 }, submitted_at: Time.current,
+                            concept_tags: { "architecture" => "scaling_bottlenecks" })
+
+      get root_path
+      expect(response.body).to match(/<details class="ref">\s*<summary>Reference — Scaling bottlenecks: how it works/)
+      expect(response.body).not_to include('<details class="ref" open>')
+    end
   end
 
   describe "streak display" do

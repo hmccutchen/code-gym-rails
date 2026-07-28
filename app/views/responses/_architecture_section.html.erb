@@ -25,7 +25,8 @@
     </details>
   <% end %>
   <% if (ref = concept_reference_for(arch["concept"], "architecture")) %>
-    <%= render "shared/concept_reference", reference: ref %>
+    <%= render "shared/concept_reference", reference: ref,
+          open: !submitted && first_exposure?(arch["concept"], "architecture", response.date) %>
   <% end %>
   <%= render "dashboard/teaching_hint", note: arch["teaching_note"], field: "architecture", submitted: submitted, answer: response.answers["architecture"] %>
   <% if submitted %>
