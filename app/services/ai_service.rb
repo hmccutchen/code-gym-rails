@@ -352,7 +352,7 @@ class AiService
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — corrected/improved code for code_review, pattern, and challenge (empty string for architecture)
+      - "improved_code": string — corrected/improved code for #{third_key == "architecture" ? "code_review and pattern" : "code_review, pattern, and challenge"}#{third_key == "architecture" ? " (empty string for architecture)" : ""}
 
       Each array entry must be ONE self-contained idea in one or two sentences.
       Never pack several points into one entry, and never number points inside an

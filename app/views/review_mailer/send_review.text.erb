@@ -26,10 +26,11 @@ Rating: <%= fb["rating"] %>
 
 <% end -%>
 <% end -%>
-<% if fb["improved_code"].present? && section != "architecture" && @response.improved_code_visible?(section) -%>
+<% improved_code = DailyResponse.review_points(fb["improved_code"]).join("\n") -%>
+<% if improved_code.present? && section != "architecture" && @response.improved_code_visible?(section) -%>
 Improved code:
 
-<%= fb["improved_code"] %>
+<%= improved_code %>
 
 <% end -%>
 <% end -%>

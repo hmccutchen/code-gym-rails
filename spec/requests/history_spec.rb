@@ -57,6 +57,29 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("arch_improved_marker")
     end
 
+    it "renders improved_code for a visible pattern section" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern" => { "title" => "Pat", "question" => "pattern-q" },
+          "challenge" => { "question" => "challenge-q" }
+        }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "pattern" => "Extract a service object" },
+        submitted_at: Time.current,
+        concept_tags: { "pattern" => "other" },
+        ai_review: { "pattern" => { "rating" => "solid", "improved_code" => "pattern_improved_marker" } }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("pattern_improved_marker")
+    end
+
     it "lists only the current user's submitted responses, newest first" do
       other = create_user_with_key(email: "other@example.com", name: "Other")
       old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")

@@ -581,6 +581,7 @@ RSpec.describe AiService do
         expect(prompt.downcase).to include("alternatives")
         expect(prompt).to include('"architecture"')   # asks for the architecture key back
         expect(prompt).not_to include("Coding Challenge:")
+        expect(prompt).to include('For this section "improved_code" must be an empty string.')
       end
     end
 
