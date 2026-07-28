@@ -288,6 +288,65 @@ RSpec.describe AiService do
     end
   end
 
+  describe "retention check selection" do
+    def mastery(concept:, bucket:, due_on:)
+      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: due_on)
+    end
+
+    it "fills only the slots reinforcement did not claim" do
+      mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
+      allow(user).to receive(:concepts_needing_reinforcement)
+        .and_return([ { concept: "a", tier: "standard" }, { concept: "b", tier: "standard" } ])
+
+      checks = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
+      expect(checks.map(&:concept)).to eq(%w[memoization])
+    end
+
+    it "offers nothing when reinforcement already claims three slots" do
+      mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
+      expect(service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 0)).to eq([])
+    end
+
+    it "offers architecture-bucket concepts only on architecture days" do
+      mastery(concept: "service_boundaries", bucket: "architecture", due_on: Date.current - 2)
+
+      on_challenge = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 3)
+      on_arch      = service.send(:retention_checks_for, user, "ruby_rails", third: :architecture, slots: 3)
+
+      expect(on_challenge.map(&:concept)).to eq([])
+      expect(on_arch.map(&:concept)).to eq(%w[service_boundaries])
+    end
+
+    it "never offers a concept from the other language's bucket" do
+      mastery(concept: "closures", bucket: "javascript", due_on: Date.current - 2)
+      checks = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 3)
+      expect(checks.map(&:concept)).to eq([])
+    end
+  end
+
+  describe "retention prompt block" do
+    it "labels retention concepts separately and demands a fresh scenario at full difficulty" do
+      cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).to include("memoization")
+      expect(prompt).to match(/retention check/i)
+      expect(prompt).to match(/fresh/i)
+      expect(prompt).to match(/full difficulty|do not (ease|simplify)/i)
+    end
+
+    it "omits the retention block entirely when nothing is due" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [])
+      expect(prompt).not_to match(/retention check/i)
+    end
+  end
+
   describe "#normalize_concepts" do
     it "keeps on-list concepts and maps off-list ones to 'other'" do
       set = {
@@ -513,8 +572,45 @@ RSpec.describe AiService do
       set = { "code_review" => { "concept" => "n_plus_one" } }
       svc = double_class.new(canned_text: set.to_json)
       allow(svc).to receive(:roll_third_section).and_return(:architecture)
-      expect(svc).to receive(:build_exercise_prompt).with(user, anything, third: :architecture).and_call_original
+      expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
+    end
+  end
+
+  describe "retention instrumentation" do
+    def due_mastery
+      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 2)
+    end
+
+    it "logs offered and honored when the model used the due concept" do
+      due_mastery
+      set = { "code_review" => { "concept" => "memoization" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=memoization/)
+      svc.generate_exercise(user, language: "ruby_rails")
+    end
+
+    it "logs an empty honored list when the model ignored the due concept" do
+      due_mastery
+      set = { "code_review" => { "concept" => "n_plus_one" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=-.*tagged=n_plus_one/)
+      svc.generate_exercise(user, language: "ruby_rails")
+    end
+
+    it "logs nothing when no check is due" do
+      set = { "code_review" => { "concept" => "n_plus_one" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      expect(Rails.logger).not_to receive(:info).with(/\[retention\]/)
+      svc.generate_exercise(user, language: "ruby_rails")
     end
   end
 

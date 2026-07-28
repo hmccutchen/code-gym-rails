@@ -94,13 +94,23 @@ class AiService
   end
 
   # ── Generate a personalized daily exercise set ────────────────────────────
+  # Concept selection happens HERE rather than inside build_exercise_prompt so the
+  # caller can compare what was offered against what the model actually used — the
+  # prompt builder is private and returns only a string, so it cannot report that.
   def generate_exercise(user, language: user.language_for_today)
-    third  = roll_third_section
+    third         = roll_third_section
+    reinforcement = user.concepts_needing_reinforcement
+    slots         = [ 3 - reinforcement.size, 0 ].max
+    due_checks    = retention_checks_for(user, language, third: third, slots: slots)
+
     result = call(system: build_system_prompt(language),
-                  prompt: build_exercise_prompt(user, language, third: third))
+                  prompt: build_exercise_prompt(user, language, third: third,
+                                                reinforcement: reinforcement, due_checks: due_checks))
 
     log_usage(user, result, purpose: "generate_exercise")
-    normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    log_retention(user, language, due_checks, problem_set)
+    problem_set
   end
 
   # ── Review a submitted response inline ───────────────────────────────────
@@ -234,6 +244,41 @@ class AiService
     rand < 0.75 ? :architecture : :challenge
   end
 
+  # Due retention checks for the buckets this day can actually host. Architecture
+  # concepts have no home outside the architecture third, and a language concept
+  # must match the day's resolved generation language — otherwise a mixed-language
+  # user gets a Rails concept on a JavaScript day.
+  def retention_checks_for(user, language, third:, slots:)
+    return [] if slots.zero?
+
+    buckets = [ language ]
+    buckets << "architecture" if third == :architecture
+
+    buckets.flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: slots).to_a }
+           .sort_by(&:next_retention_check_on)
+           .first(slots)
+  end
+
+  # Delivery is advisory, so the only way to know whether retention checks actually
+  # land is to record both halves. Logged after normalize_concepts so it reflects
+  # the concepts actually persisted, not whatever the provider first returned.
+  # `tagged` makes a miss diagnosable rather than merely countable: it shows what
+  # the model picked instead.
+  def log_retention(user, language, due_checks, problem_set)
+    return if due_checks.empty?
+
+    offered = due_checks.map(&:concept)
+    tagged  = problem_set.values.filter_map { |s| s["concept"] if s.is_a?(Hash) }
+    honored = offered & tagged
+
+    Rails.logger.info(
+      "[retention] user=#{user.id} date=#{Date.current} language=#{language} " \
+      "offered=#{offered.join(',').presence || '-'} " \
+      "honored=#{honored.join(',').presence || '-'} " \
+      "tagged=#{tagged.join(',').presence || '-'}"
+    )
+  end
+
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
   def call(system:, prompt:)
@@ -316,7 +361,7 @@ class AiService
     SCHEMA
   end
 
-  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge)
+  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [])
     history = user.recent_performance
 
     history_text = if history.empty?
@@ -337,9 +382,27 @@ class AiService
       }.join("\n")
     end
 
-    reinforcement_list = user.concepts_needing_reinforcement
+    reinforcement_list = reinforcement || user.concepts_needing_reinforcement
     reinforcement_text = reinforcement_list.any? ?
       reinforcement_list.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
+
+    # Advisory, like every other concept instruction here — the model may ignore it.
+    # If real-world hit rate turns out low, the fix is to escalate THIS wording
+    # toward the directive phrasing used for reinforcement above ("reintroduce
+    # every concept listed"). It is not a reason to revisit the schedule, the data
+    # model, or the decision not to track delivery.
+    retention_block =
+      if due_checks.any?
+        <<~RET.chomp
+
+          Retention checks due today: #{due_checks.map(&:concept).join(', ')}
+          - These are concepts the engineer previously MASTERED. Work each one into a section above, alongside the reinforcement concepts.
+          - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
+          - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.
+        RET
+      else
+        ""
+      end
 
     config      = config_for(language)
     label       = config[:label]
@@ -387,6 +450,7 @@ class AiService
       #{third_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
+      #{retention_block}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
