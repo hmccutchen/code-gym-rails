@@ -24,6 +24,25 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe ".improved_code_text" do
+    it "preserves a code block's leading indentation, unlike .review_points" do
+      code = "def foo\n  bar\nend"
+      expect(DailyResponse.improved_code_text(code)).to eq(code)
+    end
+
+    it "tolerates the Array shape drift review_points guards against, joined without stripping entries" do
+      expect(DailyResponse.improved_code_text([ "  def foo", "  bar", "end" ]))
+        .to eq("  def foo\n  bar\nend")
+    end
+
+    it "treats nil and blank as absent" do
+      expect(DailyResponse.improved_code_text(nil)).to be_nil
+      expect(DailyResponse.improved_code_text("")).to be_nil
+      expect(DailyResponse.improved_code_text("   ")).to be_nil
+      expect(DailyResponse.improved_code_text([])).to be_nil
+    end
+  end
+
   let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
 
   let(:exercise) do
@@ -156,6 +175,17 @@ RSpec.describe DailyResponse, type: :model do
 
       expect(first.improved_code_visible?("pattern")).to be(false)
       expect(second.improved_code_visible?("pattern")).to be(true)
+    end
+
+    it "is always false for the architecture section, even on a repeat exposure" do
+      first  = submit(concept: "service_boundaries", date: Date.current - 3)
+      second = submit(concept: "service_boundaries", date: Date.current - 1)
+      # improved_code_visible? is normally keyed by section+concept; pass
+      # "architecture" directly to prove the exclusion is unconditional, not
+      # incidentally true because these fixtures never tag an architecture
+      # section.
+      expect(first.improved_code_visible?("architecture")).to be(false)
+      expect(second.improved_code_visible?("architecture")).to be(false)
     end
   end
 end

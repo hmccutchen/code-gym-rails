@@ -23,8 +23,8 @@
         <% end %>
       <% end %>
     <% end %>
-    <% improved_code = DailyResponse.review_points(fb["improved_code"]).join("\n") %>
-    <% if improved_code.present? && section != "architecture" && response.improved_code_visible?(section) %>
+    <% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) %>
+    <% if improved_code.present? && response.improved_code_visible?(section) %>
       <pre class="snippet" style="margin-top:.75rem"><code><%= improved_code %></code></pre>
     <% end %>
     <div class="alternates" data-section="<%= section %>">

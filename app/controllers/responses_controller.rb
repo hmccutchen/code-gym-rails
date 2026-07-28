@@ -164,12 +164,28 @@ class ResponsesController < ApplicationController
       section: @section, question: question, thread: thread
     )
 
-    ActiveRecord::Base.transaction do
-      @response.review_follow_ups.create!(section: @section, role: :user, content: question)
-      @response.review_follow_ups.create!(section: @section, role: :assistant, content: answer)
+    # The provider call above is slow and deliberately stays outside the lock.
+    # The count check above is only advisory — two concurrent requests can both
+    # read `asked == 2` and both reach here. with_lock takes a row lock and
+    # reloads @response, so this re-check is the real guarantee: if the cap was
+    # reached by another request while this one was waiting on the provider,
+    # this request backs off here instead of writing a 4th turn.
+    capped = false
+    @response.with_lock do
+      current_count = @response.review_follow_ups.where(section: @section, role: :user).count
+      if current_count >= MAX_FOLLOW_UPS_PER_SECTION
+        capped = true
+      else
+        @response.review_follow_ups.create!(section: @section, role: :user, content: question)
+        @response.review_follow_ups.create!(section: @section, role: :assistant, content: answer)
+      end
     end
 
-    render json: { status: "ok", answer: answer, remaining: MAX_FOLLOW_UPS_PER_SECTION - asked - 1 }
+    if capped
+      render_section_error("You've used all #{MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+    else
+      render json: { status: "ok", answer: answer, remaining: MAX_FOLLOW_UPS_PER_SECTION - asked - 1 }
+    end
   rescue AiService::Error => e
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end

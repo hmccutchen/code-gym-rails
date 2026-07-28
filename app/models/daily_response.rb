@@ -37,6 +37,17 @@ class DailyResponse < ApplicationRecord
     end
   end
 
+  # Same array-tolerance as review_points (a schema drift could return an Array
+  # here too), but without stripping each entry: review_points' per-entry
+  # #strip is right for prose points, but for a code block it deletes the
+  # first line's leading indentation. nil/blank is still "absent" either way.
+  def self.improved_code_text(value)
+    case value
+    when Array then value.map(&:to_s).join("\n")
+    else            value.to_s
+    end.then { |text| text.blank? ? nil : text }
+  end
+
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
@@ -62,10 +73,15 @@ class DailyResponse < ApplicationRecord
   # improved_code is revealed only from a concept's SECOND exposure onward — the
   # first time a concept appears, the corrected answer stays hidden (mirrors the
   # attempt-gated teaching_note). Ungated for blank/"other" (no concept to track).
+  # The architecture section never has improved_code at all (the model is asked
+  # to return an empty string there — see build_review_prompt) — that exclusion
+  # lives here rather than in each render template, so both templates stay in
+  # sync automatically.
   def improved_code_visible?(section)
+    return false if section.to_s == "architecture"
     concept = concept_tags[section.to_s]
     return true if concept.blank? || concept == "other"
-    bucket = section.to_s == "architecture" ? "architecture" : daily_exercise.language
+    bucket = daily_exercise.language
     user.concept_exposure_count(concept, bucket, on_or_before: date) >= 2
   end
 end

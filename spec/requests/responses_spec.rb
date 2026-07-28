@@ -746,5 +746,27 @@ RSpec.describe "Responses", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(r.reload.review_follow_ups.count).to eq(0)
     end
+
+    it "backs off without writing when another request fills the cap while this one waits on the provider" do
+      r = reviewed_response_for(user)
+      2.times { |i| ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "q#{i}") }
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      # The count-then-create cap check is race-able: the initial count (2, still
+      # under the cap of 3) is read before this slow provider call. Simulate a
+      # concurrent second request completing its own turn pair while this one is
+      # still waiting — the re-check inside with_lock must catch that the cap
+      # was reached in the meantime, rather than blindly writing a 4th user turn.
+      allow(fake).to receive(:answer_follow_up) do
+        ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "concurrent")
+        "An answer"
+      end
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "One more?" }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
+    end
   end
 end
