@@ -8,8 +8,13 @@ class DashboardController < ApplicationController
 
     if flash[:generating]
       # Set by DailyExercisesController#generate right after a manual weekend
-      # trigger — avoids re-enqueueing a second job on this same request.
+      # trigger or a "Try again" retry — an explicit fresh trigger always
+      # takes priority over a stale failure recorded earlier today.
       @generating = true
+    elsif current_user.last_generation_error_date == Date.current
+      # An earlier attempt today failed and nothing has retried since — show
+      # the failure instead of silently auto-enqueuing another attempt.
+      @generation_failed = true
     elsif Date.current.on_weekday?
       GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
       @generating = true

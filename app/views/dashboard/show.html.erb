@@ -32,11 +32,11 @@
   </div>
 </div>
 
-<%= turbo_stream_from current_user %>
-
 <div id="dashboard-content">
   <% if @generating %>
     <%= render "dashboard/generating" %>
+  <% elsif @generation_failed %>
+    <%= render "dashboard/generation_failed", message: current_user.last_generation_error %>
   <% elsif @weekend_no_exercise %>
     <%= render "dashboard/weekend_empty" %>
   <% else %>

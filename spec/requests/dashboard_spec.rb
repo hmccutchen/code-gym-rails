@@ -90,6 +90,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to match(/id="submit-row"[^>]*style="display:none"/)
   end
 
+  it "never renders a Turbo Stream subscription tag (this app loads no Turbo JS)" do
+    create_exercise
+    get root_path
+    expect(response.body).not_to include("turbo-cable-stream-source")
+  end
+
   it "always renders the answer form as a plain POST, even for a persisted draft" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
@@ -290,20 +296,13 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       end
 
       # Regression lock-in: the dashboard must live-update once generation
-      # finishes rather than requiring a manual refresh. The placeholder's
-      # wrapper id must match what GenerateDailyExercisesJob broadcasts a
-      # replace against, and the page must actually subscribe to that user's
-      # Turbo Stream — otherwise the job's broadcast has nothing to update.
-      it "wraps the placeholder in the dashboard-content id the job broadcasts a replace to" do
+      # finishes rather than requiring a manual refresh. dashboard/_generating's
+      # inline script polls GET /dashboard/status and reloads on completion —
+      # the placeholder just needs to keep the dashboard-content wrapper id.
+      it "wraps the placeholder in the dashboard-content id" do
         get root_path
 
         expect(response.body).to match(%r{<div id="dashboard-content">.*Generating your personalized exercise set.*</div>}m)
-      end
-
-      it "subscribes to the current user's Turbo Stream so the job's broadcast can reach this page" do
-        get root_path
-
-        expect(response.body).to include(Turbo::StreamsChannel.signed_stream_name(user))
       end
     end
 
@@ -324,6 +323,53 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).to include('data-loading-form="true"')
         expect(response.body).to include('data-loading-label="Generating…"')
       end
+    end
+  end
+
+  describe "generation failure recovery" do
+    around do |example|
+      travel_to(Date.new(2026, 7, 13)) { example.run } # Monday
+    end
+
+    it "shows the failure message instead of the exercise when today's generation failed" do
+      user.update!(last_generation_error_date: Date.current,
+                   last_generation_error: "The AI provider is rate-limiting requests — try again shortly.")
+
+      get root_path
+
+      expect(response.body).to include("Couldn't generate today's exercises.")
+      expect(response.body).to include("The AI provider is rate-limiting requests — try again shortly.")
+    end
+
+    it "does not re-enqueue a job when today's generation already failed" do
+      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+
+      expect {
+        get root_path
+      }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+    end
+
+    it "shows the generating state instead of the stale failure once a retry is triggered" do
+      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+
+      expect {
+        post generate_path
+      }.to have_enqueued_job(GenerateDailyExercisesJob)
+
+      get root_path
+
+      expect(response.body).to include("Generating your personalized exercise set")
+    end
+
+    it "shows the exercise, not the stale failure, once generation succeeds after an earlier failure today" do
+      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+      DailyExercise.create!(user: user, date: Date.current,
+                            problem_set: base_problem_set, generated_at: Time.current)
+
+      get root_path
+
+      expect(response.body).not_to include("Couldn't generate today's exercises.")
+      expect(response.body).to include('data-rating-for="code_review"')
     end
   end
 
