@@ -25,6 +25,17 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.last_generation_error).to be_nil
   end
 
+  it "clears a prior failure once generation succeeds" do
+    user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(user.reload.last_generation_error_date).to be_nil
+    expect(user.last_generation_error).to be_nil
+  end
+
   it "logs and continues when AiService::Error is raised" do
     fake_service = instance_double(ClaudeService)
     allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
