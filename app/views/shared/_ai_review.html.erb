@@ -31,7 +31,7 @@
       <% Array(response.review_alternates[section]).each do |alt| %>
         <p class="alternate-item"><%= alt %></p>
       <% end %>
-      <% if Array(response.review_alternates[section]).size < ResponsesController::MAX_ALTERNATES_PER_SECTION %>
+      <% if Array(response.review_alternates[section]).size < DailyResponse::MAX_ALTERNATES_PER_SECTION %>
         <button type="button" class="btn btn-ghost btn-sm explain-differently"
                 data-url="<%= explain_differently_response_path(response) %>"
                 data-section="<%= section %>">Explain this differently</button>
@@ -56,14 +56,14 @@
           <p class="follow-up-turn follow-up-<%= turn.role %>"><%= turn.content %></p>
         <% end %>
       </div>
-      <% if asked < ResponsesController::MAX_FOLLOW_UPS_PER_SECTION %>
+      <% if asked < DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %>
         <div class="follow-up-form">
           <input type="text" class="follow-up-input" placeholder="Ask a follow-up about this feedback…"
                  data-url="<%= follow_ups_response_path(response) %>" data-section="<%= section %>">
           <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
         </div>
       <% else %>
-        <p class="follow-up-capped">You've used all <%= ResponsesController::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.</p>
+        <p class="follow-up-capped">You've used all <%= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.</p>
       <% end %>
       <span class="follow-up-status" aria-live="polite"></span>
     </div>
@@ -156,7 +156,7 @@
       input.disabled = true;
       status.textContent = "Thinking…";
       try {
-        const res = await fetch(button.dataset.url ?? input.dataset.url, {
+        const res = await fetch(input.dataset.url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -178,7 +178,7 @@
           container.querySelector(".follow-up-form").remove();
           const capped = document.createElement("p");
           capped.className = "follow-up-capped";
-          capped.textContent = "You've used all your follow-ups for this section.";
+          capped.textContent = "You've used all <%= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.";
           container.insertBefore(capped, status);
         }
       } catch (e) {

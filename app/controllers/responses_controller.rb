@@ -7,15 +7,6 @@ class ResponsesController < ApplicationController
   # user out forever — after this window a new request may reclaim the row.
   REVIEW_CLAIM_STALE_AFTER = 3.minutes
 
-  # How many alternate framings a single section may accumulate. Enforced here as
-  # well as in the view: the view stops offering the button at the cap, but only
-  # the server bound holds against a crafted request.
-  MAX_ALTERNATES_PER_SECTION = 2
-
-  # How many questions a user may ask about one section. Three exchanges is enough
-  # to clear up a misunderstanding without the review becoming an open-ended chat.
-  MAX_FOLLOW_UPS_PER_SECTION = 3
-
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
     exercise = current_user.daily_exercises.for_date.first
@@ -118,7 +109,7 @@ class ResponsesController < ApplicationController
     if @response.save
       render json: { status: "saved" }
     else
-      render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity
+      render_section_error(@response.errors.full_messages.to_sentence)
     end
   end
 
@@ -126,9 +117,8 @@ class ResponsesController < ApplicationController
   # Synchronous like #review; the caller posts via fetch and appends in place.
   def explain_differently
     existing = Array(@response.review_alternates[@section])
-    if existing.size >= MAX_ALTERNATES_PER_SECTION
-      return render json: { status: "error", error: "You've already asked for #{MAX_ALTERNATES_PER_SECTION} alternate explanations here." },
-                    status: :unprocessable_entity
+    if existing.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
+      return render_section_error("You've already asked for #{DailyResponse::MAX_ALTERNATES_PER_SECTION} alternate explanations here.")
     end
 
     alternate = AiService.for(current_user).explain_differently(
@@ -139,7 +129,7 @@ class ResponsesController < ApplicationController
     @response.review_alternates = @response.review_alternates.merge(@section => existing + [ alternate ])
     @response.save!
 
-    render json: { status: "ok", alternate: alternate, remaining: MAX_ALTERNATES_PER_SECTION - existing.size - 1 }
+    render json: { status: "ok", alternate: alternate, remaining: DailyResponse::MAX_ALTERNATES_PER_SECTION - existing.size - 1 }
   rescue AiService::Error => e
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end
@@ -153,8 +143,8 @@ class ResponsesController < ApplicationController
     return render_section_error("Ask a question first.") if question.blank?
 
     asked = @response.review_follow_ups.where(section: @section, role: :user).count
-    if asked >= MAX_FOLLOW_UPS_PER_SECTION
-      return render_section_error("You've used all #{MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+    if asked >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
+      return render_section_error("You've used all #{DailyResponse::MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
     end
 
     thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
@@ -173,7 +163,7 @@ class ResponsesController < ApplicationController
     capped = false
     @response.with_lock do
       current_count = @response.review_follow_ups.where(section: @section, role: :user).count
-      if current_count >= MAX_FOLLOW_UPS_PER_SECTION
+      if current_count >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
         capped = true
       else
         @response.review_follow_ups.create!(section: @section, role: :user, content: question)
@@ -182,9 +172,9 @@ class ResponsesController < ApplicationController
     end
 
     if capped
-      render_section_error("You've used all #{MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+      render_section_error("You've used all #{DailyResponse::MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
     else
-      render json: { status: "ok", answer: answer, remaining: MAX_FOLLOW_UPS_PER_SECTION - asked - 1 }
+      render json: { status: "ok", answer: answer, remaining: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - asked - 1 }
     end
   rescue AiService::Error => e
     render json: { status: "error", error: e.message }, status: :service_unavailable

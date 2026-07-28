@@ -9,6 +9,19 @@ class DailyResponse < ApplicationRecord
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
 
+  # How many alternate framings a single section may accumulate. Enforced in
+  # ResponsesController#explain_differently as well as in the view: the view
+  # stops offering the button at the cap, but only the server bound holds
+  # against a crafted request. Lives here, not on the controller, because it's
+  # a property of the data (how many alternates a response may hold) that the
+  # view partial also needs to read.
+  MAX_ALTERNATES_PER_SECTION = 2
+
+  # How many questions a user may ask about one section. Three exchanges is
+  # enough to clear up a misunderstanding without the review becoming an
+  # open-ended chat. Same rationale as MAX_ALTERNATES_PER_SECTION for living here.
+  MAX_FOLLOW_UPS_PER_SECTION = 3
+
   validates :date, uniqueness: { scope: :user_id }
 
   # Ordered field → {label, list} map for rendering ai_review sections — shared by

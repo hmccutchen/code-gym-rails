@@ -580,6 +580,17 @@ RSpec.describe "Responses", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(r.reload.self_explanations).to eq({})
     end
+
+    it "uses the same {status, error} shape as the other review endpoints on a save failure" do
+      r = reviewed_response_for(user)
+      allow_any_instance_of(DailyResponse).to receive(:save).and_return(false)
+      allow_any_instance_of(DailyResponse).to receive_message_chain(:errors, :full_messages).and_return([ "Answers is invalid" ])
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)).to eq("status" => "error", "error" => "Answers is invalid")
+    end
   end
 
   describe "POST /responses/:id/explain_differently" do
@@ -635,6 +646,10 @@ RSpec.describe "Responses", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(fake).not_to have_received(:explain_differently)
       expect(r.reload.review_alternates["code_review"]).to eq([ "one", "two" ])
+      # Same error-body shape as follow_ups' cap and every other section error —
+      # {"status", "error"} — not a hand-rolled one-off render.
+      expect(JSON.parse(response.body)).to eq("status" => "error",
+        "error" => "You've already asked for 2 alternate explanations here.")
     end
 
     it "404s for another user's response" do
