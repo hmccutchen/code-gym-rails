@@ -48,6 +48,25 @@
                 placeholder="Optional — putting it in your own words is the point."><%= response.self_explanations[section] %></textarea>
       <span class="self-explanation-status" aria-live="polite"></span>
     </div>
+    <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by(&:created_at) %>
+    <% asked = turns.count { |t| t.role_user? } %>
+    <div class="follow-ups" data-section="<%= section %>">
+      <div class="follow-up-thread">
+        <% turns.each do |turn| %>
+          <p class="follow-up-turn follow-up-<%= turn.role %>"><%= turn.content %></p>
+        <% end %>
+      </div>
+      <% if asked < ResponsesController::MAX_FOLLOW_UPS_PER_SECTION %>
+        <div class="follow-up-form">
+          <input type="text" class="follow-up-input" placeholder="Ask a follow-up about this feedback…"
+                 data-url="<%= follow_ups_response_path(response) %>" data-section="<%= section %>">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+        </div>
+      <% else %>
+        <p class="follow-up-capped">You've used all <%= ResponsesController::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.</p>
+      <% end %>
+      <span class="follow-up-status" aria-live="polite"></span>
+    </div>
   </div>
 <% end %>
 
@@ -113,6 +132,65 @@
         status.textContent = e.message || "Couldn't generate that — try again";
         button.disabled = false;
       }
+    });
+  });
+
+  document.querySelectorAll(".follow-up-send:not([data-fu-wired])").forEach(button => {
+    button.dataset.fuWired = "1";
+    const container = button.closest(".follow-ups");
+    const input = container.querySelector(".follow-up-input");
+    const thread = container.querySelector(".follow-up-thread");
+    const status = container.querySelector(".follow-up-status");
+
+    const addTurn = (role, text) => {
+      const p = document.createElement("p");
+      p.className = "follow-up-turn follow-up-" + role;
+      p.textContent = text;
+      thread.appendChild(p);
+    };
+
+    const send = async () => {
+      const question = input.value.trim();
+      if (!question) return;
+      button.disabled = true;
+      input.disabled = true;
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(button.dataset.url ?? input.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: input.dataset.section, question: question })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        addTurn("user", question);
+        addTurn("assistant", data.answer);
+        input.value = "";
+        status.textContent = "";
+        if (data.remaining > 0) {
+          button.disabled = false;
+          input.disabled = false;
+        } else {
+          container.querySelector(".follow-up-form").remove();
+          const capped = document.createElement("p");
+          capped.className = "follow-up-capped";
+          capped.textContent = "You've used all your follow-ups for this section.";
+          container.insertBefore(capped, status);
+        }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't send that — try again";
+        button.disabled = false;
+        input.disabled = false;
+      }
+    };
+
+    button.addEventListener("click", send);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); send(); }
     });
   });
 })();

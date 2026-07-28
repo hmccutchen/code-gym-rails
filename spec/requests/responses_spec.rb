@@ -666,4 +666,85 @@ RSpec.describe "Responses", type: :request do
       expect(r.reload.review_alternates).to eq({})
     end
   end
+
+  describe "POST /responses/:id/follow_ups" do
+    let(:user) { create_user_with_key }
+
+    def reviewed_response_for(owner)
+      exercise = DailyExercise.create!(
+        user: owner, date: Date.current - 5, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: Date.current - 5,
+        answers: { "code_review" => "an answer with substance" },
+        submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+    end
+
+    def stub_answer(text = "Because the query runs per row.")
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:answer_follow_up).and_return(text)
+      fake
+    end
+
+    it "creates the user turn and the assistant turn, in order" do
+      r = reviewed_response_for(user)
+      stub_answer
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why is that slow?" }
+      expect(response).to have_http_status(:ok)
+
+      turns = r.reload.review_follow_ups.for_section("code_review")
+      expect(turns.map(&:role)).to eq(%w[user assistant])
+      expect(turns.first.content).to eq("Why is that slow?")
+      expect(turns.last.content).to eq("Because the query runs per row.")
+    end
+
+    it "returns 422 at the cap and does not call the provider" do
+      r = reviewed_response_for(user)
+      3.times { |i| ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "q#{i}") }
+      fake = stub_answer
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "One more?" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:answer_follow_up)
+      expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
+    end
+
+    it "rolls back the user turn when the provider fails" do
+      r = reviewed_response_for(user)
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:answer_follow_up).and_raise(AiService::RateLimitError, "slow down")
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why?" }
+      expect(response).to have_http_status(:service_unavailable)
+      expect(r.reload.review_follow_ups.count).to eq(0)
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why?" }
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects a blank question" do
+      r = reviewed_response_for(user)
+      stub_answer
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "   " }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.review_follow_ups.count).to eq(0)
+    end
+  end
 end

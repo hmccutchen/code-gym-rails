@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_28_000002) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_28_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -84,6 +84,17 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_000002) do
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id"
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
+  end
+
+  create_table "review_follow_ups", force: :cascade do |t|
+    t.bigint "daily_response_id", null: false
+    t.string "section", null: false
+    t.integer "role", null: false
+    t.text "content", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["daily_response_id", "section", "created_at"], name: "index_review_follow_ups_on_response_section_created"
+    t.index ["daily_response_id"], name: "index_review_follow_ups_on_daily_response_id"
   end
 
   create_table "solid_cable_messages", force: :cascade do |t|
@@ -269,6 +280,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_000002) do
   add_foreign_key "daily_exercises", "users"
   add_foreign_key "daily_responses", "daily_exercises"
   add_foreign_key "daily_responses", "users"
+  add_foreign_key "review_follow_ups", "daily_responses"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

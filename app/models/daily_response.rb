@@ -1,6 +1,7 @@
 class DailyResponse < ApplicationRecord
   belongs_to :user, inverse_of: :daily_responses
   belongs_to :daily_exercise
+  has_many :review_follow_ups, dependent: :destroy
 
   SELF_RATINGS = %w[too_easy right_level too_hard].freeze
   SELF_RATING_LABELS = { "too_easy" => "too easy", "right_level" => "just right", "too_hard" => "too hard" }.freeze

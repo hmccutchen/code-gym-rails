@@ -176,6 +176,45 @@ class AiService
     result[:text].to_s.strip
   end
 
+  # ── Answer one follow-up question about a completed review ────────────────
+  # `thread` is an ordered array of { role:, content: } hashes — the prior turns
+  # for this section. Returns plain prose, like #explain_differently.
+  def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
+    coach  = config_for(exercise.language)[:coach]
+    review = daily_response.ai_review&.dig(section) || {}
+
+    review_summary = DailyResponse::AI_REVIEW_FIELDS.filter_map { |key, field|
+      points = DailyResponse.review_points(review[key])
+      "#{field[:label]}: #{points.join('; ')}" if points.any?
+    }.join("\n")
+
+    thread_text = thread.any? ?
+      thread.map { |turn| "#{turn[:role] == 'assistant' ? 'You' : 'Them'}: #{turn[:content]}" }.join("\n") :
+      "(no prior questions)"
+
+    result = call(
+      system: "You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.",
+      prompt: <<~PROMPT
+        The original exercise asked: #{exercise.problem_set.dig(section, "question")}
+        Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
+
+        The review you gave:
+        #{review_summary.presence || "(no detail recorded)"}
+
+        Conversation so far:
+        #{thread_text}
+
+        Their new question: #{question}
+
+        Answer it directly. Stay on this concept — if they drift far off topic, say
+        so briefly and bring it back. Two short paragraphs at most.
+      PROMPT
+    )
+
+    log_usage(user, result, purpose: "review_follow_up")
+    result[:text].to_s.strip
+  end
+
   private
 
   # Looks up the fixed per-language config, failing loudly on anything

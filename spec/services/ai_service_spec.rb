@@ -716,6 +716,51 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#answer_follow_up" do
+    it "sends the question, the section's review, and the prior thread in order" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "Find the N+1", "snippet" => "code" }
+      })
+      resp = DailyResponse.new(
+        answers: { "code_review" => "Looks fine" },
+        ai_review: { "code_review" => { "missed" => [ "loads per row" ] } }
+      )
+      thread = [
+        { role: "user",      content: "Why is that slow?" },
+        { role: "assistant", content: "Each row triggers its own query." }
+      ]
+
+      spy_class = Class.new(double_class) do
+        attr_reader :last_prompt
+        def call(system:, prompt:)
+          @last_prompt = prompt
+          super
+        end
+      end
+      svc = spy_class.new(canned_text: "Because the database round-trip dominates.")
+
+      result = svc.answer_follow_up(user, exercise, resp, section: "code_review",
+                                    question: "Does eager loading always help?", thread: thread)
+
+      expect(result).to eq("Because the database round-trip dominates.")
+      expect(svc.last_prompt).to include("Does eager loading always help?")
+      expect(svc.last_prompt).to include("loads per row")
+      expect(svc.last_prompt).to include("Why is that slow?")
+      expect(svc.last_prompt).to include("Each row triggers its own query.")
+      expect(svc.last_prompt.index("Why is that slow?")).to be < svc.last_prompt.index("Each row triggers its own query.")
+    end
+
+    it "logs usage under its own purpose" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {} })
+      svc = double_class.new(canned_text: "An answer")
+
+      expect {
+        svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
+      }.to change { ApiUsage.where(purpose: "review_follow_up").count }.by(1)
+    end
+  end
+
   describe ".for" do
     it "returns a ClaudeService for an anthropic user" do
       user.update!(api_key: "sk-ant-test", provider: "anthropic")

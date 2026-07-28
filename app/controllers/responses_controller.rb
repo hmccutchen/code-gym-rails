@@ -1,6 +1,6 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently ]
-  before_action :require_reviewed_section!, only: [ :self_explanation, :explain_differently ]
+  before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently, :follow_ups ]
+  before_action :require_reviewed_section!, only: [ :self_explanation, :explain_differently, :follow_ups ]
 
   # How long a claimed-but-unfinished review blocks a retry. The provider call
   # has no configured timeout, so a crash or hang mid-review must not lock the
@@ -11,6 +11,10 @@ class ResponsesController < ApplicationController
   # well as in the view: the view stops offering the button at the cap, but only
   # the server bound holds against a crafted request.
   MAX_ALTERNATES_PER_SECTION = 2
+
+  # How many questions a user may ask about one section. Three exchanges is enough
+  # to clear up a misunderstanding without the review becoming an open-ended chat.
+  MAX_FOLLOW_UPS_PER_SECTION = 3
 
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
@@ -136,6 +140,36 @@ class ResponsesController < ApplicationController
     @response.save!
 
     render json: { status: "ok", alternate: alternate, remaining: MAX_ALTERNATES_PER_SECTION - existing.size - 1 }
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
+  # POST /responses/:id/follow_ups — ask one clarifying question about a section's
+  # review. Synchronous: a single short completion, so it needs no job or polling.
+  # Both turns are written in one transaction, so a provider failure can never
+  # leave an orphaned question with no answer in the thread.
+  def follow_ups
+    question = params[:question].to_s.strip
+    return render_section_error("Ask a question first.") if question.blank?
+
+    asked = @response.review_follow_ups.where(section: @section, role: :user).count
+    if asked >= MAX_FOLLOW_UPS_PER_SECTION
+      return render_section_error("You've used all #{MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+    end
+
+    thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
+
+    answer = AiService.for(current_user).answer_follow_up(
+      current_user, @response.daily_exercise, @response,
+      section: @section, question: question, thread: thread
+    )
+
+    ActiveRecord::Base.transaction do
+      @response.review_follow_ups.create!(section: @section, role: :user, content: question)
+      @response.review_follow_ups.create!(section: @section, role: :assistant, content: answer)
+    end
+
+    render json: { status: "ok", answer: answer, remaining: MAX_FOLLOW_UPS_PER_SECTION - asked - 1 }
   rescue AiService::Error => e
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end

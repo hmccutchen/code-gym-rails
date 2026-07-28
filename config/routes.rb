@@ -52,6 +52,7 @@ Rails.application.routes.draw do
       post :email_review # email the completed review to the user
       patch :self_explanation # save the user's own restatement of why a fix works
       post :explain_differently # regenerate one section's feedback with a new framing
+      post :follow_ups # ask a clarifying question about one section's review
     end
   end
 
