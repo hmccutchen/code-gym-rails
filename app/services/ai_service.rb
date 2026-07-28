@@ -266,31 +266,37 @@ class AiService
     rand < 0.75 ? :architecture : :challenge
   end
 
-  # Due retention checks for the buckets this day can actually host. Architecture
-  # concepts have no home outside the architecture third, and a language concept
-  # must match the day's resolved generation language — otherwise a mixed-language
-  # user gets a Rails concept on a JavaScript day.
+  # The concept buckets today's set can actually host. Architecture concepts have
+  # no home outside the architecture third, and a language concept must match the
+  # day's resolved generation language — otherwise a mixed-language user gets a
+  # Rails concept on a JavaScript day. Both retention callers below share this so
+  # the eligibility rule can never drift between deciding to reserve a slot and
+  # deciding what fills it.
+  def hostable_buckets(language, third:)
+    buckets = [ language ]
+    buckets << "architecture" if third == :architecture
+    buckets
+  end
+
+  # Due retention checks for the buckets this day can actually host.
   def retention_checks_for(user, language, third:, slots:)
     return [] if slots.zero?
 
-    buckets = [ language ]
-    buckets << "architecture" if third == :architecture
-
-    buckets.flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: slots).to_a }
-           .sort_by(&:next_retention_check_on)
-           .first(slots)
+    hostable_buckets(language, third: third)
+      .flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: slots).to_a }
+      .sort_by(&:next_retention_check_on)
+      .first(slots)
   end
 
   # Whether reinforcement should give up its 3rd slot: only when some retention
   # check, in a bucket today's third can actually host, has crossed the
   # "meaningfully overdue" threshold (ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
-  # Mirrors retention_checks_for's bucket rule so an architecture-only overdue
-  # concept can't force a slot on a challenge day it could never occupy.
+  # Sharing hostable_buckets with retention_checks_for is what stops an
+  # architecture-only overdue concept from forcing a slot on a challenge day it
+  # could never occupy.
   def overdue_retention_check_pending?(user, language, third:)
-    buckets = [ language ]
-    buckets << "architecture" if third == :architecture
-
-    buckets.any? { |bucket| user.concepts_overdue_for_retention_check(bucket: bucket).exists? }
+    hostable_buckets(language, third: third)
+      .any? { |bucket| user.concepts_overdue_for_retention_check(bucket: bucket).exists? }
   end
 
   # A due retention concept's `language` bucket names which vocabulary it was
