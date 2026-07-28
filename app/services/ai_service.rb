@@ -352,12 +352,17 @@ class AiService
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — corrected/improved code (for code sections only; empty string otherwise)
+      - "improved_code": string — corrected/improved code for code_review, pattern, and challenge (empty string for architecture)
 
       Each array entry must be ONE self-contained idea in one or two sentences.
       Never pack several points into one entry, and never number points inside an
       entry ("1) ... 2) ...") — separate ideas belong in separate entries. Use an
       empty array when there is nothing to say for that field.
+
+      For "pattern", improved_code must show the refactored structure that addresses
+      what they missed — the classes, methods, and boundaries the pattern calls for —
+      not a one-line tweak. A pattern fix is structural; show enough of the shape to
+      make the structure obvious.
 
       Exercise:
       Code Review question: #{exercise.code_review["question"]}

@@ -38,6 +38,25 @@ RSpec.describe "History", type: :request do
       expect(response).to redirect_to(login_path)
     end
 
+    it "never renders improved_code for the architecture section" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "architecture" => { "title" => "A", "question" => "arch-q" } }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "architecture" => "I'd shard because of the write volume" },
+        submitted_at: Time.current,
+        concept_tags: { "architecture" => "other" },
+        ai_review: { "architecture" => { "rating" => "solid", "improved_code" => "arch_improved_marker" } }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).not_to include("arch_improved_marker")
+    end
+
     it "lists only the current user's submitted responses, newest first" do
       other = create_user_with_key(email: "other@example.com", name: "Other")
       old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")

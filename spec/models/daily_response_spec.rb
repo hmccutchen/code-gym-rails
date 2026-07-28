@@ -142,5 +142,20 @@ RSpec.describe DailyResponse, type: :model do
         answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "other" })
       expect(r.improved_code_visible?("code_review")).to be(true)
     end
+
+    def submit_pattern(concept:, date:)
+      ex = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "pattern" => { "concept" => concept } })
+      user.daily_responses.create!(daily_exercise: ex, date: date, submitted_at: Time.current,
+        answers: { "pattern" => "x" * 20 }, concept_tags: { "pattern" => concept })
+    end
+
+    it "applies the same first-exposure rule to the pattern section" do
+      first  = submit_pattern(concept: "service_objects", date: Date.current - 3)
+      second = submit_pattern(concept: "service_objects", date: Date.current - 1)
+
+      expect(first.improved_code_visible?("pattern")).to be(false)
+      expect(second.improved_code_visible?("pattern")).to be(true)
+    end
   end
 end

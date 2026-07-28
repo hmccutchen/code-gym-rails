@@ -26,7 +26,7 @@ Rating: <%= fb["rating"] %>
 
 <% end -%>
 <% end -%>
-<% if fb["improved_code"].present? && @response.improved_code_visible?(section) -%>
+<% if fb["improved_code"].present? && section != "architecture" && @response.improved_code_visible?(section) -%>
 Improved code:
 
 <%= fb["improved_code"] %>

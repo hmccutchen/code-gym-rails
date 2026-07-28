@@ -50,6 +50,16 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(body).to include("User.includes(:posts)")
     end
 
+    it "never renders improved_code for the architecture section" do
+      daily_response.update!(
+        concept_tags: { "architecture" => "other" },
+        ai_review: { "architecture" => { "rating" => "solid", "improved_code" => "arch_improved_marker" } }
+      )
+
+      expect(mail.body.encoded).not_to include("arch_improved_marker")
+      expect(mail.body.encoded).not_to include("Improved code:")
+    end
+
     it "skips blank fields" do
       daily_response.ai_review["code_review"]["improved_code"] = ""
       daily_response.ai_review["code_review"]["missed"] = ""

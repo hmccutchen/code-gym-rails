@@ -546,6 +546,19 @@ RSpec.describe AiService do
       expect(prompt).to match(/separate ideas belong in separate entries/i)
     end
 
+    it "names pattern as code-bearing and asks for a refactored structure" do
+      ex = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?", "snippet" => "code" },
+        "pattern"     => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "Implement uniq_by" }
+      })
+      resp = DailyResponse.new(answers: { "pattern" => "Extract a service object" })
+      prompt = service.send(:build_review_prompt, ex, resp)
+
+      expect(prompt).to include("code_review, pattern, and challenge")
+      expect(prompt).to match(/refactored structure/i)
+    end
+
     context "architecture third section" do
       def arch_exercise
         DailyExercise.new(
