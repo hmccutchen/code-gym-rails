@@ -322,7 +322,8 @@ class AiService
                 "tagline":     "string — bold one-liner",
                 "explanation": "string — 2-3 sentences",
                 "tradeoffs":   ["string — a tradeoff", "string — a tradeoff", "string — a tradeoff"],
-                "senior_lens": "string — how a senior frames the decision"
+                "senior_lens": "string — how a senior frames the decision",
+                "diagram":     "string — Mermaid source visualizing the decision, or an empty string if no diagram would help"
               }
             }
         ARCH
@@ -418,6 +419,10 @@ class AiService
           - The architecture question itself is one sentence — do not restate the scenario in it.
           - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
           - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
+          - The architecture reference's "diagram" must be valid Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not.
+          - Node labels must be short (a few words). Use quoted labels like A["Order service"] when a label contains spaces or punctuation.
+          - The diagram should show the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
+          - Return an empty string for "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
         ARCH
       else
         <<~CH.chomp

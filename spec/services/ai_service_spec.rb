@@ -94,6 +94,28 @@ RSpec.describe AiService do
     end
   end
 
+  describe "architecture diagram generation" do
+    it "asks for a Mermaid diagram in the architecture reference, with syntax constraints" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+
+      expect(schema).to include("diagram")
+      expect(schema).to match(/mermaid/i)
+    end
+
+    it "constrains the diagram to a narrow, parseable subset" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
+
+      expect(prompt).to match(/flowchart TD|graph LR/)
+      expect(prompt).to match(/8 nodes|eight nodes/i)
+      expect(prompt).to match(/empty string/i) # opting out is allowed
+    end
+
+    it "does not ask for a diagram on a challenge third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+      expect(schema).not_to match(/mermaid/i)
+    end
+  end
+
   describe "#roll_third_section" do
     it "returns :architecture ~75% and :challenge ~25% (both reachable)" do
       allow(service).to receive(:rand).and_return(0.10)

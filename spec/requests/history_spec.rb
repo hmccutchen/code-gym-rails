@@ -57,6 +57,61 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("arch_improved_marker")
     end
 
+    def architecture_session(diagram:)
+      reference = { "tagline" => "t", "explanation" => "e", "tradeoffs" => [ "a" ], "senior_lens" => "s" }
+      reference["diagram"] = diagram unless diagram.nil?
+
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "architecture" => {
+          "title" => "Datastore", "question" => "Which approach?", "scenario" => "10x traffic",
+          "reference" => reference
+        } }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "architecture" => "I would shard because of write volume" },
+        submitted_at: Time.current
+      )
+    end
+
+    it "renders a hidden diagram container and the mermaid module when a diagram is present" do
+      architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("mermaid-diagram")
+      expect(response.body).to include("flowchart TD")
+      expect(response.body).to include("cdn.jsdelivr.net")
+      expect(response.body).to match(/securityLevel:\s*["']strict["']/)
+    end
+
+    it "renders no container and no mermaid script when the diagram is an empty string" do
+      architecture_session(diagram: "")
+      login_as(user)
+      get history_path
+
+      # The .mermaid-diagram CSS rule itself is global (defined once in the
+      # layout's <style> block, like every other section style), so it is
+      # present on every page regardless of content. What must NOT appear is
+      # an actual container element or the script that would populate one.
+      expect(response.body).not_to include('<div class="mermaid-diagram"')
+      expect(response.body).not_to include("cdn.jsdelivr.net")
+    end
+
+    it "renders no container and no mermaid script for an exercise generated before diagrams existed" do
+      architecture_session(diagram: nil)
+      login_as(user)
+      get history_path
+
+      # The .mermaid-diagram CSS rule itself is global (defined once in the
+      # layout's <style> block, like every other section style), so it is
+      # present on every page regardless of content. What must NOT appear is
+      # an actual container element or the script that would populate one.
+      expect(response.body).not_to include('<div class="mermaid-diagram"')
+      expect(response.body).not_to include("cdn.jsdelivr.net")
+    end
+
     it "renders improved_code for a visible pattern section" do
       exercise = DailyExercise.create!(
         user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
