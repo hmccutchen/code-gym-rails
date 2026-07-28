@@ -20,8 +20,9 @@ Rating: <%= fb["rating"] %>
 <% end -%>
 
 <% else -%>
-<% next if fb[key].blank? -%>
-<%= field[:label] %>: <%= fb[key] %>
+<% text = DailyResponse.review_points(fb[key]).join(" ") -%>
+<% next if text.blank? -%>
+<%= field[:label] %>: <%= text %>
 
 <% end -%>
 <% end -%>

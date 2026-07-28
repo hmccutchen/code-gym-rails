@@ -32,7 +32,6 @@ class DailyResponse < ApplicationRecord
   def self.review_points(value)
     case value
     when Array then value.map { |v| v.to_s.strip }.reject(&:blank?)
-    when nil   then []
     else            [ value.to_s.strip ].reject(&:blank?)
     end
   end

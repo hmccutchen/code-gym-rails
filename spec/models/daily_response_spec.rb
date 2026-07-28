@@ -17,6 +17,11 @@ RSpec.describe DailyResponse, type: :model do
       expect(DailyResponse.review_points("   ")).to eq([])
       expect(DailyResponse.review_points([])).to eq([])
     end
+
+    it "tolerates unexpected non-string, non-array shapes as a one-item array" do
+      expect(DailyResponse.review_points({ "a" => "b" })).to eq([ { "a" => "b" }.to_s ])
+      expect(DailyResponse.review_points(42)).to eq([ "42" ])
+    end
   end
 
   let(:user) { User.create!(email: "dev@example.com", name: "Dev") }

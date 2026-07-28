@@ -16,8 +16,11 @@
             </ul>
           </div>
         <% end %>
-      <% elsif fb[key].present? %>
-        <p class="review-item"><strong><%= field[:label] %>:</strong> <%= fb[key] %></p>
+      <% else %>
+        <% text = DailyResponse.review_points(fb[key]).join(" ") %>
+        <% if text.present? %>
+          <p class="review-item"><strong><%= field[:label] %>:</strong> <%= text %></p>
+        <% end %>
       <% end %>
     <% end %>
     <% if fb["improved_code"].present? && response.improved_code_visible?(section) %>
