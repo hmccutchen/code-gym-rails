@@ -6,8 +6,7 @@ Rails.application.routes.draw do
   # Not used by anything live today — the dashboard's generation-completion
   # signal is a polled JSON endpoint instead (this app loads no Turbo/
   # Stimulus JS, so a broadcast here would have no subscriber). Left mounted
-  # rather than removed as an unrelated cleanup; see
-  # docs/superpowers/specs/2026-07-27-fix-stalled-generation-spinner-design.md.
+  # rather than removed, as that's a separate, unrelated cleanup.
   mount ActionCable.server => "/cable"
 
   # Auth (magic link)
