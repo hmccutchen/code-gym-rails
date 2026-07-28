@@ -6,6 +6,10 @@ class DailyExercisesController < ApplicationController
   def generate
     return redirect_to root_path if current_user.daily_exercises.for_date.exists?
 
+    # Clear any stale failure from an earlier attempt today so /dashboard/status
+    # doesn't report "failed" (with yesterday's message) while this retry is
+    # still in flight — see GenerateDailyExercisesJob's status-polling comment.
+    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
     GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
     redirect_to root_path, flash: { generating: true }
   end

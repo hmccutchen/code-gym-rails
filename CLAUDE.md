@@ -8,7 +8,7 @@ A team Rails app for daily personalized coding exercises. Each engineer logs in 
 
 - **Rails 8.0.5** + PostgreSQL
 - **Solid Queue** — background jobs + recurring 8am weekday cron (no Redis needed)
-- **Turbo Streams** over Solid Cable — live dashboard updates when generation finishes
+- **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
 - **BCrypt** — magic link token digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest

@@ -53,6 +53,11 @@ class GenerateDailyExercisesJob < ApplicationJob
       language:     language
     )
 
+    # Defense-in-depth: #status/#show both check exercise-existence before
+    # these columns, so this isn't load-bearing today, but clears the slate
+    # for any future reader that checks these columns directly.
+    user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
+
     Rails.logger.info("Generated exercise for #{user.email} on #{Date.current}")
   rescue AiService::AuthenticationError => e
     Rails.logger.error("Auth failure generating exercise for #{user.email}: #{e.message}")

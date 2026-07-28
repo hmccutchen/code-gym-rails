@@ -50,4 +50,14 @@ RSpec.describe "GET /dashboard/status", type: :request do
 
     expect(JSON.parse(response.body)).to eq("status" => "ready")
   end
+
+  it "returns pending, not failed, while a retry is in flight after an earlier failure today" do
+    user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+
+    post generate_path
+
+    get dashboard_status_path
+
+    expect(JSON.parse(response.body)).to eq("status" => "pending")
+  end
 end
