@@ -42,7 +42,8 @@
       <div class="question"><%= cr["question"] %></div>
       <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
       <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
-        <%= render "shared/concept_reference", reference: ref %>
+        <%= render "shared/concept_reference", reference: ref,
+              open: first_exposure?(cr["concept"], exercise.language, exercise.date) %>
       <% end %>
       <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: false, answer: response.answers["code_review"] %>
       <textarea name="response[answers][code_review]" class="answer" placeholder="What's the issue and how would you fix it?" data-field="code_review"><%= response.answers["code_review"] %></textarea>
@@ -61,7 +62,8 @@
       <div class="question"><%= pat["question"] %></div>
 
       <% if (ref = concept_reference_for(pat["concept"], exercise.language)) %>
-        <%= render "shared/concept_reference", reference: ref %>
+        <%= render "shared/concept_reference", reference: ref,
+              open: first_exposure?(pat["concept"], exercise.language, exercise.date) %>
       <% end %>
 
       <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: false, answer: response.answers["pattern"] %>
@@ -85,7 +87,8 @@
           <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
         <% end %>
         <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
-          <%= render "shared/concept_reference", reference: ref %>
+          <%= render "shared/concept_reference", reference: ref,
+                open: first_exposure?(ch["concept"], exercise.language, exercise.date) %>
         <% end %>
         <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: false, answer: response.answers["challenge"] %>
         <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" data-field="challenge"><%= response.answers["challenge"] %></textarea>

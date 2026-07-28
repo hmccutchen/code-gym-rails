@@ -1,7 +1,10 @@
-<%# Always-collapsed reference dropdown for a section's concept. Rendered near
-    the section's question whenever a cached ConceptReference exists — no
-    submission gate, no exposure-count logic. `reference` is a ConceptReference. %>
-<details class="ref">
+<%# Reference dropdown for a section's concept, rendered near the section's
+    question whenever a cached ConceptReference exists. Collapsed by default;
+    callers may pass `open: true` for a concept's first-ever exposure while
+    answering — see ConceptReferencesHelper#first_exposure?. `reference` is a
+    ConceptReference. %>
+<% open = local_assigns.fetch(:open, false) %>
+<details class="ref"<%= " open".html_safe if open %>>
   <summary>Reference — <%= reference.concept.humanize %>: how it works</summary>
   <div class="ref-body">
     <p style="margin-bottom:.75rem"><strong><%= reference.tagline %></strong></p>
