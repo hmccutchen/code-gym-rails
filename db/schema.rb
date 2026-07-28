@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_28_000003) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_28_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -36,7 +36,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_000003) do
     t.string "last_rating"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "mastered_at"
+    t.date "next_retention_check_on"
+    t.integer "retention_interval_days"
     t.index ["user_id", "concept", "language"], name: "index_concept_masteries_on_user_id_and_concept_and_language", unique: true
+    t.index ["user_id", "next_retention_check_on"], name: "index_concept_masteries_on_user_id_and_next_retention_check_on"
     t.index ["user_id"], name: "index_concept_masteries_on_user_id"
   end
 

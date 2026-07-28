@@ -376,6 +376,38 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#concepts_due_for_retention_check" do
+    let(:user) { User.create!(email: "due@example.com", name: "Due") }
+
+    def mastery(concept:, bucket:, due_on:)
+      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
+                                     mastered_at: 1.month.ago,
+                                     retention_interval_days: 7,
+                                     next_retention_check_on: due_on)
+    end
+
+    it "returns only due concepts in the requested bucket, most overdue first" do
+      mastery(concept: "n_plus_one",   bucket: "ruby_rails", due_on: Date.current - 3)
+      mastery(concept: "memoization",  bucket: "ruby_rails", due_on: Date.current - 10)
+      mastery(concept: "closures",     bucket: "javascript", due_on: Date.current - 5)
+      mastery(concept: "indexing",     bucket: "ruby_rails", due_on: Date.current + 4)
+
+      result = user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 5)
+      expect(result.map(&:concept)).to eq(%w[memoization n_plus_one])
+    end
+
+    it "excludes concepts with no schedule" do
+      user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :standard)
+      expect(user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 5)).to be_empty
+    end
+
+    it "honors the limit" do
+      mastery(concept: "n_plus_one",  bucket: "ruby_rails", due_on: Date.current - 3)
+      mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 10)
+      expect(user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 1).map(&:concept)).to eq(%w[memoization])
+    end
+  end
+
   describe "#language_for_today" do
     it "returns ruby_rails unchanged when the preference is ruby_rails" do
       user = create_user

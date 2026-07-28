@@ -5,6 +5,15 @@ class ConceptMastery < ApplicationRecord
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
 
+  # Once a concept is mastered it would otherwise never resurface. These schedule
+  # a re-check at expanding intervals: 7 days ≈ 5 weekday sessions (long enough to
+  # forget, short enough to catch decay), doubling per successful check, capped at
+  # 60 days because each vocabulary is only 13-16 concepts — past two months
+  # ordinary rotation resurfaces the concept anyway.
+  RETENTION_INITIAL_INTERVAL_DAYS = 7
+  RETENTION_GROWTH_FACTOR         = 2
+  RETENTION_MAX_INTERVAL_DAYS     = 60
+
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: [ :user_id, :language ] }
 
@@ -58,6 +67,7 @@ class ConceptMastery < ApplicationRecord
 
     if mastered
       cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0)
+      cm.assign_attributes(**retention_schedule_for(cm, response.date))
     elsif improving || prev.blank?
       cm.streak = 0
     else # stagnant: same-or-worse than last time
@@ -69,7 +79,38 @@ class ConceptMastery < ApplicationRecord
       end
     end
 
+    unless mastered
+      # A failed check drops the schedule entirely; the concept re-enters normal
+      # reinforcement through concepts_needing_reinforcement's existing rules, so
+      # there is no parallel "retry the check" path to maintain. mastered_at stays
+      # as a historical record that it was once mastered.
+      cm.assign_attributes(next_retention_check_on: nil, retention_interval_days: nil)
+    end
+
     cm.last_rating = rep_ai
     cm.save!
   end
+
+  # The interval only grows when the scheduled check was actually DUE. Without that
+  # guard, mastering the same concept three days running would inflate 7 → 14 → 28
+  # with no real spacing behind it; here the date is simply re-anchored instead.
+  def self.retention_schedule_for(cm, on_date)
+    due = cm.next_retention_check_on.present? && cm.next_retention_check_on <= on_date
+
+    interval =
+      if cm.retention_interval_days.blank?
+        RETENTION_INITIAL_INTERVAL_DAYS
+      elsif due
+        [ cm.retention_interval_days * RETENTION_GROWTH_FACTOR, RETENTION_MAX_INTERVAL_DAYS ].min
+      else
+        cm.retention_interval_days
+      end
+
+    {
+      mastered_at:             Time.current,
+      retention_interval_days: interval,
+      next_retention_check_on: on_date + interval
+    }
+  end
+  private_class_method :retention_schedule_for
 end

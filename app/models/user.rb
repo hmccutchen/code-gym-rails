@@ -138,6 +138,19 @@ class User < ApplicationRecord
     result
   end
 
+  # Mastered concepts whose scheduled re-check has come due, most overdue first.
+  # Bucket-scoped by the caller: an architecture concept has no valid home outside
+  # the architecture third, and a ruby_rails concept must not surface on a
+  # JavaScript day.
+  def concepts_due_for_retention_check(bucket:, limit:)
+    concept_masteries
+      .where(language: bucket)
+      .where.not(next_retention_check_on: nil)
+      .where(next_retention_check_on: ..Date.current)
+      .order(:next_retention_check_on)
+      .limit(limit)
+  end
+
   # Single-query, memoized index of every submitted response's concept exposures,
   # keyed [concept, bucket] => the distinct dates the concept appeared (in query
   # order, not sorted — callers only ever count them). Built once per User
