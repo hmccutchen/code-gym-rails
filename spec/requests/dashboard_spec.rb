@@ -304,6 +304,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
         expect(response.body).to match(%r{<div id="dashboard-content">.*Generating your personalized exercise set.*</div>}m)
       end
+
+      it "polls the status endpoint from the generating state" do
+        get root_path
+
+        expect(response.body).to include(dashboard_status_path)
+      end
     end
 
     context "on a weekend" do
@@ -370,6 +376,16 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).not_to include("Couldn't generate today's exercises.")
       expect(response.body).to include('data-rating-for="code_review"')
+    end
+
+    it "wires the failure state's Try again button to actually retrigger generation" do
+      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+
+      get root_path
+
+      expect(response.body).to match(/<form[^>]*action="#{generate_path}"/)
+      expect(response.body).to include(">Try again<")
+      expect(response.body).to include('data-loading-form="true"')
     end
   end
 

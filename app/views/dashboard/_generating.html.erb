@@ -1,5 +1,42 @@
 <div class="section" style="text-align:center;padding:3rem;">
   <div class="spinner" style="margin-bottom:1rem;" aria-hidden="true"></div>
   <p style="color:var(--muted);margin-bottom:.5rem;">Generating your personalized exercise set…</p>
-  <p style="font-size:.85rem;color:var(--muted);">This usually takes about 10 seconds — this page will update automatically.</p>
+  <p style="font-size:.85rem;color:var(--muted);" id="generating-hint">This usually takes about 10 seconds — this page will update automatically.</p>
 </div>
+
+<%# Wrapped in an IIFE: this partial can be rendered by more than one full
+    page load in a row (e.g. a "Try again" retry landing back here), and
+    top-level const/let would redeclare on a second execution — same hazard
+    the answer-autosave script in dashboard/_exercise.html.erb documents. %>
+<script>
+(() => {
+  const hint = document.getElementById("generating-hint");
+  const statusUrl = "<%= dashboard_status_path %>";
+  let attempts = 0;
+  const MAX_ATTEMPTS = 40; // ~2 minutes at 3s intervals
+
+  async function poll() {
+    attempts += 1;
+
+    try {
+      const res = await fetch(statusUrl, { headers: { "Accept": "application/json" } });
+      const data = await res.json();
+      if (data.status === "ready" || data.status === "failed") {
+        window.location.reload();
+        return;
+      }
+    } catch {
+      // Transient network hiccup — keep polling rather than giving up early.
+    }
+
+    if (attempts >= MAX_ATTEMPTS) {
+      hint.textContent = "This is taking longer than expected — try refreshing the page.";
+      return;
+    }
+
+    setTimeout(poll, 3000);
+  }
+
+  setTimeout(poll, 3000);
+})();
+</script>
