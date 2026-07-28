@@ -151,6 +151,24 @@ class User < ApplicationRecord
       .limit(limit)
   end
 
+  # Due concepts that have crossed the "meaningfully overdue" threshold: overdue
+  # by RETENTION_OVERDUE_THRESHOLD_MULTIPLIER × the concept's OWN current
+  # retention_interval_days, on top of its due date. Used only to decide whether
+  # to reserve a reinforcement slot for retention — a merely-due check is not
+  # enough on its own (see AiService#generate_exercise). retention_interval_days
+  # is nullable (cleared whenever a check fails), so null-interval rows are
+  # excluded explicitly rather than risking a null comparison silently matching.
+  def concepts_overdue_for_retention_check(bucket:)
+    concept_masteries
+      .where(language: bucket)
+      .where.not(next_retention_check_on: nil)
+      .where.not(retention_interval_days: nil)
+      .where(
+        "next_retention_check_on + (retention_interval_days * ?) <= ?",
+        ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER, Date.current
+      )
+  end
+
   # Single-query, memoized index of every submitted response's concept exposures,
   # keyed [concept, bucket] => the distinct dates the concept appeared (in query
   # order, not sorted — callers only ever count them). Built once per User

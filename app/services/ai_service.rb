@@ -102,12 +102,15 @@ class AiService
     reinforcement = user.concepts_needing_reinforcement
     # An exercise has only 3 sections, so only the first 3 reinforcement concepts
     # can ever occupy one — sizing against the full (often 4-8 entry) list left
-    # slots permanently at 0 for any active user. Reinforcement still gets
-    # priority: it claims up to 2 of the 3 slots outright, but 1 slot is always
-    # reserved for a due retention check, even when reinforcement would otherwise
-    # claim all three. This is what keeps retention checks from being starved
-    # forever while still letting reinforcement dominate when it's genuinely busy.
-    slots         = [ 3 - reinforcement.first(3).size, 1 ].max
+    # slots permanently at 0 for any active user. Reinforcement keeps all 3 slots
+    # by default; a slot is taken back for retention only when reinforcement
+    # would otherwise claim all three AND at least one retention check, in a
+    # bucket today can actually host, has gone meaningfully overdue (see
+    # ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER). A merely-due check
+    # is not enough to spend a reinforcement slot on — only a check nobody's
+    # gotten to in a while earns the trade.
+    slots         = 3 - reinforcement.first(3).size
+    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, third: third)
     due_checks    = retention_checks_for(user, language, third: third, slots: slots)
 
     result = call(system: build_system_prompt(language),
@@ -276,6 +279,18 @@ class AiService
     buckets.flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: slots).to_a }
            .sort_by(&:next_retention_check_on)
            .first(slots)
+  end
+
+  # Whether reinforcement should give up its 3rd slot: only when some retention
+  # check, in a bucket today's third can actually host, has crossed the
+  # "meaningfully overdue" threshold (ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
+  # Mirrors retention_checks_for's bucket rule so an architecture-only overdue
+  # concept can't force a slot on a challenge day it could never occupy.
+  def overdue_retention_check_pending?(user, language, third:)
+    buckets = [ language ]
+    buckets << "architecture" if third == :architecture
+
+    buckets.any? { |bucket| user.concepts_overdue_for_retention_check(bucket: bucket).exists? }
   end
 
   # A due retention concept's `language` bucket names which vocabulary it was

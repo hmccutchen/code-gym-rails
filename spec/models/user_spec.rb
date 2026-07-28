@@ -408,6 +408,47 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#concepts_overdue_for_retention_check" do
+    let(:user) { User.create!(email: "overdue@example.com", name: "Overdue") }
+
+    def mastery(concept:, bucket: "ruby_rails", due_on:, interval: 7)
+      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
+                                     mastered_at: 1.month.ago,
+                                     retention_interval_days: interval,
+                                     next_retention_check_on: due_on)
+    end
+
+    it "excludes a concept that is due but has not crossed its own interval's overdue threshold" do
+      mastery(concept: "memoization", due_on: Date.current - 2, interval: 7)
+      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails")).to be_empty
+    end
+
+    it "includes a concept once it is overdue by its own full interval" do
+      mastery(concept: "memoization", due_on: Date.current - 8, interval: 7)
+      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails").map(&:concept)).to eq(%w[memoization])
+    end
+
+    it "scales the threshold with each concept's own interval, not a flat number" do
+      mastery(concept: "short_interval", due_on: Date.current - 8, interval: 7)   # 8 > 7: crossed
+      mastery(concept: "long_interval",  due_on: Date.current - 8, interval: 28)  # 8 < 28: not crossed
+      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails").map(&:concept)).to eq(%w[short_interval])
+    end
+
+    it "excludes rows with a null retention_interval_days even when next_retention_check_on is far in the past" do
+      user.concept_masteries.create!(concept: "no_interval", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 1.month.ago,
+                                     retention_interval_days: nil,
+                                     next_retention_check_on: Date.current - 100)
+      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails")).to be_empty
+    end
+
+    it "filters by bucket" do
+      mastery(concept: "closures", bucket: "javascript", due_on: Date.current - 8, interval: 7)
+      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails")).to be_empty
+      expect(user.concepts_overdue_for_retention_check(bucket: "javascript").map(&:concept)).to eq(%w[closures])
+    end
+  end
+
   describe "#language_for_today" do
     it "returns ruby_rails unchanged when the preference is ruby_rails" do
       user = create_user

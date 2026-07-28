@@ -13,6 +13,12 @@ class ConceptMastery < ApplicationRecord
   RETENTION_INITIAL_INTERVAL_DAYS = 7
   RETENTION_GROWTH_FACTOR         = 2
   RETENTION_MAX_INTERVAL_DAYS     = 60
+  # How far past its own due date a check must fall before it's "meaningfully
+  # overdue" enough to bump a reinforcement slot: 1 means overdue by 100% of
+  # the concept's own current retention_interval_days (a 7-day check crosses
+  # at 14 days past due, a 28-day check at 56). Sits alongside
+  # RETENTION_GROWTH_FACTOR as an equally tunable knob on the same schedule.
+  RETENTION_OVERDUE_THRESHOLD_MULTIPLIER = 1
 
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: [ :user_id, :language ] }

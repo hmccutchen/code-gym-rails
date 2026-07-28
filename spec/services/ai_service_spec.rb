@@ -628,7 +628,10 @@ RSpec.describe AiService do
     # any active user), not the 3 sections an exercise can actually hold, so
     # slots was 0 and a due retention check could never reach the prompt. This
     # builds a realistic reinforcement list from real DailyResponse rows instead.
-    it "still surfaces a due retention check when real history fills all three reinforcement slots" do
+    # The mastery below must be OVERDUE (past due by its own full interval), not
+    # merely due — under the current policy a merely-due check does not reclaim
+    # a slot from a full reinforcement list.
+    it "still surfaces an overdue retention check when real history fills all three reinforcement slots" do
       # 4 distinct, still-struggling concepts across 4 real submitted days — enough
       # that concepts_needing_reinforcement realistically returns more than 3 entries.
       %w[n_plus_one transaction_safety service_objects scope_chaining].each_with_index do |concept, i|
@@ -644,7 +647,7 @@ RSpec.describe AiService do
 
       user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
-                                     next_retention_check_on: Date.current - 2)
+                                     next_retention_check_on: Date.current - 8)
 
       captured_prompt = nil
       spy_class = Class.new(double_class) do
@@ -661,6 +664,83 @@ RSpec.describe AiService do
       svc.generate_exercise(user, language: "ruby_rails")
 
       expect(captured_prompt).to include("Retention checks due today: memoization")
+    end
+
+    describe "the overdue-threshold reservation policy" do
+      # Real reinforcement history (not a stub of concepts_needing_reinforcement)
+      # so slots genuinely computes to 0 before any retention consideration —
+      # stubbing the reinforcement list is exactly what hid the original bug.
+      def build_reinforcement_history(concepts: %w[n_plus_one transaction_safety service_objects scope_chaining])
+        concepts.each_with_index do |concept, i|
+          date = Date.current - (i + 2)
+          exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                           problem_set: { "code_review" => { "concept" => concept } })
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
+                                answers: { "code_review" => "x" * 20 },
+                                section_ratings: { "code_review" => "too_hard" },
+                                concept_tags: { "code_review" => concept })
+        end
+      end
+
+      def mastery(due_on:, bucket: "ruby_rails", concept: "memoization", interval: 7)
+        user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
+                                       mastered_at: 1.month.ago, retention_interval_days: interval,
+                                       next_retention_check_on: due_on)
+      end
+
+      def capture_prompt_for(third:)
+        captured_prompt = nil
+        spy_class = Class.new(double_class) do
+          define_method(:build_exercise_prompt) do |*args, **kwargs|
+            result = super(*args, **kwargs)
+            captured_prompt = result
+            result
+          end
+        end
+        svc = spy_class.new(canned_text: { "code_review" => { "concept" => "n_plus_one" } }.to_json)
+        allow(svc).to receive(:roll_third_section).and_return(third)
+
+        svc.generate_exercise(user, language: "ruby_rails")
+        captured_prompt
+      end
+
+      it "keeps all 3 reinforcement slots when a check is due but not yet overdue by its own interval" do
+        build_reinforcement_history
+        expect(user.concepts_needing_reinforcement.size).to be > 3
+        mastery(due_on: Date.current - 2) # due (interval 7 means threshold is at -7, not crossed)
+
+        prompt = capture_prompt_for(third: :challenge)
+
+        expect(prompt).not_to match(/Retention checks due today/)
+      end
+
+      it "reserves a slot once the check crosses its own interval's overdue threshold" do
+        build_reinforcement_history
+        mastery(due_on: Date.current - 8) # due_on + interval(7) = -1, past today: crossed
+
+        prompt = capture_prompt_for(third: :challenge)
+
+        expect(prompt).to include("Retention checks due today: memoization")
+      end
+
+      it "reads the threshold from RETENTION_OVERDUE_THRESHOLD_MULTIPLIER rather than a hardcoded value" do
+        build_reinforcement_history
+        mastery(due_on: Date.current - 8) # qualifies at multiplier 1 (8 days > 7-day interval)
+        stub_const("ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER", 2)
+
+        prompt = capture_prompt_for(third: :challenge)
+
+        expect(prompt).not_to match(/Retention checks due today/)
+      end
+
+      it "does not reserve a slot for an architecture-bucket concept overdue on a challenge day" do
+        build_reinforcement_history
+        mastery(due_on: Date.current - 8, bucket: "architecture", concept: "service_boundaries")
+
+        prompt = capture_prompt_for(third: :challenge)
+
+        expect(prompt).not_to match(/Retention checks due today/)
+      end
     end
   end
 
