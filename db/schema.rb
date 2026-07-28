@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_24_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_27_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -256,6 +256,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_24_000000) do
     t.string "language", default: "ruby_rails", null: false
     t.string "time_zone"
     t.datetime "anonymized_at"
+    t.date "last_generation_error_date"
+    t.string "last_generation_error"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["login_token_digest"], name: "index_users_on_login_token_digest"
   end

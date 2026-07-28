@@ -3,7 +3,10 @@ Rails.application.routes.draw do
   # app has booted; served by Rails' built-in health controller, no auth required.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Turbo Stream broadcasts (exercise-generation live updates) ride over this.
+  # Not used by anything live today — the dashboard's generation-completion
+  # signal is a polled JSON endpoint instead (this app loads no Turbo/
+  # Stimulus JS, so a broadcast here would have no subscriber). Left mounted
+  # rather than removed, as that's a separate, unrelated cleanup.
   mount ActionCable.server => "/cable"
 
   # Auth (magic link)
@@ -35,6 +38,11 @@ Rails.application.routes.draw do
   # Manually trigger on-demand generation when the automatic weekday trigger
   # in DashboardController#show intentionally didn't fire (weekends).
   post "generate", to: "daily_exercises#generate"
+
+  # Polled by the dashboard while an async generation job is in flight (see
+  # dashboard/_generating.html.erb) — this app has no live Turbo/ActionCable
+  # connection to push completion, so the page checks in instead.
+  get "dashboard/status", to: "dashboard#status", as: :dashboard_status
 
   # Submit/update today's answers. Rating rides along in #create's payload; there
   # is no per-day show page — /history renders every submitted day, today included.
