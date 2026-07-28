@@ -137,5 +137,24 @@ RSpec.describe ConceptMastery, type: :model do
       review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing")
       expect(user.concepts_needing_reinforcement.map { |r| r[:concept] }).to include("n_plus_one")
     end
+
+    it "anchors the next check on today, not the reviewed response's date, for a late review" do
+      cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong", date: Date.current - 10)
+      # response.date decides whether the check was due (it was, absent a prior
+      # schedule this counts as initial mastery); the NEXT check must still count
+      # forward from today, not from the 10-day-old response date, or reviewing
+      # a stale submission would schedule a check that's already overdue.
+      expect(cm.next_retention_check_on).to eq(Date.current + 7)
+    end
+
+    it "keeps mastered_at as the original mastery time across a later successful retention check" do
+      cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong", date: Date.current - 20)
+      original_mastered_at = cm.mastered_at
+      cm.update!(next_retention_check_on: Date.current - 1)
+
+      cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong")
+
+      expect(cm.mastered_at).to eq(original_mastered_at)
+    end
   end
 end

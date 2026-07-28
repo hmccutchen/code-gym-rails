@@ -100,7 +100,14 @@ class AiService
   def generate_exercise(user, language: user.language_for_today)
     third         = roll_third_section
     reinforcement = user.concepts_needing_reinforcement
-    slots         = [ 3 - reinforcement.size, 0 ].max
+    # An exercise has only 3 sections, so only the first 3 reinforcement concepts
+    # can ever occupy one — sizing against the full (often 4-8 entry) list left
+    # slots permanently at 0 for any active user. Reinforcement still gets
+    # priority: it claims up to 2 of the 3 slots outright, but 1 slot is always
+    # reserved for a due retention check, even when reinforcement would otherwise
+    # claim all three. This is what keeps retention checks from being starved
+    # forever while still letting reinforcement dominate when it's genuinely busy.
+    slots         = [ 3 - reinforcement.first(3).size, 1 ].max
     due_checks    = retention_checks_for(user, language, third: third, slots: slots)
 
     result = call(system: build_system_prompt(language),
@@ -183,7 +190,7 @@ class AiService
     )
 
     log_usage(user, result, purpose: "explain_differently")
-    result[:text].to_s.strip
+    text_or_raise(result, subject: "alternate explanation")
   end
 
   # ── Answer one follow-up question about a completed review ────────────────
@@ -222,10 +229,22 @@ class AiService
     )
 
     log_usage(user, result, purpose: "review_follow_up")
-    result[:text].to_s.strip
+    text_or_raise(result, subject: "follow-up answer")
   end
 
   private
+
+  # A blank provider response is a provider bug, not a valid answer — persisting
+  # it downstream fails a presence validation with an error class that escapes
+  # the controller's `rescue AiService::Error`, so the user gets a raw 500
+  # instead of the clean "couldn't generate that" message every other failure
+  # gets. Raising here routes it through the same handling as any other bad
+  # provider response.
+  def text_or_raise(result, subject:)
+    text = result[:text].to_s.strip
+    raise InvalidResponseError, "Provider returned an empty #{subject}" if text.blank?
+    text
+  end
 
   # Looks up the fixed per-language config, failing loudly on anything
   # outside RAILS_CONCEPTS/JS_CONCEPTS's languages (e.g. "mixed", or a typo)
@@ -257,6 +276,21 @@ class AiService
     buckets.flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: slots).to_a }
            .sort_by(&:next_retention_check_on)
            .first(slots)
+  end
+
+  # A due retention concept's `language` bucket names which vocabulary it was
+  # validated against, but not which section(s) that vocabulary is legal in
+  # today — without this the model has no way to know an architecture-vocabulary
+  # concept can't go in code_review, guesses wrong, and normalize_concepts
+  # rewrites a correctly-honored check into a false "miss".
+  def annotate_retention_concept(cm, third)
+    if cm.language == "architecture"
+      "#{cm.concept} (architecture section)"
+    elsif third == :architecture
+      "#{cm.concept} (code_review or pattern)"
+    else
+      "#{cm.concept} (code_review, pattern, or challenge)"
+    end
   end
 
   # Delivery is advisory, so the only way to know whether retention checks actually
@@ -396,8 +430,8 @@ class AiService
       if due_checks.any?
         <<~RET.chomp
 
-          Retention checks due today: #{due_checks.map(&:concept).join(', ')}
-          - These are concepts the engineer previously MASTERED. Work each one into a section above, alongside the reinforcement concepts.
+          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third) }.join(', ')}
+          - These are concepts the engineer previously MASTERED. Each is annotated with the section(s) it may occupy — work it into one of those in the schema below, alongside the reinforcement concepts.
           - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
           - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.
         RET
@@ -497,7 +531,7 @@ class AiService
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — corrected/improved code for #{third_key == "architecture" ? "code_review and pattern" : "code_review, pattern, and challenge"}#{third_key == "architecture" ? " (empty string for architecture)" : ""}
+      - "improved_code": string — #{arch ? "corrected/improved code for code_review and pattern (empty string for architecture)" : "corrected/improved code for code_review, pattern, and challenge"}
 
       Each array entry must be ONE self-contained idea in one or two sentences.
       Never pack several points into one entry, and never number points inside an

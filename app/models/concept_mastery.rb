@@ -83,7 +83,8 @@ class ConceptMastery < ApplicationRecord
       # A failed check drops the schedule entirely; the concept re-enters normal
       # reinforcement through concepts_needing_reinforcement's existing rules, so
       # there is no parallel "retry the check" path to maintain. mastered_at stays
-      # as a historical record that it was once mastered.
+      # as a historical record that it was once mastered — see retention_schedule_for,
+      # which only ever sets it the first time.
       cm.assign_attributes(next_retention_check_on: nil, retention_interval_days: nil)
     end
 
@@ -94,6 +95,13 @@ class ConceptMastery < ApplicationRecord
   # The interval only grows when the scheduled check was actually DUE. Without that
   # guard, mastering the same concept three days running would inflate 7 → 14 → 28
   # with no real spacing behind it; here the date is simply re-anchored instead.
+  #
+  # `on_date` (response.date, the day the submitted work covers) decides whether
+  # the check was due — that's a question about the work being reviewed, and a
+  # late review shouldn't change the answer. But the NEXT check has to count
+  # forward from today (the day we're actually scheduling it), not from
+  # response.date — otherwise reviewing a 10-day-old submission schedules a
+  # check that's already days in the past and immediately due.
   def self.retention_schedule_for(cm, on_date)
     due = cm.next_retention_check_on.present? && cm.next_retention_check_on <= on_date
 
@@ -107,9 +115,12 @@ class ConceptMastery < ApplicationRecord
       end
 
     {
-      mastered_at:             Time.current,
+      # Set only on first mastery — mastered_at is a historical "when was this
+      # concept first mastered" record, not a "most recently" timestamp, so a
+      # later successful retention check must not overwrite it.
+      mastered_at:             cm.mastered_at || Time.current,
       retention_interval_days: interval,
-      next_retention_check_on: on_date + interval
+      next_retention_check_on: Date.current + interval
     }
   end
   private_class_method :retention_schedule_for

@@ -356,7 +356,11 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
                             reinforcement: [], due_checks: [ cm ])
 
-      expect(prompt).to include("memoization")
+      # Asserts the exact rendered line, not merely that "memoization" appears
+      # anywhere — memoization is also in RAILS_CONCEPTS and printed in every
+      # ruby_rails prompt's vocabulary bullet, so a looser assertion would pass
+      # even if due_checks were ignored entirely.
+      expect(prompt).to include("Retention checks due today: memoization (code_review, pattern, or challenge)")
       expect(prompt).to match(/retention check/i)
       expect(prompt).to match(/fresh/i)
       expect(prompt).to match(/full difficulty|do not (ease|simplify)/i)
@@ -366,6 +370,26 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
                             reinforcement: [], due_checks: [])
       expect(prompt).not_to match(/retention check/i)
+    end
+
+    it "annotates a language-bucket concept's legal sections for the architecture third" do
+      cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture,
+                            reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
+    end
+
+    it "annotates an architecture-bucket concept as architecture-section-only" do
+      cm = user.concept_masteries.create!(concept: "service_boundaries", language: "architecture", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture,
+                            reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).to include("Retention checks due today: service_boundaries (architecture section)")
     end
   end
 
@@ -596,6 +620,47 @@ RSpec.describe AiService do
       allow(svc).to receive(:roll_third_section).and_return(:architecture)
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
+    end
+
+    # Every other retention test stubs concepts_needing_reinforcement, which is
+    # exactly what hid the original bug: `slots = [3 - reinforcement.size, 0].max`
+    # sized against the FULL reinforcement list (realistically 4-8 concepts for
+    # any active user), not the 3 sections an exercise can actually hold, so
+    # slots was 0 and a due retention check could never reach the prompt. This
+    # builds a realistic reinforcement list from real DailyResponse rows instead.
+    it "still surfaces a due retention check when real history fills all three reinforcement slots" do
+      # 4 distinct, still-struggling concepts across 4 real submitted days — enough
+      # that concepts_needing_reinforcement realistically returns more than 3 entries.
+      %w[n_plus_one transaction_safety service_objects scope_chaining].each_with_index do |concept, i|
+        date = Date.current - (i + 2)
+        exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                         problem_set: { "code_review" => { "concept" => concept } })
+        DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
+                              answers: { "code_review" => "x" * 20 },
+                              section_ratings: { "code_review" => "too_hard" },
+                              concept_tags: { "code_review" => concept })
+      end
+      expect(user.concepts_needing_reinforcement.size).to be > 3
+
+      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 2)
+
+      captured_prompt = nil
+      spy_class = Class.new(double_class) do
+        define_method(:build_exercise_prompt) do |*args, **kwargs|
+          result = super(*args, **kwargs)
+          captured_prompt = result
+          result
+        end
+      end
+      set = { "code_review" => { "concept" => "n_plus_one" } }
+      svc = spy_class.new(canned_text: set.to_json)
+      allow(svc).to receive(:roll_third_section).and_return(:challenge)
+
+      svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(captured_prompt).to include("Retention checks due today: memoization")
     end
   end
 
@@ -832,6 +897,16 @@ RSpec.describe AiService do
         svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
       }.to change { ApiUsage.where(purpose: "explain_differently").count }.by(1)
     end
+
+    it "raises InvalidResponseError instead of returning a blank alternate" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {} })
+      svc = double_class.new(canned_text: "   ")
+
+      expect {
+        svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
+      }.to raise_error(AiService::InvalidResponseError)
+    end
   end
 
   describe "#answer_follow_up" do
@@ -876,6 +951,16 @@ RSpec.describe AiService do
       expect {
         svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
       }.to change { ApiUsage.where(purpose: "review_follow_up").count }.by(1)
+    end
+
+    it "raises InvalidResponseError instead of returning a blank answer" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {} })
+      svc = double_class.new(canned_text: "")
+
+      expect {
+        svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
+      }.to raise_error(AiService::InvalidResponseError)
     end
   end
 
