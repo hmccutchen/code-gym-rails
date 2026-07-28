@@ -680,6 +680,28 @@ RSpec.describe "Responses", type: :request do
       expect(response).to have_http_status(:service_unavailable)
       expect(r.reload.review_alternates).to eq({})
     end
+
+    it "backs off without writing when another request fills the cap while this one waits on the provider" do
+      r = reviewed_response_for(user)
+      r.update!(review_alternates: { "code_review" => [ "one" ] })
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      # The size-then-append cap check is race-able: the initial size (1, still
+      # under the cap of 2) is read before this slow provider call. Simulate a
+      # concurrent second request appending its own alternate while this one is
+      # still waiting — the re-check inside with_lock must catch that the cap
+      # was reached in the meantime, rather than overwriting it with a stale array.
+      allow(fake).to receive(:explain_differently) do
+        r.update!(review_alternates: { "code_review" => [ "one", "concurrent" ] })
+        "A different framing"
+      end
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.review_alternates["code_review"]).to eq([ "one", "concurrent" ])
+    end
   end
 
   describe "POST /responses/:id/follow_ups" do

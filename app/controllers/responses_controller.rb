@@ -126,10 +126,31 @@ class ResponsesController < ApplicationController
       section: @section, prior_alternates: existing
     )
 
-    @response.review_alternates = @response.review_alternates.merge(@section => existing + [ alternate ])
-    @response.save!
+    # The provider call above is slow and deliberately stays outside the lock.
+    # The count check above is only advisory — two concurrent requests can both
+    # read `existing.size` under the cap and both reach here. with_lock takes a
+    # row lock and reloads @response, so this re-check is the real guarantee:
+    # if the cap was reached by another request while this one was waiting on
+    # the provider, this request backs off here instead of overwriting (and
+    # silently dropping) the other request's alternate.
+    capped = false
+    remaining = nil
+    @response.with_lock do
+      current = Array(@response.review_alternates[@section])
+      if current.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
+        capped = true
+      else
+        @response.review_alternates = @response.review_alternates.merge(@section => current + [ alternate ])
+        @response.save!
+        remaining = DailyResponse::MAX_ALTERNATES_PER_SECTION - current.size - 1
+      end
+    end
 
-    render json: { status: "ok", alternate: alternate, remaining: DailyResponse::MAX_ALTERNATES_PER_SECTION - existing.size - 1 }
+    if capped
+      render_section_error("You've already asked for #{DailyResponse::MAX_ALTERNATES_PER_SECTION} alternate explanations here.")
+    else
+      render json: { status: "ok", alternate: alternate, remaining: remaining }
+    end
   rescue AiService::Error => e
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end
