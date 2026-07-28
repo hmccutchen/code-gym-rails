@@ -3,7 +3,11 @@ Rails.application.routes.draw do
   # app has booted; served by Rails' built-in health controller, no auth required.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Turbo Stream broadcasts (exercise-generation live updates) ride over this.
+  # Not used by anything live today — the dashboard's generation-completion
+  # signal is a polled JSON endpoint instead (this app loads no Turbo/
+  # Stimulus JS, so a broadcast here would have no subscriber). Left mounted
+  # rather than removed as an unrelated cleanup; see
+  # docs/superpowers/specs/2026-07-27-fix-stalled-generation-spinner-design.md.
   mount ActionCable.server => "/cable"
 
   # Auth (magic link)

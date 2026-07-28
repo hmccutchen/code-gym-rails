@@ -28,8 +28,11 @@ User logs in (magic link email)
          reads: user.recent_performance (last 10 sessions + ratings + feedback + concepts)
          calls: the user's provider with a personalized prompt, in the user's
                 chosen language (user.language_for_today)
-         saves: DailyExercise { problem_set: jsonb, language }
-         broadcasts: Turbo Stream replace of #dashboard-content (success or failure)
+         saves: DailyExercise { problem_set: jsonb, language } on success, or
+         persists last_generation_error(_date) on the user on failure — the
+         dashboard learns the outcome by polling GET /dashboard/status and
+         reloading (this app loads no Turbo/Stimulus JS, so a live push has
+         no subscriber)
 
 User opens dashboard:
   └→ DashboardController#show
@@ -120,7 +123,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call + connection only
-- `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation + Turbo broadcasts
+- `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
