@@ -70,10 +70,21 @@
   </div>
 <% end %>
 
-<script>
-// Autosaves on blur. This partial renders once per history entry, so the
-// :not([data-se-wired]) guard is what keeps a control from being wired — and its
-// listener duplicated — on the second and later copies of this script.
+<%# This partial can render once per history entry (up to one per reviewed
+    session on the page), so the script below is emitted into the layout's
+    shared :page_scripts region — and only on the FIRST render of this
+    partial per request — rather than inline here, where it would otherwise
+    ship one identical ~4.7 KB copy per entry. The :not([data-se-wired]) etc.
+    guards inside the script still matter: they're what let this single copy
+    wire up controls that keep appearing across every entry's markup. %>
+<% unless @ai_review_script_emitted %>
+  <% @ai_review_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script>
+// Autosaves on blur. This script is emitted once (see the guard above) but
+// wires controls across every review-block on the page, so the
+// :not([data-se-wired]) guard is what keeps a control from being wired — and
+// its listener duplicated — when new matching elements appear.
 // Inline script matching the app's convention; Stimulus is not wired here.
 (() => {
   document.querySelectorAll(".self-explanation-input:not([data-se-wired])").forEach(field => {
@@ -194,4 +205,6 @@
     });
   });
 })();
-</script>
+    </script>
+  <% end %>
+<% end %>

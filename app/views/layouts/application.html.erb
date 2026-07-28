@@ -283,5 +283,10 @@
       });
     })();
   </script>
+  <%# Per-page scripts that would otherwise be duplicated once per rendered
+      partial instance (e.g. shared/_ai_review, responses/_architecture_section
+      on /history) — those partials emit into this region exactly once per
+      request regardless of how many times they render. %>
+  <%= yield :page_scripts %>
 </body>
 </html>

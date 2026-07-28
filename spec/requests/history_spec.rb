@@ -112,6 +112,22 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("cdn.jsdelivr.net")
     end
 
+    it "emits the ai_review autosave script and the mermaid module exactly once across multiple entries" do
+      # shared/_ai_review renders once per reviewed entry, and
+      # responses/_architecture_section's mermaid module renders once per
+      # architecture section with a diagram — both would otherwise ship one
+      # duplicate ~4-5 KB script per entry. Verifies they're deduped into the
+      # layout's shared :page_scripts region instead.
+      3.times { |i| create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true) }
+      architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
+
+      login_as(user)
+      get history_path
+
+      expect(response.body.scan("Autosaves on blur.").size).to eq(1)
+      expect(response.body.scan("cdn.jsdelivr.net").size).to eq(1)
+    end
+
     it "renders improved_code for a visible pattern section" do
       exercise = DailyExercise.create!(
         user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
