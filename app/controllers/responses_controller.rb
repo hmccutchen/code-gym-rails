@@ -1,5 +1,6 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [ :review, :email_review ]
+  before_action :set_response, only: [ :review, :email_review, :self_explanation ]
+  before_action :require_reviewed_section!, only: [ :self_explanation ]
 
   # How long a claimed-but-unfinished review blocks a retry. The provider call
   # has no configured timeout, so a crash or hang mid-review must not lock the
@@ -97,6 +98,21 @@ class ResponsesController < ApplicationController
     redirect_to root_path, notice: "Review sent to #{current_user.email}."
   end
 
+  # PATCH /responses/:id/self_explanation — save the user's own one-sentence
+  # explanation of why a fix works. Capture only: nothing grades it, and it gates
+  # nothing. Writing to an arbitrarily old response is intentional — /history is
+  # where reviews live, so this is where the prompt is answered.
+  def self_explanation
+    @response.self_explanations = @response.self_explanations.merge(
+      @section => params[:text].to_s.strip
+    )
+    if @response.save
+      render json: { status: "saved" }
+    else
+      render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   # Errors send the user back to the dashboard, where the retry button lives.
@@ -108,6 +124,25 @@ class ResponsesController < ApplicationController
 
   def set_response
     @response = current_user.daily_responses.find(params[:id])
+  end
+
+  # Shared by every endpoint that writes against an existing review. Ownership is
+  # already enforced by set_response's association scope (another user's id raises
+  # RecordNotFound → 404, which also avoids leaking whether that id exists); this
+  # adds the two guards specific to review-attached writes. Validating the section
+  # against the exercise's own problem_set mirrors #create's slice guard — without
+  # it a crafted param writes arbitrary keys into the jsonb columns.
+  def require_reviewed_section!
+    return render_section_error("No review to attach that to yet.") unless @response.reviewed?
+
+    @section = params[:section].to_s
+    return if @response.daily_exercise.problem_set.key?(@section)
+
+    render_section_error("That section isn't part of this exercise.")
+  end
+
+  def render_section_error(message)
+    render json: { status: "error", error: message }, status: :unprocessable_entity
   end
 
   # Atomic claim against a concurrent double-review (e.g. an impatient second

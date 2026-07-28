@@ -27,5 +27,49 @@
     <% if improved_code.present? && section != "architecture" && response.improved_code_visible?(section) %>
       <pre class="snippet" style="margin-top:.75rem"><code><%= improved_code %></code></pre>
     <% end %>
+    <div class="self-explanation">
+      <label for="self-exp-<%= response.id %>-<%= section %>">In one sentence, why does this fix work?</label>
+      <textarea id="self-exp-<%= response.id %>-<%= section %>"
+                class="self-explanation-input"
+                rows="2"
+                data-url="<%= self_explanation_response_path(response) %>"
+                data-section="<%= section %>"
+                placeholder="Optional — putting it in your own words is the point."><%= response.self_explanations[section] %></textarea>
+      <span class="self-explanation-status" aria-live="polite"></span>
+    </div>
   </div>
 <% end %>
+
+<script>
+// Autosaves on blur. This partial renders once per history entry, so the
+// :not([data-se-wired]) guard is what keeps a control from being wired — and its
+// listener duplicated — on the second and later copies of this script.
+// Inline script matching the app's convention; Stimulus is not wired here.
+(() => {
+  document.querySelectorAll(".self-explanation-input:not([data-se-wired])").forEach(field => {
+    field.dataset.seWired = "1";
+    const status = field.parentElement.querySelector(".self-explanation-status");
+    let lastSaved = field.value;
+
+    field.addEventListener("blur", async () => {
+      if (field.value === lastSaved) return;
+      status.textContent = "Saving…";
+      try {
+        const res = await fetch(field.dataset.url, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: field.dataset.section, text: field.value })
+        });
+        if (!res.ok) throw new Error(res.status);
+        lastSaved = field.value;
+        status.textContent = "Saved";
+      } catch {
+        status.textContent = "Couldn't save — try again";
+      }
+    });
+  });
+})();
+</script>

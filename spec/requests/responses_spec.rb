@@ -506,4 +506,79 @@ RSpec.describe "Responses", type: :request do
       expect(response).to redirect_to(root_path)
     end
   end
+
+  describe "PATCH /responses/:id/self_explanation" do
+    let(:user) { create_user_with_key }
+
+    def reviewed_response_for(owner)
+      exercise = DailyExercise.create!(
+        user: owner, date: Date.current - 5, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: Date.current - 5,
+        answers: { "code_review" => "an answer with substance" },
+        submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+    end
+
+    it "saves and then updates an explanation for a valid section" do
+      r = reviewed_response_for(user)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "Because it batches the query" }
+      expect(response).to have_http_status(:ok)
+      expect(r.reload.self_explanations["code_review"]).to eq("Because it batches the query")
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "Revised reasoning" }
+      expect(r.reload.self_explanations["code_review"]).to eq("Revised reasoning")
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:not_found)
+      expect(r.reload.self_explanations).to eq({})
+    end
+
+    # Guards against a regression where require_reviewed_section! runs before
+    # set_response: if the before_action order were ever swapped, this would
+    # 422 ("no review yet") instead of 404, leaking that the row exists at all.
+    # reviewed_response_for(other) would mask this — its ai_review is already
+    # present, so both orderings would happen to 404/422 the same way. Only an
+    # *unreviewed* other-user row can tell the two before_actions apart.
+    it "404s for another user's unreviewed response, not 422" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      r.update!(ai_review: nil)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:not_found)
+      expect(r.reload.self_explanations).to eq({})
+    end
+
+    it "rejects an unreviewed response" do
+      r = reviewed_response_for(user)
+      r.update!(ai_review: nil)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.self_explanations).to eq({})
+    end
+
+    it "rejects a section absent from the exercise's problem_set" do
+      r = reviewed_response_for(user)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "architecture", text: "x" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.self_explanations).to eq({})
+    end
+  end
 end

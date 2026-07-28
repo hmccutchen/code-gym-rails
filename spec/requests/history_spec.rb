@@ -214,6 +214,15 @@ RSpec.describe "History", type: :request do
 
       expect(response.body).to include("<li>Spotted the issue on #{2.days.ago.to_date}</li>")
     end
+
+    it "renders the self-explanation prompt on a reviewed entry" do
+      create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("In one sentence, why does this fix work?")
+      expect(response.body).to include("self-explanation-input")
+    end
   end
 
   describe "review summary label" do

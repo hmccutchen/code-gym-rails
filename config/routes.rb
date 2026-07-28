@@ -50,6 +50,7 @@ Rails.application.routes.draw do
     member do
       post :review       # trigger the inline AI review
       post :email_review # email the completed review to the user
+      patch :self_explanation # save the user's own restatement of why a fix works
     end
   end
 
