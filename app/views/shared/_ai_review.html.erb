@@ -48,7 +48,7 @@
                 placeholder="Optional — putting it in your own words is the point."><%= response.self_explanations[section] %></textarea>
       <span class="self-explanation-status" aria-live="polite"></span>
     </div>
-    <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by(&:created_at) %>
+    <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by { |t| [ t.created_at, t.id ] } %>
     <% asked = turns.count { |t| t.role_user? } %>
     <div class="follow-ups" data-section="<%= section %>">
       <div class="follow-up-thread">

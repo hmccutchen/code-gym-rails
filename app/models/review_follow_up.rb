@@ -9,5 +9,9 @@ class ReviewFollowUp < ApplicationRecord
 
   validates :section, :content, presence: true
 
-  scope :for_section, ->(section) { where(section: section).order(:created_at) }
+  # :id as a tiebreaker: the user and assistant turns of one exchange are created
+  # microseconds apart in the same transaction, and Postgres timestamp precision
+  # can collide. created_at alone would then order them arbitrarily and could
+  # render the answer above its question.
+  scope :for_section, ->(section) { where(section: section).order(:created_at, :id) }
 end
