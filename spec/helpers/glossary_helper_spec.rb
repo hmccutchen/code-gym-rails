@@ -7,7 +7,7 @@ RSpec.describe GlossaryHelper, type: :helper do
       result = helper.glossary_wrap("A Closure captures scope.", glossary)
 
       expect(result).to be_html_safe
-      expect(result).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables.">Closure</span>')
+      expect(result).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables." tabindex="0" role="button" aria-label="Closure: A function bundled with its surrounding variables.">Closure</span>')
     end
 
     it "only wraps the first occurrence, leaving later repeats plain" do
@@ -23,7 +23,7 @@ RSpec.describe GlossaryHelper, type: :helper do
       result = helper.glossary_wrap("Welcome to the classroom, not a class problem.", glossary)
 
       expect(result).to include("Welcome to the classroom, not a")
-      expect(result).to include('<span class="gloss-term" data-definition="A blueprint for objects.">class</span> problem.')
+      expect(result).to include('<span class="gloss-term" data-definition="A blueprint for objects." tabindex="0" role="button" aria-label="class: A blueprint for objects.">class</span> problem.')
     end
 
     it "wraps multiple distinct terms independently in the same text" do
@@ -157,6 +157,23 @@ RSpec.describe GlossaryHelper, type: :helper do
       glossary = [ { "term" => "closure", "definition" => "def" } ]
       result = helper.glossary_wrap("closure", glossary)
       expect(result).to be_html_safe
+    end
+
+    it "makes the wrapped term keyboard-focusable with an accessible name" do
+      glossary = [ { "term" => "closure", "definition" => "A function bundled with its surrounding variables." } ]
+      result = helper.glossary_wrap("A closure captures scope.", glossary)
+
+      expect(result).to include('tabindex="0"')
+      expect(result).to include('role="button"')
+      expect(result).to include('aria-label="closure: A function bundled with its surrounding variables."')
+    end
+
+    it "escapes HTML-special characters in the aria-label the same way as the data-definition" do
+      glossary = [ { "term" => "closure", "definition" => %(a trick" onmouseover="alert(1)) } ]
+      result = helper.glossary_wrap("Explain the closure here.", glossary)
+
+      expect(result).not_to include('aria-label="closure: a trick" onmouseover="alert(1)"')
+      expect(result).to include('aria-label="closure: a trick&quot; onmouseover=&quot;alert(1)"')
     end
 
     it "treats no-match result (plain text) as not html_safe by default" do

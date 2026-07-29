@@ -128,7 +128,8 @@
     @media (hover: hover) and (pointer: fine) {
       .gloss-term:hover::after { display: block; }
     }
-    .gloss-term.gloss-open::after { display: block; }
+    .gloss-term.gloss-open::after, .gloss-term:focus-visible::after { display: block; }
+    .gloss-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
     .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
@@ -308,19 +309,33 @@
   </script>
   <%# Glossary term tooltips: hover reveals the definition on desktop (pure
       CSS, gated to real-hover pointers above); tap toggles it on touch,
-      since hover has no equivalent there. One delegated listener handles
-      every .gloss-term on the page regardless of which partial rendered it,
-      matching the loading-form script's delegation just above. Cheap and
-      unconditional — no CDN fetch, so no presence-gated dedup partial is
-      needed the way syntax highlighting and Mermaid require. %>
+      since hover has no equivalent there. Enter/Space toggles it the same
+      way for keyboard users, matching the tabindex="0" the terms render
+      with and the :focus-visible reveal rule above. One delegated listener
+      per event type handles every .gloss-term on the page regardless of
+      which partial rendered it, matching the loading-form script's
+      delegation just above. Cheap and unconditional — no CDN fetch, so no
+      presence-gated dedup partial is needed the way syntax highlighting and
+      Mermaid require. %>
   <script>
     (() => {
-      document.addEventListener("click", (event) => {
-        const term = event.target.closest(".gloss-term");
+      const toggleTerm = (term) => {
         document.querySelectorAll(".gloss-term.gloss-open").forEach((el) => {
           if (el !== term) el.classList.remove("gloss-open");
         });
         if (term) term.classList.toggle("gloss-open");
+      };
+
+      document.addEventListener("click", (event) => {
+        toggleTerm(event.target.closest(".gloss-term"));
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        const term = event.target.closest(".gloss-term");
+        if (!term) return;
+        event.preventDefault();
+        toggleTerm(term);
       });
     })();
   </script>

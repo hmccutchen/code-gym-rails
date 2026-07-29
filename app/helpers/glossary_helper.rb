@@ -7,6 +7,12 @@
 # The result is marked .html_safe only after that escaping, so nothing in
 # `text` or `glossary` (both may be AI-generated) can ever break out of the
 # surrounding markup.
+#
+# Each span also carries tabindex="0", role="button", and an aria-label of
+# "term: definition" so the tooltip is reachable and announced for keyboard
+# and screen-reader users, not just mouse/touch — the layout's CSS shows the
+# tooltip on :focus-visible in addition to :hover/.gloss-open, and its JS
+# toggles .gloss-open on Enter/Space in addition to click/tap.
 module GlossaryHelper
   def glossary_wrap(text, glossary)
     return text if text.blank? || glossary.blank?
@@ -40,7 +46,8 @@ module GlossaryHelper
     matches.each do |m|
       result << ERB::Util.html_escape(text[cursor...m[:range].begin])
       matched_text = text[m[:range]]
-      result << %(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(m[:definition])}">#{ERB::Util.html_escape(matched_text)}</span>)
+      accessible_label = ERB::Util.html_escape("#{matched_text}: #{m[:definition]}")
+      result << %(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(m[:definition])}" tabindex="0" role="button" aria-label="#{accessible_label}">#{ERB::Util.html_escape(matched_text)}</span>)
       cursor = m[:range].end
     end
     result << ERB::Util.html_escape(text[cursor..])

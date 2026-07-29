@@ -200,7 +200,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       ps["code_review"]["glossary"] = [ { "term" => "closure", "definition" => "A function bundled with its surrounding variables." } ]
       create_exercise(problem_set: ps)
       get root_path
-      expect(response.body).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables.">closure</span>')
+      expect(response.body).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables." tabindex="0" role="button" aria-label="closure: A function bundled with its surrounding variables.">closure</span>')
     end
 
     it "wraps a matching term in an architecture option" do
@@ -212,7 +212,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       }
       create_exercise(problem_set: ps)
       get root_path
-      expect(response.body).to include('<span class="gloss-term" data-definition="Caching a function&#39;s return value.">memoization</span>')
+      expect(response.body).to include('<span class="gloss-term" data-definition="Caching a function&#39;s return value." tabindex="0" role="button" aria-label="memoization: Caching a function&#39;s return value.">memoization</span>')
     end
 
     it "renders no glossary markup for sections without a glossary key" do
@@ -227,7 +227,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       ps["pattern"]["glossary"] = [ { "term" => "duck typing", "definition" => "Caring about behavior, not declared type." } ]
       create_response(create_exercise(problem_set: ps))
       get root_path
-      expect(response.body).to include('<span class="gloss-term" data-definition="Caring about behavior, not declared type.">duck typing</span>')
+      expect(response.body).to include('<span class="gloss-term" data-definition="Caring about behavior, not declared type." tabindex="0" role="button" aria-label="duck typing: Caring about behavior, not declared type.">duck typing</span>')
     end
   end
 
