@@ -987,6 +987,40 @@ RSpec.describe AiService do
       end
     end
 
+    context "security_review third section" do
+      def security_review_exercise
+        DailyExercise.new(
+          language: "ruby_rails",
+          problem_set: {
+            "code_review" => { "question" => "cr?", "snippet" => "code" },
+            "pattern"     => { "title" => "P", "question" => "pat?" },
+            "security_review" => {
+              "title" => "S",
+              "question" => "What vulnerability exists here, and how would you mitigate it?",
+              "snippet" => "User.new(params[:user])"
+            }
+          }
+        )
+      end
+
+      it "evaluates vulnerability identification and mitigation soundness, not a single expected answer" do
+        resp = DailyResponse.new(answers: { "security_review" => "Mass assignment; use strong params" })
+        prompt = service.send(:build_review_prompt, security_review_exercise, resp)
+
+        expect(prompt).to include("What vulnerability exists here")
+        expect(prompt.downcase).to include("mitigation")
+        expect(prompt).to include('"security_review"')
+        expect(prompt).not_to include("Coding Challenge:")
+        expect(prompt).to include('For this section "improved_code" must show the mitigated version of the snippet.')
+      end
+
+      it "asks for improved_code covering code_review, pattern, and security_review" do
+        resp = DailyResponse.new(answers: {})
+        prompt = service.send(:build_review_prompt, security_review_exercise, resp)
+        expect(prompt).to include("corrected/improved code for code_review, pattern, and security_review")
+      end
+    end
+
     it "keeps the existing challenge criteria when the third section is a challenge" do
       ex = DailyExercise.new(language: "ruby_rails", problem_set: {
         "code_review" => { "question" => "cr?", "snippet" => "code" },

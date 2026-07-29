@@ -633,11 +633,13 @@ class AiService
   end
 
   def build_review_prompt(exercise, daily_response)
-    answers = daily_response.answers
-    arch    = exercise.architecture
+    answers   = daily_response.answers
+    third_key = exercise.third_key
 
     third_block =
-      if arch
+      case third_key
+      when "architecture"
+        arch = exercise.architecture
         <<~ARCH.chomp
           Architecture decision (#{arch["title"]}): #{arch["question"]}
           Scenario/constraints: #{arch["scenario"]}
@@ -649,6 +651,16 @@ class AiService
           - Did they consider alternatives rather than asserting one option?
           For this section "improved_code" must be an empty string.
         ARCH
+      when "security_review"
+        sec = exercise.security_review
+        <<~SEC.chomp
+          Security Review (#{sec["title"]}): #{sec["question"]}
+          Snippet: #{sec["snippet"]}
+          Their answer: #{answers["security_review"].presence || "(skipped)"}
+
+          Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their proposed mitigation is sound — not against one single expected answer. Give partial credit in "missed" for identifying the vulnerability without a complete mitigation, or vice versa.
+          For this section "improved_code" must show the mitigated version of the snippet.
+        SEC
       else
         <<~CH.chomp
           Coding Challenge: #{exercise.challenge["question"]}
@@ -656,7 +668,10 @@ class AiService
         CH
       end
 
-    third_key = arch ? "architecture" : "challenge"
+    improved_code_note =
+      third_key == "architecture" ?
+        "corrected/improved code for code_review and pattern (empty string for architecture)" :
+        "corrected/improved code for code_review, pattern, and #{third_key}"
 
     <<~PROMPT
       Review these Code Gym answers. For each section, return a JSON object with:
@@ -665,7 +680,7 @@ class AiService
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — #{arch ? "corrected/improved code for code_review and pattern (empty string for architecture)" : "corrected/improved code for code_review, pattern, and challenge"}
+      - "improved_code": string — #{improved_code_note}
 
       Each array entry must be ONE self-contained idea in one or two sentences.
       Never pack several points into one entry, and never number points inside an
