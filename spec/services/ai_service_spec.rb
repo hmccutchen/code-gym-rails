@@ -55,6 +55,17 @@ RSpec.describe AiService do
       expect(schema.scan(/"scenario"/).size).to eq(3)
     end
 
+    it "defines an optional glossary array for each of the three sections" do
+      schema = service.send(:exercise_schema_for)
+      expect(schema.scan(/"glossary"/).size).to eq(3)
+    end
+
+    it "swaps in a glossary array for the architecture block too" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+      architecture = JSON.parse(schema)["architecture"]
+      expect(architecture).to have_key("glossary")
+    end
+
     it "includes the challenge block by default (third: :challenge)" do
       schema = service.send(:exercise_schema_for, "ruby_rails")
       expect(schema).to include("\"challenge\"")
@@ -88,7 +99,7 @@ RSpec.describe AiService do
       pattern = JSON.parse(schema)["pattern"]
 
       expect(pattern.keys).to contain_exactly(
-        "title", "why", "question", "scenario", "teaching_note", "concept"
+        "title", "why", "question", "scenario", "teaching_note", "concept", "glossary"
       )
       expect(pattern).not_to have_key("reference")
     end
