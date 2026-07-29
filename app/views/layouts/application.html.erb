@@ -115,6 +115,22 @@
     details.hint.locked { pointer-events: none; opacity: .45; }
     .hint-body { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; border-radius: 0 6px 6px 0; margin-top: .5rem; line-height: 1.6; }
 
+    .gloss-term { border-bottom: 1px dotted var(--muted); cursor: help; position: relative; }
+    .gloss-term::after {
+      content: attr(data-definition);
+      position: absolute; left: 0; bottom: 100%; margin-bottom: .35rem;
+      width: max-content; max-width: 16rem;
+      background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px;
+      padding: .5rem .65rem; font-size: .8rem; line-height: 1.5; color: var(--text);
+      white-space: normal; z-index: 10;
+      display: none;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .gloss-term:hover::after { display: block; }
+    }
+    .gloss-term.gloss-open::after, .gloss-term:focus-visible::after { display: block; }
+    .gloss-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
     .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
     .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
@@ -288,6 +304,38 @@
           button.classList.remove("btn-loading");
           setLabel(originalLabel);
         });
+      });
+    })();
+  </script>
+  <%# Glossary term tooltips: hover reveals the definition on desktop (pure
+      CSS, gated to real-hover pointers above); tap toggles it on touch,
+      since hover has no equivalent there. Enter/Space toggles it the same
+      way for keyboard users, matching the tabindex="0" the terms render
+      with and the :focus-visible reveal rule above. One delegated listener
+      per event type handles every .gloss-term on the page regardless of
+      which partial rendered it, matching the loading-form script's
+      delegation just above. Cheap and unconditional — no CDN fetch, so no
+      presence-gated dedup partial is needed the way syntax highlighting and
+      Mermaid require. %>
+  <script>
+    (() => {
+      const toggleTerm = (term) => {
+        document.querySelectorAll(".gloss-term.gloss-open").forEach((el) => {
+          if (el !== term) el.classList.remove("gloss-open");
+        });
+        if (term) term.classList.toggle("gloss-open");
+      };
+
+      document.addEventListener("click", (event) => {
+        toggleTerm(event.target.closest(".gloss-term"));
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        const term = event.target.closest(".gloss-term");
+        if (!term) return;
+        event.preventDefault();
+        toggleTerm(term);
       });
     })();
   </script>
