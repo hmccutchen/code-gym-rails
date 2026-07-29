@@ -120,6 +120,19 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(result).to include("&lt;script&gt;xss&lt;/script&gt;")
     end
 
+    it "still escapes dangerous text even when called with an html_safe (SafeBuffer) input" do
+      # ERB::Util.html_escape is a documented no-op on ActiveSupport::SafeBuffer input, so if
+      # `text` ever arrived pre-marked html_safe, every escape call in the assembly loop would
+      # silently skip unless the helper strips that wrapper first.
+      glossary = [ { "term" => "closure", "definition" => "def" } ]
+      unsafe_text = "<img src=x onerror=alert(1)> closure here".html_safe
+      result = helper.glossary_wrap(unsafe_text, glossary)
+
+      expect(result).not_to include("<img src=x onerror=alert(1)>")
+      expect(result).to include("&lt;img src=x onerror=alert(1)&gt;")
+      expect(result).to include('<span class="gloss-term"')
+    end
+
     it "handles a definition with both single and double quotes safely" do
       glossary = [ { "term" => "closure", "definition" => %q(it's a "thing") } ]
       result = helper.glossary_wrap("A closure exists.", glossary)

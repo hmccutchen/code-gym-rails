@@ -11,6 +11,11 @@ module GlossaryHelper
   def glossary_wrap(text, glossary)
     return text if text.blank? || glossary.blank?
 
+    # Strip any ActiveSupport::SafeBuffer wrapper unconditionally: html_escape
+    # is a no-op on already-html_safe input, which would silently skip every
+    # escape call below if `text` ever arrived pre-marked safe.
+    text = text.to_str
+
     matches = []
     glossary.each do |entry|
       term       = entry["term"]
