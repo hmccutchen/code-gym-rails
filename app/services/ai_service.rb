@@ -258,12 +258,12 @@ class AiService
     end
   end
 
-  # Which third section this set gets: architecture-reasoning 75% of the time,
-  # a traditional coding challenge 25%. Extracted so tests can stub it — never
+  # Which third section this set gets: architecture-reasoning 60% of the time,
+  # a traditional coding challenge 40%. Extracted so tests can stub it — never
   # assert on real randomness. The chosen kind is not tracked separately; the
   # persisted third key (problem_set["architecture"] vs ["challenge"]) is the record.
   def roll_third_section
-    rand < 0.75 ? :architecture : :challenge
+    rand < 0.60 ? :architecture : :challenge
   end
 
   # The concept buckets today's set can actually host. Architecture concepts have

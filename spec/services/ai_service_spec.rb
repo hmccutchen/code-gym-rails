@@ -128,10 +128,16 @@ RSpec.describe AiService do
   end
 
   describe "#roll_third_section" do
-    it "returns :architecture ~75% and :challenge ~25% (both reachable)" do
+    it "returns :architecture ~60% and :challenge ~40% (both reachable)" do
       allow(service).to receive(:rand).and_return(0.10)
       expect(service.send(:roll_third_section)).to eq(:architecture)
       allow(service).to receive(:rand).and_return(0.90)
+      expect(service.send(:roll_third_section)).to eq(:challenge)
+
+      # Boundary check: just under vs. just at/over the new 0.60 threshold.
+      allow(service).to receive(:rand).and_return(0.59)
+      expect(service.send(:roll_third_section)).to eq(:architecture)
+      allow(service).to receive(:rand).and_return(0.60)
       expect(service.send(:roll_third_section)).to eq(:challenge)
     end
   end
