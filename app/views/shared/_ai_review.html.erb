@@ -1,3 +1,4 @@
+<% exercise_language = response.daily_exercise.language %>
 <% response.ai_review.each do |section, fb| %>
   <% next unless fb.is_a?(Hash) %>
   <div class="review-block">
@@ -25,7 +26,7 @@
     <% end %>
     <% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) %>
     <% if improved_code.present? && response.improved_code_visible?(section) %>
-      <pre class="snippet" style="margin-top:.75rem"><code><%= improved_code %></code></pre>
+      <pre class="snippet" style="margin-top:.75rem"><code<% if (lang = hljs_language(exercise_language)) %> data-hljs="<%= lang %>"<% end %>><%= improved_code %></code></pre>
     <% end %>
     <div class="alternates" data-section="<%= section %>">
       <% Array(response.review_alternates[section]).each do |alt| %>
@@ -69,6 +70,8 @@
     </div>
   </div>
 <% end %>
+
+<%= render "shared/syntax_highlighting_script" %>
 
 <%# This partial can render once per history entry (up to one per reviewed
     session on the page), so the script below is emitted into the layout's

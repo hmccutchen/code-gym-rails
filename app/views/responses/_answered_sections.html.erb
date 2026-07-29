@@ -2,12 +2,13 @@
     question, snippet, the user's answer, and (always) the concept-reference
     dropdown when one is cached. Shared by the dashboard's submitted state and
     each entry on the history page. Locals: exercise, response. %>
+<%= render "shared/syntax_highlighting_script" %>
 <% if (cr = exercise.code_review) %>
 <div class="section">
   <div class="section-label">1 — Code Review</div>
   <% if cr["scenario"].present? %><div class="section-scenario"><%= cr["scenario"] %></div><% end %>
   <div class="question"><%= cr["question"] %></div>
-  <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
+  <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= cr["snippet"] %></code></pre>
   <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
     <%= render "shared/concept_reference", reference: ref %>
   <% end %>
@@ -40,7 +41,7 @@
     <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
     <div class="question"><%= ch["question"] %></div>
     <% if ch["starter_code"].present? %>
-      <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
+      <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= ch["starter_code"] %></code></pre>
     <% end %>
     <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
       <%= render "shared/concept_reference", reference: ref %>

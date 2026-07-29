@@ -1,0 +1,48 @@
+<%# Renders from any of the four code-bearing partials (dashboard/_exercise,
+    responses/_answered_sections, shared/_ai_review, shared/_concept_reference),
+    each of which may itself render multiple times on one page — e.g. every
+    entry on /history. The guard below pushes the script into :page_scripts
+    only on the FIRST call anywhere on the page, mirroring the Mermaid diagram
+    script's dedup pattern exactly. The script itself scans every matching
+    element on the page, not just the caller's own, so one copy still handles
+    every block regardless of how many call sites triggered the emission. %>
+<% unless @syntax_highlighting_script_emitted %>
+  <% @syntax_highlighting_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script type="module">
+      // Version pinned exactly (not "@11"), matching the Mermaid CDN import's
+      // reasoning: a highlight.js release can't change behavior under us without
+      // a deliberate bump. Core + only the two grammars actually used, not the
+      // ~35-language "common" bundle.
+      //
+      // Degradation is simpler than Mermaid's: the code is already fully correct,
+      // readable plain text before this script runs — highlighting is a pure
+      // enhancement, not something the page depends on. A blocked CDN or a parse
+      // failure just leaves every block exactly as it renders without this script.
+      try {
+        const [{ default: hljs }, { default: ruby }, { default: javascript }] = await Promise.all([
+          import("https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/es/core.min.js"),
+          import("https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/es/languages/ruby.min.js"),
+          import("https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/es/languages/javascript.min.js"),
+        ]);
+        hljs.registerLanguage("ruby", ruby);
+        hljs.registerLanguage("javascript", javascript);
+
+        for (const el of document.querySelectorAll("code[data-hljs]:not([data-hljs-done])")) {
+          el.dataset.hljsDone = "1";
+          const lang = el.dataset.hljs;
+          if (!hljs.getLanguage(lang)) continue;
+          // el.textContent reads the already-rendered, already-escaped source back
+          // out rather than re-parsing HTML. hljs.highlight()'s .value output is
+          // guaranteed pre-escaped by the library, so it's safe to set as innerHTML.
+          const { value } = hljs.highlight(el.textContent, { language: lang });
+          el.innerHTML = value;
+          el.classList.add("hljs");
+        }
+      } catch {
+        // CDN unreachable or a module failed to load — blocks stay plain text,
+        // exactly as they render without this script at all.
+      }
+    </script>
+  <% end %>
+<% end %>

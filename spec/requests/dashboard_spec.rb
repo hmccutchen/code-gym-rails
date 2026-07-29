@@ -546,6 +546,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  it "marks the unsubmitted form's code_review snippet for syntax highlighting" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false)
+
+    get root_path
+
+    expect(response.body).to include('data-hljs="ruby"')
+  end
+
   describe "streak display" do
     # A Wednesday, so the streak days are plain weekdays.
     let(:wednesday) { Time.utc(2026, 7, 22, 12) }
@@ -579,5 +588,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).not_to include("🔥")
       end
     end
+  end
+
+  it "marks submitted code blocks for syntax highlighting even when unreviewed" do
+    exercise = create_exercise
+    create_response(exercise, submitted: true)
+
+    get root_path
+
+    expect(response.body).to include('data-hljs="ruby"')
+    expect(response.body).to include("highlight.js@11.11.1/es/core.min.js")
   end
 end
