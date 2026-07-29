@@ -597,6 +597,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     get root_path
 
     expect(response.body).to include('data-hljs="ruby"')
-    expect(response.body).to include("highlight.js@11.11.1/es/core.min.js")
+    expect(response.body).to include("highlight.js@11.11.1/lib/core")
   end
 end

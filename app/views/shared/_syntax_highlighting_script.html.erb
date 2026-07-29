@@ -27,10 +27,17 @@
         // evaluated client-side since this guard's render call is unconditional
         // across all four call sites rather than gated per-site on content.
         if (document.querySelector("code[data-hljs]:not([data-hljs-done])")) {
+          // highlight.js's own jsDelivr "es/" build re-exports from its CJS
+          // "lib/core.js" (see https://github.com/highlightjs/highlight.js/blob/main/es/core.js) —
+          // that CJS-to-ESM interop only works in Node/bundlers, not a native
+          // browser `import()`, where it throws "does not provide an export
+          // named 'default'" and silently disables highlighting on every page.
+          // esm.sh re-transpiles the same CJS source into real ESM, so it
+          // works here. Version pinned exactly, same reasoning as before.
           const [{ default: hljs }, { default: ruby }, { default: javascript }] = await Promise.all([
-            import("https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/es/core.min.js"),
-            import("https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/es/languages/ruby.min.js"),
-            import("https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/es/languages/javascript.min.js"),
+            import("https://esm.sh/highlight.js@11.11.1/lib/core"),
+            import("https://esm.sh/highlight.js@11.11.1/lib/languages/ruby"),
+            import("https://esm.sh/highlight.js@11.11.1/lib/languages/javascript"),
           ]);
           hljs.registerLanguage("ruby", ruby);
           hljs.registerLanguage("javascript", javascript);

@@ -355,7 +355,7 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body.scan("highlight.js@11.11.1/es/core.min.js").size).to eq(1)
+      expect(response.body.scan("highlight.js@11.11.1/lib/core").size).to eq(1)
     end
 
     it "marks a reviewed session with no improved_code in any section and still loads the script" do
@@ -369,7 +369,7 @@ RSpec.describe "History", type: :request do
       # The code_review snippet should be marked
       expect(response.body).to include('data-hljs="ruby"')
       # The script should load even though there's no improved_code
-      expect(response.body).to include("highlight.js@11.11.1/es/core.min.js")
+      expect(response.body).to include("highlight.js@11.11.1/lib/core")
     end
   end
 
