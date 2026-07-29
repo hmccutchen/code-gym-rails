@@ -47,6 +47,25 @@ RSpec.describe "Responses", type: :request do
       )
     end
 
+    it "tags and saves a security_review third section's concept and answer" do
+      create_exercise(
+        "code_review"      => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"          => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "security_review"  => { "title" => "t", "question" => "q", "concept" => "sql_injection_prevention" }
+      )
+
+      post responses_path,
+        params: { response: { answers: { security_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      resp = DailyResponse.last
+      expect(resp.answers["security_review"]).to eq("a" * 20)
+      expect(resp.concept_tags).to eq(
+        "code_review" => "n_plus_one", "pattern" => "memoization", "security_review" => "sql_injection_prevention"
+      )
+    end
+
     it "ignores an answer for a third section this exercise does not have" do
       create_exercise(
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
@@ -473,6 +492,28 @@ RSpec.describe "Responses", type: :request do
         .exactly(:once)
         .and have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+    end
+
+    it "enqueues the security_review concept under the exercise's own language bucket, not a separate one" do
+      create_exercise(
+        "code_review"     => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"         => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "security_review" => { "title" => "t", "question" => "q", "concept" => "sql_injection_prevention" }
+      )
+
+      expect {
+        post responses_path,
+          params: { response: { answers: { security_review: "a" * 20 }, submit: "1" } }.to_json,
+          headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "sql_injection_prevention", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+        .and have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+        .and have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "memoization", language: "ruby_rails", user_id: user.id)
         .exactly(:once)
     end
   end

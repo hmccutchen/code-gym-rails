@@ -18,8 +18,8 @@ class ResponsesController < ApplicationController
     )
 
     # Only persist answers for sections this exercise actually has. Strong params
-    # permit both `challenge` and `architecture` (the two possible third keys), so
-    # without this a crafted request could store both and push
+    # permit `challenge`, `architecture`, and `security_review` (the three possible
+    # third keys), so without this a crafted request could store multiple and push
     # DailyResponse#answered_sections / #completeness past 3 sections / 100%.
     submitted_answers = response_params[:answers]&.slice(*exercise.problem_set.keys)
 
@@ -273,13 +273,13 @@ class ResponsesController < ApplicationController
   def response_params
     @response_params ||= params.require(:response).permit(
       :submit, :feedback_text,
-      answers: [ :code_review, :pattern, :challenge, :architecture ],
-      section_ratings: [ :code_review, :pattern, :challenge, :architecture ]
+      answers: [ :code_review, :pattern, :challenge, :architecture, :security_review ],
+      section_ratings: [ :code_review, :pattern, :challenge, :architecture, :security_review ]
     )
   end
 
   def exercise_concept_tags(exercise)
-    %w[code_review pattern challenge architecture]
+    %w[code_review pattern challenge architecture security_review]
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
   end

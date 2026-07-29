@@ -206,6 +206,19 @@ RSpec.describe User, type: :model do
 
       expect(user.recent_performance.first[:scenarios]).to eq([ "billing", "multi-region failover" ])
     end
+
+    it "includes a security_review section's scenario in recent_performance's framings" do
+      user = create_user
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current - 1, generated_at: Time.current,
+        problem_set: { "security_review" => { "scenario" => "a legacy GraphQL layer needs a fix" } }
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1,
+                            answers: { "security_review" => "x" * 20 })
+
+      performance = user.recent_performance
+      expect(performance.first[:scenarios]).to include("a legacy GraphQL layer needs a fix")
+    end
   end
 
   describe "#recent_performance section_ratings" do

@@ -91,7 +91,7 @@ class User < ApplicationRecord
   def recent_performance(limit: 10)
     recent_daily_responses(limit).map do |r|
       problem_set = r.daily_exercise&.problem_set || {}
-      scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
+      scenarios = %w[code_review pattern challenge architecture security_review].filter_map do |section|
         problem_set.dig(section, "scenario").presence
       end
       ai_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
