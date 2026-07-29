@@ -65,6 +65,21 @@ class AiService
     idempotency_at_scale observability_tradeoffs
   ].freeze
 
+  # Curated, real, job-adjacent scenario flavors for the "scenario" field's
+  # business-domain framing — prompt-level grounding only, to keep generated
+  # scenarios feeling like real engineering work rather than generic SaaS
+  # examples. Never concept-tagged, never fed into concept_vocabulary_for or
+  # any mastery-loop bucket. `legacy_graphql_maintenance` is scenario dressing
+  # only, for occasional legacy-app relevance — see build_exercise_prompt's
+  # explicit low-frequency instruction. It must never appear as a "concept"
+  # value.
+  SCENARIO_DOMAINS = %w[
+    background_job_processing api_versioning_and_deprecation
+    activerecord_query_construction component_state_management
+    data_export_and_reporting webhook_delivery rate_limiting
+    multi_tenant_data_isolation legacy_graphql_maintenance
+  ].freeze
+
   # Single source of truth per concrete generation language ("mixed" is a
   # user-level meta-preference that always resolves to one of these before it
   # reaches AiService — see User#language_for_today). Adding a language means
@@ -518,6 +533,8 @@ class AiService
         ""
       end
 
+    scenario_domain_list = (SCENARIO_DOMAINS - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
+
     config      = config_for(language)
     label       = config[:label]
     focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
@@ -565,6 +582,7 @@ class AiService
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
+      - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list}. Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - Each section's "glossary": 0-4 {term, definition} pairs for incidental terminology inside THAT section's own title/scenario/question/why/options text that a mid-level developer newer to #{label} might not immediately know — distinct from the section's own tagged "concept" and from "teaching_note". One plain-English sentence per definition, same tone as the rest of this app's teaching content. Return an empty array when nothing in the section's text warrants one — never force entries to exist.
       #{third_guidance}

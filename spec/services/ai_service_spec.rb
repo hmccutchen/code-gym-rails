@@ -217,6 +217,23 @@ RSpec.describe AiService do
     end
   end
 
+  describe "SCENARIO_DOMAINS" do
+    it "is a frozen list of scenario flavors, including a rare legacy-GraphQL entry" do
+      expect(AiService::SCENARIO_DOMAINS).to be_frozen
+      expect(AiService::SCENARIO_DOMAINS).to include(
+        "background_job_processing", "api_versioning_and_deprecation",
+        "activerecord_query_construction", "component_state_management",
+        "legacy_graphql_maintenance"
+      )
+    end
+
+    it "is never mixed into any tracked concept vocabulary" do
+      expect(AiService::SCENARIO_DOMAINS & AiService::RAILS_CONCEPTS).to be_empty
+      expect(AiService::SCENARIO_DOMAINS & AiService::JS_CONCEPTS).to be_empty
+      expect(AiService::SCENARIO_DOMAINS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+    end
+  end
+
   describe "#build_concept_reference_prompt (architecture)" do
     it "frames code_example as language-agnostic pseudocode for the architecture config" do
       config = service.send(:config_for, "architecture")
@@ -358,6 +375,15 @@ RSpec.describe AiService do
     it "omits TypeScript-syntax guidance for ruby_rails" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
       expect(prompt).not_to include("TypeScript syntax")
+    end
+
+    it "prefers drawing scenarios from SCENARIO_DOMAINS, with legacy GraphQL framed as rare and concept-free" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("background job processing")
+      expect(prompt).to include("activerecord query construction")
+      expect(prompt.downcase).to include("legacy graphql")
+      expect(prompt).to match(/1 in every 8-10/)
+      expect(prompt.downcase).to include("never as the tagged concept")
     end
   end
 
