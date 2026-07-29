@@ -278,14 +278,40 @@ class AiService
     buckets
   end
 
-  # Due retention checks for the buckets this day can actually host.
+  # A vocabulary is at most 16 concepts (see RAILS_CONCEPTS / JS_CONCEPTS /
+  # ARCHITECTURE_CONCEPTS), so "every due concept in a bucket" is never a large
+  # fetch — this exists only so the per-bucket query below doesn't truncate to
+  # `slots` before the overdue-ratio re-rank gets a chance to run across all of
+  # them (see retention_checks_for's comment).
+  RETENTION_BUCKET_FETCH_CAP = 20
+
+  # Due retention checks for the buckets this day can actually host, most overdue
+  # RELATIVE TO EACH CONCEPT'S OWN INTERVAL first — the same ratio
+  # overdue_retention_check_pending? uses to decide whether a slot gets reserved
+  # at all. Sorting by raw due-date instead would let a long-interval concept
+  # that's merely due outrank a short-interval one that's actually crossed the
+  # overdue threshold, handing the reserved slot to a concept that didn't earn it.
+  #
+  # The per-bucket query is fetched WITHOUT truncating to `slots` — passing
+  # `limit: slots` there would let SQL's raw-date ORDER BY throw away the very
+  # concept this ranking exists to surface before overdue_ratio ever saw it.
   def retention_checks_for(user, language, third:, slots:)
     return [] if slots.zero?
 
     hostable_buckets(language, third: third)
-      .flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: slots).to_a }
-      .sort_by(&:next_retention_check_on)
+      .flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a }
+      .sort_by { |cm| -(overdue_ratio(cm)) }
       .first(slots)
+  end
+
+  # Days overdue divided by the concept's own retention_interval_days — the same
+  # normalization concepts_overdue_for_retention_check applies in SQL, computed
+  # in Ruby here since this list already spans multiple bucket queries. A nil or
+  # zero interval (should not happen alongside a set next_retention_check_on, but
+  # never trust that from a selection method) sorts last rather than raising.
+  def overdue_ratio(cm)
+    return -Float::INFINITY if cm.retention_interval_days.to_i <= 0
+    (Date.current - cm.next_retention_check_on).to_f / cm.retention_interval_days
   end
 
   # Whether reinforcement should give up its 3rd slot: only when some retention

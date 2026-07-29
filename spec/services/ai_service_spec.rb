@@ -326,6 +326,23 @@ RSpec.describe AiService do
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
+    it "prioritizes a threshold-crossed short-interval concept over a merely-due long-interval one" do
+      # "n_plus_one": interval 28, due 20 days ago — due, but not yet overdue by
+      # its own interval (would need 28 days past due to cross the threshold).
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 2.months.ago, retention_interval_days: 28,
+                                     next_retention_check_on: Date.current - 20)
+      # "memoization": interval 7, due 10 days ago — has crossed its own
+      # threshold (10 > 7). Sorting by raw due-date alone would rank n_plus_one
+      # first (20 days ago < 10 days ago); sorting by overdue-ratio must not.
+      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 10)
+
+      checks = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
+      expect(checks.map(&:concept)).to eq(%w[memoization])
+    end
+
     it "offers nothing when reinforcement already claims three slots" do
       mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
       expect(service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 0)).to eq([])
