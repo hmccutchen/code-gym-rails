@@ -1,0 +1,24 @@
+<%# Security Review third section, shared by the dashboard form (submitted: false)
+    and the read-only render of a submitted day (submitted: true), which appears
+    on the dashboard after submitting and on every history entry.
+    Locals: sec, response, submitted. %>
+<div class="section">
+  <div class="section-label">3 — Security Review: <%= glossary_wrap(sec["title"], sec["glossary"]) %></div>
+  <div class="question"><%= glossary_wrap(sec["question"], sec["glossary"]) %></div>
+  <pre class="snippet"><code<% if (lang = hljs_language(response.daily_exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= sec["snippet"] %></code></pre>
+  <% if (ref = concept_reference_for(sec["concept"], response.daily_exercise.language)) %>
+    <%= render "shared/concept_reference", reference: ref,
+          open: !submitted && first_exposure?(sec["concept"], response.daily_exercise.language, response.date) %>
+  <% end %>
+  <%= render "dashboard/teaching_hint", note: sec["teaching_note"], field: "security_review", submitted: submitted, answer: response.answers["security_review"] %>
+  <% if submitted %>
+    <div class="answer-display"><%= response.answers["security_review"].presence || "(skipped)" %></div>
+  <% else %>
+    <textarea name="response[answers][security_review]" class="answer" placeholder="What's exploitable here, and how would you mitigate it?" data-field="security_review"><%= response.answers["security_review"] %></textarea>
+    <div class="rating-row" data-rating-for="security_review">
+      <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+        <button type="button" class="rating-btn<%= " active" if response.self_rating_for("security_review") == value %>" data-rating-for="security_review" data-rating="<%= value %>"><%= label.upcase_first %></button>
+      <% end %>
+    </div>
+  <% end %>
+</div>
