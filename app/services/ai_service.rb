@@ -569,7 +569,8 @@ class AiService
     concepts    = config[:concepts]
 
     third_guidance =
-      if third == :architecture
+      case third
+      when :architecture
         <<~ARCH.chomp
           - The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
           - Keep the architecture scenario SHORT: 2-3 sentences, ~50 words maximum, and exactly 2-3 concrete constraints total. Usually the observable symptom plus one hard technical constraint is enough — pick only the constraints the decision actually turns on, and leave the rest out. Do NOT stack scale figures, team size, infrastructure detail, budget, and timeline into one scenario.
@@ -582,6 +583,12 @@ class AiService
           - The diagram should show the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
           - Return an empty string for "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
         ARCH
+      when :security_review
+        <<~SEC.chomp
+          - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
+          - Choose the security_review concept from this vocabulary, exactly one — the SAME vocabulary as code_review/pattern, no separate security vocabulary: #{concepts.join(", ")}
+          - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
+        SEC
       else
         <<~CH.chomp
           - The challenge starter_code should give enough scaffold to get started without giving away the answer.

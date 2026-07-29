@@ -412,6 +412,14 @@ RSpec.describe AiService do
       expect(prompt).to match(/1 in every 8-10/)
       expect(prompt.downcase).to include("never as the tagged concept")
     end
+
+    it "instructs adversarial security framing and reuses the language vocabulary (not a separate one) when third: :security_review" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review)
+      expect(prompt.downcase).to include("security review")
+      expect(prompt.downcase).to include("mitigation")
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
+    end
   end
 
   describe "retention check selection" do
