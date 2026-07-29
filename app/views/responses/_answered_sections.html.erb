@@ -6,8 +6,8 @@
 <% if (cr = exercise.code_review) %>
 <div class="section">
   <div class="section-label">1 — Code Review</div>
-  <% if cr["scenario"].present? %><div class="section-scenario"><%= cr["scenario"] %></div><% end %>
-  <div class="question"><%= cr["question"] %></div>
+  <% if cr["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(cr["scenario"], cr["glossary"]) %></div><% end %>
+  <div class="question"><%= glossary_wrap(cr["question"], cr["glossary"]) %></div>
   <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= cr["snippet"] %></code></pre>
   <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
     <%= render "shared/concept_reference", reference: ref %>
@@ -19,10 +19,10 @@
 
 <% if (pat = exercise.pattern) %>
 <div class="section">
-  <div class="section-label">2 — Pattern of the Month: <%= pat["title"] %></div>
-  <% if pat["scenario"].present? %><div class="section-scenario"><%= pat["scenario"] %></div><% end %>
-  <div class="why-box"><strong>Why it exists:</strong> <%= pat["why"] %></div>
-  <div class="question"><%= pat["question"] %></div>
+  <div class="section-label">2 — Pattern of the Month: <%= glossary_wrap(pat["title"], pat["glossary"]) %></div>
+  <% if pat["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(pat["scenario"], pat["glossary"]) %></div><% end %>
+  <div class="why-box"><strong>Why it exists:</strong> <%= glossary_wrap(pat["why"], pat["glossary"]) %></div>
+  <div class="question"><%= glossary_wrap(pat["question"], pat["glossary"]) %></div>
 
   <% if (ref = concept_reference_for(pat["concept"], exercise.language)) %>
     <%= render "shared/concept_reference", reference: ref %>
@@ -38,8 +38,8 @@
 <% elsif (ch = exercise.challenge) %>
   <div class="section">
     <div class="section-label">3 — Coding Challenge</div>
-    <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
-    <div class="question"><%= ch["question"] %></div>
+    <% if ch["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(ch["scenario"], ch["glossary"]) %></div><% end %>
+    <div class="question"><%= glossary_wrap(ch["question"], ch["glossary"]) %></div>
     <% if ch["starter_code"].present? %>
       <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= ch["starter_code"] %></code></pre>
     <% end %>

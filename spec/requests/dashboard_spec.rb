@@ -193,6 +193,44 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "glossary tooltips" do
+    it "wraps a matching term in the code_review question with its definition" do
+      ps = base_problem_set
+      ps["code_review"]["question"] = "What does this closure capture?"
+      ps["code_review"]["glossary"] = [ { "term" => "closure", "definition" => "A function bundled with its surrounding variables." } ]
+      create_exercise(problem_set: ps)
+      get root_path
+      expect(response.body).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables.">closure</span>')
+    end
+
+    it "wraps a matching term in an architecture option" do
+      ps = base_problem_set
+      ps["architecture"] = {
+        "title" => "Pick a store", "question" => "Which store fits best?",
+        "options" => [ "Use memoization to cache results", "Recompute every time" ],
+        "glossary" => [ { "term" => "memoization", "definition" => "Caching a function's return value." } ]
+      }
+      create_exercise(problem_set: ps)
+      get root_path
+      expect(response.body).to include('<span class="gloss-term" data-definition="Caching a function&#39;s return value.">memoization</span>')
+    end
+
+    it "renders no glossary markup for sections without a glossary key" do
+      create_exercise
+      get root_path
+      expect(response.body).not_to include("gloss-term")
+    end
+
+    it "still wraps glossary terms in the read-only submitted view" do
+      ps = base_problem_set
+      ps["pattern"]["why"] = "It avoids duck typing surprises."
+      ps["pattern"]["glossary"] = [ { "term" => "duck typing", "definition" => "Caring about behavior, not declared type." } ]
+      create_response(create_exercise(problem_set: ps))
+      get root_path
+      expect(response.body).to include('<span class="gloss-term" data-definition="Caring about behavior, not declared type.">duck typing</span>')
+    end
+  end
+
   describe "regenerate button" do
     it "shows a light confirm when there are no answers yet" do
       create_exercise
