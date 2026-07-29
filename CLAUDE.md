@@ -4,6 +4,10 @@
 
 A team Rails app for daily personalized coding exercises. Each engineer logs in (magic link, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline AI review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
 
+## Code Style
+
+Code should be self-documenting. Don't add comments unless they're strictly needed — e.g. to explain a non-obvious *why* (a hidden constraint, a workaround, a subtle invariant). Never add comments that just restate *what* the code does.
+
 ## Stack
 
 - **Rails 8.0.5** + PostgreSQL
