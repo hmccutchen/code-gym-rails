@@ -94,6 +94,26 @@ RSpec.describe AiService do
       expect(schema).to include("ONE sentence")
     end
 
+    it "swaps in the security_review block with a vulnerable snippet and a mitigation question when third: :security_review" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      expect(schema).to include("\"security_review\"")
+      expect(schema).to include("snippet")
+      expect(schema.downcase).to include("mitigate")
+      expect(schema).not_to include("\"architecture\"")
+      expect(schema).not_to include("\"challenge\"")
+    end
+
+    it "gives security_review's reference the same shape as a normal concept reference, not architecture's tradeoffs-plural shape" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      security_review = JSON.parse(schema)["security_review"]
+      expect(security_review["reference"].keys).to contain_exactly("tagline", "explanation", "code_example", "senior_lens")
+    end
+
+    it "does not ask for a diagram on a security_review third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      expect(schema).not_to match(/mermaid/i)
+    end
+
     it "no longer asks the model for a pattern.reference block" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
       pattern = JSON.parse(schema)["pattern"]

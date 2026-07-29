@@ -436,7 +436,8 @@ class AiService
     glossary_field = %("glossary": [{"term": "string — an unfamiliar word from this section's own text", "definition": "string — one plain-English sentence"}])
 
     third_section =
-      if third == :architecture
+      case third
+      when :architecture
         <<~ARCH.chomp
           "architecture": {
               "title":     "string — short name for the decision",
@@ -455,6 +456,23 @@ class AiService
               }
             }
         ARCH
+      when :security_review
+        <<~SEC.chomp
+          "security_review": {
+              "title":        "string",
+              "question":     "string — what security vulnerability exists here, and how would you mitigate it",
+              "snippet":      "string — #{label} code, ~10-15 lines, containing one real, exploitable vulnerability",
+              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary",
+              #{glossary_field},
+              "reference": {
+                "tagline":      "string — bold one-liner",
+                "explanation":  "string — 2-3 sentences",
+                "code_example": "string — annotated #{label} code, ~15 lines",
+                "senior_lens":  "string — when to reach for it / tradeoffs"
+              }
+            }
+        SEC
       else
         <<~CH.chomp
           "challenge": {
