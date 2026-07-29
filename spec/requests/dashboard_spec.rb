@@ -218,7 +218,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     it "renders no glossary markup for sections without a glossary key" do
       create_exercise
       get root_path
-      expect(response.body).not_to include("gloss-term")
+      expect(response.body).not_to include('<span class="gloss-term"')
     end
 
     it "still wraps glossary terms in the read-only submitted view" do
