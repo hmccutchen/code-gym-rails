@@ -196,6 +196,7 @@ class ResponsesController < ApplicationController
     # reached by another request while this one was waiting on the provider,
     # this request backs off here instead of writing a 4th turn.
     capped = false
+    remaining = nil
     @response.with_lock do
       current_count = @response.review_follow_ups.where(section: @section, role: :user).count
       if current_count >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
@@ -203,13 +204,14 @@ class ResponsesController < ApplicationController
       else
         @response.review_follow_ups.create!(section: @section, role: :user, content: question)
         @response.review_follow_ups.create!(section: @section, role: :assistant, content: answer)
+        remaining = DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - current_count - 1
       end
     end
 
     if capped
       render_section_error("You've used all #{DailyResponse::MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
     else
-      render json: { status: "ok", answer: answer, remaining: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - asked - 1 }
+      render json: { status: "ok", answer: answer, remaining: remaining }
     end
   rescue AiService::Error => e
     render json: { status: "error", error: e.message }, status: :service_unavailable

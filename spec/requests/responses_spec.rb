@@ -764,6 +764,26 @@ RSpec.describe "Responses", type: :request do
       expect(turns.last.content).to eq("Because the query runs per row.")
     end
 
+    it "reports remaining from the count taken inside the lock, not the pre-provider-call count" do
+      r = reviewed_response_for(user)
+      # A concurrent request lands between the advisory pre-check and the lock,
+      # so the in-lock count (2) is one higher than the count read before the
+      # provider call (1). remaining must reflect the fresher number.
+      ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "already asked")
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:answer_follow_up) do
+        ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "snuck in")
+        "An answer"
+      end
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why is that slow?" }
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["remaining"]).to eq(0)
+    end
+
     it "returns 422 at the cap and does not call the provider" do
       r = reviewed_response_for(user)
       3.times { |i| ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "q#{i}") }
