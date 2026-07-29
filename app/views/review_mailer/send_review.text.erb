@@ -10,15 +10,27 @@ Here's your Code Gym review from <%= @response.date.strftime("%A, %B %-d, %Y") %
 Rating: <%= fb["rating"] %>
 
 <% end -%>
-<% DailyResponse::AI_REVIEW_FIELDS.each do |key, label| -%>
-<% next if fb[key].blank? -%>
-<%= label %>: <%= fb[key] %>
+<% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| -%>
+<% if field[:list] -%>
+<% points = DailyResponse.review_points(fb[key]) -%>
+<% next if points.empty? -%>
+<%= field[:label] %>:
+<% points.each do |point| -%>
+- <%= point %>
+<% end -%>
+
+<% else -%>
+<% text = DailyResponse.review_points(fb[key]).join(" ") -%>
+<% next if text.blank? -%>
+<%= field[:label] %>: <%= text %>
 
 <% end -%>
-<% if fb["improved_code"].present? && @response.improved_code_visible?(section) -%>
+<% end -%>
+<% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) -%>
+<% if improved_code.present? && @response.improved_code_visible?(section) -%>
 Improved code:
 
-<%= fb["improved_code"] %>
+<%= improved_code %>
 
 <% end -%>
 <% end -%>

@@ -94,13 +94,33 @@ class AiService
   end
 
   # ── Generate a personalized daily exercise set ────────────────────────────
+  # Concept selection happens HERE rather than inside build_exercise_prompt so the
+  # caller can compare what was offered against what the model actually used — the
+  # prompt builder is private and returns only a string, so it cannot report that.
   def generate_exercise(user, language: user.language_for_today)
-    third  = roll_third_section
+    third         = roll_third_section
+    reinforcement = user.concepts_needing_reinforcement
+    # An exercise has only 3 sections, so only the first 3 reinforcement concepts
+    # can ever occupy one — sizing against the full (often 4-8 entry) list left
+    # slots permanently at 0 for any active user. Reinforcement keeps all 3 slots
+    # by default; a slot is taken back for retention only when reinforcement
+    # would otherwise claim all three AND at least one retention check, in a
+    # bucket today can actually host, has gone meaningfully overdue (see
+    # ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER). A merely-due check
+    # is not enough to spend a reinforcement slot on — only a check nobody's
+    # gotten to in a while earns the trade.
+    slots         = 3 - reinforcement.first(3).size
+    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, third: third)
+    due_checks    = retention_checks_for(user, language, third: third, slots: slots)
+
     result = call(system: build_system_prompt(language),
-                  prompt: build_exercise_prompt(user, language, third: third))
+                  prompt: build_exercise_prompt(user, language, third: third,
+                                                reinforcement: reinforcement, due_checks: due_checks))
 
     log_usage(user, result, purpose: "generate_exercise")
-    normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    log_retention(user, language, due_checks, problem_set)
+    problem_set
   end
 
   # ── Review a submitted response inline ───────────────────────────────────
@@ -139,7 +159,95 @@ class AiService
     reference
   end
 
+  # ── Reframe one section's feedback a different way ───────────────────────
+  # Returns a plain string, not JSON: there is no structure to parse, and routing
+  # it through parse_json_object would add a failure mode for no benefit.
+  def explain_differently(user, exercise, daily_response, section:, prior_alternates: [])
+    coach   = config_for(exercise.language)[:coach]
+    review  = daily_response.ai_review&.dig(section) || {}
+    missed  = DailyResponse.review_points(review["missed"])
+
+    prior = if prior_alternates.any?
+      "Framings already given (do NOT reprise these angles or analogies):\n" +
+        prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
+    else
+      "No alternate framing has been given yet."
+    end
+
+    result = call(
+      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.",
+      prompt: <<~PROMPT
+        The engineer was asked: #{exercise.problem_set.dig(section, "question")}
+        Their answer: #{daily_response.answers[section].presence || "(skipped)"}
+
+        What they missed:
+        #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
+
+        #{prior}
+
+        Explain the SAME point again using a genuinely different approach — a
+        different analogy, a different level of abstraction, or a concrete worked
+        scenario instead of a principle. Do not repeat the original wording.
+        Two short paragraphs at most.
+      PROMPT
+    )
+
+    log_usage(user, result, purpose: "explain_differently")
+    text_or_raise(result, subject: "alternate explanation")
+  end
+
+  # ── Answer one follow-up question about a completed review ────────────────
+  # `thread` is an ordered array of { role:, content: } hashes — the prior turns
+  # for this section. Returns plain prose, like #explain_differently.
+  def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
+    coach  = config_for(exercise.language)[:coach]
+    review = daily_response.ai_review&.dig(section) || {}
+
+    review_summary = DailyResponse::AI_REVIEW_FIELDS.filter_map { |key, field|
+      points = DailyResponse.review_points(review[key])
+      "#{field[:label]}: #{points.join('; ')}" if points.any?
+    }.join("\n")
+
+    thread_text = thread.any? ?
+      thread.map { |turn| "#{turn[:role] == 'assistant' ? 'You' : 'Them'}: #{turn[:content]}" }.join("\n") :
+      "(no prior questions)"
+
+    result = call(
+      system: "You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.",
+      prompt: <<~PROMPT
+        The original exercise asked: #{exercise.problem_set.dig(section, "question")}
+        Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
+
+        The review you gave:
+        #{review_summary.presence || "(no detail recorded)"}
+
+        Conversation so far:
+        #{thread_text}
+
+        Their new question: #{question}
+
+        Answer it directly. Stay on this concept — if they drift far off topic, say
+        so briefly and bring it back. Two short paragraphs at most.
+      PROMPT
+    )
+
+    log_usage(user, result, purpose: "review_follow_up")
+    text_or_raise(result, subject: "follow-up answer")
+  end
+
   private
+
+  # A blank provider response is a provider bug, not a valid answer — persisting
+  # it downstream fails a presence validation with an error class that escapes
+  # the controller's `rescue AiService::Error`, so the user gets a raw 500
+  # instead of the clean "couldn't generate that" message every other failure
+  # gets. Raising here routes it through the same handling as any other bad
+  # provider response.
+  def text_or_raise(result, subject:)
+    text = result[:text].to_s.strip
+    raise InvalidResponseError, "Provider returned an empty #{subject}" if text.blank?
+    text
+  end
 
   # Looks up the fixed per-language config, failing loudly on anything
   # outside RAILS_CONCEPTS/JS_CONCEPTS's languages (e.g. "mixed", or a typo)
@@ -156,6 +264,100 @@ class AiService
   # persisted third key (problem_set["architecture"] vs ["challenge"]) is the record.
   def roll_third_section
     rand < 0.75 ? :architecture : :challenge
+  end
+
+  # The concept buckets today's set can actually host. Architecture concepts have
+  # no home outside the architecture third, and a language concept must match the
+  # day's resolved generation language — otherwise a mixed-language user gets a
+  # Rails concept on a JavaScript day. Both retention callers below share this so
+  # the eligibility rule can never drift between deciding to reserve a slot and
+  # deciding what fills it.
+  def hostable_buckets(language, third:)
+    buckets = [ language ]
+    buckets << "architecture" if third == :architecture
+    buckets
+  end
+
+  # A vocabulary is at most 16 concepts (see RAILS_CONCEPTS / JS_CONCEPTS /
+  # ARCHITECTURE_CONCEPTS), so "every due concept in a bucket" is never a large
+  # fetch — this exists only so the per-bucket query below doesn't truncate to
+  # `slots` before the overdue-ratio re-rank gets a chance to run across all of
+  # them (see retention_checks_for's comment).
+  RETENTION_BUCKET_FETCH_CAP = 20
+
+  # Due retention checks for the buckets this day can actually host, most overdue
+  # RELATIVE TO EACH CONCEPT'S OWN INTERVAL first — the same ratio
+  # overdue_retention_check_pending? uses to decide whether a slot gets reserved
+  # at all. Sorting by raw due-date instead would let a long-interval concept
+  # that's merely due outrank a short-interval one that's actually crossed the
+  # overdue threshold, handing the reserved slot to a concept that didn't earn it.
+  #
+  # The per-bucket query is fetched WITHOUT truncating to `slots` — passing
+  # `limit: slots` there would let SQL's raw-date ORDER BY throw away the very
+  # concept this ranking exists to surface before overdue_ratio ever saw it.
+  def retention_checks_for(user, language, third:, slots:)
+    return [] if slots.zero?
+
+    hostable_buckets(language, third: third)
+      .flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a }
+      .sort_by { |cm| -(overdue_ratio(cm)) }
+      .first(slots)
+  end
+
+  # Days overdue divided by the concept's own retention_interval_days — the same
+  # normalization concepts_overdue_for_retention_check applies in SQL, computed
+  # in Ruby here since this list already spans multiple bucket queries. A nil or
+  # zero interval (should not happen alongside a set next_retention_check_on, but
+  # never trust that from a selection method) sorts last rather than raising.
+  def overdue_ratio(cm)
+    return -Float::INFINITY if cm.retention_interval_days.to_i <= 0
+    (Date.current - cm.next_retention_check_on).to_f / cm.retention_interval_days
+  end
+
+  # Whether reinforcement should give up its 3rd slot: only when some retention
+  # check, in a bucket today's third can actually host, has crossed the
+  # "meaningfully overdue" threshold (ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
+  # Sharing hostable_buckets with retention_checks_for is what stops an
+  # architecture-only overdue concept from forcing a slot on a challenge day it
+  # could never occupy.
+  def overdue_retention_check_pending?(user, language, third:)
+    hostable_buckets(language, third: third)
+      .any? { |bucket| user.concepts_overdue_for_retention_check(bucket: bucket).exists? }
+  end
+
+  # A due retention concept's `language` bucket names which vocabulary it was
+  # validated against, but not which section(s) that vocabulary is legal in
+  # today — without this the model has no way to know an architecture-vocabulary
+  # concept can't go in code_review, guesses wrong, and normalize_concepts
+  # rewrites a correctly-honored check into a false "miss".
+  def annotate_retention_concept(cm, third)
+    if cm.language == "architecture"
+      "#{cm.concept} (architecture section)"
+    elsif third == :architecture
+      "#{cm.concept} (code_review or pattern)"
+    else
+      "#{cm.concept} (code_review, pattern, or challenge)"
+    end
+  end
+
+  # Delivery is advisory, so the only way to know whether retention checks actually
+  # land is to record both halves. Logged after normalize_concepts so it reflects
+  # the concepts actually persisted, not whatever the provider first returned.
+  # `tagged` makes a miss diagnosable rather than merely countable: it shows what
+  # the model picked instead.
+  def log_retention(user, language, due_checks, problem_set)
+    return if due_checks.empty?
+
+    offered = due_checks.map(&:concept)
+    tagged  = problem_set.values.filter_map { |s| s["concept"] if s.is_a?(Hash) }
+    honored = offered & tagged
+
+    Rails.logger.info(
+      "[retention] user=#{user.id} date=#{Date.current} language=#{language} " \
+      "offered=#{offered.join(',').presence || '-'} " \
+      "honored=#{honored.join(',').presence || '-'} " \
+      "tagged=#{tagged.join(',').presence || '-'}"
+    )
   end
 
   # Subclasses must implement: makes the provider-specific HTTP call and
@@ -201,7 +403,8 @@ class AiService
                 "tagline":     "string — bold one-liner",
                 "explanation": "string — 2-3 sentences",
                 "tradeoffs":   ["string — a tradeoff", "string — a tradeoff", "string — a tradeoff"],
-                "senior_lens": "string — how a senior frames the decision"
+                "senior_lens": "string — how a senior frames the decision",
+                "diagram":     "string — Mermaid source visualizing the decision, or an empty string if no diagram would help"
               }
             }
         ARCH
@@ -240,7 +443,7 @@ class AiService
     SCHEMA
   end
 
-  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge)
+  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [])
     history = user.recent_performance
 
     history_text = if history.empty?
@@ -261,9 +464,27 @@ class AiService
       }.join("\n")
     end
 
-    reinforcement_list = user.concepts_needing_reinforcement
+    reinforcement_list = reinforcement || user.concepts_needing_reinforcement
     reinforcement_text = reinforcement_list.any? ?
       reinforcement_list.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
+
+    # Advisory, like every other concept instruction here — the model may ignore it.
+    # If real-world hit rate turns out low, the fix is to escalate THIS wording
+    # toward the directive phrasing used for reinforcement above ("reintroduce
+    # every concept listed"). It is not a reason to revisit the schedule, the data
+    # model, or the decision not to track delivery.
+    retention_block =
+      if due_checks.any?
+        <<~RET.chomp
+
+          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third) }.join(', ')}
+          - These are concepts the engineer previously MASTERED. Each is annotated with the section(s) it may occupy — work it into one of those in the schema below, alongside the reinforcement concepts.
+          - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
+          - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.
+        RET
+      else
+        ""
+      end
 
     config      = config_for(language)
     label       = config[:label]
@@ -279,6 +500,10 @@ class AiService
           - The architecture question itself is one sentence — do not restate the scenario in it.
           - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
           - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
+          - The architecture reference's "diagram" must be valid Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not.
+          - Node labels must be short (a few words). Use quoted labels like A["Order service"] when a label contains spaces or punctuation.
+          - The diagram should show the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
+          - Return an empty string for "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
         ARCH
       else
         <<~CH.chomp
@@ -311,6 +536,7 @@ class AiService
       #{third_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
+      #{retention_block}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
@@ -348,11 +574,21 @@ class AiService
     <<~PROMPT
       Review these Code Gym answers. For each section, return a JSON object with:
       - "rating": "beginner" | "developing" | "solid" | "strong"
-      - "correct": string — what they got right
-      - "missed": string — what they missed or got wrong
-      - "better_questions": string — questions they should have asked themselves
+      - "correct": array of strings — each entry one distinct thing they got right
+      - "missed": array of strings — each entry one distinct thing they missed or got wrong
+      - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — corrected/improved code (for code sections only; empty string otherwise)
+      - "improved_code": string — #{arch ? "corrected/improved code for code_review and pattern (empty string for architecture)" : "corrected/improved code for code_review, pattern, and challenge"}
+
+      Each array entry must be ONE self-contained idea in one or two sentences.
+      Never pack several points into one entry, and never number points inside an
+      entry ("1) ... 2) ...") — separate ideas belong in separate entries. Use an
+      empty array when there is nothing to say for that field.
+
+      For "pattern", improved_code must show the refactored structure that addresses
+      what they missed — the classes, methods, and boundaries the pattern calls for —
+      not a one-line tweak. A pattern fix is structural; show enough of the shape to
+      make the structure obvious.
 
       Exercise:
       Code Review question: #{exercise.code_review["question"]}

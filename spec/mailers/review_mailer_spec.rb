@@ -42,12 +42,22 @@ RSpec.describe ReviewMailer, type: :mailer do
       body = mail.body.encoded
       expect(body).to include("Code review")
       expect(body).to include("Rating: solid")
-      expect(body).to include("What you got right: You spotted the N+1 query")
-      expect(body).to include("What you missed: The missing index on user_id")
-      expect(body).to include("Questions to ask yourself: What happens under concurrent writes?")
+      expect(body).to include("What you got right:\n- You spotted the N+1 query")
+      expect(body).to include("What you missed:\n- The missing index on user_id")
+      expect(body).to include("Questions to ask yourself:\n- What happens under concurrent writes?")
       expect(body).to include("Next step: Read about partial indexes")
       expect(body).to include("Improved code:")
       expect(body).to include("User.includes(:posts)")
+    end
+
+    it "never renders improved_code for the architecture section" do
+      daily_response.update!(
+        concept_tags: { "architecture" => "other" },
+        ai_review: { "architecture" => { "rating" => "solid", "improved_code" => "arch_improved_marker" } }
+      )
+
+      expect(mail.body.encoded).not_to include("arch_improved_marker")
+      expect(mail.body.encoded).not_to include("Improved code:")
     end
 
     it "skips blank fields" do
@@ -55,6 +65,21 @@ RSpec.describe ReviewMailer, type: :mailer do
       daily_response.ai_review["code_review"]["missed"] = ""
       expect(mail.body.encoded).not_to include("Improved code:")
       expect(mail.body.encoded).not_to include("What you missed:")
+    end
+
+    it "renders each entry of an array-shaped field as its own bullet" do
+      daily_response.ai_review["code_review"]["missed"] = [
+        "The missing index on user_id",
+        "No transaction around the two writes"
+      ]
+
+      body = mail.body.encoded
+      expect(body).to include("What you missed:\n- The missing index on user_id\n- No transaction around the two writes")
+    end
+
+    it "omits a list field that is an empty array" do
+      daily_response.ai_review["code_review"]["missed"] = []
+      expect(mail.body.encoded).not_to include("What you missed")
     end
   end
 end

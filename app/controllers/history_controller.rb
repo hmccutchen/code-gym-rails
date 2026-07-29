@@ -3,7 +3,7 @@ class HistoryController < ApplicationController
   # (auto-saved but unsubmitted) stay on the dashboard, not here.
   def index
     @responses = current_user.daily_responses
-                             .includes(:user, :daily_exercise)
+                             .includes(:user, :daily_exercise, :review_follow_ups)
                              .where.not(submitted_at: nil)
                              .order(date: :desc)
   end

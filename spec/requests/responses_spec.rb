@@ -506,4 +506,347 @@ RSpec.describe "Responses", type: :request do
       expect(response).to redirect_to(root_path)
     end
   end
+
+  describe "PATCH /responses/:id/self_explanation" do
+    let(:user) { create_user_with_key }
+
+    def reviewed_response_for(owner)
+      exercise = DailyExercise.create!(
+        user: owner, date: Date.current - 5, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: Date.current - 5,
+        answers: { "code_review" => "an answer with substance" },
+        submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+    end
+
+    it "saves and then updates an explanation for a valid section" do
+      r = reviewed_response_for(user)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "Because it batches the query" }
+      expect(response).to have_http_status(:ok)
+      expect(r.reload.self_explanations["code_review"]).to eq("Because it batches the query")
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "Revised reasoning" }
+      expect(r.reload.self_explanations["code_review"]).to eq("Revised reasoning")
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:not_found)
+      expect(r.reload.self_explanations).to eq({})
+    end
+
+    # Guards against a regression where require_reviewed_section! runs before
+    # set_response: if the before_action order were ever swapped, this would
+    # 422 ("no review yet") instead of 404, leaking that the row exists at all.
+    # reviewed_response_for(other) would mask this — its ai_review is already
+    # present, so both orderings would happen to 404/422 the same way. Only an
+    # *unreviewed* other-user row can tell the two before_actions apart.
+    it "404s for another user's unreviewed response, not 422" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      r.update!(ai_review: nil)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:not_found)
+      expect(r.reload.self_explanations).to eq({})
+    end
+
+    it "rejects an unreviewed response" do
+      r = reviewed_response_for(user)
+      r.update!(ai_review: nil)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.self_explanations).to eq({})
+    end
+
+    it "rejects a section absent from the exercise's problem_set" do
+      r = reviewed_response_for(user)
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "architecture", text: "x" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.self_explanations).to eq({})
+    end
+
+    it "uses the same {status, error} shape as the other review endpoints on a save failure" do
+      r = reviewed_response_for(user)
+      allow_any_instance_of(DailyResponse).to receive(:save).and_return(false)
+      allow_any_instance_of(DailyResponse).to receive_message_chain(:errors, :full_messages).and_return([ "Answers is invalid" ])
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)).to eq("status" => "error", "error" => "Answers is invalid")
+    end
+
+    it "doesn't drop another section's explanation written concurrently by a second tab" do
+      r = reviewed_response_for(user)
+      # Simulates a second tab's request for a different section committing in
+      # the gap between this request loading @response (in set_response) and
+      # this request taking the row lock. Without with_lock's reload, the merge
+      # would still be operating on the pre-concurrent-write in-memory hash and
+      # would overwrite "pattern" on save.
+      allow_any_instance_of(DailyResponse).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+        DailyResponse.where(id: r.id)
+          .update_all(%(self_explanations = self_explanations || '{"pattern":"concurrent"}'::jsonb))
+        original.call(*args, &block)
+      end
+      login_as(user)
+
+      patch self_explanation_response_path(r), params: { section: "code_review", text: "Because it batches the query" }
+
+      expect(response).to have_http_status(:ok)
+      expect(r.reload.self_explanations).to eq(
+        "code_review" => "Because it batches the query",
+        "pattern" => "concurrent"
+      )
+    end
+  end
+
+  describe "POST /responses/:id/explain_differently" do
+    let(:user) { create_user_with_key }
+
+    def reviewed_response_for(owner)
+      exercise = DailyExercise.create!(
+        user: owner, date: Date.current - 5, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: Date.current - 5,
+        answers: { "code_review" => "an answer with substance" },
+        submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid", "missed" => [ "the index" ] } }
+      )
+    end
+
+    def stub_alternate(text = "A different framing")
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:explain_differently).and_return(text)
+      fake
+    end
+
+    it "appends an alternate and persists it" do
+      r = reviewed_response_for(user)
+      stub_alternate("First alternate")
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:ok)
+      expect(r.reload.review_alternates["code_review"]).to eq([ "First alternate" ])
+    end
+
+    it "appends rather than replacing on a second call" do
+      r = reviewed_response_for(user)
+      stub_alternate("Second alternate")
+      r.update!(review_alternates: { "code_review" => [ "First alternate" ] })
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(r.reload.review_alternates["code_review"]).to eq([ "First alternate", "Second alternate" ])
+    end
+
+    it "returns 422 at the cap and does not call the provider" do
+      r = reviewed_response_for(user)
+      r.update!(review_alternates: { "code_review" => [ "one", "two" ] })
+      fake = stub_alternate
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:explain_differently)
+      expect(r.reload.review_alternates["code_review"]).to eq([ "one", "two" ])
+      # Same error-body shape as follow_ups' cap and every other section error —
+      # {"status", "error"} — not a hand-rolled one-off render.
+      expect(JSON.parse(response.body)).to eq("status" => "error",
+        "error" => "You've already asked for 2 alternate explanations here.")
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects a section absent from the exercise's problem_set" do
+      r = reviewed_response_for(user)
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "challenge" }
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "leaves the stored array untouched when the provider fails" do
+      r = reviewed_response_for(user)
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:explain_differently).and_raise(AiService::RateLimitError, "slow down")
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+      expect(response).to have_http_status(:service_unavailable)
+      expect(r.reload.review_alternates).to eq({})
+    end
+
+    it "backs off without writing when another request fills the cap while this one waits on the provider" do
+      r = reviewed_response_for(user)
+      r.update!(review_alternates: { "code_review" => [ "one" ] })
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      # The size-then-append cap check is race-able: the initial size (1, still
+      # under the cap of 2) is read before this slow provider call. Simulate a
+      # concurrent second request appending its own alternate while this one is
+      # still waiting — the re-check inside with_lock must catch that the cap
+      # was reached in the meantime, rather than overwriting it with a stale array.
+      allow(fake).to receive(:explain_differently) do
+        r.update!(review_alternates: { "code_review" => [ "one", "concurrent" ] })
+        "A different framing"
+      end
+      login_as(user)
+
+      post explain_differently_response_path(r), params: { section: "code_review" }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.review_alternates["code_review"]).to eq([ "one", "concurrent" ])
+    end
+  end
+
+  describe "POST /responses/:id/follow_ups" do
+    let(:user) { create_user_with_key }
+
+    def reviewed_response_for(owner)
+      exercise = DailyExercise.create!(
+        user: owner, date: Date.current - 5, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: Date.current - 5,
+        answers: { "code_review" => "an answer with substance" },
+        submitted_at: Time.current,
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+    end
+
+    def stub_answer(text = "Because the query runs per row.")
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:answer_follow_up).and_return(text)
+      fake
+    end
+
+    it "creates the user turn and the assistant turn, in order" do
+      r = reviewed_response_for(user)
+      stub_answer
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why is that slow?" }
+      expect(response).to have_http_status(:ok)
+
+      turns = r.reload.review_follow_ups.for_section("code_review")
+      expect(turns.map(&:role)).to eq(%w[user assistant])
+      expect(turns.first.content).to eq("Why is that slow?")
+      expect(turns.last.content).to eq("Because the query runs per row.")
+    end
+
+    it "reports remaining from the count taken inside the lock, not the pre-provider-call count" do
+      r = reviewed_response_for(user)
+      # A concurrent request lands between the advisory pre-check and the lock,
+      # so the in-lock count (2) is one higher than the count read before the
+      # provider call (1). remaining must reflect the fresher number.
+      ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "already asked")
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:answer_follow_up) do
+        ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "snuck in")
+        "An answer"
+      end
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why is that slow?" }
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["remaining"]).to eq(0)
+    end
+
+    it "returns 422 at the cap and does not call the provider" do
+      r = reviewed_response_for(user)
+      3.times { |i| ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "q#{i}") }
+      fake = stub_answer
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "One more?" }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:answer_follow_up)
+      expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
+    end
+
+    it "rolls back the user turn when the provider fails" do
+      r = reviewed_response_for(user)
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      allow(fake).to receive(:answer_follow_up).and_raise(AiService::RateLimitError, "slow down")
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why?" }
+      expect(response).to have_http_status(:service_unavailable)
+      expect(r.reload.review_follow_ups.count).to eq(0)
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      r = reviewed_response_for(other)
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "Why?" }
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects a blank question" do
+      r = reviewed_response_for(user)
+      stub_answer
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "   " }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.review_follow_ups.count).to eq(0)
+    end
+
+    it "backs off without writing when another request fills the cap while this one waits on the provider" do
+      r = reviewed_response_for(user)
+      2.times { |i| ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "q#{i}") }
+      fake = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).and_return(fake)
+      # The count-then-create cap check is race-able: the initial count (2, still
+      # under the cap of 3) is read before this slow provider call. Simulate a
+      # concurrent second request completing its own turn pair while this one is
+      # still waiting — the re-check inside with_lock must catch that the cap
+      # was reached in the meantime, rather than blindly writing a 4th user turn.
+      allow(fake).to receive(:answer_follow_up) do
+        ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "concurrent")
+        "An answer"
+      end
+      login_as(user)
+
+      post follow_ups_response_path(r), params: { section: "code_review", question: "One more?" }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
+    end
+  end
 end

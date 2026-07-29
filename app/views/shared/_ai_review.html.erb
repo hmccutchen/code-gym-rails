@@ -5,13 +5,206 @@
     <% if response.self_rating_favorable?(section) && response.ai_rating_unfavorable?(section) %>
       <p class="calibration-note"><%= t("review.calibration_note", rating: response.self_rating_label(section)) %></p>
     <% end %>
-    <% DailyResponse::AI_REVIEW_FIELDS.each do |key, label| %>
-      <% if fb[key].present? %>
-        <p class="review-item"><strong><%= label %>:</strong> <%= fb[key] %></p>
+    <% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| %>
+      <% if field[:list] %>
+        <% points = DailyResponse.review_points(fb[key]) %>
+        <% if points.any? %>
+          <div class="review-item">
+            <strong><%= field[:label] %>:</strong>
+            <ul class="review-points">
+              <% points.each do |point| %><li><%= point %></li><% end %>
+            </ul>
+          </div>
+        <% end %>
+      <% else %>
+        <% text = DailyResponse.review_points(fb[key]).join(" ") %>
+        <% if text.present? %>
+          <p class="review-item"><strong><%= field[:label] %>:</strong> <%= text %></p>
+        <% end %>
       <% end %>
     <% end %>
-    <% if fb["improved_code"].present? && response.improved_code_visible?(section) %>
-      <pre class="snippet" style="margin-top:.75rem"><code><%= fb["improved_code"] %></code></pre>
+    <% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) %>
+    <% if improved_code.present? && response.improved_code_visible?(section) %>
+      <pre class="snippet" style="margin-top:.75rem"><code><%= improved_code %></code></pre>
     <% end %>
+    <div class="alternates" data-section="<%= section %>">
+      <% Array(response.review_alternates[section]).each do |alt| %>
+        <p class="alternate-item"><%= alt %></p>
+      <% end %>
+      <% if Array(response.review_alternates[section]).size < DailyResponse::MAX_ALTERNATES_PER_SECTION %>
+        <button type="button" class="btn btn-ghost btn-sm explain-differently"
+                data-url="<%= explain_differently_response_path(response) %>"
+                data-section="<%= section %>">Explain this differently</button>
+      <% end %>
+      <span class="alternate-status" aria-live="polite"></span>
+    </div>
+    <div class="self-explanation">
+      <label for="self-exp-<%= response.id %>-<%= section %>">In one sentence, why does this fix work?</label>
+      <textarea id="self-exp-<%= response.id %>-<%= section %>"
+                class="self-explanation-input"
+                rows="2"
+                data-url="<%= self_explanation_response_path(response) %>"
+                data-section="<%= section %>"
+                placeholder="Optional — putting it in your own words is the point."><%= response.self_explanations[section] %></textarea>
+      <span class="self-explanation-status" aria-live="polite"></span>
+    </div>
+    <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by { |t| [ t.created_at, t.id ] } %>
+    <% asked = turns.count { |t| t.role_user? } %>
+    <div class="follow-ups" data-section="<%= section %>">
+      <div class="follow-up-thread">
+        <% turns.each do |turn| %>
+          <p class="follow-up-turn follow-up-<%= turn.role %>"><%= turn.content %></p>
+        <% end %>
+      </div>
+      <% if asked < DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %>
+        <div class="follow-up-form">
+          <input type="text" class="follow-up-input" placeholder="Ask a follow-up about this feedback…"
+                 data-url="<%= follow_ups_response_path(response) %>" data-section="<%= section %>">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+        </div>
+      <% else %>
+        <p class="follow-up-capped">You've used all <%= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.</p>
+      <% end %>
+      <span class="follow-up-status" aria-live="polite"></span>
+    </div>
   </div>
+<% end %>
+
+<%# This partial can render once per history entry (up to one per reviewed
+    session on the page), so the script below is emitted into the layout's
+    shared :page_scripts region — and only on the FIRST render of this
+    partial per request — rather than inline here, where it would otherwise
+    ship one identical ~4.7 KB copy per entry. The :not([data-se-wired]) etc.
+    guards inside the script still matter: they're what let this single copy
+    wire up controls that keep appearing across every entry's markup. %>
+<% unless @ai_review_script_emitted %>
+  <% @ai_review_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script>
+// Autosaves on blur. This script is emitted once (see the guard above) but
+// wires controls across every review-block on the page, so the
+// :not([data-se-wired]) guard is what keeps a control from being wired — and
+// its listener duplicated — when new matching elements appear.
+// Inline script matching the app's convention; Stimulus is not wired here.
+(() => {
+  document.querySelectorAll(".self-explanation-input:not([data-se-wired])").forEach(field => {
+    field.dataset.seWired = "1";
+    const status = field.parentElement.querySelector(".self-explanation-status");
+    let lastSaved = field.value;
+
+    field.addEventListener("blur", async () => {
+      if (field.value === lastSaved) return;
+      status.textContent = "Saving…";
+      try {
+        const res = await fetch(field.dataset.url, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: field.dataset.section, text: field.value })
+        });
+        if (!res.ok) throw new Error(res.status);
+        lastSaved = field.value;
+        status.textContent = "Saved";
+      } catch {
+        status.textContent = "Couldn't save — try again";
+      }
+    });
+  });
+
+  document.querySelectorAll(".explain-differently:not([data-alt-wired])").forEach(button => {
+    button.dataset.altWired = "1";
+    const container = button.parentElement;
+    const status = container.querySelector(".alternate-status");
+
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(button.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: button.dataset.section })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        const p = document.createElement("p");
+        p.className = "alternate-item";
+        p.textContent = data.alternate;
+        container.insertBefore(p, button);
+        status.textContent = "";
+        if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't generate that — try again";
+        button.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll(".follow-up-send:not([data-fu-wired])").forEach(button => {
+    button.dataset.fuWired = "1";
+    const container = button.closest(".follow-ups");
+    const input = container.querySelector(".follow-up-input");
+    const thread = container.querySelector(".follow-up-thread");
+    const status = container.querySelector(".follow-up-status");
+
+    const addTurn = (role, text) => {
+      const p = document.createElement("p");
+      p.className = "follow-up-turn follow-up-" + role;
+      p.textContent = text;
+      thread.appendChild(p);
+    };
+
+    const send = async () => {
+      const question = input.value.trim();
+      if (!question) return;
+      button.disabled = true;
+      input.disabled = true;
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(input.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: input.dataset.section, question: question })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        addTurn("user", question);
+        addTurn("assistant", data.answer);
+        input.value = "";
+        status.textContent = "";
+        if (data.remaining > 0) {
+          button.disabled = false;
+          input.disabled = false;
+        } else {
+          container.querySelector(".follow-up-form").remove();
+          const capped = document.createElement("p");
+          capped.className = "follow-up-capped";
+          capped.textContent = "You've used all <%= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.";
+          container.insertBefore(capped, status);
+        }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't send that — try again";
+        button.disabled = false;
+        input.disabled = false;
+      }
+    };
+
+    button.addEventListener("click", send);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); send(); }
+    });
+  });
+})();
+    </script>
+  <% end %>
 <% end %>

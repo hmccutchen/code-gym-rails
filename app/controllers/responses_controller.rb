@@ -1,5 +1,6 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [ :review, :email_review ]
+  before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently, :follow_ups ]
+  before_action :require_reviewed_section!, only: [ :self_explanation, :explain_differently, :follow_ups ]
 
   # How long a claimed-but-unfinished review blocks a retry. The provider call
   # has no configured timeout, so a crash or hang mid-review must not lock the
@@ -97,6 +98,125 @@ class ResponsesController < ApplicationController
     redirect_to root_path, notice: "Review sent to #{current_user.email}."
   end
 
+  # PATCH /responses/:id/self_explanation — save the user's own one-sentence
+  # explanation of why a fix works. Capture only: nothing grades it, and it gates
+  # nothing. Writing to an arbitrarily old response is intentional — /history is
+  # where reviews live, so this is where the prompt is answered.
+  def self_explanation
+    text = params[:text].to_s.strip
+    saved = true
+    errors = nil
+
+    # No AI call here, so the lock is held only for a fast read-merge-write —
+    # unlike explain_differently/follow_ups there's nothing slow to keep
+    # outside it. Without this, two tabs saving different sections at once
+    # each hold their own stale in-memory hash, and the last save wins,
+    # silently dropping the other tab's section.
+    @response.with_lock do
+      @response.self_explanations = @response.self_explanations.merge(
+        @section => text
+      )
+      saved = @response.save
+      errors = @response.errors.full_messages.to_sentence unless saved
+    end
+
+    if saved
+      render json: { status: "saved" }
+    else
+      render_section_error(errors)
+    end
+  end
+
+  # POST /responses/:id/explain_differently — one section's feedback, reframed.
+  # Synchronous like #review; the caller posts via fetch and appends in place.
+  def explain_differently
+    existing = Array(@response.review_alternates[@section])
+    if existing.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
+      return render_section_error("You've already asked for #{DailyResponse::MAX_ALTERNATES_PER_SECTION} alternate explanations here.")
+    end
+
+    alternate = AiService.for(current_user).explain_differently(
+      current_user, @response.daily_exercise, @response,
+      section: @section, prior_alternates: existing
+    )
+
+    # The provider call above is slow and deliberately stays outside the lock.
+    # The count check above is only advisory — two concurrent requests can both
+    # read `existing.size` under the cap and both reach here. with_lock takes a
+    # row lock and reloads @response, so this re-check is the real guarantee:
+    # if the cap was reached by another request while this one was waiting on
+    # the provider, this request backs off here instead of overwriting (and
+    # silently dropping) the other request's alternate.
+    capped = false
+    remaining = nil
+    @response.with_lock do
+      current = Array(@response.review_alternates[@section])
+      if current.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
+        capped = true
+      else
+        @response.review_alternates = @response.review_alternates.merge(@section => current + [ alternate ])
+        @response.save!
+        remaining = DailyResponse::MAX_ALTERNATES_PER_SECTION - current.size - 1
+      end
+    end
+
+    if capped
+      render_section_error("You've already asked for #{DailyResponse::MAX_ALTERNATES_PER_SECTION} alternate explanations here.")
+    else
+      render json: { status: "ok", alternate: alternate, remaining: remaining }
+    end
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
+  # POST /responses/:id/follow_ups — ask one clarifying question about a section's
+  # review. Synchronous: a single short completion, so it needs no job or polling.
+  # Both turns are written in one transaction, so a provider failure can never
+  # leave an orphaned question with no answer in the thread.
+  def follow_ups
+    question = params[:question].to_s.strip
+    return render_section_error("Ask a question first.") if question.blank?
+
+    asked = @response.review_follow_ups.where(section: @section, role: :user).count
+    if asked >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
+      return render_section_error("You've used all #{DailyResponse::MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+    end
+
+    thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
+
+    answer = AiService.for(current_user).answer_follow_up(
+      current_user, @response.daily_exercise, @response,
+      section: @section, question: question, thread: thread
+    )
+
+    # The provider call above is slow and deliberately stays outside the lock.
+    # The count check above is only advisory — two concurrent requests can both
+    # read `asked == 2` and both reach here. with_lock takes a row lock and
+    # reloads @response, so this re-check is the real guarantee: if the cap was
+    # reached by another request while this one was waiting on the provider,
+    # this request backs off here instead of writing a 4th turn.
+    capped = false
+    remaining = nil
+    @response.with_lock do
+      current_count = @response.review_follow_ups.where(section: @section, role: :user).count
+      if current_count >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
+        capped = true
+      else
+        @response.review_follow_ups.create!(section: @section, role: :user, content: question)
+        @response.review_follow_ups.create!(section: @section, role: :assistant, content: answer)
+        remaining = DailyResponse::MAX_FOLLOW_UPS_PER_SECTION - current_count - 1
+      end
+    end
+
+    if capped
+      render_section_error("You've used all #{DailyResponse::MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+    else
+      render json: { status: "ok", answer: answer, remaining: remaining }
+    end
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
   private
 
   # Errors send the user back to the dashboard, where the retry button lives.
@@ -108,6 +228,25 @@ class ResponsesController < ApplicationController
 
   def set_response
     @response = current_user.daily_responses.find(params[:id])
+  end
+
+  # Shared by every endpoint that writes against an existing review. Ownership is
+  # already enforced by set_response's association scope (another user's id raises
+  # RecordNotFound → 404, which also avoids leaking whether that id exists); this
+  # adds the two guards specific to review-attached writes. Validating the section
+  # against the exercise's own problem_set mirrors #create's slice guard — without
+  # it a crafted param writes arbitrary keys into the jsonb columns.
+  def require_reviewed_section!
+    return render_section_error("No review to attach that to yet.") unless @response.reviewed?
+
+    @section = params[:section].to_s
+    return if @response.daily_exercise.problem_set.key?(@section)
+
+    render_section_error("That section isn't part of this exercise.")
+  end
+
+  def render_section_error(message)
+    render json: { status: "error", error: message }, status: :unprocessable_entity
   end
 
   # Atomic claim against a concurrent double-review (e.g. an impatient second

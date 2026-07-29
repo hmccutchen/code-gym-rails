@@ -38,6 +38,119 @@ RSpec.describe "History", type: :request do
       expect(response).to redirect_to(login_path)
     end
 
+    it "never renders improved_code for the architecture section" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "architecture" => { "title" => "A", "question" => "arch-q" } }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "architecture" => "I'd shard because of the write volume" },
+        submitted_at: Time.current,
+        concept_tags: { "architecture" => "other" },
+        ai_review: { "architecture" => { "rating" => "solid", "improved_code" => "arch_improved_marker" } }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).not_to include("arch_improved_marker")
+    end
+
+    def architecture_session(diagram:)
+      reference = { "tagline" => "t", "explanation" => "e", "tradeoffs" => [ "a" ], "senior_lens" => "s" }
+      reference["diagram"] = diagram unless diagram.nil?
+
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "architecture" => {
+          "title" => "Datastore", "question" => "Which approach?", "scenario" => "10x traffic",
+          "reference" => reference
+        } }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "architecture" => "I would shard because of write volume" },
+        submitted_at: Time.current
+      )
+    end
+
+    it "renders a hidden diagram container and the mermaid module when a diagram is present" do
+      architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("mermaid-diagram")
+      expect(response.body).to include("flowchart TD")
+      expect(response.body).to include("cdn.jsdelivr.net")
+      expect(response.body).to match(/securityLevel:\s*["']strict["']/)
+    end
+
+    it "renders no container and no mermaid script when the diagram is an empty string" do
+      architecture_session(diagram: "")
+      login_as(user)
+      get history_path
+
+      # The .mermaid-diagram CSS rule itself is global (defined once in the
+      # layout's <style> block, like every other section style), so it is
+      # present on every page regardless of content. What must NOT appear is
+      # an actual container element or the script that would populate one.
+      expect(response.body).not_to include('<div class="mermaid-diagram"')
+      expect(response.body).not_to include("cdn.jsdelivr.net")
+    end
+
+    it "renders no container and no mermaid script for an exercise generated before diagrams existed" do
+      architecture_session(diagram: nil)
+      login_as(user)
+      get history_path
+
+      # The .mermaid-diagram CSS rule itself is global (defined once in the
+      # layout's <style> block, like every other section style), so it is
+      # present on every page regardless of content. What must NOT appear is
+      # an actual container element or the script that would populate one.
+      expect(response.body).not_to include('<div class="mermaid-diagram"')
+      expect(response.body).not_to include("cdn.jsdelivr.net")
+    end
+
+    it "emits the ai_review autosave script and the mermaid module exactly once across multiple entries" do
+      # shared/_ai_review renders once per reviewed entry, and
+      # responses/_architecture_section's mermaid module renders once per
+      # architecture section with a diagram — both would otherwise ship one
+      # duplicate ~4-5 KB script per entry. Verifies they're deduped into the
+      # layout's shared :page_scripts region instead.
+      3.times { |i| create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true) }
+      architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
+
+      login_as(user)
+      get history_path
+
+      expect(response.body.scan("Autosaves on blur.").size).to eq(1)
+      expect(response.body.scan("cdn.jsdelivr.net").size).to eq(1)
+    end
+
+    it "renders improved_code for a visible pattern section" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern" => { "title" => "Pat", "question" => "pattern-q" },
+          "challenge" => { "question" => "challenge-q" }
+        }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "pattern" => "Extract a service object" },
+        submitted_at: Time.current,
+        concept_tags: { "pattern" => "other" },
+        ai_review: { "pattern" => { "rating" => "solid", "improved_code" => "pattern_improved_marker" } }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("pattern_improved_marker")
+    end
+
     it "lists only the current user's submitted responses, newest first" do
       other = create_user_with_key(email: "other@example.com", name: "Other")
       old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")
@@ -146,6 +259,40 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("only-section")
       # The malformed row must not take the rest of the page down with it.
       expect(response.body).to include("q-#{intact.date}")
+    end
+
+    it "renders an array-shaped review field as a list, one item per point" do
+      session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      session.update!(ai_review: {
+        "code_review" => {
+          "rating"  => "solid",
+          "missed"  => [ "The missing index on user_id", "No transaction around the writes" ]
+        }
+      })
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("<li>The missing index on user_id</li>")
+      expect(response.body).to include("<li>No transaction around the writes</li>")
+    end
+
+    it "renders a legacy string-shaped review field as a single-item list" do
+      create_session_for(user, date: 2.days.ago.to_date, reviewed: true)
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("<li>Spotted the issue on #{2.days.ago.to_date}</li>")
+    end
+
+    it "renders the self-explanation prompt on a reviewed entry" do
+      create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("In one sentence, why does this fix work?")
+      expect(response.body).to include("self-explanation-input")
     end
   end
 
