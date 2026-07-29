@@ -187,5 +187,18 @@ RSpec.describe DailyResponse, type: :model do
       expect(first.improved_code_visible?("architecture")).to be(false)
       expect(second.improved_code_visible?("architecture")).to be(false)
     end
+
+    describe "#improved_code_visible? for security_review" do
+      it "is not excluded like architecture — it follows the normal concept-exposure gate" do
+        exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+          problem_set: { "security_review" => { "concept" => "xss_prevention" } })
+        response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+          answers: { "security_review" => "x" * 20 },
+          concept_tags: { "security_review" => "xss_prevention" })
+
+        # No prior exposure yet — gated closed, same rule code_review/pattern follow.
+        expect(response.improved_code_visible?("security_review")).to be false
+      end
+    end
   end
 end

@@ -80,6 +80,11 @@ RSpec.describe ConceptMastery, type: :model do
     expect(cm.tier).to eq("standard")
   end
 
+  it "buckets a security_review-tagged concept under the exercise's language, not a separate 'architecture'-style bucket" do
+    cm = review!(concept: "sql_injection_prevention", self_rating: "too_hard", ai_rating: "developing", section: "security_review")
+    expect(cm.language).to eq("ruby_rails")
+  end
+
   it "skips a concept whose representative section was unreviewed" do
     exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
       problem_set: { "code_review" => { "concept" => "n_plus_one" } })
