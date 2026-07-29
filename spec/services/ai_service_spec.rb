@@ -182,14 +182,25 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 16-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(16)
+    it "is a frozen 20-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(20)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
 
     it "includes the two JS security concepts chosen for real depth" do
       expect(AiService::JS_CONCEPTS).to include("xss_prevention", "insecure_client_storage")
+    end
+  end
+
+  describe "TYPESCRIPT_FLAVORED_CONCEPTS" do
+    it "is a frozen 4-entry subset of JS_CONCEPTS" do
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.size).to eq(4)
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS).to be_frozen
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS - AiService::JS_CONCEPTS).to be_empty
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS).to contain_exactly(
+        "generics", "type_guards_narrowing", "union_intersection_types", "mapped_conditional_types"
+      )
     end
   end
 
@@ -336,6 +347,17 @@ RSpec.describe AiService do
     it "no longer enumerates team size, budget, and timeline as things to include" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
       expect(prompt).not_to include("team size, scale, reliability needs, existing tech debt")
+    end
+
+    it "includes TypeScript-syntax guidance keyed off the TS-flavored concepts when language is javascript" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include("TypeScript syntax")
+      expect(prompt).to include(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.join(", "))
+    end
+
+    it "omits TypeScript-syntax guidance for ruby_rails" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+      expect(prompt).not_to include("TypeScript syntax")
     end
   end
 

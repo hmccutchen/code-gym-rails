@@ -42,6 +42,16 @@ class AiService
     this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
     memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
+    generics type_guards_narrowing union_intersection_types mapped_conditional_types
+  ].freeze
+
+  # Subset of JS_CONCEPTS that reflects real TypeScript usage rather than a
+  # separate language mode: no new generation language, no schema change.
+  # When one of these is the section's tagged concept, build_exercise_prompt
+  # instructs real TS syntax/annotations for that section only — every other
+  # JS_CONCEPTS entry stays plain JS, matching actual day-to-day variety.
+  TYPESCRIPT_FLAVORED_CONCEPTS = %w[
+    generics type_guards_narrowing union_intersection_types mapped_conditional_types
   ].freeze
 
   # Language-INDEPENDENT architecture/design-reasoning vocabulary. Unlike
@@ -501,6 +511,13 @@ class AiService
         ""
       end
 
+    ts_guidance =
+      if language == "javascript"
+        "- If a section's tagged concept is one of #{TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
+      else
+        ""
+      end
+
     config      = config_for(language)
     label       = config[:label]
     focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
@@ -547,6 +564,7 @@ class AiService
       - The code_review snippet must be realistic #{label} code — not toy examples.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
+      #{ts_guidance}
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - Each section's "glossary": 0-4 {term, definition} pairs for incidental terminology inside THAT section's own title/scenario/question/why/options text that a mid-level developer newer to #{label} might not immediately know — distinct from the section's own tagged "concept" and from "teaching_note". One plain-English sentence per definition, same tone as the rest of this app's teaching content. Return an empty array when nothing in the section's text warrants one — never force entries to exist.
       #{third_guidance}
