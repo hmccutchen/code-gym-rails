@@ -23,6 +23,7 @@
   <%= render "responses/answered_sections", exercise: exercise, response: response %>
   <%= render "responses/submission", response: response %>
 <% else %>
+  <%= render "shared/syntax_highlighting_script" %>
   <%# Progress bar (sticky so progress stays visible while scrolling the three
       sections on small screens) %>
   <div class="progress-sticky">
@@ -40,7 +41,7 @@
       <div class="section-label">1 — Code Review</div>
       <% if cr["scenario"].present? %><div class="section-scenario"><%= cr["scenario"] %></div><% end %>
       <div class="question"><%= cr["question"] %></div>
-      <pre class="snippet"><code><%= cr["snippet"] %></code></pre>
+      <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= cr["snippet"] %></code></pre>
       <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
         <%= render "shared/concept_reference", reference: ref,
               open: first_exposure?(cr["concept"], exercise.language, exercise.date) %>
@@ -84,7 +85,7 @@
         <% if ch["scenario"].present? %><div class="section-scenario"><%= ch["scenario"] %></div><% end %>
         <div class="question"><%= ch["question"] %></div>
         <% if ch["starter_code"].present? %>
-          <pre class="snippet"><code><%= ch["starter_code"] %></code></pre>
+          <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= ch["starter_code"] %></code></pre>
         <% end %>
         <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
           <%= render "shared/concept_reference", reference: ref,

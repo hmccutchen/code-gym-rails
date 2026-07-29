@@ -9,7 +9,8 @@
   <div class="ref-body">
     <p style="margin-bottom:.75rem"><strong><%= reference.tagline %></strong></p>
     <p style="margin-bottom:.75rem"><%= reference.explanation %></p>
-    <pre class="snippet"><code><%= reference.code_example %></code></pre>
+    <pre class="snippet"><code<% if (lang = hljs_language(reference.language)) %> data-hljs="<%= lang %>"<% end %>><%= reference.code_example %></code></pre>
     <p>🔭 <%= reference.senior_lens %></p>
   </div>
 </details>
+<%= render "shared/syntax_highlighting_script" %>

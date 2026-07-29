@@ -94,9 +94,9 @@ RSpec.describe "History", type: :request do
       # The .mermaid-diagram CSS rule itself is global (defined once in the
       # layout's <style> block, like every other section style), so it is
       # present on every page regardless of content. What must NOT appear is
-      # an actual container element or the script that would populate one.
+      # an actual container element or the mermaid script.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
-      expect(response.body).not_to include("cdn.jsdelivr.net")
+      expect(response.body).not_to include("mermaid@11.4.1")
     end
 
     it "renders no container and no mermaid script for an exercise generated before diagrams existed" do
@@ -107,9 +107,9 @@ RSpec.describe "History", type: :request do
       # The .mermaid-diagram CSS rule itself is global (defined once in the
       # layout's <style> block, like every other section style), so it is
       # present on every page regardless of content. What must NOT appear is
-      # an actual container element or the script that would populate one.
+      # an actual container element or the mermaid script.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
-      expect(response.body).not_to include("cdn.jsdelivr.net")
+      expect(response.body).not_to include("mermaid@11.4.1")
     end
 
     it "emits the ai_review autosave script and the mermaid module exactly once across multiple entries" do
@@ -125,7 +125,8 @@ RSpec.describe "History", type: :request do
       get history_path
 
       expect(response.body.scan("Autosaves on blur.").size).to eq(1)
-      expect(response.body.scan("cdn.jsdelivr.net").size).to eq(1)
+      # Check for mermaid script specifically, since highlight.js script also uses cdn.jsdelivr.net
+      expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
 
     it "renders improved_code for a visible pattern section" do
@@ -293,6 +294,82 @@ RSpec.describe "History", type: :request do
 
       expect(response.body).to include("In one sentence, why does this fix work?")
       expect(response.body).to include("self-explanation-input")
+    end
+
+    it "marks code_review and improved_code with the exercise's highlight.js language" do
+      session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      session.update!(ai_review: { "code_review" => { "rating" => "solid", "improved_code" => "User.includes(:posts)" } })
+
+      login_as(user)
+      get history_path
+
+      # create_session_for's challenge section has no starter_code, so the only
+      # two data-hljs="ruby" occurrences on this page are the code_review
+      # snippet (responses/_answered_sections) and improved_code (shared/_ai_review).
+      expect(response.body.scan('data-hljs="ruby"').size).to eq(2)
+    end
+
+    it "marks a javascript exercise's snippet as javascript, not ruby" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "javascript",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "const x = 1;" } }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "code_review" => "an answer with real substance" }, submitted_at: Time.current
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include('data-hljs="javascript"')
+      expect(response.body).not_to include('data-hljs="ruby"')
+    end
+
+    it "never marks an architecture concept reference's pseudocode example for highlighting" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "architecture" => { "title" => "A", "question" => "arch-q", "concept" => "scaling_bottlenecks" } }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "architecture" => "I would shard because of write volume" }, submitted_at: Time.current
+      )
+      ConceptReference.create!(concept: "scaling_bottlenecks", language: "architecture",
+        tagline: "t", explanation: "e", code_example: "shard_by(:tenant_id)  # pseudocode", senior_lens: "s")
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("shard_by(:tenant_id)")
+      # Check for data-hljs as an HTML attribute, not in script code
+      expect(response.body).not_to include('data-hljs="')
+    end
+
+    it "loads the highlight.js script exactly once across multiple reviewed entries" do
+      3.times do |i|
+        session = create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true)
+        session.update!(ai_review: { "code_review" => { "rating" => "solid", "improved_code" => "improved" } })
+      end
+
+      login_as(user)
+      get history_path
+
+      expect(response.body.scan("highlight.js@11.11.1/es/core.min.js").size).to eq(1)
+    end
+
+    it "marks a reviewed session with no improved_code in any section and still loads the script" do
+      session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      # Update to ensure NO improved_code in any section
+      session.update!(ai_review: { "code_review" => { "rating" => "solid", "correct" => "Good job" } })
+
+      login_as(user)
+      get history_path
+
+      # The code_review snippet should be marked
+      expect(response.body).to include('data-hljs="ruby"')
+      # The script should load even though there's no improved_code
+      expect(response.body).to include("highlight.js@11.11.1/es/core.min.js")
     end
   end
 
