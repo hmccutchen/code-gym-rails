@@ -462,6 +462,7 @@ class AiService
               "title":        "string",
               "question":     "string — what security vulnerability exists here, and how would you mitigate it",
               "snippet":      "string — #{label} code, ~10-15 lines, containing one real, exploitable vulnerability",
+              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the provided vocabulary",
               #{glossary_field},
@@ -617,7 +618,7 @@ class AiService
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
-      - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list}. Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
+      - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - Each section's "glossary": 0-4 {term, definition} pairs for incidental terminology inside THAT section's own title/scenario/question/why/options text that a mid-level developer newer to #{label} might not immediately know — distinct from the section's own tagged "concept" and from "teaching_note". One plain-English sentence per definition, same tone as the rest of this app's teaching content. Return an empty array when nothing in the section's text warrants one — never force entries to exist.
       #{third_guidance}

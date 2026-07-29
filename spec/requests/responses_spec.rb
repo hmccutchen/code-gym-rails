@@ -938,7 +938,35 @@ RSpec.describe "Responses", type: :request do
       expect(resp.reload.ai_review["security_review"]["rating"]).to eq("solid")
 
       get history_path
-      expect(response.body).to include("Injection risk").or include("Security review")
+      # "Injection risk" is security_review["title"] — the only place in this
+      # page that string can come from is the _security_review_section partial
+      # itself. (A weaker assertion on "Security review" would also pass off
+      # history/index.html.erb's independent section.humanize pill, which
+      # renders for any rated section regardless of whether the answer
+      # partial rendered anything.)
+      expect(response.body).to include("Injection risk")
+    end
+  end
+
+  describe "dashboard unsubmitted render of a security_review exercise" do
+    it "renders the security_review title, answer textarea, and rating row with the exact names the controller and JS agree on" do
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review"      => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"          => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "security_review"  => { "title" => "Injection risk", "question" => "What's exploitable here?",
+                                  "snippet" => "User.where(\"name = '\#{params[:name]}'\")",
+                                  "concept" => "sql_injection_prevention" }
+        }
+      )
+
+      get root_path
+
+      expect(response.body).to include("Injection risk")
+      expect(response.body).to include("exploitable here")
+      expect(response.body).to include('name="response[answers][security_review]"')
+      expect(response.body).to include('data-rating-for="security_review"')
     end
   end
 end

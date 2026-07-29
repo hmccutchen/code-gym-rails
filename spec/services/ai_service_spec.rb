@@ -114,6 +114,12 @@ RSpec.describe AiService do
       expect(schema).not_to match(/mermaid/i)
     end
 
+    it "defines a scenario field for security_review, matching code_review/pattern/challenge" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      security_review = JSON.parse(schema)["security_review"]
+      expect(security_review).to have_key("scenario")
+    end
+
     it "no longer asks the model for a pattern.reference block" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
       pattern = JSON.parse(schema)["pattern"]
@@ -144,6 +150,12 @@ RSpec.describe AiService do
     it "does not ask for a diagram on a challenge third" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
       expect(schema).not_to match(/mermaid/i)
+    end
+  end
+
+  describe "THIRD_SECTION_WEIGHTS" do
+    it "sums to 1.0 across all three weights, including the unused :challenge entry" do
+      expect(AiService::THIRD_SECTION_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
     end
   end
 
@@ -245,12 +257,14 @@ RSpec.describe AiService do
   end
 
   describe "SCENARIO_DOMAINS" do
-    it "is a frozen list of scenario flavors, including a rare legacy-GraphQL entry" do
+    it "is a frozen list of exactly these 9 scenario flavors, including a rare legacy-GraphQL entry" do
       expect(AiService::SCENARIO_DOMAINS).to be_frozen
-      expect(AiService::SCENARIO_DOMAINS).to include(
+      expect(AiService::SCENARIO_DOMAINS.size).to eq(9)
+      expect(AiService::SCENARIO_DOMAINS).to contain_exactly(
         "background_job_processing", "api_versioning_and_deprecation",
         "activerecord_query_construction", "component_state_management",
-        "legacy_graphql_maintenance"
+        "data_export_and_reporting", "webhook_delivery", "rate_limiting",
+        "multi_tenant_data_isolation", "legacy_graphql_maintenance"
       )
     end
 
@@ -411,6 +425,13 @@ RSpec.describe AiService do
       expect(prompt.downcase).to include("legacy graphql")
       expect(prompt).to match(/1 in every 8-10/)
       expect(prompt.downcase).to include("never as the tagged concept")
+    end
+
+    it "instructs adapting a scenario flavor to the day's stack, for either language" do
+      %w[ruby_rails javascript].each do |language|
+        prompt = service.send(:build_exercise_prompt, user, language)
+        expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
+      end
     end
 
     it "instructs adversarial security framing and reuses the language vocabulary (not a separate one) when third: :security_review" do

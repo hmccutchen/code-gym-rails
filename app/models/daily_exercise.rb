@@ -26,8 +26,8 @@ class DailyExercise < ApplicationRecord
   # "challenge"` pattern that build_review_prompt used before a third shape
   # (security_review) existed.
   def third_key
-    return "architecture"    if problem_set.key?("architecture")
-    return "security_review" if problem_set.key?("security_review")
+    return "architecture"    if architecture
+    return "security_review" if security_review
     "challenge"
   end
 end
