@@ -890,4 +890,55 @@ RSpec.describe "Responses", type: :request do
       expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
     end
   end
+
+  describe "security_review end-to-end" do
+    def create_security_review_exercise
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review"      => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"          => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "security_review"  => { "title" => "Injection risk", "question" => "What's exploitable here?",
+                                  "snippet" => "User.where(\"name = '\#{params[:name]}'\")",
+                                  "concept" => "sql_injection_prevention" }
+        }
+      )
+    end
+
+    it "accepts a submitted answer, rating, and completes review through history" do
+      exercise = create_security_review_exercise
+
+      post responses_path,
+        params: { response: {
+          answers: { code_review: "a" * 20, pattern: "b" * 20, security_review: "c" * 20 },
+          section_ratings: { code_review: "right_level", pattern: "right_level", security_review: "right_level" },
+          submit: "1"
+        } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      resp = DailyResponse.last
+      expect(resp.submitted?).to be true
+      expect(resp.answers["security_review"]).to eq("c" * 20)
+      expect(resp.concept_tags["security_review"]).to eq("sql_injection_prevention")
+
+      fake_review = {
+        "code_review"     => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" },
+        "pattern"         => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" },
+        "security_review" => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "fixed = User.where(name: params[:name])" }
+      }
+      # Matches this file's existing convention for stubbing the review call
+      # (see the "POST /responses/:id/review" describe block) rather than
+      # allow_any_instance_of, which this codebase's specs don't otherwise use.
+      fake_service = instance_double(ClaudeService, review_response: fake_review)
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(resp.reload.ai_review["security_review"]["rating"]).to eq("solid")
+
+      get history_path
+      expect(response.body).to include("Injection risk").or include("Security review")
+    end
+  end
 end
