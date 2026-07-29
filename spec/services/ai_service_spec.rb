@@ -166,18 +166,30 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 16-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(16)
+    it "is a frozen 18-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(18)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+    end
+
+    it "includes the two Rails security concepts chosen for real depth" do
+      expect(AiService::RAILS_CONCEPTS).to include("mass_assignment_protection", "sql_injection_prevention")
+    end
+
+    it "excludes secure_secrets_handling and dependency_vulnerability_management as poor fits for this app's format" do
+      expect(AiService::RAILS_CONCEPTS).not_to include("secure_secrets_handling", "dependency_vulnerability_management")
     end
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 14-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(14)
+    it "is a frozen 16-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(16)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
+    end
+
+    it "includes the two JS security concepts chosen for real depth" do
+      expect(AiService::JS_CONCEPTS).to include("xss_prevention", "insecure_client_storage")
     end
   end
 

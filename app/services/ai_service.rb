@@ -20,18 +20,28 @@ class AiService
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
   # Kept closed rather than AI-extensible so history stays clean.
+  #
+  # Security concepts are deliberately selective: the mastery-tier system
+  # (Standard/Reduced/Paused, easing/reinforcing over time) only pays off for
+  # concepts with real depth — room to be approached multiple ways, room to
+  # get harder or easier. Two proposed security items were cut for lacking
+  # that depth: `secure_secrets_handling` is essentially one rule ("don't
+  # hardcode credentials") with no harder version to graduate toward, and
+  # `dependency_vulnerability_management` is a process/tooling habit (running
+  # an audit tool, reviewing a Dependabot PR) that no code snippet can test —
+  # the wrong shape for this app's format entirely.
   RAILS_CONCEPTS = %w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
-    error_handling
+    error_handling mass_assignment_protection sql_injection_prevention
   ].freeze
 
   JS_CONCEPTS = %w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
     this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
     memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
-    controlled_vs_uncontrolled
+    controlled_vs_uncontrolled xss_prevention insecure_client_storage
   ].freeze
 
   # Language-INDEPENDENT architecture/design-reasoning vocabulary. Unlike
