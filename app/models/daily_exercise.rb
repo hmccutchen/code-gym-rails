@@ -15,8 +15,19 @@ class DailyExercise < ApplicationRecord
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
 
-  def code_review  = problem_set["code_review"]&.with_indifferent_access
-  def pattern      = problem_set["pattern"]&.with_indifferent_access
-  def challenge    = problem_set["challenge"]&.with_indifferent_access
-  def architecture = problem_set["architecture"]&.with_indifferent_access
+  def code_review       = problem_set["code_review"]&.with_indifferent_access
+  def pattern            = problem_set["pattern"]&.with_indifferent_access
+  def challenge          = problem_set["challenge"]&.with_indifferent_access
+  def architecture       = problem_set["architecture"]&.with_indifferent_access
+  def security_review    = problem_set["security_review"]&.with_indifferent_access
+
+  # Which of the three possible third-section shapes this exercise's
+  # problem_set actually holds. Replaces the ad hoc `arch ? "architecture" :
+  # "challenge"` pattern that build_review_prompt used before a third shape
+  # (security_review) existed.
+  def third_key
+    return "architecture"    if problem_set.key?("architecture")
+    return "security_review" if problem_set.key?("security_review")
+    "challenge"
+  end
 end
