@@ -293,12 +293,19 @@ class AiService
     end
   end
 
-  # Which third section this set gets: architecture-reasoning 60% of the time,
-  # a traditional coding challenge 40%. Extracted so tests can stub it — never
-  # assert on real randomness. The chosen kind is not tracked separately; the
-  # persisted third key (problem_set["architecture"] vs ["challenge"]) is the record.
+  # Which third section this set gets. Named, tunable weights rather than a
+  # bare literal: architecture-reasoning most of the time, a security-review
+  # snippet a quarter of the time, a traditional coding challenge the rest.
+  # Extracted so tests can stub it — never assert on real randomness. The
+  # chosen kind is not tracked separately; the persisted third key
+  # (problem_set["architecture"/"security_review"/"challenge"]) is the record.
+  THIRD_SECTION_WEIGHTS = { architecture: 0.50, security_review: 0.25, challenge: 0.25 }.freeze
+
   def roll_third_section
-    rand < 0.60 ? :architecture : :challenge
+    r = rand
+    return :architecture    if r < THIRD_SECTION_WEIGHTS[:architecture]
+    return :security_review if r < THIRD_SECTION_WEIGHTS[:architecture] + THIRD_SECTION_WEIGHTS[:security_review]
+    :challenge
   end
 
   # The concept buckets today's set can actually host. Architecture concepts have
@@ -364,14 +371,17 @@ class AiService
   # validated against, but not which section(s) that vocabulary is legal in
   # today — without this the model has no way to know an architecture-vocabulary
   # concept can't go in code_review, guesses wrong, and normalize_concepts
-  # rewrites a correctly-honored check into a false "miss".
+  # rewrites a correctly-honored check into a false "miss". The else branch
+  # names `third` itself (not a hardcoded "challenge") because a language-
+  # bucket concept is equally legal in whichever non-architecture third
+  # section today actually has — challenge or security_review.
   def annotate_retention_concept(cm, third)
     if cm.language == "architecture"
       "#{cm.concept} (architecture section)"
     elsif third == :architecture
       "#{cm.concept} (code_review or pattern)"
     else
-      "#{cm.concept} (code_review, pattern, or challenge)"
+      "#{cm.concept} (code_review, pattern, or #{third})"
     end
   end
 

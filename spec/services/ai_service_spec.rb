@@ -128,16 +128,23 @@ RSpec.describe AiService do
   end
 
   describe "#roll_third_section" do
-    it "returns :architecture ~60% and :challenge ~40% (both reachable)" do
+    it "returns :architecture below 0.50, :security_review from 0.50 up to 0.75, :challenge from 0.75 up" do
       allow(service).to receive(:rand).and_return(0.10)
       expect(service.send(:roll_third_section)).to eq(:architecture)
-      allow(service).to receive(:rand).and_return(0.90)
+
+      allow(service).to receive(:rand).and_return(0.49)
+      expect(service.send(:roll_third_section)).to eq(:architecture)
+
+      allow(service).to receive(:rand).and_return(0.50)
+      expect(service.send(:roll_third_section)).to eq(:security_review)
+
+      allow(service).to receive(:rand).and_return(0.74)
+      expect(service.send(:roll_third_section)).to eq(:security_review)
+
+      allow(service).to receive(:rand).and_return(0.75)
       expect(service.send(:roll_third_section)).to eq(:challenge)
 
-      # Boundary check: just under vs. just at/over the new 0.60 threshold.
-      allow(service).to receive(:rand).and_return(0.59)
-      expect(service.send(:roll_third_section)).to eq(:architecture)
-      allow(service).to receive(:rand).and_return(0.60)
+      allow(service).to receive(:rand).and_return(0.99)
       expect(service.send(:roll_third_section)).to eq(:challenge)
     end
   end
@@ -474,6 +481,16 @@ RSpec.describe AiService do
                             reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
+    end
+
+    it "annotates a language-bucket concept's legal sections for the security_review third" do
+      cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review,
+                            reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).to include("Retention checks due today: memoization (code_review, pattern, or security_review)")
     end
 
     it "annotates an architecture-bucket concept as architecture-section-only" do
