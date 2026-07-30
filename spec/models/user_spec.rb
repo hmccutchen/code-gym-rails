@@ -638,6 +638,18 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#paused_generation_at?" do
+    it "is false when paused_generation_at is nil" do
+      user = User.new(paused_generation_at: nil)
+      expect(user.paused_generation_at?).to be false
+    end
+
+    it "is true when paused_generation_at is set" do
+      user = User.new(paused_generation_at: Time.current)
+      expect(user.paused_generation_at?).to be true
+    end
+  end
+
   describe ".active" do
     it "excludes anonymized users and includes normal ones" do
       normal = create_user(email: "normal@example.com")
