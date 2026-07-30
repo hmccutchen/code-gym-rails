@@ -16,4 +16,18 @@ class AccountsController < ApplicationController
     reset_session
     redirect_to login_path, notice: "Your account has been deleted."
   end
+
+  # PATCH /account/toggle_generation
+  # Flips paused_generation_at between nil and now. Only affects
+  # GenerateDailyExercisesJob's unattended cron batch path — on-demand
+  # generation (dashboard open, /generate) is unaffected either way.
+  def toggle_generation
+    if current_user.paused_generation_at?
+      current_user.update!(paused_generation_at: nil)
+      redirect_to account_path, notice: "Automatic daily generation resumed."
+    else
+      current_user.update!(paused_generation_at: Time.current)
+      redirect_to account_path, notice: "Automatic daily generation paused."
+    end
+  end
 end

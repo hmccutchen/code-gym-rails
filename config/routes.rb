@@ -21,7 +21,9 @@ Rails.application.routes.draw do
 
   # Account page: log out or permanently delete (anonymize) the account.
   # Singular resource — a user has exactly one.
-  resource :account, only: [ :show, :destroy ]
+  resource :account, only: [ :show, :destroy ] do
+    patch :toggle_generation, on: :member
+  end
 
   # Core app
   root "dashboard#show"
