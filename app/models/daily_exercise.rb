@@ -26,10 +26,12 @@ class DailyExercise < ApplicationRecord
   # "challenge"` pattern that build_review_prompt used before a third shape
   # (security_review) existed.
   #
-  # Checked with `problem_set[key].is_a?(Hash)`, not `problem_set.key?(key)` —
-  # a provider that emits `"architecture": null` alongside a real challenge
-  # section would otherwise resolve third_key to the null key, and
-  # build_review_prompt's `arch["title"]` would raise on the nil section.
+  # Checked on the value's shape, not `problem_set.key?(key)`. A provider can
+  # emit a third key holding null or a bare string alongside the real section;
+  # resolving to it would hand build_review_prompt a section whose `["title"]`
+  # raises. The earlier `key?` form of this method did exactly that, and the
+  # per-key readers it replaced (`problem_set["architecture"]&.with_indifferent_access`)
+  # raised outright on a non-Hash value rather than falling through.
   def third_key
     ExerciseSection.thirds.map(&:key).find { |key| problem_set[key].is_a?(Hash) } || "challenge"
   end
