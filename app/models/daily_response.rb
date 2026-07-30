@@ -86,12 +86,14 @@ class DailyResponse < ApplicationRecord
   # improved_code is revealed only from a concept's SECOND exposure onward — the
   # first time a concept appears, the corrected answer stays hidden (mirrors the
   # attempt-gated teaching_note). Ungated for blank/"other" (no concept to track).
-  # The architecture section never has improved_code at all (the model is asked
-  # to return an empty string there — see build_review_prompt) — that exclusion
-  # lives here rather than in each render template, so both templates stay in
-  # sync automatically.
+  # Whether a section kind carries improved_code at all is the kind's own
+  # property (see ExerciseSection) — the architecture section never does, and
+  # that exclusion lives there rather than in each render template, so both
+  # templates stay in sync automatically.
   def improved_code_visible?(section)
-    return false if section.to_s == "architecture"
+    kind = ExerciseSection.find(section)
+    return false if kind && !kind.improved_code?
+
     concept = concept_tags[section.to_s]
     return true if concept.blank? || concept == "other"
     bucket = daily_exercise.language

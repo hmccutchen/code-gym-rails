@@ -153,34 +153,6 @@ RSpec.describe AiService do
     end
   end
 
-  describe "THIRD_SECTION_WEIGHTS" do
-    it "sums to 1.0 across all three weights, including the unused :challenge entry" do
-      expect(AiService::THIRD_SECTION_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
-    end
-  end
-
-  describe "#roll_third_section" do
-    it "returns :architecture below 0.50, :security_review from 0.50 up to 0.75, :challenge from 0.75 up" do
-      allow(service).to receive(:rand).and_return(0.10)
-      expect(service.send(:roll_third_section)).to eq(:architecture)
-
-      allow(service).to receive(:rand).and_return(0.49)
-      expect(service.send(:roll_third_section)).to eq(:architecture)
-
-      allow(service).to receive(:rand).and_return(0.50)
-      expect(service.send(:roll_third_section)).to eq(:security_review)
-
-      allow(service).to receive(:rand).and_return(0.74)
-      expect(service.send(:roll_third_section)).to eq(:security_review)
-
-      allow(service).to receive(:rand).and_return(0.75)
-      expect(service.send(:roll_third_section)).to eq(:challenge)
-
-      allow(service).to receive(:rand).and_return(0.99)
-      expect(service.send(:roll_third_section)).to eq(:challenge)
-    end
-  end
-
   describe "#build_system_prompt" do
     it "focuses on Rails patterns for ruby_rails" do
       prompt = service.send(:build_system_prompt, "ruby_rails")
@@ -441,61 +413,6 @@ RSpec.describe AiService do
       expect(prompt).to include(AiService::RAILS_SECURITY_CONCEPTS.join(", "))
       expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
       expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
-    end
-  end
-
-  describe "retention check selection" do
-    def mastery(concept:, bucket:, due_on:)
-      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
-                                     mastered_at: 1.month.ago, retention_interval_days: 7,
-                                     next_retention_check_on: due_on)
-    end
-
-    it "fills only the slots reinforcement did not claim" do
-      mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
-      allow(user).to receive(:concepts_needing_reinforcement)
-        .and_return([ { concept: "a", tier: "standard" }, { concept: "b", tier: "standard" } ])
-
-      checks = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
-      expect(checks.map(&:concept)).to eq(%w[memoization])
-    end
-
-    it "prioritizes a threshold-crossed short-interval concept over a merely-due long-interval one" do
-      # "n_plus_one": interval 28, due 20 days ago — due, but not yet overdue by
-      # its own interval (would need 28 days past due to cross the threshold).
-      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard,
-                                     mastered_at: 2.months.ago, retention_interval_days: 28,
-                                     next_retention_check_on: Date.current - 20)
-      # "memoization": interval 7, due 10 days ago — has crossed its own
-      # threshold (10 > 7). Sorting by raw due-date alone would rank n_plus_one
-      # first (20 days ago < 10 days ago); sorting by overdue-ratio must not.
-      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
-                                     mastered_at: 1.month.ago, retention_interval_days: 7,
-                                     next_retention_check_on: Date.current - 10)
-
-      checks = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
-      expect(checks.map(&:concept)).to eq(%w[memoization])
-    end
-
-    it "offers nothing when reinforcement already claims three slots" do
-      mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
-      expect(service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 0)).to eq([])
-    end
-
-    it "offers architecture-bucket concepts only on architecture days" do
-      mastery(concept: "service_boundaries", bucket: "architecture", due_on: Date.current - 2)
-
-      on_challenge = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 3)
-      on_arch      = service.send(:retention_checks_for, user, "ruby_rails", third: :architecture, slots: 3)
-
-      expect(on_challenge.map(&:concept)).to eq([])
-      expect(on_arch.map(&:concept)).to eq(%w[service_boundaries])
-    end
-
-    it "never offers a concept from the other language's bucket" do
-      mastery(concept: "closures", bucket: "javascript", due_on: Date.current - 2)
-      checks = service.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 3)
-      expect(checks.map(&:concept)).to eq([])
     end
   end
 
@@ -809,7 +726,7 @@ RSpec.describe AiService do
     it "threads the rolled third-section kind into the exercise prompt" do
       set = { "code_review" => { "concept" => "n_plus_one" } }
       svc = double_class.new(canned_text: set.to_json)
-      allow(svc).to receive(:roll_third_section).and_return(:architecture)
+      allow(DailyPlan).to receive(:roll_third_section).and_return(:architecture)
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
     end
@@ -851,7 +768,7 @@ RSpec.describe AiService do
       end
       set = { "code_review" => { "concept" => "n_plus_one" } }
       svc = spy_class.new(canned_text: set.to_json)
-      allow(svc).to receive(:roll_third_section).and_return(:challenge)
+      allow(DailyPlan).to receive(:roll_third_section).and_return(:challenge)
 
       svc.generate_exercise(user, language: "ruby_rails")
 
@@ -890,7 +807,7 @@ RSpec.describe AiService do
           end
         end
         svc = spy_class.new(canned_text: { "code_review" => { "concept" => "n_plus_one" } }.to_json)
-        allow(svc).to receive(:roll_third_section).and_return(third)
+        allow(DailyPlan).to receive(:roll_third_section).and_return(third)
 
         svc.generate_exercise(user, language: "ruby_rails")
         captured_prompt

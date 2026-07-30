@@ -97,7 +97,7 @@ class User < ApplicationRecord
   def recent_performance(limit: 10)
     recent_daily_responses(limit).map do |r|
       problem_set = r.daily_exercise&.problem_set || {}
-      scenarios = %w[code_review pattern challenge architecture security_review].filter_map do |section|
+      scenarios = ExerciseSection.keys.filter_map do |section|
         problem_set.dig(section, "scenario").presence
       end
       ai_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
@@ -133,7 +133,7 @@ class User < ApplicationRecord
 
         next if r.self_rating_favorable?(section) && r.ai_rating_favorable?(section) # mastered
 
-        bucket = section == "architecture" ? "architecture" : r.daily_exercise&.language
+        bucket = ConceptBucket.for(section, r.daily_exercise&.language)
         tier   = concept_masteries.find_by(concept: concept, language: bucket)&.tier || "standard"
         next if tier == "paused"
 
@@ -187,7 +187,7 @@ class User < ApplicationRecord
                      .each do |date, tags, language|
         (tags || {}).each do |section, concept|
           next if concept.blank? || concept == "other"
-          bucket = section == "architecture" ? "architecture" : language
+          bucket = ConceptBucket.for(section, language)
           # Union, not append: a concept tagged on multiple sections the same
           # day is one exposure, not one per section (matches ConceptMastery#record_review!).
           index[[ concept, bucket ]] |= [ date ]

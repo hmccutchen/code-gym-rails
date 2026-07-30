@@ -48,7 +48,7 @@ class ConceptMastery < ApplicationRecord
     end
 
     sections_by_concept.each do |concept, sections|
-      bucket = sections.include?("architecture") ? "architecture" : response.daily_exercise.language
+      bucket = ConceptBucket.for(sections, response.daily_exercise.language)
       evaluate_concept!(user, concept, bucket, response, sections)
     end
   end
