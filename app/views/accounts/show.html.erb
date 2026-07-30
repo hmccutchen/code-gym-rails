@@ -23,6 +23,16 @@
     <%= link_to "Settings →", setup_path %>
   </div>
 
+  <div class="generation-toggle">
+    <% if current_user.paused_generation_at? %>
+      <p>Automatic generation is paused (since <%= current_user.paused_generation_at.to_date.strftime("%B %-d") %>).</p>
+      <%= button_to "Resume automatic generation", toggle_generation_account_path, method: :patch, class: "btn btn-ghost" %>
+    <% else %>
+      <p>Automatic generation is active.</p>
+      <%= button_to "Pause automatic generation", toggle_generation_account_path, method: :patch, class: "btn btn-ghost" %>
+    <% end %>
+  </div>
+
   <div class="danger-zone">
     <h2>Danger zone</h2>
     <p>Deleting your account permanently removes your name, email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone.</p>
