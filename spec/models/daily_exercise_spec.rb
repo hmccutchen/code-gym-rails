@@ -69,5 +69,10 @@ RSpec.describe DailyExercise, type: :model do
       exercise = DailyExercise.new(problem_set: { "challenge" => {} })
       expect(exercise.third_key).to eq("challenge")
     end
+
+    it "skips a third key present with a null value, falling through to the next real section" do
+      exercise = DailyExercise.new(problem_set: { "architecture" => nil, "challenge" => {} })
+      expect(exercise.third_key).to eq("challenge")
+    end
   end
 end
