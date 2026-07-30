@@ -126,6 +126,9 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 ## File Map
 
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging
+- `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks), decided before any provider is contacted; pure decision, no prompt or HTTP
+- `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture is language-independent; everything else buckets by the day's language)
+- `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review); one class per kind answers which are thirds, which vocabulary they draw from, and which show improved code
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call + connection only
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints

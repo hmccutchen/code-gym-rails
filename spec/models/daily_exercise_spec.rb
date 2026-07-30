@@ -69,5 +69,20 @@ RSpec.describe DailyExercise, type: :model do
       exercise = DailyExercise.new(problem_set: { "challenge" => {} })
       expect(exercise.third_key).to eq("challenge")
     end
+
+    it "skips a third key present with a null value, falling through to the next real section" do
+      exercise = DailyExercise.new(problem_set: { "architecture" => nil, "challenge" => {} })
+      expect(exercise.third_key).to eq("challenge")
+    end
+
+    it "skips a third key holding a non-Hash value, falling through to the next real section" do
+      exercise = DailyExercise.new(problem_set: { "architecture" => "not a section", "challenge" => {} })
+      expect(exercise.third_key).to eq("challenge")
+    end
+
+    it "skips a non-Hash architecture in favour of a real security_review" do
+      exercise = DailyExercise.new(problem_set: { "architecture" => [], "security_review" => {} })
+      expect(exercise.third_key).to eq("security_review")
+    end
   end
 end

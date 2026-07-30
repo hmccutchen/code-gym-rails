@@ -273,27 +273,25 @@ class ResponsesController < ApplicationController
   def response_params
     @response_params ||= params.require(:response).permit(
       :submit, :feedback_text,
-      answers: [ :code_review, :pattern, :challenge, :architecture, :security_review ],
-      section_ratings: [ :code_review, :pattern, :challenge, :architecture, :security_review ]
+      answers: ExerciseSection.keys,
+      section_ratings: ExerciseSection.keys
     )
   end
 
   def exercise_concept_tags(exercise)
-    %w[code_review pattern challenge architecture security_review]
+    ExerciseSection.keys
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
   end
 
   # Kick off generation for each distinct (concept, language-bucket) lacking a
-  # cached reference. The architecture section is language-independent, so its
-  # concept is bucketed under "architecture"; every other section uses the
-  # exercise's language. The exists? check only avoids obvious no-op jobs; the
+  # cached reference. The exists? check only avoids obvious no-op jobs; the
   # job re-checks, so a racing duplicate enqueue is harmless.
   def enqueue_concept_references(exercise)
     enqueued = []
     exercise_concept_tags(exercise).each do |section, concept|
       next if concept == "other"
-      language = section == "architecture" ? "architecture" : exercise.language
+      language = ConceptBucket.for(section, exercise.language)
       pair = [ concept, language ]
       next if enqueued.include?(pair) || ConceptReference.exists?(concept: concept, language: language)
       GenerateConceptReferenceJob.perform_later(concept: concept, language: language, user_id: current_user.id)
