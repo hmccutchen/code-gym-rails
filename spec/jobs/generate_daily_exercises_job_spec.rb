@@ -201,5 +201,27 @@ RSpec.describe GenerateDailyExercisesJob do
         expect(DailyExercise.where(user: alaska).count).to eq(0)
       end
     end
+
+    it "skips a user who has paused automatic generation" do
+      stub_generation_for(pac)
+      pac.update!(paused_generation_at: Time.current)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        described_class.new.perform
+        local_today = Time.use_zone("America/Los_Angeles") { Date.current }
+        expect(DailyExercise.exists?(user: pac, date: local_today)).to be false
+      end
+    end
+
+    it "still generates for a paused user on the on-demand path" do
+      stub_generation_for(pac)
+      pac.update!(paused_generation_at: Time.current)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        described_class.new.perform(user_id: pac.id)
+        local_today = Time.use_zone("America/Los_Angeles") { Date.current }
+        expect(DailyExercise.exists?(user: pac, date: local_today)).to be true
+      end
+    end
   end
 end

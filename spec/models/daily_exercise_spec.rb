@@ -43,4 +43,31 @@ RSpec.describe DailyExercise, type: :model do
       expect(without.architecture).to be_nil
     end
   end
+
+  describe "#security_review" do
+    it "reads the security_review blob with indifferent access, nil when absent" do
+      with_sec = DailyExercise.new(problem_set: { "security_review" => { "concept" => "xss_prevention" } })
+      without  = DailyExercise.new(problem_set: { "challenge" => { "concept" => "n_plus_one" } })
+
+      expect(with_sec.security_review[:concept]).to eq("xss_prevention")
+      expect(without.security_review).to be_nil
+    end
+  end
+
+  describe "#third_key" do
+    it "returns 'architecture' when the architecture key is present" do
+      exercise = DailyExercise.new(problem_set: { "architecture" => {} })
+      expect(exercise.third_key).to eq("architecture")
+    end
+
+    it "returns 'security_review' when present without architecture" do
+      exercise = DailyExercise.new(problem_set: { "security_review" => {} })
+      expect(exercise.third_key).to eq("security_review")
+    end
+
+    it "returns 'challenge' when neither architecture nor security_review is present" do
+      exercise = DailyExercise.new(problem_set: { "challenge" => {} })
+      expect(exercise.third_key).to eq("challenge")
+    end
+  end
 end

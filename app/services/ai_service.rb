@@ -20,18 +20,47 @@ class AiService
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
   # Kept closed rather than AI-extensible so history stays clean.
+  #
+  # Security concepts are deliberately selective: the mastery-tier system
+  # (Standard/Reduced/Paused, easing/reinforcing over time) only pays off for
+  # concepts with real depth — room to be approached multiple ways, room to
+  # get harder or easier. Two proposed security items were cut for lacking
+  # that depth: `secure_secrets_handling` is essentially one rule ("don't
+  # hardcode credentials") with no harder version to graduate toward, and
+  # `dependency_vulnerability_management` is a process/tooling habit (running
+  # an audit tool, reviewing a Dependabot PR) that no code snippet can test —
+  # the wrong shape for this app's format entirely.
   RAILS_CONCEPTS = %w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
-    error_handling
+    error_handling mass_assignment_protection sql_injection_prevention
   ].freeze
 
   JS_CONCEPTS = %w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
     this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
     memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
-    controlled_vs_uncontrolled
+    controlled_vs_uncontrolled xss_prevention insecure_client_storage
+    generics type_guards_narrowing union_intersection_types mapped_conditional_types
+  ].freeze
+
+  # The exact subset security_review draws from — never the full language
+  # vocabulary. Each concept gets reinforced through two reasoning modes on
+  # different days: "is this correct" (code_review) and "is this exploitable"
+  # (security_review). A restricted list is what makes that interleaving
+  # deliberate rather than incidental — without it, security_review could
+  # surface an unrelated concept like memoization under adversarial framing.
+  RAILS_SECURITY_CONCEPTS = %w[mass_assignment_protection sql_injection_prevention].freeze
+  JS_SECURITY_CONCEPTS    = %w[xss_prevention insecure_client_storage].freeze
+
+  # Subset of JS_CONCEPTS that reflects real TypeScript usage rather than a
+  # separate language mode: no new generation language, no schema change.
+  # When one of these is the section's tagged concept, build_exercise_prompt
+  # instructs real TS syntax/annotations for that section only — every other
+  # JS_CONCEPTS entry stays plain JS, matching actual day-to-day variety.
+  TYPESCRIPT_FLAVORED_CONCEPTS = %w[
+    generics type_guards_narrowing union_intersection_types mapped_conditional_types
   ].freeze
 
   # Language-INDEPENDENT architecture/design-reasoning vocabulary. Unlike
@@ -45,22 +74,39 @@ class AiService
     idempotency_at_scale observability_tradeoffs
   ].freeze
 
+  # Curated, real, job-adjacent scenario flavors for the "scenario" field's
+  # business-domain framing — prompt-level grounding only, to keep generated
+  # scenarios feeling like real engineering work rather than generic SaaS
+  # examples. Never concept-tagged, never fed into concept_vocabulary_for or
+  # any mastery-loop bucket. `legacy_graphql_maintenance` is scenario dressing
+  # only, for occasional legacy-app relevance — see build_exercise_prompt's
+  # explicit low-frequency instruction. It must never appear as a "concept"
+  # value.
+  SCENARIO_DOMAINS = %w[
+    background_job_processing api_versioning_and_deprecation
+    activerecord_query_construction component_state_management
+    data_export_and_reporting webhook_delivery rate_limiting
+    multi_tenant_data_isolation legacy_graphql_maintenance
+  ].freeze
+
   # Single source of truth per concrete generation language ("mixed" is a
   # user-level meta-preference that always resolves to one of these before it
   # reaches AiService — see User#language_for_today). Adding a language means
   # adding one entry here, not hunting down every ternary in this file.
   LANGUAGE_CONFIG = {
     "ruby_rails" => {
-      label:    "Ruby/Rails",
-      concepts: RAILS_CONCEPTS,
-      coach:    "Rails",
-      focus:    "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
+      label:             "Ruby/Rails",
+      concepts:          RAILS_CONCEPTS,
+      security_concepts: RAILS_SECURITY_CONCEPTS,
+      coach:             "Rails",
+      focus:             "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
     },
     "javascript" => {
-      label:    "JavaScript/React",
-      concepts: JS_CONCEPTS,
-      coach:    "JavaScript/React",
-      focus:    "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
+      label:             "JavaScript/React",
+      concepts:          JS_CONCEPTS,
+      security_concepts: JS_SECURITY_CONCEPTS,
+      coach:             "JavaScript/React",
+      focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
     },
     "architecture" => {
       label:    "language-agnostic",
@@ -258,12 +304,19 @@ class AiService
     end
   end
 
-  # Which third section this set gets: architecture-reasoning 60% of the time,
-  # a traditional coding challenge 40%. Extracted so tests can stub it — never
-  # assert on real randomness. The chosen kind is not tracked separately; the
-  # persisted third key (problem_set["architecture"] vs ["challenge"]) is the record.
+  # Which third section this set gets. Named, tunable weights rather than a
+  # bare literal: architecture-reasoning most of the time, a security-review
+  # snippet a quarter of the time, a traditional coding challenge the rest.
+  # Extracted so tests can stub it — never assert on real randomness. The
+  # chosen kind is not tracked separately; the persisted third key
+  # (problem_set["architecture"/"security_review"/"challenge"]) is the record.
+  THIRD_SECTION_WEIGHTS = { architecture: 0.50, security_review: 0.25, challenge: 0.25 }.freeze
+
   def roll_third_section
-    rand < 0.60 ? :architecture : :challenge
+    r = rand
+    return :architecture    if r < THIRD_SECTION_WEIGHTS[:architecture]
+    return :security_review if r < THIRD_SECTION_WEIGHTS[:architecture] + THIRD_SECTION_WEIGHTS[:security_review]
+    :challenge
   end
 
   # The concept buckets today's set can actually host. Architecture concepts have
@@ -329,14 +382,20 @@ class AiService
   # validated against, but not which section(s) that vocabulary is legal in
   # today — without this the model has no way to know an architecture-vocabulary
   # concept can't go in code_review, guesses wrong, and normalize_concepts
-  # rewrites a correctly-honored check into a false "miss".
+  # rewrites a correctly-honored check into a false "miss". A language-bucket
+  # concept is legal in challenge always, but in security_review only when
+  # it's one of that language's security_concepts (RAILS_SECURITY_CONCEPTS/
+  # JS_SECURITY_CONCEPTS) — security_review draws from that restricted list
+  # exclusively, so any other concept can only land in code_review/pattern.
   def annotate_retention_concept(cm, third)
     if cm.language == "architecture"
       "#{cm.concept} (architecture section)"
     elsif third == :architecture
       "#{cm.concept} (code_review or pattern)"
+    elsif third == :security_review && !config_for(cm.language)[:security_concepts].include?(cm.concept)
+      "#{cm.concept} (code_review or pattern)"
     else
-      "#{cm.concept} (code_review, pattern, or challenge)"
+      "#{cm.concept} (code_review, pattern, or #{third})"
     end
   end
 
@@ -391,7 +450,8 @@ class AiService
     glossary_field = %("glossary": [{"term": "string — an unfamiliar word from this section's own text", "definition": "string — one plain-English sentence"}])
 
     third_section =
-      if third == :architecture
+      case third
+      when :architecture
         <<~ARCH.chomp
           "architecture": {
               "title":     "string — short name for the decision",
@@ -410,6 +470,24 @@ class AiService
               }
             }
         ARCH
+      when :security_review
+        <<~SEC.chomp
+          "security_review": {
+              "title":        "string",
+              "question":     "string — what security vulnerability exists here, and how would you mitigate it",
+              "snippet":      "string — #{label} code, ~10-15 lines, containing one real, exploitable vulnerability",
+              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary",
+              #{glossary_field},
+              "reference": {
+                "tagline":      "string — bold one-liner",
+                "explanation":  "string — 2-3 sentences",
+                "code_example": "string — annotated #{label} code, ~15 lines",
+                "senior_lens":  "string — when to reach for it / tradeoffs"
+              }
+            }
+        SEC
       else
         <<~CH.chomp
           "challenge": {
@@ -491,13 +569,23 @@ class AiService
         ""
       end
 
+    ts_guidance =
+      if language == "javascript"
+        "- If a section's tagged concept is one of #{TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
+      else
+        ""
+      end
+
+    scenario_domain_list = (SCENARIO_DOMAINS - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
+
     config      = config_for(language)
     label       = config[:label]
     focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
     concepts    = config[:concepts]
 
     third_guidance =
-      if third == :architecture
+      case third
+      when :architecture
         <<~ARCH.chomp
           - The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
           - Keep the architecture scenario SHORT: 2-3 sentences, ~50 words maximum, and exactly 2-3 concrete constraints total. Usually the observable symptom plus one hard technical constraint is enough — pick only the constraints the decision actually turns on, and leave the rest out. Do NOT stack scale figures, team size, infrastructure detail, budget, and timeline into one scenario.
@@ -510,6 +598,12 @@ class AiService
           - The diagram should show the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
           - Return an empty string for "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
         ARCH
+      when :security_review
+        <<~SEC.chomp
+          - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
+          - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{config[:security_concepts].join(", ")}
+          - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
+        SEC
       else
         <<~CH.chomp
           - The challenge starter_code should give enough scaffold to get started without giving away the answer.
@@ -537,6 +631,8 @@ class AiService
       - The code_review snippet must be realistic #{label} code — not toy examples.
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
+      #{ts_guidance}
+      - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - Each section's "glossary": 0-4 {term, definition} pairs for incidental terminology inside THAT section's own title/scenario/question/why/options text that a mid-level developer newer to #{label} might not immediately know — distinct from the section's own tagged "concept" and from "teaching_note". One plain-English sentence per definition, same tone as the rest of this app's teaching content. Return an empty array when nothing in the section's text warrants one — never force entries to exist.
       #{third_guidance}
@@ -552,11 +648,13 @@ class AiService
   end
 
   def build_review_prompt(exercise, daily_response)
-    answers = daily_response.answers
-    arch    = exercise.architecture
+    answers   = daily_response.answers
+    third_key = exercise.third_key
 
     third_block =
-      if arch
+      case third_key
+      when "architecture"
+        arch = exercise.architecture
         <<~ARCH.chomp
           Architecture decision (#{arch["title"]}): #{arch["question"]}
           Scenario/constraints: #{arch["scenario"]}
@@ -568,6 +666,16 @@ class AiService
           - Did they consider alternatives rather than asserting one option?
           For this section "improved_code" must be an empty string.
         ARCH
+      when "security_review"
+        sec = exercise.security_review
+        <<~SEC.chomp
+          Security Review (#{sec["title"]}): #{sec["question"]}
+          Snippet: #{sec["snippet"]}
+          Their answer: #{answers["security_review"].presence || "(skipped)"}
+
+          Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their proposed mitigation is sound — not against one single expected answer. Give partial credit in "missed" for identifying the vulnerability without a complete mitigation, or vice versa.
+          For this section "improved_code" must show the mitigated version of the snippet.
+        SEC
       else
         <<~CH.chomp
           Coding Challenge: #{exercise.challenge["question"]}
@@ -575,7 +683,10 @@ class AiService
         CH
       end
 
-    third_key = arch ? "architecture" : "challenge"
+    improved_code_note =
+      third_key == "architecture" ?
+        "corrected/improved code for code_review and pattern (empty string for architecture)" :
+        "corrected/improved code for code_review, pattern, and #{third_key}"
 
     <<~PROMPT
       Review these Code Gym answers. For each section, return a JSON object with:
@@ -584,7 +695,7 @@ class AiService
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — #{arch ? "corrected/improved code for code_review and pattern (empty string for architecture)" : "corrected/improved code for code_review, pattern, and challenge"}
+      - "improved_code": string — #{improved_code_note}
 
       Each array entry must be ONE self-contained idea in one or two sentences.
       Never pack several points into one entry, and never number points inside an
@@ -704,10 +815,14 @@ class AiService
 
   # The (suggestion-bucket, vocabulary) a section's concept is validated against.
   # The architecture section is language-independent — always ARCHITECTURE_CONCEPTS,
-  # bucketed under "architecture"; every other section follows the generation language.
+  # bucketed under "architecture". security_review is restricted to that language's
+  # security_concepts subset, never the full vocabulary. Every other section
+  # (code_review, pattern, challenge) follows the generation language's full list.
   private def concept_vocabulary_for(section_key, language)
     if section_key == "architecture"
       [ "architecture", ARCHITECTURE_CONCEPTS ]
+    elsif section_key == "security_review"
+      [ language, config_for(language)[:security_concepts] ]
     else
       [ language, config_for(language)[:concepts] ]
     end

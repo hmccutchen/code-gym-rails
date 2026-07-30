@@ -47,6 +47,25 @@ RSpec.describe "Responses", type: :request do
       )
     end
 
+    it "tags and saves a security_review third section's concept and answer" do
+      create_exercise(
+        "code_review"      => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"          => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "security_review"  => { "title" => "t", "question" => "q", "concept" => "sql_injection_prevention" }
+      )
+
+      post responses_path,
+        params: { response: { answers: { security_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      resp = DailyResponse.last
+      expect(resp.answers["security_review"]).to eq("a" * 20)
+      expect(resp.concept_tags).to eq(
+        "code_review" => "n_plus_one", "pattern" => "memoization", "security_review" => "sql_injection_prevention"
+      )
+    end
+
     it "ignores an answer for a third section this exercise does not have" do
       create_exercise(
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
@@ -475,6 +494,28 @@ RSpec.describe "Responses", type: :request do
         .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
         .exactly(:once)
     end
+
+    it "enqueues the security_review concept under the exercise's own language bucket, not a separate one" do
+      create_exercise(
+        "code_review"     => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"         => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "security_review" => { "title" => "t", "question" => "q", "concept" => "sql_injection_prevention" }
+      )
+
+      expect {
+        post responses_path,
+          params: { response: { answers: { security_review: "a" * 20 }, submit: "1" } }.to_json,
+          headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "sql_injection_prevention", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+        .and have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+        .and have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "memoization", language: "ruby_rails", user_id: user.id)
+        .exactly(:once)
+    end
   end
 
   describe "POST /responses redirect targets on final submit" do
@@ -847,6 +888,85 @@ RSpec.describe "Responses", type: :request do
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
+    end
+  end
+
+  describe "security_review end-to-end" do
+    def create_security_review_exercise
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review"      => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"          => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "security_review"  => { "title" => "Injection risk", "question" => "What's exploitable here?",
+                                  "snippet" => "User.where(\"name = '\#{params[:name]}'\")",
+                                  "concept" => "sql_injection_prevention" }
+        }
+      )
+    end
+
+    it "accepts a submitted answer, rating, and completes review through history" do
+      exercise = create_security_review_exercise
+
+      post responses_path,
+        params: { response: {
+          answers: { code_review: "a" * 20, pattern: "b" * 20, security_review: "c" * 20 },
+          section_ratings: { code_review: "right_level", pattern: "right_level", security_review: "right_level" },
+          submit: "1"
+        } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      resp = DailyResponse.last
+      expect(resp.submitted?).to be true
+      expect(resp.answers["security_review"]).to eq("c" * 20)
+      expect(resp.concept_tags["security_review"]).to eq("sql_injection_prevention")
+
+      fake_review = {
+        "code_review"     => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" },
+        "pattern"         => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" },
+        "security_review" => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "fixed = User.where(name: params[:name])" }
+      }
+      # Matches this file's existing convention for stubbing the review call
+      # (see the "POST /responses/:id/review" describe block) rather than
+      # allow_any_instance_of, which this codebase's specs don't otherwise use.
+      fake_service = instance_double(ClaudeService, review_response: fake_review)
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(resp.reload.ai_review["security_review"]["rating"]).to eq("solid")
+
+      get history_path
+      # "Injection risk" is security_review["title"] — the only place in this
+      # page that string can come from is the _security_review_section partial
+      # itself. (A weaker assertion on "Security review" would also pass off
+      # history/index.html.erb's independent section.humanize pill, which
+      # renders for any rated section regardless of whether the answer
+      # partial rendered anything.)
+      expect(response.body).to include("Injection risk")
+    end
+  end
+
+  describe "dashboard unsubmitted render of a security_review exercise" do
+    it "renders the security_review title, answer textarea, and rating row with the exact names the controller and JS agree on" do
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review"      => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"          => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+          "security_review"  => { "title" => "Injection risk", "question" => "What's exploitable here?",
+                                  "snippet" => "User.where(\"name = '\#{params[:name]}'\")",
+                                  "concept" => "sql_injection_prevention" }
+        }
+      )
+
+      get root_path
+
+      expect(response.body).to include("Injection risk")
+      expect(response.body).to include("exploitable here")
+      expect(response.body).to include('name="response[answers][security_review]"')
+      expect(response.body).to include('data-rating-for="security_review"')
     end
   end
 end

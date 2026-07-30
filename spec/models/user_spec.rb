@@ -206,6 +206,19 @@ RSpec.describe User, type: :model do
 
       expect(user.recent_performance.first[:scenarios]).to eq([ "billing", "multi-region failover" ])
     end
+
+    it "includes a security_review section's scenario in recent_performance's framings" do
+      user = create_user
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current - 1, generated_at: Time.current,
+        problem_set: { "security_review" => { "scenario" => "a legacy GraphQL layer needs a fix" } }
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current - 1,
+                            answers: { "security_review" => "x" * 20 })
+
+      performance = user.recent_performance
+      expect(performance.first[:scenarios]).to include("a legacy GraphQL layer needs a fix")
+    end
   end
 
   describe "#recent_performance section_ratings" do
@@ -622,6 +635,18 @@ RSpec.describe User, type: :model do
       expect(response.feedback_text).to eq("good one")
       expect(usage.reload.user_id).to eq(user.id)
       expect(ApiUsage.where(user_id: user.id).count).to eq(1)
+    end
+  end
+
+  describe "#paused_generation_at?" do
+    it "is false when paused_generation_at is nil" do
+      user = User.new(paused_generation_at: nil)
+      expect(user.paused_generation_at?).to be false
+    end
+
+    it "is true when paused_generation_at is set" do
+      user = User.new(paused_generation_at: Time.current)
+      expect(user.paused_generation_at?).to be true
     end
   end
 

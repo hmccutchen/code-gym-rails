@@ -59,6 +59,12 @@ class User < ApplicationRecord
     anonymized_at.present?
   end
 
+  # Only affects GenerateDailyExercisesJob's unattended cron batch path — the
+  # on-demand path (dashboard open, /generate) ignores this column entirely.
+  def paused_generation_at?
+    paused_generation_at.present?
+  end
+
   # Idempotent under concurrency: `with_lock` takes a row lock and reloads
   # before the check, so two in-flight calls (double-click, retry from another
   # tab) serialize — the second sees `anonymized?` already true, returns false,
@@ -91,7 +97,7 @@ class User < ApplicationRecord
   def recent_performance(limit: 10)
     recent_daily_responses(limit).map do |r|
       problem_set = r.daily_exercise&.problem_set || {}
-      scenarios = %w[code_review pattern challenge architecture].filter_map do |section|
+      scenarios = %w[code_review pattern challenge architecture security_review].filter_map do |section|
         problem_set.dig(section, "scenario").presence
       end
       ai_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact

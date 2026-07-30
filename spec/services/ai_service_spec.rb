@@ -94,6 +94,32 @@ RSpec.describe AiService do
       expect(schema).to include("ONE sentence")
     end
 
+    it "swaps in the security_review block with a vulnerable snippet and a mitigation question when third: :security_review" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      expect(schema).to include("\"security_review\"")
+      expect(schema).to include("snippet")
+      expect(schema.downcase).to include("mitigate")
+      expect(schema).not_to include("\"architecture\"")
+      expect(schema).not_to include("\"challenge\"")
+    end
+
+    it "gives security_review's reference the same shape as a normal concept reference, not architecture's tradeoffs-plural shape" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      security_review = JSON.parse(schema)["security_review"]
+      expect(security_review["reference"].keys).to contain_exactly("tagline", "explanation", "code_example", "senior_lens")
+    end
+
+    it "does not ask for a diagram on a security_review third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      expect(schema).not_to match(/mermaid/i)
+    end
+
+    it "defines a scenario field for security_review, matching code_review/pattern/challenge" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
+      security_review = JSON.parse(schema)["security_review"]
+      expect(security_review).to have_key("scenario")
+    end
+
     it "no longer asks the model for a pattern.reference block" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
       pattern = JSON.parse(schema)["pattern"]
@@ -127,17 +153,30 @@ RSpec.describe AiService do
     end
   end
 
+  describe "THIRD_SECTION_WEIGHTS" do
+    it "sums to 1.0 across all three weights, including the unused :challenge entry" do
+      expect(AiService::THIRD_SECTION_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
+    end
+  end
+
   describe "#roll_third_section" do
-    it "returns :architecture ~60% and :challenge ~40% (both reachable)" do
+    it "returns :architecture below 0.50, :security_review from 0.50 up to 0.75, :challenge from 0.75 up" do
       allow(service).to receive(:rand).and_return(0.10)
       expect(service.send(:roll_third_section)).to eq(:architecture)
-      allow(service).to receive(:rand).and_return(0.90)
+
+      allow(service).to receive(:rand).and_return(0.49)
+      expect(service.send(:roll_third_section)).to eq(:architecture)
+
+      allow(service).to receive(:rand).and_return(0.50)
+      expect(service.send(:roll_third_section)).to eq(:security_review)
+
+      allow(service).to receive(:rand).and_return(0.74)
+      expect(service.send(:roll_third_section)).to eq(:security_review)
+
+      allow(service).to receive(:rand).and_return(0.75)
       expect(service.send(:roll_third_section)).to eq(:challenge)
 
-      # Boundary check: just under vs. just at/over the new 0.60 threshold.
-      allow(service).to receive(:rand).and_return(0.59)
-      expect(service.send(:roll_third_section)).to eq(:architecture)
-      allow(service).to receive(:rand).and_return(0.60)
+      allow(service).to receive(:rand).and_return(0.99)
       expect(service.send(:roll_third_section)).to eq(:challenge)
     end
   end
@@ -166,18 +205,41 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 16-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(16)
+    it "is a frozen 18-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(18)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
+    end
+
+    it "includes the two Rails security concepts chosen for real depth" do
+      expect(AiService::RAILS_CONCEPTS).to include("mass_assignment_protection", "sql_injection_prevention")
+    end
+
+    it "excludes secure_secrets_handling and dependency_vulnerability_management as poor fits for this app's format" do
+      expect(AiService::RAILS_CONCEPTS).not_to include("secure_secrets_handling", "dependency_vulnerability_management")
     end
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 14-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(14)
+    it "is a frozen 20-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(20)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
+    end
+
+    it "includes the two JS security concepts chosen for real depth" do
+      expect(AiService::JS_CONCEPTS).to include("xss_prevention", "insecure_client_storage")
+    end
+  end
+
+  describe "TYPESCRIPT_FLAVORED_CONCEPTS" do
+    it "is a frozen 4-entry subset of JS_CONCEPTS" do
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.size).to eq(4)
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS).to be_frozen
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS - AiService::JS_CONCEPTS).to be_empty
+      expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS).to contain_exactly(
+        "generics", "type_guards_narrowing", "union_intersection_types", "mapped_conditional_types"
+      )
     end
   end
 
@@ -191,6 +253,25 @@ RSpec.describe AiService do
     it "is not mixed into any per-language generation vocabulary" do
       expect(AiService::RAILS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
       expect(AiService::JS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+    end
+  end
+
+  describe "SCENARIO_DOMAINS" do
+    it "is a frozen list of exactly these 9 scenario flavors, including a rare legacy-GraphQL entry" do
+      expect(AiService::SCENARIO_DOMAINS).to be_frozen
+      expect(AiService::SCENARIO_DOMAINS.size).to eq(9)
+      expect(AiService::SCENARIO_DOMAINS).to contain_exactly(
+        "background_job_processing", "api_versioning_and_deprecation",
+        "activerecord_query_construction", "component_state_management",
+        "data_export_and_reporting", "webhook_delivery", "rate_limiting",
+        "multi_tenant_data_isolation", "legacy_graphql_maintenance"
+      )
+    end
+
+    it "is never mixed into any tracked concept vocabulary" do
+      expect(AiService::SCENARIO_DOMAINS & AiService::RAILS_CONCEPTS).to be_empty
+      expect(AiService::SCENARIO_DOMAINS & AiService::JS_CONCEPTS).to be_empty
+      expect(AiService::SCENARIO_DOMAINS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
     end
   end
 
@@ -325,6 +406,42 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
       expect(prompt).not_to include("team size, scale, reliability needs, existing tech debt")
     end
+
+    it "includes TypeScript-syntax guidance keyed off the TS-flavored concepts when language is javascript" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include("TypeScript syntax")
+      expect(prompt).to include(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.join(", "))
+    end
+
+    it "omits TypeScript-syntax guidance for ruby_rails" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+      expect(prompt).not_to include("TypeScript syntax")
+    end
+
+    it "prefers drawing scenarios from SCENARIO_DOMAINS, with legacy GraphQL framed as rare and concept-free" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("background job processing")
+      expect(prompt).to include("activerecord query construction")
+      expect(prompt.downcase).to include("legacy graphql")
+      expect(prompt).to match(/1 in every 8-10/)
+      expect(prompt.downcase).to include("never as the tagged concept")
+    end
+
+    it "instructs adapting a scenario flavor to the day's stack, for either language" do
+      %w[ruby_rails javascript].each do |language|
+        prompt = service.send(:build_exercise_prompt, user, language)
+        expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
+      end
+    end
+
+    it "instructs adversarial security framing and restricts the concept vocabulary to the four security concepts when third: :security_review" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review)
+      expect(prompt.downcase).to include("security review")
+      expect(prompt.downcase).to include("mitigation")
+      expect(prompt).to include(AiService::RAILS_SECURITY_CONCEPTS.join(", "))
+      expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
+    end
   end
 
   describe "retention check selection" do
@@ -414,6 +531,26 @@ RSpec.describe AiService do
                             reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
+    end
+
+    it "annotates a language-bucket concept as code_review/pattern-only for the security_review third when the concept isn't a security concept" do
+      cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review,
+                            reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
+    end
+
+    it "annotates a security concept as legal in security_review too" do
+      cm = user.concept_masteries.create!(concept: "sql_injection_prevention", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review,
+                            reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).to include("Retention checks due today: sql_injection_prevention (code_review, pattern, or security_review)")
     end
 
     it "annotates an architecture-bucket concept as architecture-section-only" do
@@ -513,6 +650,27 @@ RSpec.describe AiService do
       set = { "architecture" => { "concept" => "n_plus_one" } }
       out = service.send(:normalize_concepts, set, "ruby_rails")
       expect(out["architecture"]["concept"]).to eq("other")
+    end
+
+    it "validates the security_review section against that language's security_concepts, not the full vocabulary" do
+      set = {
+        "code_review"     => { "concept" => "memoization" },
+        "security_review" => { "concept" => "sql_injection_prevention" }
+      }
+      out = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(out["code_review"]["concept"]).to eq("memoization")
+      expect(out["security_review"]["concept"]).to eq("sql_injection_prevention")
+    end
+
+    it "maps an on-language-vocabulary but off-security-list concept in security_review to 'other'" do
+      set = { "security_review" => { "concept" => "memoization" } }
+
+      expect {
+        service.send(:normalize_concepts, set, "ruby_rails")
+      }.to change(SuggestedConcept, :count).by(1)
+
+      expect(set["security_review"]["concept"]).to eq("other")
+      expect(SuggestedConcept.last.language).to eq("ruby_rails")
     end
   end
 
@@ -879,6 +1037,40 @@ RSpec.describe AiService do
         expect(prompt).to include('"architecture"')   # asks for the architecture key back
         expect(prompt).not_to include("Coding Challenge:")
         expect(prompt).to include('For this section "improved_code" must be an empty string.')
+      end
+    end
+
+    context "security_review third section" do
+      def security_review_exercise
+        DailyExercise.new(
+          language: "ruby_rails",
+          problem_set: {
+            "code_review" => { "question" => "cr?", "snippet" => "code" },
+            "pattern"     => { "title" => "P", "question" => "pat?" },
+            "security_review" => {
+              "title" => "S",
+              "question" => "What vulnerability exists here, and how would you mitigate it?",
+              "snippet" => "User.new(params[:user])"
+            }
+          }
+        )
+      end
+
+      it "evaluates vulnerability identification and mitigation soundness, not a single expected answer" do
+        resp = DailyResponse.new(answers: { "security_review" => "Mass assignment; use strong params" })
+        prompt = service.send(:build_review_prompt, security_review_exercise, resp)
+
+        expect(prompt).to include("What vulnerability exists here")
+        expect(prompt.downcase).to include("mitigation")
+        expect(prompt).to include('"security_review"')
+        expect(prompt).not_to include("Coding Challenge:")
+        expect(prompt).to include('For this section "improved_code" must show the mitigated version of the snippet.')
+      end
+
+      it "asks for improved_code covering code_review, pattern, and security_review" do
+        resp = DailyResponse.new(answers: {})
+        prompt = service.send(:build_review_prompt, security_review_exercise, resp)
+        expect(prompt).to include("corrected/improved code for code_review, pattern, and security_review")
       end
     end
 

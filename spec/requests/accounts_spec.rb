@@ -100,4 +100,62 @@ RSpec.describe "Accounts", type: :request do
       expect(response.body).to include("It cannot be undone.")
     end
   end
+
+  describe "the automatic generation toggle" do
+    it "shows the active state and a pause button when not paused" do
+      login_as(create_user_with_key)
+
+      get account_path
+
+      expect(response.body).to include("Automatic generation is active")
+      expect(response.body).to include("Pause automatic generation")
+    end
+
+    it "shows the paused state and a resume button when paused" do
+      user = create_user_with_key(email: "paused@example.com", name: "Paused")
+      user.update!(paused_generation_at: Time.utc(2026, 7, 29, 12, 0))
+      login_as(user)
+
+      get account_path
+
+      expect(response.body).to include("Automatic generation is paused (since July 29)")
+      expect(response.body).to include("Resume automatic generation")
+    end
+  end
+
+  describe "PATCH /account/toggle_generation" do
+    it "pauses automatic generation for an active user" do
+      user = create_user_with_key(email: "pauser@example.com", name: "Pauser")
+      login_as(user)
+
+      patch toggle_generation_account_path
+
+      expect(response).to redirect_to(account_path)
+      follow_redirect!
+      expect(response.body).to include("Automatic daily generation paused.")
+      expect(user.reload.paused_generation_at).not_to be_nil
+    end
+
+    it "resumes automatic generation for a paused user" do
+      user = create_user_with_key(email: "resumer@example.com", name: "Resumer")
+      user.update!(paused_generation_at: Time.current)
+      login_as(user)
+
+      patch toggle_generation_account_path
+
+      expect(response).to redirect_to(account_path)
+      follow_redirect!
+      expect(response.body).to include("Automatic daily generation resumed.")
+      expect(user.reload.paused_generation_at).to be_nil
+    end
+
+    it "does nothing when logged out" do
+      user = create_user_with_key(email: "loggedout@example.com")
+
+      patch toggle_generation_account_path
+
+      expect(response).to redirect_to(login_path)
+      expect(user.reload.paused_generation_at).to be_nil
+    end
+  end
 end
