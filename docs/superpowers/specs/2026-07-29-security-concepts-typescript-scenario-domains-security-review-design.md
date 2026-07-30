@@ -267,12 +267,19 @@ New `third_guidance` branch for `:security_review`:
 > #{label}. The question asks the engineer to identify the vulnerability AND
 > propose a mitigation — not just "what's wrong with this code."
 > Choose this section's concept from this vocabulary, exactly one:
-> #{concepts.join(", ")} (the same vocabulary as code_review/pattern — no
-> separate security vocabulary).
+> #{security_concepts.join(", ")} — these are the ONLY concepts security_review
+> may use, never one from code_review/pattern's broader vocabulary.
 
 Unlike the architecture branch, no separate `ARCHITECTURE_CONCEPTS`-style
-vocabulary line is needed — the concept comes from the same `concepts`
-variable already in scope for `code_review`/`pattern`.
+constant is needed at the `concepts` local-variable level — the restricted
+list is looked up per language via `config_for(language)[:security_concepts]`
+(a new `security_concepts:` key alongside each language's `concepts:` key in
+`LANGUAGE_CONFIG`), holding exactly the four concepts added in Change 1
+(`RAILS_SECURITY_CONCEPTS`/`JS_SECURITY_CONCEPTS`). `concept_vocabulary_for`
+(used by `normalize_concepts`) special-cases `section_key == "security_review"`
+the same way it already special-cases `"architecture"`, so an off-list pick
+is normalized to `"other"` rather than silently accepted because it happens
+to appear elsewhere in the language's full vocabulary.
 
 ### Review (`build_review_prompt`)
 

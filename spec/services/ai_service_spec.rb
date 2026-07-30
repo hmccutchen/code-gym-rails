@@ -434,11 +434,12 @@ RSpec.describe AiService do
       end
     end
 
-    it "instructs adversarial security framing and reuses the language vocabulary (not a separate one) when third: :security_review" do
+    it "instructs adversarial security framing and restricts the concept vocabulary to the four security concepts when third: :security_review" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review)
       expect(prompt.downcase).to include("security review")
       expect(prompt.downcase).to include("mitigation")
-      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+      expect(prompt).to include(AiService::RAILS_SECURITY_CONCEPTS.join(", "))
+      expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
       expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
     end
   end
@@ -532,14 +533,24 @@ RSpec.describe AiService do
       expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
     end
 
-    it "annotates a language-bucket concept's legal sections for the security_review third" do
+    it "annotates a language-bucket concept as code_review/pattern-only for the security_review third when the concept isn't a security concept" do
       cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                           mastered_at: 1.month.ago, retention_interval_days: 7,
                                           next_retention_check_on: Date.current - 2)
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review,
                             reinforcement: [], due_checks: [ cm ])
 
-      expect(prompt).to include("Retention checks due today: memoization (code_review, pattern, or security_review)")
+      expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
+    end
+
+    it "annotates a security concept as legal in security_review too" do
+      cm = user.concept_masteries.create!(concept: "sql_injection_prevention", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review,
+                            reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).to include("Retention checks due today: sql_injection_prevention (code_review, pattern, or security_review)")
     end
 
     it "annotates an architecture-bucket concept as architecture-section-only" do
@@ -639,6 +650,27 @@ RSpec.describe AiService do
       set = { "architecture" => { "concept" => "n_plus_one" } }
       out = service.send(:normalize_concepts, set, "ruby_rails")
       expect(out["architecture"]["concept"]).to eq("other")
+    end
+
+    it "validates the security_review section against that language's security_concepts, not the full vocabulary" do
+      set = {
+        "code_review"     => { "concept" => "memoization" },
+        "security_review" => { "concept" => "sql_injection_prevention" }
+      }
+      out = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(out["code_review"]["concept"]).to eq("memoization")
+      expect(out["security_review"]["concept"]).to eq("sql_injection_prevention")
+    end
+
+    it "maps an on-language-vocabulary but off-security-list concept in security_review to 'other'" do
+      set = { "security_review" => { "concept" => "memoization" } }
+
+      expect {
+        service.send(:normalize_concepts, set, "ruby_rails")
+      }.to change(SuggestedConcept, :count).by(1)
+
+      expect(set["security_review"]["concept"]).to eq("other")
+      expect(SuggestedConcept.last.language).to eq("ruby_rails")
     end
   end
 

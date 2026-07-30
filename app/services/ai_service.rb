@@ -45,6 +45,15 @@ class AiService
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
   ].freeze
 
+  # The exact subset security_review draws from — never the full language
+  # vocabulary. Each concept gets reinforced through two reasoning modes on
+  # different days: "is this correct" (code_review) and "is this exploitable"
+  # (security_review). A restricted list is what makes that interleaving
+  # deliberate rather than incidental — without it, security_review could
+  # surface an unrelated concept like memoization under adversarial framing.
+  RAILS_SECURITY_CONCEPTS = %w[mass_assignment_protection sql_injection_prevention].freeze
+  JS_SECURITY_CONCEPTS    = %w[xss_prevention insecure_client_storage].freeze
+
   # Subset of JS_CONCEPTS that reflects real TypeScript usage rather than a
   # separate language mode: no new generation language, no schema change.
   # When one of these is the section's tagged concept, build_exercise_prompt
@@ -86,16 +95,18 @@ class AiService
   # adding one entry here, not hunting down every ternary in this file.
   LANGUAGE_CONFIG = {
     "ruby_rails" => {
-      label:    "Ruby/Rails",
-      concepts: RAILS_CONCEPTS,
-      coach:    "Rails",
-      focus:    "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
+      label:             "Ruby/Rails",
+      concepts:          RAILS_CONCEPTS,
+      security_concepts: RAILS_SECURITY_CONCEPTS,
+      coach:             "Rails",
+      focus:             "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
     },
     "javascript" => {
-      label:    "JavaScript/React",
-      concepts: JS_CONCEPTS,
-      coach:    "JavaScript/React",
-      focus:    "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
+      label:             "JavaScript/React",
+      concepts:          JS_CONCEPTS,
+      security_concepts: JS_SECURITY_CONCEPTS,
+      coach:             "JavaScript/React",
+      focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
     },
     "architecture" => {
       label:    "language-agnostic",
@@ -371,14 +382,17 @@ class AiService
   # validated against, but not which section(s) that vocabulary is legal in
   # today — without this the model has no way to know an architecture-vocabulary
   # concept can't go in code_review, guesses wrong, and normalize_concepts
-  # rewrites a correctly-honored check into a false "miss". The else branch
-  # names `third` itself (not a hardcoded "challenge") because a language-
-  # bucket concept is equally legal in whichever non-architecture third
-  # section today actually has — challenge or security_review.
+  # rewrites a correctly-honored check into a false "miss". A language-bucket
+  # concept is legal in challenge always, but in security_review only when
+  # it's one of that language's security_concepts (RAILS_SECURITY_CONCEPTS/
+  # JS_SECURITY_CONCEPTS) — security_review draws from that restricted list
+  # exclusively, so any other concept can only land in code_review/pattern.
   def annotate_retention_concept(cm, third)
     if cm.language == "architecture"
       "#{cm.concept} (architecture section)"
     elsif third == :architecture
+      "#{cm.concept} (code_review or pattern)"
+    elsif third == :security_review && !config_for(cm.language)[:security_concepts].include?(cm.concept)
       "#{cm.concept} (code_review or pattern)"
     else
       "#{cm.concept} (code_review, pattern, or #{third})"
@@ -587,7 +601,7 @@ class AiService
       when :security_review
         <<~SEC.chomp
           - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
-          - Choose the security_review concept from this vocabulary, exactly one — the SAME vocabulary as code_review/pattern, no separate security vocabulary: #{concepts.join(", ")}
+          - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{config[:security_concepts].join(", ")}
           - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
         SEC
       else
@@ -801,10 +815,14 @@ class AiService
 
   # The (suggestion-bucket, vocabulary) a section's concept is validated against.
   # The architecture section is language-independent — always ARCHITECTURE_CONCEPTS,
-  # bucketed under "architecture"; every other section follows the generation language.
+  # bucketed under "architecture". security_review is restricted to that language's
+  # security_concepts subset, never the full vocabulary. Every other section
+  # (code_review, pattern, challenge) follows the generation language's full list.
   private def concept_vocabulary_for(section_key, language)
     if section_key == "architecture"
       [ "architecture", ARCHITECTURE_CONCEPTS ]
+    elsif section_key == "security_review"
+      [ language, config_for(language)[:security_concepts] ]
     else
       [ language, config_for(language)[:concepts] ]
     end
