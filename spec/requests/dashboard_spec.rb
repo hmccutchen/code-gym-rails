@@ -611,6 +611,22 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("data-parsons-blocks")
       expect(response.body.index('data-block-id="2"')).to be < response.body.index('data-block-id="0"')
     end
+
+    it "falls back to the stored order when display_order is missing, rather than rendering nothing" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ], "concept" => "n_plus_one"
+        }
+      })
+      get root_path
+
+      expect(response.body).to include('data-block-id="0"')
+      expect(response.body).to include('data-block-id="1"')
+      expect(response.body).to include('data-block-id="2"')
+    end
   end
 
   describe "streak display" do    # A Wednesday, so the streak days are plain weekdays.

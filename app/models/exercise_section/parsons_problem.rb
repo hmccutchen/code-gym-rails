@@ -1,7 +1,7 @@
 # Blocks are always persisted in correct order (AiService#shuffle_parsons_blocks!
-# scrambles only the display order), so a fully correct submission is always the
-# identity permutation. That keeps grading local and deterministic — the AI is
-# never asked to judge correctness for this kind, only to explain the result.
+# scrambles only the display order), so a correct submission is always the
+# identity permutation. That is what keeps grading local and deterministic —
+# the AI is never asked to judge correctness for this kind, only to explain it.
 class ExerciseSection::ParsonsProblem < ExerciseSection
   ANSWER_PREFIX = "order:".freeze
 

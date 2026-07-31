@@ -20,7 +20,8 @@ class ExerciseSection
 
   # Precedence order, NOT enumeration order: a problem_set holding more than one
   # third key (a provider returning both) resolves the way it always has —
-  # architecture first, then security_review, then challenge.
+  # architecture first, then security_review, then challenge, then
+  # parsons_problem.
   def self.thirds
     [ Architecture, SecurityReview, Challenge, ParsonsProblem ]
   end

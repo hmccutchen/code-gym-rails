@@ -1095,6 +1095,20 @@ RSpec.describe AiService do
         expect(prompt).to include('"  names.sort"')
         expect(prompt).to include('"end"')
       end
+
+      it "does not raise when the provider omitted the blocks array" do
+        exercise = DailyExercise.new(
+          language: "ruby_rails",
+          problem_set: {
+            "code_review" => { "question" => "cr?", "snippet" => "code" },
+            "pattern"     => { "title" => "P", "question" => "pat?" },
+            "parsons_problem" => { "title" => "T", "question" => "Q" }
+          }
+        )
+        resp = DailyResponse.new(answers: {})
+
+        expect { service.send(:build_review_prompt, exercise, resp) }.not_to raise_error
+      end
     end
 
     it "keeps the existing challenge criteria when the third section is a challenge" do
@@ -1229,6 +1243,21 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: { "code_review" => { "rating" => "solid" } }.to_json)
       review = svc.review_response(user, exercise, response)
       expect(review).to eq("code_review" => { "rating" => "solid" })
+    end
+
+    it "does not raise when the provider omitted the blocks array" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "t", "question" => "q" },
+          "parsons_problem" => { "title" => "T", "question" => "Q" }
+        }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      svc = double_class.new(canned_text: { "parsons_problem" => { "rating" => "strong" } }.to_json)
+      expect { svc.review_response(user, exercise, response) }.not_to raise_error
     end
   end
 

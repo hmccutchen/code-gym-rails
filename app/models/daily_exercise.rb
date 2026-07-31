@@ -22,8 +22,8 @@ class DailyExercise < ApplicationRecord
   def security_review    = problem_set["security_review"]&.with_indifferent_access
   def parsons_problem    = problem_set["parsons_problem"]&.with_indifferent_access
 
-  # Which of the three possible third-section shapes this exercise's
-  # problem_set actually holds. Replaces the ad hoc `arch ? "architecture" :
+  # Which third-section shape this exercise's problem_set actually holds.
+  # Replaces the ad hoc `arch ? "architecture" :
   # "challenge"` pattern that build_review_prompt used before a third shape
   # (security_review) existed.
   #

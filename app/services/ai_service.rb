@@ -316,10 +316,9 @@ class AiService
     end
   end
 
-  # Which submitted positions are wrong and what belongs there instead — the
-  # ground truth the review prompt hands the model so it explains a known fact
-  # rather than judging one. Padding mirrors ParsonsProblem.grade, so a short or
-  # skipped submission describes as "(nothing submitted)" rather than raising.
+  # The ground truth the review prompt hands the model, so it explains a known
+  # result rather than judging one. Padding mirrors ParsonsProblem.grade so a
+  # short or skipped submission describes rather than raises.
   def describe_parsons_mismatches(blocks, submitted_ids)
     padded = Array.new(blocks.size) { |i| submitted_ids[i] }
     descriptions = padded.each_index.filter_map { |i|
@@ -642,13 +641,14 @@ class AiService
         SEC
       when "parsons_problem"
         parsons   = exercise.parsons_problem
+        blocks    = Array(parsons["blocks"])
         submitted = ExerciseSection::ParsonsProblem.parse_order(answers["parsons_problem"])
-        graded    = ExerciseSection::ParsonsProblem.grade(submitted, parsons["blocks"].size)
+        graded    = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)
 
         <<~PARSONS.chomp
           Parsons Problem (#{parsons["title"]}): #{parsons["question"]}
-          Correct blocks, in order: #{parsons["blocks"].each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
-          What they misplaced: #{describe_parsons_mismatches(parsons["blocks"], submitted)}
+          Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
+          What they misplaced: #{describe_parsons_mismatches(blocks, submitted)}
           Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{graded[:mismatches]} block(s) out of place.
 
           Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
@@ -662,9 +662,9 @@ class AiService
       end
 
     improved_code_note =
-      ExerciseSection.find(third_key)&.improved_code? != false ?
-        "corrected/improved code for code_review, pattern, and #{third_key}" :
-        "corrected/improved code for code_review and pattern (empty string for #{third_key})"
+      ExerciseSection.find(third_key)&.improved_code? == false ?
+        "corrected/improved code for code_review and pattern (empty string for #{third_key})" :
+        "corrected/improved code for code_review, pattern, and #{third_key}"
 
     <<~PROMPT
       Review these Code Gym answers. For each section, return a JSON object with:
@@ -799,14 +799,13 @@ class AiService
 
     submitted = ExerciseSection::ParsonsProblem.parse_order(daily_response.answers["parsons_problem"])
     review["parsons_problem"]["rating"] =
-      ExerciseSection::ParsonsProblem.grade(submitted, parsons["blocks"].size)[:rating]
+      ExerciseSection::ParsonsProblem.grade(submitted, Array(parsons["blocks"]).size)[:rating]
   end
 
-  # The provider always returns "blocks" in correct order, so shuffling happens
-  # here exactly once and the resulting display_order is persisted — page
-  # refreshes and the read-only history view then show the same arrangement.
-  # Re-rolled off the identity permutation so the scramble is never
-  # already-solved.
+  # The provider returns "blocks" already in correct order, so the scramble is
+  # rolled once here and persisted — refreshes and the history view then show
+  # the same arrangement. Never the identity permutation, which would ship an
+  # already-solved problem.
   def shuffle_parsons_blocks!(problem_set)
     parsons = problem_set["parsons_problem"]
     return problem_set unless parsons.is_a?(Hash) && parsons["blocks"].is_a?(Array)

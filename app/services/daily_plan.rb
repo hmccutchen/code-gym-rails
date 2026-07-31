@@ -113,11 +113,10 @@ class DailyPlan
   end
   private_class_method :overdue_ratio
 
-  # Concepts with genuine mastery history: standard tier and past their initial
-  # retention interval, meaning they already survived at least one scheduled
-  # check rather than being mastered once and never re-tested. Anything already
-  # claimed by reinforcement or a due check carries its own, stronger prompt
-  # annotation and takes precedence over this one.
+  # Standard tier and past the initial retention interval, meaning the concept
+  # already survived a scheduled check rather than being mastered once and never
+  # re-tested. Reinforcement and due checks carry their own, stronger prompt
+  # annotation, so anything they claim is excluded here.
   def self.established_concepts_for(user, language, third:, reinforcement:, due_checks:)
     claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
 

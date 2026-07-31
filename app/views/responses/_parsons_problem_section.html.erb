@@ -26,8 +26,10 @@
     </ol>
   <% else %>
     <%# The learner's own saved arrangement wins over the original scramble, so
-        a reload doesn't undo their work. %>
-    <% initial_order = ExerciseSection::ParsonsProblem.parse_order(response.answers["parsons_problem"]).presence || Array(parsons["display_order"]) %>
+        a reload doesn't undo their work. A row missing display_order falls back
+        to the stored (correct) order rather than rendering nothing. %>
+    <% initial_order = ExerciseSection::ParsonsProblem.parse_order(response.answers["parsons_problem"]).presence ||
+                       Array(parsons["display_order"]).presence || (0...blocks.size).to_a %>
     <ol class="parsons-list" data-parsons-blocks>
       <% initial_order.each do |block_id| %>
         <li class="parsons-block" data-block-id="<%= block_id %>">
