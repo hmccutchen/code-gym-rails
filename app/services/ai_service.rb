@@ -148,10 +148,12 @@ class AiService
 
     result = call(system: build_system_prompt(language),
                   prompt: build_exercise_prompt(user, language, third: plan.third,
-                                                reinforcement: plan.reinforcement, due_checks: plan.due_checks))
+                                                reinforcement: plan.reinforcement, due_checks: plan.due_checks,
+                                                established: plan.established))
 
     log_usage(user, result, purpose: "generate_exercise")
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
     problem_set
   end
@@ -166,7 +168,9 @@ class AiService
     )
 
     log_usage(user, result, purpose: "review_response")
-    parse_json_object(result[:text], subject: "review")
+    review = parse_json_object(result[:text], subject: "review")
+    override_parsons_rating!(review, exercise, daily_response)
+    review
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
@@ -312,6 +316,51 @@ class AiService
     end
   end
 
+  # A provider can return a parsons_problem object with no "blocks" — that
+  # still resolves as the third section (third_key only checks for a Hash), but
+  # there is nothing to score against, so the prompt must not claim a verified
+  # count. Grading is skipped entirely in that case rather than reporting the
+  # grader's degenerate "0 out of place".
+  def parsons_review_block(parsons, answer)
+    blocks = Array(parsons["blocks"])
+    header = "Parsons Problem (#{parsons["title"]}): #{parsons["question"]}"
+
+    if blocks.empty?
+      return <<~UNVERIFIED.chomp
+        #{header}
+        This section's blocks are missing from the stored exercise, so the submitted ordering CANNOT be verified. Do not state or imply how many blocks were misplaced, and do not rate this section's correctness — say only that the exercise data is unavailable.
+        For this section "improved_code" must be an empty string.
+      UNVERIFIED
+    end
+
+    submitted = ExerciseSection::ParsonsProblem.parse_order(answer)
+    graded    = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)
+
+    <<~PARSONS.chomp
+      #{header}
+      Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
+      What they misplaced: #{describe_parsons_mismatches(blocks, submitted)}
+      Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{graded[:mismatches]} block(s) out of place.
+
+      Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
+      For this section "improved_code" must be an empty string.
+    PARSONS
+  end
+
+  # The ground truth the review prompt hands the model, so it explains a known
+  # result rather than judging one. Padding mirrors ParsonsProblem.grade so a
+  # short or skipped submission describes rather than raises.
+  def describe_parsons_mismatches(blocks, submitted_ids)
+    return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
+    padded = Array.new(blocks.size) { |i| submitted_ids[i] }
+    descriptions = padded.each_index.filter_map { |i|
+      next if padded[i] == i
+      got = ExerciseSection::ParsonsProblem.valid_id?(padded[i], blocks.size) ? "\"#{blocks[padded[i]]}\"" : "(nothing submitted)"
+      "position #{i + 1} has #{got} (correct block there: \"#{blocks[i]}\")"
+    }
+    descriptions.any? ? descriptions.join("; ") : "exact match — no blocks misplaced"
+  end
+
   # Delivery is advisory, so the only way to know whether retention checks actually
   # land is to record both halves. Logged after normalize_concepts so it reflects
   # the concepts actually persisted, not whatever the provider first returned.
@@ -401,6 +450,18 @@ class AiService
               }
             }
         SEC
+      when :parsons_problem
+        <<~PB.chomp
+          "parsons_problem": {
+              "title":    "string",
+              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+              "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
+              "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
+              "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary",
+              #{glossary_field}
+            }
+        PB
       else
         <<~CH.chomp
           "challenge": {
@@ -439,7 +500,7 @@ class AiService
     SCHEMA
   end
 
-  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [])
+  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [], established: [])
     history = user.recent_performance
 
     history_text = if history.empty?
@@ -482,6 +543,21 @@ class AiService
         ""
       end
 
+    # Unlike retention_block, this never forces a selection — it only shapes a
+    # section if the model was already going to pick one of these on its own.
+    established_block =
+      if established.any?
+        <<~EST.chomp
+
+          Established concepts (well past first mastery — survived a retention check): #{established.map(&:concept).join(', ')}
+          - If you were already going to select one of these for a section's concept, keep that section's teaching_note minimal (a single short sentence, or an empty string is fine) and return an empty glossary array for that section.
+          - Pitch at full difficulty — do not ease, simplify, or add scaffolding for these, the same as you would not for a retention check.
+          - This is advisory, like every other concept instruction here: it does not force you to select one of these concepts, only shapes the section if you do.
+        EST
+      else
+        ""
+      end
+
     ts_guidance =
       if language == "javascript"
         "- If a section's tagged concept is one of #{TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
@@ -517,6 +593,11 @@ class AiService
           - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{config[:security_concepts].join(", ")}
           - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
         SEC
+      when :parsons_problem
+        <<~PB.chomp
+          - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
+          - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
+        PB
       else
         <<~CH.chomp
           - The challenge starter_code should give enough scaffold to get started without giving away the answer.
@@ -552,6 +633,7 @@ class AiService
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
+      #{established_block}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
@@ -589,6 +671,8 @@ class AiService
           Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their proposed mitigation is sound — not against one single expected answer. Give partial credit in "missed" for identifying the vulnerability without a complete mitigation, or vice versa.
           For this section "improved_code" must show the mitigated version of the snippet.
         SEC
+      when "parsons_problem"
+        parsons_review_block(exercise.parsons_problem, answers["parsons_problem"])
       else
         <<~CH.chomp
           Coding Challenge: #{exercise.challenge["question"]}
@@ -597,8 +681,8 @@ class AiService
       end
 
     improved_code_note =
-      third_key == "architecture" ?
-        "corrected/improved code for code_review and pattern (empty string for architecture)" :
+      ExerciseSection.find(third_key)&.improved_code? == false ?
+        "corrected/improved code for code_review and pattern (empty string for #{third_key})" :
         "corrected/improved code for code_review, pattern, and #{third_key}"
 
     <<~PROMPT
@@ -723,6 +807,36 @@ class AiService
         record_suggested_concept(bucket, original)
       end
     end
+    problem_set
+  end
+
+  # Parsons correctness is decided in Ruby, never by the model — whatever rating
+  # it returned for this key is discarded and replaced. Skipped when the stored
+  # section has no blocks, since there is nothing to grade against and the
+  # grader would report a spurious perfect score.
+  def override_parsons_rating!(review, exercise, daily_response)
+    parsons = exercise.parsons_problem
+    return unless parsons.is_a?(Hash) && review["parsons_problem"].is_a?(Hash)
+
+    blocks = Array(parsons["blocks"])
+    return if blocks.empty?
+
+    submitted = ExerciseSection::ParsonsProblem.parse_order(daily_response.answers["parsons_problem"])
+    review["parsons_problem"]["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
+  end
+
+  # The provider returns "blocks" already in correct order, so the scramble is
+  # rolled once here and persisted — refreshes and the history view then show
+  # the same arrangement. Never the identity permutation, which would ship an
+  # already-solved problem.
+  def shuffle_parsons_blocks!(problem_set)
+    parsons = problem_set["parsons_problem"]
+    return problem_set unless parsons.is_a?(Hash) && parsons["blocks"].is_a?(Array)
+
+    identity = (0...parsons["blocks"].size).to_a
+    order    = identity.shuffle
+    order    = identity.shuffle while order == identity && identity.size > 1
+    parsons["display_order"] = order
     problem_set
   end
 

@@ -11,15 +11,15 @@
 # `.for` is the only public entry point and everything below it is a step
 # toward building one. Result is the value it hands back.
 class DailyPlan
-  Result = Data.define(:third, :reinforcement, :due_checks)
+  Result = Data.define(:third, :reinforcement, :due_checks, :established)
 
   # Which third section this set gets. Named, tunable weights rather than a
-  # bare literal: architecture-reasoning most of the time, a security-review
-  # snippet a quarter of the time, a traditional coding challenge the rest.
+  # bare literal: architecture-reasoning most of the time, the other three kinds
+  # evenly splitting the rest.
   # Extracted so tests can stub it — never assert on real randomness. The
   # chosen kind is not tracked separately; the persisted third key
-  # (problem_set["architecture"/"security_review"/"challenge"]) is the record.
-  THIRD_SECTION_WEIGHTS = { architecture: 0.50, security_review: 0.25, challenge: 0.25 }.freeze
+  # (ExerciseSection.thirds) is the record.
+  THIRD_SECTION_WEIGHTS = { architecture: 0.40, security_review: 0.20, challenge: 0.20, parsons_problem: 0.20 }.freeze
 
   # A vocabulary is at most 16 concepts (see AiService::RAILS_CONCEPTS /
   # JS_CONCEPTS / ARCHITECTURE_CONCEPTS), so "every due concept in a bucket" is
@@ -47,15 +47,25 @@ class DailyPlan
     slots         = 3 - reinforcement.first(3).size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, third: third)
     due_checks    = retention_checks_for(user, language, third: third, slots: slots)
+    established   = established_concepts_for(user, language, third: third,
+                                             reinforcement: reinforcement, due_checks: due_checks)
 
-    Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks)
+    Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established)
   end
 
+  # Cumulative weights are rounded before comparison: summing float weights
+  # (0.40 + 0.20 == 0.6000000000000001) otherwise shifts each boundary by an
+  # ulp and hands the wrong kind back at the exact boundary value.
   def self.roll_third_section
     r = rand
-    return :architecture    if r < THIRD_SECTION_WEIGHTS[:architecture]
-    return :security_review if r < THIRD_SECTION_WEIGHTS[:architecture] + THIRD_SECTION_WEIGHTS[:security_review]
-    :challenge
+    cumulative = 0.0
+
+    THIRD_SECTION_WEIGHTS.each do |kind, weight|
+      cumulative += weight
+      return kind if r < cumulative.round(10)
+    end
+
+    THIRD_SECTION_WEIGHTS.keys.last
   end
   private_class_method :roll_third_section
 
@@ -102,6 +112,20 @@ class DailyPlan
     (Date.current - cm.next_retention_check_on).to_f / cm.retention_interval_days
   end
   private_class_method :overdue_ratio
+
+  # Standard tier and past the initial retention interval, meaning the concept
+  # already survived a scheduled check rather than being mastered once and never
+  # re-tested. Reinforcement and due checks carry their own, stronger prompt
+  # annotation, so anything they claim is excluded here.
+  def self.established_concepts_for(user, language, third:, reinforcement:, due_checks:)
+    claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
+
+    user.concept_masteries
+      .where(language: hostable_buckets(language, third: third), tier: :standard)
+      .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
+      .reject { |cm| claimed.include?(cm.concept) }
+  end
+  private_class_method :established_concepts_for
 
   # Whether reinforcement should give up its 3rd slot: only when some retention
   # check, in a bucket today's third can actually host, has crossed the

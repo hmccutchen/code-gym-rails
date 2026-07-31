@@ -120,6 +120,15 @@ RSpec.describe AiService do
       expect(security_review).to have_key("scenario")
     end
 
+    it "includes a parsons_problem section with blocks in correct order, teaching_note, and concept when third: :parsons_problem" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :parsons_problem)
+      expect(schema).to include('"parsons_problem"')
+      expect(schema).to include('"blocks"')
+      expect(schema).to match(/IN THE CORRECT FINAL ORDER/)
+      expect(schema).to include('"teaching_note"')
+      expect(schema).to include('"concept"')
+    end
+
     it "no longer asks the model for a pattern.reference block" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
       pattern = JSON.parse(schema)["pattern"]
@@ -414,6 +423,14 @@ RSpec.describe AiService do
       expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
       expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
     end
+
+    it "instructs 5-8 correct-order blocks and restricts the concept vocabulary to the normal set when third: :parsons_problem" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :parsons_problem)
+      expect(prompt.downcase).to include("parsons problem")
+      expect(prompt).to match(/5 to 8/)
+      expect(prompt.downcase).to include("correct final order")
+      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
+    end
   end
 
   describe "retention prompt block" do
@@ -478,6 +495,41 @@ RSpec.describe AiService do
                             reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: service_boundaries (architecture section)")
+    end
+  end
+
+  describe "established prompt block" do
+    it "advises minimal scaffolding and full difficulty for concepts with mastery history" do
+      cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 2.months.ago, retention_interval_days: 14,
+                                          next_retention_check_on: Date.current + 10)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [], established: [ cm ])
+
+      expect(prompt).to include(
+        "Established concepts (well past first mastery — survived a retention check): memoization"
+      )
+      expect(prompt).to match(/keep that section's teaching_note minimal/i)
+      expect(prompt).to match(/full difficulty/i)
+      expect(prompt).to match(/does not force you to select/i)
+    end
+
+    it "omits the established block entirely when nothing qualifies" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [], established: [])
+      expect(prompt).not_to match(/well past first mastery/i)
+    end
+
+    it "lists multiple established concepts comma-separated" do
+      cm1 = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                           mastered_at: 2.months.ago, retention_interval_days: 14,
+                                           next_retention_check_on: Date.current + 10)
+      cm2 = user.concept_masteries.create!(concept: "scope_chaining", language: "ruby_rails", tier: :standard,
+                                           mastered_at: 1.month.ago, retention_interval_days: 28,
+                                           next_retention_check_on: Date.current + 20)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [], established: [ cm1, cm2 ])
+      expect(prompt).to include("memoization, scope_chaining")
     end
   end
 
@@ -683,6 +735,25 @@ RSpec.describe AiService do
   end
 
   describe "#generate_exercise" do
+    it "shuffles parsons_problem blocks into a non-identity display_order" do
+      set = { "parsons_problem" => { "blocks" => %w[a b c d e] } }
+      svc = double_class.new(canned_text: set.to_json)
+
+      result = svc.generate_exercise(user)
+
+      order = result["parsons_problem"]["display_order"]
+      expect(order).to match_array([ 0, 1, 2, 3, 4 ])
+      expect(order).not_to eq([ 0, 1, 2, 3, 4 ])
+    end
+
+    it "leaves problem sets without a parsons_problem section untouched" do
+      set = { "code_review" => { "concept" => "n_plus_one" } }
+      svc = double_class.new(canned_text: set.to_json)
+
+      result = svc.generate_exercise(user)
+      expect(result).not_to have_key("parsons_problem")
+    end
+
     it "raises rather than returning a problem set that isn't a JSON object" do
       svc = double_class.new(canned_text: '["not", "a", "problem set"]')
 
@@ -991,6 +1062,64 @@ RSpec.describe AiService do
       end
     end
 
+    context "parsons_problem third section" do
+      def parsons_exercise
+        DailyExercise.new(
+          language: "ruby_rails",
+          problem_set: {
+            "code_review" => { "question" => "cr?", "snippet" => "code" },
+            "pattern"     => { "title" => "P", "question" => "pat?" },
+            "parsons_problem" => {
+              "title" => "Sort a list", "question" => "Arrange these blocks",
+              "blocks" => [ "def sorted_names(names)", "  names.sort", "end" ]
+            }
+          }
+        )
+      end
+
+      it "grounds the AI in the verified mismatch count and forbids it from judging correctness" do
+        resp = DailyResponse.new(answers: { "parsons_problem" => "order:0,2,1" })
+        prompt = service.send(:build_review_prompt, parsons_exercise, resp)
+
+        expect(prompt).to include("Sort a list")
+        expect(prompt).to match(/2 block\(s\) out of place/)
+        expect(prompt).to match(/do not.*judge|not.*re-judge/i)
+        expect(prompt).to match(/does not force|do not output a "rating"/i)
+        expect(prompt).to include('For this section "improved_code" must be an empty string.')
+      end
+
+      it "describes which specific blocks are misplaced" do
+        resp = DailyResponse.new(answers: { "parsons_problem" => "order:0,2,1" })
+        prompt = service.send(:build_review_prompt, parsons_exercise, resp)
+
+        expect(prompt).to include('"  names.sort"')
+        expect(prompt).to include('"end"')
+      end
+
+      it "describes an out-of-range id as nothing submitted rather than the block it would wrap to" do
+        resp = DailyResponse.new(answers: { "parsons_problem" => "order:-1,1,2" })
+        prompt = service.send(:build_review_prompt, parsons_exercise, resp)
+
+        expect(prompt).to include("position 1 has (nothing submitted)")
+      end
+
+      it "does not claim a verified result when the provider omitted the blocks array" do
+        exercise = DailyExercise.new(
+          language: "ruby_rails",
+          problem_set: {
+            "code_review" => { "question" => "cr?", "snippet" => "code" },
+            "pattern"     => { "title" => "P", "question" => "pat?" },
+            "parsons_problem" => { "title" => "T", "question" => "Q" }
+          }
+        )
+        resp = DailyResponse.new(answers: {})
+
+        prompt = service.send(:build_review_prompt, exercise, resp)
+        expect(prompt).not_to match(/block\(s\) out of place/)
+        expect(prompt).to include("CANNOT be verified")
+      end
+    end
+
     it "keeps the existing challenge criteria when the third section is a challenge" do
       ex = DailyExercise.new(language: "ruby_rails", problem_set: {
         "code_review" => { "question" => "cr?", "snippet" => "code" },
@@ -1079,6 +1208,66 @@ RSpec.describe AiService do
       expect {
         svc.review_response(user, sample_exercise("ruby_rails"), instance_double(DailyResponse, answers: {}))
       }.to raise_error(AiService::InvalidResponseError, /instead of a JSON object/)
+    end
+  end
+
+  describe "#review_response — parsons_problem rating override" do
+    it "always uses the locally computed rating, discarding whatever the model returned" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "t", "question" => "q" },
+          "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "parsons_problem" => "order:0,1,2,3,4" }
+      )
+
+      canned = {
+        "code_review"     => { "rating" => "solid" },
+        "pattern"         => { "rating" => "solid" },
+        "parsons_problem" => { "rating" => "beginner" }
+      }.to_json
+      svc = double_class.new(canned_text: canned)
+
+      review = svc.review_response(user, exercise, response)
+      expect(review["parsons_problem"]["rating"]).to eq("strong")
+      expect(review["code_review"]["rating"]).to eq("solid")
+    end
+
+    it "does nothing when the exercise has no parsons_problem section" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "t", "question" => "q" },
+          "challenge"   => { "question" => "q" }
+        }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      svc = double_class.new(canned_text: { "code_review" => { "rating" => "solid" } }.to_json)
+      review = svc.review_response(user, exercise, response)
+      expect(review).to eq("code_review" => { "rating" => "solid" })
+    end
+
+    it "leaves the rating alone when the provider omitted the blocks array" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "t", "question" => "q" },
+          "parsons_problem" => { "title" => "T", "question" => "Q" }
+        }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      svc = double_class.new(canned_text: { "parsons_problem" => { "rating" => "developing" } }.to_json)
+      review = svc.review_response(user, exercise, response)
+      expect(review["parsons_problem"]["rating"]).to eq("developing")
     end
   end
 

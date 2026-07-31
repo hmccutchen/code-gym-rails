@@ -54,6 +54,16 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#parsons_problem" do
+    it "reads the parsons_problem blob with indifferent access, nil when absent" do
+      with_parsons = DailyExercise.new(problem_set: { "parsons_problem" => { "title" => "Sort a list" } })
+      without      = DailyExercise.new(problem_set: {})
+
+      expect(with_parsons.parsons_problem[:title]).to eq("Sort a list")
+      expect(without.parsons_problem).to be_nil
+    end
+  end
+
   describe "#third_key" do
     it "returns 'architecture' when the architecture key is present" do
       exercise = DailyExercise.new(problem_set: { "architecture" => {} })
@@ -83,6 +93,14 @@ RSpec.describe DailyExercise, type: :model do
     it "skips a non-Hash architecture in favour of a real security_review" do
       exercise = DailyExercise.new(problem_set: { "architecture" => [], "security_review" => {} })
       expect(exercise.third_key).to eq("security_review")
+    end
+
+    it "resolves to parsons_problem when that's the only third-shaped key present" do
+      exercise = DailyExercise.new(problem_set: {
+        "code_review" => { "concept" => "x" }, "pattern" => { "concept" => "y" },
+        "parsons_problem" => { "blocks" => [ "a", "b" ] }
+      })
+      expect(exercise.third_key).to eq("parsons_problem")
     end
   end
 end

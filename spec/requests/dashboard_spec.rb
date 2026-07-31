@@ -593,8 +593,63 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-hljs="ruby"')
   end
 
-  describe "streak display" do
-    # A Wednesday, so the streak days are plain weekdays.
+  describe "parsons_problem third section" do
+    it "renders the reorder list and a hidden answer field when today's third section is parsons_problem" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      get root_path
+
+      expect(response.body).to include("Parsons Problem: Sort names")
+      expect(response.body).to include('data-field="parsons_problem"')
+      expect(response.body).to include("data-parsons-blocks")
+      expect(response.body.index('data-block-id="2"')).to be < response.body.index('data-block-id="0"')
+    end
+
+    it "falls back to the stored order when display_order is missing, rather than rendering nothing" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ], "concept" => "n_plus_one"
+        }
+      })
+      get root_path
+
+      expect(response.body).to include('data-block-id="0"')
+      expect(response.body).to include('data-block-id="1"')
+      expect(response.body).to include('data-block-id="2"')
+    end
+
+    it "renders every block once when a tampered answer order was saved" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.last, date: Date.current,
+                            answers: { "parsons_problem" => "order:0,0,0" })
+
+      get root_path
+
+      expect(response.body.scan('data-block-id="0"').size).to eq(1)
+      expect(response.body).to include('data-block-id="1"')
+      expect(response.body).to include('data-block-id="2"')
+    end
+  end
+
+  describe "streak display" do    # A Wednesday, so the streak days are plain weekdays.
     let(:wednesday) { Time.utc(2026, 7, 22, 12) }
 
     def submit_on(date)
