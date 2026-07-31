@@ -11,7 +11,7 @@ class ExerciseSection
   # (strong params, concept tagging, scenario collection) so anything deriving a
   # Hash or Array from it keeps the ordering it already had.
   def self.all
-    [ CodeReview, Pattern, Challenge, Architecture, SecurityReview ]
+    [ CodeReview, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem ]
   end
 
   def self.keys
@@ -22,7 +22,7 @@ class ExerciseSection
   # third key (a provider returning both) resolves the way it always has —
   # architecture first, then security_review, then challenge.
   def self.thirds
-    [ Architecture, SecurityReview, Challenge ]
+    [ Architecture, SecurityReview, Challenge, ParsonsProblem ]
   end
 
   # nil for anything outside the closed set. Callers decide what an unrecognized

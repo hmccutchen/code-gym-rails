@@ -37,6 +37,8 @@
   <%= render "responses/architecture_section", arch: arch, response: response, submitted: true %>
 <% elsif (sec = exercise.security_review) %>
   <%= render "responses/security_review_section", sec: sec, response: response, submitted: true %>
+<% elsif (parsons = exercise.parsons_problem) %>
+  <%= render "responses/parsons_problem_section", parsons: parsons, response: response, submitted: true %>
 <% elsif (ch = exercise.challenge) %>
   <div class="section">
     <div class="section-label">3 — Coding Challenge</div>

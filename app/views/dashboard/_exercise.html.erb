@@ -80,6 +80,8 @@
       <%= render "responses/architecture_section", arch: arch, response: response, submitted: false %>
     <% elsif (sec = exercise.security_review) %>
       <%= render "responses/security_review_section", sec: sec, response: response, submitted: false %>
+    <% elsif (parsons = exercise.parsons_problem) %>
+      <%= render "responses/parsons_problem_section", parsons: parsons, response: response, submitted: false %>
     <% else %>
       <% ch = exercise.challenge %>
       <div class="section">

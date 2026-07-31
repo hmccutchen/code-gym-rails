@@ -20,6 +20,7 @@ class DailyExercise < ApplicationRecord
   def challenge          = problem_set["challenge"]&.with_indifferent_access
   def architecture       = problem_set["architecture"]&.with_indifferent_access
   def security_review    = problem_set["security_review"]&.with_indifferent_access
+  def parsons_problem    = problem_set["parsons_problem"]&.with_indifferent_access
 
   # Which of the three possible third-section shapes this exercise's
   # problem_set actually holds. Replaces the ad hoc `arch ? "architecture" :

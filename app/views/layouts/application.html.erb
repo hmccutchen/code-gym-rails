@@ -100,6 +100,14 @@
     .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
     .arch-options { margin: 0 0 1.25rem 1.25rem; font-size: .95rem; line-height: 1.8; }
 
+    .parsons-list { list-style: none; margin: 0 0 1.25rem; padding: 0; counter-reset: parsons; }
+    .parsons-block { display: flex; align-items: flex-start; gap: .5rem; margin-bottom: .4rem; }
+    .parsons-block pre.snippet { flex: 1; margin: 0; padding: .55rem .75rem; }
+    .parsons-controls { display: flex; flex-direction: column; gap: .2rem; }
+    .parsons-list:not(.parsons-list-readonly) .parsons-block { cursor: grab; }
+    .parsons-correct pre.snippet { border-color: #2f7d5a; }
+    .parsons-misplaced pre.snippet { border-color: #a4453f; }
+
     details.ref { margin-bottom: 1rem; }
     details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
     details.ref summary::before { content: "▶ "; }

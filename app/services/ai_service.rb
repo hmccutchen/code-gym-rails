@@ -153,6 +153,7 @@ class AiService
 
     log_usage(user, result, purpose: "generate_exercise")
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
     problem_set
   end
@@ -167,7 +168,9 @@ class AiService
     )
 
     log_usage(user, result, purpose: "review_response")
-    parse_json_object(result[:text], subject: "review")
+    review = parse_json_object(result[:text], subject: "review")
+    override_parsons_rating!(review, exercise, daily_response)
+    review
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
@@ -313,6 +316,20 @@ class AiService
     end
   end
 
+  # Which submitted positions are wrong and what belongs there instead — the
+  # ground truth the review prompt hands the model so it explains a known fact
+  # rather than judging one. Padding mirrors ParsonsProblem.grade, so a short or
+  # skipped submission describes as "(nothing submitted)" rather than raising.
+  def describe_parsons_mismatches(blocks, submitted_ids)
+    padded = Array.new(blocks.size) { |i| submitted_ids[i] }
+    descriptions = padded.each_index.filter_map { |i|
+      next if padded[i] == i
+      got = padded[i].is_a?(Integer) && blocks[padded[i]] ? "\"#{blocks[padded[i]]}\"" : "(nothing submitted)"
+      "position #{i + 1} has #{got} (correct block there: \"#{blocks[i]}\")"
+    }
+    descriptions.any? ? descriptions.join("; ") : "exact match — no blocks misplaced"
+  end
+
   # Delivery is advisory, so the only way to know whether retention checks actually
   # land is to record both halves. Logged after normalize_concepts so it reflects
   # the concepts actually persisted, not whatever the provider first returned.
@@ -402,6 +419,18 @@ class AiService
               }
             }
         SEC
+      when :parsons_problem
+        <<~PB.chomp
+          "parsons_problem": {
+              "title":    "string",
+              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+              "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
+              "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
+              "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary",
+              #{glossary_field}
+            }
+        PB
       else
         <<~CH.chomp
           "challenge": {
@@ -533,6 +562,11 @@ class AiService
           - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{config[:security_concepts].join(", ")}
           - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
         SEC
+      when :parsons_problem
+        <<~PB.chomp
+          - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
+          - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
+        PB
       else
         <<~CH.chomp
           - The challenge starter_code should give enough scaffold to get started without giving away the answer.
@@ -606,6 +640,20 @@ class AiService
           Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their proposed mitigation is sound — not against one single expected answer. Give partial credit in "missed" for identifying the vulnerability without a complete mitigation, or vice versa.
           For this section "improved_code" must show the mitigated version of the snippet.
         SEC
+      when "parsons_problem"
+        parsons   = exercise.parsons_problem
+        submitted = ExerciseSection::ParsonsProblem.parse_order(answers["parsons_problem"])
+        graded    = ExerciseSection::ParsonsProblem.grade(submitted, parsons["blocks"].size)
+
+        <<~PARSONS.chomp
+          Parsons Problem (#{parsons["title"]}): #{parsons["question"]}
+          Correct blocks, in order: #{parsons["blocks"].each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
+          What they misplaced: #{describe_parsons_mismatches(parsons["blocks"], submitted)}
+          Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{graded[:mismatches]} block(s) out of place.
+
+          Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
+          For this section "improved_code" must be an empty string.
+        PARSONS
       else
         <<~CH.chomp
           Coding Challenge: #{exercise.challenge["question"]}
@@ -614,9 +662,9 @@ class AiService
       end
 
     improved_code_note =
-      third_key == "architecture" ?
-        "corrected/improved code for code_review and pattern (empty string for architecture)" :
-        "corrected/improved code for code_review, pattern, and #{third_key}"
+      ExerciseSection.find(third_key)&.improved_code? != false ?
+        "corrected/improved code for code_review, pattern, and #{third_key}" :
+        "corrected/improved code for code_review and pattern (empty string for #{third_key})"
 
     <<~PROMPT
       Review these Code Gym answers. For each section, return a JSON object with:
@@ -740,6 +788,33 @@ class AiService
         record_suggested_concept(bucket, original)
       end
     end
+    problem_set
+  end
+
+  # Parsons correctness is decided in Ruby, never by the model — whatever rating
+  # it returned for this key is discarded and replaced.
+  def override_parsons_rating!(review, exercise, daily_response)
+    parsons = exercise.parsons_problem
+    return unless parsons.is_a?(Hash) && review["parsons_problem"].is_a?(Hash)
+
+    submitted = ExerciseSection::ParsonsProblem.parse_order(daily_response.answers["parsons_problem"])
+    review["parsons_problem"]["rating"] =
+      ExerciseSection::ParsonsProblem.grade(submitted, parsons["blocks"].size)[:rating]
+  end
+
+  # The provider always returns "blocks" in correct order, so shuffling happens
+  # here exactly once and the resulting display_order is persisted — page
+  # refreshes and the read-only history view then show the same arrangement.
+  # Re-rolled off the identity permutation so the scramble is never
+  # already-solved.
+  def shuffle_parsons_blocks!(problem_set)
+    parsons = problem_set["parsons_problem"]
+    return problem_set unless parsons.is_a?(Hash) && parsons["blocks"].is_a?(Array)
+
+    identity = (0...parsons["blocks"].size).to_a
+    order    = identity.shuffle
+    order    = identity.shuffle while order == identity && identity.size > 1
+    parsons["display_order"] = order
     problem_set
   end
 

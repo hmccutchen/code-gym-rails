@@ -14,12 +14,12 @@ class DailyPlan
   Result = Data.define(:third, :reinforcement, :due_checks, :established)
 
   # Which third section this set gets. Named, tunable weights rather than a
-  # bare literal: architecture-reasoning most of the time, a security-review
-  # snippet a quarter of the time, a traditional coding challenge the rest.
+  # bare literal: architecture-reasoning most of the time, the other three kinds
+  # evenly splitting the rest.
   # Extracted so tests can stub it — never assert on real randomness. The
   # chosen kind is not tracked separately; the persisted third key
-  # (problem_set["architecture"/"security_review"/"challenge"]) is the record.
-  THIRD_SECTION_WEIGHTS = { architecture: 0.50, security_review: 0.25, challenge: 0.25 }.freeze
+  # (ExerciseSection.thirds) is the record.
+  THIRD_SECTION_WEIGHTS = { architecture: 0.40, security_review: 0.20, challenge: 0.20, parsons_problem: 0.20 }.freeze
 
   # A vocabulary is at most 16 concepts (see AiService::RAILS_CONCEPTS /
   # JS_CONCEPTS / ARCHITECTURE_CONCEPTS), so "every due concept in a bucket" is
@@ -53,11 +53,19 @@ class DailyPlan
     Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established)
   end
 
+  # Cumulative weights are rounded before comparison: summing float weights
+  # (0.40 + 0.20 == 0.6000000000000001) otherwise shifts each boundary by an
+  # ulp and hands the wrong kind back at the exact boundary value.
   def self.roll_third_section
     r = rand
-    return :architecture    if r < THIRD_SECTION_WEIGHTS[:architecture]
-    return :security_review if r < THIRD_SECTION_WEIGHTS[:architecture] + THIRD_SECTION_WEIGHTS[:security_review]
-    :challenge
+    cumulative = 0.0
+
+    THIRD_SECTION_WEIGHTS.each do |kind, weight|
+      cumulative += weight
+      return kind if r < cumulative.round(10)
+    end
+
+    THIRD_SECTION_WEIGHTS.keys.last
   end
   private_class_method :roll_third_section
 

@@ -4,30 +4,40 @@ RSpec.describe DailyPlan do
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
   describe "THIRD_SECTION_WEIGHTS" do
-    it "sums to 1.0 across all three weights, including the unused :challenge entry" do
+    it "sums to 1.0 across all four weights" do
       expect(DailyPlan::THIRD_SECTION_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
+    end
+
+    it "includes parsons_problem" do
+      expect(DailyPlan::THIRD_SECTION_WEIGHTS).to have_key(:parsons_problem)
     end
   end
 
   describe "#roll_third_section" do
-    it "returns :architecture below 0.50, :security_review from 0.50 up to 0.75, :challenge from 0.75 up" do
+    it "returns :architecture below 0.40, :security_review from 0.40-0.60, :challenge from 0.60-0.80, :parsons_problem from 0.80 up" do
       allow(DailyPlan).to receive(:rand).and_return(0.10)
       expect(DailyPlan.send(:roll_third_section)).to eq(:architecture)
 
-      allow(DailyPlan).to receive(:rand).and_return(0.49)
+      allow(DailyPlan).to receive(:rand).and_return(0.39)
       expect(DailyPlan.send(:roll_third_section)).to eq(:architecture)
 
-      allow(DailyPlan).to receive(:rand).and_return(0.50)
+      allow(DailyPlan).to receive(:rand).and_return(0.40)
       expect(DailyPlan.send(:roll_third_section)).to eq(:security_review)
 
-      allow(DailyPlan).to receive(:rand).and_return(0.74)
+      allow(DailyPlan).to receive(:rand).and_return(0.59)
       expect(DailyPlan.send(:roll_third_section)).to eq(:security_review)
 
-      allow(DailyPlan).to receive(:rand).and_return(0.75)
+      allow(DailyPlan).to receive(:rand).and_return(0.60)
       expect(DailyPlan.send(:roll_third_section)).to eq(:challenge)
+
+      allow(DailyPlan).to receive(:rand).and_return(0.79)
+      expect(DailyPlan.send(:roll_third_section)).to eq(:challenge)
+
+      allow(DailyPlan).to receive(:rand).and_return(0.80)
+      expect(DailyPlan.send(:roll_third_section)).to eq(:parsons_problem)
 
       allow(DailyPlan).to receive(:rand).and_return(0.99)
-      expect(DailyPlan.send(:roll_third_section)).to eq(:challenge)
+      expect(DailyPlan.send(:roll_third_section)).to eq(:parsons_problem)
     end
   end
 

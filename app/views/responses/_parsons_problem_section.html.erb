@@ -1,0 +1,110 @@
+<%# Parsons Problem third section, shared by the dashboard form (submitted: false)
+    and the read-only render of a submitted day (submitted: true), which appears
+    on the dashboard after submitting and on every history entry.
+    Locals: parsons, response, submitted. %>
+<% language = response.daily_exercise.language %>
+<% blocks   = parsons["blocks"] || [] %>
+<div class="section">
+  <div class="section-label">3 — Parsons Problem: <%= glossary_wrap(parsons["title"], parsons["glossary"]) %></div>
+  <% if parsons["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(parsons["scenario"], parsons["glossary"]) %></div><% end %>
+  <div class="question"><%= glossary_wrap(parsons["question"], parsons["glossary"]) %></div>
+
+  <% if (ref = concept_reference_for(parsons["concept"], language)) %>
+    <%= render "shared/concept_reference", reference: ref,
+          open: !submitted && first_exposure?(parsons["concept"], language, response.date) %>
+  <% end %>
+  <%= render "dashboard/teaching_hint", note: parsons["teaching_note"], field: "parsons_problem", submitted: submitted, answer: response.answers["parsons_problem"] %>
+
+  <% if submitted %>
+    <% submitted_ids = ExerciseSection::ParsonsProblem.parse_order(response.answers["parsons_problem"]) %>
+    <ol class="parsons-list parsons-list-readonly">
+      <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>
+        <li class="parsons-block <%= block_id == position ? "parsons-correct" : "parsons-misplaced" %>">
+          <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= block_id.is_a?(Integer) ? blocks[block_id] : "(skipped)" %></code></pre>
+        </li>
+      <% end %>
+    </ol>
+  <% else %>
+    <%# The learner's own saved arrangement wins over the original scramble, so
+        a reload doesn't undo their work. %>
+    <% initial_order = ExerciseSection::ParsonsProblem.parse_order(response.answers["parsons_problem"]).presence || Array(parsons["display_order"]) %>
+    <ol class="parsons-list" data-parsons-blocks>
+      <% initial_order.each do |block_id| %>
+        <li class="parsons-block" data-block-id="<%= block_id %>">
+          <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= blocks[block_id] %></code></pre>
+          <div class="parsons-controls">
+            <button type="button" class="btn btn-ghost btn-sm parsons-move-up" aria-label="Move block up">↑</button>
+            <button type="button" class="btn btn-ghost btn-sm parsons-move-down" aria-label="Move block down">↓</button>
+          </div>
+        </li>
+      <% end %>
+    </ol>
+    <textarea name="response[answers][parsons_problem]" class="answer" data-field="parsons_problem" style="display:none"><%= response.answers["parsons_problem"] %></textarea>
+    <div class="rating-row" data-rating-for="parsons_problem">
+      <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+        <button type="button" class="rating-btn<%= " active" if response.self_rating_for("parsons_problem") == value %>" data-rating-for="parsons_problem" data-rating="<%= value %>"><%= label.upcase_first %></button>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+<% unless submitted || @parsons_script_emitted %>
+  <% @parsons_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script>
+    // Up/down buttons are the baseline and always work; the SortableJS import
+    // below only layers dragging on top. Neither path syncs the hidden field on
+    // wire-up — only on an actual move — so the section reads as unanswered
+    // until the learner does something, matching every other section.
+    (() => {
+      function syncHiddenField(list) {
+        const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
+        const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
+        textarea.value = "order:" + ids.join(",");
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      document.querySelectorAll("ol[data-parsons-blocks]:not([data-parsons-wired])").forEach(list => {
+        list.dataset.parsonsWired = "1";
+
+        list.querySelectorAll(".parsons-move-up").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const li = btn.closest(".parsons-block");
+            const prev = li.previousElementSibling;
+            if (prev) { list.insertBefore(li, prev); syncHiddenField(list); }
+          });
+        });
+
+        list.querySelectorAll(".parsons-move-down").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const li = btn.closest(".parsons-block");
+            const next = li.nextElementSibling;
+            if (next) { list.insertBefore(next, li); syncHiddenField(list); }
+          });
+        });
+      });
+    })();
+    </script>
+    <script type="module">
+      // Version pinned exactly, same posture as the Mermaid import in
+      // _architecture_section — a blocked CDN leaves the up/down buttons as the
+      // only way to reorder, which already fully works on its own.
+      try {
+        const { default: Sortable } = await import("https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js");
+        document.querySelectorAll("ol[data-parsons-blocks]:not([data-sortable-done])").forEach(list => {
+          list.dataset.sortableDone = "1";
+          Sortable.create(list, {
+            animation: 150,
+            onEnd: () => {
+              const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
+              const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
+              textarea.value = "order:" + ids.join(",");
+              textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          });
+        });
+      } catch {
+        // CDN unreachable or module failed to load — up/down buttons still work.
+      }
+    </script>
+  <% end %>
+<% end %>
