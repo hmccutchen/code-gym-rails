@@ -75,6 +75,22 @@ Because the rule targets `.section` and nothing else, it applies uniformly to
 every section kind (code review, pattern, challenge, architecture, security
 review, Parsons) with no per-kind handling.
 
+### History page
+
+On `/history` the shared section partials render inside `.history-entry`
+(`app/views/history/index.html.erb`), which is itself inside `.container` — two
+padded ancestors rather than one. A `-1.5rem` margin cancels only the inner one,
+so the cards would overhang the entry's rounded border instead of reaching the
+screen edge.
+
+The entry wrapper therefore gets the same full-bleed treatment on phones, and
+nested `.section` cards are reset to `margin-inline: 0` with their rounded
+corners and side borders restored, so they stay inset and keep the card-in-card
+look they have on desktop. These rules live in the history page's own `<style>`
+block, not the layout, because the selectors are page-specific.
+
+This was found during final review, after the rest of this spec was written.
+
 ## Testing
 
 This project has no Capybara, Selenium, or system-spec tooling, and CSS layout
