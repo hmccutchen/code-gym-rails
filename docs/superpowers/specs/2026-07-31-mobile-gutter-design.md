@@ -1,0 +1,105 @@
+# Mobile Gutter
+
+## Problem
+
+The app has no mobile styling at all. The layout's `<style>` block contains one
+media query (`hover: hover`), and nothing else adapts below desktop width.
+
+The visible cost is horizontal space. `.container` contributes `1.5rem` of side
+padding and `.section` contributes another `1.5rem`. They nest, so problem-set
+text sits inside `3rem` (48px) of chrome per side. On a 375px phone that is
+roughly a quarter of the screen, and problem text — which is prose plus wrapped
+code — is squeezed into what remains.
+
+That padding exists for a reason on desktop: it keeps problem-set text from
+crowding the card edge. The mobile and desktop views do not have to match, so
+the fix is a breakpoint, not a global reduction.
+
+## Scope
+
+In scope: the mobile gutter for section cards.
+
+Explicitly out of scope:
+
+- **Parsons drag styling.** An earlier draft of this spec reworked the drag
+  preview so only bare text moved between stable code panels. That is dropped —
+  the current whole-block drag suits the mobile feel, and the section is left
+  exactly as it is. If it is revisited later it gets its own spec.
+- Nav links, rating button rows, follow-up inputs, type scale, and tap-target
+  sizing. These may have their own mobile problems; folding them in would make
+  the diff unreviewable. Deliberately deferred.
+
+No Ruby, no markup, no JavaScript, and no data-shape changes. The entire change
+is one CSS media query in the layout's shared `<style>` block.
+
+## Design
+
+The breakpoint is 600px: phones only. Small tablets and landscape phones keep
+the desktop treatment.
+
+Section cards break out of the container gutter rather than the container
+zeroing its own padding:
+
+```css
+@media (max-width: 600px) {
+  .section {
+    margin-inline: -1.5rem;
+    padding: 1.25rem 1rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+```
+
+`.container` keeps `padding: 0 1.5rem` untouched. This is the key decision: the
+negative margin is scoped to `.section`, so nav, flash messages, page headings,
+and every non-card page (account, login) are unaffected and need no audit. The
+alternative — setting the container gutter to 0 under the breakpoint — would
+push the nav and every heading flush against the screen edge and require
+re-padding them individually.
+
+Interior horizontal chrome drops from `3rem` to `1rem` per side, returning about
+64px of text width on a 375px screen.
+
+Square corners and no side borders: a rounded card flush against the screen edge
+reads as a rendering bug. Top and bottom borders stay so consecutive cards still
+separate visually.
+
+This rule lives in the layout's shared `<style>` block beside the existing
+`.section` rule, not in a per-page block, because sections render on both the
+dashboard and the history page — the same reason given in the existing comment
+above the shared submission-rendering styles.
+
+Because the rule targets `.section` and nothing else, it applies uniformly to
+every section kind (code review, pattern, challenge, architecture, security
+review, Parsons) with no per-kind handling.
+
+## Testing
+
+This project has no Capybara, Selenium, or system-spec tooling, and CSS layout
+cannot be asserted programmatically here. Existing view coverage is request
+specs asserting on rendered markup, and the new assertion follows that
+convention.
+
+Automated:
+
+- `spec/requests/dashboard_spec.rb`: assert the rendered layout includes
+  `@media (max-width: 600px)`, guarding the mobile block against being dropped
+  in a later edit.
+
+Manual, to be recorded as explicit steps in the implementation plan:
+
+- DevTools at 375px on the dashboard: section cards reach both screen edges,
+  nav and flash messages keep their gutter, no horizontal scrollbar appears.
+- Same check on the history page, which renders the shared section partials in
+  their submitted state.
+- Confirm at 601px and above that nothing changed.
+
+## Risks
+
+Low. The change is a single media query affecting one selector, with no Ruby,
+markup, or JavaScript involved. The worst realistic outcome is a visual
+regression. The one value worth a second look in review is the `-1.5rem` margin:
+if it ever drifts out of sync with the `.container` padding it is meant to
+cancel, the result is either a visible inset or a horizontal scrollbar.
