@@ -446,8 +446,12 @@ RSpec.describe "History", type: :request do
 
       get history_path
 
-      expect(response.body).to include("@media (max-width: 600px)")
-      expect(response.body).to include(".history-entry .section")
+      # The layout's own mobile rule also renders here, so matching the
+      # breakpoint alone would pass even with this page's block deleted. Both
+      # declarations are pinned to their selectors: the entry breaks out, and
+      # the nested cards are reset so they don't break out a second time.
+      expect(response.body).to match(/@media \(max-width: 600px\) \{\s*\.history-entry \{[^}]*margin-inline: -1\.5rem;/)
+      expect(response.body).to match(/\.history-entry \.section \{[^}]*margin-inline: 0;/)
     end
   end
 end

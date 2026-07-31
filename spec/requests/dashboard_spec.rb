@@ -319,8 +319,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       create_exercise
       get root_path
 
-      expect(response.body).to include("@media (max-width: 600px)")
-      expect(response.body).to include("margin-inline: -1.5rem")
+      # Tied to the selector rather than matched loose, so deleting the
+      # break-out declaration cannot leave this green.
+      expect(response.body).to match(/@media \(max-width: 600px\) \{\s*\.section \{[^}]*margin-inline: -1\.5rem;/)
     end
   end
 

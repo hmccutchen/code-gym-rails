@@ -100,9 +100,24 @@ convention.
 
 Automated:
 
-- `spec/requests/dashboard_spec.rb`: assert the rendered layout includes
-  `@media (max-width: 600px)`, guarding the mobile block against being dropped
-  in a later edit.
+- `spec/requests/dashboard_spec.rb`: assert the layout's `@media (max-width:
+  600px)` block contains `.section { … margin-inline: -1.5rem }`.
+- `spec/requests/history_spec.rb`: assert the history page's own block contains
+  both `.history-entry { … margin-inline: -1.5rem }` and `.history-entry
+  .section { … margin-inline: 0 }`.
+
+Each assertion pins a declaration to its selector rather than matching either in
+isolation. Matching the breakpoint alone is worthless on the history page — the
+layout's block renders there too, so that string survives even if the page's
+entire media query is deleted. Matching a bare selector is equally worthless:
+`.history-entry .section` also appears in the border rules, so the one
+declaration that prevents the double break-out could be removed with the test
+still green. Both weaknesses were real and were caught in review; the
+replacements were verified by deleting each declaration in turn and confirming
+the corresponding test fails.
+
+These tests guard that the rules ship, not that they render correctly. Only the
+manual checks below can establish the latter.
 
 Manual, to be recorded as explicit steps in the implementation plan:
 
