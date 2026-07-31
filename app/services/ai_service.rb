@@ -355,7 +355,7 @@ class AiService
     padded = Array.new(blocks.size) { |i| submitted_ids[i] }
     descriptions = padded.each_index.filter_map { |i|
       next if padded[i] == i
-      got = padded[i].is_a?(Integer) && blocks[padded[i]] ? "\"#{blocks[padded[i]]}\"" : "(nothing submitted)"
+      got = ExerciseSection::ParsonsProblem.valid_id?(padded[i], blocks.size) ? "\"#{blocks[padded[i]]}\"" : "(nothing submitted)"
       "position #{i + 1} has #{got} (correct block there: \"#{blocks[i]}\")"
     }
     descriptions.any? ? descriptions.join("; ") : "exact match — no blocks misplaced"

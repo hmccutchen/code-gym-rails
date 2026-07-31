@@ -71,6 +71,7 @@
 
       document.querySelectorAll("ol[data-parsons-blocks]:not([data-parsons-wired])").forEach(list => {
         list.dataset.parsonsWired = "1";
+        list.parsonsSync = () => syncHiddenField(list);
 
         list.querySelectorAll(".parsons-move-up").forEach(btn => {
           btn.addEventListener("click", () => {
@@ -98,15 +99,7 @@
         const { default: Sortable } = await import("https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js");
         document.querySelectorAll("ol[data-parsons-blocks]:not([data-sortable-done])").forEach(list => {
           list.dataset.sortableDone = "1";
-          Sortable.create(list, {
-            animation: 150,
-            onEnd: () => {
-              const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
-              const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
-              textarea.value = "order:" + ids.join(",");
-              textarea.dispatchEvent(new Event("input", { bubbles: true }));
-            }
-          });
+          Sortable.create(list, { animation: 150, onEnd: () => list.parsonsSync?.() });
         });
       } catch {
         // CDN unreachable or module failed to load — up/down buttons still work.

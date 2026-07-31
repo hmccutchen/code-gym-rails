@@ -120,12 +120,10 @@ class DailyPlan
   def self.established_concepts_for(user, language, third:, reinforcement:, due_checks:)
     claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
 
-    hostable_buckets(language, third: third).flat_map { |bucket|
-      user.concept_masteries
-        .where(language: bucket, tier: :standard)
-        .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
-        .to_a
-    }.reject { |cm| claimed.include?(cm.concept) }
+    user.concept_masteries
+      .where(language: hostable_buckets(language, third: third), tier: :standard)
+      .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
+      .reject { |cm| claimed.include?(cm.concept) }
   end
   private_class_method :established_concepts_for
 

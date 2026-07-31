@@ -1096,6 +1096,13 @@ RSpec.describe AiService do
         expect(prompt).to include('"end"')
       end
 
+      it "describes an out-of-range id as nothing submitted rather than the block it would wrap to" do
+        resp = DailyResponse.new(answers: { "parsons_problem" => "order:-1,1,2" })
+        prompt = service.send(:build_review_prompt, parsons_exercise, resp)
+
+        expect(prompt).to include("position 1 has (nothing submitted)")
+      end
+
       it "does not claim a verified result when the provider omitted the blocks array" do
         exercise = DailyExercise.new(
           language: "ruby_rails",

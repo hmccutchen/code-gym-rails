@@ -14,9 +14,10 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # degrades to "everything misplaced" rather than raising on a skipped or
     # corrupted submission.
     def parse_order(answer)
-      return [] unless answer.to_s.start_with?(ANSWER_PREFIX)
+      text = answer.to_s
+      return [] unless text.start_with?(ANSWER_PREFIX)
 
-      answer.delete_prefix(ANSWER_PREFIX).split(",").filter_map { |s| Integer(s, exception: false) }
+      text.delete_prefix(ANSWER_PREFIX).split(",").filter_map { |s| Integer(s, exception: false) }
     end
 
     # answers["parsons_problem"] is a free-form permitted param, so a saved
