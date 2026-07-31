@@ -292,7 +292,7 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body).to include("In one sentence, why does this fix work?")
+      expect(response.body).to include("Break this fix into 2-3 steps and name what each one does.")
       expect(response.body).to include("self-explanation-input")
     end
 

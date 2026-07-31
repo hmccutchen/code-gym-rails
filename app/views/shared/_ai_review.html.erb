@@ -40,13 +40,13 @@
       <span class="alternate-status" aria-live="polite"></span>
     </div>
     <div class="self-explanation">
-      <label for="self-exp-<%= response.id %>-<%= section %>">In one sentence, why does this fix work?</label>
+      <label for="self-exp-<%= response.id %>-<%= section %>">Break this fix into 2-3 steps and name what each one does.</label>
       <textarea id="self-exp-<%= response.id %>-<%= section %>"
                 class="self-explanation-input"
-                rows="2"
+                rows="4"
                 data-url="<%= self_explanation_response_path(response) %>"
                 data-section="<%= section %>"
-                placeholder="Optional — putting it in your own words is the point."><%= response.self_explanations[section] %></textarea>
+                placeholder="Optional — steps in your own words."><%= response.self_explanations[section] %></textarea>
       <span class="self-explanation-status" aria-live="polite"></span>
     </div>
     <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by { |t| [ t.created_at, t.id ] } %>
