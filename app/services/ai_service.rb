@@ -316,10 +316,42 @@ class AiService
     end
   end
 
+  # A provider can return a parsons_problem object with no "blocks" — that
+  # still resolves as the third section (third_key only checks for a Hash), but
+  # there is nothing to score against, so the prompt must not claim a verified
+  # count. Grading is skipped entirely in that case rather than reporting the
+  # grader's degenerate "0 out of place".
+  def parsons_review_block(parsons, answer)
+    blocks = Array(parsons["blocks"])
+    header = "Parsons Problem (#{parsons["title"]}): #{parsons["question"]}"
+
+    if blocks.empty?
+      return <<~UNVERIFIED.chomp
+        #{header}
+        This section's blocks are missing from the stored exercise, so the submitted ordering CANNOT be verified. Do not state or imply how many blocks were misplaced, and do not rate this section's correctness — say only that the exercise data is unavailable.
+        For this section "improved_code" must be an empty string.
+      UNVERIFIED
+    end
+
+    submitted = ExerciseSection::ParsonsProblem.parse_order(answer)
+    graded    = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)
+
+    <<~PARSONS.chomp
+      #{header}
+      Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
+      What they misplaced: #{describe_parsons_mismatches(blocks, submitted)}
+      Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{graded[:mismatches]} block(s) out of place.
+
+      Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
+      For this section "improved_code" must be an empty string.
+    PARSONS
+  end
+
   # The ground truth the review prompt hands the model, so it explains a known
   # result rather than judging one. Padding mirrors ParsonsProblem.grade so a
   # short or skipped submission describes rather than raises.
   def describe_parsons_mismatches(blocks, submitted_ids)
+    return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
     padded = Array.new(blocks.size) { |i| submitted_ids[i] }
     descriptions = padded.each_index.filter_map { |i|
       next if padded[i] == i
@@ -640,20 +672,7 @@ class AiService
           For this section "improved_code" must show the mitigated version of the snippet.
         SEC
       when "parsons_problem"
-        parsons   = exercise.parsons_problem
-        blocks    = Array(parsons["blocks"])
-        submitted = ExerciseSection::ParsonsProblem.parse_order(answers["parsons_problem"])
-        graded    = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)
-
-        <<~PARSONS.chomp
-          Parsons Problem (#{parsons["title"]}): #{parsons["question"]}
-          Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
-          What they misplaced: #{describe_parsons_mismatches(blocks, submitted)}
-          Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{graded[:mismatches]} block(s) out of place.
-
-          Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
-          For this section "improved_code" must be an empty string.
-        PARSONS
+        parsons_review_block(exercise.parsons_problem, answers["parsons_problem"])
       else
         <<~CH.chomp
           Coding Challenge: #{exercise.challenge["question"]}
@@ -792,14 +811,18 @@ class AiService
   end
 
   # Parsons correctness is decided in Ruby, never by the model — whatever rating
-  # it returned for this key is discarded and replaced.
+  # it returned for this key is discarded and replaced. Skipped when the stored
+  # section has no blocks, since there is nothing to grade against and the
+  # grader would report a spurious perfect score.
   def override_parsons_rating!(review, exercise, daily_response)
     parsons = exercise.parsons_problem
     return unless parsons.is_a?(Hash) && review["parsons_problem"].is_a?(Hash)
 
+    blocks = Array(parsons["blocks"])
+    return if blocks.empty?
+
     submitted = ExerciseSection::ParsonsProblem.parse_order(daily_response.answers["parsons_problem"])
-    review["parsons_problem"]["rating"] =
-      ExerciseSection::ParsonsProblem.grade(submitted, Array(parsons["blocks"]).size)[:rating]
+    review["parsons_problem"]["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
   end
 
   # The provider returns "blocks" already in correct order, so the scramble is

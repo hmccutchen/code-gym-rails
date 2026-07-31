@@ -58,6 +58,31 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("parsons-move-up")
       expect(response.body).to include("parsons-correct")
     end
+
+    it "renders an out-of-range block id as skipped instead of an empty or wrapped block" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+          "parsons_problem" => {
+            "title" => "Sort names", "question" => "Arrange these blocks",
+            "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+            "display_order" => [ 0, 1, 2 ], "concept" => "n_plus_one"
+          }
+        }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20, "parsons_problem" => "order:-1,9,1" }
+      )
+      login_as(user)
+      get history_path
+
+      parsons_list = response.body[/<ol class="parsons-list parsons-list-readonly">.*?<\/ol>/m]
+      expect(parsons_list.scan("(skipped)").size).to eq(2)
+      expect(parsons_list).to include("names.sort")
+    end
   end
 
   describe "GET /history" do

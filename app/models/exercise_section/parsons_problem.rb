@@ -19,6 +19,31 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       answer.delete_prefix(ANSWER_PREFIX).split(",").filter_map { |s| Integer(s, exception: false) }
     end
 
+    # answers["parsons_problem"] is a free-form permitted param, so a saved
+    # order can hold duplicate, negative, or out-of-range ids. Anything short of
+    # a complete permutation is rejected outright — a partially valid order
+    # would drop blocks from the page and then be persisted back by the next
+    # autosave.
+    def normalize_order(ids, block_count)
+      return [] unless ids.size == block_count && ids.uniq.size == block_count
+      return [] unless ids.all? { |id| valid_id?(id, block_count) }
+
+      ids
+    end
+
+    def valid_id?(id, block_count)
+      id.is_a?(Integer) && id >= 0 && id < block_count
+    end
+
+    # The arrangement to render on the dashboard: the learner's own saved order
+    # if it survives normalization, else the generated scramble, else the
+    # stored (correct) order.
+    def initial_order(answer:, display_order:, block_count:)
+      [ parse_order(answer), Array(display_order) ]
+        .filter_map { |ids| normalize_order(ids, block_count).presence }
+        .first || (0...block_count).to_a
+    end
+
     # A mismatch count of exactly 1 is impossible for a permutation — the
     # smallest non-zero mismatch is a pair swap — so the table has no `when 1`.
     def grade(submitted_ids, block_count)

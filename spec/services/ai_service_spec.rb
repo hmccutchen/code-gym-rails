@@ -1096,7 +1096,7 @@ RSpec.describe AiService do
         expect(prompt).to include('"end"')
       end
 
-      it "does not raise when the provider omitted the blocks array" do
+      it "does not claim a verified result when the provider omitted the blocks array" do
         exercise = DailyExercise.new(
           language: "ruby_rails",
           problem_set: {
@@ -1107,7 +1107,9 @@ RSpec.describe AiService do
         )
         resp = DailyResponse.new(answers: {})
 
-        expect { service.send(:build_review_prompt, exercise, resp) }.not_to raise_error
+        prompt = service.send(:build_review_prompt, exercise, resp)
+        expect(prompt).not_to match(/block\(s\) out of place/)
+        expect(prompt).to include("CANNOT be verified")
       end
     end
 
@@ -1245,7 +1247,7 @@ RSpec.describe AiService do
       expect(review).to eq("code_review" => { "rating" => "solid" })
     end
 
-    it "does not raise when the provider omitted the blocks array" do
+    it "leaves the rating alone when the provider omitted the blocks array" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: {
@@ -1256,8 +1258,9 @@ RSpec.describe AiService do
       )
       response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
 
-      svc = double_class.new(canned_text: { "parsons_problem" => { "rating" => "strong" } }.to_json)
-      expect { svc.review_response(user, exercise, response) }.not_to raise_error
+      svc = double_class.new(canned_text: { "parsons_problem" => { "rating" => "developing" } }.to_json)
+      review = svc.review_response(user, exercise, response)
+      expect(review["parsons_problem"]["rating"]).to eq("developing")
     end
   end
 

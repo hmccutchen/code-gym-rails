@@ -627,6 +627,26 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include('data-block-id="1"')
       expect(response.body).to include('data-block-id="2"')
     end
+
+    it "renders every block once when a tampered answer order was saved" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      DailyResponse.create!(user: user, daily_exercise: user.daily_exercises.last, date: Date.current,
+                            answers: { "parsons_problem" => "order:0,0,0" })
+
+      get root_path
+
+      expect(response.body.scan('data-block-id="0"').size).to eq(1)
+      expect(response.body).to include('data-block-id="1"')
+      expect(response.body).to include('data-block-id="2"')
+    end
   end
 
   describe "streak display" do    # A Wednesday, so the streak days are plain weekdays.

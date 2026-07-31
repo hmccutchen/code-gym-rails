@@ -119,5 +119,63 @@ RSpec.describe ExerciseSection do
         expect(ExerciseSection::ParsonsProblem.grade([ 0, 1 ], 5)).to eq(mismatches: 3, rating: "developing")
       end
     end
+
+    describe ".normalize_order" do
+      it "accepts a complete permutation" do
+        expect(ExerciseSection::ParsonsProblem.normalize_order([ 2, 0, 1 ], 3)).to eq([ 2, 0, 1 ])
+      end
+
+      it "rejects duplicate ids" do
+        expect(ExerciseSection::ParsonsProblem.normalize_order([ 0, 0, 0 ], 3)).to eq([])
+      end
+
+      it "rejects negative ids, which would otherwise wrap around the block list" do
+        expect(ExerciseSection::ParsonsProblem.normalize_order([ -1, 0, 1 ], 3)).to eq([])
+      end
+
+      it "rejects ids past the end of the block list" do
+        expect(ExerciseSection::ParsonsProblem.normalize_order([ 0, 1, 9 ], 3)).to eq([])
+      end
+
+      it "rejects an incomplete order" do
+        expect(ExerciseSection::ParsonsProblem.normalize_order([ 0, 1 ], 3)).to eq([])
+      end
+    end
+
+    describe ".initial_order" do
+      it "prefers the learner's saved order" do
+        order = ExerciseSection::ParsonsProblem.initial_order(
+          answer: "order:2,0,1", display_order: [ 1, 2, 0 ], block_count: 3
+        )
+        expect(order).to eq([ 2, 0, 1 ])
+      end
+
+      it "falls back to the generated scramble when the saved order is corrupted" do
+        order = ExerciseSection::ParsonsProblem.initial_order(
+          answer: "order:0,0,0", display_order: [ 1, 2, 0 ], block_count: 3
+        )
+        expect(order).to eq([ 1, 2, 0 ])
+      end
+
+      it "falls back to the stored order when neither candidate is a full permutation" do
+        order = ExerciseSection::ParsonsProblem.initial_order(
+          answer: "order:9,9", display_order: [ 0, 1 ], block_count: 3
+        )
+        expect(order).to eq([ 0, 1, 2 ])
+      end
+    end
+
+    describe ".valid_id?" do
+      it "accepts only in-range integers" do
+        expect(ExerciseSection::ParsonsProblem.valid_id?(0, 3)).to be true
+        expect(ExerciseSection::ParsonsProblem.valid_id?(2, 3)).to be true
+      end
+
+      it "rejects nil, negative, and out-of-range ids" do
+        expect(ExerciseSection::ParsonsProblem.valid_id?(nil, 3)).to be false
+        expect(ExerciseSection::ParsonsProblem.valid_id?(-1, 3)).to be false
+        expect(ExerciseSection::ParsonsProblem.valid_id?(3, 3)).to be false
+      end
+    end
   end
 end

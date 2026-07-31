@@ -3,7 +3,7 @@
     on the dashboard after submitting and on every history entry.
     Locals: parsons, response, submitted. %>
 <% language = response.daily_exercise.language %>
-<% blocks   = parsons["blocks"] || [] %>
+<% blocks   = Array(parsons["blocks"]) %>
 <div class="section">
   <div class="section-label">3 — Parsons Problem: <%= glossary_wrap(parsons["title"], parsons["glossary"]) %></div>
   <% if parsons["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(parsons["scenario"], parsons["glossary"]) %></div><% end %>
@@ -20,16 +20,20 @@
     <ol class="parsons-list parsons-list-readonly">
       <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>
         <li class="parsons-block <%= block_id == position ? "parsons-correct" : "parsons-misplaced" %>">
-          <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= block_id.is_a?(Integer) ? blocks[block_id] : "(skipped)" %></code></pre>
+          <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= ExerciseSection::ParsonsProblem.valid_id?(block_id, blocks.size) ? blocks[block_id] : "(skipped)" %></code></pre>
         </li>
       <% end %>
     </ol>
   <% else %>
     <%# The learner's own saved arrangement wins over the original scramble, so
-        a reload doesn't undo their work. A row missing display_order falls back
-        to the stored (correct) order rather than rendering nothing. %>
-    <% initial_order = ExerciseSection::ParsonsProblem.parse_order(response.answers["parsons_problem"]).presence ||
-                       Array(parsons["display_order"]).presence || (0...blocks.size).to_a %>
+        a reload doesn't undo their work. Each candidate is rejected unless it
+        is a complete permutation of the blocks, so a corrupted answer or a row
+        missing display_order falls back rather than dropping blocks. %>
+    <% initial_order = ExerciseSection::ParsonsProblem.initial_order(
+         answer: response.answers["parsons_problem"],
+         display_order: parsons["display_order"],
+         block_count: blocks.size
+       ) %>
     <ol class="parsons-list" data-parsons-blocks>
       <% initial_order.each do |block_id| %>
         <li class="parsons-block" data-block-id="<%= block_id %>">
