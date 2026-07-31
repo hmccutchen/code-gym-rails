@@ -438,4 +438,16 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("Claude&#39;s review")
     end
   end
+
+  describe "mobile gutter" do
+    it "makes history entries full-bleed on phones without letting nested sections break out again" do
+      login_as(user)
+      create_session_for(user, date: Date.current)
+
+      get history_path
+
+      expect(response.body).to include("@media (max-width: 600px)")
+      expect(response.body).to include(".history-entry .section")
+    end
+  end
 end
