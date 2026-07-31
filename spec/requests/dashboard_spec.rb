@@ -314,6 +314,17 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "mobile section gutter" do
+    it "renders a 600px breakpoint that pulls section cards out to the screen edges" do
+      create_exercise
+      get root_path
+
+      # Tied to the selector rather than matched loose, so deleting the
+      # break-out declaration cannot leave this green.
+      expect(response.body).to match(/@media \(max-width: 600px\) \{\s*\.section \{[^}]*margin-inline: -1\.5rem;/)
+    end
+  end
+
   describe "on-demand generation and the weekday guard" do
     around do |example|
       # A known Monday and a known Saturday, so weekday?/weekend? are unambiguous

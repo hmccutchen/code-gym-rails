@@ -18,6 +18,26 @@
   details.answers summary::before { content: "▶ "; }
   details.answers[open] summary::before { content: "▼ "; }
   details.answers .section { margin-top: 1rem; }
+
+  /* Mirrors the layout's .section mobile rule; the values are coupled. */
+  @media (max-width: 600px) {
+    .history-entry {
+      margin-inline: -1.5rem;
+      padding: 1.25rem 1rem;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+    /* The entry already spans the viewport, so the shared .section rule's
+       break-out would overhang it; these cards stay inset and keep the card
+       look they have on desktop. */
+    .history-entry .section {
+      margin-inline: 0;
+      border-radius: 10px;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+  }
 </style>
 
 <div class="page-header">
