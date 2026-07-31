@@ -85,4 +85,78 @@ RSpec.describe DailyPlan do
       expect(checks.map(&:concept)).to eq([])
     end
   end
+
+  describe "established concept selection" do
+    def established_mastery(concept:, bucket: "ruby_rails", interval: 14)
+      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
+                                     mastered_at: 2.months.ago, retention_interval_days: interval,
+                                     next_retention_check_on: Date.current + 5)
+    end
+
+    it "includes standard-tier concepts past their initial retention interval" do
+      established_mastery(concept: "memoization", interval: 14)
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+                              reinforcement: [], due_checks: [])
+      expect(result.map(&:concept)).to eq(%w[memoization])
+    end
+
+    it "excludes concepts still on their initial interval (never survived a retention check)" do
+      established_mastery(concept: "memoization", interval: 7)
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+                              reinforcement: [], due_checks: [])
+      expect(result).to eq([])
+    end
+
+    it "excludes concepts already claimed by reinforcement" do
+      established_mastery(concept: "memoization", interval: 14)
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+                              reinforcement: [ { concept: "memoization", tier: "standard" } ], due_checks: [])
+      expect(result).to eq([])
+    end
+
+    it "excludes concepts already claimed by today's due retention checks" do
+      cm = established_mastery(concept: "memoization", interval: 14)
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+                              reinforcement: [], due_checks: [ cm ])
+      expect(result).to eq([])
+    end
+
+    it "excludes reduced and paused tier concepts" do
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :reduced,
+                                     retention_interval_days: nil)
+      user.concept_masteries.create!(concept: "scope_chaining", language: "ruby_rails", tier: :paused,
+                                     retention_interval_days: nil, cooldown_remaining: 2)
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+                              reinforcement: [], due_checks: [])
+      expect(result).to eq([])
+    end
+
+    it "only includes architecture-bucket concepts on architecture days, like retention checks do" do
+      established_mastery(concept: "service_boundaries", bucket: "architecture", interval: 14)
+
+      on_challenge = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+                                    reinforcement: [], due_checks: [])
+      on_arch      = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :architecture,
+                                    reinforcement: [], due_checks: [])
+
+      expect(on_challenge).to eq([])
+      expect(on_arch.map(&:concept)).to eq(%w[service_boundaries])
+    end
+  end
+
+  describe "#for" do
+    it "includes established in the returned Result" do
+      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 2.months.ago, retention_interval_days: 14,
+                                     next_retention_check_on: Date.current + 5)
+
+      result = DailyPlan.for(user, language: "ruby_rails")
+      expect(result.established.map(&:concept)).to eq(%w[memoization])
+    end
+  end
 end

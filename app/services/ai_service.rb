@@ -148,7 +148,8 @@ class AiService
 
     result = call(system: build_system_prompt(language),
                   prompt: build_exercise_prompt(user, language, third: plan.third,
-                                                reinforcement: plan.reinforcement, due_checks: plan.due_checks))
+                                                reinforcement: plan.reinforcement, due_checks: plan.due_checks,
+                                                established: plan.established))
 
     log_usage(user, result, purpose: "generate_exercise")
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
@@ -439,7 +440,7 @@ class AiService
     SCHEMA
   end
 
-  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [])
+  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [], established: [])
     history = user.recent_performance
 
     history_text = if history.empty?
@@ -478,6 +479,21 @@ class AiService
           - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
           - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.
         RET
+      else
+        ""
+      end
+
+    # Unlike retention_block, this never forces a selection — it only shapes a
+    # section if the model was already going to pick one of these on its own.
+    established_block =
+      if established.any?
+        <<~EST.chomp
+
+          Established concepts (well past first mastery — survived a retention check): #{established.map(&:concept).join(', ')}
+          - If you were already going to select one of these for a section's concept, keep that section's teaching_note minimal (a single short sentence, or an empty string is fine) and return an empty glossary array for that section.
+          - Pitch at full difficulty — do not ease, simplify, or add scaffolding for these, the same as you would not for a retention check.
+          - This is advisory, like every other concept instruction here: it does not force you to select one of these concepts, only shapes the section if you do.
+        EST
       else
         ""
       end
@@ -552,6 +568,7 @@ class AiService
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
+      #{established_block}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 

@@ -481,6 +481,41 @@ RSpec.describe AiService do
     end
   end
 
+  describe "established prompt block" do
+    it "advises minimal scaffolding and full difficulty for concepts with mastery history" do
+      cm = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 2.months.ago, retention_interval_days: 14,
+                                          next_retention_check_on: Date.current + 10)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [], established: [ cm ])
+
+      expect(prompt).to include(
+        "Established concepts (well past first mastery — survived a retention check): memoization"
+      )
+      expect(prompt).to match(/keep that section's teaching_note minimal/i)
+      expect(prompt).to match(/full difficulty/i)
+      expect(prompt).to match(/does not force you to select/i)
+    end
+
+    it "omits the established block entirely when nothing qualifies" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [], established: [])
+      expect(prompt).not_to match(/well past first mastery/i)
+    end
+
+    it "lists multiple established concepts comma-separated" do
+      cm1 = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                           mastered_at: 2.months.ago, retention_interval_days: 14,
+                                           next_retention_check_on: Date.current + 10)
+      cm2 = user.concept_masteries.create!(concept: "scope_chaining", language: "ruby_rails", tier: :standard,
+                                           mastered_at: 1.month.ago, retention_interval_days: 28,
+                                           next_retention_check_on: Date.current + 20)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
+                            reinforcement: [], due_checks: [], established: [ cm1, cm2 ])
+      expect(prompt).to include("memoization, scope_chaining")
+    end
+  end
+
   describe "#normalize_concepts" do
     it "keeps on-list concepts and maps off-list ones to 'other'" do
       set = {

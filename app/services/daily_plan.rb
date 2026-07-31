@@ -11,7 +11,7 @@
 # `.for` is the only public entry point and everything below it is a step
 # toward building one. Result is the value it hands back.
 class DailyPlan
-  Result = Data.define(:third, :reinforcement, :due_checks)
+  Result = Data.define(:third, :reinforcement, :due_checks, :established)
 
   # Which third section this set gets. Named, tunable weights rather than a
   # bare literal: architecture-reasoning most of the time, a security-review
@@ -47,8 +47,10 @@ class DailyPlan
     slots         = 3 - reinforcement.first(3).size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, third: third)
     due_checks    = retention_checks_for(user, language, third: third, slots: slots)
+    established   = established_concepts_for(user, language, third: third,
+                                             reinforcement: reinforcement, due_checks: due_checks)
 
-    Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks)
+    Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established)
   end
 
   def self.roll_third_section
@@ -102,6 +104,23 @@ class DailyPlan
     (Date.current - cm.next_retention_check_on).to_f / cm.retention_interval_days
   end
   private_class_method :overdue_ratio
+
+  # Concepts with genuine mastery history: standard tier and past their initial
+  # retention interval, meaning they already survived at least one scheduled
+  # check rather than being mastered once and never re-tested. Anything already
+  # claimed by reinforcement or a due check carries its own, stronger prompt
+  # annotation and takes precedence over this one.
+  def self.established_concepts_for(user, language, third:, reinforcement:, due_checks:)
+    claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
+
+    hostable_buckets(language, third: third).flat_map { |bucket|
+      user.concept_masteries
+        .where(language: bucket, tier: :standard)
+        .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
+        .to_a
+    }.reject { |cm| claimed.include?(cm.concept) }
+  end
+  private_class_method :established_concepts_for
 
   # Whether reinforcement should give up its 3rd slot: only when some retention
   # check, in a bucket today's third can actually host, has crossed the
