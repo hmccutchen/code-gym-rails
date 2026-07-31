@@ -100,11 +100,9 @@
     .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
     .arch-options { margin: 0 0 1.25rem 1.25rem; font-size: .95rem; line-height: 1.8; }
 
-    /* Phones only. The negative inline margin cancels .container's 1.5rem
-       gutter so cards run edge to edge, reclaiming ~64px of text width on a
-       375px screen; the two values are coupled and must change together.
-       Scoped to .section rather than zeroing .container's padding, which would
-       drag the nav and every page heading flush against the screen edge. */
+    /* Scoped to .section rather than zeroing .container's padding, which would
+       drag the nav and every page heading flush against the screen edge. The
+       -1.5rem tracks .container's padding and must change with it. */
     @media (max-width: 600px) {
       .section {
         margin-inline: -1.5rem;
