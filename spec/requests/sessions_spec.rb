@@ -82,6 +82,73 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
+  describe "POST /login/code" do
+    include ActiveJob::TestHelper
+
+    it "logs the user in with the code emailed after POST /login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      expect(raw_code).to be_present
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to be_present
+    end
+
+    it "rejects an incorrect code without logging in" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+
+      post verify_login_code_path, params: { code: "000000" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(session[:user_id]).to be_nil
+    end
+
+    it "locks out after 5 wrong attempts, invalidating the emailed link too" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+
+      5.times { post verify_login_code_path, params: { code: "000000" } }
+
+      get verify_auth_path(token: raw_token)
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to match(/invalid or expired/i)
+    end
+
+    it "returns nil-equivalent (no session) when there is no pending login in this browser" do
+      post verify_login_code_path, params: { code: "123456" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(session[:user_id]).to be_nil
+    end
+  end
+
+  describe "GET /login/status" do
+    it "reports unauthenticated before verification" do
+      get login_status_path
+      expect(JSON.parse(response.body)).to eq("authenticated" => false)
+    end
+
+    it "reports authenticated once verify has completed in this session" do
+      user = User.create!(email: "dev@example.com", name: "Dev")
+      raw_token = user.generate_login_token!
+
+      get login_status_path
+      expect(JSON.parse(response.body)["authenticated"]).to eq(false)
+
+      get verify_auth_path(token: raw_token)
+
+      get login_status_path
+      expect(JSON.parse(response.body)["authenticated"]).to eq(true)
+    end
+  end
+
   describe "session lifetime" do
     it "expires the session cookie after 2 days" do
       expect(Rails.application.config.session_options[:expire_after]).to eq(2.days)

@@ -7,7 +7,7 @@ class SessionsController < ApplicationController
     redirect_to root_path if logged_in?
   end
 
-  # POST /login — send magic link
+  # POST /login — send magic link (and its login-code twin)
   def create
     email = params[:email].to_s.strip.downcase
     name  = params[:name].to_s.strip
@@ -21,7 +21,11 @@ class SessionsController < ApplicationController
     end
 
     raw_token = user.generate_login_token!
-    UserMailer.magic_link(user, raw_token).deliver_later
+    UserMailer.magic_link(user, raw_token, user.raw_login_code).deliver_later
+
+    # Drives the "check your email" pending state on the login page (Fix 1's
+    # code field, Fix 2's polling) across reloads in this same browser.
+    session[:pending_login_email] = email
 
     redirect_to login_path, notice: "Check your email for a login link. It expires in 15 minutes."
   rescue ActiveRecord::RecordInvalid => e
@@ -40,8 +44,36 @@ class SessionsController < ApplicationController
 
     user.clear_login_token!
     session[:user_id] = user.id
+    session.delete(:pending_login_email)
 
     redirect_to session.delete(:return_to) || root_path, notice: "Welcome back, #{user.name}!"
+  end
+
+  # POST /login/code — the PWA-friendly alternate to clicking the link.
+  # Email comes from this browser's own pending-login session state, never
+  # from a client-supplied field, so the code can't be used to target a
+  # different account than the one that requested it here.
+  def verify_code
+    email = session[:pending_login_email]
+    user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
+
+    if user
+      session[:user_id] = user.id
+      session.delete(:pending_login_email)
+      redirect_to session.delete(:return_to) || root_path, notice: "Welcome back, #{user.name}!"
+    else
+      flash.now[:alert] = "Incorrect or expired code. Try again, or use the link in your email."
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  # GET /login/status — polled by the pending-login state in a normal
+  # (non-PWA) browser tab. Relies on Rails' cookie session store sharing one
+  # cookie across tabs in the same browser: once the tab that clicked the
+  # link sets session[:user_id], this tab's very next request already
+  # carries the updated cookie.
+  def status
+    render json: { authenticated: logged_in? }
   end
 
   def destroy
