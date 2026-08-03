@@ -128,6 +128,27 @@ class FakeService < AiService
     "improved_code" => ""
   }.freeze
 
+  CONCEPT_REFERENCE = {
+    "tagline" => "One clear rule, not a grab-bag of tips.",
+    "explanation" => "This concept has one core idea worth internalizing, with a couple of situations where it matters most.",
+    "code_example" => <<~RUBY.strip,
+      # A short, annotated example demonstrating the concept.
+      def example
+        true
+      end
+    RUBY
+    "senior_lens" => "A senior engineer reaches for this automatically, without having to reason it out each time."
+  }.freeze
+
+  EXPLAIN_DIFFERENTLY_TEXT =
+    "Think of it like a relay race — each service object is one runner, and its only job is to hand off cleanly " \
+    "to the next one. If a single method complains about doing too much, that's the same as one runner trying to " \
+    "run the whole race alone."
+
+  FOLLOW_UP_ANSWER_TEXT =
+    "Focus on the boundary of the operation: what MUST happen before returning success, and what could safely " \
+    "happen after. That's what separates a synchronous responsibility from something a background job can own."
+
   private
 
   def call(system:, prompt:)
@@ -138,6 +159,12 @@ class FakeService < AiService
       when /giving direct, specific feedback/
         third_key = prompt[/Return JSON with keys: "code_review", "pattern", "(\w+)"/, 1]
         { "code_review" => REVIEW_SECTION, "pattern" => REVIEW_SECTION, third_key => REVIEW_SECTION }.to_json
+      when /writing a concise, durable reference/
+        CONCEPT_REFERENCE.to_json
+      when /re-explaining one point/
+        EXPLAIN_DIFFERENTLY_TEXT
+      when /answering a follow-up question/
+        FOLLOW_UP_ANSWER_TEXT
       else
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end

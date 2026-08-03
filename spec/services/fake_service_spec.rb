@@ -63,4 +63,42 @@ RSpec.describe FakeService do
       expect(review["code_review"]["correct"]).to be_an(Array)
     end
   end
+
+  describe "#generate_concept_reference" do
+    it "returns every required CONCEPT_REFERENCE_FIELDS field non-blank" do
+      reference = described_class.new(user.api_key).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+        expect(reference[field].to_s.strip).to be_present
+      end
+    end
+  end
+
+  describe "#explain_differently" do
+    it "returns non-blank plain prose" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails",
+                                        generated_at: Time.current, problem_set: described_class::EXERCISE_PROBLEM_SET)
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                        answers: { "pattern" => "Extract a service object" })
+
+      text = described_class.new(user.api_key).explain_differently(user, exercise, response, section: "pattern")
+
+      expect(text).to be_present
+    end
+  end
+
+  describe "#answer_follow_up" do
+    it "returns non-blank plain prose" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails",
+                                        generated_at: Time.current, problem_set: described_class::EXERCISE_PROBLEM_SET)
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                        answers: { "pattern" => "Extract a service object" })
+
+      text = described_class.new(user.api_key).answer_follow_up(
+        user, exercise, response, section: "pattern", question: "Why not just a bigger model?"
+      )
+
+      expect(text).to be_present
+    end
+  end
 end
