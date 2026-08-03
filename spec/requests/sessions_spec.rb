@@ -82,6 +82,244 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
+  describe "POST /login/code" do
+    include ActiveJob::TestHelper
+
+    # The generated code is random, so a hardcoded "wrong" code can occasionally
+    # be the real one. Derive one that never collides.
+    def wrong_code_for(code)
+      format("%06d", (code.to_i + 1) % 1_000_000)
+    end
+
+    it "logs the user in with the code emailed after POST /login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      expect(raw_code).to be_present
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to be_present
+    end
+
+    it "rejects an incorrect code without logging in" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      post verify_login_code_path, params: { code: wrong_code_for(raw_code) }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(session[:user_id]).to be_nil
+    end
+
+    it "locks out after 5 wrong attempts, invalidating the emailed link too" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      body = ActionMailer::Base.deliveries.last.body.encoded
+      raw_token = body[/token=([\w-]+)/, 1]
+      wrong = wrong_code_for(body[/enter this code: (\d{6})/, 1])
+
+      5.times { post verify_login_code_path, params: { code: wrong } }
+
+      get verify_auth_path(token: raw_token)
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to match(/invalid or expired/i)
+    end
+
+    it "returns nil-equivalent (no session) when there is no pending login in this browser" do
+      post verify_login_code_path, params: { code: "123456" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(session[:user_id]).to be_nil
+    end
+  end
+
+  describe "login code gating by device" do
+    include ActiveJob::TestHelper
+
+    it "emails a login code when the request came from a touch device" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+
+      expect(ActionMailer::Base.deliveries.last.body.encoded).to match(/enter this code: \d{6}/)
+    end
+
+    it "omits the login code when the request came from a desktop browser" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+
+      expect(ActionMailer::Base.deliveries.last.body.encoded).not_to include("enter this code")
+    end
+
+    it "still emails a working magic link to a desktop browser" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+
+      get verify_auth_path(token: raw_token)
+
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to be_present
+    end
+
+    it "clears the pending-login device flag after a link login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+
+      get verify_auth_path(token: raw_token)
+
+      expect(session[:pending_login_email]).to be_nil
+      expect(session[:pending_login_touch]).to be_nil
+    end
+
+    it "clears the pending-login device flag after a code login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(session[:pending_login_email]).to be_nil
+      expect(session[:pending_login_touch]).to be_nil
+    end
+  end
+
+  describe "the login page's device-gated code UI" do
+    it "carries a touch_device field for the client script to set" do
+      get login_path
+
+      expect(response.body).to include('name="touch_device"')
+    end
+
+    it "offers the code form on the pending page after a touch-device request" do
+      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+
+      get login_path
+
+      expect(response.body).to include("/login/code")
+      expect(response.body).to include("6-digit code")
+    end
+
+    it "hides the code form on the pending page after a desktop request" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+
+      get login_path
+
+      expect(response.body).not_to include("/login/code")
+      expect(response.body).to include("Check your email")
+    end
+  end
+
+  describe "GET /login/status" do
+    it "reports unauthenticated before verification" do
+      get login_status_path
+      expect(JSON.parse(response.body)).to eq("authenticated" => false)
+    end
+
+    it "reports authenticated once verify has completed in this session" do
+      user = User.create!(email: "dev@example.com", name: "Dev")
+      raw_token = user.generate_login_token!
+
+      get login_status_path
+      expect(JSON.parse(response.body)["authenticated"]).to eq(false)
+
+      get verify_auth_path(token: raw_token)
+
+      get login_status_path
+      expect(JSON.parse(response.body)["authenticated"]).to eq(true)
+    end
+  end
+
+  describe "session rotation on login" do
+    include ActiveJob::TestHelper
+
+    it "issues a new session on link login so nothing written before auth survives" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+      pre_login_session_id = session.id.public_id
+
+      get verify_auth_path(token: raw_token)
+
+      expect(session[:user_id]).to be_present
+      expect(session.id.public_id).not_to eq(pre_login_session_id)
+    end
+
+    it "issues a new session on code login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      pre_login_session_id = session.id.public_id
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(session[:user_id]).to be_present
+      expect(session.id.public_id).not_to eq(pre_login_session_id)
+    end
+
+    it "issues a new session on logout" do
+      user = create_user_with_key(email: "dev@example.com")
+      login_as(user)
+      get history_path
+      pre_logout_session_id = session.id.public_id
+
+      delete logout_path
+
+      expect(session[:user_id]).to be_nil
+      expect(session.id.public_id).not_to eq(pre_logout_session_id)
+    end
+
+    # The rotation discards the whole session, so return_to has to be read out
+    # before reset_session or the post-login redirect silently loses it.
+    it "still returns the user to the page they were bounced from" do
+      user = User.create!(email: "dev@example.com", name: "Dev")
+      raw_token = user.generate_login_token!
+
+      get history_path
+      expect(response).to redirect_to(login_path)
+
+      get verify_auth_path(token: raw_token)
+
+      expect(response).to redirect_to(history_path)
+    end
+
+    it "clears the pending-login state on code login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(session[:pending_login_email]).to be_nil
+      expect(session[:pending_login_touch]).to be_nil
+    end
+  end
+
+  describe "session lifetime" do
+    it "expires the session cookie after 2 days" do
+      expect(Rails.application.config.session_options[:expire_after]).to eq(2.days)
+    end
+
+    it "keeps the default cookie key so existing sessions survive the change" do
+      expect(Rails.application.config.session_options[:key]).to eq("_code_gym_rails_session")
+    end
+  end
+
   describe "anonymized users" do
     it "rejects a session cookie belonging to an anonymized user" do
       user = create_user_with_key(email: "gone@example.com")

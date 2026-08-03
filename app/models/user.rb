@@ -25,13 +25,19 @@ class User < ApplicationRecord
   scope :active, -> { where(anonymized_at: nil) }
 
   TOKEN_EXPIRY = 15.minutes
+  LOGIN_CODE_MAX_ATTEMPTS = 5
+
+  attr_reader :raw_login_code
 
   # ── Magic link ────────────────────────────────────────────────────────────
   def generate_login_token!
     raw_token = SecureRandom.urlsafe_base64(32)
+    @raw_login_code = format("%06d", SecureRandom.random_number(1_000_000))
     update!(
       login_token_digest:   BCrypt::Password.create(raw_token),
-      login_token_sent_at:  Time.current
+      login_token_sent_at:  Time.current,
+      login_code_digest:    BCrypt::Password.create(@raw_login_code),
+      login_code_attempts:  0
     )
     raw_token
   end
@@ -45,8 +51,33 @@ class User < ApplicationRecord
     candidates.find { |u| BCrypt::Password.new(u.login_token_digest) == raw_token }
   end
 
+  # Same underlying token record as the link — a different presentation, not a
+  # separate or weaker mechanism. Wrong guesses count against
+  # LOGIN_CODE_MAX_ATTEMPTS; hitting it invalidates the code AND the link,
+  # forcing a fresh request rather than leaving a guessable code live.
+  def self.authenticate_login_code(email:, code:)
+    candidates = active.where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
+                       .where.not(login_code_digest: nil)
+    user = candidates.find_by(email: email.to_s.strip.downcase)
+    return nil unless user
+
+    if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip
+      user.clear_login_token!
+      return user
+    end
+
+    user.increment!(:login_code_attempts)
+    user.clear_login_token! if user.login_code_attempts >= LOGIN_CODE_MAX_ATTEMPTS
+    nil
+  end
+
   def clear_login_token!
-    update!(login_token_digest: nil, login_token_sent_at: nil)
+    update!(
+      login_token_digest:   nil,
+      login_token_sent_at:  nil,
+      login_code_digest:    nil,
+      login_code_attempts:  0
+    )
   end
 
   # ── Account deletion ──────────────────────────────────────────────────────
@@ -80,6 +111,8 @@ class User < ApplicationRecord
         api_key:             nil,
         login_token_digest:  nil,
         login_token_sent_at: nil,
+        login_code_digest:   nil,
+        login_code_attempts: 0,
         anonymized_at:       Time.current
       )
     end

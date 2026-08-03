@@ -10,10 +10,12 @@ Rails.application.routes.draw do
   mount ActionCable.server => "/cable"
 
   # Auth (magic link)
-  get  "login",        to: "sessions#new"
-  post "login",        to: "sessions#create"
-  get  "auth/verify",  to: "sessions#verify", as: :verify_auth
-  delete "logout",     to: "sessions#destroy", as: :logout
+  get    "login",        to: "sessions#new"
+  post   "login",        to: "sessions#create"
+  get    "auth/verify",  to: "sessions#verify", as: :verify_auth
+  post   "login/code",   to: "sessions#verify_code", as: :verify_login_code
+  get    "login/status", to: "sessions#status", as: :login_status
+  delete "logout",       to: "sessions#destroy", as: :logout
 
   # First-time setup: enter an Anthropic or Gemini API key
   get   "setup", to: "api_keys#edit"
