@@ -12,15 +12,21 @@ class ApplicationController < ActionController::Base
   private
 
   def handle_invalid_token
-    # Logging in rotates the session (and its CSRF token), which leaves the
-    # login forms — rendered under the pre-login session — stale the instant
-    # they succeed. A re-submit (a double-tap on mobile) then lands here with
-    # the user already logged in. The request is still blocked; it just isn't
-    # worth telling someone who just authenticated that their session expired
-    # and bouncing them to a login page that only redirects back.
-    return redirect_to(root_path) if logged_in? && controller_name == "sessions"
+    return redirect_to(root_path) if duplicate_login_submit?
 
     redirect_to login_path, alert: "Your session expired — please try again."
+  end
+
+  # Logging in rotates the session (and its CSRF token), which leaves the login
+  # forms — rendered under the pre-login session — stale the instant they
+  # succeed. A re-submit (a double-tap on mobile) then lands here with the user
+  # already logged in. The request is still blocked; it just isn't worth telling
+  # someone who just authenticated that their session expired and bouncing them
+  # to a login page that only redirects back. Deliberately excludes logout:
+  # silently returning someone to the dashboard when they asked to sign out
+  # would hide a failure they do care about.
+  def duplicate_login_submit?
+    logged_in? && controller_name == "sessions" && %w[create verify_code].include?(action_name)
   end
 
   def use_time_zone(&block)

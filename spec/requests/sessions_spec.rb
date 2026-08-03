@@ -314,7 +314,7 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
-  describe "duplicate login-code submit" do
+  describe "stale CSRF token after the session rotates" do
     include ActiveJob::TestHelper
 
     around do |example|
@@ -359,6 +359,20 @@ RSpec.describe "Sessions", type: :request do
 
       expect(response).to redirect_to(login_path)
       expect(flash[:alert]).to eq("Your session expired — please try again.")
+    end
+
+    # Logout is a sessions action too, but silently returning someone to the
+    # dashboard when they asked to sign out would hide a failure they care
+    # about — and leave them still logged in with nothing said.
+    it "still warns on a stale logout instead of silently returning to the dashboard" do
+      user = create_user_with_key(email: "out@example.com")
+      login_as(user)
+
+      delete logout_path, params: { authenticity_token: "stale-bogus-token" }
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq("Your session expired — please try again.")
+      expect(session[:user_id]).to be_present
     end
   end
 
