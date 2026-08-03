@@ -1,10 +1,15 @@
-# One-time local setup for spec/system/ (CI runs the equivalent in
-# .github/workflows/ci.yml): install a Playwright CLI version matched to the
-# playwright-ruby-client gem, then have it download a Chromium build.
+# One-time local setup for spec/system/ (CI runs the same commands in
+# .github/workflows/ci.yml): install the pinned Playwright CLI from the
+# committed lockfile, then have it download a Chromium build.
 #
-#   export PLAYWRIGHT_CLI_VERSION=$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')
-#   npm install "playwright-core@$PLAYWRIGHT_CLI_VERSION"
+#   npm ci
 #   ./node_modules/.bin/playwright-core install --with-deps chromium
+#
+# `npm ci` (not `npm install`) so the lockfile is never rewritten as a side
+# effect of setup. The pinned version must match what playwright-ruby-client
+# expects, so bump it deliberately alongside the gem:
+#
+#   npm install --save-exact "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
 #
 # capybara-playwright-driver must NOT be registered under the name :playwright
 # — Rails 6.1+ reserves that name for its own built-in Playwright driver, which

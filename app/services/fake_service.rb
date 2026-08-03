@@ -158,6 +158,8 @@ class FakeService < AiService
         EXERCISE_PROBLEM_SET.to_json
       when /giving direct, specific feedback/
         third_key = prompt[/Return JSON with keys: "code_review", "pattern", "(\w+)"/, 1]
+        raise "FakeService could not extract the third section key from the review prompt" if third_key.blank?
+
         { "code_review" => REVIEW_SECTION, "pattern" => REVIEW_SECTION, third_key => REVIEW_SECTION }.to_json
       when /writing a concise, durable reference/
         CONCEPT_REFERENCE.to_json

@@ -62,6 +62,14 @@ RSpec.describe FakeService do
       expect(review["architecture"]["rating"]).to be_present
       expect(review["code_review"]["correct"]).to be_an(Array)
     end
+
+    it "raises a clear error when the third section key can't be extracted from the prompt" do
+      service = described_class.new(user.api_key)
+
+      expect {
+        service.send(:call, system: "You are giving direct, specific feedback", prompt: "no keys line here")
+      }.to raise_error(/could not extract the third section key/)
+    end
   end
 
   describe "#generate_concept_reference" do

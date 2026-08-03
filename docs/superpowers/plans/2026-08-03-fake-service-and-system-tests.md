@@ -615,22 +615,21 @@ Expected: `Gemfile.lock` gains `capybara`, `capybara-playwright-driver`, and `pl
 
 Run:
 ```bash
-export PLAYWRIGHT_CLI_VERSION=$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')
-npm install "playwright-core@$PLAYWRIGHT_CLI_VERSION"
+npm install --save-exact "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
 ./node_modules/.bin/playwright-core install --with-deps chromium
 ```
-Expected: `package.json`, `package-lock.json`, and `node_modules/` appear in the project root; the last command downloads a Chromium build. This pins the CLI to the exact version `playwright-ruby-client` expects — an unversioned `npx playwright` can silently install an incompatible version (see the gem's own install docs).
+Expected: `package.json`, `package-lock.json`, and `node_modules/` appear in the project root; the last command downloads a Chromium build. This pins the CLI to the exact version `playwright-ruby-client` expects — an unversioned `npx playwright` can silently install an incompatible version (see the gem's own install docs). `--save-exact` (no caret range) so a lockfile regeneration can never drift onto an incompatible CLI.
 
-- [ ] **Step 3: Keep the npm artifacts out of git**
+- [ ] **Step 3: Commit the npm manifests, ignore the install directory**
 
-In `.gitignore`, add:
+`package.json` and `package-lock.json` are tracked so CI (and every developer) installs the identical pinned CLI with `npm ci`. Only the install output is ignored — in `.gitignore`, add:
 
 ```
-# Playwright CLI for system specs (installed via Task 5, not tracked)
+# Playwright CLI install output for system specs (restored via `npm ci`)
 /node_modules/
-/package.json
-/package-lock.json
 ```
+
+Local setup after checkout is then `npm ci`, never `npm install` — the latter would rewrite the lockfile as a side effect. Reserve `npm install --save-exact` for an intentional version bump alongside the gem.
 
 - [ ] **Step 4: Register the driver and wire it into system specs**
 
