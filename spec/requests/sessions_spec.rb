@@ -110,6 +110,7 @@ RSpec.describe "Sessions", type: :request do
         post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      expect(raw_code).to be_present
 
       post verify_login_code_path, params: { code: wrong_code_for(raw_code) }
 
@@ -123,7 +124,10 @@ RSpec.describe "Sessions", type: :request do
       end
       body = ActionMailer::Base.deliveries.last.body.encoded
       raw_token = body[/token=([\w-]+)/, 1]
-      wrong = wrong_code_for(body[/enter this code: (\d{6})/, 1])
+      raw_code  = body[/enter this code: (\d{6})/, 1]
+      expect(raw_token).to be_present
+      expect(raw_code).to be_present
+      wrong = wrong_code_for(raw_code)
 
       5.times { post verify_login_code_path, params: { code: wrong } }
 

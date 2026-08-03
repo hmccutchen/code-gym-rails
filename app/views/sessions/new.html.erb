@@ -37,11 +37,16 @@
     <script>
     (() => {
       const field = document.getElementById("touch-device");
-      if (!field || !window.matchMedia) return;
+      if (!field) return;
+
+      // matchMedia is optional here: navigator.standalone alone is enough to
+      // identify an installed iOS PWA, so bailing out on its absence would
+      // drop that signal.
+      const matches = (query) => window.matchMedia ? window.matchMedia(query).matches : false;
 
       const isTouch = window.navigator.standalone === true ||
-        window.matchMedia("(display-mode: standalone)").matches ||
-        window.matchMedia("(pointer: coarse)").matches;
+        matches("(display-mode: standalone)") ||
+        matches("(pointer: coarse)");
 
       if (isTouch) field.value = "1";
     })();
