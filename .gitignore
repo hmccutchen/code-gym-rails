@@ -33,7 +33,6 @@
 # Ignore master key for decrypting credentials and more.
 /config/master.key
 
-# Playwright CLI for system specs (installed via Task 5, not tracked)
+# Playwright CLI for system specs — not tracked; see
+# spec/support/system_test_helper.rb for the one-time install commands.
 /node_modules/
-/package.json
-/package-lock.json

@@ -65,15 +65,7 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
-  describe "stale CSRF token (e.g. after a deploy restart)" do
-    around do |example|
-      original = ActionController::Base.allow_forgery_protection
-      ActionController::Base.allow_forgery_protection = true
-      example.run
-    ensure
-      ActionController::Base.allow_forgery_protection = original
-    end
-
+  describe "stale CSRF token (e.g. after a deploy restart)", :with_csrf do
     it "redirects to login with a friendly flash instead of a raw 422" do
       post login_path, params: { email: "x@example.com", authenticity_token: "stale-bogus-token" }
 
@@ -314,16 +306,8 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
-  describe "stale CSRF token after the session rotates" do
+  describe "stale CSRF token after the session rotates", :with_csrf do
     include ActiveJob::TestHelper
-
-    around do |example|
-      original = ActionController::Base.allow_forgery_protection
-      ActionController::Base.allow_forgery_protection = true
-      example.run
-    ensure
-      ActionController::Base.allow_forgery_protection = original
-    end
 
     def authenticity_token
       response.body[/name="authenticity_token" value="([^"]+)"/, 1]

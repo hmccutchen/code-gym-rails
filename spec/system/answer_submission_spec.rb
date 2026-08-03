@@ -1,18 +1,11 @@
 # spec/system/answer_submission_spec.rb
 require "rails_helper"
 
-RSpec.describe "Rating-gated answer submission", type: :system do
-  # allow_forgery_protection is off app-wide in test (config/environments/test.rb),
-  # which also blanks csrf_meta_tags — the dashboard's inline submit script reads
-  # that meta tag and throws on a real browser exercising the real fetch/CSRF path.
-  # Same toggle spec/requests/sessions_spec.rb uses for its CSRF-dependent examples.
-  around do |example|
-    original = ActionController::Base.allow_forgery_protection
-    ActionController::Base.allow_forgery_protection = true
-    example.run
-  ensure
-    ActionController::Base.allow_forgery_protection = original
-  end
+RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true do
+  # allow_forgery_protection off (config/environments/test.rb) also blanks
+  # csrf_meta_tags — the dashboard's inline submit script reads that meta tag
+  # and throws on a real browser exercising the real fetch/CSRF path, so this
+  # spec needs :with_csrf (spec/support/csrf_helper.rb) turned on.
 
   it "enables Submit only once every section is rated, then submits and shows the submitted state" do
     user = create_fake_provider_user
@@ -20,6 +13,10 @@ RSpec.describe "Rating-gated answer submission", type: :system do
 
     travel_to(monday) do
       perform_enqueued_jobs { visit_as(user) }
+      # Regex, not a literal string: this label renders inside
+      # `.section-label` (CSS `text-transform: uppercase`), and the
+      # Playwright driver matches on rendered text — see
+      # dashboard_generation_spec.rb for the full explanation.
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       expect(page).to have_button("Submit answers →", disabled: true)

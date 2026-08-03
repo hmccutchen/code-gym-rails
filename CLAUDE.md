@@ -129,10 +129,10 @@ bundle exec rspec
 capybara-playwright-driver) covering flows unit/request specs can't fully
 verify — rating-gated submit, review loading state — driven exclusively
 against a `FakeService` (`provider: "fake"`) test user, never a real API key.
-Running them locally requires a one-time Playwright CLI install (see
-`app/services/fake_service.rb`'s and `spec/support/system_test_helper.rb`'s
-comments for the exact commands); `bundle exec rspec` alone runs everything
-else and skips nothing.
+Running them locally requires a one-time Playwright CLI install — see the
+comment block at the top of `spec/support/system_test_helper.rb` for the
+exact commands. CI installs the same CLI on every run (see below), so
+`bundle exec rspec` runs the full suite there without any extra setup.
 
 CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
 

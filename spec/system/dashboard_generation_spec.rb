@@ -19,6 +19,12 @@ RSpec.describe "Dashboard on-demand generation", type: :system do
       # before the job was enqueued) — the page's own poll script picks up
       # the now-ready state and reloads. default_max_wait_time (10s, Task 5)
       # comfortably covers the poll's first 3s tick.
+      #
+      # Regex, not a literal string: these labels render inside
+      # `.section-label`, which is CSS `text-transform: uppercase` — the
+      # Playwright driver matches on the rendered (uppercased) text, so a
+      # literal "Code Review" would fail. Case-insensitive regex sidesteps
+      # both the DOM casing and this rendering detail.
       expect(page).to have_content(/Code Review/i, wait: 10)
       expect(page).to have_content(/Pattern of the Month/i)
       expect(page).to have_content(/Architecture Decision/i)
