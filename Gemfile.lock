@@ -430,7 +430,7 @@ DEPENDENCIES
   bootsnap
   brakeman
   capybara
-  capybara-playwright-driver
+  capybara-playwright-driver (~> 0.5.10)
   debug
   faraday (~> 2.0)
   faraday-retry

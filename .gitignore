@@ -33,6 +33,6 @@
 # Ignore master key for decrypting credentials and more.
 /config/master.key
 
-# Playwright CLI install output — restored with `npm ci` from the tracked
-# lockfile; see spec/support/system_test_helper.rb for the setup commands.
-/node_modules/
+# Playwright CLI install output — restored with `npm --prefix spec/playwright ci`
+# from the tracked lockfile; see spec/support/system_test_helper.rb.
+/spec/playwright/node_modules/

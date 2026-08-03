@@ -130,11 +130,18 @@ class AiService
   end
 
   # ── Dispatch to the right provider for this user ─────────────────────────
+  # "fake" is never reachable through the app — ApiKeysController derives
+  # provider from a two-entry key-format allowlist — so a fake-provider user in
+  # production could only come from a console/DB mistake, where silently serving
+  # canned exercises would be worse than failing loudly.
   def self.for(user)
     case user.provider
     when "anthropic" then ClaudeService.new(user.api_key)
     when "gemini"    then GeminiService.new(user.api_key)
-    when "fake"      then FakeService.new(user.api_key)
+    when "fake"
+      raise Error, "User #{user.id} has the test-only fake provider outside a local environment" unless Rails.env.local?
+
+      FakeService.new(user.api_key)
     else
       raise Error, "User #{user.id} has no recognized AI provider configured"
     end

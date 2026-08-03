@@ -13,6 +13,12 @@ RSpec.describe FakeService do
     expect(AiService.for(user)).to be_a(FakeService)
   end
 
+  it "is refused by AiService.for outside a local environment" do
+    allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+
+    expect { AiService.for(user) }.to raise_error(AiService::Error, /test-only fake provider/)
+  end
+
   describe "#generate_exercise" do
     it "returns a problem set covering every ExerciseSection kind with valid, non-'other' concepts" do
       problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")

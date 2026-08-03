@@ -151,6 +151,10 @@ class FakeService < AiService
 
   private
 
+  # Both raises are deliberately bare RuntimeErrors, not AiService::Error:
+  # GenerateDailyExercisesJob rescues the AiService hierarchy and turns it into
+  # a persisted, user-facing failure message, which would bury a broken fake as
+  # "generation failed" instead of failing the spec that caused it.
   def call(system:, prompt:)
     text =
       case system

@@ -1,4 +1,3 @@
-# spec/system/answer_submission_spec.rb
 require "rails_helper"
 
 RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true do

@@ -1,4 +1,3 @@
-# spec/system/dashboard_generation_spec.rb
 require "rails_helper"
 
 RSpec.describe "Dashboard on-demand generation", type: :system do

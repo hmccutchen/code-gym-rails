@@ -592,7 +592,7 @@ git commit -m "Add create_fake_provider_user test helper"
 - Create: `spec/system/smoke_spec.rb`
 
 **Interfaces:**
-- Produces: `driven_by :capybara_playwright` registered and available to any `type: :system` spec; `Capybara.default_max_wait_time` raised to 10s (Capybara's 2s default is too short for a real browser + this app's fetch-based interactions); a real headless Chromium reachable via a project-local `node_modules/.bin/playwright-core`.
+- Produces: `driven_by :capybara_playwright` registered and available to any `type: :system` spec; `Capybara.default_max_wait_time` raised to 10s (Capybara's 2s default is too short for a real browser + this app's fetch-based interactions); a real headless Chromium reachable via a project-local `spec/playwright/node_modules/.bin/playwright-core`.
 - Consumes: Node.js + npm (already present on this machine — confirmed via `node -v` / `npm -v` during planning).
 
 - [ ] **Step 1: Add the gems in a dedicated test-only group**
@@ -615,21 +615,22 @@ Expected: `Gemfile.lock` gains `capybara`, `capybara-playwright-driver`, and `pl
 
 Run:
 ```bash
-npm install --save-exact "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
-./node_modules/.bin/playwright-core install --with-deps chromium
+mkdir -p spec/playwright
+npm --prefix spec/playwright install --save-exact "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
+./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
 ```
-Expected: `package.json`, `package-lock.json`, and `node_modules/` appear in the project root; the last command downloads a Chromium build. This pins the CLI to the exact version `playwright-ruby-client` expects — an unversioned `npx playwright` can silently install an incompatible version (see the gem's own install docs). `--save-exact` (no caret range) so a lockfile regeneration can never drift onto an incompatible CLI.
+Expected: `package.json`, `package-lock.json`, and `node_modules/` appear under `spec/playwright/`; the last command downloads a Chromium build. They must NOT live in the repo root: Railway builds with Nixpacks, whose Ruby provider installs Node and runs an npm install whenever it finds a root `package.json`, and this importmap-only app needs no Node in production. This pins the CLI to the exact version `playwright-ruby-client` expects — an unversioned `npx playwright` can silently install an incompatible version (see the gem's own install docs). `--save-exact` (no caret range) so a lockfile regeneration can never drift onto an incompatible CLI.
 
 - [ ] **Step 3: Commit the npm manifests, ignore the install directory**
 
-`package.json` and `package-lock.json` are tracked so CI (and every developer) installs the identical pinned CLI with `npm ci`. Only the install output is ignored — in `.gitignore`, add:
+`spec/playwright/package.json` and `spec/playwright/package-lock.json` are tracked so CI (and every developer) installs the identical pinned CLI with `npm ci`. Only the install output is ignored — in `.gitignore`, add:
 
 ```
-# Playwright CLI install output for system specs (restored via `npm ci`)
-/node_modules/
+# Playwright CLI install output for system specs
+/spec/playwright/node_modules/
 ```
 
-Local setup after checkout is then `npm ci`, never `npm install` — the latter would rewrite the lockfile as a side effect. Reserve `npm install --save-exact` for an intentional version bump alongside the gem.
+Local setup after checkout is then `npm --prefix spec/playwright ci`, never `npm install` — the latter would rewrite the lockfile as a side effect. Reserve `npm install --save-exact` for an intentional version bump alongside the gem.
 
 - [ ] **Step 4: Register the driver and wire it into system specs**
 
@@ -644,7 +645,7 @@ Capybara.register_driver(:capybara_playwright) do |app|
     app,
     browser_type: :chromium,
     headless: true,
-    playwright_cli_executable_path: Rails.root.join("node_modules/.bin/playwright-core").to_s
+    playwright_cli_executable_path: Rails.root.join("spec/playwright/node_modules/.bin/playwright-core").to_s
   )
 end
 
@@ -724,7 +725,7 @@ end
 - [ ] **Step 7: Run the smoke spec to verify it passes**
 
 Run: `bundle exec rspec spec/system/smoke_spec.rb`
-Expected: PASS. If it fails with a driver/executable error, re-check that `node_modules/.bin/playwright-core` exists (Step 2) and that `PLAYWRIGHT_CLI_VERSION` resolved to a real version string.
+Expected: PASS. If it fails with a driver/executable error, re-check that `spec/playwright/node_modules/.bin/playwright-core` exists (Step 2) and that `PLAYWRIGHT_CLI_VERSION` resolved to a real version string.
 
 - [ ] **Step 8: Run the full suite**
 
@@ -738,7 +739,7 @@ git add Gemfile Gemfile.lock .gitignore spec/support/system_test_helper.rb spec/
 git commit -m "Add Capybara + Playwright system test driver"
 ```
 
-Note: `package.json`/`package-lock.json`/`node_modules/` are gitignored (Step 3) — nothing from Step 2 gets committed. Anyone else running system specs needs to repeat Step 2 locally (or CI needs an equivalent step, out of scope for this plan).
+Note: only `spec/playwright/node_modules/` is gitignored (Step 3); the manifests are committed, so anyone else running system specs just needs `npm --prefix spec/playwright ci` plus the browser download, which is exactly what CI runs.
 
 ---
 

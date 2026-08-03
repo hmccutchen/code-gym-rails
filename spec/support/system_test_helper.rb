@@ -2,24 +2,33 @@
 # .github/workflows/ci.yml): install the pinned Playwright CLI from the
 # committed lockfile, then have it download a Chromium build.
 #
-#   npm ci
-#   ./node_modules/.bin/playwright-core install --with-deps chromium
+#   npm --prefix spec/playwright ci
+#   ./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
+#
+# The npm manifests deliberately live in spec/playwright/, NOT the repo root:
+# Railway builds with Nixpacks, whose Ruby provider installs Node and runs an
+# npm install whenever it finds a root package.json. This app is importmap-only
+# and needs no Node in production, so keeping the manifests out of the root
+# leaves the production build untouched.
 #
 # `npm ci` (not `npm install`) so the lockfile is never rewritten as a side
-# effect of setup. The pinned version must match what playwright-ruby-client
+# effect of setup. The pinned CLI version must match what playwright-ruby-client
 # expects, so bump it deliberately alongside the gem:
 #
-#   npm install --save-exact "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
+#   npm --prefix spec/playwright install --save-exact \
+#     "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
 #
 # capybara-playwright-driver must NOT be registered under the name :playwright
 # — Rails 6.1+ reserves that name for its own built-in Playwright driver, which
 # would silently take over instead. Registered here as :capybara_playwright.
+PLAYWRIGHT_CLI_PATH = Rails.root.join("spec/playwright/node_modules/.bin/playwright-core")
+
 Capybara.register_driver(:capybara_playwright) do |app|
   Capybara::Playwright::Driver.new(
     app,
     browser_type: :chromium,
     headless: true,
-    playwright_cli_executable_path: Rails.root.join("node_modules/.bin/playwright-core").to_s
+    playwright_cli_executable_path: PLAYWRIGHT_CLI_PATH.to_s
   )
 end
 
