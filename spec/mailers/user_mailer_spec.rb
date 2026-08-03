@@ -18,5 +18,14 @@ RSpec.describe UserMailer, type: :mailer do
     it "builds an absolute URL from the configured mailer host" do
       expect(mail.body.encoded).to match(%r{https?://example\.com/auth/verify})
     end
+
+    it "includes the raw login code when one is provided" do
+      mail_with_code = UserMailer.magic_link(user, raw_token, "123456")
+      expect(mail_with_code.body.encoded).to include("123456")
+    end
+
+    it "omits any code line when no code is provided" do
+      expect(mail.body.encoded).not_to include("enter this code")
+    end
   end
 end

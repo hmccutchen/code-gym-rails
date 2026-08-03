@@ -1,7 +1,8 @@
 class UserMailer < ApplicationMailer
-  def magic_link(user, raw_token)
+  def magic_link(user, raw_token, raw_code = nil)
     @user      = user
     @magic_url = verify_auth_url(token: raw_token)
+    @raw_code  = raw_code
     mail(to: user.email, subject: "Your Code Gym login link")
   end
 end
