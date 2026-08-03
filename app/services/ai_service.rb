@@ -134,6 +134,7 @@ class AiService
     case user.provider
     when "anthropic" then ClaudeService.new(user.api_key)
     when "gemini"    then GeminiService.new(user.api_key)
+    when "fake"      then FakeService.new(user.api_key)
     else
       raise Error, "User #{user.id} has no recognized AI provider configured"
     end

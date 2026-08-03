@@ -16,7 +16,7 @@ class User < ApplicationRecord
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
   validates :skill_level, inclusion: { in: %w[beginner developing solid strong] }
-  validates :provider, inclusion: { in: %w[anthropic gemini] }, allow_nil: true
+  validates :provider, inclusion: { in: %w[anthropic gemini fake] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
   validate :time_zone_must_be_loadable
 
