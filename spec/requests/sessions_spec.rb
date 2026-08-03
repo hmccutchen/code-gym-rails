@@ -185,6 +185,32 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
+  describe "the login page's device-gated code UI" do
+    it "carries a touch_device field for the client script to set" do
+      get login_path
+
+      expect(response.body).to include('name="touch_device"')
+    end
+
+    it "offers the code form on the pending page after a touch-device request" do
+      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+
+      get login_path
+
+      expect(response.body).to include("/login/code")
+      expect(response.body).to include("6-digit code")
+    end
+
+    it "hides the code form on the pending page after a desktop request" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+
+      get login_path
+
+      expect(response.body).not_to include("/login/code")
+      expect(response.body).to include("Check your email")
+    end
+  end
+
   describe "GET /login/status" do
     it "reports unauthenticated before verification" do
       get login_status_path

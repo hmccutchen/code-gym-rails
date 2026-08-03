@@ -2,16 +2,18 @@
   Check your email for a login link — this page will update automatically once you click it.
 </p>
 
-<details id="code-details">
-  <summary>Or enter the code instead</summary>
-  <%= form_with url: verify_login_code_path, method: :post do |f| %>
-    <div class="form-field" style="margin-top:.75rem;">
-      <%= f.label :code, "6-digit code from the email" %>
-      <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6, autocomplete: "one-time-code", placeholder: "123456", required: true %>
-    </div>
-    <%= f.submit "Verify code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
-  <% end %>
-</details>
+<% if session[:pending_login_touch] %>
+  <details id="code-details">
+    <summary>Or enter the code instead</summary>
+    <%= form_with url: verify_login_code_path, method: :post do |f| %>
+      <div class="form-field" style="margin-top:.75rem;">
+        <%= f.label :code, "6-digit code from the email" %>
+        <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6, autocomplete: "one-time-code", placeholder: "123456", required: true %>
+      </div>
+      <%= f.submit "Verify code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+    <% end %>
+  </details>
+<% end %>
 
 <%# Wrapped in an IIFE: this partial can render again after a failed code
     submit re-renders sessions/new, and top-level const/let would redeclare
@@ -22,9 +24,13 @@
   const isStandalone = window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   const message = document.getElementById("pending-message");
-  const details  = document.getElementById("code-details");
+  const details = document.getElementById("code-details");
 
-  if (isStandalone) {
+  // `details` is absent on desktop, where the server omits the code form
+  // entirely. Requiring it here means a standalone app that somehow has no
+  // code form still falls through to polling rather than stranding the user
+  // on a message about a field that isn't there.
+  if (isStandalone && details) {
     message.textContent = "Check your email for a 6-digit code and enter it below.";
     details.open = true;
     details.querySelector("summary").style.display = "none";
