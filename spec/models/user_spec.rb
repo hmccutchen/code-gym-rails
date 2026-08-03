@@ -122,6 +122,12 @@ RSpec.describe User, type: :model do
   end
 
   describe "login code" do
+    # The generator emits a random 6-digit string, so a hardcoded "wrong" code
+    # can occasionally *be* the real one. Derive one that never collides.
+    def wrong_code_for(user)
+      format("%06d", (user.raw_login_code.to_i + 1) % 1_000_000)
+    end
+
     it "generates a code digest alongside the token, with attempts reset to zero" do
       user = create_user
       user.generate_login_token!
@@ -142,7 +148,9 @@ RSpec.describe User, type: :model do
       user = create_user
       user.generate_login_token!
 
-      expect(user.reload.login_code_digest).not_to include(user.raw_login_code)
+      digest = user.reload.login_code_digest
+      expect(digest).not_to eq(user.raw_login_code)
+      expect(BCrypt::Password.new(digest)).to eq(user.raw_login_code)
     end
 
     it "authenticates with the correct code and invalidates both the code and the link" do
@@ -160,7 +168,7 @@ RSpec.describe User, type: :model do
       user = create_user
       user.generate_login_token!
 
-      expect(User.authenticate_login_code(email: user.email, code: "000000")).to be_nil
+      expect(User.authenticate_login_code(email: user.email, code: wrong_code_for(user))).to be_nil
       expect(user.reload.login_code_attempts).to eq(1)
       expect(user.login_code_digest).to be_present
     end
@@ -168,11 +176,12 @@ RSpec.describe User, type: :model do
     it "locks out and invalidates both the code and the token after 5 wrong attempts" do
       user = create_user
       user.generate_login_token!
+      wrong = wrong_code_for(user)
 
-      4.times { User.authenticate_login_code(email: user.email, code: "000000") }
+      4.times { User.authenticate_login_code(email: user.email, code: wrong) }
       expect(user.reload.login_code_digest).to be_present
 
-      User.authenticate_login_code(email: user.email, code: "000000")
+      User.authenticate_login_code(email: user.email, code: wrong)
       expect(user.reload.login_code_digest).to be_nil
       expect(user.login_token_digest).to be_nil
     end

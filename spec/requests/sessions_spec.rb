@@ -85,6 +85,12 @@ RSpec.describe "Sessions", type: :request do
   describe "POST /login/code" do
     include ActiveJob::TestHelper
 
+    # The generated code is random, so a hardcoded "wrong" code can occasionally
+    # be the real one. Derive one that never collides.
+    def wrong_code_for(code)
+      format("%06d", (code.to_i + 1) % 1_000_000)
+    end
+
     it "logs the user in with the code emailed after POST /login" do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
@@ -100,9 +106,12 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "rejects an incorrect code without logging in" do
-      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
 
-      post verify_login_code_path, params: { code: "000000" }
+      post verify_login_code_path, params: { code: wrong_code_for(raw_code) }
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(session[:user_id]).to be_nil
@@ -112,9 +121,11 @@ RSpec.describe "Sessions", type: :request do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
       end
-      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+      body = ActionMailer::Base.deliveries.last.body.encoded
+      raw_token = body[/token=([\w-]+)/, 1]
+      wrong = wrong_code_for(body[/enter this code: (\d{6})/, 1])
 
-      5.times { post verify_login_code_path, params: { code: "000000" } }
+      5.times { post verify_login_code_path, params: { code: wrong } }
 
       get verify_auth_path(token: raw_token)
       expect(response).to redirect_to(login_path)
