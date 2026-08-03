@@ -125,6 +125,15 @@ RSpec (`spec/` — models, requests, services, jobs, mailers). Run with:
 bundle exec rspec
 ```
 
+`spec/system/` holds a small number of real-browser specs (Capybara +
+capybara-playwright-driver) covering flows unit/request specs can't fully
+verify — rating-gated submit, review loading state — driven exclusively
+against a `FakeService` (`provider: "fake"`) test user, never a real API key.
+Running them locally requires a one-time Playwright CLI install (see
+`app/services/fake_service.rb`'s and `spec/support/system_test_helper.rb`'s
+comments for the exact commands); `bundle exec rspec` alone runs everything
+else and skips nothing.
+
 CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
 
 ## File Map
@@ -143,5 +152,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PREVIEW_SEED_EMAIL`
 - `app/services/preview_mail.rb` — inline mail delivery in preview apps, so login never needs a worker
+- `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output
+- `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway
