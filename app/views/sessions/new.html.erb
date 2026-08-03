@@ -6,21 +6,27 @@
   .form-field label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
   .form-field input { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 1rem; }
   .form-field input:focus { outline: none; border-color: var(--accent); }
+  .login-wrap details { text-align: left; }
+  .login-wrap summary { cursor: pointer; color: var(--muted); margin-bottom: .5rem; }
 </style>
 
 <div class="login-wrap">
   <h1>Code Gym</h1>
-  <p>Daily dev exercises.<br>Enter your email to get a magic link.</p>
+  <% if session[:pending_login_email].present? %>
+    <%= render "sessions/pending" %>
+  <% else %>
+    <p>Daily dev exercises.<br>Enter your email to get a magic link.</p>
 
-  <%= form_with url: login_path, method: :post do |f| %>
-    <div class="form-field">
-      <%= f.label :name, "Name (first time only)" %>
-      <%= f.text_field :name, placeholder: "Your name", autocomplete: "name" %>
-    </div>
-    <div class="form-field">
-      <%= f.label :email, "Work email" %>
-      <%= f.email_field :email, placeholder: "you@company.com", required: true, autocomplete: "email" %>
-    </div>
-    <%= f.submit "Send magic link →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+    <%= form_with url: login_path, method: :post do |f| %>
+      <div class="form-field">
+        <%= f.label :name, "Name (first time only)" %>
+        <%= f.text_field :name, placeholder: "Your name", autocomplete: "name" %>
+      </div>
+      <div class="form-field">
+        <%= f.label :email, "Work email" %>
+        <%= f.email_field :email, placeholder: "you@company.com", required: true, autocomplete: "email" %>
+      </div>
+      <%= f.submit "Send magic link →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+    <% end %>
   <% end %>
 </div>

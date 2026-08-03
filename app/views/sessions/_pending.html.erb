@@ -1,0 +1,58 @@
+<p id="pending-message" style="color:var(--muted);margin-bottom:1.5rem;">
+  Check your email for a login link — this page will update automatically once you click it.
+</p>
+
+<details id="code-details">
+  <summary>Or enter the code instead</summary>
+  <%= form_with url: verify_login_code_path, method: :post do |f| %>
+    <div class="form-field" style="margin-top:.75rem;">
+      <%= f.label :code, "6-digit code from the email" %>
+      <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6, autocomplete: "one-time-code", placeholder: "123456", required: true %>
+    </div>
+    <%= f.submit "Verify code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+  <% end %>
+</details>
+
+<%# Wrapped in an IIFE: this partial can render again after a failed code
+    submit re-renders sessions/new, and top-level const/let would redeclare
+    on that second execution — same hazard documented in
+    dashboard/_generating.html.erb's polling script. %>
+<script>
+(() => {
+  const isStandalone = window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  const message = document.getElementById("pending-message");
+  const details  = document.getElementById("code-details");
+
+  if (isStandalone) {
+    message.textContent = "Check your email for a 6-digit code and enter it below.";
+    details.open = true;
+    details.querySelector("summary").style.display = "none";
+    return; // no shared storage for a same-browser link click to land in, so polling could never resolve
+  }
+
+  const statusUrl = "<%= login_status_path %>";
+  let attempts = 0;
+  const MAX_ATTEMPTS = 200; // ~10 minutes at 3s intervals
+
+  async function poll() {
+    attempts += 1;
+
+    try {
+      const res = await fetch(statusUrl, { headers: { "Accept": "application/json" } });
+      const data = await res.json();
+      if (data.authenticated) {
+        window.location.href = "/";
+        return;
+      }
+    } catch {
+      // Transient network hiccup — keep polling rather than giving up early.
+    }
+
+    if (attempts >= MAX_ATTEMPTS) return;
+    setTimeout(poll, 3000);
+  }
+
+  setTimeout(poll, 3000);
+})();
+</script>
