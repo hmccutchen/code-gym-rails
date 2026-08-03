@@ -161,8 +161,10 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "clears the pending-login device flag after a link login" do
-      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
-      raw_token = User.find_by(email: "dev@example.com").generate_login_token!
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
 
       get verify_auth_path(token: raw_token)
 
