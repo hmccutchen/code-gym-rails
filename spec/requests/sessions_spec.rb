@@ -310,6 +310,54 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
+  describe "duplicate login-code submit" do
+    include ActiveJob::TestHelper
+
+    around do |example|
+      original = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+      example.run
+    ensure
+      ActionController::Base.allow_forgery_protection = original
+    end
+
+    def authenticity_token
+      response.body[/name="authenticity_token" value="([^"]+)"/, 1]
+    end
+
+    # Logging in rotates the session, and the CSRF token with it, so the code
+    # form — rendered under the pre-login session — is stale the moment it
+    # succeeds. Re-submitting it (a double-tap on mobile) must not tell an
+    # already-logged-in user their session expired.
+    it "sends an already-logged-in user home instead of claiming the session expired" do
+      get login_path
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1",
+                                   authenticity_token: authenticity_token }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      get login_path
+      code_form_token = authenticity_token
+
+      post verify_login_code_path, params: { code: raw_code, authenticity_token: code_form_token }
+      expect(response).to redirect_to(root_path)
+
+      post verify_login_code_path, params: { code: raw_code, authenticity_token: code_form_token }
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to be_nil
+      expect(session[:user_id]).to be_present
+    end
+
+    it "still warns a logged-out user whose token is stale" do
+      post login_path, params: { email: "x@example.com", authenticity_token: "stale-bogus-token" }
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq("Your session expired — please try again.")
+    end
+  end
+
   describe "session lifetime" do
     it "expires the session cookie after 2 days" do
       expect(Rails.application.config.session_options[:expire_after]).to eq(2.days)
