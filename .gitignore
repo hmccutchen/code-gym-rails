@@ -32,3 +32,8 @@
 
 # Ignore master key for decrypting credentials and more.
 /config/master.key
+
+# Playwright CLI for system specs (installed via Task 5, not tracked)
+/node_modules/
+/package.json
+/package-lock.json
