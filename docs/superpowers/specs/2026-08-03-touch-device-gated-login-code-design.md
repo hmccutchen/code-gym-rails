@@ -1,6 +1,6 @@
 # Gating the Login Code on Touch Devices — Design
 
-**Status:** approved, pending implementation
+**Status:** implemented (PR #51)
 **Builds on:** `2026-08-03-pwa-login-code-and-auto-redirect-design.md`
 
 ## Problem

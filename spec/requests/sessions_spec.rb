@@ -110,6 +110,7 @@ RSpec.describe "Sessions", type: :request do
         post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      expect(raw_code).to be_present
 
       post verify_login_code_path, params: { code: wrong_code_for(raw_code) }
 
@@ -123,7 +124,10 @@ RSpec.describe "Sessions", type: :request do
       end
       body = ActionMailer::Base.deliveries.last.body.encoded
       raw_token = body[/token=([\w-]+)/, 1]
-      wrong = wrong_code_for(body[/enter this code: (\d{6})/, 1])
+      raw_code  = body[/enter this code: (\d{6})/, 1]
+      expect(raw_token).to be_present
+      expect(raw_code).to be_present
+      wrong = wrong_code_for(raw_code)
 
       5.times { post verify_login_code_path, params: { code: wrong } }
 
@@ -307,6 +311,68 @@ RSpec.describe "Sessions", type: :request do
 
       expect(session[:pending_login_email]).to be_nil
       expect(session[:pending_login_touch]).to be_nil
+    end
+  end
+
+  describe "stale CSRF token after the session rotates" do
+    include ActiveJob::TestHelper
+
+    around do |example|
+      original = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+      example.run
+    ensure
+      ActionController::Base.allow_forgery_protection = original
+    end
+
+    def authenticity_token
+      response.body[/name="authenticity_token" value="([^"]+)"/, 1]
+    end
+
+    # Logging in rotates the session, and the CSRF token with it, so the code
+    # form — rendered under the pre-login session — is stale the moment it
+    # succeeds. Re-submitting it (a double-tap on mobile) must not tell an
+    # already-logged-in user their session expired.
+    it "sends an already-logged-in user home instead of claiming the session expired" do
+      get login_path
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1",
+                                   authenticity_token: authenticity_token }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      get login_path
+      code_form_token = authenticity_token
+
+      post verify_login_code_path, params: { code: raw_code, authenticity_token: code_form_token }
+      expect(response).to redirect_to(root_path)
+
+      post verify_login_code_path, params: { code: raw_code, authenticity_token: code_form_token }
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to be_nil
+      expect(session[:user_id]).to be_present
+    end
+
+    it "still warns a logged-out user whose token is stale" do
+      post login_path, params: { email: "x@example.com", authenticity_token: "stale-bogus-token" }
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq("Your session expired — please try again.")
+    end
+
+    # Logout is a sessions action too, but silently returning someone to the
+    # dashboard when they asked to sign out would hide a failure they care
+    # about — and leave them still logged in with nothing said.
+    it "still warns on a stale logout instead of silently returning to the dashboard" do
+      user = create_user_with_key(email: "out@example.com")
+      login_as(user)
+
+      delete logout_path, params: { authenticity_token: "stale-bogus-token" }
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq("Your session expired — please try again.")
+      expect(session[:user_id]).to be_present
     end
   end
 
