@@ -87,7 +87,7 @@ RSpec.describe "Sessions", type: :request do
 
     it "logs the user in with the code emailed after POST /login" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
       end
 
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
@@ -100,7 +100,7 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "rejects an incorrect code without logging in" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
 
       post verify_login_code_path, params: { code: "000000" }
 
@@ -110,7 +110,7 @@ RSpec.describe "Sessions", type: :request do
 
     it "locks out after 5 wrong attempts, invalidating the emailed link too" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
       end
       raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
 
@@ -126,6 +126,60 @@ RSpec.describe "Sessions", type: :request do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(session[:user_id]).to be_nil
+    end
+  end
+
+  describe "login code gating by device" do
+    include ActiveJob::TestHelper
+
+    it "emails a login code when the request came from a touch device" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+
+      expect(ActionMailer::Base.deliveries.last.body.encoded).to match(/enter this code: \d{6}/)
+    end
+
+    it "omits the login code when the request came from a desktop browser" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+
+      expect(ActionMailer::Base.deliveries.last.body.encoded).not_to include("enter this code")
+    end
+
+    it "still emails a working magic link to a desktop browser" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+
+      get verify_auth_path(token: raw_token)
+
+      expect(response).to redirect_to(root_path)
+      expect(session[:user_id]).to be_present
+    end
+
+    it "clears the pending-login device flag after a link login" do
+      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      raw_token = User.find_by(email: "dev@example.com").generate_login_token!
+
+      get verify_auth_path(token: raw_token)
+
+      expect(session[:pending_login_email]).to be_nil
+      expect(session[:pending_login_touch]).to be_nil
+    end
+
+    it "clears the pending-login device flag after a code login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(session[:pending_login_email]).to be_nil
+      expect(session[:pending_login_touch]).to be_nil
     end
   end
 
