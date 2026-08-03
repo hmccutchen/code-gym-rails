@@ -82,6 +82,16 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
+  describe "session lifetime" do
+    it "expires the session cookie after 2 days" do
+      expect(Rails.application.config.session_options[:expire_after]).to eq(2.days)
+    end
+
+    it "keeps the default cookie key so existing sessions survive the change" do
+      expect(Rails.application.config.session_options[:key]).to eq("_code_gym_rails_session")
+    end
+  end
+
   describe "anonymized users" do
     it "rejects a session cookie belonging to an anonymized user" do
       user = create_user_with_key(email: "gone@example.com")
