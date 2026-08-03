@@ -44,4 +44,23 @@ RSpec.describe FakeService do
       expect(usage.tokens_out).to eq(0)
     end
   end
+
+  describe "#review_response" do
+    it "returns a review keyed to the exercise's actual third_key" do
+      user_exercise = DailyExercise.create!(
+        user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+        problem_set: described_class::EXERCISE_PROBLEM_SET
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: user_exercise, date: Date.current,
+        answers: { "code_review" => "N+1 query", "pattern" => "Extract a service object", "architecture" => "Move it to a job" }
+      )
+
+      review = described_class.new(user.api_key).review_response(user, user_exercise, response)
+
+      expect(review.keys).to match_array(%w[code_review pattern architecture])
+      expect(review["architecture"]["rating"]).to be_present
+      expect(review["code_review"]["correct"]).to be_an(Array)
+    end
+  end
 end

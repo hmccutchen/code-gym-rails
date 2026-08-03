@@ -119,6 +119,15 @@ class FakeService < AiService
     }
   }.freeze
 
+  REVIEW_SECTION = {
+    "rating" => "solid",
+    "correct" => [ "Correctly identified the core issue." ],
+    "missed" => [ "Didn't mention the specific fix." ],
+    "better_questions" => [ "What would happen under concurrent access?" ],
+    "next_step" => "Review the referenced concept material once more.",
+    "improved_code" => ""
+  }.freeze
+
   private
 
   def call(system:, prompt:)
@@ -126,6 +135,9 @@ class FakeService < AiService
       case system
       when /generating personalized daily exercise sets/
         EXERCISE_PROBLEM_SET.to_json
+      when /giving direct, specific feedback/
+        third_key = prompt[/Return JSON with keys: "code_review", "pattern", "(\w+)"/, 1]
+        { "code_review" => REVIEW_SECTION, "pattern" => REVIEW_SECTION, third_key => REVIEW_SECTION }.to_json
       else
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end
