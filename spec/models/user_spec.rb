@@ -121,6 +121,97 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "login code" do
+    it "generates a code digest alongside the token, with attempts reset to zero" do
+      user = create_user
+      user.generate_login_token!
+
+      expect(user.reload.login_code_digest).to be_present
+      expect(user.login_code_attempts).to eq(0)
+    end
+
+    it "exposes the raw code only in-memory on the instance that generated it" do
+      user = create_user
+      user.generate_login_token!
+
+      expect(user.raw_login_code).to match(/\A\d{6}\z/)
+      expect(User.find(user.id).raw_login_code).to be_nil
+    end
+
+    it "stores only a digest, never the raw code" do
+      user = create_user
+      user.generate_login_token!
+
+      expect(user.reload.login_code_digest).not_to include(user.raw_login_code)
+    end
+
+    it "authenticates with the correct code and invalidates both the code and the link" do
+      user = create_user
+      raw_token = user.generate_login_token!
+      raw_code = user.raw_login_code
+
+      expect(User.authenticate_login_code(email: user.email, code: raw_code)).to eq(user)
+      expect(user.reload.login_code_digest).to be_nil
+      expect(user.login_token_digest).to be_nil
+      expect(User.find_by_login_token(raw_token)).to be_nil
+    end
+
+    it "returns nil and increments attempts for a wrong code" do
+      user = create_user
+      user.generate_login_token!
+
+      expect(User.authenticate_login_code(email: user.email, code: "000000")).to be_nil
+      expect(user.reload.login_code_attempts).to eq(1)
+      expect(user.login_code_digest).to be_present
+    end
+
+    it "locks out and invalidates both the code and the token after 5 wrong attempts" do
+      user = create_user
+      user.generate_login_token!
+
+      4.times { User.authenticate_login_code(email: user.email, code: "000000") }
+      expect(user.reload.login_code_digest).to be_present
+
+      User.authenticate_login_code(email: user.email, code: "000000")
+      expect(user.reload.login_code_digest).to be_nil
+      expect(user.login_token_digest).to be_nil
+    end
+
+    it "invalidates the code once the link has already been used" do
+      user = create_user
+      user.generate_login_token!
+      raw_code = user.raw_login_code
+
+      user.clear_login_token!
+
+      expect(User.authenticate_login_code(email: user.email, code: raw_code)).to be_nil
+    end
+
+    it "expires the code on the same window as the token" do
+      user = create_user
+      user.generate_login_token!
+      raw_code = user.raw_login_code
+
+      travel(User::TOKEN_EXPIRY + 1.minute) do
+        expect(User.authenticate_login_code(email: user.email, code: raw_code)).to be_nil
+      end
+    end
+
+    it "returns nil for an email with no pending login" do
+      create_user
+      expect(User.authenticate_login_code(email: "nobody@example.com", code: "123456")).to be_nil
+    end
+
+    it "clears the code when the account is anonymized" do
+      user = create_user
+      user.generate_login_token!
+
+      user.anonymize!
+
+      expect(user.reload.login_code_digest).to be_nil
+    end
+  end
+
   describe "#recent_performance sections_answered" do
     it "counts a section answered on the same terms the dashboard and history do" do
       user = create_user
