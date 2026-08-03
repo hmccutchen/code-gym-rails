@@ -231,6 +231,74 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
+  describe "session rotation on login" do
+    include ActiveJob::TestHelper
+
+    it "issues a new session on link login so nothing written before auth survives" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+      pre_login_session_id = session.id.public_id
+
+      get verify_auth_path(token: raw_token)
+
+      expect(session[:user_id]).to be_present
+      expect(session.id.public_id).not_to eq(pre_login_session_id)
+    end
+
+    it "issues a new session on code login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      pre_login_session_id = session.id.public_id
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(session[:user_id]).to be_present
+      expect(session.id.public_id).not_to eq(pre_login_session_id)
+    end
+
+    it "issues a new session on logout" do
+      user = create_user_with_key(email: "dev@example.com")
+      login_as(user)
+      get history_path
+      pre_logout_session_id = session.id.public_id
+
+      delete logout_path
+
+      expect(session[:user_id]).to be_nil
+      expect(session.id.public_id).not_to eq(pre_logout_session_id)
+    end
+
+    # The rotation discards the whole session, so return_to has to be read out
+    # before reset_session or the post-login redirect silently loses it.
+    it "still returns the user to the page they were bounced from" do
+      user = User.create!(email: "dev@example.com", name: "Dev")
+      raw_token = user.generate_login_token!
+
+      get history_path
+      expect(response).to redirect_to(login_path)
+
+      get verify_auth_path(token: raw_token)
+
+      expect(response).to redirect_to(history_path)
+    end
+
+    it "clears the pending-login state on code login" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      post verify_login_code_path, params: { code: raw_code }
+
+      expect(session[:pending_login_email]).to be_nil
+      expect(session[:pending_login_touch]).to be_nil
+    end
+  end
+
   describe "session lifetime" do
     it "expires the session cookie after 2 days" do
       expect(Rails.application.config.session_options[:expire_after]).to eq(2.days)

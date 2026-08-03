@@ -49,11 +49,9 @@ class SessionsController < ApplicationController
     end
 
     user.clear_login_token!
-    session[:user_id] = user.id
-    session.delete(:pending_login_email)
-    session.delete(:pending_login_touch)
+    destination = start_new_session_for(user)
 
-    redirect_to session.delete(:return_to) || root_path, notice: "Welcome back, #{user.name}!"
+    redirect_to destination || root_path, notice: "Welcome back, #{user.name}!"
   end
 
   # POST /login/code — the PWA-friendly alternate to clicking the link.
@@ -65,10 +63,8 @@ class SessionsController < ApplicationController
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
 
     if user
-      session[:user_id] = user.id
-      session.delete(:pending_login_email)
-      session.delete(:pending_login_touch)
-      redirect_to session.delete(:return_to) || root_path, notice: "Welcome back, #{user.name}!"
+      destination = start_new_session_for(user)
+      redirect_to destination || root_path, notice: "Welcome back, #{user.name}!"
     else
       flash.now[:alert] = "Incorrect or expired code. Try again, or use the link in your email."
       render :new, status: :unprocessable_entity
@@ -85,7 +81,20 @@ class SessionsController < ApplicationController
   end
 
   def destroy
-    session.delete(:user_id)
+    reset_session
     redirect_to login_path, notice: "Logged out."
+  end
+
+  private
+
+  # Rotate the session on login so nothing written before authentication —
+  # return_to, the pending-login state — survives into the authenticated
+  # session. Returns the pre-login return_to, which has to be read out before
+  # reset_session discards it.
+  def start_new_session_for(user)
+    destination = session[:return_to]
+    reset_session
+    session[:user_id] = user.id
+    destination
   end
 end
