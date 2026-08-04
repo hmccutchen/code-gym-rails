@@ -293,11 +293,20 @@ RSpec.describe AiService do
       )
     end
 
-    it "instructs that the code_review snippet may occasionally be a test file with a test smell" do
-      prompt = service.send(:build_exercise_prompt, user)
+    it "names only RSpec in the code_review test-file clause on a Rails day" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
       expect(prompt).to include(
-        "Roughly 1 in 4 sessions, make it an RSpec-style (Rails) or Jest/Vitest-style (JS) test file exhibiting a real test smell instead"
+        "Roughly 1 in 4 sessions, make it an RSpec-style test file exhibiting a real test smell instead"
       )
+      expect(prompt).not_to include("Jest/Vitest")
+    end
+
+    it "names only Jest/Vitest in the code_review test-file clause on a JavaScript day" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include(
+        "Roughly 1 in 4 sessions, make it a Jest/Vitest-style test file exhibiting a real test smell instead"
+      )
+      expect(prompt).not_to include("RSpec")
     end
 
     it "embeds per-session concepts with per-section self and AI ratings" do

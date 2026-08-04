@@ -101,6 +101,7 @@ class AiService
       concepts:          RAILS_CONCEPTS,
       security_concepts: RAILS_SECURITY_CONCEPTS,
       coach:             "Rails",
+      test_framework:    "an RSpec-style",
       focus:             "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
     },
     "javascript" => {
@@ -108,6 +109,7 @@ class AiService
       concepts:          JS_CONCEPTS,
       security_concepts: JS_SECURITY_CONCEPTS,
       coach:             "JavaScript/React",
+      test_framework:    "a Jest/Vitest-style",
       focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
     },
     "architecture" => {
@@ -582,6 +584,13 @@ class AiService
     focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
     concepts    = config[:concepts]
 
+    test_file_clause =
+      if config[:test_framework].present?
+        " Roughly 1 in 4 sessions, make it #{config[:test_framework]} test file exhibiting a real test smell instead — same question shape (\"what's the issue here, and how would you fix it\")."
+      else
+        ""
+      end
+
     third_guidance =
       case third
       when :architecture
@@ -632,7 +641,7 @@ class AiService
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
-      - The code_review snippet must be realistic #{label} code — not toy examples. Roughly 1 in 4 sessions, make it an RSpec-style (Rails) or Jest/Vitest-style (JS) test file exhibiting a real test smell instead — same question shape ("what's the issue here, and how would you fix it").
+      - The code_review snippet must be realistic #{label} code — not toy examples.#{test_file_clause}
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
