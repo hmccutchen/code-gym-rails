@@ -149,13 +149,16 @@
     /* Below this breakpoint .section breaks out of .container
        (margin-inline: -1.5rem) and sets its own padding, so the panel is
        measured against the section — not the container — to line up with the
-       text it defines. Both fallbacks equal the desktop values, so a render
-       where the script has not run is unchanged. */
+       text it defines. Every fallback equals the desktop value, so the paths
+       that reveal the panel without running the script (:focus-visible, hover
+       on a hover-capable pointer, or no script at all) stay capped as before.
+       max-width reuses --gloss-width so that it is a no-op once the script has
+       set an explicit width, which the 16rem cap would otherwise clamp. */
     @media (max-width: 600px) {
       .gloss-term::after {
         left: var(--gloss-shift, 0);
         width: var(--gloss-width, max-content);
-        max-width: none;
+        max-width: var(--gloss-width, 16rem);
       }
     }
     @media (hover: hover) and (pointer: fine) {

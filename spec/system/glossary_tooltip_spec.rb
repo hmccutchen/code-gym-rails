@@ -61,6 +61,30 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     end
   end
 
+  # The panel is also revealed by :focus-visible and by hover on hover-capable
+  # pointers, neither of which runs the positioning script. Those paths get no
+  # custom properties, so the fallbacks alone have to keep the panel capped.
+  it "keeps the desktop width cap when the positioning script has not measured a term" do
+    user = create_fake_provider_user
+
+    travel_to(Date.current.beginning_of_week(:monday)) do
+      page.current_window.resize_to(phone_width, 800)
+      start_dashboard(user, question: "The customer loyalty tier")
+
+      capped = page.evaluate_script(<<~JS)
+        (() => {
+          const term = Array.from(document.querySelectorAll(".gloss-term"))
+            .find((el) => /loyalty tier/i.test(el.textContent));
+          const style = getComputedStyle(term, "::after");
+          return { maxWidth: style.maxWidth, left: style.left };
+        })()
+      JS
+
+      expect(capped["maxWidth"]).to eq("256px")
+      expect(capped["left"]).to eq("0px")
+    end
+  end
+
   it "re-fits an already-open panel after the device is rotated" do
     user = create_fake_provider_user
     landscape_width = 568
