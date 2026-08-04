@@ -72,28 +72,38 @@ keeps the panel attached to the term's own line.
 
 ### 2. JavaScript: measure on open
 
-Extend the existing delegated handler. When a term opens, measure the
-`.container` content box and the term, then set both properties on the term so
-the panel's edges land on the container's content edges:
+Extend the existing delegated handler. When a term opens, measure the box that
+actually bounds the text and the term itself, then set both properties on the
+term so the panel's edges land on that box's content edges:
 
 ```js
 const positionPanel = (term) => {
-  const container = term.closest(".container");
-  if (!container) return;
-  const box = container.getBoundingClientRect();
-  const pad = parseFloat(getComputedStyle(container).paddingLeft) || 0;
-  term.style.setProperty("--gloss-width", `${box.width - pad * 2}px`);
-  term.style.setProperty("--gloss-shift", `${box.left + pad - term.getBoundingClientRect().left}px`);
+  const box = term.closest(".section, .container");
+  if (!box) return;
+  const rect = box.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(box).paddingLeft) || 0;
+  term.style.setProperty("--gloss-width", `${rect.width - pad * 2}px`);
+  term.style.setProperty("--gloss-shift", `${rect.left + pad - term.getBoundingClientRect().left}px`);
 };
 ```
 
+The reference box is `.section`, not `.container`. Below 600px the layout
+deliberately breaks sections out of the container
+(`.section { margin-inline: -1.5rem; padding: 1.25rem 1rem; }`), so a section
+spans the full viewport width with its own 1rem padding while `.container` keeps
+1.5rem. Measuring `.container` would leave the panel misaligned with the text it
+describes. Every current `glossary_wrap` call site renders inside a `.section`;
+`.container` is retained in the selector list as a fallback so a term added
+outside one still gets a sane box. `closest()` with a selector list returns the
+nearest match, which is the section whenever one exists.
+
 Called only when a term is being opened, from the existing `toggleTerm`. Terms
-outside a `.container` fall back to current behavior rather than throwing.
+outside both boxes fall back to current behavior rather than throwing.
 
 The properties are not cleared on close. They are only read while the panel is
 visible and are recomputed on every open, so a stale value can never be
 displayed. Reading `paddingLeft` and doubling it assumes symmetric side padding,
-which matches `.container`'s `padding: 0 1.5rem`.
+which matches both `.section` and `.container`.
 
 ### 3. JavaScript: recompute on resize
 
