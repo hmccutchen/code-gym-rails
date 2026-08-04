@@ -146,6 +146,21 @@
       white-space: normal; z-index: 10;
       display: none;
     }
+    /* Below this breakpoint .section breaks out of .container
+       (margin-inline: -1.5rem) and sets its own padding, so the panel is
+       measured against the section — not the container — to line up with the
+       text it defines. Every fallback equals the desktop value, so the paths
+       that reveal the panel without running the script (:focus-visible, hover
+       on a hover-capable pointer, or no script at all) stay capped as before.
+       max-width reuses --gloss-width so that it is a no-op once the script has
+       set an explicit width, which the 16rem cap would otherwise clamp. */
+    @media (max-width: 600px) {
+      .gloss-term::after {
+        left: var(--gloss-shift, 0);
+        width: var(--gloss-width, max-content);
+        max-width: var(--gloss-width, 16rem);
+      }
+    }
     @media (hover: hover) and (pointer: fine) {
       .gloss-term:hover::after { display: block; }
     }
@@ -340,11 +355,20 @@
       Mermaid require. %>
   <script>
     (() => {
+      const positionPanel = (term) => {
+        const box = term.closest(".section, .container");
+        if (!box) return;
+        const rect = box.getBoundingClientRect();
+        const pad = parseFloat(getComputedStyle(box).paddingLeft) || 0;
+        term.style.setProperty("--gloss-width", `${rect.width - pad * 2}px`);
+        term.style.setProperty("--gloss-shift", `${rect.left + pad - term.getBoundingClientRect().left}px`);
+      };
+
       const toggleTerm = (term) => {
         document.querySelectorAll(".gloss-term.gloss-open").forEach((el) => {
           if (el !== term) el.classList.remove("gloss-open");
         });
-        if (term) term.classList.toggle("gloss-open");
+        if (term && term.classList.toggle("gloss-open")) positionPanel(term);
       };
 
       document.addEventListener("click", (event) => {
@@ -357,6 +381,21 @@
         if (!term) return;
         event.preventDefault();
         toggleTerm(term);
+      });
+
+      // :focus-visible and :hover reveal the panel through CSS alone, without
+      // ever toggling .gloss-open, so those paths have to be measured too — the
+      // width cap bounds the panel but does not keep it on screen.
+      const positionFromEvent = (event) => {
+        const term = event.target.closest && event.target.closest(".gloss-term");
+        if (term) positionPanel(term);
+      };
+      document.addEventListener("focusin", positionFromEvent);
+      document.addEventListener("pointerover", positionFromEvent);
+
+      window.addEventListener("resize", () => {
+        const open = document.querySelector(".gloss-term.gloss-open");
+        if (open) positionPanel(open);
       });
     })();
   </script>
