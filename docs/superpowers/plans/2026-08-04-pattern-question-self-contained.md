@@ -26,7 +26,7 @@
 - Consumes: `AiService#build_exercise_prompt(user, language = "ruby_rails", third: :challenge, ...)` (instance method, already defined) — calls into `#exercise_schema_for`, which is where the schema string lives.
 - Produces: nothing new is exposed; this only changes the content of the string `build_exercise_prompt` returns.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this `it` block inside the existing `describe "#build_exercise_prompt"` block in `spec/services/ai_service_spec.rb` (place it near the other schema/instruction assertions, e.g. right after the `"instructs that teaching notes hint without giving the answer"` test):
 
@@ -39,12 +39,12 @@ Add this `it` block inside the existing `describe "#build_exercise_prompt"` bloc
     end
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bundle exec rspec spec/services/ai_service_spec.rb -e "instructs that pattern's question must be self-contained"`
 Expected: FAIL — the current schema string doesn't contain this text (it currently reads `"question": "string — conceptual question to answer",` with no trailing constraint).
 
-- [ ] **Step 3: Update the pattern schema field description**
+- [x] **Step 3: Update the pattern schema field description**
 
 In `app/services/ai_service.rb`, in the `"pattern"` block inside `exercise_schema_for` (around line 500), change:
 
@@ -55,7 +55,7 @@ In `app/services/ai_service.rb`, in the `"pattern"` block inside `exercise_schem
 to:
 
 ```ruby
-          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \"the code below\" — none is shown for this section.",
+          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
 ```
 
 The full pattern block (lines 497-505) should read:
@@ -64,7 +64,7 @@ The full pattern block (lines 497-505) should read:
         "pattern": {
           "title":    "string — pattern name",
           "why":      "string — one sentence on why the pattern exists",
-          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \"the code below\" — none is shown for this section.",
+          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
@@ -72,17 +72,17 @@ The full pattern block (lines 497-505) should read:
         },
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `bundle exec rspec spec/services/ai_service_spec.rb -e "instructs that pattern's question must be self-contained"`
 Expected: PASS
 
-- [ ] **Step 5: Run the full ai_service spec file to check for regressions**
+- [x] **Step 5: Run the full ai_service spec file to check for regressions**
 
 Run: `bundle exec rspec spec/services/ai_service_spec.rb`
 Expected: all examples PASS (no other spec asserts the old exact text of this field, but this confirms nothing else broke).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/services/ai_service.rb spec/services/ai_service_spec.rb
