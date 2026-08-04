@@ -34,54 +34,35 @@
 
 - [ ] **Step 1: Write the failing system spec**
 
-Create `spec/system/glossary_tooltip_spec.rb` with exactly this content:
+Create `spec/system/glossary_tooltip_spec.rb`. Two details matter and were both
+established empirically — do not simplify them away:
 
-```ruby
-require "rails_helper"
+1. **The exercise is built directly, not generated through `FakeService`.** The
+   bug only reproduces when the term sits away from the left edge, because the
+   old panel was anchored at the term. `FakeService`'s own wording wraps
+   "loyalty tier" to the start of a line (measured `termLeft` of 16px), where
+   overflow is impossible and the test would pass against the unfixed code.
+2. **Assert on the change in `document.documentElement.scrollWidth`, not on an
+   absolute width.** At 320px the page already overflows to 353px because of the
+   code snippet, so an absolute "no overflow" assertion would fail for unrelated
+   reasons. Also note `getComputedStyle(el, "::after").width` returns `auto`
+   (parses to `NaN`) whenever the panel is narrower than its 16rem cap, so it is
+   not a dependable measurement on its own.
 
-RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
-  # 375px is the iPhone SE/12 mini CSS width and the narrowest mainstream
-  # target — the case where a term late in a line pushed the old fixed-width
-  # panel off the right edge with no way to read the rest of the definition.
-  PHONE_WIDTH = 375
-
-  it "keeps an opened definition panel fully inside the viewport" do
-    user = create_fake_provider_user
-    monday = Date.current.beginning_of_week(:monday)
-
-    travel_to(monday) do
-      page.current_window.resize_to(PHONE_WIDTH, 800)
-      perform_enqueued_jobs { visit_as(user) }
-      expect(page).to have_content(/Code Review/i, wait: 10)
-
-      term = find("span.gloss-term", text: /loyalty tier/i, match: :first)
-      term.click
-
-      box = page.evaluate_script(<<~JS)
-        (() => {
-          const term = document.querySelector(".gloss-term.gloss-open");
-          const style = getComputedStyle(term, "::after");
-          const rect = term.getBoundingClientRect();
-          const left = rect.left + parseFloat(style.left);
-          return { left: left, right: left + parseFloat(style.width), display: style.display };
-        })()
-      JS
-
-      expect(box["display"]).to eq("block")
-      expect(box["left"]).to be >= 0
-      expect(box["right"]).to be <= PHONE_WIDTH
-    end
-  end
-end
-```
+Use the file content given in Steps 1 and 7 of this plan verbatim; the finished
+file is the source of truth.
 
 - [ ] **Step 2: Run the spec to verify it fails**
 
 Run: `bundle exec rspec spec/system/glossary_tooltip_spec.rb`
 
-Expected: FAIL. The panel is still anchored at the term's left edge with `max-width: 16rem`, so `box["right"]` exceeds 375 and the `be <= PHONE_WIDTH` expectation fails with a message like `expected: <= 375, got: 4xx`.
+Expected: the first example FAILS on
+`expect(box["scrollAfter"]).to be <= box["scrollBefore"]` with `expected: <= 353,
+got: 377` — opening the panel pushes the page 24px further off screen.
 
-If instead it fails on `box["display"]` not being `"block"`, the click did not open the panel — check that the term was found and that no other element intercepted the click, and fix the spec before continuing. Do not proceed to Step 3 until the failure is the width/overflow assertion.
+If it passes instead, the fixture is not reproducing the bug: check that
+`termLeft` is greater than a quarter of the viewport width. Do not proceed until
+the failure is that overflow assertion.
 
 - [ ] **Step 3: Add the mobile CSS rule**
 
@@ -190,37 +171,14 @@ Add a resize listener before the closing `})();`, so it reads:
 
 - [ ] **Step 7: Add a rotation regression test**
 
-In `spec/system/glossary_tooltip_spec.rb`, add this second example inside the existing `describe` block, after the first `it`:
+Add a second example that rotates **landscape → portrait**, not the reverse: a
+panel sized for the wider screen is the one that no longer fits afterwards.
+Rotating portrait → landscape cannot fail, because a panel that already fits the
+narrow screen still fits the wide one.
 
-```ruby
-  it "re-fits an already-open panel when the device is rotated" do
-    user = create_fake_provider_user
-    monday = Date.current.beginning_of_week(:monday)
-    landscape_width = 667
-
-    travel_to(monday) do
-      page.current_window.resize_to(PHONE_WIDTH, 800)
-      perform_enqueued_jobs { visit_as(user) }
-      expect(page).to have_content(/Code Review/i, wait: 10)
-
-      find("span.gloss-term", text: /loyalty tier/i, match: :first).click
-      page.current_window.resize_to(landscape_width, 375)
-
-      box = page.evaluate_script(<<~JS)
-        (() => {
-          const term = document.querySelector(".gloss-term.gloss-open");
-          const style = getComputedStyle(term, "::after");
-          const rect = term.getBoundingClientRect();
-          const left = rect.left + parseFloat(style.left);
-          return { left: left, right: left + parseFloat(style.width) };
-        })()
-      JS
-
-      expect(box["left"]).to be >= 0
-      expect(box["right"]).to be <= landscape_width
-    end
-  end
-```
+Without the Step 6 listener this example fails with a panel right edge of
+`552` against a `320` viewport — the stale landscape width. Copy the second `it`
+block from the finished `spec/system/glossary_tooltip_spec.rb`.
 
 - [ ] **Step 8: Run the full spec file**
 

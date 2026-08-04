@@ -146,6 +146,18 @@
       white-space: normal; z-index: 10;
       display: none;
     }
+    /* Below this breakpoint .section breaks out of .container
+       (margin-inline: -1.5rem) and sets its own padding, so the panel is
+       measured against the section — not the container — to line up with the
+       text it defines. Both fallbacks equal the desktop values, so a render
+       where the script has not run is unchanged. */
+    @media (max-width: 600px) {
+      .gloss-term::after {
+        left: var(--gloss-shift, 0);
+        width: var(--gloss-width, max-content);
+        max-width: none;
+      }
+    }
     @media (hover: hover) and (pointer: fine) {
       .gloss-term:hover::after { display: block; }
     }
@@ -340,11 +352,20 @@
       Mermaid require. %>
   <script>
     (() => {
+      const positionPanel = (term) => {
+        const box = term.closest(".section, .container");
+        if (!box) return;
+        const rect = box.getBoundingClientRect();
+        const pad = parseFloat(getComputedStyle(box).paddingLeft) || 0;
+        term.style.setProperty("--gloss-width", `${rect.width - pad * 2}px`);
+        term.style.setProperty("--gloss-shift", `${rect.left + pad - term.getBoundingClientRect().left}px`);
+      };
+
       const toggleTerm = (term) => {
         document.querySelectorAll(".gloss-term.gloss-open").forEach((el) => {
           if (el !== term) el.classList.remove("gloss-open");
         });
-        if (term) term.classList.toggle("gloss-open");
+        if (term && term.classList.toggle("gloss-open")) positionPanel(term);
       };
 
       document.addEventListener("click", (event) => {
@@ -357,6 +378,11 @@
         if (!term) return;
         event.preventDefault();
         toggleTerm(term);
+      });
+
+      window.addEventListener("resize", () => {
+        const open = document.querySelector(".gloss-term.gloss-open");
+        if (open) positionPanel(open);
       });
     })();
   </script>
