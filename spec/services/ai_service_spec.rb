@@ -186,8 +186,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 18-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(18)
+    it "is a frozen 20-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(20)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -196,20 +196,28 @@ RSpec.describe AiService do
       expect(AiService::RAILS_CONCEPTS).to include("mass_assignment_protection", "sql_injection_prevention")
     end
 
+    it "includes the two test-analysis concepts added for code_review's occasional test-file variant" do
+      expect(AiService::RAILS_CONCEPTS).to include("over_mocking", "testing_implementation_not_behavior")
+    end
+
     it "excludes secure_secrets_handling and dependency_vulnerability_management as poor fits for this app's format" do
       expect(AiService::RAILS_CONCEPTS).not_to include("secure_secrets_handling", "dependency_vulnerability_management")
     end
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 20-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(20)
+    it "is a frozen 22-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(22)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
 
     it "includes the two JS security concepts chosen for real depth" do
       expect(AiService::JS_CONCEPTS).to include("xss_prevention", "insecure_client_storage")
+    end
+
+    it "includes the two test-analysis concepts added for code_review's occasional test-file variant" do
+      expect(AiService::JS_CONCEPTS).to include("over_mocking", "testing_implementation_not_behavior")
     end
   end
 
@@ -282,6 +290,13 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include(
         "\"question\": \"string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.\""
+      )
+    end
+
+    it "instructs that the code_review snippet may occasionally be a test file with a test smell" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include(
+        "Roughly 1 in 4 sessions, make it an RSpec-style (Rails) or Jest/Vitest-style (JS) test file exhibiting a real test smell instead"
       )
     end
 

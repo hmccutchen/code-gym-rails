@@ -35,6 +35,7 @@ class AiService
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
+    over_mocking testing_implementation_not_behavior
   ].freeze
 
   JS_CONCEPTS = %w[
@@ -43,6 +44,7 @@ class AiService
     memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
+    over_mocking testing_implementation_not_behavior
   ].freeze
 
   # The exact subset security_review draws from — never the full language
@@ -630,7 +632,7 @@ class AiService
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
-      - The code_review snippet must be realistic #{label} code — not toy examples.
+      - The code_review snippet must be realistic #{label} code — not toy examples. Roughly 1 in 4 sessions, make it an RSpec-style (Rails) or Jest/Vitest-style (JS) test file exhibiting a real test smell instead — same question shape ("what's the issue here, and how would you fix it").
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
