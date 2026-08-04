@@ -85,6 +85,40 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     end
   end
 
+  # Keyboard users reach the panel through :focus-visible and never fire a
+  # click, so the panel has to be measured on focus as well. Capping the width
+  # is not enough on its own: a 16rem panel anchored at a term sitting 120px in
+  # still runs past a 320px screen.
+  it "keeps the panel on screen when it is revealed by keyboard focus" do
+    user = create_fake_provider_user
+
+    travel_to(Date.current.beginning_of_week(:monday)) do
+      page.current_window.resize_to(phone_width, 800)
+      start_dashboard(user, question: "The customer loyalty tier")
+
+      box = page.evaluate_script(<<~JS)
+        (() => {
+          const term = Array.from(document.querySelectorAll(".gloss-term"))
+            .find((el) => /loyalty tier/i.test(el.textContent));
+          term.focus();
+          const style = getComputedStyle(term, "::after");
+          const left = term.getBoundingClientRect().left + parseFloat(style.left);
+          return {
+            display: style.display,
+            termLeft: term.getBoundingClientRect().left,
+            left: left,
+            right: left + parseFloat(style.width)
+          };
+        })()
+      JS
+
+      expect(box["display"]).to eq("block")
+      expect(box["termLeft"]).to be > phone_width * 0.25
+      expect(box["left"]).to be >= 0
+      expect(box["right"]).to be <= phone_width
+    end
+  end
+
   it "re-fits an already-open panel after the device is rotated" do
     user = create_fake_provider_user
     landscape_width = 568

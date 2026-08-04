@@ -383,6 +383,16 @@
         toggleTerm(term);
       });
 
+      // :focus-visible and :hover reveal the panel through CSS alone, without
+      // ever toggling .gloss-open, so those paths have to be measured too — the
+      // width cap bounds the panel but does not keep it on screen.
+      const positionFromEvent = (event) => {
+        const term = event.target.closest && event.target.closest(".gloss-term");
+        if (term) positionPanel(term);
+      };
+      document.addEventListener("focusin", positionFromEvent);
+      document.addEventListener("pointerover", positionFromEvent);
+
       window.addEventListener("resize", () => {
         const open = document.querySelector(".gloss-term.gloss-open");
         if (open) positionPanel(open);
