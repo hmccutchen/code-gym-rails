@@ -278,6 +278,13 @@ RSpec.describe AiService do
       expect(prompt.downcase).to include("never the full answer")
     end
 
+    it "instructs that pattern's question must be self-contained, with no code reference" do
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include(
+        "\"question\": \"string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.\""
+      )
+    end
+
     it "embeds per-session concepts with per-section self and AI ratings" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)

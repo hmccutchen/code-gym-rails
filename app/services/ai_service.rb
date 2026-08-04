@@ -497,7 +497,7 @@ class AiService
         "pattern": {
           "title":    "string — pattern name",
           "why":      "string — one sentence on why the pattern exists",
-          "question": "string — conceptual question to answer",
+          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
