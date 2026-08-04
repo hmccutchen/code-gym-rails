@@ -4,6 +4,10 @@
 
 A team Rails app for daily personalized coding exercises. Each engineer logs in (magic link, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline AI review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
 
+## Git Workflow
+
+All changes are made on a feature/dev branch, never directly on `main`. Create (or switch to) a branch before touching any files, and open a PR into `main` when the work is ready for review.
+
 ## Code Style
 
 Code should be self-documenting. Don't add comments unless they're strictly needed — e.g. to explain a non-obvious *why* (a hidden constraint, a workaround, a subtle invariant). Never add comments that just restate *what* the code does.
@@ -121,6 +125,20 @@ RSpec (`spec/` — models, requests, services, jobs, mailers). Run with:
 bundle exec rspec
 ```
 
+`spec/system/` holds a small number of real-browser specs (Capybara +
+capybara-playwright-driver) covering flows unit/request specs can't fully
+verify — rating-gated submit, review loading state — driven exclusively
+against a `FakeService` (`provider: "fake"`) test user, never a real API key.
+`FakeService` returns every section kind at once rather than the three a real
+provider is asked for, so system specs can't assert which third `DailyPlan`
+chose — cover that in service/job specs instead.
+Running them locally requires a one-time Playwright CLI install — see the
+comment block at the top of `spec/support/system_test_helper.rb` for the
+exact commands. The npm manifests live in `spec/playwright/`, not the repo
+root, so Nixpacks doesn't add a Node phase to the Railway production build.
+CI installs the same CLI on every run (see below), so
+`bundle exec rspec` runs the full suite there without any extra setup.
+
 CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
 
 ## File Map
@@ -139,5 +157,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PREVIEW_SEED_EMAIL`
 - `app/services/preview_mail.rb` — inline mail delivery in preview apps, so login never needs a worker
+- `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
+- `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway

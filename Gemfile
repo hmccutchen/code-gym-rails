@@ -61,6 +61,17 @@ group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem "web-console"
 end
+
+group :test do
+  # Real-browser system specs, driven by Playwright — kept in its own group
+  # (not merged into :development, :test) so neither gem loads outside tests.
+  # capybara-playwright-driver is pinned because its playwright-ruby-client
+  # dependency must stay compatible with the exact playwright-core CLI version
+  # pinned in spec/playwright/package.json — bump the two together.
+  gem "capybara"
+  gem "capybara-playwright-driver", "~> 0.5.10"
+end
+
 gem "faraday", "~> 2.0"
 gem "faraday-retry"
 gem "letter_opener", group: :development

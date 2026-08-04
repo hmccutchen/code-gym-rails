@@ -87,6 +87,17 @@ jobs:
       - name: Prepare test database
         run: bin/rails db:prepare
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright CLI
+        run: npm --prefix spec/playwright ci
+
+      - name: Install Playwright browser
+        run: ./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
+
       - name: Run RSpec
         run: bundle exec rspec
 
