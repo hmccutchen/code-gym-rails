@@ -35,6 +35,7 @@ class AiService
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
+    over_mocking testing_implementation_not_behavior
   ].freeze
 
   JS_CONCEPTS = %w[
@@ -43,6 +44,7 @@ class AiService
     memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
+    over_mocking testing_implementation_not_behavior
   ].freeze
 
   # The exact subset security_review draws from — never the full language
@@ -99,6 +101,7 @@ class AiService
       concepts:          RAILS_CONCEPTS,
       security_concepts: RAILS_SECURITY_CONCEPTS,
       coach:             "Rails",
+      test_framework:    "an RSpec-style",
       focus:             "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
     },
     "javascript" => {
@@ -106,6 +109,7 @@ class AiService
       concepts:          JS_CONCEPTS,
       security_concepts: JS_SECURITY_CONCEPTS,
       coach:             "JavaScript/React",
+      test_framework:    "a Jest/Vitest-style",
       focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
     },
     "architecture" => {
@@ -497,7 +501,7 @@ class AiService
         "pattern": {
           "title":    "string — pattern name",
           "why":      "string — one sentence on why the pattern exists",
-          "question": "string — conceptual question to answer",
+          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
@@ -580,6 +584,13 @@ class AiService
     focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
     concepts    = config[:concepts]
 
+    test_file_clause =
+      if config[:test_framework].present?
+        " Roughly 1 in 4 sessions, make it #{config[:test_framework]} test file exhibiting a real test smell instead — same question shape (\"what's the issue here, and how would you fix it\")."
+      else
+        ""
+      end
+
     third_guidance =
       case third
       when :architecture
@@ -630,7 +641,7 @@ class AiService
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
-      - The code_review snippet must be realistic #{label} code — not toy examples.
+      - The code_review snippet must be realistic #{label} code — not toy examples.#{test_file_clause}
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
