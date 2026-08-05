@@ -42,6 +42,7 @@
       <% end %>
     </div>
   <% end %>
+  <%= render "shared/glossary_search", field: "architecture" %>
 </div>
 <% if arch.dig("reference", "diagram").present? && !@architecture_diagram_script_emitted %>
   <% @architecture_diagram_script_emitted = true %>
