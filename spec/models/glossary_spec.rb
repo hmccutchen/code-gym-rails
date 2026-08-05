@@ -33,4 +33,18 @@ RSpec.describe Glossary do
   it "has no blank definitions" do
     expect(Glossary::TERMS.values).to all(be_present)
   end
+
+  # Regression guard: a user is most likely to search for exactly the words
+  # this app already shows them — a concept tag, or its underscore_case form.
+  # Catches the class of bug reported in production: "concurrency" (a real
+  # RAILS_CONCEPTS entry) had no glossary hit at all, and several others only
+  # existed under a mismatched singular/plural or punctuation form.
+  it "resolves every AiService concept vocabulary entry, in its literal or space-normalized form" do
+    concepts = AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS
+    missing = concepts.uniq.reject do |concept|
+      Glossary.lookup(concept) || Glossary.lookup(concept.tr("_", " "))
+    end
+
+    expect(missing).to be_empty
+  end
 end
