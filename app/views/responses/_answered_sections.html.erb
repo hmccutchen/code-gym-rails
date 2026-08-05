@@ -14,6 +14,7 @@
   <% end %>
   <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: true, answer: response.answers["code_review"] %>
   <div class="answer-display"><%= response.answers["code_review"].presence || "(skipped)" %></div>
+  <%= render "shared/glossary_search", field: "code_review" %>
 </div>
 <% end %>
 
@@ -30,6 +31,7 @@
 
   <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: true, answer: response.answers["pattern"] %>
   <div class="answer-display"><%= response.answers["pattern"].presence || "(skipped)" %></div>
+  <%= render "shared/glossary_search", field: "pattern" %>
 </div>
 <% end %>
 
@@ -52,5 +54,6 @@
     <% end %>
     <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, answer: response.answers["challenge"] %>
     <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
+    <%= render "shared/glossary_search", field: "challenge" %>
   </div>
 <% end %>

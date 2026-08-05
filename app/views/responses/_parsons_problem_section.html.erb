@@ -53,6 +53,7 @@
       <% end %>
     </div>
   <% end %>
+  <%= render "shared/glossary_search", field: "parsons_problem" %>
 </div>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>

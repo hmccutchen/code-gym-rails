@@ -170,6 +170,15 @@
     .gloss-term.gloss-open::after, .gloss-term:focus-visible::after { display: block; }
     .gloss-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+    .glossary-search { margin-top: 1rem; padding-top: .85rem; border-top: 1px dashed var(--border); }
+    .glossary-search-row { display: flex; gap: .5rem; }
+    .glossary-search input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .45rem .65rem; color: var(--text); font-size: .85rem; font-family: inherit; }
+    .glossary-results { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .85rem; }
+    .glossary-results li { padding: .4rem 0; border-bottom: 1px solid var(--border); line-height: 1.5; }
+    .glossary-results li:last-child { border-bottom: none; }
+    .glossary-results li strong { color: var(--text); }
+    .glossary-results li.glossary-miss { color: var(--muted); font-style: italic; }
+
     .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
     .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
@@ -399,6 +408,59 @@
       window.addEventListener("resize", () => {
         const open = document.querySelector(".gloss-term.gloss-open");
         if (open) positionPanel(open);
+      });
+    })();
+  </script>
+  <script type="application/json" id="glossary-data"><%= raw json_escape(Glossary::TERMS.to_json) %></script>
+  <%# Glossary search: on-demand lookup against the static Glossary::TERMS
+      hash embedded above as JSON — entirely client-side, so it keeps working
+      even with a dead session or an invalid/expired provider key. Separate
+      from the gloss-term tooltip script above, which only renders AI-picked
+      terms inline; this searches ANY term a user types. One delegated
+      listener handles every .glossary-search box on the page, regardless of
+      which section partial rendered it — same pattern as the tooltip script. %>
+  <script>
+    (() => {
+      const dataEl = document.getElementById("glossary-data");
+      const terms = Object.create(null);
+      if (dataEl) {
+        const parsed = JSON.parse(dataEl.textContent);
+        Object.keys(parsed).forEach((key) => { terms[key] = parsed[key]; });
+      }
+
+      const runSearch = (box) => {
+        const input = box.querySelector("input[type='text']");
+        const list = box.querySelector(".glossary-results");
+        const raw = input.value.trim();
+        if (!raw) return;
+
+        const definition = terms[raw.toLowerCase()];
+        const li = document.createElement("li");
+        if (definition) {
+          const strong = document.createElement("strong");
+          strong.textContent = `${raw}: `;
+          li.append(strong, document.createTextNode(definition));
+        } else {
+          li.className = "glossary-miss";
+          li.textContent = `"${raw}" isn't in the glossary yet.`;
+        }
+        list.appendChild(li);
+        input.value = "";
+        input.focus();
+      };
+
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-glossary-search] button");
+        if (!button) return;
+        runSearch(button.closest("[data-glossary-search]"));
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        const input = event.target.closest("[data-glossary-search] input[type='text']");
+        if (!input) return;
+        event.preventDefault();
+        runSearch(input.closest("[data-glossary-search]"));
       });
     })();
   </script>
