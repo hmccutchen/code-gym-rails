@@ -658,6 +658,75 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include('data-block-id="1"')
       expect(response.body).to include('data-block-id="2"')
     end
+
+    it "renders the blocks without server-side move controls, since drag is the primary input" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      get root_path
+
+      expect(response.body).to include("data-parsons-blocks")
+      expect(response.body).not_to include(%(<div class="parsons-controls">))
+    end
+
+    it "ships the arrow-injection fallback and a touch delay so a stalled CDN is survivable" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      get root_path
+
+      expect(response.body).to include("parsonsAddControls")
+      expect(response.body).to include("delayOnTouchOnly: true")
+    end
+
+    it "makes each block focusable and advertises the reorder shortcut, since drag is pointer-only" do
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      get root_path
+
+      blocks = response.body.scan(/<li class="parsons-block"[^>]*>/)
+      expect(blocks.size).to eq(3)
+      expect(blocks).to all(include('tabindex="0"'))
+      expect(blocks).to all(include('aria-keyshortcuts="Control+ArrowUp Control+ArrowDown"'))
+      expect(response.body).to include("Reorder with the arrow keys")
+    end
+
+    it "leaves the submitted read-only blocks unfocusable" do
+      exercise = create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date,
+                            answers: { "parsons_problem" => "0,1,2" }, submitted_at: Time.current)
+      get root_path
+
+      expect(response.body).to include("parsons-list-readonly")
+      expect(response.body).not_to include('tabindex="0"')
+    end
   end
 
   describe "streak display" do    # A Wednesday, so the streak days are plain weekdays.

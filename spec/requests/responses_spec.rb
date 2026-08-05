@@ -252,15 +252,15 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "POST /responses/:id/review" do
-    def create_submitted_response
+    def create_submitted_response(date: Date.current)
       exercise = DailyExercise.create!(
-        user: user, date: Date.current,
+        user: user, date: date,
         problem_set: { "code_review" => { "question" => "q", "snippet" => "s" },
                        "pattern" => { "title" => "t", "question" => "q" },
                        "challenge" => { "title" => "t", "question" => "q" } },
         generated_at: Time.current
       )
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
     end
 
@@ -303,6 +303,29 @@ RSpec.describe "Responses", type: :request do
 
       expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
       expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+    end
+
+    it "sends the user to the history page that actually holds the reviewed entry" do
+      target = create_submitted_response(date: 30.days.ago.to_date)
+      (1..10).each { |i| create_submitted_response(date: i.days.ago.to_date) }
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(target)
+
+      expect(response).to redirect_to(history_path(page: 2, anchor: "response-#{target.id}"))
+    end
+
+    it "omits the page parameter when the entry is on the first page" do
+      target = create_submitted_response(date: 1.day.ago.to_date)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(target)
+
+      expect(response).to redirect_to(history_path(anchor: "response-#{target.id}"))
     end
 
     it "redirects with an alert when the provider raises" do

@@ -33,6 +33,13 @@ class ApplicationController < ActionController::Base
     Time.use_zone(current_user&.effective_time_zone || User::DEFAULT_TIME_ZONE, &block)
   end
 
+  # Page 1 keeps the bare /history URL: the url helper drops a nil param, so the
+  # canonical first page has one address rather than two. Every redirect into
+  # history goes through here so they cannot drift apart.
+  def history_page_path(page, anchor: nil)
+    history_path(page: (page unless page == 1), anchor: anchor)
+  end
+
   # Scoped to `active` so an anonymized user's still-open session (another tab,
   # another device) stops resolving at its very next request.
   def current_user

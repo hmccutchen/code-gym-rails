@@ -36,15 +36,16 @@
        ) %>
     <ol class="parsons-list" data-parsons-blocks>
       <% initial_order.each do |block_id| %>
-        <li class="parsons-block" data-block-id="<%= block_id %>">
+        <li class="parsons-block" data-block-id="<%= block_id %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
           <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= blocks[block_id] %></code></pre>
-          <div class="parsons-controls">
-            <button type="button" class="btn btn-ghost btn-sm parsons-move-up" aria-label="Move block up">↑</button>
-            <button type="button" class="btn btn-ghost btn-sm parsons-move-down" aria-label="Move block down">↓</button>
-          </div>
         </li>
       <% end %>
     </ol>
+    <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
+        not using a mouse. The hint is clipped until a block takes focus, which
+        keeps it out of the way of the people who will never need it. %>
+    <p class="parsons-keyhint">Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks.</p>
+    <p class="parsons-status" aria-live="polite"></p>
     <textarea name="response[answers][parsons_problem]" class="answer" data-field="parsons_problem" style="display:none"><%= response.answers["parsons_problem"] %></textarea>
     <div class="rating-row" data-rating-for="parsons_problem">
       <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
@@ -57,10 +58,11 @@
   <% @parsons_script_emitted = true %>
   <% content_for :page_scripts do %>
     <script>
-    // Up/down buttons are the baseline and always work; the SortableJS import
-    // below only layers dragging on top. Neither path syncs the hidden field on
-    // wire-up — only on an actual move — so the section reads as unanswered
-    // until the learner does something, matching every other section.
+    // Drag (SortableJS, imported below) is the primary way to reorder. The
+    // up/down buttons are a recovery path, injected only when that import
+    // fails or never resolves. Neither path syncs the hidden field on wire-up
+    // — only on an actual move — so the section reads as unanswered until the
+    // learner does something, matching every other section.
     (() => {
       function syncHiddenField(list) {
         const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
@@ -69,40 +71,102 @@
         textarea.dispatchEvent(new Event("input", { bubbles: true }));
       }
 
+      function moveBlock(list, li, direction) {
+        if (direction === "up") {
+          const prev = li.previousElementSibling;
+          if (!prev) return;
+          list.insertBefore(li, prev);
+        } else {
+          const next = li.nextElementSibling;
+          if (!next) return;
+          list.insertBefore(next, li);
+        }
+        syncHiddenField(list);
+        announce(list, li);
+      }
+
+      // Without this a keyboard or screen-reader user gets no confirmation that
+      // a move landed — the visual reflow is the only feedback drag users need.
+      function announce(list, li) {
+        const status = list.parentElement.querySelector(".parsons-status");
+        if (!status) return;
+        const blocks = [ ...list.querySelectorAll(".parsons-block") ];
+        status.textContent = `Block moved to position ${blocks.indexOf(li) + 1} of ${blocks.length}.`;
+      }
+
+      function handleKey(list, event) {
+        const li = event.target.closest?.(".parsons-block");
+        if (!li || !list.contains(li)) return;
+        const direction = event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down" : null;
+        if (!direction) return;
+
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          moveBlock(list, li, direction);
+          li.focus();
+          return;
+        }
+        const sibling = direction === "up" ? li.previousElementSibling : li.nextElementSibling;
+        if (sibling) {
+          event.preventDefault();
+          sibling.focus();
+        }
+      }
+
+      function controlButton(list, li, direction) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `btn btn-ghost btn-sm parsons-move-${direction}`;
+        btn.textContent = direction === "up" ? "↑" : "↓";
+        btn.setAttribute("aria-label", `Move block ${direction}`);
+        btn.addEventListener("click", () => moveBlock(list, li, direction));
+        return btn;
+      }
+
+      function addControls(list) {
+        if (list.dataset.parsonsControls) return;
+        list.dataset.parsonsControls = "1";
+        list.querySelectorAll(".parsons-block").forEach(li => {
+          const controls = document.createElement("div");
+          controls.className = "parsons-controls";
+          controls.append(controlButton(list, li, "up"), controlButton(list, li, "down"));
+          li.appendChild(controls);
+        });
+      }
+
       document.querySelectorAll("ol[data-parsons-blocks]:not([data-parsons-wired])").forEach(list => {
         list.dataset.parsonsWired = "1";
         list.parsonsSync = () => syncHiddenField(list);
-
-        list.querySelectorAll(".parsons-move-up").forEach(btn => {
-          btn.addEventListener("click", () => {
-            const li = btn.closest(".parsons-block");
-            const prev = li.previousElementSibling;
-            if (prev) { list.insertBefore(li, prev); syncHiddenField(list); }
-          });
-        });
-
-        list.querySelectorAll(".parsons-move-down").forEach(btn => {
-          btn.addEventListener("click", () => {
-            const li = btn.closest(".parsons-block");
-            const next = li.nextElementSibling;
-            if (next) { list.insertBefore(next, li); syncHiddenField(list); }
-          });
-        });
+        list.parsonsAddControls = () => addControls(list);
+        list.addEventListener("keydown", event => handleKey(list, event));
+        // A CDN that hangs rather than errors never rejects the import below,
+        // so its catch never runs. Without this the section would stay
+        // unanswerable for as long as the request is stalled.
+        setTimeout(() => { if (!list.dataset.sortableDone) addControls(list); }, 3000);
       });
     })();
     </script>
     <script type="module">
       // Version pinned exactly, same posture as the Mermaid import in
-      // _architecture_section — a blocked CDN leaves the up/down buttons as the
-      // only way to reorder, which already fully works on its own.
+      // _architecture_section — a blocked CDN falls back to the injected
+      // up/down buttons above.
       try {
         const { default: Sortable } = await import("https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js");
         document.querySelectorAll("ol[data-parsons-blocks]:not([data-sortable-done])").forEach(list => {
           list.dataset.sortableDone = "1";
-          Sortable.create(list, { animation: 150, onEnd: () => list.parsonsSync?.() });
+          // delayOnTouchOnly: a touch drag needs a brief hold, so an ordinary
+          // swipe still scrolls the page instead of picking up a block. With
+          // the arrows gone this is the only input on a phone. Mouse dragging
+          // is unaffected.
+          Sortable.create(list, {
+            animation: 150,
+            delay: 150,
+            delayOnTouchOnly: true,
+            onEnd: () => list.parsonsSync?.()
+          });
         });
       } catch {
-        // CDN unreachable or module failed to load — up/down buttons still work.
+        document.querySelectorAll("ol[data-parsons-blocks]").forEach(list => list.parsonsAddControls?.());
       }
     </script>
   <% end %>

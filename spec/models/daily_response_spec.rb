@@ -201,4 +201,51 @@ RSpec.describe DailyResponse, type: :model do
       end
     end
   end
+
+  describe "#history_page" do
+    def submitted_response_on(owner, date)
+      exercise = owner.daily_exercises.create!(
+        date: date,
+        generated_at: Time.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      owner.daily_responses.create!(
+        daily_exercise: exercise,
+        date: date,
+        answers: { "code_review" => "An answer with real substance" },
+        submitted_at: Time.current
+      )
+    end
+
+    it "puts the ten newest sessions on page 1 and the eleventh on page 2" do
+      responses = (0..10).map { |i| submitted_response_on(user, i.days.ago.to_date) }
+
+      expect(responses[0].history_page).to eq(1)
+      expect(responses[9].history_page).to eq(1)
+      expect(responses[10].history_page).to eq(2)
+    end
+
+    it "ignores unsubmitted drafts, which never appear in history at all" do
+      target = submitted_response_on(user, 20.days.ago.to_date)
+      (0..9).each do |i|
+        date = i.days.ago.to_date
+        draft_exercise = user.daily_exercises.create!(
+          date: date,
+          generated_at: Time.current,
+          problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+        )
+        user.daily_responses.create!(daily_exercise: draft_exercise, date: date, answers: {})
+      end
+
+      expect(target.history_page).to eq(1)
+    end
+
+    it "ignores another user's sessions" do
+      other = User.create!(email: "other@example.com", name: "Other")
+      (0..9).each { |i| submitted_response_on(other, i.days.ago.to_date) }
+      target = submitted_response_on(user, 20.days.ago.to_date)
+
+      expect(target.history_page).to eq(1)
+    end
+  end
 end

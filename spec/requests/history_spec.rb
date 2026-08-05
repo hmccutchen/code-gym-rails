@@ -454,4 +454,126 @@ RSpec.describe "History", type: :request do
       expect(response.body).to match(/\.history-entry \.section \{[^}]*margin-inline: 0;/)
     end
   end
+
+  describe "pagination" do
+    def create_sessions(count)
+      (0...count).map { |i| create_session_for(user, date: (i + 1).days.ago.to_date) }
+    end
+
+    def formatted(session)
+      session.date.strftime("%A, %B %-d, %Y")
+    end
+
+    def pagination_nav
+      response.body[/<nav class="pagination".*?<\/nav>/m]
+    end
+
+    it "shows the ten newest sessions on page 1 and the eleventh on page 2" do
+      sessions = create_sessions(11)
+      login_as(user)
+
+      get history_path
+      expect(response.body).to include(formatted(sessions[0]))
+      expect(response.body).to include(formatted(sessions[9]))
+      expect(response.body).not_to include(formatted(sessions[10]))
+
+      get history_path(page: 2)
+      expect(response.body).to include(formatted(sessions[10]))
+      expect(response.body).not_to include(formatted(sessions[0]))
+    end
+
+    it "reports the total session count on every page, not the page size" do
+      create_sessions(11)
+      login_as(user)
+
+      get history_path
+      expect(response.body).to include("11 submitted sessions")
+
+      get history_path(page: 2)
+      expect(response.body).to include("11 submitted sessions")
+    end
+
+    it "renders no nav when every session fits on one page" do
+      create_sessions(10)
+      login_as(user)
+
+      get history_path
+
+      expect(response.body).not_to include('class="pagination"')
+    end
+
+    it "links forward from the first page and back from the last" do
+      create_sessions(11)
+      login_as(user)
+
+      get history_path
+      expect(pagination_nav).to include("Page 1 of 2")
+      expect(pagination_nav).to include(%(href="#{history_path(page: 2)}"))
+
+      get history_path(page: 2)
+      expect(pagination_nav).to include("Page 2 of 2")
+      expect(pagination_nav).to include(%(href="#{history_path(page: 1)}"))
+    end
+
+    it "redirects an out-of-range page to the last real page" do
+      create_sessions(11)
+      login_as(user)
+
+      get history_path(page: 99)
+
+      expect(response).to redirect_to(history_path(page: 2))
+    end
+
+    it "redirects to the bare /history URL when the last page is page 1" do
+      create_sessions(3)
+      login_as(user)
+
+      get history_path(page: 99)
+
+      expect(response).to redirect_to(history_path)
+    end
+
+    it "serves page 1 for a non-numeric page rather than erroring" do
+      sessions = create_sessions(11)
+      login_as(user)
+
+      get history_path(page: "abc")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(formatted(sessions[0]))
+    end
+
+    it "clamps zero and negative page numbers to page 1" do
+      sessions = create_sessions(11)
+      login_as(user)
+
+      get history_path(page: 0)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(formatted(sessions[0]))
+
+      get history_path(page: -1)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(formatted(sessions[0]))
+    end
+
+    it "auto-opens the newest entry on page 1 and nothing on later pages" do
+      create_sessions(11)
+      login_as(user)
+
+      get history_path
+      expect(response.body.scan(/<details class="answers" open>/).size).to eq(1)
+
+      get history_path(page: 2)
+      expect(response.body.scan(/<details class="answers" open>/).size).to eq(0)
+    end
+
+    it "still renders the empty state when the user has no sessions at all" do
+      login_as(user)
+
+      get history_path
+
+      expect(response.body).to include("No submitted sessions yet.")
+      expect(response.body).not_to include('class="pagination"')
+    end
+  end
 end
