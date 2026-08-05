@@ -96,7 +96,7 @@ RSpec.describe ClaudeService do
       end
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
-      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20)
+      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false)
     end
 
     it "sends MAX_TOKENS as the request's output budget" do
@@ -120,7 +120,7 @@ RSpec.describe ClaudeService do
       expect(ClaudeService::MAX_TOKENS).to be >= 8_000
     end
 
-    it "raises TruncatedResponseError when the model stopped at the output cap" do
+    it "reports truncation when the model stopped at the output cap" do
       body = {
         "content"     => [ { "type" => "text", "text" => '{"code_review": {"correct": ["half a sen' } ],
         "stop_reason" => "max_tokens",
@@ -129,12 +129,12 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      expect {
-        service.send(:call, system: "sys", prompt: "prompt text")
-      }.to raise_error(AiService::TruncatedResponseError, /output limit/i)
+      # Reported as data, not raised here: AiService#call_and_log owns the
+      # policy, so the billed usage is recorded before the failure propagates.
+      expect(service.send(:call, system: "sys", prompt: "prompt text")[:truncated]).to be(true)
     end
 
-    it "does not raise for a normal end_turn stop reason" do
+    it "does not report truncation for a normal end_turn stop reason" do
       body = {
         "content"     => [ { "type" => "text", "text" => "hello" } ],
         "stop_reason" => "end_turn",
@@ -143,7 +143,9 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      expect(service.send(:call, system: "sys", prompt: "prompt text")[:text]).to eq("hello")
+      result = service.send(:call, system: "sys", prompt: "prompt text")
+      expect(result[:text]).to eq("hello")
+      expect(result[:truncated]).to be(false)
     end
 
     it "raises AiService::Error on a non-success response" do

@@ -7,16 +7,17 @@ RSpec.describe AiService do
   # without a real network call to any provider.
   let(:double_class) do
     Class.new(AiService) do
-      def initialize(canned_text: "{}", input_tokens: 1, output_tokens: 1)
+      def initialize(canned_text: "{}", input_tokens: 1, output_tokens: 1, truncated: false)
         @canned_text   = canned_text
         @input_tokens  = input_tokens
         @output_tokens = output_tokens
+        @truncated     = truncated
       end
 
       private
 
       def call(system:, prompt:)
-        { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens }
+        { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
 
       def build_connection
@@ -26,6 +27,43 @@ RSpec.describe AiService do
   end
 
   let(:service) { double_class.new }
+
+  # A truncated response is still a billed response, so the usage row has to
+  # be written before the failure propagates — otherwise cost tracking
+  # silently under-counts exactly the calls that burn a full output budget.
+  describe "truncated provider responses" do
+    it "records the billed usage before raising" do
+      svc = double_class.new(input_tokens: 900, output_tokens: 8_000, truncated: true)
+
+      expect {
+        expect { svc.generate_exercise(user) }.to raise_error(AiService::TruncatedResponseError)
+      }.to change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
+
+      usage = ApiUsage.last
+      expect(usage.tokens_in).to eq(900)
+      expect(usage.tokens_out).to eq(8_000)
+    end
+
+    it "raises TruncatedResponseError rather than a confusing parse error" do
+      svc = double_class.new(canned_text: '{"code_review": {"correct": ["half a sen', truncated: true)
+
+      expect {
+        svc.generate_exercise(user)
+      }.to raise_error(AiService::TruncatedResponseError, /output token limit/i)
+    end
+
+    it "records usage before raising on a prose entry point too" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {} })
+      svc = double_class.new(canned_text: "a cut-off expl", truncated: true)
+
+      expect {
+        expect {
+          svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
+        }.to raise_error(AiService::TruncatedResponseError)
+      }.to change { ApiUsage.where(purpose: "explain_differently").count }.by(1)
+    end
+  end
 
   describe "#exercise_schema_for" do
     it "defines a teaching_note and a concept for each of the three sections, for any language" do

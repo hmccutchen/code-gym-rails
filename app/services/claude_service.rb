@@ -56,18 +56,13 @@ class ClaudeService < AiService
     end
 
     parsed = JSON.parse(resp.body)
-
-    if parsed["stop_reason"] == "max_tokens"
-      raise AiService::TruncatedResponseError,
-            "Claude cut the response off at the #{MAX_TOKENS}-token output limit"
-    end
-
-    usage = parsed["usage"] || {}
+    usage  = parsed["usage"] || {}
 
     {
       text:          parsed.dig("content", 0, "text"),
       input_tokens:  usage["input_tokens"],
-      output_tokens: usage["output_tokens"]
+      output_tokens: usage["output_tokens"],
+      truncated:     parsed["stop_reason"] == "max_tokens"
     }
   rescue Faraday::Error => e
     raise AiService::Error, "Network error calling Claude: #{e.message}"
