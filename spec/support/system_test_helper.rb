@@ -46,7 +46,10 @@ Capybara.default_max_wait_time = 10
 # login appears to succeed, then the next request bounces to /login.
 #
 # Picking today when it's a weekday, and otherwise the upcoming Monday,
-# keeps the travelled clock within a day of real time in either direction.
+# keeps the travelled clock at most a day *behind* real time (midnight of
+# the current day). It can run further ahead than that — from Saturday the
+# next Monday is up to two days out — but only backward travel can expire
+# the cookie, so forward drift is harmless.
 module SystemTimeHelper
   def a_weekday
     date = Date.current

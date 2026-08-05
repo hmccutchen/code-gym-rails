@@ -99,7 +99,7 @@ RSpec.describe ClaudeService do
       expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20)
     end
 
-    it "requests an output budget large enough for a full three-section review" do
+    it "sends MAX_TOKENS as the request's output budget" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
       fake_conn = instance_double(Faraday::Connection)
       service.instance_variable_set(:@conn, fake_conn)
@@ -110,6 +110,13 @@ RSpec.describe ClaudeService do
       end
 
       service.send(:call, system: "sys", prompt: "prompt text")
+    end
+
+    # A three-section review (prose arrays plus a structural improved_code
+    # block per section) overran the original 2500-token budget and came back
+    # truncated mid-string. This floor is the actual regression guard; the
+    # test above only proves the constant reaches the request.
+    it "keeps an output budget large enough for a full three-section review" do
       expect(ClaudeService::MAX_TOKENS).to be >= 8_000
     end
 
