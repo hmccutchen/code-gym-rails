@@ -262,6 +262,11 @@ and ordinary swipes continue to scroll the page. Mouse dragging is unaffected.
 - One `spec/system/` spec against the `FakeService` user (`provider: "fake"`)
   confirms no arrows are present when SortableJS loads successfully. The
   injection behavior itself is only meaningfully observable in a real browser.
+  (Implementation note: the spec pre-seeds a `DailyExercise` whose third
+  section is `parsons_problem` rather than letting the dashboard generate one.
+  `FakeService` returns every section kind, but only one third renders and
+  `ExerciseSection.thirds` precedence makes `architecture` win every time, so
+  a generated fake-provider dashboard never shows a Parsons section.)
 
 The existing `spec/requests/history_spec.rb:58` assertion that a submitted
 Parsons render contains no `parsons-move-up` passes unchanged: the script block

@@ -59,7 +59,8 @@ User interacts:
   └→ ResponsesController#email_review→ mails the completed review to the user,
        then returns to the dashboard (where the button lives)
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day)
-  └→ HistoryController#index         → every submitted session, newest first —
+  └→ HistoryController#index         → every submitted session, newest first,
+       paginated 10 per page (pagy, offset) —
        the single destination for viewing any day's problems, answers, and
        review, today's included. There is no per-day review page.
        (feedback + concept tags are included in tomorrow's generation prompt)
@@ -88,6 +89,16 @@ User interacts:
 - **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call. The AI review stays a separate, manual step afterward — cost-conscious by design. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database, so `PreviewSeed` (`app/services/preview_seed.rb`) seeds three days of demo content for the single account named by `PREVIEW_SEED_EMAIL`. It runs from `preDeployCommand` in every environment including production, and is safe there because it no-ops without that variable, only ever creates rows (never updates or deletes), and never reassigns a non-blank attribute. `PreviewMail` additionally sends mail inline when the variable is set, so magic-link login does not depend on the worker service. **`PREVIEW_SEED_EMAIL` must be set on the PR-environment template only** — set at the shared or base level, Railway propagates it into production. There is no login bypass: PR apps authenticate with real magic links.
+- **Paginated history**: `/history` renders 10 submitted sessions per page via
+  Pagy's offset paginator (`DailyResponse::HISTORY_PAGE_SIZE`). Pagy 43's API
+  is a full rewrite — `Pagy::Method`, `pagy(:offset, …)`, and helper methods on
+  the pagy object; the `Pagy::Backend`/`pagy_nav` API in most documentation is
+  gone. An out-of-range page raises and redirects to the last real page rather
+  than rendering the empty state to someone who has sessions. The post-review
+  redirect uses `DailyResponse#history_page` so its anchor still resolves.
+- **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
+  up/down arrow buttons are injected by script only if that import fails or
+  stalls for 3s.
 
 ## Railway Deployment
 
@@ -152,6 +163,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
+- `app/controllers/history_controller.rb` — paginated list of submitted sessions
 - `app/controllers/sessions_controller.rb` — magic link create + verify
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
