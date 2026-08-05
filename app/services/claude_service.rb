@@ -34,11 +34,11 @@ class ClaudeService < AiService
 
   private
 
-  def call(system:, prompt:)
+  def call(system:, prompt:, cache_system: false)
     body = {
       model:      MODEL,
       max_tokens: MAX_TOKENS,
-      system:     system,
+      system:     cache_system ? [ { type: "text", text: system, cache_control: { type: "ephemeral" } } ] : system,
       messages:   [ { role: "user", content: prompt } ]
     }
 

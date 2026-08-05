@@ -51,30 +51,33 @@ RSpec.describe FakeService do
     end
   end
 
-  describe "#review_response" do
-    it "returns a review keyed to the exercise's actual third_key" do
+  describe "#review_sections" do
+    it "returns ok: true for each requested section, independently gradable" do
       user_exercise = DailyExercise.create!(
         user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
         problem_set: described_class::EXERCISE_PROBLEM_SET
       )
       response = DailyResponse.create!(
         user: user, daily_exercise: user_exercise, date: Date.current,
-        answers: { "code_review" => "N+1 query", "pattern" => "Extract a service object", "architecture" => "Move it to a job" }
+        answers: { "code_review" => "N+1 query", "pattern" => "Extract a service object", "architecture" => "Move it to a job" },
+        submitted_at: Time.current
       )
 
-      review = described_class.new(user.api_key).review_response(user, user_exercise, response)
+      results = described_class.new(user.api_key).review_sections(user, user_exercise, response, sections: %w[code_review pattern architecture])
 
-      expect(review.keys).to match_array(%w[code_review pattern architecture])
-      expect(review["architecture"]["rating"]).to be_present
-      expect(review["code_review"]["correct"]).to be_an(Array)
+      expect(results.keys).to match_array(%w[code_review pattern architecture])
+      results.each_value do |outcome|
+        expect(outcome[:ok]).to be(true)
+        expect(outcome[:review]["correct"]).to be_an(Array)
+      end
     end
 
-    it "raises a clear error when the third section key can't be extracted from the prompt" do
+    it "raises a clear error when the section key can't be extracted from the prompt" do
       service = described_class.new(user.api_key)
 
       expect {
-        service.send(:call, system: "You are giving direct, specific feedback", prompt: "no keys line here")
-      }.to raise_error(/could not extract the third section key/)
+        service.send(:call, system: "You are a senior Rails engineer giving direct, specific feedback", prompt: "no section marker here")
+      }.to raise_error(/could not extract the section key/)
     end
   end
 

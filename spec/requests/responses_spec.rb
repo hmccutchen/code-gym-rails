@@ -283,33 +283,44 @@ RSpec.describe "Responses", type: :request do
 
     it "does not re-review an already-reviewed day, and lands on its history entry" do
       daily_response = create_submitted_response
-      daily_response.update!(ai_review: { "code_review" => { "rating" => "solid" } })
+      daily_response.update!(ai_review: {
+        "code_review" => { "rating" => "solid" },
+        "pattern"     => { "rating" => "solid" },
+        "challenge"   => { "rating" => "solid" }
+      })
       expect(AiService).not_to receive(:for)
 
       post review_response_path(daily_response)
 
       expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
       expect(flash[:notice]).to eq("Already reviewed.")
-      expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
     end
 
     it "saves the ai_review from the user's configured provider" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(fake_service).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: true, review: { "rating" => "solid" } },
+        "challenge"   => { ok: true, review: { "rating" => "solid" } }
+      )
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
 
       expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
-      expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+      expect(daily_response.reload.ai_review.keys).to match_array(%w[code_review pattern challenge])
     end
 
     it "sends the user to the history page that actually holds the reviewed entry" do
       target = create_submitted_response(date: 30.days.ago.to_date)
       (1..10).each { |i| create_submitted_response(date: i.days.ago.to_date) }
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(fake_service).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: true, review: { "rating" => "solid" } },
+        "challenge"   => { ok: true, review: { "rating" => "solid" } }
+      )
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(target)
@@ -320,7 +331,11 @@ RSpec.describe "Responses", type: :request do
     it "omits the page parameter when the entry is on the first page" do
       target = create_submitted_response(date: 1.day.ago.to_date)
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(fake_service).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: true, review: { "rating" => "solid" } },
+        "challenge"   => { ok: true, review: { "rating" => "solid" } }
+      )
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(target)
@@ -331,7 +346,7 @@ RSpec.describe "Responses", type: :request do
     it "redirects with an alert when the provider raises" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_raise(AiService::Error, "rate limited")
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "other", message: "rate limited" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
@@ -343,7 +358,7 @@ RSpec.describe "Responses", type: :request do
     it "shows a Settings-pointing alert without leaking the provider message when the provider raises AuthenticationError" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_raise(AiService::AuthenticationError, "invalid x-api-key")
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "authentication", message: "invalid x-api-key" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
@@ -355,7 +370,7 @@ RSpec.describe "Responses", type: :request do
     it "shows a try-again alert when the provider raises RateLimitError" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_raise(AiService::RateLimitError, "rate limited")
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "rate_limit", message: "rate limited" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
@@ -376,9 +391,9 @@ RSpec.describe "Responses", type: :request do
     end
 
     before do
-      fake = instance_double(ClaudeService, review_response: {
-        "code_review" => { "rating" => "developing", "correct" => "ok",
-                           "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" }
+      fake = instance_double(ClaudeService, review_sections: {
+        "code_review" => { ok: true, review: { "rating" => "developing", "correct" => "ok",
+                           "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" } }
       })
       allow(AiService).to receive(:for).and_return(fake)
     end
@@ -424,7 +439,7 @@ RSpec.describe "Responses", type: :request do
     it "reclaims the review after the in-flight marker goes stale" do
       resp = submitted_response(reviewing_since: 10.minutes.ago)
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)
@@ -437,7 +452,7 @@ RSpec.describe "Responses", type: :request do
     it "clears the claim on success so a stray marker never lingers" do
       resp = submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)
@@ -448,12 +463,103 @@ RSpec.describe "Responses", type: :request do
     it "clears the claim when the provider raises, so an immediate retry can proceed" do
       resp = submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_response).and_raise(AiService::Error, "boom")
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "other", message: "boom" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)
 
       expect(resp.reload.reviewing_since).to be_nil
+    end
+  end
+
+  describe "POST /responses/:id/review partial success and retry" do
+    def submitted_response
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "t", "question" => "q" },
+          "challenge"   => { "question" => "q" }
+        }
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20, "pattern" => "a" * 20, "challenge" => "a" * 20 },
+                            submitted_at: Time.current)
+    end
+
+    it "saves succeeded sections and records the failure reason for the rest, redirecting to the dashboard" do
+      resp = submitted_response
+      fake_service = instance_double(ClaudeService, review_sections: {
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: true, review: { "rating" => "developing" } },
+        "challenge"   => { ok: false, error_code: "rate_limit", message: "rate limited" }
+      })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(resp)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq("2 of 3 sections reviewed — 1 couldn't be reviewed, try again.")
+      resp.reload
+      expect(resp.ai_review.keys).to match_array(%w[code_review pattern])
+      expect(resp.review_errors).to eq("challenge" => "rate_limit")
+      expect(resp).not_to be_fully_reviewed
+      expect(resp).to be_reviewed
+    end
+
+    it "only re-requests the still-missing section on retry, and clears its error once it succeeds" do
+      resp = submitted_response
+      resp.update!(
+        ai_review: { "code_review" => { "rating" => "solid" }, "pattern" => { "rating" => "developing" } },
+        review_errors: { "challenge" => "rate_limit" }
+      )
+      fake_service = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      expect(fake_service).to receive(:review_sections)
+        .with(user, resp.daily_exercise, resp, sections: %w[challenge])
+        .and_return("challenge" => { ok: true, review: { "rating" => "strong" } })
+
+      post review_response_path(resp)
+
+      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(flash[:notice]).to eq("Review ready!")
+      resp.reload
+      expect(resp).to be_fully_reviewed
+      expect(resp.review_errors).to eq({})
+    end
+
+    it "does not re-decrement a paused concept's cooldown on a retry that completes the review" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "t", "question" => "q" },
+          "challenge"   => { "question" => "q" }
+        }
+      )
+      resp = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20, "pattern" => "a" * 20, "challenge" => "a" * 20 },
+        submitted_at: Time.current, concept_tags: { "code_review" => "n_plus_one" }
+      )
+      paused = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+
+      fake_service = instance_double(ClaudeService, review_sections: {
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: true, review: { "rating" => "solid" } },
+        "challenge"   => { ok: false, error_code: "other", message: "boom" }
+      })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      post review_response_path(resp)
+      expect(paused.reload.cooldown_remaining).to eq(1)
+
+      retry_service = instance_double(ClaudeService, review_sections: {
+        "challenge" => { ok: true, review: { "rating" => "solid" } }
+      })
+      allow(AiService).to receive(:for).with(user).and_return(retry_service)
+      post review_response_path(resp)
+
+      expect(paused.reload.cooldown_remaining).to eq(1)
     end
   end
 
@@ -966,10 +1072,7 @@ RSpec.describe "Responses", type: :request do
         "pattern"         => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" },
         "security_review" => { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "fixed = User.where(name: params[:name])" }
       }
-      # Matches this file's existing convention for stubbing the review call
-      # (see the "POST /responses/:id/review" describe block) rather than
-      # allow_any_instance_of, which this codebase's specs don't otherwise use.
-      fake_service = instance_double(ClaudeService, review_response: fake_review)
+      fake_service = instance_double(ClaudeService, review_sections: fake_review.transform_values { |r| { ok: true, review: r } })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)

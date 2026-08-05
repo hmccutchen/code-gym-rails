@@ -7,16 +7,19 @@ RSpec.describe AiService do
   # without a real network call to any provider.
   let(:double_class) do
     Class.new(AiService) do
-      def initialize(canned_text: "{}", input_tokens: 1, output_tokens: 1, truncated: false)
-        @canned_text   = canned_text
-        @input_tokens  = input_tokens
-        @output_tokens = output_tokens
-        @truncated     = truncated
+      attr_writer :canned_text, :input_tokens, :output_tokens, :truncated
+
+      def initialize(_api_key = nil, canned_text: "{}", input_tokens: 1, output_tokens: 1, truncated: false)
+        @api_key       = _api_key
+        @canned_text   = _api_key.is_a?(Hash) ? _api_key.fetch(:canned_text, "{}") : canned_text
+        @input_tokens  = _api_key.is_a?(Hash) ? _api_key.fetch(:input_tokens, 1) : input_tokens
+        @output_tokens = _api_key.is_a?(Hash) ? _api_key.fetch(:output_tokens, 1) : output_tokens
+        @truncated     = _api_key.is_a?(Hash) ? _api_key.fetch(:truncated, false) : truncated
       end
 
       private
 
-      def call(system:, prompt:)
+      def call(system:, prompt:, cache_system: false)
         { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
 
@@ -1030,27 +1033,59 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#review_response" do
-    def sample_exercise(language)
-      DailyExercise.new(
-        language: language,
-        problem_set: {
-          "code_review" => { "question" => "q", "snippet" => "s" },
-          "pattern" => { "title" => "t", "question" => "q" },
-          "challenge" => { "question" => "q" }
-        }
-      )
-    end
-
-    it "asks for correct/missed/better_questions as arrays and next_step as a string" do
-      ex = DailyExercise.new(language: "ruby_rails", problem_set: {
+  describe "#build_review_day_context" do
+    def exercise_with_third(third_key, third_section)
+      DailyExercise.new(language: "ruby_rails", problem_set: {
         "code_review" => { "question" => "cr?", "snippet" => "code" },
         "pattern"     => { "title" => "P", "question" => "pat?" },
-        "challenge"   => { "question" => "Implement uniq_by" }
+        third_key     => third_section
       })
-      resp = DailyResponse.new(answers: { "code_review" => "It's an N+1" })
-      prompt = service.send(:build_review_prompt, ex, resp)
+    end
 
+    it "includes all three sections' questions, answers, and self-ratings" do
+      exercise = exercise_with_third("challenge", { "question" => "Implement uniq_by" })
+      resp = DailyResponse.new(
+        answers: { "code_review" => "It's an N+1", "pattern" => "Extract a service object", "challenge" => "def uniq_by; end" },
+        section_ratings: { "code_review" => "right_level", "pattern" => "too_hard", "challenge" => "too_easy" }
+      )
+
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+
+      expect(context).to include("cr?", "It's an N+1", "right_level")
+      expect(context).to include("pat?", "Extract a service object", "too_hard")
+      expect(context).to include("Implement uniq_by", "def uniq_by; end", "too_easy")
+    end
+
+    it "names the coach in the framing" do
+      exercise = exercise_with_third("challenge", { "question" => "q" })
+      resp = DailyResponse.new(answers: {}, section_ratings: {})
+      context = service.send(:build_review_day_context, "JavaScript/React", exercise, resp)
+      expect(context).to include("senior JavaScript/React engineer")
+    end
+
+    it "tells the model it will be asked to grade only one section" do
+      exercise = exercise_with_third("challenge", { "question" => "q" })
+      resp = DailyResponse.new(answers: {}, section_ratings: {})
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(context).to match(/grade exactly one/i)
+    end
+  end
+
+  describe "#build_review_section_prompt" do
+    def exercise_with_third(third_key, third_section)
+      DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?", "snippet" => "code" },
+        "pattern"     => { "title" => "P", "question" => "pat?" },
+        third_key     => third_section
+      })
+    end
+
+    it "asks for correct/missed/better_questions as arrays and next_step as a string, ungrouped" do
+      exercise = exercise_with_third("challenge", { "question" => "q" })
+      resp = DailyResponse.new(answers: {})
+      prompt = service.send(:build_review_section_prompt, exercise, resp, "code_review")
+
+      expect(prompt).to include('NOT wrapped in a "code_review" key')
       expect(prompt).to include('"correct": array of strings')
       expect(prompt).to include('"missed": array of strings')
       expect(prompt).to include('"better_questions": array of strings')
@@ -1058,235 +1093,60 @@ RSpec.describe AiService do
       expect(prompt).to match(/separate ideas belong in separate entries/i)
     end
 
-    it "names pattern as code-bearing and asks for a refactored structure" do
-      ex = DailyExercise.new(language: "ruby_rails", problem_set: {
-        "code_review" => { "question" => "cr?", "snippet" => "code" },
-        "pattern"     => { "title" => "P", "question" => "pat?" },
-        "challenge"   => { "question" => "Implement uniq_by" }
-      })
-      resp = DailyResponse.new(answers: { "pattern" => "Extract a service object" })
-      prompt = service.send(:build_review_prompt, ex, resp)
-
-      expect(prompt).to include("code_review, pattern, and challenge")
+    it "names pattern as structural and asks for a refactored structure" do
+      exercise = exercise_with_third("challenge", { "question" => "q" })
+      resp = DailyResponse.new(answers: {})
+      prompt = service.send(:build_review_section_prompt, exercise, resp, "pattern")
       expect(prompt).to match(/refactored structure/i)
     end
 
-    context "architecture third section" do
-      def arch_exercise
-        DailyExercise.new(
-          language: "ruby_rails",
-          problem_set: {
-            "code_review" => { "question" => "cr?", "snippet" => "code" },
-            "pattern"     => { "title" => "P", "question" => "pat?" },
-            "architecture" => { "title" => "A", "question" => "Pick a datastore approach?",
-                                "scenario" => "10x traffic spike expected" }
-          }
-        )
-      end
+    it "evaluates architecture on depth of reasoning, not correctness, and forbids improved_code" do
+      exercise = exercise_with_third("architecture", { "title" => "A", "question" => "q", "scenario" => "s" })
+      resp = DailyResponse.new(answers: {})
+      prompt = service.send(:build_review_section_prompt, exercise, resp, "architecture")
 
-      it "evaluates tradeoff reasoning, constraints, and alternatives — not correctness" do
-        resp = DailyResponse.new(answers: { "architecture" => "I'd shard because..." })
-        prompt = service.send(:build_review_prompt, arch_exercise, resp)
-        expect(prompt).to include("Pick a datastore approach?")
-        expect(prompt).to include("10x traffic spike expected")
-        expect(prompt.downcase).to include("tradeoff")
-        expect(prompt.downcase).to include("alternatives")
-        expect(prompt).to include('"architecture"')   # asks for the architecture key back
-        expect(prompt).not_to include("Coding Challenge:")
-        expect(prompt).to include('For this section "improved_code" must be an empty string.')
-      end
+      expect(prompt.downcase).to include("tradeoff")
+      expect(prompt.downcase).to include("alternatives")
+      expect(prompt).to include("must be an empty string for this section")
     end
 
-    context "security_review third section" do
-      def security_review_exercise
-        DailyExercise.new(
-          language: "ruby_rails",
-          problem_set: {
-            "code_review" => { "question" => "cr?", "snippet" => "code" },
-            "pattern"     => { "title" => "P", "question" => "pat?" },
-            "security_review" => {
-              "title" => "S",
-              "question" => "What vulnerability exists here, and how would you mitigate it?",
-              "snippet" => "User.new(params[:user])"
-            }
-          }
-        )
-      end
+    it "evaluates security_review on vulnerability + mitigation with partial credit" do
+      exercise = exercise_with_third("security_review", { "title" => "S", "question" => "q", "snippet" => "code" })
+      resp = DailyResponse.new(answers: {})
+      prompt = service.send(:build_review_section_prompt, exercise, resp, "security_review")
 
-      it "evaluates vulnerability identification and mitigation soundness, not a single expected answer" do
-        resp = DailyResponse.new(answers: { "security_review" => "Mass assignment; use strong params" })
-        prompt = service.send(:build_review_prompt, security_review_exercise, resp)
-
-        expect(prompt).to include("What vulnerability exists here")
-        expect(prompt.downcase).to include("mitigation")
-        expect(prompt).to include('"security_review"')
-        expect(prompt).not_to include("Coding Challenge:")
-        expect(prompt).to include('For this section "improved_code" must show the mitigated version of the snippet.')
-      end
-
-      it "asks for improved_code covering code_review, pattern, and security_review" do
-        resp = DailyResponse.new(answers: {})
-        prompt = service.send(:build_review_prompt, security_review_exercise, resp)
-        expect(prompt).to include("corrected/improved code for code_review, pattern, and security_review")
-      end
+      expect(prompt.downcase).to include("mitigation")
+      expect(prompt.downcase).to include("partial credit")
     end
 
-    context "parsons_problem third section" do
-      def parsons_exercise
-        DailyExercise.new(
-          language: "ruby_rails",
-          problem_set: {
-            "code_review" => { "question" => "cr?", "snippet" => "code" },
-            "pattern"     => { "title" => "P", "question" => "pat?" },
-            "parsons_problem" => {
-              "title" => "Sort a list", "question" => "Arrange these blocks",
-              "blocks" => [ "def sorted_names(names)", "  names.sort", "end" ]
-            }
-          }
-        )
-      end
-
-      it "grounds the AI in the verified mismatch count and forbids it from judging correctness" do
-        resp = DailyResponse.new(answers: { "parsons_problem" => "order:0,2,1" })
-        prompt = service.send(:build_review_prompt, parsons_exercise, resp)
-
-        expect(prompt).to include("Sort a list")
-        expect(prompt).to match(/2 block\(s\) out of place/)
-        expect(prompt).to match(/do not.*judge|not.*re-judge/i)
-        expect(prompt).to match(/does not force|do not output a "rating"/i)
-        expect(prompt).to include('For this section "improved_code" must be an empty string.')
-      end
-
-      it "describes which specific blocks are misplaced" do
-        resp = DailyResponse.new(answers: { "parsons_problem" => "order:0,2,1" })
-        prompt = service.send(:build_review_prompt, parsons_exercise, resp)
-
-        expect(prompt).to include('"  names.sort"')
-        expect(prompt).to include('"end"')
-      end
-
-      it "describes an out-of-range id as nothing submitted rather than the block it would wrap to" do
-        resp = DailyResponse.new(answers: { "parsons_problem" => "order:-1,1,2" })
-        prompt = service.send(:build_review_prompt, parsons_exercise, resp)
-
-        expect(prompt).to include("position 1 has (nothing submitted)")
-      end
-
-      it "does not claim a verified result when the provider omitted the blocks array" do
-        exercise = DailyExercise.new(
-          language: "ruby_rails",
-          problem_set: {
-            "code_review" => { "question" => "cr?", "snippet" => "code" },
-            "pattern"     => { "title" => "P", "question" => "pat?" },
-            "parsons_problem" => { "title" => "T", "question" => "Q" }
-          }
-        )
-        resp = DailyResponse.new(answers: {})
-
-        prompt = service.send(:build_review_prompt, exercise, resp)
-        expect(prompt).not_to match(/block\(s\) out of place/)
-        expect(prompt).to include("CANNOT be verified")
-      end
-    end
-
-    it "keeps the existing challenge criteria when the third section is a challenge" do
-      ex = DailyExercise.new(language: "ruby_rails", problem_set: {
-        "code_review" => { "question" => "cr?", "snippet" => "code" },
-        "pattern"     => { "title" => "P", "question" => "pat?" },
-        "challenge"   => { "question" => "Implement uniq_by" }
+    it "grounds parsons_problem in the verified mismatch count and forbids improved_code" do
+      exercise = exercise_with_third("parsons_problem", {
+        "title" => "T", "question" => "Q", "blocks" => %w[a b c d e]
       })
-      resp = DailyResponse.new(answers: { "challenge" => "def uniq_by..." })
-      prompt = service.send(:build_review_prompt, ex, resp)
-      expect(prompt).to include("Coding Challenge: Implement uniq_by")
-      expect(prompt).to include('"challenge"')
+      resp = DailyResponse.new(answers: { "parsons_problem" => "order:0,2,1,3,4" })
+      prompt = service.send(:build_review_section_prompt, exercise, resp, "parsons_problem")
+
+      expect(prompt).to match(/2 block\(s\) out of place/)
+      expect(prompt).to match(/do not.*judge|not.*re-judge/i)
+      expect(prompt).to include('must be an empty string')
     end
 
-    it "names Rails in the system prompt for a ruby_rails exercise" do
-      spy_class = Class.new(double_class) do
-        attr_reader :last_system
-
-        def call(system:, prompt:)
-          @last_system = system
-          super
-        end
-      end
-      svc = spy_class.new
-
-      svc.review_response(user, sample_exercise("ruby_rails"), instance_double(DailyResponse, answers: {}))
-
-      expect(svc.last_system).to include("senior Rails engineer")
-    end
-
-    it "names JavaScript/React in the system prompt for a javascript exercise" do
-      spy_class = Class.new(double_class) do
-        attr_reader :last_system
-
-        def call(system:, prompt:)
-          @last_system = system
-          super
-        end
-      end
-      svc = spy_class.new
-
-      svc.review_response(user, sample_exercise("javascript"), instance_double(DailyResponse, answers: {}))
-
-      expect(svc.last_system).to include("senior JavaScript/React engineer")
-    end
-
-    it "returns the AI service's stubbed feedback for the submitted answers to each JSON question" do
-      exercise = sample_exercise("ruby_rails")
-      daily_response = instance_double(DailyResponse, answers: {
-        "code_review" => "It's an N+1 query — fix with includes.",
-        "pattern"     => "Extract a scope object.",
-        "challenge"   => "def foo; end"
-      })
-
-      feedback = {
-        "code_review" => { "rating" => "solid", "correct" => "Spotted the N+1", "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" },
-        "pattern"     => { "rating" => "developing", "correct" => "", "missed" => "Missed the edge case", "better_questions" => "", "next_step" => "", "improved_code" => "" },
-        "challenge"   => { "rating" => "strong", "correct" => "Works as specified", "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "" }
-      }
-
-      spy_class = Class.new(double_class) do
-        attr_reader :last_prompt
-
-        def call(system:, prompt:)
-          @last_prompt = prompt
-          super
-        end
-      end
-      svc = spy_class.new(canned_text: feedback.to_json)
-
-      result = svc.review_response(user, exercise, daily_response)
-
-      expect(result).to eq(feedback)
-      expect(svc.last_prompt).to include(exercise.code_review["question"])
-      expect(svc.last_prompt).to include("It's an N+1 query — fix with includes.")
-      expect(svc.last_prompt).to include(exercise.pattern["question"])
-      expect(svc.last_prompt).to include("Extract a scope object.")
-      expect(svc.last_prompt).to include(exercise.challenge["question"])
-      expect(svc.last_prompt).to include("def foo; end")
-    end
-
-    # A review that isn't a JSON object would still be truthy once persisted to
-    # ai_review, which flips DailyResponse#reviewed? and permanently retires the
-    # "Get review" button — leaving the user with an empty review and no retry.
-    it "raises rather than returning a review that isn't a JSON object" do
-      svc = double_class.new(canned_text: '["not", "an", "object"]')
-
-      expect {
-        svc.review_response(user, sample_exercise("ruby_rails"), instance_double(DailyResponse, answers: {}))
-      }.to raise_error(AiService::InvalidResponseError, /instead of a JSON object/)
+    it "does not claim a verified parsons result when the exercise has no blocks array" do
+      exercise = exercise_with_third("parsons_problem", { "title" => "T", "question" => "Q" })
+      resp = DailyResponse.new(answers: {})
+      prompt = service.send(:build_review_section_prompt, exercise, resp, "parsons_problem")
+      expect(prompt).not_to match(/block\(s\) out of place/)
+      expect(prompt).to include("CANNOT be verified")
     end
   end
 
-  describe "#review_response — parsons_problem rating override" do
+  describe "#override_parsons_section_rating!" do
     it "always uses the locally computed rating, discarding whatever the model returned" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: {
-          "code_review" => { "question" => "q", "snippet" => "s" },
-          "pattern"     => { "title" => "t", "question" => "q" },
+          "code_review"     => { "question" => "q", "snippet" => "s" },
+          "pattern"         => { "title" => "t", "question" => "q" },
           "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
         }
       )
@@ -1294,49 +1154,128 @@ RSpec.describe AiService do
         user: user, daily_exercise: exercise, date: Date.current,
         answers: { "parsons_problem" => "order:0,1,2,3,4" }
       )
+      review = { "rating" => "beginner" }
 
-      canned = {
-        "code_review"     => { "rating" => "solid" },
-        "pattern"         => { "rating" => "solid" },
-        "parsons_problem" => { "rating" => "beginner" }
-      }.to_json
-      svc = double_class.new(canned_text: canned)
+      service.send(:override_parsons_section_rating!, review, exercise, response)
 
-      review = svc.review_response(user, exercise, response)
-      expect(review["parsons_problem"]["rating"]).to eq("strong")
-      expect(review["code_review"]["rating"]).to eq("solid")
+      expect(review["rating"]).to eq("strong")
     end
 
-    it "does nothing when the exercise has no parsons_problem section" do
+    it "does nothing when the exercise's parsons_problem has no blocks" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: {
-          "code_review" => { "question" => "q", "snippet" => "s" },
-          "pattern"     => { "title" => "t", "question" => "q" },
-          "challenge"   => { "question" => "q" }
-        }
-      )
-      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
-
-      svc = double_class.new(canned_text: { "code_review" => { "rating" => "solid" } }.to_json)
-      review = svc.review_response(user, exercise, response)
-      expect(review).to eq("code_review" => { "rating" => "solid" })
-    end
-
-    it "leaves the rating alone when the provider omitted the blocks array" do
-      exercise = DailyExercise.create!(
-        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-        problem_set: {
-          "code_review" => { "question" => "q", "snippet" => "s" },
-          "pattern"     => { "title" => "t", "question" => "q" },
+          "code_review"     => { "question" => "q", "snippet" => "s" },
+          "pattern"         => { "title" => "t", "question" => "q" },
           "parsons_problem" => { "title" => "T", "question" => "Q" }
         }
       )
       response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+      review = { "rating" => "developing" }
 
-      svc = double_class.new(canned_text: { "parsons_problem" => { "rating" => "developing" } }.to_json)
-      review = svc.review_response(user, exercise, response)
-      expect(review["parsons_problem"]["rating"]).to eq("developing")
+      service.send(:override_parsons_section_rating!, review, exercise, response)
+
+      expect(review["rating"]).to eq("developing")
+    end
+  end
+
+  describe "#review_sections" do
+    def exercise_and_response
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "cr?", "snippet" => "code" },
+          "pattern"     => { "title" => "P", "question" => "pat?" },
+          "challenge"   => { "question" => "Implement uniq_by" }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20, "pattern" => "a" * 20, "challenge" => "a" * 20 },
+        submitted_at: Time.current
+      )
+      [ exercise, response ]
+    end
+
+    it "returns an ok: true result per requested section on success" do
+      exercise, response = exercise_and_response
+      review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }
+      svc = double_class.new(canned_text: review.to_json)
+
+      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+
+      expect(results.keys).to match_array(%w[code_review pattern])
+      expect(results["code_review"]).to eq(ok: true, review: review)
+      expect(results["pattern"]).to eq(ok: true, review: review)
+    end
+
+    it "logs one ApiUsage row per requested section" do
+      exercise, response = exercise_and_response
+      svc = double_class.new(canned_text: { "rating" => "solid" }.to_json, input_tokens: 10, output_tokens: 20)
+
+      expect {
+        svc.review_sections(user, exercise, response, sections: %w[code_review pattern challenge])
+      }.to change { ApiUsage.where(purpose: "review_response").count }.by(3)
+    end
+
+    it "tags a failed section without affecting a successful one" do
+      exercise, response = exercise_and_response
+
+      failing_class = Class.new(AiService) do
+        def initialize(_api_key = nil, canned_text: "{}")
+          @canned_text = canned_text
+          @calls = 0
+        end
+
+        private
+
+        def call(system:, prompt:, cache_system: false)
+          @calls += 1
+          raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
+          { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
+        end
+
+        def build_connection = nil
+      end
+      svc = failing_class.new(canned_text: { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }.to_json)
+
+      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+
+      expect(results["code_review"][:ok]).to be(true)
+      expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", message: "rate limited")
+    end
+
+    it "maps AuthenticationError to its error code" do
+      exercise, response = exercise_and_response
+
+      auth_failing = Class.new(AiService) do
+        private
+        def call(system:, prompt:, cache_system: false) = raise(AiService::AuthenticationError, "bad key")
+        def build_connection = nil
+      end.new("fake_key")
+
+      results = auth_failing.review_sections(user, exercise, response, sections: %w[code_review])
+      expect(results["code_review"][:error_code]).to eq("authentication")
+    end
+
+    it "applies override_parsons_section_rating! only when parsons_problem is requested and succeeds" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review"     => { "question" => "q", "snippet" => "s" },
+          "pattern"         => { "title" => "t", "question" => "q" },
+          "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "parsons_problem" => "order:0,1,2,3,4" }, submitted_at: Time.current
+      )
+      svc = double_class.new(canned_text: { "rating" => "beginner" }.to_json)
+
+      results = svc.review_sections(user, exercise, response, sections: %w[parsons_problem])
+
+      expect(results["parsons_problem"][:review]["rating"]).to eq("strong")
     end
   end
 
@@ -1352,7 +1291,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:)
+        def call(system:, prompt:, cache_system: false)
           @last_prompt = prompt
           super
         end
@@ -1406,7 +1345,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:)
+        def call(system:, prompt:, cache_system: false)
           @last_prompt = prompt
           super
         end

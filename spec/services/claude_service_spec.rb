@@ -196,5 +196,41 @@ RSpec.describe ClaudeService do
 
       expect { service.send(:call, system: "sys", prompt: "prompt") }.to raise_error(AiService::Error)
     end
+
+    it "wraps system in a cache_control content block when cache_system is true" do
+      captured_body = nil
+      conn = instance_double(Faraday::Connection)
+      allow(conn).to receive(:post) do |_url, body|
+        captured_body = JSON.parse(body)
+        instance_double(Faraday::Response, success?: true, status: 200, body: {
+          "content" => [ { "type" => "text", "text" => "hello" } ],
+          "usage"   => { "input_tokens" => 1, "output_tokens" => 1 }
+        }.to_json)
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      service.send(:call, system: "shared context", prompt: "prompt text", cache_system: true)
+
+      expect(captured_body["system"]).to eq(
+        [ { "type" => "text", "text" => "shared context", "cache_control" => { "type" => "ephemeral" } } ]
+      )
+    end
+
+    it "sends system as a plain string when cache_system is false (default)" do
+      captured_body = nil
+      conn = instance_double(Faraday::Connection)
+      allow(conn).to receive(:post) do |_url, body|
+        captured_body = JSON.parse(body)
+        instance_double(Faraday::Response, success?: true, status: 200, body: {
+          "content" => [ { "type" => "text", "text" => "hello" } ],
+          "usage"   => { "input_tokens" => 1, "output_tokens" => 1 }
+        }.to_json)
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      service.send(:call, system: "sys", prompt: "prompt text")
+
+      expect(captured_body["system"]).to eq("sys")
+    end
   end
 end

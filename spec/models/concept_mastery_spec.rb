@@ -13,7 +13,7 @@ RSpec.describe ConceptMastery, type: :model do
       section_ratings: { section => self_rating },
       concept_tags: { section => concept },
       ai_review: { section => { "rating" => ai_rating } })
-    described_class.record_review!(response)
+    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
     user.concept_masteries.find_by(concept: concept, language: "ruby_rails")
   end
 
@@ -73,7 +73,7 @@ RSpec.describe ConceptMastery, type: :model do
       section_ratings: { "code_review" => "right_level", "pattern" => "too_hard" },
       concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" },
       ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "developing" } })
-    described_class.record_review!(response)
+    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
     cm = user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")
     # least-favorable: rep_ai = developing, self not all-favorable → not mastered, baseline records developing
     expect(cm.last_rating).to eq("developing")
@@ -91,7 +91,7 @@ RSpec.describe ConceptMastery, type: :model do
     response = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
       answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
       concept_tags: { "code_review" => "n_plus_one" }, ai_review: {})
-    described_class.record_review!(response)
+    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
     expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_nil
   end
 
@@ -160,6 +160,72 @@ RSpec.describe ConceptMastery, type: :model do
       cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong")
 
       expect(cm.mastered_at).to eq(original_mastered_at)
+    end
+  end
+
+  describe ".record_review! — per-section scoping" do
+    it "does not evaluate a concept whose section is excluded from sections:" do
+      user = User.create!(email: "scope_test@example.com", name: "ST")
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "t", "question" => "q", "concept" => "memoization" }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20, "pattern" => "a" * 20 }, submitted_at: Time.current,
+        section_ratings: { "code_review" => "right_level", "pattern" => "right_level" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+        ai_review: {
+          "code_review" => { "rating" => "solid" },
+          "pattern"     => { "rating" => "solid" }
+        }
+      )
+
+      ConceptMastery.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+
+      expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_present
+      expect(user.concept_masteries.find_by(concept: "memoization")).to be_nil
+    end
+
+    it "does not decrement paused concepts' cooldown when apply_session_countdown is false" do
+      user = User.create!(email: "countdown_false@example.com", name: "CF")
+      paused = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+        concept_tags: { "code_review" => "n_plus_one" },
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+
+      ConceptMastery.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+
+      expect(paused.reload.cooldown_remaining).to eq(2)
+    end
+
+    it "decrements paused concepts' cooldown when apply_session_countdown is true" do
+      user = User.create!(email: "countdown_true@example.com", name: "CT")
+      paused = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+        concept_tags: { "code_review" => "n_plus_one" },
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+
+      ConceptMastery.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+
+      expect(paused.reload.cooldown_remaining).to eq(1)
     end
   end
 end
