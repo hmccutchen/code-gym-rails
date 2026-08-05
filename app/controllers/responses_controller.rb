@@ -72,19 +72,28 @@ class ResponsesController < ApplicationController
       return redirect_to root_path, alert: "A review is already being generated for this — check back in a moment."
     end
 
+    # Recompute after reload to close the race: another request may have
+    # finished the last missing section between our first check and the claim.
+    missing = @response.daily_exercise.problem_set.keys - Array(@response.ai_review&.keys)
+    if missing.empty?
+      release_review_claim!
+      return redirect_to history_anchor, notice: "Already reviewed."
+    end
+
     first_batch = @response.ai_review.blank?
     results = AiService.for(current_user).review_sections(current_user, @response.daily_exercise, @response, sections: missing)
     successes = results.select { |_, r| r[:ok] }
     failures  = results.reject { |_, r| r[:ok] }
 
-    if successes.any?
-      ActiveRecord::Base.transaction do
+    ActiveRecord::Base.transaction do
+      if successes.any?
         @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |r| r[:review] })
-        @response.review_errors = @response.review_errors.except(*successes.keys)
-                                                           .merge(failures.transform_values { |r| r[:error_code] })
-        @response.save!
         ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
       end
+      @response.review_errors = @response.review_errors
+                                          .except(*successes.keys)
+                                          .merge(failures.transform_values { |r| { "code" => r[:error_code], "message" => r[:message] } })
+      @response.save!
     end
     release_review_claim!
 

@@ -191,18 +191,20 @@ class AiService
 
     threads = sections.map do |section|
       Thread.new do
-        service = self.class.new(@api_key)
-        begin
-          result = service.send(
-            :call_and_log, user, purpose: "review_response",
-            system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
-            cache_system: true
-          )
-          review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
-          review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-          [ section, { ok: true, review: review } ]
-        rescue AiService::Error => e
-          [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+        ActiveRecord::Base.connection_pool.with_connection do
+          service = self.class.new(@api_key)
+          begin
+            result = service.send(
+              :call_and_log, user, purpose: "review_response",
+              system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
+              cache_system: true
+            )
+            review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+            review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+            [ section, { ok: true, review: review } ]
+          rescue AiService::Error => e
+            [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+          end
         end
       end
     end
