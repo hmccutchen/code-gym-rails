@@ -36,6 +36,25 @@ end
 # through this app's fetch-based autosave/submit/status-poll flows.
 Capybara.default_max_wait_time = 10
 
+# System specs need a weekday (the dashboard only generates Mon-Fri), but
+# unlike request specs they cannot travel_to an arbitrary one: `travel_to`
+# stubs the clock in *our* process only, while Chromium stamps cookies
+# against the real wall clock. The session cookie carries
+# `expire_after: 2.days` (config/initializers/session_store.rb) measured
+# from the travelled time, so travelling more than two days into the past
+# hands the browser an already-expired cookie, which it silently drops —
+# login appears to succeed, then the next request bounces to /login.
+#
+# Picking today when it's a weekday, and otherwise the upcoming Monday,
+# keeps the travelled clock within a day of real time in either direction.
+module SystemTimeHelper
+  def a_weekday
+    date = Date.current
+    date = date.next_occurring(:monday) if date.on_weekend?
+    date
+  end
+end
+
 RSpec.configure do |config|
   config.before(:each, type: :system) do
     driven_by :capybara_playwright
@@ -45,4 +64,6 @@ RSpec.configure do |config|
   # config/environments/test.rb) — system specs that trigger on-demand
   # generation need to actually run it, not just assert it was enqueued.
   config.include ActiveJob::TestHelper, type: :system
+
+  config.include SystemTimeHelper, type: :system
 end
