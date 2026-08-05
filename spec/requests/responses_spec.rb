@@ -264,6 +264,16 @@ RSpec.describe "Responses", type: :request do
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
     end
 
+    def create_submitted_response_on(date)
+      exercise = DailyExercise.create!(
+        user: user, date: date,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } },
+        generated_at: Time.current
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+    end
+
     it "refuses to review an unsubmitted draft and sends the user back to the form" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current,
@@ -303,6 +313,29 @@ RSpec.describe "Responses", type: :request do
 
       expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
       expect(daily_response.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
+    end
+
+    it "sends the user to the history page that actually holds the reviewed entry" do
+      target = create_submitted_response_on(30.days.ago.to_date)
+      (1..10).each { |i| create_submitted_response_on(i.days.ago.to_date) }
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(target)
+
+      expect(response).to redirect_to(history_path(page: 2, anchor: "response-#{target.id}"))
+    end
+
+    it "omits the page parameter when the entry is on the first page" do
+      target = create_submitted_response_on(1.day.ago.to_date)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(target)
+
+      expect(response).to redirect_to(history_path(anchor: "response-#{target.id}"))
     end
 
     it "redirects with an alert when the provider raises" do

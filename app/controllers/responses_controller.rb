@@ -222,8 +222,13 @@ class ResponsesController < ApplicationController
   # Errors send the user back to the dashboard, where the retry button lives.
   # review's non-error redirects land on the history entry for the day in
   # question; email_review always goes to root_path (see above).
+  #
+  # History is paginated, so the anchor only resolves if the request lands on
+  # the page holding that entry. A nil page is dropped by the url helper, which
+  # keeps page 1 on its bare /history URL.
   def history_anchor
-    history_path(anchor: "response-#{@response.id}")
+    page = @response.history_page
+    history_path(page: (page unless page == 1), anchor: "response-#{@response.id}")
   end
 
   def set_response
