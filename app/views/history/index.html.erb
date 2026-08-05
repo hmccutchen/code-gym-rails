@@ -38,14 +38,18 @@
       border-right: 1px solid var(--border);
     }
   }
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 2rem 0 1rem; font-size: .9rem; }
+  .pagination a { color: var(--accent); text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: .4rem .7rem; }
+  .pagination a[aria-disabled="true"] { color: var(--muted); opacity: .5; pointer-events: none; }
+  .pagination span { color: var(--muted); }
 </style>
 
 <div class="page-header">
   <h1>History</h1>
-  <div class="count"><%= pluralize(@responses.size, "submitted session") %></div>
+  <div class="count"><%= pluralize(@pagy.count, "submitted session") %></div>
 </div>
 
-<% if @responses.empty? %>
+<% if @pagy.count.zero? %>
   <div class="history-entry" style="text-align:center;padding:3rem;">
     <p style="color:var(--muted);">No submitted sessions yet. <%= link_to "Back to today's gym", root_path %></p>
   </div>
@@ -70,13 +74,13 @@
     <%# Same partial the dashboard's submitted state renders — history is the one
         destination for viewing any day's response, so there is no second
         rendering to keep in sync. Collapsed by default; newest entry open. %>
-    <details class="answers"<%= " open".html_safe if i.zero? %>>
+    <details class="answers"<%= " open".html_safe if i.zero? && @pagy.page == 1 %>>
       <summary>Problems &amp; answers</summary>
       <%= render "responses/answered_sections", exercise: daily_response.daily_exercise, response: daily_response %>
     </details>
 
     <% if daily_response.reviewed? %>
-      <details class="review" <%= "open" if i.zero? %>>
+      <details class="review" <%= "open" if i.zero? && @pagy.page == 1 %>>
         <summary><%= t("review.history_summary", provider: daily_response.user.provider_label) %></summary>
         <%= render "shared/ai_review", response: daily_response %>
       </details>
@@ -84,4 +88,13 @@
       <p class="no-review">No AI review requested.</p>
     <% end %>
   </div>
+<% end %>
+
+<% if @pagy.last > 1 %>
+  <%# Raw output: Pagy returns pre-escaped HTML without calling html_safe. %>
+  <nav class="pagination" aria-label="History pages">
+    <%== @pagy.previous_tag(text: "← Newer") %>
+    <span>Page <%= @pagy.page %> of <%= @pagy.last %></span>
+    <%== @pagy.next_tag(text: "Older →") %>
+  </nav>
 <% end %>

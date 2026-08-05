@@ -23,6 +23,9 @@ gem "bcrypt", "~> 3.1.7"
 # Email delivery via Resend's HTTP API (Railway blocks outbound SMTP below Pro)
 gem "resend"
 
+# Offset pagination for the History page (HistoryController)
+gem "pagy", "~> 43.6"
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
