@@ -149,8 +149,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-browser-${{ runner.os }}-${{ hashFiles('spec/playwright/package-lock.json') }}
 
-      # --with-deps installs system libraries outside ~/.cache/ms-playwright, so
-      # it has to run even on a browser cache hit; --only-shell keeps that cheap.
+      # --with-deps also installs system libraries via apt, which live outside
+      # ~/.cache/ms-playwright and so aren't restored by the cache. On a hit we
+      # still need those, but not the browser download — install-deps is the
+      # half that does exactly that.
       - name: Install Playwright browser dependencies
         if: steps.cache_playwright_browser.outputs.cache-hit == 'true'
         run: ./spec/playwright/node_modules/.bin/playwright-core install-deps chromium
