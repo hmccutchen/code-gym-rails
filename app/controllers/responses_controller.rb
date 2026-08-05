@@ -261,7 +261,7 @@ class ResponsesController < ApplicationController
   def require_reviewed_section!
     @section = params[:section].to_s
     return render_section_error("That section isn't part of this exercise.") unless @response.daily_exercise.problem_set.key?(@section)
-    return render_section_error("No review to attach that to yet.") unless @response.section_reviewed?(@section)
+    render_section_error("No review to attach that to yet.") unless @response.section_reviewed?(@section)
   end
 
   def render_section_error(message)
