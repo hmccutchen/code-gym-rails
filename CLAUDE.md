@@ -98,7 +98,10 @@ User interacts:
   redirect uses `DailyResponse#history_page` so its anchor still resolves.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
-  stalls for 3s.
+  stalls for 3s. Because dragging is pointer-only, every block is focusable and
+  reorderable with Ctrl+↑/↓ (bare ↑/↓ moves focus), with an `aria-live` status
+  line announcing each move — that keyboard path, not the arrows, is what keeps
+  the section answerable without a mouse.
 
 ## Railway Deployment
 

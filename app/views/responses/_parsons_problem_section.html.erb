@@ -36,11 +36,16 @@
        ) %>
     <ol class="parsons-list" data-parsons-blocks>
       <% initial_order.each do |block_id| %>
-        <li class="parsons-block" data-block-id="<%= block_id %>">
+        <li class="parsons-block" data-block-id="<%= block_id %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
           <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= blocks[block_id] %></code></pre>
         </li>
       <% end %>
     </ol>
+    <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
+        not using a mouse. The hint is clipped until a block takes focus, which
+        keeps it out of the way of the people who will never need it. %>
+    <p class="parsons-keyhint">Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks.</p>
+    <p class="parsons-status" aria-live="polite"></p>
     <textarea name="response[answers][parsons_problem]" class="answer" data-field="parsons_problem" style="display:none"><%= response.answers["parsons_problem"] %></textarea>
     <div class="rating-row" data-rating-for="parsons_problem">
       <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
@@ -77,6 +82,35 @@
           list.insertBefore(next, li);
         }
         syncHiddenField(list);
+        announce(list, li);
+      }
+
+      // Without this a keyboard or screen-reader user gets no confirmation that
+      // a move landed — the visual reflow is the only feedback drag users need.
+      function announce(list, li) {
+        const status = list.parentElement.querySelector(".parsons-status");
+        if (!status) return;
+        const blocks = [ ...list.querySelectorAll(".parsons-block") ];
+        status.textContent = `Block moved to position ${blocks.indexOf(li) + 1} of ${blocks.length}.`;
+      }
+
+      function handleKey(list, event) {
+        const li = event.target.closest?.(".parsons-block");
+        if (!li || !list.contains(li)) return;
+        const direction = event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down" : null;
+        if (!direction) return;
+
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          moveBlock(list, li, direction);
+          li.focus();
+          return;
+        }
+        const sibling = direction === "up" ? li.previousElementSibling : li.nextElementSibling;
+        if (sibling) {
+          event.preventDefault();
+          sibling.focus();
+        }
       }
 
       function controlButton(list, li, direction) {
@@ -104,6 +138,7 @@
         list.dataset.parsonsWired = "1";
         list.parsonsSync = () => syncHiddenField(list);
         list.parsonsAddControls = () => addControls(list);
+        list.addEventListener("keydown", event => handleKey(list, event));
         // A CDN that hangs rather than errors never rejects the import below,
         // so its catch never runs. Without this the section would stay
         // unanswerable for as long as the request is stalled.
