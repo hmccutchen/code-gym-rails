@@ -16,6 +16,13 @@ class AiService
   # our prompt/schema or a provider-side change.
   class InvalidResponseError < Error; end
 
+  # The provider stopped generating because it hit its output token cap, so
+  # the JSON body is syntactically incomplete. Detected explicitly because
+  # otherwise it surfaces as a generic parse error ("unexpected end of
+  # input"), which points at the wrong cause — the payload isn't malformed,
+  # it's unfinished.
+  class TruncatedResponseError < InvalidResponseError; end
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.

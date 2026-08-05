@@ -99,6 +99,46 @@ RSpec.describe ClaudeService do
       expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20)
     end
 
+    it "requests an output budget large enough for a full three-section review" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        expect(JSON.parse(body)["max_tokens"]).to eq(ClaudeService::MAX_TOKENS)
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "prompt text")
+      expect(ClaudeService::MAX_TOKENS).to be >= 8_000
+    end
+
+    it "raises TruncatedResponseError when the model stopped at the output cap" do
+      body = {
+        "content"     => [ { "type" => "text", "text" => '{"code_review": {"correct": ["half a sen' } ],
+        "stop_reason" => "max_tokens",
+        "usage"       => { "input_tokens" => 10, "output_tokens" => 2500 }
+      }.to_json
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt text")
+      }.to raise_error(AiService::TruncatedResponseError, /output limit/i)
+    end
+
+    it "does not raise for a normal end_turn stop reason" do
+      body = {
+        "content"     => [ { "type" => "text", "text" => "hello" } ],
+        "stop_reason" => "end_turn",
+        "usage"       => { "input_tokens" => 10, "output_tokens" => 20 }
+      }.to_json
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      expect(service.send(:call, system: "sys", prompt: "prompt text")[:text]).to eq("hello")
+    end
+
     it "raises AiService::Error on a non-success response" do
       fake_response = instance_double(Faraday::Response, success?: false, status: 500, body: "boom")
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
