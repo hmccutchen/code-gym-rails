@@ -534,6 +534,19 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include(formatted(sessions[0]))
     end
 
+    it "clamps zero and negative page numbers to page 1" do
+      sessions = create_sessions(11)
+      login_as(user)
+
+      get history_path(page: 0)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(formatted(sessions[0]))
+
+      get history_path(page: -1)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(formatted(sessions[0]))
+    end
+
     it "auto-opens the newest entry on page 1 and nothing on later pages" do
       create_sessions(11)
       login_as(user)
