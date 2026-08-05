@@ -3,9 +3,9 @@ require "rails_helper"
 RSpec.describe "Dashboard on-demand generation", type: :system do
   it "generates and renders today's exercise for a fresh fake-provider user" do
     user = create_fake_provider_user
-    monday = Date.current.beginning_of_week(:monday)
+    weekday = a_weekday
 
-    travel_to(monday) do
+    travel_to(weekday) do
       # DashboardController#show enqueues GenerateDailyExercisesJob on a
       # weekday when no exercise exists yet; :test queue_adapter means it
       # won't actually run unless we ask it to.

@@ -8,9 +8,9 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
   it "enables Submit only once every section is rated, then submits and shows the submitted state" do
     user = create_fake_provider_user
-    monday = Date.current.beginning_of_week(:monday)
+    weekday = a_weekday
 
-    travel_to(monday) do
+    travel_to(weekday) do
       perform_enqueued_jobs { visit_as(user) }
       # Regex, not a literal string: this label renders inside
       # `.section-label` (CSS `text-transform: uppercase`), and the

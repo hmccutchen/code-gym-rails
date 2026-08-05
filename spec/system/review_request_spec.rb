@@ -9,9 +9,9 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
 
   it "requests a review and lands on history with the review visible" do
     user = create_fake_provider_user
-    monday = Date.current.beginning_of_week(:monday)
+    weekday = a_weekday
 
-    travel_to(monday) do
+    travel_to(weekday) do
       perform_enqueued_jobs { visit_as(user) }
       expect(page).to have_content(/Code Review/i, wait: 10)
 

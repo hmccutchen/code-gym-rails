@@ -16,6 +16,13 @@ class AiService
   # our prompt/schema or a provider-side change.
   class InvalidResponseError < Error; end
 
+  # The provider stopped generating because it hit its output token cap, so
+  # the JSON body is syntactically incomplete. Detected explicitly because
+  # otherwise it surfaces as a generic parse error ("unexpected end of
+  # input"), which points at the wrong cause — the payload isn't malformed,
+  # it's unfinished.
+  class TruncatedResponseError < InvalidResponseError; end
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
@@ -158,12 +165,14 @@ class AiService
   def generate_exercise(user, language: user.language_for_today)
     plan = DailyPlan.for(user, language: language)
 
-    result = call(system: build_system_prompt(language),
-                  prompt: build_exercise_prompt(user, language, third: plan.third,
-                                                reinforcement: plan.reinforcement, due_checks: plan.due_checks,
-                                                established: plan.established))
+    result = call_and_log(
+      user, purpose: "generate_exercise",
+      system: build_system_prompt(language),
+      prompt: build_exercise_prompt(user, language, third: plan.third,
+                                    reinforcement: plan.reinforcement, due_checks: plan.due_checks,
+                                    established: plan.established)
+    )
 
-    log_usage(user, result, purpose: "generate_exercise")
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
@@ -174,12 +183,12 @@ class AiService
   def review_response(user, exercise, daily_response)
     coach = config_for(exercise.language)[:coach]
 
-    result = call(
+    result = call_and_log(
+      user, purpose: "review_response",
       system: "You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. Be honest and constructive. Return JSON.",
       prompt: build_review_prompt(exercise, daily_response)
     )
 
-    log_usage(user, result, purpose: "review_response")
     review = parse_json_object(result[:text], subject: "review")
     override_parsons_rating!(review, exercise, daily_response)
     review
@@ -189,12 +198,12 @@ class AiService
   def generate_concept_reference(user, concept, language)
     config = config_for(language)
 
-    result = call(
+    result = call_and_log(
+      user, purpose: "generate_concept_reference",
       system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
       prompt: build_concept_reference_prompt(concept, config)
     )
 
-    log_usage(user, result, purpose: "generate_concept_reference")
     reference = parse_json_object(result[:text], subject: "concept reference")
 
     # Caching keys off (concept, language), so a row missing any field would
@@ -223,7 +232,8 @@ class AiService
       "No alternate framing has been given yet."
     end
 
-    result = call(
+    result = call_and_log(
+      user, purpose: "explain_differently",
       system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.",
       prompt: <<~PROMPT
         The engineer was asked: #{exercise.problem_set.dig(section, "question")}
@@ -241,7 +251,6 @@ class AiService
       PROMPT
     )
 
-    log_usage(user, result, purpose: "explain_differently")
     text_or_raise(result, subject: "alternate explanation")
   end
 
@@ -261,7 +270,8 @@ class AiService
       thread.map { |turn| "#{turn[:role] == 'assistant' ? 'You' : 'Them'}: #{turn[:content]}" }.join("\n") :
       "(no prior questions)"
 
-    result = call(
+    result = call_and_log(
+      user, purpose: "review_follow_up",
       system: "You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.",
       prompt: <<~PROMPT
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
@@ -280,7 +290,6 @@ class AiService
       PROMPT
     )
 
-    log_usage(user, result, purpose: "review_follow_up")
     text_or_raise(result, subject: "follow-up answer")
   end
 
@@ -892,5 +901,27 @@ class AiService
     )
   rescue => e
     Rails.logger.warn("ApiUsage log failed: #{e.message}")
+  end
+
+  # Every provider entry point funnels through here so usage is recorded on
+  # exactly one path. A truncated response is still a billed response — and
+  # the most expensive kind, since it burned the whole output budget — so the
+  # usage row has to be written before the failure propagates, or cost
+  # tracking under-counts precisely the calls that cost the most.
+  #
+  # Providers report truncation as data (`truncated:`) rather than raising it
+  # themselves: recognizing a stop reason is provider-specific, but deciding
+  # that it's fatal is shared policy, and belongs with the rest of the
+  # response handling here.
+  def call_and_log(user, purpose:, system:, prompt:)
+    result = call(system: system, prompt: prompt)
+    log_usage(user, result, purpose: purpose)
+
+    if result[:truncated]
+      raise TruncatedResponseError,
+            "Provider stopped generating at its output token limit (#{result[:output_tokens].to_i} tokens)"
+    end
+
+    result
   end
 end

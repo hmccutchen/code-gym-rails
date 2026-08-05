@@ -5,6 +5,14 @@ class ClaudeService < AiService
   MODEL   = "claude-sonnet-4-5"
   API_URL = "https://api.anthropic.com/v1/messages"
 
+  # Output ceiling, not a target — Anthropic bills generated tokens, so a
+  # headroom-heavy cap costs nothing on the common case. It has to clear the
+  # largest response we ask for: a three-section review, each section
+  # carrying prose arrays plus a structural `improved_code` block. The
+  # original 2500 predated those fields and silently truncated reviews
+  # mid-string, which surfaced as a JSON parse error.
+  MAX_TOKENS = 8_000
+
   # 3 total attempts, exponential backoff capped at 8s. `methods: [:post]`
   # is required because faraday-retry's default idempotent-methods list
   # excludes POST, which every call here uses — without it, retries would
@@ -29,7 +37,7 @@ class ClaudeService < AiService
   def call(system:, prompt:)
     body = {
       model:      MODEL,
-      max_tokens: 2500,
+      max_tokens: MAX_TOKENS,
       system:     system,
       messages:   [ { role: "user", content: prompt } ]
     }
@@ -53,7 +61,8 @@ class ClaudeService < AiService
     {
       text:          parsed.dig("content", 0, "text"),
       input_tokens:  usage["input_tokens"],
-      output_tokens: usage["output_tokens"]
+      output_tokens: usage["output_tokens"],
+      truncated:     parsed["stop_reason"] == "max_tokens"
     }
   rescue Faraday::Error => e
     raise AiService::Error, "Network error calling Claude: #{e.message}"

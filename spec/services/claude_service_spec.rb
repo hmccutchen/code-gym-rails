@@ -96,7 +96,56 @@ RSpec.describe ClaudeService do
       end
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
-      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20)
+      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false)
+    end
+
+    it "sends MAX_TOKENS as the request's output budget" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        expect(JSON.parse(body)["max_tokens"]).to eq(ClaudeService::MAX_TOKENS)
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "prompt text")
+    end
+
+    # A three-section review (prose arrays plus a structural improved_code
+    # block per section) overran the original 2500-token budget and came back
+    # truncated mid-string. This floor is the actual regression guard; the
+    # test above only proves the constant reaches the request.
+    it "keeps an output budget large enough for a full three-section review" do
+      expect(ClaudeService::MAX_TOKENS).to be >= 8_000
+    end
+
+    it "reports truncation when the model stopped at the output cap" do
+      body = {
+        "content"     => [ { "type" => "text", "text" => '{"code_review": {"correct": ["half a sen' } ],
+        "stop_reason" => "max_tokens",
+        "usage"       => { "input_tokens" => 10, "output_tokens" => 2500 }
+      }.to_json
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      # Reported as data, not raised here: AiService#call_and_log owns the
+      # policy, so the billed usage is recorded before the failure propagates.
+      expect(service.send(:call, system: "sys", prompt: "prompt text")[:truncated]).to be(true)
+    end
+
+    it "does not report truncation for a normal end_turn stop reason" do
+      body = {
+        "content"     => [ { "type" => "text", "text" => "hello" } ],
+        "stop_reason" => "end_turn",
+        "usage"       => { "input_tokens" => 10, "output_tokens" => 20 }
+      }.to_json
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      result = service.send(:call, system: "sys", prompt: "prompt text")
+      expect(result[:text]).to eq("hello")
+      expect(result[:truncated]).to be(false)
     end
 
     it "raises AiService::Error on a non-success response" do

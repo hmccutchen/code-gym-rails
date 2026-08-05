@@ -45,7 +45,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
   it "keeps an opened definition panel from running off the side of the screen" do
     user = create_fake_provider_user
 
-    travel_to(Date.current.beginning_of_week(:monday)) do
+    travel_to(a_weekday) do
       page.current_window.resize_to(phone_width, 800)
       start_dashboard(user, question: "The customer loyalty tier")
 
@@ -67,7 +67,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
   it "keeps the desktop width cap when the positioning script has not measured a term" do
     user = create_fake_provider_user
 
-    travel_to(Date.current.beginning_of_week(:monday)) do
+    travel_to(a_weekday) do
       page.current_window.resize_to(phone_width, 800)
       start_dashboard(user, question: "The customer loyalty tier")
 
@@ -92,7 +92,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
   it "keeps the panel on screen when it is revealed by keyboard focus" do
     user = create_fake_provider_user
 
-    travel_to(Date.current.beginning_of_week(:monday)) do
+    travel_to(a_weekday) do
       page.current_window.resize_to(phone_width, 800)
       start_dashboard(user, question: "The customer loyalty tier")
 
@@ -123,7 +123,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     user = create_fake_provider_user
     landscape_width = 568
 
-    travel_to(Date.current.beginning_of_week(:monday)) do
+    travel_to(a_weekday) do
       # Rotated landscape → portrait, not the reverse: a panel sized for the
       # wider screen is the one that no longer fits after the rotation.
       page.current_window.resize_to(landscape_width, 320)
