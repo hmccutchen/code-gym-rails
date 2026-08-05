@@ -9,12 +9,13 @@ RSpec.describe AiService do
     Class.new(AiService) do
       attr_writer :canned_text, :input_tokens, :output_tokens, :truncated
 
-      def initialize(_api_key = nil, canned_text: "{}", input_tokens: 1, output_tokens: 1, truncated: false)
-        @api_key       = _api_key
-        @canned_text   = _api_key.is_a?(Hash) ? _api_key.fetch(:canned_text, "{}") : canned_text
-        @input_tokens  = _api_key.is_a?(Hash) ? _api_key.fetch(:input_tokens, 1) : input_tokens
-        @output_tokens = _api_key.is_a?(Hash) ? _api_key.fetch(:output_tokens, 1) : output_tokens
-        @truncated     = _api_key.is_a?(Hash) ? _api_key.fetch(:truncated, false) : truncated
+      def initialize(api_key_or_config = nil, canned_text: "{}", input_tokens: 1, output_tokens: 1, truncated: false)
+        config = api_key_or_config.is_a?(Hash) ? api_key_or_config : { canned_text: canned_text, input_tokens: input_tokens, output_tokens: output_tokens, truncated: truncated }
+        @api_key       = config
+        @canned_text   = config.fetch(:canned_text, "{}")
+        @input_tokens  = config.fetch(:input_tokens, 1)
+        @output_tokens = config.fetch(:output_tokens, 1)
+        @truncated     = config.fetch(:truncated, false)
       end
 
       private
