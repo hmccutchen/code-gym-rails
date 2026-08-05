@@ -24,6 +24,35 @@ RSpec.describe "Parsons reorder controls", type: :system do
     )
   end
 
+  SORTABLE_URL = "**cdn.jsdelivr.net**sortable**"
+
+  # Both branches of the fallback are decided by whether one CDN request
+  # succeeds, so intercepting that request is what makes either branch testable
+  # at all — otherwise the outcome is whatever the CI runner's network allows,
+  # and the failure branch is never exercised. The stub only needs `create`:
+  # the partial destructures the default export and calls nothing else on it.
+  def stub_sortable_cdn(outcome)
+    page.driver.with_playwright_page do |pw|
+      pw.route(SORTABLE_URL, ->(route, _request) {
+        case outcome
+        when :blocked then route.abort
+        when :loaded  then route.fulfill(
+          status: 200,
+          contentType: "application/javascript",
+          body: "export default { create() {} };"
+        )
+        end
+      })
+    end
+  end
+
+  def visit_seeded_dashboard(cdn:)
+    seed_parsons_exercise
+    stub_sortable_cdn(cdn)
+    visit_as(user)
+    expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]", wait: 10)
+  end
+
   def block_ids
     all("ol[data-parsons-blocks] .parsons-block").map { |li| li["data-block-id"] }
   end
@@ -32,26 +61,33 @@ RSpec.describe "Parsons reorder controls", type: :system do
     find("textarea[data-field='parsons_problem']", visible: :all).value
   end
 
-  # data-sortable-done is set by the SortableJS module once drag is wired, so
-  # waiting on it is what makes the assertions meaningful rather than merely early.
-  def visit_seeded_dashboard
-    seed_parsons_exercise
-    visit_as(user)
-    expect(page).to have_css("ol[data-parsons-blocks][data-sortable-done]", wait: 10)
-  end
-
   it "shows no arrow buttons once drag is available" do
     travel_to(weekday) do
-      visit_seeded_dashboard
+      visit_seeded_dashboard(cdn: :loaded)
 
+      expect(page).to have_css("ol[data-parsons-blocks][data-sortable-done]", wait: 10)
       expect(page).to have_no_css(".parsons-move-up")
       expect(page).to have_no_css(".parsons-move-down")
     end
   end
 
+  it "injects working arrows when the CDN is unreachable" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :blocked)
+
+      expect(page).to have_css(".parsons-move-up", count: 3, wait: 10)
+      expect(page).to have_no_css("ol[data-parsons-blocks][data-sortable-done]")
+
+      all(".parsons-move-down").first.click
+
+      expect(block_ids).to eq([ "0", "2", "1" ])
+      expect(hidden_answer).to eq("order:0,2,1")
+    end
+  end
+
   it "reorders with the keyboard, since dragging is pointer-only" do
     travel_to(weekday) do
-      visit_seeded_dashboard
+      visit_seeded_dashboard(cdn: :loaded)
       expect(block_ids).to eq([ "2", "0", "1" ])
 
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
@@ -64,7 +100,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
   it "moves focus between blocks with a bare arrow key" do
     travel_to(weekday) do
-      visit_seeded_dashboard
+      visit_seeded_dashboard(cdn: :loaded)
 
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(:down)
 

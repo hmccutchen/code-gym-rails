@@ -22,6 +22,6 @@ class HistoryController < ApplicationController
   private
 
   def redirect_to_last_page(error)
-    redirect_to history_path(page: error.pagy.last)
+    redirect_to history_page_path(error.pagy.last)
   end
 end

@@ -524,6 +524,15 @@ RSpec.describe "History", type: :request do
       expect(response).to redirect_to(history_path(page: 2))
     end
 
+    it "redirects to the bare /history URL when the last page is page 1" do
+      create_sessions(3)
+      login_as(user)
+
+      get history_path(page: 99)
+
+      expect(response).to redirect_to(history_path)
+    end
+
     it "serves page 1 for a non-numeric page rather than erroring" do
       sessions = create_sessions(11)
       login_as(user)

@@ -224,11 +224,9 @@ class ResponsesController < ApplicationController
   # question; email_review always goes to root_path (see above).
   #
   # History is paginated, so the anchor only resolves if the request lands on
-  # the page holding that entry. A nil page is dropped by the url helper, which
-  # keeps page 1 on its bare /history URL.
+  # the page holding that entry.
   def history_anchor
-    page = @response.history_page
-    history_path(page: (page unless page == 1), anchor: "response-#{@response.id}")
+    history_page_path(@response.history_page, anchor: "response-#{@response.id}")
   end
 
   def set_response
