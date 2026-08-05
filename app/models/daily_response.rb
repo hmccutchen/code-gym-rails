@@ -22,7 +22,14 @@ class DailyResponse < ApplicationRecord
   # open-ended chat. Same rationale as MAX_ALTERNATES_PER_SECTION for living here.
   MAX_FOLLOW_UPS_PER_SECTION = 3
 
+  # How many History entries render per page. Lives on the model rather than
+  # HistoryController because #history_page needs the same number to work out
+  # which page a given response lands on.
+  HISTORY_PAGE_SIZE = 10
+
   validates :date, uniqueness: { scope: :user_id }
+
+  scope :submitted, -> { where.not(submitted_at: nil) }
 
   # Ordered field → {label, list} map for rendering ai_review sections — shared by
   # the shared/_ai_review partial and ReviewMailer so the copy lives in one place.
@@ -63,6 +70,13 @@ class DailyResponse < ApplicationRecord
 
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
+
+  # History orders `date: :desc`, so the number of strictly-newer submitted
+  # sessions is this response's zero-based position in that ordering.
+  def history_page
+    newer = user.daily_responses.submitted.where("date > ?", date).count
+    (newer / HISTORY_PAGE_SIZE) + 1
+  end
 
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
