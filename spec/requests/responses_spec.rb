@@ -252,22 +252,12 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "POST /responses/:id/review" do
-    def create_submitted_response
+    def create_submitted_response(date: Date.current)
       exercise = DailyExercise.create!(
-        user: user, date: Date.current,
+        user: user, date: date,
         problem_set: { "code_review" => { "question" => "q", "snippet" => "s" },
                        "pattern" => { "title" => "t", "question" => "q" },
                        "challenge" => { "title" => "t", "question" => "q" } },
-        generated_at: Time.current
-      )
-      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
-    end
-
-    def create_submitted_response_on(date)
-      exercise = DailyExercise.create!(
-        user: user, date: date,
-        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } },
         generated_at: Time.current
       )
       DailyResponse.create!(user: user, daily_exercise: exercise, date: date,
@@ -316,8 +306,8 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "sends the user to the history page that actually holds the reviewed entry" do
-      target = create_submitted_response_on(30.days.ago.to_date)
-      (1..10).each { |i| create_submitted_response_on(i.days.ago.to_date) }
+      target = create_submitted_response(date: 30.days.ago.to_date)
+      (1..10).each { |i| create_submitted_response(date: i.days.ago.to_date) }
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
@@ -328,7 +318,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "omits the page parameter when the entry is on the first page" do
-      target = create_submitted_response_on(1.day.ago.to_date)
+      target = create_submitted_response(date: 1.day.ago.to_date)
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:review_response).and_return("code_review" => { "rating" => "solid" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
