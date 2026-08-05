@@ -8,8 +8,8 @@
   <% response.section_ratings.each do |section, value| %>
     <span class="history-pill"><%= section.humanize %>: <%= DailyResponse::SELF_RATING_LABELS[value] %></span>
   <% end %>
-  <% unless response.reviewed? %>
-    <%= button_to t("review.get_button", provider: response.user.provider_label),
+  <% unless response.fully_reviewed? %>
+    <%= button_to response.reviewed? ? t("review.finish_button") : t("review.get_button", provider: response.user.provider_label),
           review_response_path(response), method: :post,
           class: "btn btn-primary btn-sm",
           form: { class: "review-form", data: { turbo: false } } %>

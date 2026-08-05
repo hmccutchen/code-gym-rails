@@ -179,19 +179,35 @@ class AiService
     problem_set
   end
 
-  # ── Review a submitted response inline ───────────────────────────────────
-  def review_response(user, exercise, daily_response)
-    coach = config_for(exercise.language)[:coach]
+  # ── Review a submitted response, one thread per still-missing section ────
+  # Each thread gets its own service instance (and therefore its own Faraday
+  # connection) — no shared mutable state crosses a thread boundary. A
+  # section's failure is caught and tagged rather than raised, so one bad
+  # section can never keep the other threads' results from being usable by
+  # the caller.
+  def review_sections(user, exercise, daily_response, sections:)
+    coach   = config_for(exercise.language)[:coach]
+    context = build_review_day_context(coach, exercise, daily_response)
 
-    result = call_and_log(
-      user, purpose: "review_response",
-      system: "You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. Be honest and constructive. Return JSON.",
-      prompt: build_review_prompt(exercise, daily_response)
-    )
+    threads = sections.map do |section|
+      Thread.new do
+        service = self.class.new(@api_key)
+        begin
+          result = service.send(
+            :call_and_log, user, purpose: "review_response",
+            system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
+            cache_system: true
+          )
+          review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+          review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+          [ section, { ok: true, review: review } ]
+        rescue AiService::Error => e
+          [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+        end
+      end
+    end
 
-    review = parse_json_object(result[:text], subject: "review")
-    override_parsons_rating!(review, exercise, daily_response)
-    review
+    threads.map(&:value).to_h
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
@@ -307,6 +323,15 @@ class AiService
     text
   end
 
+  def error_code_for(error)
+    case error
+    when AuthenticationError  then "authentication"
+    when RateLimitError       then "rate_limit"
+    when InvalidResponseError then "invalid_response"
+    else                           "other"
+    end
+  end
+
   # Looks up the fixed per-language config, failing loudly on anything
   # outside RAILS_CONCEPTS/JS_CONCEPTS's languages (e.g. "mixed", or a typo)
   # instead of silently degrading to Ruby/Rails behavior.
@@ -404,7 +429,7 @@ class AiService
 
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
-  def call(system:, prompt:)
+  def call(system:, prompt:, cache_system: false)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -670,83 +695,101 @@ class AiService
     PROMPT
   end
 
-  def build_review_prompt(exercise, daily_response)
-    answers   = daily_response.answers
-    third_key = exercise.third_key
+  # Mirrors the pattern-section `reference` shape so both render identically.
+  def build_review_day_context(coach, exercise, daily_response)
+    answers = daily_response.answers
+    ratings = daily_response.section_ratings
 
-    third_block =
-      case third_key
-      when "architecture"
-        arch = exercise.architecture
-        <<~ARCH.chomp
-          Architecture decision (#{arch["title"]}): #{arch["question"]}
-          Scenario/constraints: #{arch["scenario"]}
-          Their answer: #{answers["architecture"].presence || "(skipped)"}
+    <<~CONTEXT
+      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's three sections in a follow-up instruction — the other two are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
 
-          Evaluate the architecture answer on the DEPTH of its reasoning, not a single correct answer:
-          - Did they weigh real tradeoffs between the options?
-          - Did they address the stated constraints (scale, team, reliability, tech debt)?
-          - Did they consider alternatives rather than asserting one option?
-          For this section "improved_code" must be an empty string.
-        ARCH
-      when "security_review"
-        sec = exercise.security_review
-        <<~SEC.chomp
-          Security Review (#{sec["title"]}): #{sec["question"]}
-          Snippet: #{sec["snippet"]}
-          Their answer: #{answers["security_review"].presence || "(skipped)"}
+      Code Review question: #{exercise.code_review["question"]}
+      Code snippet: #{exercise.code_review["snippet"]}
+      Their answer: #{answers["code_review"].presence || "(skipped)"}
+      Their self-rating: #{ratings["code_review"] || "(none given)"}
 
-          Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their proposed mitigation is sound — not against one single expected answer. Give partial credit in "missed" for identifying the vulnerability without a complete mitigation, or vice versa.
-          For this section "improved_code" must show the mitigated version of the snippet.
-        SEC
-      when "parsons_problem"
-        parsons_review_block(exercise.parsons_problem, answers["parsons_problem"])
-      else
-        <<~CH.chomp
-          Coding Challenge: #{exercise.challenge["question"]}
-          Their answer: #{answers["challenge"].presence || "(skipped)"}
-        CH
-      end
+      Pattern question (#{exercise.pattern["title"]}): #{exercise.pattern["question"]}
+      Their answer: #{answers["pattern"].presence || "(skipped)"}
+      Their self-rating: #{ratings["pattern"] || "(none given)"}
 
-    improved_code_note =
-      ExerciseSection.find(third_key)&.improved_code? == false ?
-        "corrected/improved code for code_review and pattern (empty string for #{third_key})" :
-        "corrected/improved code for code_review, pattern, and #{third_key}"
+      #{third_context_summary(exercise, answers, ratings)}
+    CONTEXT
+  end
 
+  def third_context_summary(exercise, answers, ratings)
+    case exercise.third_key
+    when "architecture"
+      arch = exercise.architecture
+      "Architecture decision (#{arch["title"]}): #{arch["question"]}\n" \
+      "Scenario/constraints: #{arch["scenario"]}\n" \
+      "Their answer: #{answers["architecture"].presence || "(skipped)"}\n" \
+      "Their self-rating: #{ratings["architecture"] || "(none given)"}"
+    when "security_review"
+      sec = exercise.security_review
+      "Security Review (#{sec["title"]}): #{sec["question"]}\n" \
+      "Snippet: #{sec["snippet"]}\n" \
+      "Their answer: #{answers["security_review"].presence || "(skipped)"}\n" \
+      "Their self-rating: #{ratings["security_review"] || "(none given)"}"
+    when "parsons_problem"
+      parsons = exercise.parsons_problem
+      "Parsons Problem (#{parsons["title"]}): #{parsons["question"]}\n" \
+      "Their self-rating: #{ratings["parsons_problem"] || "(none given)"}"
+    else
+      "Coding Challenge: #{exercise.challenge["question"]}\n" \
+      "Their answer: #{answers["challenge"].presence || "(skipped)"}\n" \
+      "Their self-rating: #{ratings["challenge"] || "(none given)"}"
+    end
+  end
+
+  def build_review_section_prompt(exercise, daily_response, section)
     <<~PROMPT
-      Review these Code Gym answers. For each section, return a JSON object with:
+      Grade ONLY the "#{section}" section from the day's context above.
+
+      #{section_grading_note(exercise, daily_response, section)}
+
+      Return a single JSON object (NOT wrapped in a "#{section}" key) with:
       - "rating": "beginner" | "developing" | "solid" | "strong"
       - "correct": array of strings — each entry one distinct thing they got right
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
-      - "improved_code": string — #{improved_code_note}
+      - "improved_code": string — #{improved_code_instruction(section)}
 
-      Each array entry must be ONE self-contained idea in one or two sentences.
-      Never pack several points into one entry, and never number points inside an
-      entry ("1) ... 2) ...") — separate ideas belong in separate entries. Use an
-      empty array when there is nothing to say for that field.
-
-      For "pattern", improved_code must show the refactored structure that addresses
-      what they missed — the classes, methods, and boundaries the pattern calls for —
-      not a one-line tweak. A pattern fix is structural; show enough of the shape to
-      make the structure obvious.
-
-      Exercise:
-      Code Review question: #{exercise.code_review["question"]}
-      Code snippet: #{exercise.code_review["snippet"]}
-      Their answer: #{answers["code_review"].presence || "(skipped)"}
-
-      Pattern question (#{exercise.pattern["title"]}): #{exercise.pattern["question"]}
-      Their answer: #{answers["pattern"].presence || "(skipped)"}
-
-      #{third_block}
-
-      Return JSON with keys: "code_review", "pattern", "#{third_key}" — each matching the schema above.
+      Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+      several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+      — separate ideas belong in separate entries. Use an empty array when there is nothing to
+      say for that field.
     PROMPT
   end
 
-  # Mirrors the pattern-section `reference` shape so both render identically.
+  def improved_code_instruction(section)
+    ExerciseSection.find(section)&.improved_code? == false ?
+      "must be an empty string for this section" :
+      "corrected/improved code for this section"
+  end
+
+  def section_grading_note(exercise, daily_response, section)
+    case section
+    when "architecture"
+      "Evaluate the architecture answer on the DEPTH of its reasoning, not a single correct answer:\n" \
+      "- Did they weigh real tradeoffs between the options?\n" \
+      "- Did they address the stated constraints (scale, team, reliability, tech debt)?\n" \
+      "- Did they consider alternatives rather than asserting one option?"
+    when "security_review"
+      "Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their " \
+      "proposed mitigation is sound — not against one single expected answer. Give partial credit in " \
+      "\"missed\" for identifying the vulnerability without a complete mitigation, or vice versa."
+    when "parsons_problem"
+      parsons_review_block(exercise.parsons_problem, daily_response.answers["parsons_problem"])
+    when "pattern"
+      "For \"pattern\", improved_code must show the refactored structure that addresses what they missed — " \
+      "the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
+      "structural; show enough of the shape to make the structure obvious."
+    else
+      ""
+    end
+  end
+
   def build_concept_reference_prompt(concept, config)
     label = config[:label]
     code_example_desc =
@@ -838,19 +881,21 @@ class AiService
     problem_set
   end
 
-  # Parsons correctness is decided in Ruby, never by the model — whatever rating
-  # it returned for this key is discarded and replaced. Skipped when the stored
-  # section has no blocks, since there is nothing to grade against and the
-  # grader would report a spurious perfect score.
-  def override_parsons_rating!(review, exercise, daily_response)
+  # Parsons correctness is decided in Ruby, never by the model — whatever rating it returned
+  # is discarded and replaced. Skipped when the stored section has no blocks, since there is
+  # nothing to grade against and the grader would report a spurious perfect score. Operates on
+  # a single un-nested section hash (the shape #review_sections works with), unlike the old
+  # whole-review override_parsons_rating! this replaces.
+  def override_parsons_section_rating!(review, exercise, daily_response)
     parsons = exercise.parsons_problem
-    return unless parsons.is_a?(Hash) && review["parsons_problem"].is_a?(Hash)
+    return review unless parsons.is_a?(Hash)
 
     blocks = Array(parsons["blocks"])
-    return if blocks.empty?
+    return review if blocks.empty?
 
     submitted = ExerciseSection::ParsonsProblem.parse_order(daily_response.answers["parsons_problem"])
-    review["parsons_problem"]["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
+    review["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
+    review
   end
 
   # The provider returns "blocks" already in correct order, so the scramble is
@@ -913,8 +958,8 @@ class AiService
   # themselves: recognizing a stop reason is provider-specific, but deciding
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
-  def call_and_log(user, purpose:, system:, prompt:)
-    result = call(system: system, prompt: prompt)
+  def call_and_log(user, purpose:, system:, prompt:, cache_system: false)
+    result = call(system: system, prompt: prompt, cache_system: cache_system)
     log_usage(user, result, purpose: purpose)
 
     if result[:truncated]

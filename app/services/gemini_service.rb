@@ -26,7 +26,7 @@ class GeminiService < AiService
 
   private
 
-  def call(system:, prompt:)
+  def call(system:, prompt:, cache_system: false)
     body = {
       model:              MODEL,
       system_instruction: system,

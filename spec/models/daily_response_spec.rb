@@ -248,4 +248,63 @@ RSpec.describe DailyResponse, type: :model do
       expect(target.history_page).to eq(1)
     end
   end
+
+  describe "#fully_reviewed?" do
+    def exercise_with_three_sections
+      user = User.create!(email: "fr_test@example.com", name: "FR")
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current,
+        language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "t", "question" => "q" },
+          "challenge"   => { "question" => "q" }
+        }
+      )
+    end
+
+    it "is false when ai_review is blank" do
+      exercise = exercise_with_three_sections
+      response = DailyResponse.create!(user: exercise.user, daily_exercise: exercise, date: Date.current, answers: {})
+      expect(response).not_to be_fully_reviewed
+    end
+
+    it "is false when only some sections are present" do
+      exercise = exercise_with_three_sections
+      response = DailyResponse.create!(
+        user: exercise.user, daily_exercise: exercise, date: Date.current, answers: {},
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+      expect(response).not_to be_fully_reviewed
+    end
+
+    it "is true when every exercise section is present in ai_review" do
+      exercise = exercise_with_three_sections
+      response = DailyResponse.create!(
+        user: exercise.user, daily_exercise: exercise, date: Date.current, answers: {},
+        ai_review: {
+          "code_review" => { "rating" => "solid" },
+          "pattern"     => { "rating" => "solid" },
+          "challenge"   => { "rating" => "solid" }
+        }
+      )
+      expect(response).to be_fully_reviewed
+    end
+  end
+
+  describe "#section_reviewed?" do
+    it "is true only for a section with a Hash entry in ai_review" do
+      user = User.create!(email: "sr_test@example.com", name: "SR")
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current, answers: {},
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+      expect(response.section_reviewed?("code_review")).to be(true)
+      expect(response.section_reviewed?("pattern")).to be(false)
+    end
+  end
 end

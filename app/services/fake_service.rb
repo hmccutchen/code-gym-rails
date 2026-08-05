@@ -1,11 +1,12 @@
 # Deterministic, zero-cost AiService provider for tests. Overrides only the
 # two hooks every real provider implements (#call, #build_connection) —
 # every other AiService method (DailyPlan, log_usage, normalize_concepts,
-# log_retention, shuffle_parsons_blocks!, override_parsons_rating!) runs
-# unmodified against this fake's output, so tests exercise the same control
-# flow a real provider triggers. #call dispatches on the literal `system:`
-# string each AiService caller passes — see ai_service.rb for where each one
-# is built.
+# log_retention, shuffle_parsons_blocks!, override_parsons_section_rating!)
+# runs unmodified against this fake's output, so tests exercise the same
+# control flow a real provider triggers. #call dispatches on the literal
+# `system:` string each AiService caller passes; the review path further
+# reads which section to grade out of `prompt:`, since #review_sections
+# sends the same shared system context to every section's call.
 class FakeService < AiService
   # All six ExerciseSection kinds populated at once. DailyExercise#third_key
   # resolves by precedence over whichever keys are present hashes
@@ -155,16 +156,16 @@ class FakeService < AiService
   # GenerateDailyExercisesJob rescues the AiService hierarchy and turns it into
   # a persisted, user-facing failure message, which would bury a broken fake as
   # "generation failed" instead of failing the spec that caused it.
-  def call(system:, prompt:)
+  def call(system:, prompt:, cache_system: false)
     text =
       case system
       when /generating personalized daily exercise sets/
         EXERCISE_PROBLEM_SET.to_json
       when /giving direct, specific feedback/
-        third_key = prompt[/Return JSON with keys: "code_review", "pattern", "(\w+)"/, 1]
-        raise "FakeService could not extract the third section key from the review prompt" if third_key.blank?
+        section = prompt[/Grade ONLY the "(\w+)" section/, 1]
+        raise "FakeService could not extract the section key from the review prompt" if section.blank?
 
-        { "code_review" => REVIEW_SECTION, "pattern" => REVIEW_SECTION, third_key => REVIEW_SECTION }.to_json
+        REVIEW_SECTION.to_json
       when /writing a concise, durable reference/
         CONCEPT_REFERENCE.to_json
       when /re-explaining one point/

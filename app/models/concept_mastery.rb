@@ -23,33 +23,37 @@ class ConceptMastery < ApplicationRecord
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: [ :user_id, :language ] }
 
-  # Called inside ResponsesController#review, in the same transaction as the
-  # ai_review save. Counts one "session" (a real submit+review day): first
-  # decrements every paused concept's cooldown, then evaluates each distinct
-  # concept in this response for improving/stagnant/mastered transitions.
-  def self.record_review!(response)
+  # Called inside ResponsesController#review, in one transaction per successful
+  # batch of sections (a review action may fire this more than once across
+  # retries, each time with a disjoint `sections:` — a section can only ever be
+  # evaluated once, since it's removed from "missing" the moment it succeeds).
+  # `apply_session_countdown:` gates Step A (the once-per-day paused-cooldown
+  # decrement) so a later partial-retry within the same day's review never
+  # re-runs it — the controller passes true only on the first successful batch
+  # for a given response.
+  def self.record_review!(response, sections:, apply_session_countdown:)
     user = response.user
 
-    # Step A — session countdown for paused concepts.
-    user.concept_masteries.tier_paused.each do |cm|
-      remaining = cm.cooldown_remaining - 1
-      if remaining <= 0
-        cm.update!(tier: :reduced, streak: 0, cooldown_remaining: 0)
-      else
-        cm.update!(cooldown_remaining: remaining)
+    if apply_session_countdown
+      user.concept_masteries.tier_paused.each do |cm|
+        remaining = cm.cooldown_remaining - 1
+        if remaining <= 0
+          cm.update!(tier: :reduced, streak: 0, cooldown_remaining: 0)
+        else
+          cm.update!(cooldown_remaining: remaining)
+        end
       end
     end
 
-    # Step B — evaluate each distinct concept (one evaluation per concept/day).
     sections_by_concept = Hash.new { |h, k| h[k] = [] }
-    response.concept_tags.each do |section, concept|
+    response.concept_tags.slice(*sections).each do |section, concept|
       next if concept.blank? || concept == "other"
       sections_by_concept[concept] << section
     end
 
-    sections_by_concept.each do |concept, sections|
-      bucket = ConceptBucket.for(sections, response.daily_exercise.language)
-      evaluate_concept!(user, concept, bucket, response, sections)
+    sections_by_concept.each do |concept, secs|
+      bucket = ConceptBucket.for(secs, response.daily_exercise.language)
+      evaluate_concept!(user, concept, bucket, response, secs)
     end
   end
 

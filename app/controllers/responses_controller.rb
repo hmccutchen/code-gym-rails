@@ -64,18 +64,37 @@ class ResponsesController < ApplicationController
   # history page anchored to the day they just had reviewed.
   def review
     return redirect_to root_path, alert: "Submit your answers first." unless @response.submitted?
-    return redirect_to history_anchor, notice: "Already reviewed." if @response.reviewed?
+
+    missing = @response.daily_exercise.problem_set.keys - Array(@response.ai_review&.keys)
+    return redirect_to history_anchor, notice: "Already reviewed." if missing.empty?
+
     unless claim_review!
       return redirect_to root_path, alert: "A review is already being generated for this — check back in a moment."
     end
 
-    ai_review = AiService.for(current_user).review_response(current_user, @response.daily_exercise, @response)
+    first_batch = @response.ai_review.blank?
+    results = AiService.for(current_user).review_sections(current_user, @response.daily_exercise, @response, sections: missing)
+    successes = results.select { |_, r| r[:ok] }
+    failures  = results.reject { |_, r| r[:ok] }
 
-    ActiveRecord::Base.transaction do
-      @response.update!(ai_review: ai_review, reviewing_since: nil)
-      ConceptMastery.record_review!(@response)
+    if successes.any?
+      ActiveRecord::Base.transaction do
+        @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |r| r[:review] })
+        @response.review_errors = @response.review_errors.except(*successes.keys)
+                                                           .merge(failures.transform_values { |r| r[:error_code] })
+        @response.save!
+        ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
+      end
     end
-    redirect_to history_anchor, notice: "Review ready!"
+    release_review_claim!
+
+    if failures.empty?
+      redirect_to history_anchor, notice: "Review ready!"
+    elsif successes.any?
+      redirect_to root_path, notice: "#{successes.size} of #{missing.size} sections reviewed — #{failures.size} couldn't be reviewed, try again."
+    else
+      redirect_to root_path, alert: zero_success_alert(failures)
+    end
   rescue AiService::AuthenticationError
     release_review_claim!
     redirect_to root_path, alert: "Your API key was rejected — check it in Settings."
@@ -92,7 +111,7 @@ class ResponsesController < ApplicationController
   # dashboard's submitted state (_submission.html.erb), not on history, so
   # that's the only page where the user can repeat or confirm the action.
   def email_review
-    return redirect_to root_path, alert: "No review to email yet." unless @response.reviewed?
+    return redirect_to root_path, alert: "No review to email yet." unless @response.fully_reviewed?
 
     ReviewMailer.send_review(@response).deliver_later
     redirect_to root_path, notice: "Review sent to #{current_user.email}."
@@ -240,12 +259,9 @@ class ResponsesController < ApplicationController
   # against the exercise's own problem_set mirrors #create's slice guard — without
   # it a crafted param writes arbitrary keys into the jsonb columns.
   def require_reviewed_section!
-    return render_section_error("No review to attach that to yet.") unless @response.reviewed?
-
     @section = params[:section].to_s
-    return if @response.daily_exercise.problem_set.key?(@section)
-
-    render_section_error("That section isn't part of this exercise.")
+    return render_section_error("That section isn't part of this exercise.") unless @response.daily_exercise.problem_set.key?(@section)
+    return render_section_error("No review to attach that to yet.") unless @response.section_reviewed?(@section)
   end
 
   def render_section_error(message)
@@ -258,19 +274,27 @@ class ResponsesController < ApplicationController
   # concurrent caller can affect the row — the loser gets 0 rows and backs off
   # instead of racing into a second provider call and ConceptMastery write.
   def claim_review!
-    claimed = DailyResponse.where(id: @response.id, ai_review: nil)
+    claimed = DailyResponse.where(id: @response.id)
                            .where("reviewing_since IS NULL OR reviewing_since < ?", REVIEW_CLAIM_STALE_AFTER.ago)
                            .update_all(reviewing_since: Time.current) == 1
-    # update_all bypasses @response's in-memory attributes — reload so the
-    # later update!(reviewing_since: nil) sees a real change to persist
-    # (otherwise AR's dirty-tracking thinks it's already nil and skips the
-    # column in the UPDATE, leaving the claimed timestamp stuck in the DB).
     @response.reload if claimed
     claimed
   end
 
   def release_review_claim!
     @response.update_column(:reviewing_since, nil)
+  end
+
+  def zero_success_alert(failures)
+    codes = failures.values.map { |f| f[:error_code] }.uniq
+    case codes
+    in [ "authentication" ]
+      "Your API key was rejected — check it in Settings."
+    in [ "rate_limit" ]
+      "The AI provider is rate-limiting requests — try again shortly."
+    else
+      "Couldn't generate the review: #{failures.values.first[:message]}"
+    end
   end
 
   def response_params

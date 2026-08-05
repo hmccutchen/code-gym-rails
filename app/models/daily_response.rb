@@ -71,6 +71,14 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
+  def fully_reviewed?
+    daily_exercise.problem_set.keys.all? { |key| section_reviewed?(key) }
+  end
+
+  def section_reviewed?(section)
+    ai_review&.dig(section.to_s).is_a?(Hash)
+  end
+
   # History orders `date: :desc`, so the number of strictly-newer submitted
   # sessions is this response's zero-based position in that ordering.
   def history_page
