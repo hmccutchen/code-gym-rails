@@ -150,8 +150,10 @@ Running them locally requires a one-time Playwright CLI install — see the
 comment block at the top of `spec/support/system_test_helper.rb` for the
 exact commands. The npm manifests live in `spec/playwright/`, not the repo
 root, so Nixpacks doesn't add a Node phase to the Railway production build.
-CI installs the same CLI on every run (see below), so
-`bundle exec rspec` runs the full suite there without any extra setup.
+CI runs system specs in a separate `system_test` job that installs the same
+CLI (cached on `spec/playwright/package-lock.json`), while the `test` job runs
+everything else via `--exclude-pattern "system/**/*_spec.rb"` — the two halves
+run in parallel so unit/request feedback isn't gated behind browser setup.
 
 CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
 

@@ -87,17 +87,88 @@ jobs:
       - name: Prepare test database
         run: bin/rails db:prepare
 
+      - name: Run RSpec
+        run: bundle exec rspec --exclude-pattern "system/**/*_spec.rb"
+
+  system_test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/code_gym_rails_test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Prepare test database
+        run: bin/rails db:prepare
+
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
           node-version: 22
 
+      # Both caches key on the lockfile, so bumping playwright-core invalidates
+      # the CLI and the browser build together and they can never drift apart.
+      - name: Cache Playwright CLI
+        id: cache_playwright_cli
+        uses: actions/cache@v4
+        with:
+          path: spec/playwright/node_modules
+          key: playwright-cli-${{ runner.os }}-${{ hashFiles('spec/playwright/package-lock.json') }}
+
       - name: Install Playwright CLI
+        if: steps.cache_playwright_cli.outputs.cache-hit != 'true'
         run: npm --prefix spec/playwright ci
 
+      - name: Cache Playwright browser
+        id: cache_playwright_browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browser-${{ runner.os }}-${{ hashFiles('spec/playwright/package-lock.json') }}
+
+      # --with-deps also installs system libraries via apt, which live outside
+      # ~/.cache/ms-playwright and so aren't restored by the cache. On a hit we
+      # still need those, but not the browser download — install-deps is the
+      # half that does exactly that.
+      - name: Install Playwright browser dependencies
+        if: steps.cache_playwright_browser.outputs.cache-hit == 'true'
+        run: ./spec/playwright/node_modules/.bin/playwright-core install-deps chromium
+
       - name: Install Playwright browser
+        if: steps.cache_playwright_browser.outputs.cache-hit != 'true'
         run: ./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
 
-      - name: Run RSpec
-        run: bundle exec rspec
+      - name: Run system specs
+        run: bundle exec rspec spec/system
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-test-screenshots
+          path: tmp/screenshots
+          if-no-files-found: ignore
 
