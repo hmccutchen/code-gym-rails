@@ -1,0 +1,14 @@
+<%# On-demand static glossary lookup — distinct from GlossaryHelper's
+    pre-generated inline gloss-term spans. Searches Glossary::TERMS, embedded
+    once in the layout as JSON and read entirely client-side by the layout's
+    glossary-search script; this partial only renders the box's markup.
+    Local: field (a section identifier, e.g. "code_review") — used only to
+    label the box's data-field attribute for tests/debugging; the search
+    script itself walks the DOM via closest(), not this attribute. %>
+<div class="glossary-search" data-glossary-search data-field="<%= field %>">
+  <div class="glossary-search-row">
+    <input type="text" placeholder="Search the glossary…" aria-label="Search the glossary">
+    <button type="button" class="btn btn-ghost btn-sm">Search</button>
+  </div>
+  <ul class="glossary-results" aria-live="polite"></ul>
+</div>

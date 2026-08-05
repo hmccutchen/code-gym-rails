@@ -53,6 +53,7 @@
           <button type="button" class="rating-btn<%= " active" if response.self_rating_for("code_review") == value %>" data-rating-for="code_review" data-rating="<%= value %>"><%= label.upcase_first %></button>
         <% end %>
       </div>
+      <%= render "shared/glossary_search", field: "code_review" %>
     </div>
 
     <% pat = exercise.pattern %>
