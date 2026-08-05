@@ -502,7 +502,7 @@ RSpec.describe "Responses", type: :request do
       expect(flash[:notice]).to eq("2 of 3 sections reviewed — 1 couldn't be reviewed, try again.")
       resp.reload
       expect(resp.ai_review.keys).to match_array(%w[code_review pattern])
-      expect(resp.review_errors).to eq("challenge" => "rate_limit")
+      expect(resp.review_errors).to eq("challenge" => { "code" => "rate_limit", "message" => "rate limited" })
       expect(resp).not_to be_fully_reviewed
       expect(resp).to be_reviewed
     end
@@ -511,7 +511,7 @@ RSpec.describe "Responses", type: :request do
       resp = submitted_response
       resp.update!(
         ai_review: { "code_review" => { "rating" => "solid" }, "pattern" => { "rating" => "developing" } },
-        review_errors: { "challenge" => "rate_limit" }
+        review_errors: { "challenge" => { "code" => "rate_limit", "message" => "rate limited" } }
       )
       fake_service = instance_double(ClaudeService)
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
