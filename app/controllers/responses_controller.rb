@@ -7,6 +7,14 @@ class ResponsesController < ApplicationController
   # user out forever — after this window a new request may reclaim the row.
   REVIEW_CLAIM_STALE_AFTER = 3.minutes
 
+  # Double MAX_FOLLOW_UPS_PER_SECTION (3): a follow-up is one clarifying
+  # question about an already-finished review, while a duck thread supports
+  # an actual back-and-forth while someone is actively stuck. Lives here
+  # rather than on DailyResponse (unlike MAX_FOLLOW_UPS_PER_SECTION) since
+  # this feature has no DailyResponse-owned data — the view partial reads it
+  # straight off this controller.
+  MAX_DUCK_TURNS_PER_SECTION = 6
+
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
     exercise = current_user.daily_exercises.for_date.first
@@ -276,7 +284,49 @@ class ResponsesController < ApplicationController
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end
 
+  # POST /responses/duck_thread — one turn of the pre-submission Socratic
+  # thinking partner. Fully unpersisted: no :id, no DailyResponse row is
+  # created or written to. The client sends its own full in-memory thread on
+  # every request; the server uses it only to build this one prompt. Reads
+  # today's exercise/response only to build context and enforce the
+  # unsubmitted gate — never writes to either. See
+  # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
+  def duck_thread
+    exercise = current_user.daily_exercises.for_date.first
+    return head :not_found unless exercise
+
+    section = params[:section].to_s
+    return render_section_error("That section isn't part of this exercise.") unless exercise.problem_set.key?(section)
+
+    existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
+    return render_section_error("Submit your answers first.") if existing&.submitted?
+
+    message = params[:message].to_s.strip
+    return render_section_error("Say something first.") if message.blank?
+
+    thread = duck_thread_param
+    # Soft, request-level cap: the thread lives only in the browser, so this
+    # is not a hardened boundary (a hand-crafted request could understate its
+    # own history) — acceptable given each user pays for their own provider
+    # calls with their own key. See the design doc's "Cap on exchanges".
+    if thread.count { |turn| turn[:role] == "user" } >= MAX_DUCK_TURNS_PER_SECTION
+      return render_section_error("You've used all #{MAX_DUCK_TURNS_PER_SECTION} messages for this section — clear the conversation to keep going.")
+    end
+
+    answer = AiService.for(current_user).duck_response(
+      current_user, exercise, section: section, message: message, thread: thread
+    )
+
+    render json: { status: "ok", answer: answer }
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
   private
+
+  def duck_thread_param
+    Array(params[:thread]).map { |turn| { role: turn[:role].to_s, content: turn[:content].to_s } }
+  end
 
   # Errors send the user back to the dashboard, where the retry button lives.
   # review's non-error redirects land on the history entry for the day in

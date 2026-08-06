@@ -52,6 +52,7 @@
         <button type="button" class="rating-btn<%= " active" if response.self_rating_for("parsons_problem") == value %>" data-rating-for="parsons_problem" data-rating="<%= value %>"><%= label.upcase_first %></button>
       <% end %>
     </div>
+    <%= render "shared/duck_thread", field: "parsons_problem" %>
   <% end %>
 </div>
 <% unless submitted || @parsons_script_emitted %>

@@ -41,6 +41,7 @@
         <button type="button" class="rating-btn<%= " active" if response.self_rating_for("architecture") == value %>" data-rating-for="architecture" data-rating="<%= value %>"><%= label.upcase_first %></button>
       <% end %>
     </div>
+    <%= render "shared/duck_thread", field: "architecture" %>
   <% end %>
 </div>
 <% if arch.dig("reference", "diagram").present? && !@architecture_diagram_script_emitted %>

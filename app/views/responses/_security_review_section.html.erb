@@ -21,5 +21,6 @@
         <button type="button" class="rating-btn<%= " active" if response.self_rating_for("security_review") == value %>" data-rating-for="security_review" data-rating="<%= value %>"><%= label.upcase_first %></button>
       <% end %>
     </div>
+    <%= render "shared/duck_thread", field: "security_review" %>
   <% end %>
 </div>

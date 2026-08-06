@@ -59,6 +59,11 @@ Rails.application.routes.draw do
       post :follow_ups # ask a clarifying question about one section's review
       delete :start_over # clear today's answers/ratings/feedback so the same set can be re-attempted
     end
+    collection do
+      # Pre-submission Socratic thinking partner. No :id — fully unpersisted,
+      # nothing to look up by id (see docs/superpowers/specs/2026-08-06-duck-thread-design.md).
+      post :duck_thread
+    end
   end
 
   namespace :admin do

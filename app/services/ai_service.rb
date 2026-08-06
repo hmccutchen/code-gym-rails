@@ -69,6 +69,28 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
+  # Structural backstop for #duck_response, not just a preference: 150 tokens
+  # comfortably fits the 1-3 sentence guiding-question replies the Socratic
+  # system prompt asks for, but is far too small for a complete corrected
+  # solution to fit in regardless of what the model attempts. Deliberately
+  # distinct from ClaudeService::MAX_TOKENS, which is sized for full review
+  # generation. This is the primary cost control for the duck-thread feature.
+  DUCK_RESPONSE_MAX_TOKENS = 150
+
+  DUCK_SYSTEM_PROMPT = <<~PROMPT.chomp
+    You are a Socratic thinking partner helping an engineer work through a
+    problem they have NOT yet submitted or been graded on.
+
+    Rules, no exceptions:
+    - Never state the correct answer, the specific fix, or write corrected or
+      complete code — not even as an illustrative example.
+    - Respond ONLY with a guiding question or a brief reflective observation
+      that helps them think it through themselves.
+    - If they explicitly ask you to just tell them the answer, do not comply —
+      respond with a further guiding question instead.
+    - Keep it to 1-3 sentences. No preamble.
+  PROMPT
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
@@ -362,7 +384,57 @@ class AiService
     text_or_raise(result, subject: "follow-up answer")
   end
 
+  # ── Rubber-duck Socratic thinking-partner turn, pre-submission only ───────
+  # Fully unpersisted: no `daily_response` argument, no draft-answer context,
+  # no read of any stored state. `thread` is the client's own in-memory
+  # conversation so far, sent back on every request — used only to build this
+  # one prompt, never written anywhere. See
+  # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
+  def duck_response(user, exercise, section:, message:, thread: [])
+    context = duck_section_context(exercise, section)
+
+    thread_text = thread.any? ?
+      thread.map { |turn| "#{turn[:role] == 'assistant' ? 'You' : 'Them'}: #{turn[:content]}" }.join("\n") :
+      "(no prior messages)"
+
+    result = call_and_log(
+      user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
+      system: DUCK_SYSTEM_PROMPT,
+      prompt: <<~PROMPT
+        The exercise section:
+        #{context}
+
+        Conversation so far:
+        #{thread_text}
+
+        Their new message: #{message}
+
+        Respond as their Socratic thinking partner, following your system instructions exactly.
+      PROMPT
+    )
+
+    text_or_raise(result, subject: "duck response")
+  end
+
   private
+
+  # Plain-text summary of whichever fields a given section actually has
+  # (code_review/pattern/challenge/architecture/security_review/
+  # parsons_problem all carry a different subset) — enough context for a
+  # Socratic prompt without needing per-section-kind branching.
+  def duck_section_context(exercise, section)
+    data = exercise.problem_set.dig(section.to_s) || {}
+
+    [
+      ("Title: #{data["title"]}" if data["title"].present?),
+      ("Scenario: #{data["scenario"]}" if data["scenario"].present?),
+      ("Why it exists: #{data["why"]}" if data["why"].present?),
+      ("Question: #{data["question"]}" if data["question"].present?),
+      ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
+      ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
+      ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?)
+    ].compact.join("\n")
+  end
 
   # A blank provider response is a provider bug, not a valid answer — persisting
   # it downstream fails a presence validation with an error class that escapes
@@ -483,8 +555,10 @@ class AiService
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
   # `read_timeout` overrides the connection's default read budget for this
-  # call only (see AiService::GENERATION_READ_TIMEOUT).
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
+  # call only (see AiService::GENERATION_READ_TIMEOUT). `max_tokens`, when
+  # given, overrides the provider's own default output ceiling for this call
+  # only (see AiService::DUCK_RESPONSE_MAX_TOKENS).
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -1005,8 +1079,10 @@ class AiService
   # themselves: recognizing a stop reason is provider-specific, but deciding
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
-  def call_and_log(user, purpose:, system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
-    result = call(system: system, prompt: prompt, cache_system: cache_system, read_timeout: read_timeout)
+  def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
+                   read_timeout: READ_TIMEOUT, max_tokens: nil)
+    result = call(system: system, prompt: prompt, cache_system: cache_system,
+                  read_timeout: read_timeout, max_tokens: max_tokens)
     log_usage(user, result, purpose: purpose)
 
     if result[:truncated]

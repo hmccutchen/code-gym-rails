@@ -28,13 +28,17 @@ class GeminiService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
     body = {
       model:              MODEL,
       system_instruction: system,
       input:              prompt,
       store:              false
     }
+    # No default output cap is sent otherwise — existing callers rely on the
+    # provider's own default ceiling. Only a call that explicitly asks for a
+    # tighter cap (e.g. AiService::DUCK_RESPONSE_MAX_TOKENS) sets this.
+    body[:max_output_tokens] = max_tokens if max_tokens
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout

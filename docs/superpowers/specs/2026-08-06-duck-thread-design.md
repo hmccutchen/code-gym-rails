@@ -1,7 +1,7 @@
 # Rubber-Duck Socratic Thinking Partner
 
 **Date:** 2026-08-06
-**Status:** Approved
+**Status:** Approved (revised 2026-08-06: fully unpersisted — see "Revision" below)
 
 ## Problem
 
@@ -18,114 +18,86 @@ A Socratic thinking partner available only while a section is unsubmitted —
 distinct from `ReviewFollowUp` (post-review clarification) and
 `self_explanation` (post-review reflection). It never states an answer or
 writes corrected code; it only asks guiding questions, using the section's
-prompt and the user's current in-progress answer as context. Purely
-conversational support — no grading, no effect on ratings, concept tags, or
-`ConceptMastery`.
+own prompt content as context. Purely conversational support — no grading,
+no effect on ratings, concept tags, or `ConceptMastery`.
 
-This mirrors `ReviewFollowUp`'s proven structural pattern (table shape, cap
-enforcement, synchronous fetch + inline-script append) but is a **separate,
-distinct table and context**, not a reuse — confirmed explicitly, since the
-two features have different availability windows and different content.
+## Revision: fully unpersisted, no table
 
-## Data model: `duck_threads`, a new table
+The original version of this spec mirrored `ReviewFollowUp`'s table-backed
+structure (a `duck_threads` table, cap enforcement via row locking). That is
+now **out of scope entirely**. There is no migration, no `DuckThread` model,
+and no database writes anywhere in this feature:
 
-```ruby
-create_table :duck_threads do |t|
-  t.references :daily_response, null: false, foreign_key: true
-  t.string  :section, null: false
-  t.integer :role,    null: false
-  t.text    :content, null: false
-  t.timestamps
-end
-add_index :duck_threads, [:daily_response_id, :section, :created_at],
-          name: "index_duck_threads_on_response_section_created"
-```
+- The client (one inline script instance per section, matching the existing
+  per-partial script pattern) holds the conversation thread **in memory**
+  for that browser tab only — a plain JS array of `{ role, content }` turns,
+  built up as messages are sent and received.
+- Each request to the duck endpoint includes the **full current thread
+  array** alongside the new message. The server uses it only transiently, to
+  build context for that one `AiService` call — it is never written anywhere
+  and never read from any prior stored state.
+- Cap enforcement (`MAX_DUCK_TURNS_PER_SECTION = 6`, unchanged) is based on
+  the length of the thread array included in the request — reject (422) if
+  it's already at or over the cap. **This is a soft, request-level check,
+  not a hardened security boundary** — a client could in principle send a
+  hand-crafted request with a short thread array to exceed 6 real exchanges.
+  That's an acceptable tradeoff given the trust model here: each user
+  supplies their own provider API key, so any such cost lands on the user
+  who did it, not on anyone else — self-limiting by construction. This is a
+  deliberately different posture from `ReviewFollowUp`'s server-enforced cap,
+  justified by the fact that nothing here is persisted, evaluative, or
+  shared with another user.
+- "Clear" is purely client-side: it empties the in-memory thread array and
+  the visible turn list. Since nothing is persisted, this naturally and
+  fully resets the cap too — a fresh empty array starts back at zero. No
+  server call for Clear at all.
+- No read-only view after submission — now true **by construction**, not by
+  choice: nothing survives a page reload in the first place, since nothing
+  was ever stored.
+- Draft-answer context (the user's in-progress answer text) is **not** sent
+  to the model — only the section's own question/scenario/snippet. This
+  narrows what leaves the browser on every keystroke-adjacent request to
+  exactly what's needed for a Socratic prompt to work, and keeps the feature
+  from quietly becoming a second channel for reviewing an unsubmitted
+  answer.
 
-`app/models/duck_thread.rb` mirrors `ReviewFollowUp` exactly:
+Everything else — the availability gate (unsubmitted only), the Socratic
+system prompt and its constraints, the tight `max_tokens` structural
+backstop (150 tokens), and the turn cap value — stands as originally
+specified below.
 
-```ruby
-class DuckThread < ApplicationRecord
-  belongs_to :daily_response
+## Endpoint: the actual minimal requirement
 
-  enum :role, { user: 0, assistant: 1 }, prefix: true
+With no persistence, the natural question is whether the endpoint needs any
+`DailyResponse`/`DailyExercise` context at all. It does, but only
+**read-only**, for two things:
 
-  validates :section, :content, presence: true
+1. **Section context to build the prompt** — the section's
+   question/scenario/snippet live on `DailyExercise#problem_set`, not on the
+   client. The endpoint still looks up today's exercise
+   (`current_user.daily_exercises.for_date.first`) to read that section's
+   fields.
+2. **The submission gate** — "available only while unsubmitted" has to be
+   enforced somewhere the client can't spoof. The endpoint does a read-only
+   `current_user.daily_responses.find_by(daily_exercise:, date: Date.current)`
+   and rejects (422) only if a response exists **and** `submitted_at` is
+   present. If no response row exists yet, that's unambiguously unsubmitted
+   — proceed. Nothing is created, saved, or locked.
 
-  scope :for_section, ->(section) { where(section: section).order(:created_at, :id) }
-end
-```
-
-The `:id` tiebreaker exists for the same reason as `ReviewFollowUp`: a
-question/answer pair is written in one transaction, microseconds apart, and
-Postgres timestamp precision can collide — `created_at` alone could then
-render the answer above its question.
-
-`DailyResponse` gains `has_many :duck_threads, dependent: :destroy`. Rows are
-preserved through `User#anonymize!` (which never destroys `DailyResponse` or
-its associations) and are destroyed along with the response by
-`ResponsesController#start_over`, matching how in-progress answers and
-ratings are already treated by that action — scrapping today's attempt
-scraps its duck conversation too.
-
-`User` and `DailyResponse` need no other changes; ownership scoping is
-inherited transitively through `daily_response.user`, same as
-`ReviewFollowUp`.
-
-## Availability
-
-**Gate:** available only while `daily_response.submitted_at` is blank.
-Submission is still whole-response — one `ResponsesController#create` call
-with `submit: "1"` sets `submitted_at` for every section at once (confirmed
-against current code; unchanged by this feature).
-
-**Response record timing:** the pre-submission dashboard can render an
-*unpersisted* `DailyResponse` — `DashboardController#show` falls back to
-`DailyResponse.new(...)` when no row exists yet, and the first real row is
-normally created by the answer textarea's debounced autosave (800ms after
-the first keystroke). A user could open the duck-thread box and send a
-message before that autosave has ever fired. Rather than requiring a
-persisted response up front, the duck-thread endpoint takes no `:id` and
-performs the same `find_or_initialize_by(daily_exercise:, date:)` +
-`save!` that `ResponsesController#create` already does — so the very first
-duck message can create today's response row on the spot, with no
-dependency on answer-textarea state.
-
-**After submission:** the duck thread simply stops rendering — no read-only
-view is added anywhere. It is scratch, in-the-moment thinking, not a record
-worth preserving in the UI (unlike a completed review, which is the whole
-point of `/history`). Concretely: the duck-thread box lives only inside
-`_exercise.html.erb`'s unsubmitted branch; once a response is submitted,
-that whole branch is replaced by `_answered_sections`/`_submission`, which
-never queries `DuckThread`. Rows stay in the database untouched (nothing
-destroys them on submit) but nothing surfaces them again. The controller
-action also rejects (422) if `@response.submitted?`, as defense in depth
-against a stale tab posting after another tab or device has already
-submitted.
-
-## Context passed to the AI
-
-- The section's own question/scenario/snippet fields (whichever the section
-  kind has — `ExerciseSection` already knows this shape).
-- The user's **current in-progress answer text** for that section, sent by
-  the client as the live DOM value of that section's textarea at send-time
-  (not `daily_response.answers[section]`, which only reflects the last
-  debounced autosave — see "Endpoint & controller" below — and not a
-  completed review, since none exists pre-submission).
-- The prior duck-thread turns for that section, in order, for multi-turn
-  continuity — same `{ role:, content: }` shape `#answer_follow_up` already
-  uses for `ReviewFollowUp` threads.
+That's the full requirement. No `find_or_initialize_by`, no `save!`, no
+`with_lock` — every one of those existed in the prior draft solely to attach
+rows to a persisted `DailyResponse`, which no longer exists in this feature.
 
 ## `AiService#duck_response`
 
-Same shape as `#answer_follow_up`:
-
 ```ruby
-def duck_response(user, exercise, daily_response, section:, message:, thread: [])
+def duck_response(user, exercise, section:, message:, thread: [])
 ```
 
-Returns a plain string (no JSON parsing — same reasoning as
-`explain_differently`/`answer_follow_up`: there's no structure to parse).
-Logged via `call_and_log` with `purpose: "duck_thread"` (added to
+No `daily_response` parameter — there is no draft-answer context and no
+persisted state to read. Returns a plain string (no JSON parsing — same
+reasoning as `explain_differently`/`answer_follow_up`: there's no structure
+to parse). Logged via `call_and_log` with `purpose: "duck_thread"` (added to
 `ApiUsage::PURPOSES`, giving this feature its own line in cost tracking).
 
 **System prompt** — explicit, strongly-worded Socratic constraints:
@@ -146,12 +118,12 @@ Rules, no exceptions:
 
 This is a strong constraint on behavior, not a perfect guarantee — a
 sufficiently adversarial user could still try to prompt a model off-script.
-The structural backstop below, not prompt wording, is what actually bounds
-worst-case behavior.
+The `max_tokens` structural backstop below, not prompt wording, is what
+actually bounds worst-case behavior.
 
-**Prompt body** mirrors `#answer_follow_up`'s construction: the section's
-question, the user's current answer, the prior thread rendered as
-`You: .../Them: ...`, and the new message.
+**Prompt body**: the section's question/scenario/snippet (whichever fields
+that section kind has), the prior thread rendered as `You: .../Them: ...`
+(mirroring `#answer_follow_up`'s construction), and the new message.
 
 ## Structural backstop: a tight, call-specific `max_tokens`
 
@@ -174,31 +146,33 @@ chain:
 - `FakeService#call` gains the same keyword (ignored, like its handling of
   `cache_system` details it doesn't need).
 
-`#duck_response` defines its own constant, `DUCK_RESPONSE_MAX_TOKENS = 150`,
-and passes it explicitly — 150 tokens comfortably fits 1-3 sentences of
-prose while remaining far too small for a full corrected solution. This
+`#duck_response` defines its own constant, `AiService::DUCK_RESPONSE_MAX_TOKENS
+= 150`, and passes it explicitly — 150 tokens comfortably fits 1-3 sentences
+of prose while remaining far too small for a full corrected solution. This
 constant is deliberately distinct from `ClaudeService::MAX_TOKENS` and
 doubles as this feature's primary cost control.
 
 ## Cap on exchanges
 
-`DailyResponse::MAX_DUCK_TURNS_PER_SECTION = 6` — double
-`MAX_FOLLOW_UPS_PER_SECTION` (3). A follow-up is one clarifying question
-about an already-finished review; a duck thread is meant to support an
-actual back-and-forth while actively stuck, so it warrants more room than a
-single-shot clarification.
+`MAX_DUCK_TURNS_PER_SECTION = 6` (a plain `AiService` or controller-level
+constant now — there is no `DailyResponse`-owned cap to share with a view
+partial the way `MAX_FOLLOW_UPS_PER_SECTION` is). Double the follow-up cap:
+a follow-up is one clarifying question about an already-finished review; a
+duck thread supports an actual back-and-forth while actively stuck, so it
+warrants more room than a single-shot clarification.
 
-Enforced the same way as `#follow_ups`: an advisory pre-check before the
-(slow) provider call, then a re-check inside `@response.with_lock` before
-writing — closing the race where two concurrent requests both read under
-the cap and both reach the write. The provider call itself stays outside the
-lock. At the cap, the endpoint returns 422 with a clear message; the UI
-disables the input and shows that message rather than hiding the box
-silently.
+Enforced as a single advisory check against the **incoming thread array's**
+user-turn count: reject (422) if `thread.count { |t| t[:role] == "user" } >=
+MAX_DUCK_TURNS_PER_SECTION`. As stated above, this is a soft, request-level
+check appropriate to the trust model here (per-user API key, self-limiting
+cost), not a hardened boundary — there is no server-side state to make it
+one. At the cap, the endpoint returns 422 with a clear message; the UI
+disables the input and shows that message. Since the thread lives only in
+the browser, hitting Clear always resets the count to zero.
 
 ## Endpoint & controller
 
-New collection route (no `:id` — see "Response record timing" above):
+New collection route (no `:id` needed — nothing to look up by id):
 
 ```ruby
 resources :responses, only: [:create] do
@@ -213,40 +187,40 @@ end
 
 1. Look up today's exercise (`current_user.daily_exercises.for_date.first`);
    404 if none.
-2. `find_or_initialize_by(daily_exercise:, date: Date.current)` on
-   `current_user.daily_responses`, matching `#create`'s idempotent pattern.
-3. Reject (422) if `@response.submitted?`.
-4. Validate `section` against `exercise.problem_set.keys` (same guard as
+2. Validate `section` against `exercise.problem_set.keys` (same guard as
    `require_reviewed_section!` uses for `ReviewFollowUp`, to block a crafted
-   param from writing an arbitrary section key).
-5. Advisory cap check (`asked >= MAX_DUCK_TURNS_PER_SECTION`).
-6. `@response.save!` if new, then call `AiService#duck_response` with the
-   message, the section's current answer text, and the prior thread. The
-   answer text comes from a request param (`current_answer`) carrying the
-   textarea's live DOM value at send-time — not `@response.answers[section]`,
-   which reflects only the last debounced autosave and can lag behind what
-   the user has actually typed by up to 800ms.
-7. `@response.with_lock` re-check + `duck_threads.create!` for both the
-   user and assistant turns, same shape as `#follow_ups`.
-8. Render `{ status: "ok", answer:, remaining: }` or the capped/error JSON.
+   param from requesting context for an arbitrary section key).
+3. Read-only lookup: `current_user.daily_responses.find_by(daily_exercise:,
+   date: Date.current)`; reject (422) if present and `submitted?`.
+4. Cap check against the incoming `thread` param's user-turn count (422 if
+   at/over cap, without calling the provider).
+5. Call `AiService#duck_response` with the message, the section's
+   question/scenario/snippet pulled from the exercise, and the thread.
+6. Render `{ status: "ok", answer: }`. No `remaining` count from the server
+   — the client already holds the full thread and computes it locally.
 
-Ownership is inherited from `current_user.daily_exercises`/
-`current_user.daily_responses` scoping — there is no id param to leak
-another user's row through.
+No database writes occur anywhere in this action. Ownership is inherited
+from `current_user.daily_exercises`/`current_user.daily_responses` scoping
+— there is no id param to leak another user's row through.
 
 ## UI
 
 In `app/views/dashboard/_exercise.html.erb`, under each section's answer
 textarea (code_review, pattern, and whichever third section is present), a
-"🦆 Stuck? Talk it through" box: a turn list, a text input, and a send
-button — collapsed/lightweight by default so it doesn't compete visually
-with the primary answer flow. Wired by the same inline-script-per-partial
-pattern the follow-ups box already uses (see `shared/_ai_review.html.erb`):
-fetch on click/Enter, append the returned turn pair, disable input at the
-cap and show the capped message. The request body carries `section` and the
-**live current value of that section's textarea**, read from the DOM at
-send-time (not a previously-saved value), since the point of the feature is
-reacting to what the user is thinking right now.
+"🦆 Stuck? Talk it through" box: a turn list, a text input, a send button,
+and a Clear button — collapsed/lightweight by default so it doesn't compete
+visually with the primary answer flow. Wired by the same
+inline-script-per-partial pattern the follow-ups box already uses (see
+`shared/_ai_review.html.erb`), with state now living entirely in the script
+instance rather than round-tripping through the DOM/server:
+
+- An in-memory array of `{ role, content }` per section instance.
+- Send: appends the user's message locally, POSTs `{ section, message,
+  thread }` (the array *before* appending the new message), appends the
+  returned answer as an assistant turn on success, and disables the input
+  once the local array's user-turn count reaches the cap.
+- Clear: empties the array and the rendered turn list, and re-enables the
+  input if it had been capped.
 
 ## Non-goals / explicit exclusions
 
@@ -255,23 +229,26 @@ reacting to what the user is thinking right now.
   post-review feature.
 - No changes to submission gating, rating requirements, or
   `ConceptMastery`/concept-tagging.
-- No read-only view of a duck thread after submission (see Availability).
+- No read-only view of a duck thread after submission — true by
+  construction (nothing persisted survives a reload).
+- No migration, no new table, no new model.
 
 ## Testing
 
-- **Model spec** (`spec/models/duck_thread_spec.rb`): cap-adjacent
-  validations, `for_section` ordering tiebreaker, ownership via
-  `daily_response.user`.
 - **Service spec**: the Socratic system prompt string contains the
   never-give-the-answer constraints; `DUCK_RESPONSE_MAX_TOKENS` (150) is
   passed for this call specifically, asserted distinct from other
   `AiService` calls' token ceilings.
 - **Request spec** (`spec/requests/responses_duck_thread_spec.rb`):
-  - Creates today's `DailyResponse` on the first message when none exists
-    yet.
-  - Available pre-submission; returns 422 once `submitted_at` is set.
-  - Cap enforcement returns 422 without calling the provider once
-    `MAX_DUCK_TURNS_PER_SECTION` is reached.
+  - Available pre-submission (no response row yet, and a response row that
+    exists but isn't submitted); returns 422 once a response with
+    `submitted_at` present exists for today.
+  - Cap enforcement returns 422 without calling the provider when the
+    submitted thread array's user-turn count is already at
+    `MAX_DUCK_TURNS_PER_SECTION`.
   - 422 for a section key not present in today's `problem_set`.
   - Scoped to `current_user` — no id param exists to probe another user's
-    response through.
+    data through.
+  - Confirms no database writes occur anywhere in the flow (e.g. asserting
+    row counts are unchanged across the request for every table this
+    feature could plausibly have touched).

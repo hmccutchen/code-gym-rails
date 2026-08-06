@@ -37,7 +37,7 @@ RSpec.describe AiService do
   let(:double_class) do
     Class.new(AiService) do
       attr_writer :canned_text, :input_tokens, :output_tokens, :truncated
-      attr_reader :last_read_timeout
+      attr_reader :last_read_timeout, :last_max_tokens
 
       # #review_sections builds a fresh service per section thread, so a plain
       # ivar on the instance under test never sees those calls.
@@ -56,8 +56,9 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
         @last_read_timeout = read_timeout
+        @last_max_tokens   = max_tokens
         self.class.read_timeouts << read_timeout
         { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
@@ -1318,7 +1319,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
           @calls += 1
           raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
@@ -1339,7 +1340,7 @@ RSpec.describe AiService do
 
       auth_failing = Class.new(AiService) do
         private
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT) = raise(AiService::AuthenticationError, "bad key")
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil) = raise(AiService::AuthenticationError, "bad key")
         def build_connection = nil
       end.new("fake_key")
 
@@ -1380,7 +1381,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
           @last_prompt = prompt
           super
         end
@@ -1434,7 +1435,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
           @last_prompt = prompt
           super
         end
@@ -1469,6 +1470,92 @@ RSpec.describe AiService do
 
       expect {
         svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
+      }.to raise_error(AiService::InvalidResponseError)
+    end
+  end
+
+  describe "#duck_response" do
+    let(:exercise) do
+      DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "Find the N+1", "snippet" => "code", "scenario" => "a billing job" }
+      })
+    end
+
+    # Local spy: the shared `double_class`'s `#call` doesn't expose `system:`,
+    # and #duck_response has no `daily_response` argument to read a draft
+    # answer from in the first place — this class exists purely to capture
+    # both prompt strings this describe block's examples need to inspect.
+    let(:duck_spy_class) do
+      Class.new(double_class) do
+        attr_reader :last_prompt, :last_system
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+          @last_system = system
+          @last_prompt = prompt
+          super
+        end
+      end
+    end
+
+    it "sends the section's question/scenario/snippet, the prior thread in order, and the new message" do
+      thread = [
+        { role: "user",      content: "What's slow here?" },
+        { role: "assistant", content: "What happens inside that loop on each iteration?" }
+      ]
+      svc = duck_spy_class.new(canned_text: "What would change if the list had a thousand rows instead of ten?")
+
+      result = svc.duck_response(user, exercise, section: "code_review",
+                                 message: "I don't see anything wrong", thread: thread)
+
+      expect(result).to eq("What would change if the list had a thousand rows instead of ten?")
+      expect(svc.last_prompt).to include("Find the N+1")
+      expect(svc.last_prompt).to include("a billing job")
+      expect(svc.last_prompt).to include("What's slow here?")
+      expect(svc.last_prompt).to include("I don't see anything wrong")
+      expect(svc.last_prompt.index("What's slow here?")).to be < svc.last_prompt.index("I don't see anything wrong")
+    end
+
+    it "never sends a draft answer — the method has no daily_response argument to read one from" do
+      expect(AiService.instance_method(:duck_response).parameters).not_to include([ :req, :daily_response ])
+
+      svc = duck_spy_class.new(canned_text: "A guiding question.")
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_prompt).not_to include("daily_response")
+    end
+
+    it "the system prompt never permits stating the answer or writing corrected code" do
+      svc = duck_spy_class.new(canned_text: "A guiding question.")
+
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_system).to match(/never state the correct answer/i)
+      expect(svc.last_system).to match(/complete code/i)
+      expect(svc.last_system).to match(/1-3 sentences/i)
+    end
+
+    it "passes DUCK_RESPONSE_MAX_TOKENS, distinct from other AiService calls' ceilings" do
+      svc = double_class.new(canned_text: "A guiding question.")
+
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_max_tokens).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
+      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+    end
+
+    it "logs usage under its own purpose" do
+      svc = double_class.new(canned_text: "A guiding question.")
+
+      expect {
+        svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+      }.to change { ApiUsage.where(purpose: "duck_thread").count }.by(1)
+    end
+
+    it "raises InvalidResponseError instead of returning a blank response" do
+      svc = double_class.new(canned_text: "   ")
+
+      expect {
+        svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
       }.to raise_error(AiService::InvalidResponseError)
     end
   end

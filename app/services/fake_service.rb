@@ -142,13 +142,16 @@ class FakeService < AiService
     "Focus on the boundary of the operation: what MUST happen before returning success, and what could safely " \
     "happen after. That's what separates a synchronous responsibility from something a background job can own."
 
+  DUCK_RESPONSE_TEXT =
+    "What would happen to that method if it ran a hundred times in one request — where would the slowdown show up?"
+
   private
 
   # Both raises are deliberately bare RuntimeErrors, not AiService::Error:
   # GenerateDailyExercisesJob rescues the AiService hierarchy and turns it into
   # a persisted, user-facing failure message, which would bury a broken fake as
   # "generation failed" instead of failing the spec that caused it.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
     text =
       case system
       when /generating personalized daily exercise sets/
@@ -164,6 +167,8 @@ class FakeService < AiService
         EXPLAIN_DIFFERENTLY_TEXT
       when /answering a follow-up question/
         FOLLOW_UP_ANSWER_TEXT
+      when /Socratic thinking partner/
+        DUCK_RESPONSE_TEXT
       else
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end
