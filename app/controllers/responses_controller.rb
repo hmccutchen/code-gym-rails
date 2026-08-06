@@ -324,8 +324,16 @@ class ResponsesController < ApplicationController
 
   private
 
+  # A non-Hash-like element (e.g. thread: ["oops"] or thread: "not-an-array",
+  # which Array() wraps as a one-element array) would otherwise raise
+  # TypeError on turn[:role] and surface as a raw 500 instead of the 422
+  # every other bad-input path in this action returns.
   def duck_thread_param
-    Array(params[:thread]).map { |turn| { role: turn[:role].to_s, content: turn[:content].to_s } }
+    Array(params[:thread]).filter_map { |turn|
+      next unless turn.is_a?(Hash) || turn.respond_to?(:permit)
+
+      { role: turn[:role].to_s, content: turn[:content].to_s }
+    }
   end
 
   # Errors send the user back to the dashboard, where the retry button lives.

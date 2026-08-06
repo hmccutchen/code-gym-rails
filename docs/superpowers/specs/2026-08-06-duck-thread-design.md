@@ -252,3 +252,8 @@ instance rather than round-tripping through the DOM/server:
   - Confirms no database writes occur anywhere in the flow (e.g. asserting
     row counts are unchanged across the request for every table this
     feature could plausibly have touched).
+  - A malformed `thread` param (a non-array value, or an array containing a
+    non-Hash element) is tolerated rather than raising — `duck_thread_param`
+    filters out any element that isn't Hash-like instead of assuming every
+    element has the expected shape, so a hand-crafted or buggy client
+    request degrades to "that garbage turn is dropped" rather than a 500.

@@ -94,6 +94,32 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     expect(fake).not_to have_received(:duck_response)
   end
 
+  it "tolerates a malformed thread element instead of raising a 500" do
+    create_exercise_for(user)
+    fake = stub_answer
+    login_as(user)
+
+    post duck_thread_responses_path,
+      params: { section: "code_review", message: "help", thread: [ "oops", { role: "user", content: "real turn" } ] },
+      as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(fake).to have_received(:duck_response).with(
+      user, an_instance_of(DailyExercise), section: "code_review", message: "help",
+      thread: [ { role: "user", content: "real turn" } ]
+    )
+  end
+
+  it "tolerates a non-array thread instead of raising a 500" do
+    create_exercise_for(user)
+    stub_answer
+    login_as(user)
+
+    post duck_thread_responses_path, params: { section: "code_review", message: "help", thread: "not-an-array" }, as: :json
+
+    expect(response).to have_http_status(:ok)
+  end
+
   describe "cap enforcement" do
     it "rejects (422) once the submitted thread's user-turn count is already at the cap, without calling the provider" do
       create_exercise_for(user)
