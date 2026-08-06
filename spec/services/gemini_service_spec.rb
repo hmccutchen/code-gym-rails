@@ -31,6 +31,12 @@ RSpec.describe GeminiService do
       conn = service.send(:build_connection)
       expect(conn.headers["x-goog-api-key"]).to eq("AIzaTestKey")
     end
+
+    it "bounds the request so a hung provider cannot block a thread forever" do
+      conn = service.send(:build_connection)
+      expect(conn.options.open_timeout).to eq(AiService::OPEN_TIMEOUT)
+      expect(conn.options.timeout).to eq(AiService::READ_TIMEOUT)
+    end
   end
 
   describe "retry/backoff" do

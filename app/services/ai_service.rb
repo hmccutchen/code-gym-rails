@@ -23,6 +23,18 @@ class AiService
   # it's unfinished.
   class TruncatedResponseError < InvalidResponseError; end
 
+  # Every provider call is made from a request thread (#review and the
+  # on-demand generation path both block on it), so an unbounded call ties up
+  # a Puma thread indefinitely and outlives ResponsesController's review claim,
+  # letting a second review start while the first is still in flight. Faraday
+  # sets no timeout by default. The read budget is generous because a full
+  # section review legitimately takes tens of seconds; the ceiling that matters
+  # is (attempts × (open + read)) + retry backoff staying under
+  # ResponsesController::REVIEW_CLAIM_STALE_AFTER, which ai_service_spec
+  # asserts so the two cannot drift apart.
+  OPEN_TIMEOUT = 10
+  READ_TIMEOUT = 45
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
