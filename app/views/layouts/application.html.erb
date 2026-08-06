@@ -444,12 +444,22 @@
           li.className = "glossary-miss";
           li.textContent = `"${raw}" isn't in the glossary yet.`;
         }
-        list.appendChild(li);
+        list.replaceChildren(li);
         input.value = "";
         input.focus();
       };
 
+      const clearSearch = (box) => {
+        box.querySelector(".glossary-results").replaceChildren();
+        box.querySelector("input[type='text']").value = "";
+      };
+
       document.addEventListener("click", (event) => {
+        const clearButton = event.target.closest("[data-glossary-search] .glossary-clear");
+        if (clearButton) {
+          clearSearch(clearButton.closest("[data-glossary-search]"));
+          return;
+        }
         const button = event.target.closest("[data-glossary-search] button");
         if (!button) return;
         runSearch(button.closest("[data-glossary-search]"));
