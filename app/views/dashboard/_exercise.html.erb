@@ -1,21 +1,30 @@
 <% submitted = response.persisted? && response.submitted? %>
 
-<div class="regenerate-row" style="margin-bottom:1.5rem;">
-  <% if exercise.regenerated_at.present? %>
-    <p class="hint">You've already generated a new set today.</p>
-  <% else %>
-    <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
-    <% confirm_msg = has_progress ?
-         "This will replace today's problems and erase your answers so far. This can't be undone. Continue?" :
-         "Generate a new set for today?" %>
-    <%# turbo_confirm would be inert here — Turbo JS is not loaded. The
-        layout's loading-form script provides the confirm and the in-flight
-        spinner; the request then blocks synchronously on the provider
-        (10–30s) until the redirect lands. %>
-    <%= button_to "Generate new set", regenerate_path, method: :post,
+<div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+  <div>
+    <% if exercise.regenerated_at.present? %>
+      <p class="hint">You've already generated a new set today.</p>
+    <% else %>
+      <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
+      <% confirm_msg = has_progress ?
+           "This will replace today's problems and erase your answers so far. This can't be undone. Continue?" :
+           "Generate a new set for today?" %>
+      <%# turbo_confirm would be inert here — Turbo JS is not loaded. The
+          layout's loading-form script provides the confirm and the in-flight
+          spinner; the request then blocks synchronously on the provider
+          (10–30s) until the redirect lands. %>
+      <%= button_to "Generate new set", regenerate_path, method: :post,
+            class: "btn btn-ghost btn-sm",
+            form: { data: { loading_form: true, loading_label: "Generating…",
+                            confirm_message: confirm_msg } } %>
+    <% end %>
+  </div>
+
+  <% if response.persisted? && !response.reviewed? %>
+    <%= button_to "Start over", start_over_response_path(response), method: :delete,
           class: "btn btn-ghost btn-sm",
-          form: { data: { loading_form: true, loading_label: "Generating…",
-                          confirm_message: confirm_msg } } %>
+          form: { data: { loading_form: true, loading_label: "Starting over…",
+                          confirm_message: "This will clear today's answers and ratings so you can start fresh. This can't be undone. Continue?" } } %>
   <% end %>
 </div>
 

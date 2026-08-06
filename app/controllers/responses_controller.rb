@@ -1,5 +1,5 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently, :follow_ups ]
+  before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently, :follow_ups, :start_over ]
   before_action :require_reviewed_section!, only: [ :self_explanation, :explain_differently, :follow_ups ]
 
   # How long a claimed-but-unfinished review blocks a retry. The provider call
@@ -113,6 +113,28 @@ class ResponsesController < ApplicationController
   rescue AiService::Error => e
     release_review_claim!
     redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
+  end
+
+  # DELETE /responses/:id/start_over — abandon today's saved answers, ratings,
+  # and feedback so the same problem set can be re-attempted from a blank
+  # state. Destroys the row outright rather than clearing fields in place —
+  # #create's find_or_initialize_by already handles a missing row cleanly, so
+  # the next autosave just creates a fresh one with no special-casing needed
+  # anywhere else. Hard-blocked once any section has been reviewed: from that
+  # point ConceptMastery.record_review! has already moved real tier/streak
+  # state for that concept, and this action has no way to undo that. Also
+  # blocked while a review is actively claimed: #review's provider call runs
+  # outside a transaction, so destroying the row mid-flight lets its
+  # ConceptMastery writes commit against a response that no longer exists.
+  def start_over
+    return redirect_to root_path, alert: "This set has already been reviewed — nothing to start over." if @response.reviewed?
+    return redirect_to root_path, alert: "You can only start over on today's set." unless @response.date == Date.current
+    if @response.reviewing_since.present? && @response.reviewing_since > REVIEW_CLAIM_STALE_AFTER.ago
+      return redirect_to root_path, alert: "A review is being generated for this — try again in a moment."
+    end
+
+    @response.destroy
+    redirect_to root_path, notice: "Today's answers have been cleared — start fresh whenever you're ready."
   end
 
   # POST /responses/:id/email_review — email the completed review to the user.
