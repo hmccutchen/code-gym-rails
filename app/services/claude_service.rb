@@ -10,8 +10,10 @@ class ClaudeService < AiService
   # largest response we ask for: a three-section review, each section
   # carrying prose arrays plus a structural `improved_code` block. The
   # original 2500 predated those fields and silently truncated reviews
-  # mid-string, which surfaced as a JSON parse error.
-  MAX_TOKENS = 8_000
+  # mid-string, which surfaced as a JSON parse error. claude-sonnet-5 thinks
+  # by default and max_tokens caps thinking + response text together, so this
+  # also has to clear whatever the model spends on unrequested thinking.
+  MAX_TOKENS = 16_000
 
   # 3 total attempts, exponential backoff capped at 8s. `methods: [:post]`
   # is required because faraday-retry's default idempotent-methods list
@@ -57,9 +59,13 @@ class ClaudeService < AiService
 
     parsed = JSON.parse(resp.body)
     usage  = parsed["usage"] || {}
+    # claude-sonnet-5 thinks by default (unlike claude-sonnet-4-5), so the
+    # text block is no longer reliably content[0] — a leading thinking block
+    # pushes it back, and dig(0, "text") silently returns nil.
+    text_block = (parsed["content"] || []).find { |block| block["type"] == "text" }
 
     {
-      text:          parsed.dig("content", 0, "text"),
+      text:          text_block&.dig("text"),
       input_tokens:  usage["input_tokens"],
       output_tokens: usage["output_tokens"],
       truncated:     parsed["stop_reason"] == "max_tokens"

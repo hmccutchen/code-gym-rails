@@ -99,6 +99,20 @@ RSpec.describe ClaudeService do
       expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false)
     end
 
+    it "finds the text block even when a thinking block precedes it" do
+      body = {
+        "content" => [
+          { "type" => "thinking", "thinking" => "reasoning about the answer" },
+          { "type" => "text", "text" => "hello" }
+        ],
+        "usage" => { "input_tokens" => 10, "output_tokens" => 20 }
+      }.to_json
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      expect(service.send(:call, system: "sys", prompt: "prompt text")[:text]).to eq("hello")
+    end
+
     it "sends MAX_TOKENS as the request's output budget" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
       fake_conn = instance_double(Faraday::Connection)
