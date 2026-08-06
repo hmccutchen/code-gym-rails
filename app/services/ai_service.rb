@@ -510,7 +510,6 @@ class AiService
   # changes across languages.
   def exercise_schema_for(language = "ruby_rails", third: :challenge)
     label = config_for(language)[:label]
-    glossary_field = %("glossary": [{"term": "string — an unfamiliar word from this section's own text", "definition": "string — one plain-English sentence"}])
 
     third_section =
       case third
@@ -523,7 +522,6 @@ class AiService
               "options":   ["string — a viable approach", "string — another viable approach", "string — an optional third approach (omit for 2)"],
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the architecture vocabulary",
-              #{glossary_field},
               "reference": {
                 "tagline":     "string — bold one-liner",
                 "explanation": "string — 2-3 sentences",
@@ -542,7 +540,6 @@ class AiService
               "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the provided vocabulary",
-              #{glossary_field},
               "reference": {
                 "tagline":      "string — bold one-liner",
                 "explanation":  "string — 2-3 sentences",
@@ -559,8 +556,7 @@ class AiService
               "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
               "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
               "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              #{glossary_field}
+              "concept": "string — exactly one concept from the provided vocabulary"
             }
         PB
       else
@@ -571,8 +567,7 @@ class AiService
               "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
               "starter_code": "string — optional skeleton (empty string if none)",
               "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              #{glossary_field}
+              "concept": "string — exactly one concept from the provided vocabulary"
             }
         CH
       end
@@ -584,8 +579,7 @@ class AiService
           "snippet":  "string — #{label} code, ~10-15 lines",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          #{glossary_field}
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'"
         },
         "pattern": {
           "title":    "string — pattern name",
@@ -593,8 +587,7 @@ class AiService
           "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          #{glossary_field}
+          "concept": "string — exactly one concept from the provided vocabulary"
         },
         #{third_section}
       }
@@ -651,7 +644,7 @@ class AiService
         <<~EST.chomp
 
           Established concepts (well past first mastery — survived a retention check): #{established.map(&:concept).join(', ')}
-          - If you were already going to select one of these for a section's concept, keep that section's teaching_note minimal (a single short sentence, or an empty string is fine) and return an empty glossary array for that section.
+          - If you were already going to select one of these for a section's concept, keep that section's teaching_note minimal (a single short sentence, or an empty string is fine).
           - Pitch at full difficulty — do not ease, simplify, or add scaffolding for these, the same as you would not for a retention check.
           - This is advisory, like every other concept instruction here: it does not force you to select one of these concepts, only shapes the section if you do.
         EST
@@ -736,7 +729,6 @@ class AiService
       #{ts_guidance}
       - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
-      - Each section's "glossary": 0-4 {term, definition} pairs for incidental terminology inside THAT section's own title/scenario/question/why/options text that a mid-level developer newer to #{label} might not immediately know — distinct from the section's own tagged "concept" and from "teaching_note". One plain-English sentence per definition, same tone as the rest of this app's teaching content. Return an empty array when nothing in the section's text warrants one — never force entries to exist.
       #{third_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.

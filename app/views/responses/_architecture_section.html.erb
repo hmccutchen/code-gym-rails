@@ -3,12 +3,12 @@
     on the dashboard after submitting and on every history entry.
     Locals: arch, response, submitted. %>
 <div class="section">
-  <div class="section-label">3 — Architecture Decision: <%= glossary_wrap(arch["title"], arch["glossary"]) %></div>
-  <% if arch["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(arch["scenario"], arch["glossary"]) %></div><% end %>
-  <div class="question"><%= glossary_wrap(arch["question"], arch["glossary"]) %></div>
+  <div class="section-label">3 — Architecture Decision: <%= glossary_wrap(arch["title"]) %></div>
+  <% if arch["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(arch["scenario"]) %></div><% end %>
+  <div class="question"><%= glossary_wrap(arch["question"]) %></div>
   <% if arch["options"].present? %>
     <ul class="arch-options">
-      <% arch["options"].each do |opt| %><li><%= glossary_wrap(opt, arch["glossary"]) %></li><% end %>
+      <% arch["options"].each do |opt| %><li><%= glossary_wrap(opt) %></li><% end %>
     </ul>
   <% end %>
   <% if arch["reference"].present? %>
@@ -42,7 +42,6 @@
       <% end %>
     </div>
   <% end %>
-  <%= render "shared/glossary_search", field: "architecture" %>
 </div>
 <% if arch.dig("reference", "diagram").present? && !@architecture_diagram_script_emitted %>
   <% @architecture_diagram_script_emitted = true %>

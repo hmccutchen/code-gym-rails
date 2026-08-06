@@ -4,7 +4,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
   # The exercise is built here rather than generated through FakeService because
   # this bug only reproduces when the term sits away from the left edge: the old
   # panel was anchored at the term and ran off screen only once the term was far
-  # enough right. FakeService's own wording happens to wrap "loyalty tier" to the
+  # enough right. FakeService's own wording happens to wrap "memoization" to the
   # start of a line, where no overflow is possible.
   let(:phone_width) { 320 }
 
@@ -27,7 +27,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     page.evaluate_script(<<~JS)
       (() => {
         const term = Array.from(document.querySelectorAll(".gloss-term"))
-          .find((el) => /loyalty tier/i.test(el.textContent));
+          .find((el) => /memoization/i.test(el.textContent));
         if (!term) return { found: false };
         const before = document.documentElement.scrollWidth;
         term.click();
@@ -47,7 +47,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
 
     travel_to(a_weekday) do
       page.current_window.resize_to(phone_width, 800)
-      start_dashboard(user, question: "The customer loyalty tier")
+      start_dashboard(user, question: "The customer memoization")
 
       box = open_panel_and_measure
 
@@ -69,12 +69,12 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
 
     travel_to(a_weekday) do
       page.current_window.resize_to(phone_width, 800)
-      start_dashboard(user, question: "The customer loyalty tier")
+      start_dashboard(user, question: "The customer memoization")
 
       capped = page.evaluate_script(<<~JS)
         (() => {
           const term = Array.from(document.querySelectorAll(".gloss-term"))
-            .find((el) => /loyalty tier/i.test(el.textContent));
+            .find((el) => /memoization/i.test(el.textContent));
           const style = getComputedStyle(term, "::after");
           return { maxWidth: style.maxWidth, left: style.left };
         })()
@@ -94,12 +94,12 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
 
     travel_to(a_weekday) do
       page.current_window.resize_to(phone_width, 800)
-      start_dashboard(user, question: "The customer loyalty tier")
+      start_dashboard(user, question: "The customer memoization")
 
       box = page.evaluate_script(<<~JS)
         (() => {
           const term = Array.from(document.querySelectorAll(".gloss-term"))
-            .find((el) => /loyalty tier/i.test(el.textContent));
+            .find((el) => /memoization/i.test(el.textContent));
           term.focus();
           const style = getComputedStyle(term, "::after");
           const left = term.getBoundingClientRect().left + parseFloat(style.left);
@@ -127,7 +127,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
       # Rotated landscape → portrait, not the reverse: a panel sized for the
       # wider screen is the one that no longer fits after the rotation.
       page.current_window.resize_to(landscape_width, 320)
-      start_dashboard(user, question: "The customer loyalty tier")
+      start_dashboard(user, question: "The customer memoization")
       open_panel_and_measure
 
       page.current_window.resize_to(phone_width, 800)
