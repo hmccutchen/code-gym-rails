@@ -29,9 +29,29 @@ RSpec.describe ClaudeService do
       expect(conn.headers["x-api-key"]).to eq("sk-ant-test")
       expect(conn.headers["anthropic-version"]).to eq("2023-06-01")
     end
+
+    it "bounds the request so a hung provider cannot block a thread forever" do
+      conn = service.send(:build_connection)
+      expect(conn.options.open_timeout).to eq(AiService::OPEN_TIMEOUT)
+      expect(conn.options.timeout).to eq(AiService::READ_TIMEOUT)
+    end
   end
 
   describe "retry/backoff" do
+    it "raises a handled error when the provider never responds" do
+      conn = Faraday.new do |f|
+        f.request :retry, ClaudeService::RETRY_OPTIONS.merge(max: 0)
+        f.adapter :test do |stub|
+          stub.post(ClaudeService::API_URL) { raise Faraday::TimeoutError }
+        end
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt")
+      }.to raise_error(AiService::Error, /Network error calling Claude/)
+    end
+
     it "retries a 429 and eventually succeeds" do
       responses = [ [ 429, "" ], [ 200, success_body ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))

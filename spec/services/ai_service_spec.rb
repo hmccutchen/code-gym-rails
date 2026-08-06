@@ -3,6 +3,23 @@ require "rails_helper"
 RSpec.describe AiService do
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
+  describe "request timeout budget" do
+    # #review claims the row for REVIEW_CLAIM_STALE_AFTER and only then lets a
+    # retry through. Sections are reviewed in parallel threads, so one section's
+    # worst case is the whole request's: every attempt timing out, plus the
+    # retry backoff between them. If that can exceed the claim window, a second
+    # review can start while the first is still running — so this asserts the
+    # two constants stay in a safe relationship rather than drifting apart.
+    it "cannot exceed the review claim window even when every attempt times out" do
+      retries = ClaudeService::RETRY_OPTIONS[:max]
+      backoff = (0..retries).sum { |i| ClaudeService::RETRY_OPTIONS[:interval] * (ClaudeService::RETRY_OPTIONS[:backoff_factor]**i) }
+      backoff *= (1 + ClaudeService::RETRY_OPTIONS[:interval_randomness])
+      worst_case = (retries + 1) * (AiService::OPEN_TIMEOUT + AiService::READ_TIMEOUT) + backoff
+
+      expect(worst_case).to be < ResponsesController::REVIEW_CLAIM_STALE_AFTER.to_i
+    end
+  end
+
   # Minimal concrete subclass so AiService's shared logic can be exercised
   # without a real network call to any provider.
   let(:double_class) do

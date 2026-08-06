@@ -76,6 +76,8 @@ class ClaudeService < AiService
 
   def build_connection
     Faraday.new do |f|
+      f.options.open_timeout         = OPEN_TIMEOUT
+      f.options.timeout              = READ_TIMEOUT
       f.headers["x-api-key"]         = @api_key
       f.headers["anthropic-version"] = "2023-06-01"
       f.headers["content-type"]      = "application/json"

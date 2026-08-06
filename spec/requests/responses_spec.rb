@@ -312,6 +312,26 @@ RSpec.describe "Responses", type: :request do
       expect(daily_response.reload.ai_review.keys).to match_array(%w[code_review pattern challenge])
     end
 
+    it "abandons the review without writing mastery state if the response is destroyed mid-flight" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections) do
+        DailyResponse.where(id: daily_response.id).delete_all
+        {
+          "code_review" => { ok: true, review: { "rating" => "solid" } },
+          "pattern"     => { ok: true, review: { "rating" => "solid" } },
+          "challenge"   => { ok: true, review: { "rating" => "solid" } }
+        }
+      end
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      expect { post review_response_path(daily_response) }.not_to change(ConceptMastery, :count)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("This set was cleared while the review was running — nothing was saved.")
+      expect(DailyResponse.exists?(daily_response.id)).to be false
+    end
+
     it "sends the user to the history page that actually holds the reviewed entry" do
       target = create_submitted_response(date: 30.days.ago.to_date)
       (1..10).each { |i| create_submitted_response(date: i.days.ago.to_date) }
@@ -1087,6 +1107,111 @@ RSpec.describe "Responses", type: :request do
       # renders for any rated section regardless of whether the answer
       # partial rendered anything.)
       expect(response.body).to include("Injection risk")
+    end
+  end
+
+  describe "DELETE /responses/:id/start_over" do
+    def create_response_for(owner, submitted: false, reviewed: false, date: Date.current, reviewing_since: nil)
+      exercise = DailyExercise.create!(
+        user: owner, date: date, generated_at: Time.current,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(
+        user: owner, daily_exercise: exercise, date: date,
+        answers: { "code_review" => "a" * 20 },
+        submitted_at: submitted ? Time.current : nil,
+        reviewing_since: reviewing_since,
+        ai_review: reviewed ? { "code_review" => { "rating" => "solid" } } : nil
+      )
+    end
+
+    it "requires login" do
+      daily_response = create_response_for(user)
+      delete logout_path
+
+      delete start_over_response_path(daily_response)
+      expect(response).to redirect_to(login_path)
+    end
+
+    it "404s for another user's response" do
+      other = create_user_with_key(email: "other@example.com", name: "Other")
+      daily_response = create_response_for(other)
+
+      delete start_over_response_path(daily_response)
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "destroys an unsubmitted draft and redirects to the dashboard" do
+      daily_response = create_response_for(user, submitted: false)
+
+      delete start_over_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq("Today's answers have been cleared — start fresh whenever you're ready.")
+      expect(DailyResponse.exists?(daily_response.id)).to be false
+    end
+
+    it "destroys a submitted-but-unreviewed response" do
+      daily_response = create_response_for(user, submitted: true)
+
+      delete start_over_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(DailyResponse.exists?(daily_response.id)).to be false
+    end
+
+    it "refuses to destroy a response with at least one reviewed section, without deleting it" do
+      daily_response = create_response_for(user, submitted: true, reviewed: true)
+
+      delete start_over_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("This set has already been reviewed — nothing to start over.")
+      expect(DailyResponse.exists?(daily_response.id)).to be true
+    end
+
+    it "refuses to destroy an earlier day's unreviewed response" do
+      daily_response = create_response_for(user, submitted: true, date: Date.current - 1)
+
+      delete start_over_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("You can only start over on today's set.")
+      expect(DailyResponse.exists?(daily_response.id)).to be true
+    end
+
+    it "resolves today in the user's timezone" do
+      user.update!(time_zone: "Asia/Tokyo")
+      travel_to Time.utc(2026, 3, 10, 23, 0) do
+        daily_response = create_response_for(user, submitted: true, date: Date.new(2026, 3, 11))
+
+        delete start_over_response_path(daily_response)
+
+        expect(response).to redirect_to(root_path)
+        expect(DailyResponse.exists?(daily_response.id)).to be false
+      end
+    end
+
+    it "refuses while a review is actively being generated" do
+      daily_response = create_response_for(user, submitted: true, reviewing_since: 10.seconds.ago)
+
+      delete start_over_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("A review is being generated for this — try again in a moment.")
+      expect(DailyResponse.exists?(daily_response.id)).to be true
+    end
+
+    it "destroys when an abandoned review claim has gone stale" do
+      daily_response = create_response_for(
+        user, submitted: true,
+        reviewing_since: (ResponsesController::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago
+      )
+
+      delete start_over_response_path(daily_response)
+
+      expect(response).to redirect_to(root_path)
+      expect(DailyResponse.exists?(daily_response.id)).to be false
     end
   end
 

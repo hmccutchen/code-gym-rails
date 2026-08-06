@@ -63,6 +63,8 @@ class GeminiService < AiService
 
   def build_connection
     Faraday.new do |f|
+      f.options.open_timeout      = OPEN_TIMEOUT
+      f.options.timeout           = READ_TIMEOUT
       f.headers["x-goog-api-key"] = @api_key
       f.headers["content-type"]   = "application/json"
       f.request :retry, RETRY_OPTIONS
