@@ -2,7 +2,7 @@ require "faraday"
 require "faraday/retry"
 
 class ClaudeService < AiService
-  MODEL   = "claude-sonnet-4-5"
+  MODEL   = "claude-sonnet-5"
   API_URL = "https://api.anthropic.com/v1/messages"
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
