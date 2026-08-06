@@ -86,6 +86,13 @@ class ResponsesController < ApplicationController
     failures  = results.reject { |_, r| r[:ok] }
 
     ActiveRecord::Base.transaction do
+      # Take the row lock before writing anything. #start_over can destroy this
+      # response while the provider call above is running (its stale-claim
+      # window is shorter than an untimed request can take), and an UPDATE
+      # against a deleted row reports success — without this, ConceptMastery
+      # writes would commit for a review no row will ever hold.
+      @response.lock!
+
       if successes.any?
         @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |r| r[:review] })
         ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
@@ -104,6 +111,8 @@ class ResponsesController < ApplicationController
     else
       redirect_to root_path, alert: zero_success_alert(failures)
     end
+  rescue ActiveRecord::RecordNotFound
+    redirect_to root_path, alert: "This set was cleared while the review was running — nothing was saved."
   rescue AiService::AuthenticationError
     release_review_claim!
     redirect_to root_path, alert: "Your API key was rejected — check it in Settings."

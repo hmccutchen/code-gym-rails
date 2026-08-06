@@ -312,6 +312,26 @@ RSpec.describe "Responses", type: :request do
       expect(daily_response.reload.ai_review.keys).to match_array(%w[code_review pattern challenge])
     end
 
+    it "abandons the review without writing mastery state if the response is destroyed mid-flight" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections) do
+        DailyResponse.where(id: daily_response.id).delete_all
+        {
+          "code_review" => { ok: true, review: { "rating" => "solid" } },
+          "pattern"     => { ok: true, review: { "rating" => "solid" } },
+          "challenge"   => { ok: true, review: { "rating" => "solid" } }
+        }
+      end
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      expect { post review_response_path(daily_response) }.not_to change(ConceptMastery, :count)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("This set was cleared while the review was running — nothing was saved.")
+      expect(DailyResponse.exists?(daily_response.id)).to be false
+    end
+
     it "sends the user to the history page that actually holds the reviewed entry" do
       target = create_submitted_response(date: 30.days.ago.to_date)
       (1..10).each { |i| create_submitted_response(date: i.days.ago.to_date) }
