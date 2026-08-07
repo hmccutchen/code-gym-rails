@@ -68,8 +68,29 @@ RSpec.describe "DailyExercises", type: :request do
       }.to have_enqueued_job(RegenerateExerciseJob)
     end
 
-    # The unit specs verify the controller's claim and the job's replacement
-    # separately. This walks the whole loop, so a mismatch between what the
+    it "releases the claim and alerts when the job can't be enqueued" do
+      exercise = create_exercise
+      allow(RegenerateExerciseJob).to receive(:perform_later).and_raise(ActiveRecord::ConnectionNotEstablished)
+
+      post regenerate_path
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("Couldn't start regeneration. Please try again.")
+      expect(exercise.reload.regenerating_since).to be_nil
+    end
+
+    it "lets the user retry immediately after a failed enqueue" do
+      create_exercise
+      allow(RegenerateExerciseJob).to receive(:perform_later).and_raise(ActiveRecord::ConnectionNotEstablished)
+      post regenerate_path
+
+      allow(RegenerateExerciseJob).to receive(:perform_later).and_call_original
+
+      expect { post regenerate_path }.to have_enqueued_job(RegenerateExerciseJob)
+      expect(flash[:generating]).to be true
+    end
+
+    # The unit specs verify the controller's claim and the job's replacement    # separately. This walks the whole loop, so a mismatch between what the
     # controller enqueues and what the job expects cannot pass unnoticed.
     it "shows the spinner until the enqueued job replaces the set" do
       exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,

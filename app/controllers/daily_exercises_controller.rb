@@ -27,7 +27,17 @@ class DailyExercisesController < ApplicationController
     end
 
     current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
-    RegenerateExerciseJob.perform_later(user_id: current_user.id)
+    # The claim is already committed, so an enqueue failure would strand the
+    # user behind a spinner no worker will ever clear — release it before
+    # reporting, so a retry is possible immediately rather than in six minutes.
+    begin
+      RegenerateExerciseJob.perform_later(user_id: current_user.id)
+    rescue StandardError => e
+      Rails.logger.error("Failed to enqueue RegenerateExerciseJob for user #{current_user.id}: #{e.class}: #{e.message}")
+      release_regeneration!(exercise)
+      return redirect_to root_path, alert: "Couldn't start regeneration. Please try again."
+    end
+
     redirect_to root_path, flash: { generating: true }
   end
 
@@ -43,5 +53,12 @@ class DailyExercisesController < ApplicationController
                 .where("regenerating_since IS NULL OR regenerating_since < ?",
                        DailyExercise::REGENERATION_STALE_AFTER.ago)
                 .update_all(regenerating_since: Time.current) == 1
+  end
+
+  # Written through the relation rather than the loaded record: `exercise` was
+  # read before claim_regeneration!'s update_all, so it still believes
+  # regenerating_since is nil and assigning nil would dirty nothing.
+  def release_regeneration!(exercise)
+    current_user.daily_exercises.where(id: exercise.id).update_all(regenerating_since: nil)
   end
 end
