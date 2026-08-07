@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_05_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_07_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -63,6 +63,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_000001) do
     t.string "language", default: "ruby_rails", null: false
     t.jsonb "problem_set", default: {}, null: false
     t.datetime "regenerated_at"
+    t.datetime "regenerating_since"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["user_id", "date"], name: "index_daily_exercises_on_user_id_and_date", unique: true

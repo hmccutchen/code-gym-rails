@@ -103,4 +103,35 @@ RSpec.describe DailyExercise, type: :model do
       expect(exercise.third_key).to eq("parsons_problem")
     end
   end
+
+  describe "#regenerating?" do
+    let(:user) { User.create!(email: "regen-model@example.com", name: "Regen") }
+
+    def exercise(regenerating_since: nil)
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                            problem_set: { "code_review" => { "question" => "q" } },
+                            regenerating_since: regenerating_since)
+    end
+
+    it "is false when no regeneration has been claimed" do
+      expect(exercise).not_to be_regenerating
+    end
+
+    it "is true while a fresh claim is held" do
+      expect(exercise(regenerating_since: 10.seconds.ago)).to be_regenerating
+    end
+
+    # A worker that dies mid-job would otherwise leave the claim set forever and
+    # strand the user on a spinner, so the claim expires rather than latching.
+    it "is false once the claim is older than the stale window" do
+      stale = DailyExercise::REGENERATION_STALE_AFTER.ago - 1.second
+      expect(exercise(regenerating_since: stale)).not_to be_regenerating
+    end
+
+    # A claim must outlive the longest generation the worker can legitimately
+    # run, or a still-running job looks abandoned and a second one piles on.
+    it "outlasts the worker's generation budget" do
+      expect(DailyExercise::REGENERATION_STALE_AFTER.to_i).to be > AiService::GENERATION_READ_TIMEOUT
+    end
+  end
 end
