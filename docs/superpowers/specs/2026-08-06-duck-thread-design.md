@@ -164,6 +164,18 @@ having `ClaudeService#call` send `thinking: { type: "disabled" }` whenever
 duck-thread's), rather than trying to guess a split that reserves enough
 tokens for both thinking and the reply.
 
+**Gemini has no truncation signal of its own.** Unlike Claude's
+`stop_reason`, the Interactions API response carries no field indicating the
+call was cut off at its output cap — `GeminiService#call` previously never
+set `truncated:` at all, so `call_and_log`'s truncation check was silently
+always false for Gemini regardless of `max_tokens`. A Gemini duck-thread
+user whose natural reply exceeded 150 tokens would get a silently cut-off
+sentence instead of the clean `TruncatedResponseError` a Claude user gets.
+Fixed with a heuristic: `truncated: max_tokens.present? &&
+output_tokens.to_i >= max_tokens` — a capped call whose usage lands at or
+past what was requested is treated as truncated; an uncapped call never is,
+matching its pre-existing behavior.
+
 ## Cap on exchanges
 
 `MAX_DUCK_TURNS_PER_SECTION = 6` (a plain `AiService` or controller-level
@@ -181,6 +193,31 @@ cost), not a hardened boundary — there is no server-side state to make it
 one. At the cap, the endpoint returns 422 with a clear message; the UI
 disables the input and shows that message. Since the thread lives only in
 the browser, hitting Clear always resets the count to zero.
+
+### Input bounds (allocation/payload backstop, not the exchange cap)
+
+The user-turn cap above bounds nothing by itself against a crafted request —
+it only counts `"user"`-role entries, and a client can submit unlimited
+`"assistant"` entries. `MAX_DUCK_MESSAGE_LENGTH` (2,000 characters, the
+single message field), `MAX_DUCK_THREAD_ENTRIES`
+(`MAX_DUCK_TURNS_PER_SECTION * 2`), and `MAX_DUCK_THREAD_BYTES` bound what
+gets allocated and forwarded to the provider at all. These are meant to be
+unreachable through the actual UI — an honest session respecting
+`MAX_DUCK_TURNS_PER_SECTION` should never come close.
+
+`MAX_DUCK_THREAD_BYTES` is **derived**, not a flat number, specifically
+because a flat value undercounted that "unreachable" claim: `
+MAX_DUCK_TURNS_PER_SECTION` honest user turns alone, each at
+`MAX_DUCK_MESSAGE_LENGTH` in a worst-case 4-byte-per-character language
+(e.g. CJK), is `6 * 2_000 * 4 = 48_000` bytes — comfortably past a flat
+20,000-byte budget after only 2-3 of the 6 allowed exchanges. That
+false-rejected a completely honest, cap-respecting conversation purely
+because of the language the user typed in. Fixed as `MAX_DUCK_TURNS_PER_SECTION
+* (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)` —
+assistant replies aren't character-bounded (only by
+`AiService::DUCK_RESPONSE_MAX_TOKENS` tokens), so they get a generous flat
+per-turn byte allowance (1,200) rather than a precise token→byte
+conversion.
 
 ## Endpoint & controller
 

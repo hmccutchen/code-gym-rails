@@ -150,7 +150,7 @@ RSpec.describe GeminiService do
       end
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
-      expect(result).to eq(text: "hello", input_tokens: 8, output_tokens: 12)
+      expect(result).to eq(text: "hello", input_tokens: 8, output_tokens: 12, truncated: false)
     end
 
     it "omits generation_config entirely when no max_tokens override is given" do
@@ -187,6 +187,50 @@ RSpec.describe GeminiService do
       end
 
       service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS)
+    end
+
+    # The Interactions API response has no stop/finish-reason field to read
+    # (unlike Claude's stop_reason), so without this call_and_log's
+    # truncation check would be silently always-false for Gemini — a capped
+    # call that actually got cut off would come back as a normal, un-flagged
+    # response instead of raising AiService::TruncatedResponseError.
+    it "reports truncated when a capped call's output lands at or past the requested ceiling" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "cut off mid" } ] } ],
+          "usage" => { "total_output_tokens" => 150 }
+        }.to_json)
+      fake_conn = instance_double(Faraday::Connection, post: fake_response)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      result = service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
+      expect(result[:truncated]).to be(true)
+    end
+
+    it "does not report truncated when a capped call finishes under the ceiling" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "a short reply" } ] } ],
+          "usage" => { "total_output_tokens" => 40 }
+        }.to_json)
+      fake_conn = instance_double(Faraday::Connection, post: fake_response)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      result = service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
+      expect(result[:truncated]).to be(false)
+    end
+
+    it "never reports truncated on an uncapped call, regardless of output size" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "a very long reply" } ] } ],
+          "usage" => { "total_output_tokens" => 50_000 }
+        }.to_json)
+      fake_conn = instance_double(Faraday::Connection, post: fake_response)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      result = service.send(:call, system: "sys", prompt: "p")
+      expect(result[:truncated]).to be(false)
     end
 
     it "raises AiService::Error on a non-success response" do

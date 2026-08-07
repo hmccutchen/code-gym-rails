@@ -153,6 +153,31 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(fake).not_to have_received(:duck_response)
     end
+
+    # Regression guard: a flat MAX_DUCK_THREAD_BYTES undercounted its own
+    # documented "generous enough that no honest session approaches it" claim
+    # — 6 honest user turns at the max message length, in a worst-case
+    # 4-byte-per-character language, already exceeded a flat 20_000-byte
+    # budget after only 2-3 exchanges. This drives a full, cap-respecting,
+    # every-message-at-the-character-limit CJK conversation through and
+    # confirms it never trips the byte cap.
+    it "lets a full, honest, cap-respecting conversation through even in a worst-case multi-byte language" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      max_length_cjk_message = "あ" * ResponsesController::MAX_DUCK_MESSAGE_LENGTH
+      thread_so_far = Array.new(ResponsesController::MAX_DUCK_TURNS_PER_SECTION - 1) {
+        [ { role: "user", content: max_length_cjk_message }, { role: "assistant", content: "assistant reply" } ]
+      }.flatten
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: max_length_cjk_message, thread: thread_so_far },
+           as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(fake).to have_received(:duck_response)
+    end
   end
 
   it "returns 422 for a section not present in today's exercise, without calling the provider" do

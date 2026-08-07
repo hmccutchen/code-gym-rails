@@ -359,9 +359,7 @@ class AiService
       "#{field[:label]}: #{points.join('; ')}" if points.any?
     }.join("\n")
 
-    thread_text = thread.any? ?
-      thread.map { |turn| "#{turn[:role] == 'assistant' ? 'You' : 'Them'}: #{turn[:content]}" }.join("\n") :
-      "(no prior questions)"
+    thread_text = render_thread(thread, empty_message: "(no prior questions)")
 
     result = call_and_log(
       user, purpose: "review_follow_up",
@@ -394,10 +392,7 @@ class AiService
   # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
   def duck_response(user, exercise, section:, message:, thread: [])
     context = duck_section_context(exercise, section)
-
-    thread_text = thread.any? ?
-      thread.map { |turn| "#{turn[:role] == 'assistant' ? 'You' : 'Them'}: #{turn[:content]}" }.join("\n") :
-      "(no prior messages)"
+    thread_text = render_thread(thread, empty_message: "(no prior messages)")
 
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
@@ -419,6 +414,16 @@ class AiService
   end
 
   private
+
+  # Shared by #answer_follow_up and #duck_response — both render a prior
+  # `{ role:, content: }` conversation the same "You: .../Them: ..." way, so
+  # a future fix to that rendering (e.g. how an unrecognized role is labeled)
+  # only needs to land in one place.
+  def render_thread(thread, empty_message:)
+    return empty_message if thread.empty?
+
+    thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
+  end
 
   # Plain-text summary of whichever fields a given section actually has
   # (code_review/pattern/challenge/architecture/security_review/

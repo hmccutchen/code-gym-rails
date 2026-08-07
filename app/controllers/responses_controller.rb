@@ -25,7 +25,19 @@ class ResponsesController < ApplicationController
   # bytes because it bounds the payload, and one character is up to four.
   MAX_DUCK_MESSAGE_LENGTH = 2_000
   MAX_DUCK_THREAD_ENTRIES = MAX_DUCK_TURNS_PER_SECTION * 2
-  MAX_DUCK_THREAD_BYTES   = 20_000
+
+  # Derived, not a flat number: a flat 20_000 undercounted its own "generous
+  # enough" claim above — MAX_DUCK_TURNS_PER_SECTION honest user turns alone,
+  # each at MAX_DUCK_MESSAGE_LENGTH in a worst-case 4-byte-per-character
+  # language, is already 6 * 2_000 * 4 = 48_000 bytes, well past a flat
+  # 20_000. That falsely rejected a cap-respecting conversation typed in a
+  # multi-byte language after only 2-3 exchanges instead of the full 6.
+  # Assistant replies aren't character-bounded (only by
+  # AiService::DUCK_RESPONSE_MAX_TOKENS tokens), so they get a generous
+  # per-turn byte allowance instead of a precise token->byte conversion.
+  DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = 1_200
+  MAX_DUCK_THREAD_BYTES = MAX_DUCK_TURNS_PER_SECTION *
+    (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)
 
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
