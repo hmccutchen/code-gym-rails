@@ -293,7 +293,10 @@ class ResponsesController < ApplicationController
   # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
   def duck_thread
     exercise = current_user.daily_exercises.for_date.first
-    return head :not_found unless exercise
+    # A JSON body, not head :not_found — the client's fetch handler always
+    # calls res.json() before checking res.ok, so an empty body would raise
+    # a confusing "Unexpected end of JSON input" instead of a clean message.
+    return render json: { status: "error", error: "No exercise set for today." }, status: :not_found unless exercise
 
     section = params[:section].to_s
     return render_section_error("That section isn't part of this exercise.") unless exercise.problem_set.key?(section)
@@ -328,11 +331,19 @@ class ResponsesController < ApplicationController
   # which Array() wraps as a one-element array) would otherwise raise
   # TypeError on turn[:role] and surface as a raw 500 instead of the 422
   # every other bad-input path in this action returns.
+  # Roles are normalized to lowercase and restricted to user/assistant — the
+  # cap check below matches turn[:role] == "user" exactly, so an unnormalized
+  # "User"/"USER" would silently dodge the cap, and AiService#duck_response's
+  # thread rendering would mislabel the speaker for anything it doesn't
+  # recognize as exactly "assistant".
   def duck_thread_param
     Array(params[:thread]).filter_map { |turn|
       next unless turn.is_a?(Hash) || turn.respond_to?(:permit)
 
-      { role: turn[:role].to_s, content: turn[:content].to_s }
+      role = turn[:role].to_s.downcase
+      next unless %w[user assistant].include?(role)
+
+      { role: role, content: turn[:content].to_s }
     }
   end
 

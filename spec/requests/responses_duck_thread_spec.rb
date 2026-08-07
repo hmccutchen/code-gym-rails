@@ -75,12 +75,13 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     expect(fake).not_to have_received(:duck_response)
   end
 
-  it "returns 404 when there is no exercise for today" do
+  it "returns a JSON error body on 404, not an empty one — the client always calls res.json() before checking res.ok" do
     login_as(user)
 
     post duck_thread_responses_path, params: { section: "code_review", message: "hi", thread: [] }, as: :json
 
     expect(response).to have_http_status(:not_found)
+    expect(JSON.parse(response.body)).to include("status" => "error")
   end
 
   it "returns 422 for a blank message, without calling the provider" do
@@ -118,6 +119,42 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     post duck_thread_responses_path, params: { section: "code_review", message: "help", thread: "not-an-array" }, as: :json
 
     expect(response).to have_http_status(:ok)
+  end
+
+  it "normalizes role case and drops turns with an unrecognized role" do
+    create_exercise_for(user)
+    fake = stub_answer
+    login_as(user)
+
+    post duck_thread_responses_path,
+      params: { section: "code_review", message: "help", thread: [
+        { role: "User", content: "mixed case" },
+        { role: "SYSTEM", content: "not a real role" }
+      ] },
+      as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(fake).to have_received(:duck_response).with(
+      user, an_instance_of(DailyExercise), section: "code_review", message: "help",
+      thread: [ { role: "user", content: "mixed case" } ]
+    )
+  end
+
+  it "counts case-insensitively toward the cap, so an unnormalized role can't dodge it" do
+    create_exercise_for(user)
+    fake = stub_answer
+    login_as(user)
+
+    mixed_case_capped_thread = Array.new(ResponsesController::MAX_DUCK_TURNS_PER_SECTION) { |i|
+      [ { role: i.even? ? "user" : "User", content: "q#{i}" }, { role: "assistant", content: "a#{i}" } ]
+    }.flatten
+
+    post duck_thread_responses_path,
+      params: { section: "code_review", message: "one more", thread: mixed_case_capped_thread },
+      as: :json
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(fake).not_to have_received(:duck_response)
   end
 
   describe "cap enforcement" do

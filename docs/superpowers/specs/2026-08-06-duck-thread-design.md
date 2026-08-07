@@ -186,7 +186,10 @@ end
 `ResponsesController#duck_thread`:
 
 1. Look up today's exercise (`current_user.daily_exercises.for_date.first`);
-   404 if none.
+   404 if none — with a JSON error body, not an empty one. The client's
+   fetch handler always calls `res.json()` before checking `res.ok`, so an
+   empty 404 body would surface as a confusing JSON-parse error instead of
+   the message the UI is built to show.
 2. Validate `section` against `exercise.problem_set.keys` (same guard as
    `require_reviewed_section!` uses for `ReviewFollowUp`, to block a crafted
    param from requesting context for an arbitrary section key).
@@ -257,3 +260,12 @@ instance rather than round-tripping through the DOM/server:
     filters out any element that isn't Hash-like instead of assuming every
     element has the expected shape, so a hand-crafted or buggy client
     request degrades to "that garbage turn is dropped" rather than a 500.
+  - `role` is normalized to lowercase and restricted to `user`/`assistant` —
+    anything else is dropped. Without this, an unnormalized role like
+    `"User"` would both dodge the cap check (`turn[:role] == "user"` is an
+    exact match) and mislabel the speaker in `AiService#duck_response`'s
+    rendered thread (anything not exactly `"assistant"` renders as "Them").
+  - The 404 response (no exercise for today) returns a JSON `{status:
+    "error", error: ...}` body, matching every other error path in this
+    action — not an empty body, which the client's `res.json()` call would
+    fail to parse.
