@@ -13,13 +13,13 @@
   const hint = document.getElementById("generating-hint");
   const statusUrl = "<%= dashboard_status_path %>";
   let attempts = 0;
-  const POLL_INTERVAL_MS = 3000;
   <%# The spinner covers two different generation windows: a background
       first-time generation (bound by GENERATION_READ_TIMEOUT) and a
       regeneration in flight (the claim goes stale after REGENERATION_STALE_AFTER,
       at which point the page falls through on its own). The poller must outlast
       whichever window is longer. %>
   <% poll_interval_s = 3.0 %>
+  const POLL_INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
   const MAX_ATTEMPTS = <%= ([AiService::GENERATION_READ_TIMEOUT, DailyExercise::REGENERATION_STALE_AFTER.to_i].max / poll_interval_s).ceil + 1 %>;
 
   async function poll() {
