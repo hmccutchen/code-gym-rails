@@ -32,13 +32,24 @@
   const MAX_TURNS = <%= ResponsesController::MAX_DUCK_TURNS_PER_SECTION %>;
   const DUCK_URL = "<%= duck_thread_responses_path %>";
 
+  const SPEAKER = { user: "You", assistant: "Duck" };
+
   const renderTurns = (box) => {
     const list = box.querySelector(".duck-turns");
     list.replaceChildren();
     box.duckThread.forEach((turn) => {
       const p = document.createElement("p");
       p.className = "duck-turn duck-" + turn.role;
-      p.textContent = turn.content;
+
+      // The speaker is otherwise conveyed only by CSS colour, which assistive
+      // tech and anyone not perceiving colour never receives; visually hidden
+      // so the styled transcript is unchanged.
+      const who = document.createElement("span");
+      who.className = "visually-hidden";
+      who.textContent = (SPEAKER[turn.role] || turn.role) + ": ";
+      p.appendChild(who);
+      p.appendChild(document.createTextNode(turn.content));
+
       list.appendChild(p);
     });
   };
@@ -49,6 +60,11 @@
   // the single place that decides whether the input stays usable, so the
   // in-flight lock set before a fetch and the cap reached after one always
   // resolve to the same correct resting state.
+  //
+  // It only ever *writes* the status when capped. It used to clear it
+  // otherwise, which — because it runs in sendMessage's finally — wiped every
+  // error message microseconds after the catch set it, making failures
+  // silent. Callers that want the status cleared do so explicitly.
   const refreshCap = (box) => {
     const input = box.querySelector(".duck-input");
     const send = box.querySelector(".duck-send");
@@ -56,8 +72,10 @@
     const capped = userTurnCount(box) >= MAX_TURNS;
     input.disabled = capped;
     send.disabled = capped;
-    status.textContent = capped ?
-      `You've used all ${MAX_TURNS} messages for this section — clear the conversation to keep going.` : "";
+    if (capped) {
+      status.textContent =
+        `You've used all ${MAX_TURNS} messages for this section — clear the conversation to keep going.`;
+    }
   };
 
   document.querySelectorAll("[data-duck-thread]:not([data-duck-wired])").forEach((box) => {
@@ -76,11 +94,14 @@
       toggle.setAttribute("aria-expanded", String(!body.hidden));
     });
 
+    box.duckGeneration = 0;
+
     const sendMessage = async () => {
       const message = input.value.trim();
       if (!message || send.disabled) return;
 
       const priorThread = box.duckThread.slice();
+      const generation = box.duckGeneration;
       input.disabled = true;
       send.disabled = true;
       status.textContent = "Thinking…";
@@ -95,6 +116,10 @@
           body: JSON.stringify({ section: box.dataset.section, message: message, thread: priorThread })
         });
         const data = await res.json();
+        // Clear ran while this was in flight: the reply belongs to a
+        // conversation the user has discarded, so dropping it (rather than
+        // pushing it) is what keeps a cleared thread cleared.
+        if (generation !== box.duckGeneration) return;
         if (!res.ok) throw new Error(data.error || res.status);
 
         box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: data.answer });
@@ -102,9 +127,10 @@
         input.value = "";
         status.textContent = "";
       } catch (e) {
+        if (generation !== box.duckGeneration) return;
         status.textContent = e.message || "Couldn't send that — try again";
       } finally {
-        refreshCap(box);
+        if (generation === box.duckGeneration) refreshCap(box);
       }
     };
 
@@ -114,7 +140,10 @@
     });
 
     clear.addEventListener("click", () => {
+      box.duckGeneration += 1;
       box.duckThread = [];
+      input.value = "";
+      status.textContent = "";
       renderTurns(box);
       refreshCap(box);
     });

@@ -153,6 +153,42 @@ RSpec.describe GeminiService do
       expect(result).to eq(text: "hello", input_tokens: 8, output_tokens: 12)
     end
 
+    it "omits generation_config entirely when no max_tokens override is given" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hi" } ] } ],
+          "usage" => {}
+        }.to_json)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        expect(JSON.parse(body)).not_to have_key("generation_config")
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "p")
+    end
+
+    it "nests a max_tokens override under generation_config, where the Interactions API reads it" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hi" } ] } ],
+          "usage" => {}
+        }.to_json)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        parsed = JSON.parse(body)
+        expect(parsed["generation_config"]).to eq("max_output_tokens" => AiService::DUCK_RESPONSE_MAX_TOKENS)
+        expect(parsed).not_to have_key("max_output_tokens")
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS)
+    end
+
     it "raises AiService::Error on a non-success response" do
       fake_response = instance_double(Faraday::Response, success?: false, status: 503, body: "overloaded")
       fake_conn = instance_double(Faraday::Connection, post: fake_response)

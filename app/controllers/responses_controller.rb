@@ -15,6 +15,16 @@ class ResponsesController < ApplicationController
   # straight off this controller.
   MAX_DUCK_TURNS_PER_SECTION = 6
 
+  # The thread is client-held, so its size is attacker-controlled: the turn cap
+  # above counts only "user" roles and so bounds nothing on its own (a crafted
+  # request can carry unlimited "assistant" entries). These bound what gets
+  # allocated and forwarded to the provider. Generous enough that no honest UI
+  # session approaches them — MAX_DUCK_TURNS_PER_SECTION exchanges is at most
+  # 12 entries, and the input is a single-line text field.
+  MAX_DUCK_MESSAGE_LENGTH = 2_000
+  MAX_DUCK_THREAD_ENTRIES = MAX_DUCK_TURNS_PER_SECTION * 2
+  MAX_DUCK_THREAD_LENGTH  = 20_000
+
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
     exercise = current_user.daily_exercises.for_date.first
@@ -302,12 +312,19 @@ class ResponsesController < ApplicationController
     return render_section_error("That section isn't part of this exercise.") unless exercise.problem_set.key?(section)
 
     existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
-    return render_section_error("Submit your answers first.") if existing&.submitted?
+    return render_section_error("The thinking partner is only available before you submit.") if existing&.submitted?
 
     message = params[:message].to_s.strip
     return render_section_error("Say something first.") if message.blank?
+    if message.length > MAX_DUCK_MESSAGE_LENGTH
+      return render_section_error("That message is too long — keep it under #{MAX_DUCK_MESSAGE_LENGTH} characters.")
+    end
 
     thread = duck_thread_param
+    if thread.size > MAX_DUCK_THREAD_ENTRIES ||
+       thread.sum { |turn| turn[:content].length } > MAX_DUCK_THREAD_LENGTH
+      return render_section_error("This conversation is too long to continue — clear it to keep going.")
+    end
     # Soft, request-level cap: the thread lives only in the browser, so this
     # is not a hardened boundary (a hand-crafted request could understate its
     # own history) — acceptable given each user pays for their own provider
@@ -337,7 +354,9 @@ class ResponsesController < ApplicationController
   # thread rendering would mislabel the speaker for anything it doesn't
   # recognize as exactly "assistant".
   def duck_thread_param
-    Array(params[:thread]).filter_map { |turn|
+    # first(...+1) bounds the mapping itself while still leaving an
+    # over-limit thread detectably over limit for the caller's size check.
+    Array(params[:thread]).first(MAX_DUCK_THREAD_ENTRIES + 1).filter_map { |turn|
       next unless turn.is_a?(Hash) || turn.respond_to?(:permit)
 
       role = turn[:role].to_s.downcase

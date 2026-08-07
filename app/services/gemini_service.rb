@@ -38,7 +38,9 @@ class GeminiService < AiService
     # No default output cap is sent otherwise — existing callers rely on the
     # provider's own default ceiling. Only a call that explicitly asks for a
     # tighter cap (e.g. AiService::DUCK_RESPONSE_MAX_TOKENS) sets this.
-    body[:max_output_tokens] = max_tokens if max_tokens
+    # Must be nested under generation_config: the Interactions API ignores a
+    # top-level max_output_tokens, which would silently drop the cap.
+    body[:generation_config] = { max_output_tokens: max_tokens } if max_tokens
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout

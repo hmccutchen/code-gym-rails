@@ -64,6 +64,82 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     expect(fake).not_to have_received(:duck_response)
   end
 
+  it "does not tell an already-submitted user to submit their answers" do
+    exercise = create_exercise_for(user)
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+    stub_answer
+    login_as(user)
+
+    post duck_thread_responses_path, params: { section: "code_review", message: "too late?", thread: [] }, as: :json
+
+    expect(JSON.parse(response.body)["error"]).not_to match(/submit your answers first/i)
+    expect(JSON.parse(response.body)["error"]).to match(/before you submit/i)
+  end
+
+  describe "input bounds" do
+    it "rejects an oversized message without calling the provider" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review",
+                     message: "x" * (ResponsesController::MAX_DUCK_MESSAGE_LENGTH + 1), thread: [] },
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:duck_response)
+    end
+
+    it "accepts a message exactly at the limit" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review",
+                     message: "x" * ResponsesController::MAX_DUCK_MESSAGE_LENGTH, thread: [] },
+           as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(fake).to have_received(:duck_response)
+    end
+
+    it "rejects a thread padded with more entries than the cap could ever produce" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      # All-assistant, so the user-turn cap alone would let this through.
+      padded = Array.new(ResponsesController::MAX_DUCK_THREAD_ENTRIES + 5) do
+        { role: "assistant", content: "filler" }
+      end
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hi", thread: padded }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:duck_response)
+    end
+
+    it "rejects a thread whose total content exceeds the byte budget" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      oversized = Array.new(4) do
+        { role: "assistant", content: "y" * (ResponsesController::MAX_DUCK_THREAD_LENGTH / 3) }
+      end
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hi", thread: oversized }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:duck_response)
+    end
+  end
+
   it "returns 422 for a section not present in today's exercise, without calling the provider" do
     create_exercise_for(user)
     fake = stub_answer

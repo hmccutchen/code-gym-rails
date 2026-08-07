@@ -69,12 +69,14 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
-  # Structural backstop for #duck_response, not just a preference: 150 tokens
-  # comfortably fits the 1-3 sentence guiding-question replies the Socratic
-  # system prompt asks for, but is far too small for a complete corrected
-  # solution to fit in regardless of what the model attempts. Deliberately
-  # distinct from ClaudeService::MAX_TOKENS, which is sized for full review
-  # generation. This is the primary cost control for the duck-thread feature.
+  # Cost and length control for #duck_response: 150 tokens comfortably fits the
+  # 1-3 sentence guiding-question replies the Socratic system prompt asks for,
+  # while capping spend on a feature the user can invoke repeatedly. It makes a
+  # long answer-shaped reply unlikely, but it is a budget, not an enforcement
+  # mechanism — a short fix can fit in 150 tokens, so DUCK_SYSTEM_PROMPT's
+  # rules remain the only thing actually asking the model not to give answers.
+  # Deliberately distinct from ClaudeService::MAX_TOKENS, which is sized for
+  # full review generation.
   DUCK_RESPONSE_MAX_TOKENS = 150
 
   DUCK_SYSTEM_PROMPT = <<~PROMPT.chomp
@@ -432,8 +434,27 @@ class AiService
       ("Question: #{data["question"]}" if data["question"].present?),
       ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
       ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
-      ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?)
+      ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
+      duck_parsons_blocks(data)
     ].compact.join("\n")
+  end
+
+  # A Parsons question is only "arrange these blocks", so without the blocks
+  # the model cannot say anything section-specific. They are rendered in the
+  # learner's persisted scramble, never the stored order — blocks are
+  # persisted already-solved (see #shuffle_parsons_blocks!), so passing them
+  # raw would hand the model the exact answer the duck prompt forbids it from
+  # revealing, and would describe an arrangement the learner isn't looking at.
+  def duck_parsons_blocks(data)
+    blocks = data["blocks"]
+    return unless blocks.is_a?(Array) && blocks.any?
+
+    order = ExerciseSection::ParsonsProblem.initial_order(
+      answer: nil, display_order: data["display_order"], block_count: blocks.size
+    )
+
+    lines = order.map.with_index { |block_index, position| "#{position + 1}. #{blocks[block_index]}" }
+    "Blocks, in the learner's current on-screen order (NOT the correct order):\n#{lines.join("\n")}"
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting

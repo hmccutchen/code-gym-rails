@@ -1558,6 +1558,60 @@ RSpec.describe AiService do
         svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
       }.to raise_error(AiService::InvalidResponseError)
     end
+
+    context "for a parsons_problem section" do
+      let(:parsons_exercise) do
+        DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => {
+            "question"      => "Arrange these blocks",
+            "blocks"        => [ "def a", "  work", "end" ],
+            "display_order" => [ 2, 0, 1 ]
+          }
+        })
+      end
+
+      it "sends the blocks, without which the model cannot see the code at all" do
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, parsons_exercise, section: "parsons_problem", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("def a")
+        expect(svc.last_prompt).to include("work")
+      end
+
+      it "sends them in the learner's on-screen order, never the stored correct order" do
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, parsons_exercise, section: "parsons_problem", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("1. end")
+        expect(svc.last_prompt).to include("2. def a")
+        expect(svc.last_prompt).to include("3.   work")
+        expect(svc.last_prompt).to match(/NOT the correct order/)
+        expect(svc.last_prompt.index("1. end")).to be < svc.last_prompt.index("2. def a")
+      end
+
+      it "falls back to a stable order rather than raising when display_order is missing" do
+        exercise_without_order = DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => { "question" => "Arrange", "blocks" => [ "def a", "end" ] }
+        })
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        expect {
+          svc.duck_response(user, exercise_without_order, section: "parsons_problem", message: "stuck", thread: [])
+        }.not_to raise_error
+
+        expect(svc.last_prompt).to include("def a")
+      end
+
+      it "omits the blocks line entirely for a section that has no blocks" do
+        svc = duck_spy_class.new(canned_text: "A guiding question.")
+
+        svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+        expect(svc.last_prompt).not_to include("NOT the correct order")
+      end
+    end
   end
 
   describe ".for" do
