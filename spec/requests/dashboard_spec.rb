@@ -829,4 +829,30 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("Generating your personalized exercise set")
     end
   end
+
+  describe "after a failed regeneration" do
+    it "keeps the existing set and explains what went wrong" do
+      ps = base_problem_set.merge("code_review" => { "question" => "keep me", "snippet" => "def a; end" })
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: ps)
+      user.update!(last_generation_error_date: Date.current,
+                   last_generation_error: "The AI provider is rate-limiting requests — try again shortly.")
+
+      get root_path
+
+      expect(response.body).to include("keep me")
+      expect(response.body).to include("The AI provider is rate-limiting requests")
+    end
+
+    it "does not show the banner for a failure recorded on an earlier day" do
+      ps = base_problem_set.merge("code_review" => { "question" => "keep me", "snippet" => "def a; end" })
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: ps)
+      user.update!(last_generation_error_date: Date.current - 1, last_generation_error: "yesterday's problem")
+
+      get root_path
+
+      expect(response.body).not_to include("yesterday's problem")
+    end
+  end
 end

@@ -1,3 +1,8 @@
+<% if @regeneration_failed %>
+  <div class="flash alert" style="margin-bottom:1.5rem;">
+    Couldn't generate a new set: <%= current_user.last_generation_error %>
+  </div>
+<% end %>
 <% submitted = response.persisted? && response.submitted? %>
 
 <div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">

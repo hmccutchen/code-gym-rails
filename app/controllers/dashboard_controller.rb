@@ -9,7 +9,9 @@ class DashboardController < ApplicationController
       return
     end
 
-    return unless @exercise.nil? && current_user.api_key_present?
+    @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
+
+    return unless @exercise.nil? && current_user.api_key_present? && current_user.api_key_present?
 
     if flash[:generating]
       # Set by DailyExercisesController#generate right after a manual weekend
