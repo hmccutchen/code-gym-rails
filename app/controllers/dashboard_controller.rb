@@ -4,6 +4,13 @@ class DashboardController < ApplicationController
     @response = @exercise&.daily_response ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
 
+    if @exercise&.regenerating?
+      @generating = true
+      return
+    end
+
+    @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
+
     return unless @exercise.nil? && current_user.api_key_present?
 
     if flash[:generating]
@@ -28,7 +35,11 @@ class DashboardController < ApplicationController
   # completion (or failure) without a live Turbo/ActionCable connection
   # (this app loads no Turbo/Stimulus JS).
   def status
-    if current_user.daily_exercises.for_date.exists?
+    exercise = current_user.daily_exercises.for_date.first
+
+    if exercise&.regenerating?
+      render json: { status: "pending" }
+    elsif exercise
       render json: { status: "ready" }
     elsif current_user.last_generation_error_date == Date.current
       render json: { status: "failed", message: current_user.last_generation_error }

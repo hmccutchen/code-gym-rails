@@ -14,34 +14,51 @@ class DailyExercisesController < ApplicationController
     redirect_to root_path, flash: { generating: true }
   end
 
-  # POST /regenerate — manually re-run today's exercise generation, capped
-  # at once per day via regenerated_at. Replaces the existing DailyExercise
-  # row's contents in place; never creates a second row for the same day.
+  # POST /regenerate — manually re-run today's exercise generation, capped at
+  # once per day via regenerated_at. Replaces the existing DailyExercise row's
+  # contents in place; never creates a second row for the same day. The provider
+  # call runs on the worker, so this action never blocks on it.
   def regenerate
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: "No exercise set to regenerate yet." unless exercise
 
-    if exercise.regenerated_at.present?
+    unless claim_regeneration!(exercise)
       return redirect_to root_path, alert: "You've already generated a new set today."
     end
 
-    problem_set = AiService.for(current_user).generate_exercise(current_user, language: exercise.language, blocking: true)
-
-    ActiveRecord::Base.transaction do
-      exercise.daily_response&.destroy
-      exercise.update!(
-        problem_set:    problem_set,
-        generated_at:   Time.current,
-        regenerated_at: Time.current
-      )
+    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
+    # The claim is already committed, so an enqueue failure would strand the
+    # user behind a spinner no worker will ever clear — release it before
+    # reporting, so a retry is possible immediately rather than in six minutes.
+    begin
+      RegenerateExerciseJob.perform_later(user_id: current_user.id)
+    rescue StandardError => e
+      Rails.logger.error("Failed to enqueue RegenerateExerciseJob for user #{current_user.id}: #{e.class}: #{e.message}")
+      release_regeneration!(exercise)
+      return redirect_to root_path, alert: "Couldn't start regeneration. Please try again."
     end
 
-    redirect_to root_path, notice: "New set generated!"
-  rescue AiService::AuthenticationError
-    redirect_to root_path, alert: "Your API key was rejected — check it in Settings."
-  rescue AiService::RateLimitError => e
-    redirect_to root_path, alert: "The AI provider is rate-limiting requests — try again shortly."
-  rescue AiService::Error => e
-    redirect_to root_path, alert: "Couldn't generate a new set: #{e.message}"
+    redirect_to root_path, flash: { generating: true }
+  end
+
+  private
+
+  # Atomic claim against a concurrent double-submit, mirroring
+  # ResponsesController#claim_review!: a single UPDATE ... WHERE is serialized by
+  # Postgres row locking, so only one caller can win. The same statement enforces
+  # the once-per-day gate and lets an expired claim be retaken.
+  def claim_regeneration!(exercise)
+    current_user.daily_exercises
+                .where(id: exercise.id, regenerated_at: nil)
+                .where("regenerating_since IS NULL OR regenerating_since < ?",
+                       DailyExercise::REGENERATION_STALE_AFTER.ago)
+                .update_all(regenerating_since: Time.current) == 1
+  end
+
+  # Written through the relation rather than the loaded record: `exercise` was
+  # read before claim_regeneration!'s update_all, so it still believes
+  # regenerating_since is nil and assigning nil would dirty nothing.
+  def release_regeneration!(exercise)
+    current_user.daily_exercises.where(id: exercise.id).update_all(regenerating_since: nil)
   end
 end

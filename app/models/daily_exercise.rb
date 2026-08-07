@@ -9,6 +9,11 @@ class DailyExercise < ApplicationRecord
   # into AiService#generate_exercise via DailyExercisesController#regenerate.
   LANGUAGES = %w[ruby_rails javascript].freeze
 
+  # A regeneration claim expires so a worker that dies mid-job can't strand the
+  # user on a spinner forever. Must exceed AiService::GENERATION_READ_TIMEOUT
+  # plus job pickup, or a healthy long-running job looks abandoned.
+  REGENERATION_STALE_AFTER = 6.minutes
+
   validates :date, :problem_set, :generated_at, presence: true
   validates :date, uniqueness: { scope: :user_id }
   validates :language, inclusion: { in: LANGUAGES }
@@ -21,6 +26,10 @@ class DailyExercise < ApplicationRecord
   def architecture       = problem_set["architecture"]&.with_indifferent_access
   def security_review    = problem_set["security_review"]&.with_indifferent_access
   def parsons_problem    = problem_set["parsons_problem"]&.with_indifferent_access
+
+  def regenerating?
+    regenerating_since.present? && regenerating_since > REGENERATION_STALE_AFTER.ago
+  end
 
   # Which third-section shape this exercise's problem_set actually holds.
   # Replaces the ad hoc `arch ? "architecture" :

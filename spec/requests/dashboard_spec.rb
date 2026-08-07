@@ -772,4 +772,108 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-hljs="ruby"')
     expect(response.body).to include("highlight.js@11.11.1/lib/core")
   end
+
+  describe "while a regeneration is in flight" do
+    def claimed_exercise
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: { "code_review" => { "question" => "STALE-SET-MARKER" } },
+                            regenerating_since: Time.current)
+    end
+
+    it "shows the spinner instead of the stale problem set" do
+      claimed_exercise
+
+      get root_path
+
+      expect(response.body).to include("Generating your personalized exercise set")
+      expect(response.body).not_to include("STALE-SET-MARKER")
+    end
+
+    # The row is present the whole time, so an exists?-only check would report
+    # the regeneration finished the instant it started.
+    it "reports pending rather than ready" do
+      claimed_exercise
+
+      get dashboard_status_path
+
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
+    it "reports ready once the claim is released" do
+      exercise = claimed_exercise
+      exercise.update!(regenerating_since: nil)
+
+      get dashboard_status_path
+
+      expect(JSON.parse(response.body)["status"]).to eq("ready")
+    end
+
+    # A dead worker's claim must not trap the user on a spinner forever.
+    it "falls through to the normal dashboard when the claim is stale" do
+      problem_set = {
+        "code_review" => { "question" => "STALE-SET-MARKER", "snippet" => "def a; end" },
+        "pattern" => {
+          "title" => "Service Objects", "why" => "Because", "question" => "When?",
+          "reference" => { "tagline" => "T", "explanation" => "E",
+                           "code_example" => "code", "senior_lens" => "S" }
+        },
+        "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
+      }
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: problem_set,
+                            regenerating_since: DailyExercise::REGENERATION_STALE_AFTER.ago - 1.minute)
+
+      get root_path
+
+      expect(response.body).to include("STALE-SET-MARKER")
+      expect(response.body).not_to include("Generating your personalized exercise set")
+    end
+  end
+
+  describe "after a failed regeneration" do
+    it "keeps the existing set and explains what went wrong" do
+      ps = base_problem_set.merge("code_review" => { "question" => "keep me", "snippet" => "def a; end" })
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: ps)
+      user.update!(last_generation_error_date: Date.current,
+                   last_generation_error: "The AI provider is rate-limiting requests — try again shortly.")
+
+      get root_path
+
+      expect(response.body).to include("keep me")
+      expect(response.body).to include("The AI provider is rate-limiting requests")
+    end
+
+    it "does not show the banner for a failure recorded on an earlier day" do
+      ps = base_problem_set.merge("code_review" => { "question" => "keep me", "snippet" => "def a; end" })
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: ps)
+      user.update!(last_generation_error_date: Date.current - 1, last_generation_error: "yesterday's problem")
+
+      get root_path
+
+      expect(response.body).not_to include("yesterday's problem")
+    end
+  end
+
+  describe "the generation poller" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # The poller shipped with a fixed 40 attempts (120s) while the worker's
+    # generation budget is GENERATION_READ_TIMEOUT (300s), so a slow but healthy
+    # generation told the user to refresh while the job was still running.
+    it "keeps polling for longer than a generation is allowed to take" do
+      # A weekday with no exercise yet is the state that renders the spinner.
+      travel_to Time.utc(2026, 8, 7, 12, 0, 0) do
+        get root_path
+
+        attempts = response.body[/MAX_ATTEMPTS = (\d+)/, 1].to_i
+        interval = response.body[/POLL_INTERVAL_MS = (\d+)/, 1].to_i / 1000.0
+
+        expect(attempts).to be_positive
+        expect(attempts * interval).to be > AiService::GENERATION_READ_TIMEOUT
+        expect(attempts * interval).to be > DailyExercise::REGENERATION_STALE_AFTER.to_i
+      end
+    end
+  end
 end
