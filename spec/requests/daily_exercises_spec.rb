@@ -12,6 +12,24 @@ RSpec.describe "DailyExercises", type: :request do
   end
 
   describe "POST /regenerate" do
+    # #regenerate calls the provider inline rather than enqueuing, so it holds
+    # a Puma thread while the user waits. It has to ask for the tighter of the
+    # two generation budgets or a slow generation pins that thread for the
+    # worker's five minutes.
+    it "generates on the blocking budget, since a request thread is waiting" do
+      exercise = create_exercise
+      fake_service = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      allow(fake_service).to receive(:generate_exercise)
+        .with(user, language: exercise.language, blocking: true)
+        .and_return({ "code_review" => { "question" => "new" } })
+
+      post regenerate_path
+
+      expect(fake_service).to have_received(:generate_exercise)
+        .with(user, language: exercise.language, blocking: true)
+    end
+
     it "redirects with an alert when there's no exercise yet" do
       post regenerate_path
       expect(response).to redirect_to(root_path)
@@ -46,7 +64,7 @@ RSpec.describe "DailyExercises", type: :request do
 
       post regenerate_path
 
-      expect(fake_service).to have_received(:generate_exercise).with(user, language: "javascript")
+      expect(fake_service).to have_received(:generate_exercise).with(user, language: "javascript", blocking: true)
       expect(exercise.reload.language).to eq("javascript")
     end
 

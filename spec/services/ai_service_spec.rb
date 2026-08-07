@@ -1242,6 +1242,21 @@ RSpec.describe AiService do
       expect(svc.last_read_timeout).to eq(AiService::GENERATION_READ_TIMEOUT)
     end
 
+    # DailyExercisesController#regenerate still generates inline, so this call
+    # holds a Puma thread with a user waiting on the response. It needs more
+    # room than a section review and much less than the worker's.
+    it "tightens the budget when a request thread is blocked on the call" do
+      svc = double_class.new
+      svc.generate_exercise(user, blocking: true)
+
+      expect(svc.last_read_timeout).to eq(AiService::SYNC_GENERATION_READ_TIMEOUT)
+    end
+
+    it "keeps the blocking budget between the review and worker budgets" do
+      expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be > AiService::READ_TIMEOUT
+      expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
+    end
+
     it "leaves a section review on the short request-thread budget" do
       exercise, response = exercise_and_response_for_review
       review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }

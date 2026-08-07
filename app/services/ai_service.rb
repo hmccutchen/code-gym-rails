@@ -35,15 +35,27 @@ class AiService
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
 
-  # Generation is not bound by either constraint above. It is always enqueued
-  # (GenerateDailyExercisesJob), so it runs on the worker rather than a Puma
-  # thread and holds no review claim. It is also the single largest response we
-  # ever request — one non-streaming call carrying every section, including the
-  # full reference blocks — from a model that thinks before it answers, so the
-  # socket stays silent until the whole thing is built. READ_TIMEOUT was sized
-  # for a per-section review; imposing it here protected nothing and made
-  # generation fail on Net::ReadTimeout once ClaudeService::MAX_TOKENS grew.
-  GENERATION_READ_TIMEOUT = 300
+  # Generation asks for the single largest response we ever request — one
+  # non-streaming call carrying every section, including the full reference
+  # blocks — from a model that thinks before it answers, so the socket stays
+  # silent until the whole thing is built. READ_TIMEOUT was sized for a
+  # per-section review, and imposing it here made generation fail on
+  # Net::ReadTimeout once ClaudeService::MAX_TOKENS grew.
+  #
+  # Two budgets, because generation runs from two places with different costs
+  # for waiting:
+  #   - GENERATION_READ_TIMEOUT: GenerateDailyExercisesJob, the morning batch
+  #     and every on-demand dashboard trigger. Runs on the worker, holds no
+  #     Puma thread and no review claim, and nobody is watching a spinner, so
+  #     it can wait as long as the provider needs.
+  #   - SYNC_GENERATION_READ_TIMEOUT: DailyExercisesController#regenerate,
+  #     which still calls generate_exercise inline (the generating UI and
+  #     /dashboard/status both signal completion by the exercise row appearing,
+  #     which regenerate-in-place never does, so it cannot simply enqueue).
+  #     That holds a Puma thread with a user waiting on the response, so it
+  #     gets enough room to actually finish and no more.
+  GENERATION_READ_TIMEOUT      = 300
+  SYNC_GENERATION_READ_TIMEOUT = 90
 
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the
@@ -196,12 +208,16 @@ class AiService
   # The day's plan (third section, reinforcement, retention checks) is decided by
   # DailyPlan before any provider is contacted; this method only renders it into
   # a prompt, sends it, and records what came back.
-  def generate_exercise(user, language: user.language_for_today)
+  #
+  # `blocking:` says a request thread is waiting on this call, which buys a
+  # tighter read budget (see SYNC_GENERATION_READ_TIMEOUT). Callers state their
+  # constraint; the timeout policy stays here.
+  def generate_exercise(user, language: user.language_for_today, blocking: false)
     plan = DailyPlan.for(user, language: language)
 
     result = call_and_log(
       user, purpose: "generate_exercise",
-      read_timeout: GENERATION_READ_TIMEOUT,
+      read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
       system: build_system_prompt(language),
       prompt: build_exercise_prompt(user, language, third: plan.third,
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
