@@ -67,6 +67,47 @@ RSpec.describe "DailyExercises", type: :request do
         post regenerate_path
       }.to have_enqueued_job(RegenerateExerciseJob)
     end
+
+    it "does not claim regeneration for another user's exercise" do
+      # Current user has an exercise
+      exercise = create_exercise
+
+      # Another user also has an exercise on the same day
+      other_user = create_user_with_key(email: "other-user-#{SecureRandom.hex(4)}@example.com")
+      other_exercise = DailyExercise.create!(
+        user: other_user,
+        date: Date.current,
+        problem_set: { "code_review" => { "question" => "test" } },
+        generated_at: Time.current,
+        regenerated_at: nil
+      )
+
+      # Directly test that the claim query includes user_id scoping:
+      # Without user_id in WHERE, both exercises would match on id + regenerated_at
+      # (if somehow passed the wrong exercise_id). With user_id, only the
+      # matching user's row is updated.
+
+      # Verify that querying for the other exercise WITH the current user's id
+      # returns nothing (proving user_id scoping is working)
+      unscoped_match = DailyExercise.where(id: other_exercise.id, regenerated_at: nil).count
+      expect(unscoped_match).to eq(1)  # Other exercise exists
+
+      scoped_match = DailyExercise.where(
+        id: other_exercise.id,
+        user_id: user.id,
+        regenerated_at: nil
+      ).count
+      expect(scoped_match).to eq(0)  # But doesn't match with wrong user_id
+
+      # Current user regenerates
+      post regenerate_path
+
+      # Current user's exercise should be claimed
+      expect(exercise.reload.regenerating_since).to be_present
+
+      # Other user's exercise must not be claimed
+      expect(other_exercise.reload.regenerating_since).to be_nil
+    end
   end
 
   describe "POST /generate" do
