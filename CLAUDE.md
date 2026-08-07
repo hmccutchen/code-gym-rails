@@ -10,7 +10,34 @@ All changes are made on a feature/dev branch, never directly on `main`. Create (
 
 ## Code Style
 
-Code should be self-documenting. Don't add comments unless they're strictly needed — e.g. to explain a non-obvious *why* (a hidden constraint, a workaround, a subtle invariant). Never add comments that just restate *what* the code does.
+**Self-documenting.** The code says what it does; names carry the meaning. If a
+block needs a comment to be followed, extract it into a named method instead.
+
+**Comments are extremely minimal.** Write one only for a non-obvious *why* — a
+hidden constraint, a workaround, an invariant a future reader would otherwise
+break. Never restate *what* the code does. A comment that would go stale the
+next time the line changes shouldn't be written.
+
+**Modular, so it's easy to change.** Following pragmatic-programming principles:
+
+- **DRY** — every piece of knowledge has one authoritative home. When a rule
+  starts appearing in a second place, move it to one place both call (see
+  `DailyResponse.answered?`, `AiService`'s prompt/schema ownership).
+- **Orthogonal** — a change in one area shouldn't ripple into unrelated ones.
+  Provider specifics live in the `AiService` subclass, per-kind facts live in
+  `ExerciseSection`, so adding a provider or a section kind means adding a
+  class, not editing shared code.
+- **Small, single-purpose units** — you should be able to say what a class or
+  method does in one sentence. A file that keeps growing is doing too much.
+- **Program to the interface** — callers depend on the shape a collaborator
+  exposes, not its internals, so internals can be replaced without a rewrite.
+- **Easy to change beats clever** — prefer the obvious implementation. Optimize
+  for the next person changing it, not for line count.
+- **Fail loudly at the boundary, degrade gracefully in the UI** — validate
+  external input where it enters (provider output, params), and let anything
+  downstream assume it's clean.
+- **YAGNI** — build what's needed now. Don't add configuration, abstraction, or
+  a table for a case that doesn't exist yet.
 
 ## Stack
 
