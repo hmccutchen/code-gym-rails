@@ -45,6 +45,14 @@ class ClaudeService < AiService
       system:     cache_system ? [ { type: "text", text: system, cache_control: { type: "ephemeral" } } ] : system,
       messages:   [ { role: "user", content: prompt } ]
     }
+    # A caller-supplied max_tokens is, by construction, tighter than MAX_TOKENS
+    # (sized generously specifically to leave room for unrequested thinking —
+    # see the comment above). Sharing a tight budget with thinking risks the
+    # model spending it all before emitting any reply text, which surfaces as
+    # a truncated/empty response and a 503 for an otherwise-valid request.
+    # Disabling thinking outright avoids having to guess a split that
+    # reserves enough tokens for both.
+    body[:thinking] = { type: "disabled" } if max_tokens
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout

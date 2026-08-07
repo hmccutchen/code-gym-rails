@@ -207,6 +207,40 @@ RSpec.describe ClaudeService do
       expect(ClaudeService::MAX_TOKENS).to be >= 8_000
     end
 
+    it "does not send a thinking override when max_tokens is not overridden" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        expect(JSON.parse(body)).not_to have_key("thinking")
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "prompt text")
+    end
+
+    # claude-sonnet-5 thinks by default and max_tokens caps thinking + reply
+    # text together (see the MAX_TOKENS comment above). A caller-supplied
+    # max_tokens is by construction tighter than the generous default, so
+    # without this the model could spend the whole budget on thinking and
+    # emit no reply text at all — a fully valid request coming back
+    # truncated/empty and surfacing as a 503.
+    it "disables thinking when a caller overrides max_tokens with a tight budget" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        parsed = JSON.parse(body)
+        expect(parsed["max_tokens"]).to eq(150)
+        expect(parsed["thinking"]).to eq("type" => "disabled")
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "prompt text", max_tokens: 150)
+    end
+
     it "reports truncation when the model stopped at the output cap" do
       body = {
         "content"     => [ { "type" => "text", "text" => '{"code_review": {"correct": ["half a sen' } ],

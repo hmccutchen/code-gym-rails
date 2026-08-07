@@ -152,6 +152,18 @@ of prose while remaining far too small for a full corrected solution. This
 constant is deliberately distinct from `ClaudeService::MAX_TOKENS` and
 doubles as this feature's primary cost control.
 
+**Thinking shares this budget.** `ClaudeService::MAX_TOKENS`'s own comment
+already documents that claude-sonnet-5 thinks by default and that
+`max_tokens` caps thinking + reply text together — `MAX_TOKENS` is sized
+generously specifically to leave room for that. A caller-supplied override
+is, by construction, tighter, and a 150-token budget can plausibly be spent
+entirely on thinking before any reply text is emitted — a fully valid duck
+request would then come back truncated/empty and surface as a 503. Fixed by
+having `ClaudeService#call` send `thinking: { type: "disabled" }` whenever
+`max_tokens` is overridden (i.e. for any caller-supplied budget, not just
+duck-thread's), rather than trying to guess a split that reserves enough
+tokens for both thinking and the reply.
+
 ## Cap on exchanges
 
 `MAX_DUCK_TURNS_PER_SECTION = 6` (a plain `AiService` or controller-level
