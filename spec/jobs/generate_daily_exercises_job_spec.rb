@@ -134,6 +134,53 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.reload.last_generation_error_date).to be_nil
   end
 
+  it "persists a wait-and-retry error when AiService::TimeoutError is raised" do
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise)
+      .and_raise(AiService::TimeoutError, "Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Rails.logger).to receive(:warn)
+
+    described_class.new.perform(user_id: user.id)
+
+    user.reload
+    expect(user.last_generation_error_date).to eq(Date.current)
+    expect(user.last_generation_error).to eq("Generation took longer than the provider's budget — try again.")
+    expect(user.last_generation_error).not_to include("TCPSocket")
+  end
+
+  # A lost race: a concurrent generation created today's set while this one was
+  # still waiting on the provider. Reporting the loser's failure would leave a
+  # "couldn't generate" banner sitting above a perfectly good set all day.
+  it "does not persist a failure when today's exercise already exists" do
+    DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
+                          generated_at: Time.current, language: "ruby_rails")
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Rails.logger).to receive(:error)
+
+    described_class.new.send(:generate_for, user)
+
+    expect(user.reload.last_generation_error_date).to be_nil
+    expect(user.last_generation_error).to be_nil
+  end
+
+  it "clears a stale failure flag when today's exercise already exists" do
+    user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+    DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
+                          generated_at: Time.current, language: "ruby_rails")
+    fake_service = instance_double(ClaudeService)
+    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(Rails.logger).to receive(:error)
+
+    described_class.new.send(:generate_for, user)
+
+    expect(user.reload.last_generation_error_date).to be_nil
+    expect(user.last_generation_error).to be_nil
+  end
+
   it "skips an anonymized user on the on-demand path" do
     user.anonymize!
     expect(AiService).not_to receive(:for)
