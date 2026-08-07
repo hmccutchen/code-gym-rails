@@ -38,9 +38,10 @@ class DailyExercisesController < ApplicationController
   # Postgres row locking, so only one caller can win. The same statement enforces
   # the once-per-day gate and lets an expired claim be retaken.
   def claim_regeneration!(exercise)
-    DailyExercise.where(id: exercise.id, user_id: current_user.id, regenerated_at: nil)
-                 .where("regenerating_since IS NULL OR regenerating_since < ?",
-                        DailyExercise::REGENERATION_STALE_AFTER.ago)
-                 .update_all(regenerating_since: Time.current) == 1
+    current_user.daily_exercises
+                .where(id: exercise.id, regenerated_at: nil)
+                .where("regenerating_since IS NULL OR regenerating_since < ?",
+                       DailyExercise::REGENERATION_STALE_AFTER.ago)
+                .update_all(regenerating_since: Time.current) == 1
   end
 end
