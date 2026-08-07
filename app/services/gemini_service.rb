@@ -79,7 +79,8 @@ class GeminiService < AiService
       truncated: max_tokens.present? && output_tokens.to_i >= max_tokens
     }
   rescue Faraday::Error => e
-    raise AiService::Error, "Network error calling Gemini: #{e.message}"
+    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
+    raise error_class, "Network error calling Gemini: #{e.message}"
   end
 
   def build_connection

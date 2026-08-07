@@ -74,7 +74,7 @@ RSpec.describe GeminiService do
 
       expect {
         service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
-      }.to raise_error(AiService::Error, /Network error calling Gemini/)
+      }.to raise_error(AiService::TimeoutError, /Network error calling Gemini/)
 
       expect(attempts.size).to eq(1)
     end
@@ -85,13 +85,47 @@ RSpec.describe GeminiService do
 
       expect {
         service.send(:call, system: "sys", prompt: "p")
-      }.to raise_error(AiService::Error, /Network error calling Gemini/)
+      }.to raise_error(AiService::TimeoutError, /Network error calling Gemini/)
 
       expect(attempts.size).to eq(GeminiService::RETRY_OPTIONS[:max] + 1)
     end
   end
 
   describe "retry/backoff" do
+    it "raises a timeout-specific error when the provider never responds" do
+      conn = Faraday.new do |f|
+        f.request :retry, GeminiService::RETRY_OPTIONS.merge(max: 0)
+        f.adapter :test do |stub|
+          stub.post(GeminiService::API_URL) { raise Faraday::TimeoutError }
+        end
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      expect {
+        service.send(:call, system: "sys", prompt: "prompt")
+      }.to raise_error(AiService::TimeoutError, /Network error calling Gemini/)
+    end
+
+    it "raises a plain error for a non-timeout network failure" do
+      conn = Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(GeminiService::API_URL) { raise Faraday::ConnectionFailed, "no route" }
+        end
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      error = nil
+      begin
+        service.send(:call, system: "sys", prompt: "prompt")
+      rescue AiService::Error => e
+        error = e
+      end
+
+      expect(error).to be_a(AiService::Error)
+      expect(error).not_to be_a(AiService::TimeoutError)
+      expect(error.message).to match(/Network error calling Gemini/)
+    end
+
     it "retries a 429 and eventually succeeds" do
       responses = [ [ 429, "" ], [ 200, success_body ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))

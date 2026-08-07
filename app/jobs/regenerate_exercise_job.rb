@@ -32,6 +32,8 @@ class RegenerateExerciseJob < ApplicationJob
     release(user, exercise, "Your API key was rejected — check it in Settings.", e)
   rescue AiService::RateLimitError => e
     release(user, exercise, "The AI provider is rate-limiting requests — try again shortly.", e)
+  rescue AiService::TimeoutError => e
+    release(user, exercise, "Generation took longer than the provider's budget — try again.", e)
   rescue AiService::Error => e
     release(user, exercise, e.message, e)
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e

@@ -67,6 +67,9 @@ class GenerateDailyExercisesJob < ApplicationJob
   rescue AiService::RateLimitError => e
     Rails.logger.warn("Rate limited generating exercise for #{user.email}: #{e.message}")
     persist_failure(user, "The AI provider is rate-limiting requests — try again shortly.")
+  rescue AiService::TimeoutError => e
+    Rails.logger.warn("Timed out generating exercise for #{user.email}: #{e.message}")
+    persist_failure(user, "Generation took longer than the provider's budget — try again.")
   rescue AiService::Error => e
     Rails.logger.error("Failed to generate exercise for #{user.email}: #{e.message}")
     persist_failure(user, e.message)
@@ -81,7 +84,19 @@ class GenerateDailyExercisesJob < ApplicationJob
     Rails.logger.info("Skipped duplicate generation for #{user.email} on #{Date.current} (already generated concurrently)")
   end
 
+  # A failure only matters if the user has nothing to show for today. Two
+  # generations can be in flight at once (the hourly batch and the dashboard's
+  # on-demand trigger both check for an existing exercise before either
+  # creates one), and whichever finishes last wins this column — so a loser
+  # that timed out would otherwise leave a "couldn't generate" banner sitting
+  # above a perfectly good set for the rest of the day. If a set exists, clear
+  # the slate instead of reporting.
   def persist_failure(user, message)
+    if DailyExercise.exists?(user: user, date: Date.current)
+      user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
+      return
+    end
+
     user.update!(last_generation_error_date: Date.current, last_generation_error: message)
   end
 end

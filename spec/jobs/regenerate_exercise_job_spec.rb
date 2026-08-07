@@ -99,6 +99,17 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       .to eq("The AI provider is rate-limiting requests — try again shortly.")
   end
 
+  it "reports a timeout without leaking the socket internals it came from" do
+    claimed_exercise
+    stub_provider(AiService::TimeoutError.new("Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>"))
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(user.reload.last_generation_error)
+      .to eq("Generation took longer than the provider's budget — try again.")
+    expect(user.last_generation_error).not_to include("TCPSocket")
+  end
+
   it "preserves the existing response when the provider fails" do
     exercise = claimed_exercise
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,

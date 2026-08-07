@@ -84,7 +84,8 @@ class ClaudeService < AiService
       truncated:     parsed["stop_reason"] == "max_tokens"
     }
   rescue Faraday::Error => e
-    raise AiService::Error, "Network error calling Claude: #{e.message}"
+    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
+    raise error_class, "Network error calling Claude: #{e.message}"
   end
 
   def build_connection

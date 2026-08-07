@@ -11,6 +11,12 @@ class AiService
   # User-actionable in the sense of "try again shortly", but not a bug.
   class RateLimitError < Error; end
 
+  # The read budget ran out before the provider answered. Separated from a
+  # generic Error so callers can report it in the user's terms: the raw
+  # Faraday message ("Net::ReadTimeout with #<TCPSocket:(closed)>") is a
+  # socket-level detail that used to reach the dashboard verbatim.
+  class TimeoutError < Error; end
+
   # Malformed JSON or a payload with the wrong shape (e.g. an Array where a
   # Hash was expected). Not user-actionable — almost always a real bug in
   # our prompt/schema or a provider-side change.
