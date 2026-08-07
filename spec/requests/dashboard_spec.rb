@@ -868,10 +868,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         get root_path
 
         attempts = response.body[/MAX_ATTEMPTS = (\d+)/, 1].to_i
-        interval = response.body[/setTimeout\(poll, (\d+)\)/, 1].to_i / 1000.0
+        interval = response.body[/POLL_INTERVAL_MS = (\d+)/, 1].to_i / 1000.0
 
         expect(attempts).to be_positive
         expect(attempts * interval).to be > AiService::GENERATION_READ_TIMEOUT
+        expect(attempts * interval).to be > DailyExercise::REGENERATION_STALE_AFTER.to_i
       end
     end
   end

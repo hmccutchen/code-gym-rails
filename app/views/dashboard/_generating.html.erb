@@ -13,9 +13,14 @@
   const hint = document.getElementById("generating-hint");
   const statusUrl = "<%= dashboard_status_path %>";
   let attempts = 0;
-  <%# Derived from the provider budget rather than hardcoded, so the poller
-      cannot quietly stop covering a generation the worker is still running. %>
-  const MAX_ATTEMPTS = <%= ((AiService::GENERATION_READ_TIMEOUT + 90) / 3.0).ceil %>;
+  const POLL_INTERVAL_MS = 3000;
+  <%# The spinner covers two different generation windows: a background
+      first-time generation (bound by GENERATION_READ_TIMEOUT) and a
+      regeneration in flight (the claim goes stale after REGENERATION_STALE_AFTER,
+      at which point the page falls through on its own). The poller must outlast
+      whichever window is longer. %>
+  <% poll_interval_s = 3.0 %>
+  const MAX_ATTEMPTS = <%= ([AiService::GENERATION_READ_TIMEOUT, DailyExercise::REGENERATION_STALE_AFTER.to_i].max / poll_interval_s).ceil + 1 %>;
 
   async function poll() {
     attempts += 1;
@@ -36,9 +41,9 @@
       return;
     }
 
-    setTimeout(poll, 3000);
+    setTimeout(poll, POLL_INTERVAL_MS);
   }
 
-  setTimeout(poll, 3000);
+  setTimeout(poll, POLL_INTERVAL_MS);
 })();
 </script>
