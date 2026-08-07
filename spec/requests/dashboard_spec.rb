@@ -807,5 +807,26 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(JSON.parse(response.body)["status"]).to eq("ready")
     end
+
+    # A dead worker's claim must not trap the user on a spinner forever.
+    it "falls through to the normal dashboard when the claim is stale" do
+      problem_set = {
+        "code_review" => { "question" => "STALE-SET-MARKER", "snippet" => "def a; end" },
+        "pattern" => {
+          "title" => "Service Objects", "why" => "Because", "question" => "When?",
+          "reference" => { "tagline" => "T", "explanation" => "E",
+                           "code_example" => "code", "senior_lens" => "S" }
+        },
+        "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
+      }
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: problem_set,
+                            regenerating_since: DailyExercise::REGENERATION_STALE_AFTER.ago - 1.minute)
+
+      get root_path
+
+      expect(response.body).to include("STALE-SET-MARKER")
+      expect(response.body).not_to include("Generating your personalized exercise set")
+    end
   end
 end
