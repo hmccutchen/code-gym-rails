@@ -73,7 +73,7 @@ RSpec.describe ClaudeService do
 
       expect {
         service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
-      }.to raise_error(AiService::Error, /Network error calling Claude/)
+      }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
 
       expect(attempts.size).to eq(1)
     end
@@ -84,7 +84,7 @@ RSpec.describe ClaudeService do
 
       expect {
         service.send(:call, system: "sys", prompt: "p")
-      }.to raise_error(AiService::Error, /Network error calling Claude/)
+      }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
 
       expect(attempts.size).to eq(ClaudeService::RETRY_OPTIONS[:max] + 1)
     end
