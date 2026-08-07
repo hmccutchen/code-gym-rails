@@ -142,7 +142,9 @@
     clear.addEventListener("click", () => {
       box.duckGeneration += 1;
       box.duckThread = [];
-      input.value = "";
+      // input.value is deliberately left alone: after a failed send it still
+      // holds text the user may want to retry, and Clear names the
+      // conversation, not the draft.
       status.textContent = "";
       renderTurns(box);
       refreshCap(box);

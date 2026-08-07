@@ -440,21 +440,34 @@ class AiService
   end
 
   # A Parsons question is only "arrange these blocks", so without the blocks
-  # the model cannot say anything section-specific. They are rendered in the
-  # learner's persisted scramble, never the stored order — blocks are
-  # persisted already-solved (see #shuffle_parsons_blocks!), so passing them
-  # raw would hand the model the exact answer the duck prompt forbids it from
-  # revealing, and would describe an arrangement the learner isn't looking at.
+  # the model cannot say anything section-specific. But blocks are persisted
+  # already-solved (see #shuffle_parsons_blocks!), so their stored order IS
+  # the answer the duck prompt forbids revealing. Positions are therefore only
+  # ever quoted from a genuine persisted scramble; with no trustworthy
+  # scramble to quote, the blocks go over unordered rather than in the stored
+  # order, which would both leak the solution and misdescribe the screen.
   def duck_parsons_blocks(data)
     blocks = data["blocks"]
     return unless blocks.is_a?(Array) && blocks.any?
 
-    order = ExerciseSection::ParsonsProblem.initial_order(
-      answer: nil, display_order: data["display_order"], block_count: blocks.size
-    )
+    order = scrambled_display_order(data["display_order"], blocks.size)
+    # to_s before sorting: a provider can return non-strings, and Array#sort on
+    # mixed types raises rather than degrading.
+    return "Blocks (order withheld):\n#{blocks.map(&:to_s).sort.map { |b| "- #{b}" }.join("\n")}" unless order
 
     lines = order.map.with_index { |block_index, position| "#{position + 1}. #{blocks[block_index]}" }
     "Blocks, in the learner's current on-screen order (NOT the correct order):\n#{lines.join("\n")}"
+  end
+
+  # nil unless display_order is a complete permutation that actually differs
+  # from the stored order. The identity permutation is rejected rather than
+  # trusted: it means no scramble was ever persisted, and echoing it back
+  # would present the solved arrangement as the learner's own.
+  def scrambled_display_order(display_order, block_count)
+    order = ExerciseSection::ParsonsProblem.normalize_order(Array(display_order), block_count)
+    return if order.empty? || order == (0...block_count).to_a
+
+    order
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting

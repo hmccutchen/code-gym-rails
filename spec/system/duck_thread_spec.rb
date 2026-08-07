@@ -83,6 +83,47 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
+  it "drops a reply whose conversation was cleared while the request was in flight" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+
+      # Hold the response open so Clear can run mid-flight, then release it
+      # with a canned payload. Resolving in-page (rather than letting the real
+      # request through) keeps this deterministic: no network is involved, so
+      # the app's continuation runs on the very next microtask.
+      page.execute_script(<<~JS)
+        window.__release = null;
+        window.fetch = () => new Promise((resolve) => {
+          window.__release = () => resolve(new Response(
+            JSON.stringify({ status: "ok", answer: "RELEASED-ANSWER" }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          ));
+        });
+      JS
+
+      ask(duck, "hold this one open")
+      expect(duck).to have_content("Thinking…", wait: 10)
+
+      duck.find(".duck-clear").click
+      expect(duck).to have_no_css(".duck-turn")
+
+      page.execute_script("window.__release();")
+
+      # Give the resolved reply every chance to land before asserting it
+      # didn't: a bare negative matcher would pass instantly, before the
+      # continuation had run at all, and would keep passing with the guard
+      # removed.
+      sleep 1
+
+      expect(page.evaluate_script("document.querySelectorAll('.duck-turn').length")).to eq(0)
+      expect(duck).to have_no_content("RELEASED-ANSWER")
+      expect(duck.find(".duck-send")).not_to be_disabled
+      expect(duck.find(".duck-input")).not_to be_disabled
+    end
+  end
+
   it "surfaces a server-side rejection as a status message instead of a broken page" do
     user = create_fake_provider_user
 

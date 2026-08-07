@@ -1591,17 +1591,51 @@ RSpec.describe AiService do
         expect(svc.last_prompt.index("1. end")).to be < svc.last_prompt.index("2. def a")
       end
 
-      it "falls back to a stable order rather than raising when display_order is missing" do
+      it "never emits the stored (solved) order when display_order is missing" do
         exercise_without_order = DailyExercise.new(language: "ruby_rails", problem_set: {
-          "parsons_problem" => { "question" => "Arrange", "blocks" => [ "def a", "end" ] }
+          "parsons_problem" => { "question" => "Arrange", "blocks" => [ "def a", "  work", "end" ] }
+        })
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, exercise_without_order, section: "parsons_problem", message: "stuck", thread: [])
+
+        # The blocks are still sent — the model needs the code — but with no
+        # positions, since the only order available here is the answer.
+        expect(svc.last_prompt).to include("def a")
+        expect(svc.last_prompt).to include("order withheld")
+        expect(svc.last_prompt).not_to include("1. def a")
+        expect(svc.last_prompt).not_to match(/NOT the correct order/)
+      end
+
+      it "refuses an identity display_order, which is the solved order wearing a scramble's name" do
+        solved = DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => {
+            "question" => "Arrange", "blocks" => [ "def a", "  work", "end" ],
+            "display_order" => [ 0, 1, 2 ]
+          }
+        })
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, solved, section: "parsons_problem", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("order withheld")
+        expect(svc.last_prompt).not_to include("1. def a")
+      end
+
+      it "withholds positions rather than raising on a corrupt display_order" do
+        corrupt = DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => {
+            "question" => "Arrange", "blocks" => [ "def a", "end" ],
+            "display_order" => [ 5, 5 ]
+          }
         })
         svc = duck_spy_class.new(canned_text: "Which block has to run first?")
 
         expect {
-          svc.duck_response(user, exercise_without_order, section: "parsons_problem", message: "stuck", thread: [])
+          svc.duck_response(user, corrupt, section: "parsons_problem", message: "stuck", thread: [])
         }.not_to raise_error
 
-        expect(svc.last_prompt).to include("def a")
+        expect(svc.last_prompt).to include("order withheld")
       end
 
       it "omits the blocks line entirely for a section that has no blocks" do

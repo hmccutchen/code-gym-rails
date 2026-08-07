@@ -20,10 +20,12 @@ class ResponsesController < ApplicationController
   # request can carry unlimited "assistant" entries). These bound what gets
   # allocated and forwarded to the provider. Generous enough that no honest UI
   # session approaches them — MAX_DUCK_TURNS_PER_SECTION exchanges is at most
-  # 12 entries, and the input is a single-line text field.
+  # 12 entries, and the input is a single-line text field. The message limit is
+  # in characters because it is quoted back to the user; the thread limit is in
+  # bytes because it bounds the payload, and one character is up to four.
   MAX_DUCK_MESSAGE_LENGTH = 2_000
   MAX_DUCK_THREAD_ENTRIES = MAX_DUCK_TURNS_PER_SECTION * 2
-  MAX_DUCK_THREAD_LENGTH  = 20_000
+  MAX_DUCK_THREAD_BYTES   = 20_000
 
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
@@ -322,7 +324,7 @@ class ResponsesController < ApplicationController
 
     thread = duck_thread_param
     if thread.size > MAX_DUCK_THREAD_ENTRIES ||
-       thread.sum { |turn| turn[:content].length } > MAX_DUCK_THREAD_LENGTH
+       thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
       return render_section_error("This conversation is too long to continue — clear it to keep going.")
     end
     # Soft, request-level cap: the thread lives only in the browser, so this

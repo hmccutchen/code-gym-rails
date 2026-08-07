@@ -129,11 +129,26 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       login_as(user)
 
       oversized = Array.new(4) do
-        { role: "assistant", content: "y" * (ResponsesController::MAX_DUCK_THREAD_LENGTH / 3) }
+        { role: "assistant", content: "y" * (ResponsesController::MAX_DUCK_THREAD_BYTES / 3) }
       end
 
       post duck_thread_responses_path,
            params: { section: "code_review", message: "hi", thread: oversized }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(fake).not_to have_received(:duck_response)
+    end
+
+    it "measures the thread budget in bytes, so multi-byte content cannot slip past it" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      # Under the budget by character count, over it by bytes (3 bytes each).
+      multibyte = [ { role: "assistant", content: "あ" * (ResponsesController::MAX_DUCK_THREAD_BYTES / 2) } ]
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hi", thread: multibyte }, as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(fake).not_to have_received(:duck_response)
