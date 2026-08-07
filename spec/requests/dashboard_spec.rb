@@ -193,6 +193,26 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "duck thread toggle" do
+    it "exposes its collapsed state and the body it controls, uniquely per section" do
+      create_exercise
+      get root_path
+
+      %w[code_review pattern challenge].each do |field|
+        expect(response.body).to include(
+          %(aria-expanded="false" aria-controls="duck-body-#{field}")
+        )
+        expect(response.body).to include(%(id="duck-body-#{field}"))
+      end
+    end
+
+    it "renders no duck thread toggle once the set is submitted" do
+      create_response(create_exercise)
+      get root_path
+      expect(response.body).not_to include("aria-controls=\"duck-body-")
+    end
+  end
+
   describe "glossary tooltips (auto-hover against the full curated Glossary::TERMS list)" do
     it "wraps a curated term found in the code_review question with its definition" do
       ps = base_problem_set

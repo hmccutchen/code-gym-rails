@@ -6,8 +6,8 @@
     rendered again, so there's nothing to clean up.
     Local: field (section key, e.g. "code_review"). %>
 <div class="duck-thread" data-duck-thread data-section="<%= field %>">
-  <button type="button" class="btn btn-ghost btn-sm duck-toggle">🦆 Stuck? Talk it through</button>
-  <div class="duck-body" hidden>
+  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>">🦆 Stuck? Talk it through</button>
+  <div class="duck-body" id="duck-body-<%= field %>" hidden>
     <div class="duck-turns" aria-live="polite"></div>
     <div class="duck-form">
       <input type="text" class="duck-input" placeholder="What are you stuck on?">
@@ -71,7 +71,10 @@
     const clear  = box.querySelector(".duck-clear");
     const status = box.querySelector(".duck-status");
 
-    toggle.addEventListener("click", () => { body.hidden = !body.hidden; });
+    toggle.addEventListener("click", () => {
+      body.hidden = !body.hidden;
+      toggle.setAttribute("aria-expanded", String(!body.hidden));
+    });
 
     const sendMessage = async () => {
       const message = input.value.trim();
