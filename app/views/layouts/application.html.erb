@@ -88,6 +88,17 @@
     .follow-up-capped { font-size: .78rem; color: var(--muted); font-style: italic; }
     .follow-up-status { font-size: .75rem; color: var(--muted); }
 
+    .duck-thread { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .75rem; }
+    .duck-body { margin-top: .6rem; }
+    .duck-turns { margin-bottom: .5rem; }
+    .duck-turn { font-size: .88rem; line-height: 1.65; margin-bottom: .5rem; padding-left: .6rem; border-left: 2px solid var(--border); }
+    .duck-user { color: var(--muted); }
+    .duck-assistant { border-left-color: var(--accent); }
+    .duck-form { display: flex; gap: .5rem; }
+    .duck-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: .85rem; font-family: inherit; }
+    .duck-status { display: block; font-size: .75rem; color: var(--muted); margin-top: .4rem; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
     /* Shared submission-rendering styles. Used by responses/_answered_sections,
        responses/_architecture_section, and responses/_submission — all of which
        render on BOTH the dashboard and the history page, so these cannot live in
@@ -169,15 +180,6 @@
     }
     .gloss-term.gloss-open::after, .gloss-term:focus-visible::after { display: block; }
     .gloss-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    .glossary-search { margin-top: 1rem; padding-top: .85rem; border-top: 1px dashed var(--border); }
-    .glossary-search-row { display: flex; gap: .5rem; }
-    .glossary-search input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .45rem .65rem; color: var(--text); font-size: .85rem; font-family: inherit; }
-    .glossary-results { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .85rem; }
-    .glossary-results li { padding: .4rem 0; border-bottom: 1px solid var(--border); line-height: 1.5; }
-    .glossary-results li:last-child { border-bottom: none; }
-    .glossary-results li strong { color: var(--text); }
-    .glossary-results li.glossary-miss { color: var(--muted); font-style: italic; }
 
     .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
@@ -408,69 +410,6 @@
       window.addEventListener("resize", () => {
         const open = document.querySelector(".gloss-term.gloss-open");
         if (open) positionPanel(open);
-      });
-    })();
-  </script>
-  <script type="application/json" id="glossary-data"><%= raw json_escape(Glossary::TERMS.to_json) %></script>
-  <%# Glossary search: on-demand lookup against the static Glossary::TERMS
-      hash embedded above as JSON — entirely client-side, so it keeps working
-      even with a dead session or an invalid/expired provider key. Separate
-      from the gloss-term tooltip script above, which only renders AI-picked
-      terms inline; this searches ANY term a user types. One delegated
-      listener handles every .glossary-search box on the page, regardless of
-      which section partial rendered it — same pattern as the tooltip script. %>
-  <script>
-    (() => {
-      const dataEl = document.getElementById("glossary-data");
-      const terms = Object.create(null);
-      if (dataEl) {
-        const parsed = JSON.parse(dataEl.textContent);
-        Object.keys(parsed).forEach((key) => { terms[key] = parsed[key]; });
-      }
-
-      const runSearch = (box) => {
-        const input = box.querySelector("input[type='text']");
-        const list = box.querySelector(".glossary-results");
-        const raw = input.value.trim();
-        if (!raw) return;
-
-        const definition = terms[raw.toLowerCase()];
-        const li = document.createElement("li");
-        if (definition) {
-          const strong = document.createElement("strong");
-          strong.textContent = `${raw}: `;
-          li.append(strong, document.createTextNode(definition));
-        } else {
-          li.className = "glossary-miss";
-          li.textContent = `"${raw}" isn't in the glossary yet.`;
-        }
-        list.replaceChildren(li);
-        input.value = "";
-        input.focus();
-      };
-
-      const clearSearch = (box) => {
-        box.querySelector(".glossary-results").replaceChildren();
-        box.querySelector("input[type='text']").value = "";
-      };
-
-      document.addEventListener("click", (event) => {
-        const clearButton = event.target.closest("[data-glossary-search] .glossary-clear");
-        if (clearButton) {
-          clearSearch(clearButton.closest("[data-glossary-search]"));
-          return;
-        }
-        const button = event.target.closest("[data-glossary-search] button");
-        if (!button) return;
-        runSearch(button.closest("[data-glossary-search]"));
-      });
-
-      document.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") return;
-        const input = event.target.closest("[data-glossary-search] input[type='text']");
-        if (!input) return;
-        event.preventDefault();
-        runSearch(input.closest("[data-glossary-search]"));
       });
     })();
   </script>

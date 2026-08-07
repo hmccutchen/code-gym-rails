@@ -193,41 +193,84 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  describe "glossary tooltips" do
-    it "wraps a matching term in the code_review question with its definition" do
-      ps = base_problem_set
-      ps["code_review"]["question"] = "What does this closure capture?"
-      ps["code_review"]["glossary"] = [ { "term" => "closure", "definition" => "A function bundled with its surrounding variables." } ]
-      create_exercise(problem_set: ps)
+  describe "duck thread toggle" do
+    it "exposes its collapsed state and the body it controls, uniquely per section" do
+      create_exercise
       get root_path
-      expect(response.body).to include('<span class="gloss-term" data-definition="A function bundled with its surrounding variables." tabindex="0" role="button" aria-label="closure: A function bundled with its surrounding variables.">closure</span>')
+
+      %w[code_review pattern challenge].each do |field|
+        expect(response.body).to include(
+          %(aria-expanded="false" aria-controls="duck-body-#{field}")
+        )
+        expect(response.body).to include(%(id="duck-body-#{field}"))
+      end
     end
 
-    it "wraps a matching term in an architecture option" do
+    it "renders no duck thread toggle once the set is submitted" do
+      create_response(create_exercise)
+      get root_path
+      expect(response.body).not_to include("aria-controls=\"duck-body-")
+    end
+  end
+
+  describe "glossary tooltips (auto-hover against the full curated Glossary::TERMS list)" do
+    it "wraps a curated term found in the code_review question with its definition" do
+      ps = base_problem_set
+      ps["code_review"]["question"] = "What does this closure capture?"
+      create_exercise(problem_set: ps)
+      get root_path
+      expect(response.body).to include(
+        %(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['closure'])}" tabindex="0" role="button" aria-label="closure: #{ERB::Util.html_escape(Glossary::TERMS['closure'])}">closure</span>)
+      )
+    end
+
+    it "wraps a curated term found in an architecture option" do
       ps = base_problem_set
       ps["architecture"] = {
         "title" => "Pick a store", "question" => "Which store fits best?",
-        "options" => [ "Use memoization to cache results", "Recompute every time" ],
-        "glossary" => [ { "term" => "memoization", "definition" => "Caching a function's return value." } ]
+        "options" => [ "Use memoization to cache results", "Recompute every time" ]
       }
       create_exercise(problem_set: ps)
       get root_path
-      expect(response.body).to include('<span class="gloss-term" data-definition="Caching a function&#39;s return value." tabindex="0" role="button" aria-label="memoization: Caching a function&#39;s return value.">memoization</span>')
+      expect(response.body).to include(
+        %(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['memoization'])}" tabindex="0" role="button" aria-label="memoization: #{ERB::Util.html_escape(Glossary::TERMS['memoization'])}">memoization</span>)
+      )
     end
 
-    it "renders no glossary markup for sections without a glossary key" do
-      create_exercise
+    it "leaves a term not present in the curated glossary as plain text" do
+      # A bespoke problem_set rather than base_problem_set: base_problem_set's
+      # pattern title "Service Objects" itself matches the curated "service
+      # objects" entry, which would produce a gloss-term span unrelated to
+      # what this example is asserting.
+      create_exercise(problem_set: {
+        "code_review" => { "question" => "Find the bug in this frobnicator widget.", "snippet" => "def a; end" },
+        "pattern"     => { "title" => "Untitled Pattern", "why" => "Because", "question" => "When?" },
+        "challenge"   => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
+      })
       get root_path
       expect(response.body).not_to include('<span class="gloss-term"')
+      expect(response.body).to include("frobnicator widget")
     end
 
-    it "still wraps glossary terms in the read-only submitted view" do
+    it "still wraps curated terms in the read-only submitted view" do
       ps = base_problem_set
       ps["pattern"]["why"] = "It avoids duck typing surprises."
-      ps["pattern"]["glossary"] = [ { "term" => "duck typing", "definition" => "Caring about behavior, not declared type." } ]
       create_response(create_exercise(problem_set: ps))
       get root_path
-      expect(response.body).to include('<span class="gloss-term" data-definition="Caring about behavior, not declared type." tabindex="0" role="button" aria-label="duck typing: Caring about behavior, not declared type.">duck typing</span>')
+      expect(response.body).to include(
+        %(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['duck typing'])}" tabindex="0" role="button" aria-label="duck typing: #{ERB::Util.html_escape(Glossary::TERMS['duck typing'])}">duck typing</span>)
+      )
+    end
+
+    it "renders an old exercise with a populated but now-unused glossary field without error" do
+      ps = base_problem_set
+      ps["code_review"]["glossary"] = [ { "term" => "closure", "definition" => "stale AI-generated definition" } ]
+      create_exercise(problem_set: ps)
+
+      expect { get root_path }.not_to raise_error
+      expect(response).to have_http_status(:ok)
+      # The stale per-section field is ignored entirely — the curated definition wins, not the old one.
+      expect(response.body).not_to include("stale AI-generated definition")
     end
   end
 
@@ -455,7 +498,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     it "renders a concept-reference dropdown before submission when a reference is cached" do
-      exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
@@ -466,7 +509,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     it "auto-expands the dropdown on a concept's first-ever exposure" do
-      exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
@@ -481,7 +524,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       DailyResponse.create!(user: user, daily_exercise: prior_exercise, date: Date.current - 1,
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
                             concept_tags: { "code_review" => "n_plus_one" })
-      exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
@@ -492,15 +535,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     it "renders the section scenario label" do
-      exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
 
       get root_path
 
-      expect(response.body).to include("billing reconciliation")
+      expect(response.body).to include("invoice processing workflow")
     end
 
     it "renders no dropdown for a concept with no cached reference" do
-      exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
 
       get root_path
 
@@ -508,7 +551,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     it "renders a section's concept-reference dropdown read-only after submission" do
-      exercise = exercise_with(concept: "n_plus_one", scenario: "billing reconciliation")
+      exercise = exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",

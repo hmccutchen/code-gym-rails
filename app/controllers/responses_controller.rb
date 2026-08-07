@@ -7,6 +7,38 @@ class ResponsesController < ApplicationController
   # user out forever — after this window a new request may reclaim the row.
   REVIEW_CLAIM_STALE_AFTER = 3.minutes
 
+  # Double MAX_FOLLOW_UPS_PER_SECTION (3): a follow-up is one clarifying
+  # question about an already-finished review, while a duck thread supports
+  # an actual back-and-forth while someone is actively stuck. Lives here
+  # rather than on DailyResponse (unlike MAX_FOLLOW_UPS_PER_SECTION) since
+  # this feature has no DailyResponse-owned data — the view partial reads it
+  # straight off this controller.
+  MAX_DUCK_TURNS_PER_SECTION = 6
+
+  # The thread is client-held, so its size is attacker-controlled: the turn cap
+  # above counts only "user" roles and so bounds nothing on its own (a crafted
+  # request can carry unlimited "assistant" entries). These bound what gets
+  # allocated and forwarded to the provider. Generous enough that no honest UI
+  # session approaches them — MAX_DUCK_TURNS_PER_SECTION exchanges is at most
+  # 12 entries, and the input is a single-line text field. The message limit is
+  # in characters because it is quoted back to the user; the thread limit is in
+  # bytes because it bounds the payload, and one character is up to four.
+  MAX_DUCK_MESSAGE_LENGTH = 2_000
+  MAX_DUCK_THREAD_ENTRIES = MAX_DUCK_TURNS_PER_SECTION * 2
+
+  # Derived, not a flat number: a flat 20_000 undercounted its own "generous
+  # enough" claim above — MAX_DUCK_TURNS_PER_SECTION honest user turns alone,
+  # each at MAX_DUCK_MESSAGE_LENGTH in a worst-case 4-byte-per-character
+  # language, is already 6 * 2_000 * 4 = 48_000 bytes, well past a flat
+  # 20_000. That falsely rejected a cap-respecting conversation typed in a
+  # multi-byte language after only 2-3 exchanges instead of the full 6.
+  # Assistant replies aren't character-bounded (only by
+  # AiService::DUCK_RESPONSE_MAX_TOKENS tokens), so they get a generous
+  # per-turn byte allowance instead of a precise token->byte conversion.
+  DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = 1_200
+  MAX_DUCK_THREAD_BYTES = MAX_DUCK_TURNS_PER_SECTION *
+    (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)
+
   # POST /responses — save answers (auto-save friendly, idempotent)
   def create
     exercise = current_user.daily_exercises.for_date.first
@@ -276,7 +308,77 @@ class ResponsesController < ApplicationController
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end
 
+  # POST /responses/duck_thread — one turn of the pre-submission Socratic
+  # thinking partner. Fully unpersisted: no :id, no DailyResponse row is
+  # created or written to. The client sends its own full in-memory thread on
+  # every request; the server uses it only to build this one prompt. Reads
+  # today's exercise/response only to build context and enforce the
+  # unsubmitted gate — never writes to either. See
+  # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
+  def duck_thread
+    exercise = current_user.daily_exercises.for_date.first
+    # A JSON body, not head :not_found — the client's fetch handler always
+    # calls res.json() before checking res.ok, so an empty body would raise
+    # a confusing "Unexpected end of JSON input" instead of a clean message.
+    return render json: { status: "error", error: "No exercise set for today." }, status: :not_found unless exercise
+
+    section = params[:section].to_s
+    return render_section_error("That section isn't part of this exercise.") unless exercise.problem_set.key?(section)
+
+    existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
+    return render_section_error("The thinking partner is only available before you submit.") if existing&.submitted?
+
+    message = params[:message].to_s.strip
+    return render_section_error("Say something first.") if message.blank?
+    if message.length > MAX_DUCK_MESSAGE_LENGTH
+      return render_section_error("That message is too long — keep it under #{MAX_DUCK_MESSAGE_LENGTH} characters.")
+    end
+
+    thread = duck_thread_param
+    if thread.size > MAX_DUCK_THREAD_ENTRIES ||
+       thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
+      return render_section_error("This conversation is too long to continue — clear it to keep going.")
+    end
+    # Soft, request-level cap: the thread lives only in the browser, so this
+    # is not a hardened boundary (a hand-crafted request could understate its
+    # own history) — acceptable given each user pays for their own provider
+    # calls with their own key. See the design doc's "Cap on exchanges".
+    if thread.count { |turn| turn[:role] == "user" } >= MAX_DUCK_TURNS_PER_SECTION
+      return render_section_error("You've used all #{MAX_DUCK_TURNS_PER_SECTION} messages for this section — clear the conversation to keep going.")
+    end
+
+    answer = AiService.for(current_user).duck_response(
+      current_user, exercise, section: section, message: message, thread: thread
+    )
+
+    render json: { status: "ok", answer: answer }
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
   private
+
+  # A non-Hash-like element (e.g. thread: ["oops"] or thread: "not-an-array",
+  # which Array() wraps as a one-element array) would otherwise raise
+  # TypeError on turn[:role] and surface as a raw 500 instead of the 422
+  # every other bad-input path in this action returns.
+  # Roles are normalized to lowercase and restricted to user/assistant — the
+  # cap check below matches turn[:role] == "user" exactly, so an unnormalized
+  # "User"/"USER" would silently dodge the cap, and AiService#duck_response's
+  # thread rendering would mislabel the speaker for anything it doesn't
+  # recognize as exactly "assistant".
+  def duck_thread_param
+    # first(...+1) bounds the mapping itself while still leaving an
+    # over-limit thread detectably over limit for the caller's size check.
+    Array(params[:thread]).first(MAX_DUCK_THREAD_ENTRIES + 1).filter_map { |turn|
+      next unless turn.is_a?(Hash) || turn.respond_to?(:permit)
+
+      role = turn[:role].to_s.downcase
+      next unless %w[user assistant].include?(role)
+
+      { role: role, content: turn[:content].to_s }
+    }
+  end
 
   # Errors send the user back to the dashboard, where the retry button lives.
   # review's non-error redirects land on the history entry for the day in

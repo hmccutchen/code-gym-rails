@@ -37,7 +37,7 @@ RSpec.describe AiService do
   let(:double_class) do
     Class.new(AiService) do
       attr_writer :canned_text, :input_tokens, :output_tokens, :truncated
-      attr_reader :last_read_timeout
+      attr_reader :last_read_timeout, :last_max_tokens
 
       # #review_sections builds a fresh service per section thread, so a plain
       # ivar on the instance under test never sees those calls.
@@ -56,8 +56,9 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
         @last_read_timeout = read_timeout
+        @last_max_tokens   = max_tokens
         self.class.read_timeouts << read_timeout
         { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
@@ -135,15 +136,15 @@ RSpec.describe AiService do
       expect(schema.scan(/"scenario"/).size).to eq(3)
     end
 
-    it "defines an optional glossary array for each of the three sections" do
+    it "no longer asks the model for a per-section glossary array" do
       schema = service.send(:exercise_schema_for)
-      expect(schema.scan(/"glossary"/).size).to eq(3)
+      expect(schema).not_to match(/"glossary"/)
     end
 
-    it "swaps in a glossary array for the architecture block too" do
+    it "does not ask for a glossary array on the architecture block either" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
       architecture = JSON.parse(schema)["architecture"]
-      expect(architecture).to have_key("glossary")
+      expect(architecture).not_to have_key("glossary")
     end
 
     it "includes the challenge block by default (third: :challenge)" do
@@ -214,7 +215,7 @@ RSpec.describe AiService do
       pattern = JSON.parse(schema)["pattern"]
 
       expect(pattern.keys).to contain_exactly(
-        "title", "why", "question", "scenario", "teaching_note", "concept", "glossary"
+        "title", "why", "question", "scenario", "teaching_note", "concept"
       )
       expect(pattern).not_to have_key("reference")
     end
@@ -1318,7 +1319,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
           @calls += 1
           raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
@@ -1339,7 +1340,7 @@ RSpec.describe AiService do
 
       auth_failing = Class.new(AiService) do
         private
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT) = raise(AiService::AuthenticationError, "bad key")
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil) = raise(AiService::AuthenticationError, "bad key")
         def build_connection = nil
       end.new("fake_key")
 
@@ -1380,7 +1381,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
           @last_prompt = prompt
           super
         end
@@ -1434,7 +1435,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
           @last_prompt = prompt
           super
         end
@@ -1470,6 +1471,180 @@ RSpec.describe AiService do
       expect {
         svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
       }.to raise_error(AiService::InvalidResponseError)
+    end
+  end
+
+  describe "#duck_response" do
+    let(:exercise) do
+      DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "Find the N+1", "snippet" => "code", "scenario" => "a billing job" }
+      })
+    end
+
+    # Local spy: the shared `double_class`'s `#call` doesn't expose `system:`,
+    # and #duck_response has no `daily_response` argument to read a draft
+    # answer from in the first place — this class exists purely to capture
+    # both prompt strings this describe block's examples need to inspect.
+    let(:duck_spy_class) do
+      Class.new(double_class) do
+        attr_reader :last_prompt, :last_system
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+          @last_system = system
+          @last_prompt = prompt
+          super
+        end
+      end
+    end
+
+    it "sends the section's question/scenario/snippet, the prior thread in order, and the new message" do
+      thread = [
+        { role: "user",      content: "What's slow here?" },
+        { role: "assistant", content: "What happens inside that loop on each iteration?" }
+      ]
+      svc = duck_spy_class.new(canned_text: "What would change if the list had a thousand rows instead of ten?")
+
+      result = svc.duck_response(user, exercise, section: "code_review",
+                                 message: "I don't see anything wrong", thread: thread)
+
+      expect(result).to eq("What would change if the list had a thousand rows instead of ten?")
+      expect(svc.last_prompt).to include("Find the N+1")
+      expect(svc.last_prompt).to include("a billing job")
+      expect(svc.last_prompt).to include("What's slow here?")
+      expect(svc.last_prompt).to include("I don't see anything wrong")
+      expect(svc.last_prompt.index("What's slow here?")).to be < svc.last_prompt.index("I don't see anything wrong")
+    end
+
+    it "never sends a draft answer — the method has no daily_response argument to read one from" do
+      expect(AiService.instance_method(:duck_response).parameters).not_to include([ :req, :daily_response ])
+
+      svc = duck_spy_class.new(canned_text: "A guiding question.")
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_prompt).not_to include("daily_response")
+    end
+
+    it "the system prompt never permits stating the answer or writing corrected code" do
+      svc = duck_spy_class.new(canned_text: "A guiding question.")
+
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_system).to match(/never state the correct answer/i)
+      expect(svc.last_system).to match(/complete code/i)
+      expect(svc.last_system).to match(/1-3 sentences/i)
+    end
+
+    it "passes DUCK_RESPONSE_MAX_TOKENS, distinct from other AiService calls' ceilings" do
+      svc = double_class.new(canned_text: "A guiding question.")
+
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_max_tokens).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
+      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+    end
+
+    it "logs usage under its own purpose" do
+      svc = double_class.new(canned_text: "A guiding question.")
+
+      expect {
+        svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+      }.to change { ApiUsage.where(purpose: "duck_thread").count }.by(1)
+    end
+
+    it "raises InvalidResponseError instead of returning a blank response" do
+      svc = double_class.new(canned_text: "   ")
+
+      expect {
+        svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+      }.to raise_error(AiService::InvalidResponseError)
+    end
+
+    context "for a parsons_problem section" do
+      let(:parsons_exercise) do
+        DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => {
+            "question"      => "Arrange these blocks",
+            "blocks"        => [ "def a", "  work", "end" ],
+            "display_order" => [ 2, 0, 1 ]
+          }
+        })
+      end
+
+      it "sends the blocks, without which the model cannot see the code at all" do
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, parsons_exercise, section: "parsons_problem", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("def a")
+        expect(svc.last_prompt).to include("work")
+      end
+
+      it "sends them in the learner's on-screen order, never the stored correct order" do
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, parsons_exercise, section: "parsons_problem", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("1. end")
+        expect(svc.last_prompt).to include("2. def a")
+        expect(svc.last_prompt).to include("3.   work")
+        expect(svc.last_prompt).to match(/NOT the correct order/)
+        expect(svc.last_prompt.index("1. end")).to be < svc.last_prompt.index("2. def a")
+      end
+
+      it "never emits the stored (solved) order when display_order is missing" do
+        exercise_without_order = DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => { "question" => "Arrange", "blocks" => [ "def a", "  work", "end" ] }
+        })
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, exercise_without_order, section: "parsons_problem", message: "stuck", thread: [])
+
+        # The blocks are still sent — the model needs the code — but with no
+        # positions, since the only order available here is the answer.
+        expect(svc.last_prompt).to include("def a")
+        expect(svc.last_prompt).to include("order withheld")
+        expect(svc.last_prompt).not_to include("1. def a")
+        expect(svc.last_prompt).not_to match(/NOT the correct order/)
+      end
+
+      it "refuses an identity display_order, which is the solved order wearing a scramble's name" do
+        solved = DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => {
+            "question" => "Arrange", "blocks" => [ "def a", "  work", "end" ],
+            "display_order" => [ 0, 1, 2 ]
+          }
+        })
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        svc.duck_response(user, solved, section: "parsons_problem", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("order withheld")
+        expect(svc.last_prompt).not_to include("1. def a")
+      end
+
+      it "withholds positions rather than raising on a corrupt display_order" do
+        corrupt = DailyExercise.new(language: "ruby_rails", problem_set: {
+          "parsons_problem" => {
+            "question" => "Arrange", "blocks" => [ "def a", "end" ],
+            "display_order" => [ 5, 5 ]
+          }
+        })
+        svc = duck_spy_class.new(canned_text: "Which block has to run first?")
+
+        expect {
+          svc.duck_response(user, corrupt, section: "parsons_problem", message: "stuck", thread: [])
+        }.not_to raise_error
+
+        expect(svc.last_prompt).to include("order withheld")
+      end
+
+      it "omits the blocks line entirely for a section that has no blocks" do
+        svc = duck_spy_class.new(canned_text: "A guiding question.")
+
+        svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+        expect(svc.last_prompt).not_to include("NOT the correct order")
+      end
     end
   end
 

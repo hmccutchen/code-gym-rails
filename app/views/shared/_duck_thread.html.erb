@@ -1,0 +1,156 @@
+<%# Pre-submission "rubber duck" Socratic thinking partner for one section.
+    Fully unpersisted: the conversation lives only in this tab's memory (see
+    the script below) and is sent back in full on every request purely as
+    prompt context — nothing is ever written server-side. Only ever rendered
+    from an unsubmitted section; once submitted this partial simply isn't
+    rendered again, so there's nothing to clean up.
+    Local: field (section key, e.g. "code_review"). %>
+<div class="duck-thread" data-duck-thread data-section="<%= field %>">
+  <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>">🦆 Stuck? Talk it through</button>
+  <div class="duck-body" id="duck-body-<%= field %>" hidden>
+    <div class="duck-turns" aria-live="polite"></div>
+    <div class="duck-form">
+      <input type="text" class="duck-input" placeholder="What are you stuck on?">
+      <button type="button" class="btn btn-ghost btn-sm duck-send">Ask</button>
+      <button type="button" class="btn btn-ghost btn-sm duck-clear">Clear</button>
+    </div>
+    <span class="duck-status" aria-live="polite"></span>
+  </div>
+</div>
+
+<%# This partial can render up to three times per page (code_review, pattern,
+    and whichever third section is present), so the script is emitted once
+    into the layout's shared :page_scripts region rather than inline here —
+    same reasoning and guard pattern as shared/_ai_review's script. The
+    [data-duck-thread]:not([data-duck-wired]) guard is what lets this single
+    copy wire up every instance regardless of which render emitted it. %>
+<% unless @duck_thread_script_emitted %>
+  <% @duck_thread_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script>
+(() => {
+  const MAX_TURNS = <%= ResponsesController::MAX_DUCK_TURNS_PER_SECTION %>;
+  const DUCK_URL = "<%= duck_thread_responses_path %>";
+
+  const SPEAKER = { user: "You", assistant: "Duck" };
+
+  const renderTurns = (box) => {
+    const list = box.querySelector(".duck-turns");
+    list.replaceChildren();
+    box.duckThread.forEach((turn) => {
+      const p = document.createElement("p");
+      p.className = "duck-turn duck-" + turn.role;
+
+      // The speaker is otherwise conveyed only by CSS colour, which assistive
+      // tech and anyone not perceiving colour never receives; visually hidden
+      // so the styled transcript is unchanged.
+      const who = document.createElement("span");
+      who.className = "visually-hidden";
+      who.textContent = (SPEAKER[turn.role] || turn.role) + ": ";
+      p.appendChild(who);
+      p.appendChild(document.createTextNode(turn.content));
+
+      list.appendChild(p);
+    });
+  };
+
+  const userTurnCount = (box) => box.duckThread.filter((t) => t.role === "user").length;
+
+  // Called after every send attempt (success or failure) and after Clear —
+  // the single place that decides whether the input stays usable, so the
+  // in-flight lock set before a fetch and the cap reached after one always
+  // resolve to the same correct resting state.
+  //
+  // It only ever *writes* the status when capped. It used to clear it
+  // otherwise, which — because it runs in sendMessage's finally — wiped every
+  // error message microseconds after the catch set it, making failures
+  // silent. Callers that want the status cleared do so explicitly.
+  const refreshCap = (box) => {
+    const input = box.querySelector(".duck-input");
+    const send = box.querySelector(".duck-send");
+    const status = box.querySelector(".duck-status");
+    const capped = userTurnCount(box) >= MAX_TURNS;
+    input.disabled = capped;
+    send.disabled = capped;
+    if (capped) {
+      status.textContent =
+        `You've used all ${MAX_TURNS} messages for this section — clear the conversation to keep going.`;
+    }
+  };
+
+  document.querySelectorAll("[data-duck-thread]:not([data-duck-wired])").forEach((box) => {
+    box.dataset.duckWired = "1";
+    box.duckThread = [];
+
+    const toggle = box.querySelector(".duck-toggle");
+    const body   = box.querySelector(".duck-body");
+    const input  = box.querySelector(".duck-input");
+    const send   = box.querySelector(".duck-send");
+    const clear  = box.querySelector(".duck-clear");
+    const status = box.querySelector(".duck-status");
+
+    toggle.addEventListener("click", () => {
+      body.hidden = !body.hidden;
+      toggle.setAttribute("aria-expanded", String(!body.hidden));
+    });
+
+    box.duckGeneration = 0;
+
+    const sendMessage = async () => {
+      const message = input.value.trim();
+      if (!message || send.disabled) return;
+
+      const priorThread = box.duckThread.slice();
+      const generation = box.duckGeneration;
+      input.disabled = true;
+      send.disabled = true;
+      status.textContent = "Thinking…";
+
+      try {
+        const res = await fetch(DUCK_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: box.dataset.section, message: message, thread: priorThread })
+        });
+        const data = await res.json();
+        // Clear ran while this was in flight: the reply belongs to a
+        // conversation the user has discarded, so dropping it (rather than
+        // pushing it) is what keeps a cleared thread cleared.
+        if (generation !== box.duckGeneration) return;
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: data.answer });
+        renderTurns(box);
+        input.value = "";
+        status.textContent = "";
+      } catch (e) {
+        if (generation !== box.duckGeneration) return;
+        status.textContent = e.message || "Couldn't send that — try again";
+      } finally {
+        if (generation === box.duckGeneration) refreshCap(box);
+      }
+    };
+
+    send.addEventListener("click", sendMessage);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); sendMessage(); }
+    });
+
+    clear.addEventListener("click", () => {
+      box.duckGeneration += 1;
+      box.duckThread = [];
+      // input.value is deliberately left alone: after a failed send it still
+      // holds text the user may want to retry, and Clear names the
+      // conversation, not the draft.
+      status.textContent = "";
+      renderTurns(box);
+      refreshCap(box);
+    });
+  });
+})();
+    </script>
+  <% end %>
+<% end %>

@@ -5,9 +5,9 @@
 <% language = response.daily_exercise.language %>
 <% blocks   = Array(parsons["blocks"]) %>
 <div class="section">
-  <div class="section-label">3 — Parsons Problem: <%= glossary_wrap(parsons["title"], parsons["glossary"]) %></div>
-  <% if parsons["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(parsons["scenario"], parsons["glossary"]) %></div><% end %>
-  <div class="question"><%= glossary_wrap(parsons["question"], parsons["glossary"]) %></div>
+  <div class="section-label">3 — Parsons Problem: <%= glossary_wrap(parsons["title"]) %></div>
+  <% if parsons["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(parsons["scenario"]) %></div><% end %>
+  <div class="question"><%= glossary_wrap(parsons["question"]) %></div>
 
   <% if (ref = concept_reference_for(parsons["concept"], language)) %>
     <%= render "shared/concept_reference", reference: ref,
@@ -52,8 +52,8 @@
         <button type="button" class="rating-btn<%= " active" if response.self_rating_for("parsons_problem") == value %>" data-rating-for="parsons_problem" data-rating="<%= value %>"><%= label.upcase_first %></button>
       <% end %>
     </div>
+    <%= render "shared/duck_thread", field: "parsons_problem" %>
   <% end %>
-  <%= render "shared/glossary_search", field: "parsons_problem" %>
 </div>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>

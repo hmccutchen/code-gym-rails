@@ -69,6 +69,30 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
+  # Cost and length control for #duck_response: 150 tokens comfortably fits the
+  # 1-3 sentence guiding-question replies the Socratic system prompt asks for,
+  # while capping spend on a feature the user can invoke repeatedly. It makes a
+  # long answer-shaped reply unlikely, but it is a budget, not an enforcement
+  # mechanism — a short fix can fit in 150 tokens, so DUCK_SYSTEM_PROMPT's
+  # rules remain the only thing actually asking the model not to give answers.
+  # Deliberately distinct from ClaudeService::MAX_TOKENS, which is sized for
+  # full review generation.
+  DUCK_RESPONSE_MAX_TOKENS = 150
+
+  DUCK_SYSTEM_PROMPT = <<~PROMPT.chomp
+    You are a Socratic thinking partner helping an engineer work through a
+    problem they have NOT yet submitted or been graded on.
+
+    Rules, no exceptions:
+    - Never state the correct answer, the specific fix, or write corrected or
+      complete code — not even as an illustrative example.
+    - Respond ONLY with a guiding question or a brief reflective observation
+      that helps them think it through themselves.
+    - If they explicitly ask you to just tell them the answer, do not comply —
+      respond with a further guiding question instead.
+    - Keep it to 1-3 sentences. No preamble.
+  PROMPT
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
@@ -335,9 +359,7 @@ class AiService
       "#{field[:label]}: #{points.join('; ')}" if points.any?
     }.join("\n")
 
-    thread_text = thread.any? ?
-      thread.map { |turn| "#{turn[:role] == 'assistant' ? 'You' : 'Them'}: #{turn[:content]}" }.join("\n") :
-      "(no prior questions)"
+    thread_text = render_thread(thread, empty_message: "(no prior questions)")
 
     result = call_and_log(
       user, purpose: "review_follow_up",
@@ -362,7 +384,96 @@ class AiService
     text_or_raise(result, subject: "follow-up answer")
   end
 
+  # ── Rubber-duck Socratic thinking-partner turn, pre-submission only ───────
+  # Fully unpersisted: no `daily_response` argument, no draft-answer context,
+  # no read of any stored state. `thread` is the client's own in-memory
+  # conversation so far, sent back on every request — used only to build this
+  # one prompt, never written anywhere. See
+  # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
+  def duck_response(user, exercise, section:, message:, thread: [])
+    context = duck_section_context(exercise, section)
+    thread_text = render_thread(thread, empty_message: "(no prior messages)")
+
+    result = call_and_log(
+      user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
+      system: DUCK_SYSTEM_PROMPT,
+      prompt: <<~PROMPT
+        The exercise section:
+        #{context}
+
+        Conversation so far:
+        #{thread_text}
+
+        Their new message: #{message}
+
+        Respond as their Socratic thinking partner, following your system instructions exactly.
+      PROMPT
+    )
+
+    text_or_raise(result, subject: "duck response")
+  end
+
   private
+
+  # Shared by #answer_follow_up and #duck_response — both render a prior
+  # `{ role:, content: }` conversation the same "You: .../Them: ..." way, so
+  # a future fix to that rendering (e.g. how an unrecognized role is labeled)
+  # only needs to land in one place.
+  def render_thread(thread, empty_message:)
+    return empty_message if thread.empty?
+
+    thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
+  end
+
+  # Plain-text summary of whichever fields a given section actually has
+  # (code_review/pattern/challenge/architecture/security_review/
+  # parsons_problem all carry a different subset) — enough context for a
+  # Socratic prompt without needing per-section-kind branching.
+  def duck_section_context(exercise, section)
+    data = exercise.problem_set.dig(section.to_s) || {}
+
+    [
+      ("Title: #{data["title"]}" if data["title"].present?),
+      ("Scenario: #{data["scenario"]}" if data["scenario"].present?),
+      ("Why it exists: #{data["why"]}" if data["why"].present?),
+      ("Question: #{data["question"]}" if data["question"].present?),
+      ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
+      ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
+      ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
+      duck_parsons_blocks(data)
+    ].compact.join("\n")
+  end
+
+  # A Parsons question is only "arrange these blocks", so without the blocks
+  # the model cannot say anything section-specific. But blocks are persisted
+  # already-solved (see #shuffle_parsons_blocks!), so their stored order IS
+  # the answer the duck prompt forbids revealing. Positions are therefore only
+  # ever quoted from a genuine persisted scramble; with no trustworthy
+  # scramble to quote, the blocks go over unordered rather than in the stored
+  # order, which would both leak the solution and misdescribe the screen.
+  def duck_parsons_blocks(data)
+    blocks = data["blocks"]
+    return unless blocks.is_a?(Array) && blocks.any?
+
+    order = scrambled_display_order(data["display_order"], blocks.size)
+    # to_s before sorting: a provider can return non-strings, and Array#sort on
+    # mixed types raises rather than degrading.
+    return "Blocks (order withheld):\n#{blocks.map(&:to_s).sort.map { |b| "- #{b}" }.join("\n")}" unless order
+
+    lines = order.map.with_index { |block_index, position| "#{position + 1}. #{blocks[block_index]}" }
+    "Blocks, in the learner's current on-screen order (NOT the correct order):\n#{lines.join("\n")}"
+  end
+
+  # nil unless display_order is a complete permutation that actually differs
+  # from the stored order. The identity permutation is rejected rather than
+  # trusted: it means no scramble was ever persisted, and echoing it back
+  # would present the solved arrangement as the learner's own.
+  def scrambled_display_order(display_order, block_count)
+    order = ExerciseSection::ParsonsProblem.normalize_order(Array(display_order), block_count)
+    return if order.empty? || order == (0...block_count).to_a
+
+    order
+  end
 
   # A blank provider response is a provider bug, not a valid answer — persisting
   # it downstream fails a presence validation with an error class that escapes
@@ -483,8 +594,10 @@ class AiService
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
   # `read_timeout` overrides the connection's default read budget for this
-  # call only (see AiService::GENERATION_READ_TIMEOUT).
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
+  # call only (see AiService::GENERATION_READ_TIMEOUT). `max_tokens`, when
+  # given, overrides the provider's own default output ceiling for this call
+  # only (see AiService::DUCK_RESPONSE_MAX_TOKENS).
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -510,7 +623,6 @@ class AiService
   # changes across languages.
   def exercise_schema_for(language = "ruby_rails", third: :challenge)
     label = config_for(language)[:label]
-    glossary_field = %("glossary": [{"term": "string — an unfamiliar word from this section's own text", "definition": "string — one plain-English sentence"}])
 
     third_section =
       case third
@@ -523,7 +635,6 @@ class AiService
               "options":   ["string — a viable approach", "string — another viable approach", "string — an optional third approach (omit for 2)"],
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the architecture vocabulary",
-              #{glossary_field},
               "reference": {
                 "tagline":     "string — bold one-liner",
                 "explanation": "string — 2-3 sentences",
@@ -542,7 +653,6 @@ class AiService
               "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the provided vocabulary",
-              #{glossary_field},
               "reference": {
                 "tagline":      "string — bold one-liner",
                 "explanation":  "string — 2-3 sentences",
@@ -559,8 +669,7 @@ class AiService
               "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
               "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
               "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              #{glossary_field}
+              "concept": "string — exactly one concept from the provided vocabulary"
             }
         PB
       else
@@ -571,8 +680,7 @@ class AiService
               "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
               "starter_code": "string — optional skeleton (empty string if none)",
               "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              #{glossary_field}
+              "concept": "string — exactly one concept from the provided vocabulary"
             }
         CH
       end
@@ -584,8 +692,7 @@ class AiService
           "snippet":  "string — #{label} code, ~10-15 lines",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          #{glossary_field}
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'"
         },
         "pattern": {
           "title":    "string — pattern name",
@@ -593,8 +700,7 @@ class AiService
           "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          #{glossary_field}
+          "concept": "string — exactly one concept from the provided vocabulary"
         },
         #{third_section}
       }
@@ -651,7 +757,7 @@ class AiService
         <<~EST.chomp
 
           Established concepts (well past first mastery — survived a retention check): #{established.map(&:concept).join(', ')}
-          - If you were already going to select one of these for a section's concept, keep that section's teaching_note minimal (a single short sentence, or an empty string is fine) and return an empty glossary array for that section.
+          - If you were already going to select one of these for a section's concept, keep that section's teaching_note minimal (a single short sentence, or an empty string is fine).
           - Pitch at full difficulty — do not ease, simplify, or add scaffolding for these, the same as you would not for a retention check.
           - This is advisory, like every other concept instruction here: it does not force you to select one of these concepts, only shapes the section if you do.
         EST
@@ -736,7 +842,6 @@ class AiService
       #{ts_guidance}
       - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
-      - Each section's "glossary": 0-4 {term, definition} pairs for incidental terminology inside THAT section's own title/scenario/question/why/options text that a mid-level developer newer to #{label} might not immediately know — distinct from the section's own tagged "concept" and from "teaching_note". One plain-English sentence per definition, same tone as the rest of this app's teaching content. Return an empty array when nothing in the section's text warrants one — never force entries to exist.
       #{third_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
@@ -1013,8 +1118,10 @@ class AiService
   # themselves: recognizing a stop reason is provider-specific, but deciding
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
-  def call_and_log(user, purpose:, system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
-    result = call(system: system, prompt: prompt, cache_system: cache_system, read_timeout: read_timeout)
+  def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
+                   read_timeout: READ_TIMEOUT, max_tokens: nil)
+    result = call(system: system, prompt: prompt, cache_system: cache_system,
+                  read_timeout: read_timeout, max_tokens: max_tokens)
     log_usage(user, result, purpose: purpose)
 
     if result[:truncated]

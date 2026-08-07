@@ -31,10 +31,7 @@ class FakeService < AiService
       RUBY
       "teaching_note" => "Look at what happens to the database each time this method runs inside the loop.",
       "concept" => "n_plus_one",
-      "scenario" => "a nightly loyalty-tier recalculation job",
-      "glossary" => [
-        { "term" => "loyalty tier", "definition" => "A customer segment (bronze/silver/gold) based on total spend." }
-      ]
+      "scenario" => "a nightly loyalty-tier recalculation job"
     },
     "pattern" => {
       "title" => "Service Object",
@@ -42,8 +39,7 @@ class FakeService < AiService
       "question" => "When would you reach for a service object instead of adding another method to the model?",
       "scenario" => "checkout logic that charges a card, updates inventory, and sends a receipt email",
       "teaching_note" => "Count how many unrelated responsibilities the operation currently touches.",
-      "concept" => "service_objects",
-      "glossary" => []
+      "concept" => "service_objects"
     },
     "challenge" => {
       "title" => "Cache the expensive lookup",
@@ -51,8 +47,7 @@ class FakeService < AiService
       "scenario" => "a customer profile page that renders the order count in three different places",
       "starter_code" => "",
       "teaching_note" => "Think about what should persist across calls within one request but not across requests.",
-      "concept" => "memoization",
-      "glossary" => []
+      "concept" => "memoization"
     },
     "architecture" => {
       "title" => "Synchronous or async receipt emails",
@@ -61,7 +56,6 @@ class FakeService < AiService
       "options" => [ "Keep it synchronous but add a timeout", "Move it to a background job via Solid Queue" ],
       "teaching_note" => "Weigh checkout latency against the complexity of a job retry/failure path.",
       "concept" => "service_boundaries",
-      "glossary" => [],
       "reference" => {
         "tagline" => "Move slow, non-critical work off the request path.",
         "explanation" => "A background job absorbs email latency without blocking checkout, at the cost of needing to handle delivery failures asynchronously.",
@@ -85,7 +79,6 @@ class FakeService < AiService
       "scenario" => "a self-service profile update endpoint",
       "teaching_note" => "Consider what happens if the submitted params hash includes a key nobody intended to expose.",
       "concept" => "mass_assignment_protection",
-      "glossary" => [],
       "reference" => {
         "tagline" => "Never pass raw params straight into update.",
         "explanation" => "Without strong params, an attacker can submit unexpected attributes (like admin flags) alongside the form fields.",
@@ -115,8 +108,7 @@ class FakeService < AiService
         "end"
       ],
       "teaching_note" => "Think about what should happen before any division is attempted.",
-      "concept" => "idempotency",
-      "glossary" => []
+      "concept" => "idempotency"
     }
   }.freeze
 
@@ -150,13 +142,16 @@ class FakeService < AiService
     "Focus on the boundary of the operation: what MUST happen before returning success, and what could safely " \
     "happen after. That's what separates a synchronous responsibility from something a background job can own."
 
+  DUCK_RESPONSE_TEXT =
+    "What would happen to that method if it ran a hundred times in one request — where would the slowdown show up?"
+
   private
 
   # Both raises are deliberately bare RuntimeErrors, not AiService::Error:
   # GenerateDailyExercisesJob rescues the AiService hierarchy and turns it into
   # a persisted, user-facing failure message, which would bury a broken fake as
   # "generation failed" instead of failing the spec that caused it.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
     text =
       case system
       when /generating personalized daily exercise sets/
@@ -172,6 +167,8 @@ class FakeService < AiService
         EXPLAIN_DIFFERENTLY_TEXT
       when /answering a follow-up question/
         FOLLOW_UP_ANSWER_TEXT
+      when /Socratic thinking partner/
+        DUCK_RESPONSE_TEXT
       else
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end

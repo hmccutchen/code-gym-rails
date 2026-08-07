@@ -28,13 +28,19 @@ class GeminiService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
     body = {
       model:              MODEL,
       system_instruction: system,
       input:              prompt,
       store:              false
     }
+    # No default output cap is sent otherwise — existing callers rely on the
+    # provider's own default ceiling. Only a call that explicitly asks for a
+    # tighter cap (e.g. AiService::DUCK_RESPONSE_MAX_TOKENS) sets this.
+    # Must be nested under generation_config: the Interactions API ignores a
+    # top-level max_output_tokens, which would silently drop the cap.
+    body[:generation_config] = { max_output_tokens: max_tokens } if max_tokens
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
@@ -56,11 +62,21 @@ class GeminiService < AiService
     model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }
     text_parts   = Array(model_output && model_output["content"]).select { |c| c["type"] == "text" }.map { |c| c["text"] }
     usage        = parsed["usage"] || {}
+    output_tokens = usage["total_output_tokens"]
 
     {
       text:          text_parts.join,
       input_tokens:  usage["total_input_tokens"],
-      output_tokens: usage["total_output_tokens"]
+      output_tokens: output_tokens,
+      # The Interactions API response carries no explicit stop/finish-reason
+      # field (unlike Claude's stop_reason) — without this, call_and_log's
+      # truncation check is silently always false here. A capped call (e.g.
+      # AiService::DUCK_RESPONSE_MAX_TOKENS) that actually hits its ceiling
+      # is inferred from output landing at or past what was requested, so a
+      # Gemini user gets the same clean truncation error a Claude user would
+      # instead of a silently cut-off reply. Uncapped calls (max_tokens nil)
+      # never flag truncated, matching their pre-existing behavior.
+      truncated: max_tokens.present? && output_tokens.to_i >= max_tokens
     }
   rescue Faraday::Error => e
     raise AiService::Error, "Network error calling Gemini: #{e.message}"

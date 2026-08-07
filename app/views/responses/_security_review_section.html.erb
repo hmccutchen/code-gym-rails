@@ -3,9 +3,9 @@
     on the dashboard after submitting and on every history entry.
     Locals: sec, response, submitted. %>
 <div class="section">
-  <div class="section-label">3 — Security Review: <%= glossary_wrap(sec["title"], sec["glossary"]) %></div>
-  <% if sec["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(sec["scenario"], sec["glossary"]) %></div><% end %>
-  <div class="question"><%= glossary_wrap(sec["question"], sec["glossary"]) %></div>
+  <div class="section-label">3 — Security Review: <%= glossary_wrap(sec["title"]) %></div>
+  <% if sec["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(sec["scenario"]) %></div><% end %>
+  <div class="question"><%= glossary_wrap(sec["question"]) %></div>
   <pre class="snippet"><code<% if (lang = hljs_language(response.daily_exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= sec["snippet"] %></code></pre>
   <% if (ref = concept_reference_for(sec["concept"], response.daily_exercise.language)) %>
     <%= render "shared/concept_reference", reference: ref,
@@ -21,6 +21,6 @@
         <button type="button" class="rating-btn<%= " active" if response.self_rating_for("security_review") == value %>" data-rating-for="security_review" data-rating="<%= value %>"><%= label.upcase_first %></button>
       <% end %>
     </div>
+    <%= render "shared/duck_thread", field: "security_review" %>
   <% end %>
-  <%= render "shared/glossary_search", field: "security_review" %>
 </div>
