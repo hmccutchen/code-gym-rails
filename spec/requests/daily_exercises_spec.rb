@@ -67,6 +67,43 @@ RSpec.describe "DailyExercises", type: :request do
         post regenerate_path
       }.to have_enqueued_job(RegenerateExerciseJob)
     end
+
+    # The unit specs verify the controller's claim and the job's replacement
+    # separately. This walks the whole loop, so a mismatch between what the
+    # controller enqueues and what the job expects cannot pass unnoticed.
+    it "shows the spinner until the enqueued job replaces the set" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                       problem_set: { "code_review" => { "question" => "PREVIOUS-SET-MARKER" } })
+
+      post regenerate_path
+
+      get root_path
+      expect(response.body).to include("Generating your personalized exercise set")
+      expect(response.body).not_to include("PREVIOUS-SET-MARKER")
+
+      get dashboard_status_path
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+
+      fake_service = instance_double(ClaudeService, generate_exercise: {
+                                       "code_review" => { "question" => "freshly generated", "snippet" => "def a; end" },
+                                       "pattern" => {
+                                         "title" => "Service Objects", "why" => "Because", "question" => "When?",
+                                         "reference" => { "tagline" => "T", "explanation" => "E",
+                                                          "code_example" => "code", "senior_lens" => "S" }
+                                       },
+                                       "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
+                                     })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      perform_enqueued_jobs
+
+      expect(exercise.reload.regenerating_since).to be_nil
+
+      get dashboard_status_path
+      expect(JSON.parse(response.body)["status"]).to eq("ready")
+
+      get root_path
+      expect(response.body).to include("freshly generated")
+    end
   end
 
   describe "POST /generate" do
