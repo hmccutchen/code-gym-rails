@@ -74,6 +74,123 @@ RSpec.describe DailyResponse, type: :model do
 
       expect(daily_response.answered_sections).to be_empty
     end
+
+    context "with a scaffolded section" do
+      let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
+
+      let(:scaffolded_exercise) do
+        user.daily_exercises.create!(
+          date: Date.current, generated_at: Time.current,
+          problem_set: { "architecture" => { "question" => "q", "answer_scaffold" => scaffold } }
+        )
+      end
+
+      def response_with(answer)
+        DailyResponse.new(user: user, daily_exercise: scaffolded_exercise, date: Date.current,
+                          answers: { "architecture" => answer })
+      end
+
+      def template
+        ExerciseSection::Architecture.scaffold_template(scaffolded_exercise.problem_set["architecture"])
+      end
+
+      it "does not count a section holding nothing but its scaffold" do
+        expect(response_with(template).answered_sections).to be_empty
+      end
+
+      # The labels alone are well past the threshold, so without stripping them
+      # a two-word answer under a label would count as answered.
+      it "measures only what the user typed under the labels" do
+        expect(response_with(template + "Redis").answered_sections).to be_empty
+        expect(response_with(template + "Redis, because reads dominate").answered_sections)
+          .to eq([ "architecture" ])
+      end
+
+      # A row generated before answer_scaffold existed still has its kind's
+      # default labels stripped, so it behaves exactly as it does today.
+      it "falls back to the kind's default labels when the problem carries no scaffold" do
+        legacy = user.daily_exercises.create!(
+          date: Date.current - 1, generated_at: Time.current,
+          problem_set: { "architecture" => { "question" => "q" } }
+        )
+        pristine = ExerciseSection::Architecture::DEFAULT_SCAFFOLD.join("\n\n\n")
+        legacy_response = DailyResponse.new(user: user, daily_exercise: legacy, date: legacy.date,
+                                            answers: { "architecture" => pristine })
+
+        expect(legacy_response.answered_sections).to be_empty
+      end
+    end
+
+    it "leaves untemplated kinds on the plain length rule" do
+      daily_response = user.daily_responses.create!(
+        daily_exercise: exercise,
+        date: Date.current,
+        answers: { "code_review" => "Which option, and why:" }
+      )
+
+      expect(daily_response.answered_sections).to eq([ "code_review" ])
+    end
+  end
+
+  describe ".normalize_answers" do
+    let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
+
+    let(:scaffolded_exercise) do
+      user.daily_exercises.create!(
+        date: Date.current, generated_at: Time.current,
+        problem_set: { "architecture" => { "question" => "q", "answer_scaffold" => scaffold },
+                       "code_review"  => { "question" => "q", "snippet" => "s" } }
+      )
+    end
+
+    def template
+      ExerciseSection::Architecture.scaffold_template(scaffolded_exercise.problem_set["architecture"])
+    end
+
+    it "blanks a section holding nothing but its scaffold" do
+      expect(DailyResponse.normalize_answers({ "architecture" => template }, scaffolded_exercise))
+        .to eq("architecture" => "")
+    end
+
+    # A browser submits textarea content with CRLF line endings, so this is the
+    # shape the untouched scaffold actually arrives in — not the LF the server wrote.
+    it "blanks an untouched scaffold submitted with browser line endings" do
+      submitted = template.gsub("\n", "\r\n")
+
+      expect(DailyResponse.normalize_answers({ "architecture" => submitted }, scaffolded_exercise))
+        .to eq("architecture" => "")
+    end
+
+    it "still counts real content typed under CRLF labels" do
+      submitted = (template + "Redis, because reads dominate").gsub("\n", "\r\n")
+
+      expect(DailyResponse.normalize_answers({ "architecture" => submitted }, scaffolded_exercise))
+        .to eq("architecture" => submitted)
+      expect(DailyResponse.answered?("architecture", submitted,
+                                     scaffolded_exercise.problem_set["architecture"])).to be true
+    end
+
+    it "preserves the labels verbatim once the user has typed under them" do
+      filled = template + "Redis"
+      expect(DailyResponse.normalize_answers({ "architecture" => filled }, scaffolded_exercise))
+        .to eq("architecture" => filled)
+    end
+
+    it "leaves untemplated sections untouched" do
+      expect(DailyResponse.normalize_answers({ "code_review" => "  the N+1  " }, scaffolded_exercise))
+        .to eq("code_review" => "  the N+1  ")
+    end
+
+    it "blanks a whitespace-only answer for any kind" do
+      expect(DailyResponse.normalize_answers({ "code_review" => "   " }, scaffolded_exercise))
+        .to eq("code_review" => "")
+    end
+
+    it "tolerates a nil exercise by falling back to the kind's default labels" do
+      pristine = ExerciseSection::Architecture::DEFAULT_SCAFFOLD.join("\n\n\n")
+      expect(DailyResponse.normalize_answers({ "architecture" => pristine }, nil))
+        .to eq("architecture" => "")
+    end
   end
 
   describe "per-section self-rating predicates" do

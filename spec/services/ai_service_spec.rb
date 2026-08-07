@@ -215,7 +215,7 @@ RSpec.describe AiService do
       pattern = JSON.parse(schema)["pattern"]
 
       expect(pattern.keys).to contain_exactly(
-        "title", "why", "question", "scenario", "teaching_note", "concept"
+        "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold"
       )
       expect(pattern).not_to have_key("reference")
     end
@@ -642,6 +642,58 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge,
                             reinforcement: [], due_checks: [], established: [ cm1, cm2 ])
       expect(prompt).to include("memoization, scope_chaining")
+    end
+  end
+
+  describe "#normalize_answer_scaffolds!" do
+    it "keeps a usable scaffold on a scaffolded section" do
+      set = { "pattern" => { "answer_scaffold" => [ "  Your approach:  ", "What breaks:" ] } }
+
+      expect(service.send(:normalize_answer_scaffolds!, set)["pattern"]["answer_scaffold"])
+        .to eq([ "Your approach:", "What breaks:" ])
+    end
+
+    it "bounds a scaffold the model let run long or wide" do
+      set = { "architecture" => { "answer_scaffold" => (1..9).map { |i| "L#{i}: " + "x" * 200 } } }
+
+      labels = service.send(:normalize_answer_scaffolds!, set)["architecture"]["answer_scaffold"]
+      expect(labels.size).to eq(ExerciseSection::MAX_SCAFFOLD_LABELS)
+      expect(labels.map(&:length)).to all(be <= ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH)
+    end
+
+    # Dropped rather than repaired: the reader then takes the same fallback path
+    # every pre-scaffold row already takes.
+    it "drops an unusable scaffold instead of persisting it" do
+      [ "not an array", [], [ "", nil ], [ 42, true ], 42 ].each do |bad|
+        set = { "pattern" => { "question" => "q", "answer_scaffold" => bad } }
+        expect(service.send(:normalize_answer_scaffolds!, set)["pattern"]).not_to have_key("answer_scaffold")
+      end
+    end
+
+    it "strips a scaffold the model volunteered for an unscaffolded section" do
+      set = { "code_review" => { "answer_scaffold" => [ "Nope:" ] } }
+
+      expect(service.send(:normalize_answer_scaffolds!, set)["code_review"]).not_to have_key("answer_scaffold")
+    end
+
+    it "leaves a section that carries no scaffold alone" do
+      set = { "pattern" => { "question" => "q" } }
+
+      expect(service.send(:normalize_answer_scaffolds!, set)).to eq("pattern" => { "question" => "q" })
+    end
+  end
+
+  describe "answer_scaffold in the generation schema" do
+    it "asks for a scaffold on pattern and architecture" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+
+      expect(schema.scan("answer_scaffold").size).to eq(2)
+    end
+
+    it "does not ask for one on an unscaffolded third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+
+      expect(schema.scan("answer_scaffold").size).to eq(1)
     end
   end
 

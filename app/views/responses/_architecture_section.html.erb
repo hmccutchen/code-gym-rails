@@ -31,11 +31,11 @@
     <%= render "shared/concept_reference", reference: ref,
           open: !submitted && first_exposure?(arch["concept"], "architecture", response.date) %>
   <% end %>
-  <%= render "dashboard/teaching_hint", note: arch["teaching_note"], field: "architecture", submitted: submitted, answer: response.answers["architecture"] %>
+  <%= render "dashboard/teaching_hint", note: arch["teaching_note"], field: "architecture", submitted: submitted, response: response %>
   <% if submitted %>
     <div class="answer-display"><%= response.answers["architecture"].presence || "(skipped)" %></div>
   <% else %>
-    <textarea name="response[answers][architecture]" class="answer" placeholder="Your decision and why — weigh the tradeoffs…" data-field="architecture"><%= response.answers["architecture"] %></textarea>
+    <textarea name="response[answers][architecture]" class="answer" placeholder="Your decision and why — weigh the tradeoffs…" data-field="architecture" <%= tag.attributes(answer_scaffold_labels_attr(response, "architecture")) %>><%= answer_starting_value(response, "architecture") %></textarea>
     <div class="rating-row" data-rating-for="architecture">
       <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
         <button type="button" class="rating-btn<%= " active" if response.self_rating_for("architecture") == value %>" data-rating-for="architecture" data-rating="<%= value %>"><%= label.upcase_first %></button>

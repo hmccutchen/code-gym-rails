@@ -13,7 +13,7 @@
     <%= render "shared/concept_reference", reference: ref,
           open: !submitted && first_exposure?(parsons["concept"], language, response.date) %>
   <% end %>
-  <%= render "dashboard/teaching_hint", note: parsons["teaching_note"], field: "parsons_problem", submitted: submitted, answer: response.answers["parsons_problem"] %>
+  <%= render "dashboard/teaching_hint", note: parsons["teaching_note"], field: "parsons_problem", submitted: submitted, response: response %>
 
   <% if submitted %>
     <% submitted_ids = ExerciseSection::ParsonsProblem.parse_order(response.answers["parsons_problem"]) %>

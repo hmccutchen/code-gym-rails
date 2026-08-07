@@ -10,7 +10,34 @@ All changes are made on a feature/dev branch, never directly on `main`. Create (
 
 ## Code Style
 
-Code should be self-documenting. Don't add comments unless they're strictly needed — e.g. to explain a non-obvious *why* (a hidden constraint, a workaround, a subtle invariant). Never add comments that just restate *what* the code does.
+**Self-documenting.** The code says what it does; names carry the meaning. If a
+block needs a comment to be followed, extract it into a named method instead.
+
+**Comments are extremely minimal.** Write one only for a non-obvious *why* — a
+hidden constraint, a workaround, an invariant a future reader would otherwise
+break. Never restate *what* the code does. A comment that would go stale the
+next time the line changes shouldn't be written.
+
+**Modular, so it's easy to change.** Following pragmatic-programming principles:
+
+- **DRY** — every piece of knowledge has one authoritative home. When a rule
+  starts appearing in a second place, move it to one place both call (see
+  `DailyResponse.answered?`, `AiService`'s prompt/schema ownership).
+- **Orthogonal** — a change in one area shouldn't ripple into unrelated ones.
+  Provider specifics live in the `AiService` subclass, per-kind facts live in
+  `ExerciseSection`, so adding a provider or a section kind means adding a
+  class, not editing shared code.
+- **Small, single-purpose units** — you should be able to say what a class or
+  method does in one sentence. A file that keeps growing is doing too much.
+- **Program to the interface** — callers depend on the shape a collaborator
+  exposes, not its internals, so internals can be replaced without a rewrite.
+- **Easy to change beats clever** — prefer the obvious implementation. Optimize
+  for the next person changing it, not for line count.
+- **Fail loudly at the boundary, degrade gracefully in the UI** — validate
+  external input where it enters (provider output, params), and let anything
+  downstream assume it's clean.
+- **YAGNI** — build what's needed now. Don't add configuration, abstraction, or
+  a table for a case that doesn't exist yet.
 
 ## Stack
 
@@ -85,7 +112,8 @@ User interacts:
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory.
-- **One "answered" rule**: a section counts as answered when its trimmed text exceeds 10 characters. `DailyResponse#answered_sections` is the single source of truth — the progress bar, history, and the generation prompt all derive from it.
+- **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule).
+- **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so every `answers[section].presence` reader — review prompt, history, `recent_performance` — sees what it saw before scaffolds existed.
 - **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call. The AI review stays a separate, manual step afterward — cost-conscious by design. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database, so `PreviewSeed` (`app/services/preview_seed.rb`) seeds three days of demo content for the single account named by `PREVIEW_SEED_EMAIL`. It runs from `preDeployCommand` in every environment including production, and is safe there because it no-ops without that variable, only ever creates rows (never updates or deletes), and never reassigns a non-blank attribute. `PreviewMail` additionally sends mail inline when the variable is set, so magic-link login does not depend on the worker service. **`PREVIEW_SEED_EMAIL` must be set on the PR-environment template only** — set at the shared or base level, Railway propagates it into production. There is no login bypass: PR apps authenticate with real magic links.
@@ -162,7 +190,8 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture is language-independent; everything else buckets by the day's language)
-- `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review); one class per kind answers which are thirds, which vocabulary they draw from, and which show improved code
+- `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review); one class per kind answers which are thirds, which vocabulary they draw from, which show improved code, and which scaffold their answer
+- `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call + connection only
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints

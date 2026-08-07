@@ -39,7 +39,12 @@ class FakeService < AiService
       "question" => "When would you reach for a service object instead of adding another method to the model?",
       "scenario" => "checkout logic that charges a card, updates inventory, and sends a receipt email",
       "teaching_note" => "Count how many unrelated responsibilities the operation currently touches.",
-      "concept" => "service_objects"
+      "concept" => "service_objects",
+      "answer_scaffold" => [
+        "Where this logic lives today:",
+        "How you would call the service object:",
+        "What you would test first:"
+      ]
     },
     "challenge" => {
       "title" => "Cache the expensive lookup",
@@ -56,6 +61,10 @@ class FakeService < AiService
       "options" => [ "Keep it synchronous but add a timeout", "Move it to a background job via Solid Queue" ],
       "teaching_note" => "Weigh checkout latency against the complexity of a job retry/failure path.",
       "concept" => "service_boundaries",
+      "answer_scaffold" => [
+        "Which option, and why:",
+        "What you would need to handle if delivery fails:"
+      ],
       "reference" => {
         "tagline" => "Move slow, non-critical work off the request path.",
         "explanation" => "A background job absorbs email latency without blocking checkout, at the cost of needing to handle delivery failures asynchronously.",

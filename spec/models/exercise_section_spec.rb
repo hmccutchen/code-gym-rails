@@ -178,4 +178,124 @@ RSpec.describe ExerciseSection do
       end
     end
   end
+
+  describe "answer scaffolds" do
+    it "scaffolds only pattern and architecture" do
+      expect(ExerciseSection.all.select(&:scaffolded?))
+        .to contain_exactly(ExerciseSection::Pattern, ExerciseSection::Architecture)
+    end
+
+    describe ".scaffold_labels" do
+      it "prefers the labels the generator wrote for this problem" do
+        data = { "answer_scaffold" => [ "Which cache, and why:", "How you'd invalidate it:" ] }
+        expect(ExerciseSection::Architecture.scaffold_labels(data))
+          .to eq([ "Which cache, and why:", "How you'd invalidate it:" ])
+      end
+
+      # Every pre-scaffold row takes this path, so it is the common case, not
+      # an edge case.
+      it "falls back to the kind's default when the problem carries none" do
+        expect(ExerciseSection::Architecture.scaffold_labels({ "question" => "q" }))
+          .to eq(ExerciseSection::Architecture::DEFAULT_SCAFFOLD)
+        expect(ExerciseSection::Pattern.scaffold_labels(nil))
+          .to eq(ExerciseSection::Pattern::DEFAULT_SCAFFOLD)
+      end
+
+      it "falls back when the provider returns an unusable shape" do
+        [ "not an array", [], [ "", "   " ], [ nil ], 42 ].each do |bad|
+          expect(ExerciseSection::Pattern.scaffold_labels({ "answer_scaffold" => bad }))
+            .to eq(ExerciseSection::Pattern::DEFAULT_SCAFFOLD)
+        end
+      end
+
+      it "never scaffolds an unscaffolded kind, even if a scaffold is present" do
+        expect(ExerciseSection::CodeReview.scaffold_labels({ "answer_scaffold" => [ "Nope:" ] })).to eq([])
+      end
+    end
+
+    describe ".normalize_scaffold" do
+      it "strips labels and drops blanks" do
+        expect(ExerciseSection::Pattern.normalize_scaffold([ "  A:  ", "", nil, "B:" ])).to eq([ "A:", "B:" ])
+      end
+
+      # Dropped, not coerced: to_s would turn 42 into the label "42" and a Hash
+      # into its inspect output, both of which read as a real scaffold downstream.
+      it "drops non-string elements rather than stringifying them" do
+        expect(ExerciseSection::Pattern.normalize_scaffold([ 42, { "a" => 1 }, [ "B:" ], "A:" ]))
+          .to eq([ "A:" ])
+      end
+
+      it "drops a scaffold made entirely of non-strings" do
+        expect(ExerciseSection::Pattern.normalize_scaffold([ 42, true ])).to eq([])
+      end
+
+      it "caps the number of labels" do
+        expect(ExerciseSection::Pattern.normalize_scaffold((1..10).map { |i| "L#{i}:" }).size)
+          .to eq(ExerciseSection::MAX_SCAFFOLD_LABELS)
+      end
+
+      it "truncates a label the model let run long" do
+        long = ExerciseSection::Pattern.normalize_scaffold([ "x" * 300 ]).first
+        expect(long.length).to eq(ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH)
+      end
+    end
+
+    describe ".scaffold_template" do
+      it "lays out the day's labels with room to write under each" do
+        data = { "answer_scaffold" => [ "First:", "Second:" ] }
+        expect(ExerciseSection::Pattern.scaffold_template(data)).to eq("First:\n\n\nSecond:\n")
+      end
+
+      it "is nil for an unscaffolded kind" do
+        expect(ExerciseSection::CodeReview.scaffold_template({ "question" => "q" })).to be_nil
+      end
+    end
+
+    describe ".substantive_answer" do
+      let(:data) { { "answer_scaffold" => [ "Which option, and why:", "Tradeoffs you considered:" ] } }
+
+      it "returns the whole stripped answer for an unscaffolded kind" do
+        expect(ExerciseSection::CodeReview.substantive_answer("  the N+1 is in the loop  ", nil))
+          .to eq("the N+1 is in the loop")
+      end
+
+      it "removes untouched labels so only what the user typed is measured" do
+        filled = "Which option, and why:\nOption B\n\nTradeoffs you considered:\nSlower writes\n"
+        expect(ExerciseSection::Architecture.substantive_answer(filled, data)).to eq("Option B\n\nSlower writes")
+      end
+
+      it "is empty for a pristine scaffold" do
+        template = ExerciseSection::Architecture.scaffold_template(data)
+        expect(ExerciseSection::Architecture.substantive_answer(template, data)).to eq("")
+      end
+
+      it "strips this problem's labels, not the kind's defaults" do
+        today    = { "answer_scaffold" => [ "Which cache, and why:", "How you'd invalidate it:" ] }
+        pristine = ExerciseSection::Architecture.scaffold_template(today)
+
+        expect(ExerciseSection::Architecture.substantive_answer(pristine, today)).to eq("")
+        expect(ExerciseSection::Architecture.substantive_answer(pristine, nil)).to eq(pristine.strip)
+      end
+
+      it "keeps everything when the user deleted the scaffold and free-typed" do
+        expect(ExerciseSection::Pattern.substantive_answer("I would use a registry object", nil))
+          .to eq("I would use a registry object")
+      end
+
+      # Matching whole lines, not substrings, is what makes an edited label the
+      # user's own text rather than scaffolding to discard.
+      it "keeps a label the user edited, and indentation the user added" do
+        expect(ExerciseSection::Architecture.substantive_answer("Which option, and why: B\n  indented", data))
+          .to eq("Which option, and why: B\n  indented")
+      end
+
+      it "ignores surrounding whitespace when matching a label" do
+        expect(ExerciseSection::Architecture.substantive_answer("   Which option, and why:   \nB", data)).to eq("B")
+      end
+
+      it "treats nil as empty" do
+        expect(ExerciseSection::Pattern.substantive_answer(nil, nil)).to eq("")
+      end
+    end
+  end
 end

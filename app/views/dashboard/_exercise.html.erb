@@ -60,7 +60,7 @@
         <%= render "shared/concept_reference", reference: ref,
               open: first_exposure?(cr["concept"], exercise.language, exercise.date) %>
       <% end %>
-      <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: false, answer: response.answers["code_review"] %>
+      <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: false, response: response %>
       <textarea name="response[answers][code_review]" class="answer" placeholder="What's the issue and how would you fix it?" data-field="code_review"><%= response.answers["code_review"] %></textarea>
       <div class="rating-row" data-rating-for="code_review">
         <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
@@ -82,8 +82,8 @@
               open: first_exposure?(pat["concept"], exercise.language, exercise.date) %>
       <% end %>
 
-      <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: false, answer: response.answers["pattern"] %>
-      <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" data-field="pattern"><%= response.answers["pattern"] %></textarea>
+      <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: false, response: response %>
+      <textarea name="response[answers][pattern]" class="answer" placeholder="Your answer…" data-field="pattern" <%= tag.attributes(answer_scaffold_labels_attr(response, "pattern")) %>><%= answer_starting_value(response, "pattern") %></textarea>
       <div class="rating-row" data-rating-for="pattern">
         <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
           <button type="button" class="rating-btn<%= " active" if response.self_rating_for("pattern") == value %>" data-rating-for="pattern" data-rating="<%= value %>"><%= label.upcase_first %></button>
@@ -111,7 +111,7 @@
           <%= render "shared/concept_reference", reference: ref,
                 open: first_exposure?(ch["concept"], exercise.language, exercise.date) %>
         <% end %>
-        <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: false, answer: response.answers["challenge"] %>
+        <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: false, response: response %>
         <textarea name="response[answers][challenge]" class="answer code-answer" placeholder="# Your implementation…" data-field="challenge"><%= response.answers["challenge"] %></textarea>
         <div class="rating-row" data-rating-for="challenge">
           <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
@@ -166,13 +166,28 @@
       ratingNudge.hidden = ready;
     }
 
+    // The client-side half of DailyResponse.answered? — same rule, same
+    // threshold, but the label list comes from the server (data-scaffold-labels)
+    // rather than a second copy of the scaffold living here.
+    const ANSWER_MIN_LENGTH = <%= DailyResponse::ANSWER_MIN_LENGTH %>;
+
+    function substantive(textarea) {
+      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
+      if (!labels.length) return textarea.value.trim();
+      return textarea.value.split("\n").filter(line => !labels.includes(line.trim())).join("\n").trim();
+    }
+
+    function answered(textarea) {
+      return substantive(textarea).length > ANSWER_MIN_LENGTH;
+    }
+
     function updateProgress() {
-      const filled = [...textareas].filter(t => t.value.trim().length > 10).length;
+      const filled = [...textareas].filter(answered).length;
       progressFill.style.width = (filled / 3 * 100) + "%";
       progressLabel.textContent = filled === 3 ? "✓ All answered — ready to submit!" : `${filled} of 3 answered`;
       document.querySelectorAll("details.hint[data-hint-for]").forEach(d => {
         const t = form.querySelector(`textarea[data-field="${d.dataset.hintFor}"]`);
-        if (t) d.classList.toggle("locked", t.value.trim().length <= 10);
+        if (t) d.classList.toggle("locked", !answered(t));
       });
     }
 

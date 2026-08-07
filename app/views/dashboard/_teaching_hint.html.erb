@@ -1,5 +1,9 @@
+<%# Locals: note, field, submitted, response. The lock uses DailyResponse#answered?
+    rather than its own length check, so the hint unlocks on exactly the rule the
+    progress bar and history use — scaffold labels the user didn't type don't
+    count toward it. %>
 <% if note.present? %>
-  <% locked = !submitted && answer.to_s.strip.length <= 10 %>
+  <% locked = !submitted && !response.answered?(field) %>
   <details class="hint<%= " locked" if locked %>" data-hint-for="<%= field %>">
     <summary>Need a nudge? 💡</summary>
     <div class="hint-body"><%= note %></div>

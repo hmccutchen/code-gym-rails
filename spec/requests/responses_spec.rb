@@ -1236,4 +1236,105 @@ RSpec.describe "Responses", type: :request do
       expect(response.body).to include('data-rating-for="security_review"')
     end
   end
+
+  describe "answer scaffolds" do
+    let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
+    let(:template) { ExerciseSection::Architecture.scaffold_template("answer_scaffold" => scaffold) }
+
+    # The dashboard form renders all three sections, so these need a full set
+    # rather than the single section the POST paths above can get away with.
+    def full_set(third = "architecture", scaffold: nil)
+      third_data = { "title" => "t", "question" => "q" }
+      third_data["answer_scaffold"] = scaffold if scaffold
+      {
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "pattern"     => { "title" => "t", "why" => "w", "question" => "q" },
+        third         => third_data
+      }
+    end
+
+    def post_answers(exercise, answers)
+      post responses_path, params: { response: { answers: answers } }, as: :json
+      DailyResponse.find_by(user: user, daily_exercise: exercise)
+    end
+
+    def textarea_body(field)
+      response.body[/<textarea[^>]*data-field="#{field}"[^>]*>(.*?)<\/textarea>/m, 1]
+    end
+
+    describe "POST /responses normalization" do
+      # Rating a section triggers an autosave that posts every textarea's raw
+      # value, so an untouched scaffold reaches the server whether the user
+      # typed or not. It must not be stored as if it were an answer.
+      it "stores a blank answer when only the scaffold comes back" do
+        exercise = create_exercise(full_set("architecture", scaffold: scaffold))
+        saved = post_answers(exercise, "architecture" => template)
+
+        expect(saved.answers["architecture"]).to eq("")
+        expect(saved.answered_sections).to be_empty
+      end
+
+      it "stores the user's text with its labels intact once they type" do
+        exercise = create_exercise(full_set("architecture", scaffold: scaffold))
+        filled = template + "Redis, because reads dominate"
+        saved = post_answers(exercise, "architecture" => filled)
+
+        expect(saved.answers["architecture"]).to eq(filled)
+        expect(saved.answered_sections).to eq([ "architecture" ])
+      end
+
+      it "does not blank an unscaffolded section that happens to be short" do
+        exercise = create_exercise(full_set)
+        saved = post_answers(exercise, "code_review" => "n+1")
+
+        expect(saved.answers["code_review"]).to eq("n+1")
+      end
+    end
+
+    describe "GET / pre-fill" do
+      it "pre-fills a fresh textarea with the scaffold written for this problem" do
+        create_exercise(full_set("architecture", scaffold: scaffold))
+
+        get root_path
+
+        # Asserted on the textarea's contents, not the page: the labels also
+        # appear in data-scaffold-labels, so a page-wide match would pass even
+        # if the pre-fill never happened.
+        expect(textarea_body("architecture")).to eq(ERB::Util.html_escape(template))
+
+        labels_attr = response.body[/<textarea[^>]*data-field="architecture"[^>]*>/][/data-scaffold-labels="([^"]*)"/, 1]
+        expect(CGI.unescapeHTML(labels_attr)).to eq(scaffold.to_json)
+      end
+
+      it "falls back to the kind's default labels when the problem carries no scaffold" do
+        create_exercise(full_set)
+
+        get root_path
+
+        expect(textarea_body("architecture"))
+          .to eq(ERB::Util.html_escape(ExerciseSection::Architecture.scaffold_template(nil)))
+        expect(textarea_body("pattern"))
+          .to eq(ERB::Util.html_escape(ExerciseSection::Pattern.scaffold_template(nil)))
+      end
+
+      it "shows a previously saved answer instead of the scaffold" do
+        exercise = create_exercise(full_set)
+        DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                              answers: { "pattern" => "My own words, written before scaffolds existed" })
+
+        get root_path
+
+        expect(textarea_body("pattern")).to eq("My own words, written before scaffolds existed")
+      end
+
+      it "does not pre-fill an unscaffolded section" do
+        create_exercise(full_set("challenge"))
+
+        get root_path
+
+        expect(textarea_body("challenge")).to eq("")
+        expect(textarea_body("code_review")).to eq("")
+      end
+    end
+  end
 end
