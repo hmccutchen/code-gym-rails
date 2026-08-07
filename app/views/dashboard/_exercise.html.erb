@@ -167,12 +167,12 @@
     }
 
     // The client-side half of DailyResponse.answered? — same rule, same
-    // threshold, but the label list comes from the server (data-template-labels)
-    // rather than a second copy of the template text living here.
+    // threshold, but the label list comes from the server (data-scaffold-labels)
+    // rather than a second copy of the scaffold living here.
     const ANSWER_MIN_LENGTH = <%= DailyResponse::ANSWER_MIN_LENGTH %>;
 
     function substantive(textarea) {
-      const labels = JSON.parse(textarea.dataset.templateLabels || "[]");
+      const labels = JSON.parse(textarea.dataset.scaffoldLabels || "[]");
       if (!labels.length) return textarea.value.trim();
       return textarea.value.split("\n").filter(line => !labels.includes(line.trim())).join("\n").trim();
     }

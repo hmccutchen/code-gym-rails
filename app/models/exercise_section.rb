@@ -97,7 +97,7 @@ class ExerciseSection
     # Starting value for a fresh textarea: each label followed by room to write
     # under it. The blank lines are what make the scaffold feel like a form to
     # fill rather than a paragraph to edit.
-    def answer_template(section_data = nil)
+    def scaffold_template(section_data = nil)
       labels = scaffold_labels(section_data)
       return nil if labels.empty?
 

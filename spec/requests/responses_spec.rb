@@ -1239,7 +1239,7 @@ RSpec.describe "Responses", type: :request do
 
   describe "answer scaffolds" do
     let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
-    let(:template) { ExerciseSection::Architecture.answer_template("answer_scaffold" => scaffold) }
+    let(:template) { ExerciseSection::Architecture.scaffold_template("answer_scaffold" => scaffold) }
 
     # The dashboard form renders all three sections, so these need a full set
     # rather than the single section the POST paths above can get away with.
@@ -1298,11 +1298,11 @@ RSpec.describe "Responses", type: :request do
         get root_path
 
         # Asserted on the textarea's contents, not the page: the labels also
-        # appear in data-template-labels, so a page-wide match would pass even
+        # appear in data-scaffold-labels, so a page-wide match would pass even
         # if the pre-fill never happened.
         expect(textarea_body("architecture")).to eq(ERB::Util.html_escape(template))
 
-        labels_attr = response.body[/<textarea[^>]*data-field="architecture"[^>]*>/][/data-template-labels="([^"]*)"/, 1]
+        labels_attr = response.body[/<textarea[^>]*data-field="architecture"[^>]*>/][/data-scaffold-labels="([^"]*)"/, 1]
         expect(CGI.unescapeHTML(labels_attr)).to eq(scaffold.to_json)
       end
 
@@ -1312,9 +1312,9 @@ RSpec.describe "Responses", type: :request do
         get root_path
 
         expect(textarea_body("architecture"))
-          .to eq(ERB::Util.html_escape(ExerciseSection::Architecture.answer_template(nil)))
+          .to eq(ERB::Util.html_escape(ExerciseSection::Architecture.scaffold_template(nil)))
         expect(textarea_body("pattern"))
-          .to eq(ERB::Util.html_escape(ExerciseSection::Pattern.answer_template(nil)))
+          .to eq(ERB::Util.html_escape(ExerciseSection::Pattern.scaffold_template(nil)))
       end
 
       it "shows a previously saved answer instead of the scaffold" do

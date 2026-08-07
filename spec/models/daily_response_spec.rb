@@ -91,7 +91,7 @@ RSpec.describe DailyResponse, type: :model do
       end
 
       def template
-        ExerciseSection::Architecture.answer_template(scaffolded_exercise.problem_set["architecture"])
+        ExerciseSection::Architecture.scaffold_template(scaffolded_exercise.problem_set["architecture"])
       end
 
       it "does not count a section holding nothing but its scaffold" do
@@ -144,12 +144,30 @@ RSpec.describe DailyResponse, type: :model do
     end
 
     def template
-      ExerciseSection::Architecture.answer_template(scaffolded_exercise.problem_set["architecture"])
+      ExerciseSection::Architecture.scaffold_template(scaffolded_exercise.problem_set["architecture"])
     end
 
     it "blanks a section holding nothing but its scaffold" do
       expect(DailyResponse.normalize_answers({ "architecture" => template }, scaffolded_exercise))
         .to eq("architecture" => "")
+    end
+
+    # A browser submits textarea content with CRLF line endings, so this is the
+    # shape the untouched scaffold actually arrives in — not the LF the server wrote.
+    it "blanks an untouched scaffold submitted with browser line endings" do
+      submitted = template.gsub("\n", "\r\n")
+
+      expect(DailyResponse.normalize_answers({ "architecture" => submitted }, scaffolded_exercise))
+        .to eq("architecture" => "")
+    end
+
+    it "still counts real content typed under CRLF labels" do
+      submitted = (template + "Redis, because reads dominate").gsub("\n", "\r\n")
+
+      expect(DailyResponse.normalize_answers({ "architecture" => submitted }, scaffolded_exercise))
+        .to eq("architecture" => submitted)
+      expect(DailyResponse.answered?("architecture", submitted,
+                                     scaffolded_exercise.problem_set["architecture"])).to be true
     end
 
     it "preserves the labels verbatim once the user has typed under them" do

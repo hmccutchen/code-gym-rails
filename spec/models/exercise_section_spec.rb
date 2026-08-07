@@ -229,14 +229,14 @@ RSpec.describe ExerciseSection do
       end
     end
 
-    describe ".answer_template" do
+    describe ".scaffold_template" do
       it "lays out the day's labels with room to write under each" do
         data = { "answer_scaffold" => [ "First:", "Second:" ] }
-        expect(ExerciseSection::Pattern.answer_template(data)).to eq("First:\n\n\nSecond:\n")
+        expect(ExerciseSection::Pattern.scaffold_template(data)).to eq("First:\n\n\nSecond:\n")
       end
 
       it "is nil for an unscaffolded kind" do
-        expect(ExerciseSection::CodeReview.answer_template({ "question" => "q" })).to be_nil
+        expect(ExerciseSection::CodeReview.scaffold_template({ "question" => "q" })).to be_nil
       end
     end
 
@@ -254,13 +254,13 @@ RSpec.describe ExerciseSection do
       end
 
       it "is empty for a pristine scaffold" do
-        template = ExerciseSection::Architecture.answer_template(data)
+        template = ExerciseSection::Architecture.scaffold_template(data)
         expect(ExerciseSection::Architecture.substantive_answer(template, data)).to eq("")
       end
 
       it "strips this problem's labels, not the kind's defaults" do
         today    = { "answer_scaffold" => [ "Which cache, and why:", "How you'd invalidate it:" ] }
-        pristine = ExerciseSection::Architecture.answer_template(today)
+        pristine = ExerciseSection::Architecture.scaffold_template(today)
 
         expect(ExerciseSection::Architecture.substantive_answer(pristine, today)).to eq("")
         expect(ExerciseSection::Architecture.substantive_answer(pristine, nil)).to eq(pristine.strip)
