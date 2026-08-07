@@ -48,12 +48,12 @@ class AiService
   #     and every on-demand dashboard trigger. Runs on the worker, holds no
   #     Puma thread and no review claim, and nobody is watching a spinner, so
   #     it can wait as long as the provider needs.
-  #   - SYNC_GENERATION_READ_TIMEOUT: DailyExercisesController#regenerate,
-  #     which still calls generate_exercise inline (the generating UI and
-  #     /dashboard/status both signal completion by the exercise row appearing,
-  #     which regenerate-in-place never does, so it cannot simply enqueue).
-  #     That holds a Puma thread with a user waiting on the response, so it
-  #     gets enough room to actually finish and no more.
+  #   - SYNC_GENERATION_READ_TIMEOUT: currently uncalled. It sized the read
+  #     budget for a generation that blocks a Puma thread with a user waiting
+  #     on the response — enough room to finish and no more. Its only caller
+  #     was DailyExercisesController#regenerate, which now claims the row and
+  #     enqueues RegenerateExerciseJob instead. Retained so any future
+  #     synchronous caller inherits a bound rather than GENERATION_READ_TIMEOUT.
   GENERATION_READ_TIMEOUT      = 300
   SYNC_GENERATION_READ_TIMEOUT = 90
 
