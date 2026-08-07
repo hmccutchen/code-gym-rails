@@ -156,7 +156,7 @@ class FakeService < AiService
   # GenerateDailyExercisesJob rescues the AiService hierarchy and turns it into
   # a persisted, user-facing failure message, which would bury a broken fake as
   # "generation failed" instead of failing the spec that caused it.
-  def call(system:, prompt:, cache_system: false)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
     text =
       case system
       when /generating personalized daily exercise sets/

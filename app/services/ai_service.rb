@@ -35,6 +35,40 @@ class AiService
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
 
+  # Generation asks for the single largest response we ever request — one
+  # non-streaming call carrying every section, including the full reference
+  # blocks — from a model that thinks before it answers, so the socket stays
+  # silent until the whole thing is built. READ_TIMEOUT was sized for a
+  # per-section review, and imposing it here made generation fail on
+  # Net::ReadTimeout once ClaudeService::MAX_TOKENS grew.
+  #
+  # Two budgets, because generation runs from two places with different costs
+  # for waiting:
+  #   - GENERATION_READ_TIMEOUT: GenerateDailyExercisesJob, the morning batch
+  #     and every on-demand dashboard trigger. Runs on the worker, holds no
+  #     Puma thread and no review claim, and nobody is watching a spinner, so
+  #     it can wait as long as the provider needs.
+  #   - SYNC_GENERATION_READ_TIMEOUT: DailyExercisesController#regenerate,
+  #     which still calls generate_exercise inline (the generating UI and
+  #     /dashboard/status both signal completion by the exercise row appearing,
+  #     which regenerate-in-place never does, so it cannot simply enqueue).
+  #     That holds a Puma thread with a user waiting on the response, so it
+  #     gets enough room to actually finish and no more.
+  GENERATION_READ_TIMEOUT      = 300
+  SYNC_GENERATION_READ_TIMEOUT = 90
+
+  # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
+  # taken as final: the provider has almost certainly finished, and billed, the
+  # work we stopped waiting for, so retrying buys a duplicate charge for the
+  # entire problem set rather than a better outcome. Short calls keep retrying,
+  # and this never suppresses a retry_statuses retry (429/5xx arrive as
+  # Faraday::RetriableResponse, not a timeout).
+  RETRY_TIMEOUT_GUARD = lambda do |env, exception|
+    return true unless exception.is_a?(Faraday::TimeoutError)
+
+    !env.request.context.to_h[:long_running]
+  end
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
@@ -174,11 +208,16 @@ class AiService
   # The day's plan (third section, reinforcement, retention checks) is decided by
   # DailyPlan before any provider is contacted; this method only renders it into
   # a prompt, sends it, and records what came back.
-  def generate_exercise(user, language: user.language_for_today)
+  #
+  # `blocking:` says a request thread is waiting on this call, which buys a
+  # tighter read budget (see SYNC_GENERATION_READ_TIMEOUT). Callers state their
+  # constraint; the timeout policy stays here.
+  def generate_exercise(user, language: user.language_for_today, blocking: false)
     plan = DailyPlan.for(user, language: language)
 
     result = call_and_log(
       user, purpose: "generate_exercise",
+      read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
       system: build_system_prompt(language),
       prompt: build_exercise_prompt(user, language, third: plan.third,
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
@@ -443,7 +482,9 @@ class AiService
 
   # Subclasses must implement: makes the provider-specific HTTP call and
   # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
-  def call(system:, prompt:, cache_system: false)
+  # `read_timeout` overrides the connection's default read budget for this
+  # call only (see AiService::GENERATION_READ_TIMEOUT).
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -972,8 +1013,8 @@ class AiService
   # themselves: recognizing a stop reason is provider-specific, but deciding
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
-  def call_and_log(user, purpose:, system:, prompt:, cache_system: false)
-    result = call(system: system, prompt: prompt, cache_system: cache_system)
+  def call_and_log(user, purpose:, system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
+    result = call(system: system, prompt: prompt, cache_system: cache_system, read_timeout: read_timeout)
     log_usage(user, result, purpose: purpose)
 
     if result[:truncated]

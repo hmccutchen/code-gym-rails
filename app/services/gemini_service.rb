@@ -5,10 +5,11 @@ class GeminiService < AiService
   MODEL   = "gemini-3.5-flash"
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
-  # 3 total attempts, exponential backoff capped at 8s. `methods: [:post]`
-  # is required because faraday-retry's default idempotent-methods list
-  # excludes POST, which every call here uses — without it, retries would
-  # never fire regardless of retry_statuses. 429 matters most here: the
+  # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
+  # every retry decision through `retry_if` — faraday-retry treats a method on
+  # its `methods` list as retryable outright and never consults `retry_if`, and
+  # POST (which every call here uses) has to be on one list or the other or no
+  # retry ever fires. 429 matters most here: the
   # Gemini free tier's ~15 req/min limit means teammates generating around
   # the same time can collide. Retry-After / RateLimit-Reset response
   # headers are honored automatically by faraday-retry when present, taking
@@ -20,13 +21,14 @@ class GeminiService < AiService
     max_interval:        8,
     backoff_factor:      2,
     interval_randomness: 0.5,
-    methods:             [ :post ],
+    methods:             [],
+    retry_if:            AiService::RETRY_TIMEOUT_GUARD,
     retry_statuses:      [ 429, 500, 502, 503, 504 ]
   }.freeze
 
   private
 
-  def call(system:, prompt:, cache_system: false)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
     body = {
       model:              MODEL,
       system_instruction: system,
@@ -34,7 +36,10 @@ class GeminiService < AiService
       store:              false
     }
 
-    resp = @conn.post(API_URL, body.to_json)
+    resp = @conn.post(API_URL, body.to_json) do |req|
+      req.options.timeout = read_timeout
+      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT)
+    end
 
     unless resp.success?
       log_raw_snippet("Gemini API error #{resp.status} body", resp.body)

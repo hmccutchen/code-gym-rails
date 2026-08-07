@@ -37,6 +37,59 @@ RSpec.describe ClaudeService do
     end
   end
 
+  describe "per-call read budget" do
+    # Records what each attempt actually saw, so the assertions below are about
+    # the request that reached the adapter rather than the connection default.
+    def recording_connection(attempts, raise_timeout: true)
+      Faraday.new do |f|
+        f.request :retry, ClaudeService::RETRY_OPTIONS.merge(interval: 0, max_interval: 0)
+        f.adapter :test do |stub|
+          stub.post(ClaudeService::API_URL) do |env|
+            attempts << env.request.timeout
+            raise Faraday::TimeoutError, "Net::ReadTimeout" if raise_timeout
+
+            [ 200, {}, success_body ]
+          end
+        end
+      end
+    end
+
+    it "applies the caller's read timeout to the request itself" do
+      attempts = []
+      service.instance_variable_set(:@conn, recording_connection(attempts, raise_timeout: false))
+
+      service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+
+      expect(attempts).to eq([ AiService::GENERATION_READ_TIMEOUT ])
+    end
+
+    # A read timeout means the provider very likely finished — and billed — the
+    # work; we just stopped listening. Retrying a generation therefore pays for
+    # the whole problem set up to three times over to produce one failure, so
+    # the long-running path takes a timeout as final.
+    it "does not retry a generation that times out" do
+      attempts = []
+      service.instance_variable_set(:@conn, recording_connection(attempts))
+
+      expect {
+        service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::GENERATION_READ_TIMEOUT)
+      }.to raise_error(AiService::Error, /Network error calling Claude/)
+
+      expect(attempts.size).to eq(1)
+    end
+
+    it "still retries a short review call that times out" do
+      attempts = []
+      service.instance_variable_set(:@conn, recording_connection(attempts))
+
+      expect {
+        service.send(:call, system: "sys", prompt: "p")
+      }.to raise_error(AiService::Error, /Network error calling Claude/)
+
+      expect(attempts.size).to eq(ClaudeService::RETRY_OPTIONS[:max] + 1)
+    end
+  end
+
   describe "retry/backoff" do
     it "raises a handled error when the provider never responds" do
       conn = Faraday.new do |f|
