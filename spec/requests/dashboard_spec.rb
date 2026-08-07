@@ -855,4 +855,24 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("yesterday's problem")
     end
   end
+
+  describe "the generation poller" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # The poller shipped with a fixed 40 attempts (120s) while the worker's
+    # generation budget is GENERATION_READ_TIMEOUT (300s), so a slow but healthy
+    # generation told the user to refresh while the job was still running.
+    it "keeps polling for longer than a generation is allowed to take" do
+      # A weekday with no exercise yet is the state that renders the spinner.
+      travel_to Time.utc(2026, 8, 7, 12, 0, 0) do
+        get root_path
+
+        attempts = response.body[/MAX_ATTEMPTS = (\d+)/, 1].to_i
+        interval = response.body[/setTimeout\(poll, (\d+)\)/, 1].to_i / 1000.0
+
+        expect(attempts).to be_positive
+        expect(attempts * interval).to be > AiService::GENERATION_READ_TIMEOUT
+      end
+    end
+  end
 end

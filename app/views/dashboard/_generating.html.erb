@@ -13,7 +13,9 @@
   const hint = document.getElementById("generating-hint");
   const statusUrl = "<%= dashboard_status_path %>";
   let attempts = 0;
-  const MAX_ATTEMPTS = 40; // ~2 minutes at 3s intervals
+  <%# Derived from the provider budget rather than hardcoded, so the poller
+      cannot quietly stop covering a generation the worker is still running. %>
+  const MAX_ATTEMPTS = <%= ((AiService::GENERATION_READ_TIMEOUT + 90) / 3.0).ceil %>;
 
   async function poll() {
     attempts += 1;
