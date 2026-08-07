@@ -90,7 +90,8 @@ class ExerciseSection
     def normalize_scaffold(raw)
       return [] unless raw.is_a?(Array)
 
-      raw.filter_map { |label| label.to_s.strip.presence&.truncate(MAX_SCAFFOLD_LABEL_LENGTH) }
+      raw.grep(String)
+         .filter_map { |label| label.strip.presence&.truncate(MAX_SCAFFOLD_LABEL_LENGTH) }
          .first(MAX_SCAFFOLD_LABELS)
     end
 

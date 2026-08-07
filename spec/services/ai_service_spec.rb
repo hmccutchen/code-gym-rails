@@ -664,7 +664,7 @@ RSpec.describe AiService do
     # Dropped rather than repaired: the reader then takes the same fallback path
     # every pre-scaffold row already takes.
     it "drops an unusable scaffold instead of persisting it" do
-      [ "not an array", [], [ "", nil ], 42 ].each do |bad|
+      [ "not an array", [], [ "", nil ], [ 42, true ], 42 ].each do |bad|
         set = { "pattern" => { "question" => "q", "answer_scaffold" => bad } }
         expect(service.send(:normalize_answer_scaffolds!, set)["pattern"]).not_to have_key("answer_scaffold")
       end

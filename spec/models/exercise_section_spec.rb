@@ -214,8 +214,19 @@ RSpec.describe ExerciseSection do
     end
 
     describe ".normalize_scaffold" do
-      it "strips labels and drops blanks and non-strings" do
+      it "strips labels and drops blanks" do
         expect(ExerciseSection::Pattern.normalize_scaffold([ "  A:  ", "", nil, "B:" ])).to eq([ "A:", "B:" ])
+      end
+
+      # Dropped, not coerced: to_s would turn 42 into the label "42" and a Hash
+      # into its inspect output, both of which read as a real scaffold downstream.
+      it "drops non-string elements rather than stringifying them" do
+        expect(ExerciseSection::Pattern.normalize_scaffold([ 42, { "a" => 1 }, [ "B:" ], "A:" ]))
+          .to eq([ "A:" ])
+      end
+
+      it "drops a scaffold made entirely of non-strings" do
+        expect(ExerciseSection::Pattern.normalize_scaffold([ 42, true ])).to eq([])
       end
 
       it "caps the number of labels" do
