@@ -18,6 +18,18 @@ RSpec.describe AiService do
 
       expect(worst_case).to be < ResponsesController::REVIEW_CLAIM_STALE_AFTER.to_i
     end
+
+    # The review budget above is driven by #review holding a request thread and
+    # a claim on the row. Generation shares neither constraint: it is always
+    # enqueued (GenerateDailyExercisesJob), so it runs on the worker and holds
+    # no claim. It is also the single largest response we ever ask for — one
+    # non-streaming call carrying every section — against a model that thinks
+    # before it answers, so nothing arrives on the socket for far longer than a
+    # per-section review takes. Sharing READ_TIMEOUT with the review path made
+    # every morning's generation die on Net::ReadTimeout.
+    it "gives generation a budget far larger than the per-review one" do
+      expect(AiService::GENERATION_READ_TIMEOUT).to be > AiService::READ_TIMEOUT * 4
+    end
   end
 
   # Minimal concrete subclass so AiService's shared logic can be exercised
@@ -25,6 +37,13 @@ RSpec.describe AiService do
   let(:double_class) do
     Class.new(AiService) do
       attr_writer :canned_text, :input_tokens, :output_tokens, :truncated
+      attr_reader :last_read_timeout
+
+      # #review_sections builds a fresh service per section thread, so a plain
+      # ivar on the instance under test never sees those calls.
+      def self.read_timeouts
+        @read_timeouts ||= []
+      end
 
       def initialize(api_key_or_config = nil, canned_text: "{}", input_tokens: 1, output_tokens: 1, truncated: false)
         config = api_key_or_config.is_a?(Hash) ? api_key_or_config : { canned_text: canned_text, input_tokens: input_tokens, output_tokens: output_tokens, truncated: truncated }
@@ -37,7 +56,9 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false)
+      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
+        @last_read_timeout = read_timeout
+        self.class.read_timeouts << read_timeout
         { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
 
@@ -1197,6 +1218,41 @@ RSpec.describe AiService do
     end
   end
 
+  describe "read timeout per call type" do
+    def exercise_and_response_for_review
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "cr?", "snippet" => "code" },
+          "pattern"     => { "title" => "P", "question" => "pat?" },
+          "challenge"   => { "question" => "Implement uniq_by" }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20 }, submitted_at: Time.current
+      )
+      [ exercise, response ]
+    end
+
+    it "sends the generation call with the long generation budget" do
+      svc = double_class.new
+      svc.generate_exercise(user)
+
+      expect(svc.last_read_timeout).to eq(AiService::GENERATION_READ_TIMEOUT)
+    end
+
+    it "leaves a section review on the short request-thread budget" do
+      exercise, response = exercise_and_response_for_review
+      review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }
+      svc = double_class.new(canned_text: review.to_json)
+
+      svc.review_sections(user, exercise, response, sections: %w[code_review])
+
+      expect(double_class.read_timeouts).to eq([ AiService::READ_TIMEOUT ])
+    end
+  end
+
   describe "#review_sections" do
     def exercise_and_response
       exercise = DailyExercise.create!(
@@ -1247,7 +1303,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
           @calls += 1
           raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
@@ -1268,7 +1324,7 @@ RSpec.describe AiService do
 
       auth_failing = Class.new(AiService) do
         private
-        def call(system:, prompt:, cache_system: false) = raise(AiService::AuthenticationError, "bad key")
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT) = raise(AiService::AuthenticationError, "bad key")
         def build_connection = nil
       end.new("fake_key")
 
@@ -1309,7 +1365,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
           @last_prompt = prompt
           super
         end
@@ -1363,7 +1419,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT)
           @last_prompt = prompt
           super
         end

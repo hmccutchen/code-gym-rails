@@ -15,28 +15,30 @@ class ClaudeService < AiService
   # also has to clear whatever the model spends on unrequested thinking.
   MAX_TOKENS = 16_000
 
-  # 3 total attempts, exponential backoff capped at 8s. `methods: [:post]`
-  # is required because faraday-retry's default idempotent-methods list
-  # excludes POST, which every call here uses — without it, retries would
-  # never fire regardless of retry_statuses. 429 is Anthropic's rate limit;
-  # 500/502/503/504 are transient provider-side failures; 529 is Anthropic's
-  # own "overloaded" status. Retry-After / RateLimit-Reset response headers
-  # are honored automatically by faraday-retry when present, taking
-  # precedence over the computed backoff. Exposed as a constant so specs can
-  # build an equivalent test connection instead of duplicating these values.
+  # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
+  # every retry decision through `retry_if` — faraday-retry treats a method on
+  # its `methods` list as retryable outright and never consults `retry_if`, and
+  # POST (which every call here uses) has to be on one list or the other or no
+  # retry ever fires. 429 is Anthropic's rate limit; 500/502/503/504 are
+  # transient provider-side failures; 529 is Anthropic's own "overloaded"
+  # status. Retry-After / RateLimit-Reset response headers are honored
+  # automatically by faraday-retry when present, taking precedence over the
+  # computed backoff. Exposed as a constant so specs can build an equivalent
+  # test connection instead of duplicating these values.
   RETRY_OPTIONS = {
     max:                 2,
     interval:            0.5,
     max_interval:        8,
     backoff_factor:      2,
     interval_randomness: 0.5,
-    methods:             [ :post ],
+    methods:             [],
+    retry_if:            AiService::RETRY_TIMEOUT_GUARD,
     retry_statuses:      [ 429, 500, 502, 503, 504, 529 ]
   }.freeze
 
   private
 
-  def call(system:, prompt:, cache_system: false)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT)
     body = {
       model:      MODEL,
       max_tokens: MAX_TOKENS,
@@ -44,7 +46,10 @@ class ClaudeService < AiService
       messages:   [ { role: "user", content: prompt } ]
     }
 
-    resp = @conn.post(API_URL, body.to_json)
+    resp = @conn.post(API_URL, body.to_json) do |req|
+      req.options.timeout = read_timeout
+      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT)
+    end
 
     unless resp.success?
       log_raw_snippet("Claude API error #{resp.status} body", resp.body)
