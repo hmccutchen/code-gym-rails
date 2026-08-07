@@ -772,4 +772,40 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-hljs="ruby"')
     expect(response.body).to include("highlight.js@11.11.1/lib/core")
   end
+
+  describe "while a regeneration is in flight" do
+    def claimed_exercise
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago,
+                            problem_set: { "code_review" => { "question" => "STALE-SET-MARKER" } },
+                            regenerating_since: Time.current)
+    end
+
+    it "shows the spinner instead of the stale problem set" do
+      claimed_exercise
+
+      get root_path
+
+      expect(response.body).to include("Generating your personalized exercise set")
+      expect(response.body).not_to include("STALE-SET-MARKER")
+    end
+
+    # The row is present the whole time, so an exists?-only check would report
+    # the regeneration finished the instant it started.
+    it "reports pending rather than ready" do
+      claimed_exercise
+
+      get dashboard_status_path
+
+      expect(JSON.parse(response.body)["status"]).to eq("pending")
+    end
+
+    it "reports ready once the claim is released" do
+      exercise = claimed_exercise
+      exercise.update!(regenerating_since: nil)
+
+      get dashboard_status_path
+
+      expect(JSON.parse(response.body)["status"]).to eq("ready")
+    end
+  end
 end
