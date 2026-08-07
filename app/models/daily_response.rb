@@ -95,10 +95,48 @@ class DailyResponse < ApplicationRecord
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 
-  # Answer keys with substantive content — same >10-char heuristic the
-  # dashboard progress bar uses.
+  # Answer keys with substantive content. The threshold is a heuristic, but it
+  # is THE heuristic — the dashboard progress bar, the teaching-hint lock, and
+  # the generation prompt all derive from #answered? rather than re-deriving a
+  # length check, so there is one definition of "answered" to change.
+  #
+  # Length is measured against the answer minus the day's scaffold labels (see
+  # ExerciseSection.substantive_answer), so a scaffolded section isn't counted
+  # as answered for text the user didn't write.
+  ANSWER_MIN_LENGTH = 10
+
+  def self.substantive_answer(section, value, section_data = nil)
+    kind = ExerciseSection.find(section)
+    kind ? kind.substantive_answer(value, section_data) : value.to_s.strip
+  end
+
+  def self.answered?(section, value, section_data = nil)
+    substantive_answer(section, value, section_data).length > ANSWER_MIN_LENGTH
+  end
+
+  # Scaffold labels the user never typed into aren't an answer, so they are not
+  # stored as one. Normalizing on write (rather than at each of the several
+  # read sites that render or send `answers[section]` verbatim) keeps the AI
+  # review prompt, the history display, and recent_performance seeing exactly
+  # what they saw before scaffolds existed: a blank answer, or the user's own
+  # words. A blanked section simply re-renders its scaffold on the next load.
+  def self.normalize_answers(answers, exercise)
+    answers.to_h.transform_values(&:to_s).each_with_object({}) do |(section, value), normalized|
+      section_data = exercise&.problem_set&.dig(section.to_s)
+      normalized[section] = substantive_answer(section, value, section_data).empty? ? "" : value
+    end
+  end
+
+  def section_data(section)
+    daily_exercise&.problem_set&.dig(section.to_s)
+  end
+
+  def answered?(section)
+    self.class.answered?(section, answers[section.to_s], section_data(section))
+  end
+
   def answered_sections
-    answers.select { |_, v| v.to_s.strip.length > 10 }.keys
+    answers.keys.select { |section| answered?(section) }
   end
 
   def completeness

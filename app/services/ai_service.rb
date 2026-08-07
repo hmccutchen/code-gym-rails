@@ -255,6 +255,7 @@ class AiService
     )
 
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    normalize_answer_scaffolds!(problem_set)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
     problem_set
@@ -639,6 +640,7 @@ class AiService
               "scenario":  "string — 2-3 sentences, ~50 words max. Exactly 2-3 concrete constraints total, no more",
               "question":  "string — ONE sentence asking for a decision + justification",
               "options":   ["string — a viable approach", "string — another viable approach", "string — an optional third approach (omit for 2)"],
+              "answer_scaffold": ["string — a labelled part of a complete answer to THIS decision", "string — another part"],
               "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
               "concept": "string — exactly one concept from the architecture vocabulary",
               "reference": {
@@ -705,6 +707,7 @@ class AiService
           "why":      "string — one sentence on why the pattern exists",
           "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+          "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary"
         },
@@ -848,6 +851,7 @@ class AiService
       #{ts_guidance}
       - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
+      - answer_scaffold (pattern and architecture only): #{ExerciseSection::MAX_SCAFFOLD_LABELS} labels at most, #{ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH} characters at most each, ending in a colon. These pre-fill the answer box, so write them for THIS question specifically — name the parts a complete answer to it must cover, in the order someone should think them through (e.g. for a caching decision: "Which option, and why:", "How you'd handle a stale entry:"). Generic prompts that would fit any question of this kind are a wasted scaffold. Each is a heading the engineer writes UNDER, so it must ask for something, never state or hint at the answer — the teaching_note rules apply here too.
       #{third_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
@@ -1076,6 +1080,27 @@ class AiService
     order    = identity.shuffle
     order    = identity.shuffle while order == identity && identity.size > 1
     parsons["display_order"] = order
+    problem_set
+  end
+
+  # Bounds and sanitizes the model-generated answer_scaffold before it is
+  # persisted, so what reaches the form is always a short list of short labels.
+  # An unusable or missing scaffold is dropped entirely rather than repaired —
+  # ExerciseSection.scaffold_labels then falls back to the kind's default, which
+  # is the same path every pre-scaffold row already takes.
+  def normalize_answer_scaffolds!(problem_set)
+    problem_set.each do |section_key, section_data|
+      kind = ExerciseSection.find(section_key)
+      next unless section_data.is_a?(Hash)
+
+      unless kind&.scaffolded?
+        section_data.delete("answer_scaffold")
+        next
+      end
+
+      labels = kind.normalize_scaffold(section_data["answer_scaffold"])
+      labels.any? ? section_data["answer_scaffold"] = labels : section_data.delete("answer_scaffold")
+    end
     problem_set
   end
 

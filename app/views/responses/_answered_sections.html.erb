@@ -12,7 +12,7 @@
   <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
     <%= render "shared/concept_reference", reference: ref %>
   <% end %>
-  <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: true, answer: response.answers["code_review"] %>
+  <%= render "dashboard/teaching_hint", note: cr["teaching_note"], field: "code_review", submitted: true, response: response %>
   <div class="answer-display"><%= response.answers["code_review"].presence || "(skipped)" %></div>
 </div>
 <% end %>
@@ -28,7 +28,7 @@
     <%= render "shared/concept_reference", reference: ref %>
   <% end %>
 
-  <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: true, answer: response.answers["pattern"] %>
+  <%= render "dashboard/teaching_hint", note: pat["teaching_note"], field: "pattern", submitted: true, response: response %>
   <div class="answer-display"><%= response.answers["pattern"].presence || "(skipped)" %></div>
 </div>
 <% end %>
@@ -50,7 +50,7 @@
     <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
       <%= render "shared/concept_reference", reference: ref %>
     <% end %>
-    <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, answer: response.answers["challenge"] %>
+    <%= render "dashboard/teaching_hint", note: ch["teaching_note"], field: "challenge", submitted: true, response: response %>
     <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
   </div>
 <% end %>

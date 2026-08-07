@@ -7,6 +7,13 @@
 # Deliberately closed, like the concept vocabularies these select: adding a kind
 # means adding a subclass here, not persisting a new string.
 class ExerciseSection
+  # Bounds on the model-generated `answer_scaffold`. Enough labels to decompose
+  # an answer, short enough to read as a label rather than a paragraph — and,
+  # more to the point, bounded at all, since this is provider output rendered
+  # straight into the form.
+  MAX_SCAFFOLD_LABELS       = 4
+  MAX_SCAFFOLD_LABEL_LENGTH = 80
+
   # Enumeration order, matching the order these keys have always been listed in
   # (strong params, concept tagging, scenario collection) so anything deriving a
   # Hash or Array from it keeps the ordering it already had.
@@ -52,6 +59,62 @@ class ExerciseSection
     # Whether a review of this kind can carry corrected code.
     def improved_code?
       true
+    end
+
+    # Whether this kind's answer is scaffolded, and with what labels when the
+    # day's problem carries none. nil for kinds that take a single unstructured
+    # answer — those are never pre-filled and never have labels stripped.
+    def default_scaffold
+      nil
+    end
+
+    def scaffolded?
+      default_scaffold.present?
+    end
+
+    # The labels actually in play for one day's problem. The generator tailors
+    # `answer_scaffold` to the question it just wrote; DEFAULT_SCAFFOLD covers
+    # rows generated before that field existed and any provider that omits it,
+    # so a scaffolded kind always has labels and an unscaffolded one never does.
+    def scaffold_labels(section_data)
+      return [] unless scaffolded?
+
+      normalize_scaffold(section_data.is_a?(Hash) ? section_data["answer_scaffold"] : nil)
+        .presence || default_scaffold
+    end
+
+    # Bounded and sanitized because this is model-generated text rendered into a
+    # textarea and a data attribute: labels are stripped, blanks and non-strings
+    # dropped, each truncated, and the list capped. Anything left unusable falls
+    # back to DEFAULT_SCAFFOLD via scaffold_labels.
+    def normalize_scaffold(raw)
+      return [] unless raw.is_a?(Array)
+
+      raw.filter_map { |label| label.to_s.strip.presence&.truncate(MAX_SCAFFOLD_LABEL_LENGTH) }
+         .first(MAX_SCAFFOLD_LABELS)
+    end
+
+    # Starting value for a fresh textarea: each label followed by room to write
+    # under it. The blank lines are what make the scaffold feel like a form to
+    # fill rather than a paragraph to edit.
+    def answer_template(section_data = nil)
+      labels = scaffold_labels(section_data)
+      return nil if labels.empty?
+
+      labels.join("\n\n\n") + "\n"
+    end
+
+    # The answer with this day's scaffold labels removed, so "how much did the
+    # user actually write" never counts the scaffolding we gave them. Matching
+    # whole stripped lines (not substrings) is what makes partial edits degrade
+    # gracefully: an untouched label is removed, an edited one becomes the
+    # user's own text and counts.
+    def substantive_answer(value, section_data = nil)
+      text   = value.to_s
+      labels = scaffold_labels(section_data)
+      return text.strip if labels.empty?
+
+      text.lines.reject { |line| labels.include?(line.strip) }.join.strip
     end
   end
 end

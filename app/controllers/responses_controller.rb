@@ -54,6 +54,7 @@ class ResponsesController < ApplicationController
     # third keys), so without this a crafted request could store multiple and push
     # DailyResponse#answered_sections / #completeness past 3 sections / 100%.
     submitted_answers = response_params[:answers]&.slice(*exercise.problem_set.keys)
+    submitted_answers = DailyResponse.normalize_answers(submitted_answers, exercise) if submitted_answers
 
     @response.assign_attributes(
       answers:      submitted_answers.presence || @response.answers,

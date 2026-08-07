@@ -11,7 +11,7 @@
     <%= render "shared/concept_reference", reference: ref,
           open: !submitted && first_exposure?(sec["concept"], response.daily_exercise.language, response.date) %>
   <% end %>
-  <%= render "dashboard/teaching_hint", note: sec["teaching_note"], field: "security_review", submitted: submitted, answer: response.answers["security_review"] %>
+  <%= render "dashboard/teaching_hint", note: sec["teaching_note"], field: "security_review", submitted: submitted, response: response %>
   <% if submitted %>
     <div class="answer-display"><%= response.answers["security_review"].presence || "(skipped)" %></div>
   <% else %>
