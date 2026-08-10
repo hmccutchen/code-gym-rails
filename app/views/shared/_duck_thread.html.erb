@@ -12,6 +12,10 @@
     <div class="duck-form">
       <input type="text" class="duck-input" placeholder="What are you stuck on?">
       <button type="button" class="btn btn-ghost btn-sm duck-send">Ask</button>
+      <%# Sends a fixed message on the user's behalf so getting an explanation
+          doesn't depend on knowing how to phrase one. It goes through the same
+          endpoint as any other turn and counts against the same cap. %>
+      <button type="button" class="btn btn-ghost btn-sm duck-explain" data-message="<%= AiService::DUCK_EXPLAIN_REQUEST %>">Explain this simply</button>
       <button type="button" class="btn btn-ghost btn-sm duck-clear">Clear</button>
     </div>
     <span class="duck-status" aria-live="polite"></span>
@@ -68,10 +72,12 @@
   const refreshCap = (box) => {
     const input = box.querySelector(".duck-input");
     const send = box.querySelector(".duck-send");
+    const explain = box.querySelector(".duck-explain");
     const status = box.querySelector(".duck-status");
     const capped = userTurnCount(box) >= MAX_TURNS;
     input.disabled = capped;
     send.disabled = capped;
+    explain.disabled = capped;
     if (capped) {
       status.textContent =
         `You've used all ${MAX_TURNS} messages for this section — clear the conversation to keep going.`;
@@ -85,7 +91,8 @@
     const toggle = box.querySelector(".duck-toggle");
     const body   = box.querySelector(".duck-body");
     const input  = box.querySelector(".duck-input");
-    const send   = box.querySelector(".duck-send");
+    const send    = box.querySelector(".duck-send");
+    const explain = box.querySelector(".duck-explain");
     const clear  = box.querySelector(".duck-clear");
     const status = box.querySelector(".duck-status");
 
@@ -96,8 +103,10 @@
 
     box.duckGeneration = 0;
 
-    const sendMessage = async () => {
-      const message = input.value.trim();
+    const sendMessage = async (explicitMessage) => {
+      // An explicit message (the Explain button's) bypasses the input entirely:
+      // the empty box is the normal case for it, not a reason to do nothing.
+      const message = explicitMessage || input.value.trim();
       if (!message || send.disabled) return;
 
       const priorThread = box.duckThread.slice();
@@ -124,7 +133,7 @@
 
         box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: data.answer });
         renderTurns(box);
-        input.value = "";
+        if (!explicitMessage) input.value = "";
         status.textContent = "";
       } catch (e) {
         if (generation !== box.duckGeneration) return;
@@ -134,7 +143,8 @@
       }
     };
 
-    send.addEventListener("click", sendMessage);
+    send.addEventListener("click", () => sendMessage());
+    explain.addEventListener("click", () => sendMessage(explain.dataset.message));
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") { event.preventDefault(); sendMessage(); }
     });
