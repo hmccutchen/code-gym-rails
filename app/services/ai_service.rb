@@ -694,7 +694,8 @@ class AiService
               "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
               "starter_code": "string — optional skeleton (empty string if none)",
               "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
+              "concept": "string — exactly one concept from the provided vocabulary",
+              "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
             }
         CH
       end
@@ -706,7 +707,8 @@ class AiService
           "snippet":  "string — #{label} code, ~10-15 lines",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'"
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+          "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
         },
         "pattern": {
           "title":    "string — pattern name",
@@ -715,7 +717,8 @@ class AiService
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary"
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
         },
         #{third_section}
       }
@@ -811,10 +814,7 @@ class AiService
           - The architecture question itself is one sentence — do not restate the scenario in it.
           - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
           - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
-          - The architecture reference's "diagram" must be valid Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not.
-          - Node labels must be short (a few words). Use quoted labels like A["Order service"] when a label contains spaces or punctuation.
-          - The diagram should show the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
-          - Return an empty string for "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
+          - The architecture reference's "diagram" shows the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
         ARCH
       when :security_review
         <<~SEC.chomp
@@ -858,6 +858,9 @@ class AiService
       - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - answer_scaffold (pattern and architecture only): #{ExerciseSection::MAX_SCAFFOLD_LABELS} labels at most, #{ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH} characters at most each, ending in a colon. These pre-fill the answer box, so write them for THIS question specifically — name the parts a complete answer to it must cover, in the order someone should think them through (e.g. for a caching decision: "Which option, and why:", "How you'd handle a stale entry:"). Generic prompts that would fit any question of this kind are a wasted scaffold. Each is a heading the engineer writes UNDER, so it must ask for something, never state or hint at the answer — the teaching_note rules apply here too.
+      - Every "diagram" field is Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not. Node labels must be short (a few words); use quoted labels like A["Order service"] when a label contains spaces or punctuation.
+      - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
+      - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
       #{third_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.

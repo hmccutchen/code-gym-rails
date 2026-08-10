@@ -190,9 +190,10 @@ RSpec.describe AiService do
       expect(security_review["reference"].keys).to contain_exactly("tagline", "explanation", "code_example", "senior_lens")
     end
 
-    it "does not ask for a diagram on a security_review third" do
+    it "does not ask for a diagram on the security_review section itself" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
-      expect(schema).not_to match(/mermaid/i)
+      security_review = JSON.parse(schema)["security_review"]
+      expect(security_review).not_to have_key("diagram")
     end
 
     it "defines a scenario field for security_review, matching code_review/pattern/challenge" do
@@ -215,7 +216,7 @@ RSpec.describe AiService do
       pattern = JSON.parse(schema)["pattern"]
 
       expect(pattern.keys).to contain_exactly(
-        "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold"
+        "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold", "diagram"
       )
       expect(pattern).not_to have_key("reference")
     end
@@ -237,9 +238,10 @@ RSpec.describe AiService do
       expect(prompt).to match(/empty string/i) # opting out is allowed
     end
 
-    it "does not ask for a diagram on a challenge third" do
+    it "asks for a diagram on a challenge third" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
-      expect(schema).not_to match(/mermaid/i)
+      challenge = JSON.parse(schema)["challenge"]
+      expect(challenge).to have_key("diagram")
     end
   end
 
@@ -747,6 +749,51 @@ RSpec.describe AiService do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
 
       expect(schema.scan("answer_scaffold").size).to eq(1)
+    end
+  end
+
+  describe "diagram in the generation schema and prompt" do
+    it "asks for a diagram on code_review, pattern, and the challenge third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+
+      expect(schema.scan('"diagram"').size).to eq(3)
+    end
+
+    # architecture's own reference diagram is the one occurrence here — its
+    # top-level section never gains one.
+    it "asks for no section-level diagram on a non-diagrammable third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+
+      expect(schema.scan('"diagram"').size).to eq(3)
+      expect(schema).to include('"reference"')
+    end
+
+    it "asks for none on parsons_problem or security_review beyond the two always-present kinds" do
+      %i[parsons_problem security_review].each do |third|
+        schema = service.send(:exercise_schema_for, "ruby_rails", third: third)
+        expect(schema.scan('"diagram"').size).to eq(2)
+      end
+    end
+
+    # The syntax rules used to live in the architecture-only branch. They now
+    # govern code_review and pattern, which are present every single day.
+    it "states the Mermaid syntax constraints regardless of which third was rolled" do
+      %i[challenge parsons_problem security_review architecture].each do |third|
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: third)
+
+        expect(prompt).to include("flowchart TD")
+        expect(prompt).to include("Maximum 8 nodes")
+        expect(prompt).to match(/empty string/i)
+      end
+    end
+
+    # The safety property: depicting a problem's shape must not reveal its
+    # solution.
+    it "forbids diagramming the fix rather than the scenario as written" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge)
+
+      expect(prompt).to match(/never diagram the fix/i)
+      expect(prompt).to match(/never annotate a node as the problem/i)
     end
   end
 
