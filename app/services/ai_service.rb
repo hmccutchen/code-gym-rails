@@ -211,6 +211,11 @@ class AiService
   # free of large/undesired provider content.
   RAW_SNIPPET_LIMIT = 500
 
+  # Upper bound on a section's Mermaid `diagram`. The prompt asks for at most
+  # 8 nodes with short labels, which lands well under half this — so the bound
+  # rejects runaway output without rejecting anything actually asked for.
+  MAX_DIAGRAM_LENGTH = 1_000
+
   def initialize(api_key)
     @api_key = api_key
     @conn    = build_connection
@@ -256,6 +261,7 @@ class AiService
 
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
     normalize_answer_scaffolds!(problem_set)
+    normalize_diagrams!(problem_set)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
     problem_set
@@ -1100,6 +1106,27 @@ class AiService
 
       labels = kind.normalize_scaffold(section_data["answer_scaffold"])
       labels.any? ? section_data["answer_scaffold"] = labels : section_data.delete("answer_scaffold")
+    end
+    problem_set
+  end
+
+  # Mermaid source is provider output rendered straight into an HTML data
+  # attribute, so it is bounded here rather than trusted downstream. Anything
+  # unusable is deleted, not repaired: the reader then takes the same "no
+  # diagram" path every pre-diagram row already takes.
+  #
+  # Only the top-level key — architecture's diagram lives at
+  # reference.diagram, predates this field, and is not touched.
+  def normalize_diagrams!(problem_set)
+    problem_set.each do |section_key, section_data|
+      next unless section_data.is_a?(Hash)
+
+      diagram = section_data["diagram"]
+      usable  = ExerciseSection.find(section_key)&.diagrammable? &&
+                diagram.is_a?(String) &&
+                diagram.strip.length.between?(1, MAX_DIAGRAM_LENGTH)
+
+      usable ? section_data["diagram"] = diagram.strip : section_data.delete("diagram")
     end
     problem_set
   end

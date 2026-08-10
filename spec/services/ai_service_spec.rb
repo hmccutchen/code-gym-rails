@@ -683,6 +683,59 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#normalize_diagrams!" do
+    it "keeps a usable diagram on a diagrammable section" do
+      set = { "code_review" => { "diagram" => "  flowchart TD\n  A[Job] --> B[(DB)]  " } }
+
+      expect(service.send(:normalize_diagrams!, set)["code_review"]["diagram"])
+        .to eq("flowchart TD\n  A[Job] --> B[(DB)]")
+    end
+
+    # Dropped rather than truncated: a half a diagram is broken Mermaid, which
+    # the renderer rejects anyway — dropping says the same thing without the
+    # CDN round trip.
+    it "drops an unusable diagram instead of persisting it" do
+      [ "", "   ", nil, 42, [ "flowchart TD" ], "x" * (AiService::MAX_DIAGRAM_LENGTH + 1) ].each do |bad|
+        set = { "pattern" => { "question" => "q", "diagram" => bad } }
+        expect(service.send(:normalize_diagrams!, set)["pattern"]).not_to have_key("diagram")
+      end
+    end
+
+    it "strips a diagram the model volunteered for a non-diagrammable section" do
+      set = { "security_review" => { "diagram" => "flowchart TD\n  A --> B" } }
+
+      expect(service.send(:normalize_diagrams!, set)["security_review"]).not_to have_key("diagram")
+    end
+
+    # Architecture's diagram lives at reference.diagram, not at the top level,
+    # and predates this field — normalizing the top level must not reach into
+    # it.
+    it "leaves architecture's existing reference diagram untouched" do
+      set = { "architecture" => { "reference" => { "diagram" => "flowchart TD\n  A --> B" } } }
+
+      expect(service.send(:normalize_diagrams!, set)["architecture"]["reference"]["diagram"])
+        .to eq("flowchart TD\n  A --> B")
+    end
+
+    it "leaves a section that carries no diagram alone" do
+      set = { "pattern" => { "question" => "q" } }
+
+      expect(service.send(:normalize_diagrams!, set)).to eq("pattern" => { "question" => "q" })
+    end
+
+    it "runs on generation, so a bad diagram never reaches a persisted problem set" do
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
+        "pattern"     => { "question" => "q", "concept" => "memoization", "diagram" => "flowchart TD\n  A --> B" }
+      }.to_json)
+
+      problem_set = svc.generate_exercise(user)
+
+      expect(problem_set["code_review"]).not_to have_key("diagram")
+      expect(problem_set["pattern"]["diagram"]).to eq("flowchart TD\n  A --> B")
+    end
+  end
+
   describe "answer_scaffold in the generation schema" do
     it "asks for a scaffold on pattern and architecture" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
