@@ -240,4 +240,13 @@ Nothing about the duck is persisted; that has not changed.
 - Request spec: a `DUCK_EXPLAIN_REQUEST` message is an ordinary `duck_thread`
   request, subject to the same unsubmitted gate and the same cap as any other.
 - `spec/system/duck_thread_spec.rb`: the button sends the pre-written turn and
-  is disabled once the cap is reached.
+  is disabled once the cap is reached. Two cases are called out because they
+  are precisely what the `sendMessage` and `refreshCap` changes could regress,
+  and neither is observable outside a real browser:
+  - **Explain at the cap** must be visibly disabled, not silently do nothing.
+    A button that looks live and swallows the click is worse than one that is
+    plainly unavailable.
+  - **Explain with an empty input box** must send the pre-written message. This
+    is the normal case — a user reaches for Explain precisely because they do
+    not know what to type — so `sendMessage`'s empty-input early return must
+    not fire when an explicit message argument is passed.
