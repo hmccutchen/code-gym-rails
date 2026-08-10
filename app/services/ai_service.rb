@@ -75,28 +75,59 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
-  # Cost and length control for #duck_response: 150 tokens comfortably fits the
-  # 1-3 sentence guiding-question replies the Socratic system prompt asks for,
-  # while capping spend on a feature the user can invoke repeatedly. It makes a
-  # long answer-shaped reply unlikely, but it is a budget, not an enforcement
-  # mechanism — a short fix can fit in 150 tokens, so DUCK_SYSTEM_PROMPT's
-  # rules remain the only thing actually asking the model not to give answers.
+  # Cost and length control for #duck_response. 250 tokens fits both shapes the
+  # system prompt asks for: a 1-3 sentence guiding question, and a plain-language
+  # explanation with a concrete analogy — the latter does not fit in the 150 this
+  # started at. It remains a budget, not an enforcement mechanism: a short fix
+  # fits in 250 tokens too, so DUCK_SYSTEM_PROMPT's rules are still the only
+  # thing actually asking the model not to give answers.
+  #
+  # Deliberately one ceiling for every duck reply rather than a higher one for
+  # explain-requests. The server cannot know which kind a message is until the
+  # model has answered it, so branching would mean trusting a client-declared
+  # flag that any client could set on every request — a per-type ceiling that
+  # does not hold is worse than one honest number.
   # Deliberately distinct from ClaudeService::MAX_TOKENS, which is sized for
   # full review generation.
-  DUCK_RESPONSE_MAX_TOKENS = 150
+  DUCK_RESPONSE_MAX_TOKENS = 250
+
+  # The message the "Explain this simply" button sends on the user's behalf.
+  # Server-owned so its wording lives beside the prompt it is tuned against: it
+  # names the exercise rather than the answer, so it reads as a kind-1 request
+  # under DUCK_SYSTEM_PROMPT without the prompt having to recognize it
+  # specially. It reaches the endpoint as an ordinary message and counts
+  # against the same turn cap as one.
+  DUCK_EXPLAIN_REQUEST = "Explain what this exercise is asking, in plain language."
 
   DUCK_SYSTEM_PROMPT = <<~PROMPT.chomp
     You are a Socratic thinking partner helping an engineer work through a
     problem they have NOT yet submitted or been graded on.
 
-    Rules, no exceptions:
-    - Never state the correct answer, the specific fix, or write corrected or
-      complete code — not even as an illustrative example.
-    - Respond ONLY with a guiding question or a brief reflective observation
-      that helps them think it through themselves.
-    - If they explicitly ask you to just tell them the answer, do not comply —
-      respond with a further guiding question instead.
-    - Keep it to 1-3 sentences. No preamble.
+    Every message they send is one of two kinds. Decide which before replying.
+
+    1. UNDERSTANDING THE PROBLEM — they are asking what the exercise means, what
+       a term or a piece of the snippet does, or for a plainer restatement of the
+       question. Examples: "what is this even asking?", "what does memoization
+       mean?", "explain this scenario simply", "what does this line do?"
+       Answer these DIRECTLY and simply: plain words, one concrete everyday
+       analogy if it helps, no jargon. Describe only what is already on their
+       screen — the situation as written, the vocabulary, the shape of the
+       question. Explaining what a problem IS is always allowed.
+
+    2. SOLVING THE PROBLEM — they are asking for the fix, the answer, corrected
+       code, which option to pick, or what is wrong with the snippet. Examples:
+       "what's the bug?", "how do I fix this?", "which option is right?", "just
+       tell me the answer", "is my approach correct?"
+       Never comply. Never state the correct answer, the specific fix, or write
+       corrected or complete code — not even as an illustrative example. Respond
+       with a single guiding question that helps them find it themselves.
+
+    When a message mixes both ("what does this method do, and what's wrong with
+    it?"), explain the first part and answer the second with a guiding question.
+    When you genuinely cannot tell which kind it is, treat it as kind 2.
+
+    Keep it short: 1-3 sentences for a guiding question, up to 4 for an
+    explanation. No preamble.
   PROMPT
 
   # Fixed concept vocabularies, one per generation language. Embedded in the

@@ -1686,6 +1686,48 @@ RSpec.describe AiService do
       expect(svc.last_system).to match(/1-3 sentences/i)
     end
 
+    it "allows explaining what the problem is, directly and in plain words" do
+      svc = duck_spy_class.new(canned_text: "Think of it like a shopping list you rewrite on every trip.")
+
+      svc.duck_response(user, exercise, section: "code_review",
+                        message: AiService::DUCK_EXPLAIN_REQUEST, thread: [])
+
+      expect(svc.last_system).to match(/understanding the problem/i)
+      expect(svc.last_system).to match(/answer these directly/i)
+      expect(svc.last_system).to match(/analogy/i)
+    end
+
+    # The boundary is a judgement the model makes per message, so the prompt
+    # has to give it instances to classify against, a rule for the mixed case,
+    # and a tie-break — not just a definition.
+    it "still forbids solving, and says what to do when the two are mixed or unclear" do
+      svc = duck_spy_class.new(canned_text: "A guiding question.")
+
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_system).to match(/solving the problem/i)
+      expect(svc.last_system).to match(/what's the bug\?/i)
+      expect(svc.last_system).to match(/mixes both/i)
+      expect(svc.last_system).to match(/cannot tell which kind it is, treat it as kind 2/i)
+    end
+
+    it "keeps the FakeService dispatch phrase, which every duck system spec routes on" do
+      expect(AiService::DUCK_SYSTEM_PROMPT).to include("Socratic thinking partner")
+    end
+
+    it "asks for a plain-language explanation rather than the answer" do
+      expect(AiService::DUCK_EXPLAIN_REQUEST).to match(/plain language/i)
+      expect(AiService::DUCK_EXPLAIN_REQUEST).not_to match(/answer|fix|solve/i)
+    end
+
+    # An explanation plus a concrete analogy does not fit in 150 tokens. The
+    # ceiling stays a budget, not an enforcement mechanism — the prompt is
+    # what actually withholds the answer.
+    it "gives a reply room for an explanation while staying far below a review's ceiling" do
+      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to eq(250)
+      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+    end
+
     it "passes DUCK_RESPONSE_MAX_TOKENS, distinct from other AiService calls' ceilings" do
       svc = double_class.new(canned_text: "A guiding question.")
 
