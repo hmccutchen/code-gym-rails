@@ -73,6 +73,26 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".diagrammable?" do
+    # code_review, pattern, and challenge all describe a structure in prose or
+    # in code already on screen, so a diagram of it restates what is visible.
+    it "marks the kinds whose scenario carries a structure worth diagramming" do
+      expect(described_class.find("code_review").diagrammable?).to be(true)
+      expect(described_class.find("pattern").diagrammable?).to be(true)
+      expect(described_class.find("challenge").diagrammable?).to be(true)
+    end
+
+    # security_review's task is finding one exploitable thing in a snippet, so
+    # a diagram of that snippet's structure narrows the search. A parsons
+    # problem's blocks ARE the structure — diagramming them is the answer.
+    # Architecture already carries a diagram inside its reference block.
+    it "excludes the kinds where a diagram would narrow the search or be the answer" do
+      expect(described_class.find("security_review").diagrammable?).to be(false)
+      expect(described_class.find("parsons_problem").diagrammable?).to be(false)
+      expect(described_class.find("architecture").diagrammable?).to be(false)
+    end
+  end
+
   describe ExerciseSection::ParsonsProblem do
     describe ".parse_order" do
       it "parses the order: prefix into 0-based integer ids" do

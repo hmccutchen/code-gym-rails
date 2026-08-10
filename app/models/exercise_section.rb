@@ -61,6 +61,16 @@ class ExerciseSection
       true
     end
 
+    # Whether this kind's problem_set may carry a Mermaid `diagram` of the
+    # structure its scenario describes. False by default: a diagram is only
+    # safe pre-answer where it restates something already on screen, which is
+    # not true of a kind whose whole task is finding what is hidden in a
+    # snippet (security_review) or arranging the structure itself
+    # (parsons_problem).
+    def diagrammable?
+      false
+    end
+
     # Whether this kind's answer is scaffolded, and with what labels when the
     # day's problem carries none. nil for kinds that take a single unstructured
     # answer — those are never pre-filled and never have labels stripped.

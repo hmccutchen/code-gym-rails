@@ -17,4 +17,8 @@ class ExerciseSection::Pattern < ExerciseSection
   def self.default_scaffold
     DEFAULT_SCAFFOLD
   end
+
+  def self.diagrammable?
+    true
+  end
 end
