@@ -343,6 +343,32 @@ RSpec.describe "Responses", type: :request do
       )
     end
 
+    it "logs the generation exercise's date, not the response's own save-time date, when they differ" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current - 1,
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } },
+        generated_at: Time.current
+      )
+      daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "rating" => "solid" } }
+      )
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      post review_response_path(daily_response)
+
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+      expect(payload["date"]).to eq(exercise.date.to_s)
+      expect(payload["date"]).not_to eq(daily_response.date.to_s)
+    end
+
     it "does not log when every section fails" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)

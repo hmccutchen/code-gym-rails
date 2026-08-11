@@ -32,11 +32,12 @@ would be lost on every deploy/restart, so that option is out), each prefixed
 prefixes its lines with `[retention]`. Correlated by `user_id` + `date` — no
 new identifier needed, matching how `log_retention` already correlates.
 
-**Known edge case:** `DailyResponse.date` is set independently at save time
+`DailyResponse.date` is set independently at save time
 (`find_or_initialize_by(daily_exercise:, date: Date.current)`), so a set
-generated late at night and first saved after midnight can get a review
-event dated the day *after* its generation event, silently breaking the
-`user_id` + `date` correlation for that one case.
+generated late at night and first saved after midnight could otherwise get a
+review event dated the day *after* its generation event. The review event
+logs `response.daily_exercise.date`, not `response.date`, specifically to
+avoid this — the exercise's date is always the generation event's date.
 
 Generation-time logging runs on the `worker` Solid Queue service; review-time
 logging runs on the `web` service — they're two different Railway log

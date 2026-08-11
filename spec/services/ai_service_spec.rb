@@ -1256,9 +1256,16 @@ RSpec.describe AiService do
     end
 
     it "includes due retention checks and established concepts by name" do
+      # Due: standard tier, next_retention_check_on in the past.
       user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 2)
+      # Established: standard tier, past its initial interval, but not yet
+      # due — DailyPlan.established_concepts_for excludes anything due_checks
+      # already claimed, so this needs its own, distinct concept.
+      user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 2.months.ago, retention_interval_days: 14,
+                                     next_retention_check_on: Date.current + 5)
       set = { "code_review" => { "concept" => "memoization" } }
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
@@ -1272,6 +1279,7 @@ RSpec.describe AiService do
 
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
       expect(payload["requested"]["due_checks"]).to eq([ "memoization" ])
+      expect(payload["requested"]["established"]).to eq([ "transaction_safety" ])
     end
   end
 

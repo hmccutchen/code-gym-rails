@@ -280,6 +280,12 @@ class AiService
   # constraint; the timeout policy stays here.
   def generate_exercise(user, language: user.language_for_today, blocking: false)
     plan = DailyPlan.for(user, language: language)
+    # Fetched once and threaded through to both the prompt and the
+    # diagnostics log below — two separate calls to #recent_performance
+    # would double the query and risk the logged "requested" history
+    # silently diverging from what the prompt actually contained if
+    # anything changed for this user during the provider call.
+    history = user.recent_performance
 
     result = call_and_log(
       user, purpose: "generate_exercise",
@@ -287,7 +293,7 @@ class AiService
       system: build_system_prompt(language),
       prompt: build_exercise_prompt(user, language, third: plan.third,
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
-                                    established: plan.established)
+                                    established: plan.established, history: history)
     )
 
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
@@ -295,7 +301,7 @@ class AiService
     normalize_diagrams!(problem_set)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
-    log_difficulty_diagnostics(user, language, plan, problem_set)
+    log_difficulty_diagnostics(user, language, plan, problem_set, history)
     problem_set
   end
 
@@ -645,7 +651,7 @@ class AiService
   # ResponsesController#log_review_diagnostics (correlated by user_id + date).
   # Safe to remove once that question is settled. See
   # docs/superpowers/specs/2026-08-11-difficulty-diagnostics-logging-design.md.
-  def log_difficulty_diagnostics(user, language, plan, problem_set)
+  def log_difficulty_diagnostics(user, language, plan, problem_set, history)
     payload = {
       event: "generation",
       user_id: user.id,
@@ -656,7 +662,7 @@ class AiService
         reinforcement: plan.reinforcement,
         due_checks: plan.due_checks.map(&:concept),
         established: plan.established.map(&:concept),
-        recent_performance: user.recent_performance
+        recent_performance: history
       },
       delivered: problem_set
     }
@@ -785,9 +791,12 @@ class AiService
     SCHEMA
   end
 
-  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [], established: [])
-    history = user.recent_performance
-
+  # history defaults to a fresh query so every existing caller (direct specs
+  # included) keeps working unchanged; #generate_exercise passes its own
+  # already-fetched value instead so the prompt and the diagnostics log
+  # never see two different snapshots of the same user's history.
+  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [],
+                            established: [], history: user.recent_performance)
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else

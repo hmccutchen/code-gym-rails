@@ -441,7 +441,11 @@ class ResponsesController < ApplicationController
     payload = {
       event: "review",
       user_id: response.user_id,
-      date: response.date.to_s,
+      # daily_exercise.date, not response.date: DailyResponse#date is set
+      # independently at save time, so a set generated late at night and
+      # first saved after midnight would otherwise log a review event dated
+      # a day after the generation event it's meant to correlate with.
+      date: response.daily_exercise.date.to_s,
       sections: sections.index_with { |section|
         { ai_rating: response.ai_rating_for(section), self_rating: response.self_rating_for(section) }
       }
