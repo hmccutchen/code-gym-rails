@@ -295,6 +295,7 @@ class AiService
     normalize_diagrams!(problem_set)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
+    log_difficulty_diagnostics(user, language, plan, problem_set)
     problem_set
   end
 
@@ -633,6 +634,34 @@ class AiService
       "honored=#{honored.join(',').presence || '-'} " \
       "tagged=#{tagged.join(',').presence || '-'}"
     )
+  end
+
+  # Nearly all difficulty adaptation in this app is advisory — the prompt asks
+  # the model to ease off reduced-tier concepts or raise the bar after a run
+  # of "too easy" ratings, but nothing verifies the returned problem set
+  # actually reflects that. This pairs what was requested against what was
+  # delivered so a week of production entries can answer whether the loop is
+  # working before changing any generation logic on a hunch. Read alongside
+  # ResponsesController#log_review_diagnostics (correlated by user_id + date).
+  # Safe to remove once that question is settled. See
+  # docs/superpowers/specs/2026-08-11-difficulty-diagnostics-logging-design.md.
+  def log_difficulty_diagnostics(user, language, plan, problem_set)
+    payload = {
+      event: "generation",
+      user_id: user.id,
+      date: Date.current.to_s,
+      language: language,
+      requested: {
+        skill_level: user.skill_level,
+        reinforcement: plan.reinforcement,
+        due_checks: plan.due_checks.map(&:concept),
+        established: plan.established.map(&:concept),
+        recent_performance: user.recent_performance
+      },
+      delivered: problem_set
+    }
+
+    Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
   end
 
   # Subclasses must implement: makes the provider-specific HTTP call and

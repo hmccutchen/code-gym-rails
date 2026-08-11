@@ -1202,6 +1202,7 @@ RSpec.describe AiService do
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=memoization/)
+      expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
       svc.generate_exercise(user, language: "ruby_rails")
     end
 
@@ -1212,6 +1213,7 @@ RSpec.describe AiService do
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=-.*tagged=n_plus_one/)
+      expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
       svc.generate_exercise(user, language: "ruby_rails")
     end
 
@@ -1222,6 +1224,54 @@ RSpec.describe AiService do
 
       expect(Rails.logger).not_to receive(:info).with(/\[retention\]/)
       svc.generate_exercise(user, language: "ruby_rails")
+    end
+  end
+
+  describe "difficulty diagnostics instrumentation" do
+    it "logs what was requested and what was delivered on every generation" do
+      set = { "code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([ { concept: "n_plus_one", tier: "reduced" } ])
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(logged).not_to be_nil
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+
+      expect(payload["event"]).to eq("generation")
+      expect(payload["user_id"]).to eq(user.id)
+      expect(payload["date"]).to eq(Date.current.to_s)
+      expect(payload["language"]).to eq("ruby_rails")
+      expect(payload["requested"]["skill_level"]).to eq(user.skill_level)
+      expect(payload["requested"]["reinforcement"]).to eq([ { "concept" => "n_plus_one", "tier" => "reduced" } ])
+      expect(payload["requested"]).to have_key("due_checks")
+      expect(payload["requested"]).to have_key("established")
+      expect(payload["requested"]).to have_key("recent_performance")
+      expect(payload["delivered"]).to eq(JSON.parse(set.to_json))
+    end
+
+    it "includes due retention checks and established concepts by name" do
+      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 2)
+      set = { "code_review" => { "concept" => "memoization" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      svc.generate_exercise(user, language: "ruby_rails")
+
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+      expect(payload["requested"]["due_checks"]).to eq([ "memoization" ])
     end
   end
 
