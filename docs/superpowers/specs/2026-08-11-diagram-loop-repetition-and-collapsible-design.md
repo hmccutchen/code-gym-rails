@@ -74,14 +74,22 @@ file's established pattern of asserting on the built prompt string directly
 
 ## Part 2: collapsible diagrams
 
-**Where:** `app/views/shared/_mermaid_diagram.html.erb` only. All six
-render sites (`dashboard/_exercise.html.erb` ×3,
-`responses/_answered_sections.html.erb` ×3,
-`responses/_architecture_section.html.erb` ×1) already render through this
-one shared partial, so wrapping it there covers every call site with a
-single change.
+**Where:** `app/views/shared/_mermaid_diagram.html.erb`, plus one call site.
+Six of the seven render sites (`dashboard/_exercise.html.erb` ×3,
+`responses/_answered_sections.html.erb` ×3) render the shared partial at the
+top level and need no call-site change. The seventh,
+`responses/_architecture_section.html.erb:24`, already renders the diagram
+*nested inside its own* `<details class="ref">` (the "Reference — tradeoffs"
+box, alongside tagline/tradeoffs/senior_lens) — wrapping the shared partial
+unconditionally would nest a `<details>` inside a `<details>`, turning a
+one-click reveal (open tradeoffs, diagram is right there) into two clicks
+(open tradeoffs, then open the diagram). The partial takes a new
+`collapsible` local, defaulting to `true`; the architecture call site alone
+passes `collapsible: false`, since it's already inside a collapsed box and
+doesn't need a second one.
 
-**Markup:** wrap the existing `<div class="mermaid-diagram">` in
+**Markup:** wrap the existing `<div class="mermaid-diagram">` in a
+`<details>` only when `collapsible` is true:
 
 ```erb
 <details class="ref">
