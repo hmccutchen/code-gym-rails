@@ -141,6 +141,51 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
+  # A user reaches for Explain precisely because they don't know what to type,
+  # so the empty input box is the normal case, not an edge case.
+  it "sends the pre-written explanation request with an empty input box" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+
+      expect(duck.find(".duck-input").value).to eq("")
+      duck.find(".duck-explain").click
+
+      expect(duck).to have_selector(".duck-turn.duck-user", text: AiService::DUCK_EXPLAIN_REQUEST, wait: 10)
+      expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
+      expect(DailyResponse.count).to eq(0)
+    end
+  end
+
+  # A button that looks live and silently swallows the click is worse than one
+  # that is plainly unavailable.
+  it "disables Explain at the cap rather than letting it fail silently" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      duck = open_duck(user)
+
+      ResponsesController::MAX_DUCK_TURNS_PER_SECTION.times do |i|
+        ask(duck, "stuck #{i}")
+        expect(duck).to have_css(".duck-turn.duck-user", count: i + 1, wait: 10)
+      end
+
+      expect(duck.find(".duck-explain")).to be_disabled
+      expect(duck.find(".duck-send")).to be_disabled
+      expect(duck.find(".duck-input")).to be_disabled
+
+      # Deliberately not clicked: Playwright's click auto-waits for the element
+      # to become actionable and would time out on a disabled button rather
+      # than reporting the no-op this asserts. "Visibly unavailable" is the
+      # whole property — the click itself is covered in manual verification.
+
+      # Clear restores it along with the rest of the controls.
+      duck.find(".duck-clear").click
+      expect(duck.find(".duck-explain")).not_to be_disabled
+    end
+  end
+
   it "does not render the duck thread once the set is submitted" do
     user = create_fake_provider_user
 

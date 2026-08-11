@@ -56,6 +56,7 @@
       <% if cr["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(cr["scenario"]) %></div><% end %>
       <div class="question"><%= glossary_wrap(cr["question"]) %></div>
       <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= cr["snippet"] %></code></pre>
+      <%= render "shared/mermaid_diagram", source: cr["diagram"] %>
       <% if (ref = concept_reference_for(cr["concept"], exercise.language)) %>
         <%= render "shared/concept_reference", reference: ref,
               open: first_exposure?(cr["concept"], exercise.language, exercise.date) %>
@@ -76,6 +77,7 @@
       <% if pat["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(pat["scenario"]) %></div><% end %>
       <div class="why-box"><strong>Why it exists:</strong> <%= glossary_wrap(pat["why"]) %></div>
       <div class="question"><%= glossary_wrap(pat["question"]) %></div>
+      <%= render "shared/mermaid_diagram", source: pat["diagram"] %>
 
       <% if (ref = concept_reference_for(pat["concept"], exercise.language)) %>
         <%= render "shared/concept_reference", reference: ref,
@@ -107,6 +109,7 @@
         <% if ch["starter_code"].present? %>
           <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= ch["starter_code"] %></code></pre>
         <% end %>
+        <%= render "shared/mermaid_diagram", source: ch["diagram"] %>
         <% if (ref = concept_reference_for(ch["concept"], exercise.language)) %>
           <%= render "shared/concept_reference", reference: ref,
                 open: first_exposure?(ch["concept"], exercise.language, exercise.date) %>

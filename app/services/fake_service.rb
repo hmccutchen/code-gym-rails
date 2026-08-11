@@ -31,7 +31,8 @@ class FakeService < AiService
       RUBY
       "teaching_note" => "Look at what happens to the database each time this method runs inside the loop.",
       "concept" => "n_plus_one",
-      "scenario" => "a nightly loyalty-tier recalculation job"
+      "scenario" => "a nightly loyalty-tier recalculation job",
+      "diagram" => "flowchart TD\n  A[\"Nightly job\"] --> B[\"loyalty_tier\"]\n  B --> C[(\"orders\")]"
     },
     "pattern" => {
       "title" => "Service Object",

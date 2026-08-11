@@ -314,4 +314,54 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
     expect(response).to have_http_status(:not_found)
   end
+
+  describe "the pre-written explanation request" do
+    # It travels the same path as anything the user types: same endpoint, same
+    # gate, same cap, no branch anywhere on the server.
+    it "is handled as an ordinary message with no special-casing" do
+      create_exercise_for(user)
+      fake = stub_answer("Think of it like recounting a shopping list on every trip.")
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST, thread: [] }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(fake).to have_received(:duck_response).with(
+        user, an_instance_of(DailyExercise),
+        section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST, thread: []
+      )
+      expect(DailyResponse.count).to eq(0)
+    end
+
+    it "counts against the same turn cap as a typed message" do
+      create_exercise_for(user)
+      stub_answer
+      login_as(user)
+
+      thread = Array.new(ResponsesController::MAX_DUCK_TURNS_PER_SECTION) do |i|
+        [ { role: "user", content: "q#{i}" }, { role: "assistant", content: "a#{i}" } ]
+      end.flatten
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST, thread: thread }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to match(/used all/i)
+    end
+
+    it "is refused once the set is submitted, like any other duck message" do
+      exercise = create_exercise_for(user)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "done" }, submitted_at: Time.current)
+      stub_answer
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST, thread: [] }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to match(/before you submit/i)
+    end
+  end
 end

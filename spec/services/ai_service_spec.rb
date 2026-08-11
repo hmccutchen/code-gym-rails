@@ -190,9 +190,10 @@ RSpec.describe AiService do
       expect(security_review["reference"].keys).to contain_exactly("tagline", "explanation", "code_example", "senior_lens")
     end
 
-    it "does not ask for a diagram on a security_review third" do
+    it "does not ask for a diagram on the security_review section itself" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
-      expect(schema).not_to match(/mermaid/i)
+      security_review = JSON.parse(schema)["security_review"]
+      expect(security_review).not_to have_key("diagram")
     end
 
     it "defines a scenario field for security_review, matching code_review/pattern/challenge" do
@@ -215,7 +216,7 @@ RSpec.describe AiService do
       pattern = JSON.parse(schema)["pattern"]
 
       expect(pattern.keys).to contain_exactly(
-        "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold"
+        "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold", "diagram"
       )
       expect(pattern).not_to have_key("reference")
     end
@@ -237,9 +238,10 @@ RSpec.describe AiService do
       expect(prompt).to match(/empty string/i) # opting out is allowed
     end
 
-    it "does not ask for a diagram on a challenge third" do
+    it "asks for a diagram on a challenge third" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
-      expect(schema).not_to match(/mermaid/i)
+      challenge = JSON.parse(schema)["challenge"]
+      expect(challenge).to have_key("diagram")
     end
   end
 
@@ -683,6 +685,59 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#normalize_diagrams!" do
+    it "keeps a usable diagram on a diagrammable section" do
+      set = { "code_review" => { "diagram" => "  flowchart TD\n  A[Job] --> B[(DB)]  " } }
+
+      expect(service.send(:normalize_diagrams!, set)["code_review"]["diagram"])
+        .to eq("flowchart TD\n  A[Job] --> B[(DB)]")
+    end
+
+    # Dropped rather than truncated: a half a diagram is broken Mermaid, which
+    # the renderer rejects anyway — dropping says the same thing without the
+    # CDN round trip.
+    it "drops an unusable diagram instead of persisting it" do
+      [ "", "   ", nil, 42, [ "flowchart TD" ], "x" * (AiService::MAX_DIAGRAM_LENGTH + 1) ].each do |bad|
+        set = { "pattern" => { "question" => "q", "diagram" => bad } }
+        expect(service.send(:normalize_diagrams!, set)["pattern"]).not_to have_key("diagram")
+      end
+    end
+
+    it "strips a diagram the model volunteered for a non-diagrammable section" do
+      set = { "security_review" => { "diagram" => "flowchart TD\n  A --> B" } }
+
+      expect(service.send(:normalize_diagrams!, set)["security_review"]).not_to have_key("diagram")
+    end
+
+    # Architecture's diagram lives at reference.diagram, not at the top level,
+    # and predates this field — normalizing the top level must not reach into
+    # it.
+    it "leaves architecture's existing reference diagram untouched" do
+      set = { "architecture" => { "reference" => { "diagram" => "flowchart TD\n  A --> B" } } }
+
+      expect(service.send(:normalize_diagrams!, set)["architecture"]["reference"]["diagram"])
+        .to eq("flowchart TD\n  A --> B")
+    end
+
+    it "leaves a section that carries no diagram alone" do
+      set = { "pattern" => { "question" => "q" } }
+
+      expect(service.send(:normalize_diagrams!, set)).to eq("pattern" => { "question" => "q" })
+    end
+
+    it "runs on generation, so a bad diagram never reaches a persisted problem set" do
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
+        "pattern"     => { "question" => "q", "concept" => "memoization", "diagram" => "flowchart TD\n  A --> B" }
+      }.to_json)
+
+      problem_set = svc.generate_exercise(user)
+
+      expect(problem_set["code_review"]).not_to have_key("diagram")
+      expect(problem_set["pattern"]["diagram"]).to eq("flowchart TD\n  A --> B")
+    end
+  end
+
   describe "answer_scaffold in the generation schema" do
     it "asks for a scaffold on pattern and architecture" do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
@@ -694,6 +749,51 @@ RSpec.describe AiService do
       schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
 
       expect(schema.scan("answer_scaffold").size).to eq(1)
+    end
+  end
+
+  describe "diagram in the generation schema and prompt" do
+    it "asks for a diagram on code_review, pattern, and the challenge third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+
+      expect(schema.scan('"diagram"').size).to eq(3)
+    end
+
+    # architecture's own reference diagram is the one occurrence here — its
+    # top-level section never gains one.
+    it "asks for no section-level diagram on a non-diagrammable third" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+
+      expect(schema.scan('"diagram"').size).to eq(3)
+      expect(schema).to include('"reference"')
+    end
+
+    it "asks for none on parsons_problem or security_review beyond the two always-present kinds" do
+      %i[parsons_problem security_review].each do |third|
+        schema = service.send(:exercise_schema_for, "ruby_rails", third: third)
+        expect(schema.scan('"diagram"').size).to eq(2)
+      end
+    end
+
+    # The syntax rules used to live in the architecture-only branch. They now
+    # govern code_review and pattern, which are present every single day.
+    it "states the Mermaid syntax constraints regardless of which third was rolled" do
+      %i[challenge parsons_problem security_review architecture].each do |third|
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: third)
+
+        expect(prompt).to include("flowchart TD")
+        expect(prompt).to include("Maximum 8 nodes")
+        expect(prompt).to match(/empty string/i)
+      end
+    end
+
+    # The safety property: depicting a problem's shape must not reveal its
+    # solution.
+    it "forbids diagramming the fix rather than the scenario as written" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge)
+
+      expect(prompt).to match(/never diagram the fix/i)
+      expect(prompt).to match(/never annotate a node as the problem/i)
     end
   end
 
@@ -1584,6 +1684,48 @@ RSpec.describe AiService do
       expect(svc.last_system).to match(/never state the correct answer/i)
       expect(svc.last_system).to match(/complete code/i)
       expect(svc.last_system).to match(/1-3 sentences/i)
+    end
+
+    it "allows explaining what the problem is, directly and in plain words" do
+      svc = duck_spy_class.new(canned_text: "Think of it like a shopping list you rewrite on every trip.")
+
+      svc.duck_response(user, exercise, section: "code_review",
+                        message: AiService::DUCK_EXPLAIN_REQUEST, thread: [])
+
+      expect(svc.last_system).to match(/understanding the problem/i)
+      expect(svc.last_system).to match(/answer these directly/i)
+      expect(svc.last_system).to match(/analogy/i)
+    end
+
+    # The boundary is a judgement the model makes per message, so the prompt
+    # has to give it instances to classify against, a rule for the mixed case,
+    # and a tie-break — not just a definition.
+    it "still forbids solving, and says what to do when the two are mixed or unclear" do
+      svc = duck_spy_class.new(canned_text: "A guiding question.")
+
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_system).to match(/solving the problem/i)
+      expect(svc.last_system).to match(/what's the bug\?/i)
+      expect(svc.last_system).to match(/mixes both/i)
+      expect(svc.last_system).to match(/cannot tell which kind it is, treat it as kind 2/i)
+    end
+
+    it "keeps the FakeService dispatch phrase, which every duck system spec routes on" do
+      expect(AiService::DUCK_SYSTEM_PROMPT).to include("Socratic thinking partner")
+    end
+
+    it "asks for a plain-language explanation rather than the answer" do
+      expect(AiService::DUCK_EXPLAIN_REQUEST).to match(/plain language/i)
+      expect(AiService::DUCK_EXPLAIN_REQUEST).not_to match(/answer|fix|solve/i)
+    end
+
+    # An explanation plus a concrete analogy does not fit in 150 tokens. The
+    # ceiling stays a budget, not an enforcement mechanism — the prompt is
+    # what actually withholds the answer.
+    it "gives a reply room for an explanation while staying far below a review's ceiling" do
+      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to eq(250)
+      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
     end
 
     it "passes DUCK_RESPONSE_MAX_TOKENS, distinct from other AiService calls' ceilings" do

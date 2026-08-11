@@ -75,28 +75,59 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
-  # Cost and length control for #duck_response: 150 tokens comfortably fits the
-  # 1-3 sentence guiding-question replies the Socratic system prompt asks for,
-  # while capping spend on a feature the user can invoke repeatedly. It makes a
-  # long answer-shaped reply unlikely, but it is a budget, not an enforcement
-  # mechanism — a short fix can fit in 150 tokens, so DUCK_SYSTEM_PROMPT's
-  # rules remain the only thing actually asking the model not to give answers.
+  # Cost and length control for #duck_response. 250 tokens fits both shapes the
+  # system prompt asks for: a 1-3 sentence guiding question, and a plain-language
+  # explanation with a concrete analogy — the latter does not fit in the 150 this
+  # started at. It remains a budget, not an enforcement mechanism: a short fix
+  # fits in 250 tokens too, so DUCK_SYSTEM_PROMPT's rules are still the only
+  # thing actually asking the model not to give answers.
+  #
+  # Deliberately one ceiling for every duck reply rather than a higher one for
+  # explain-requests. The server cannot know which kind a message is until the
+  # model has answered it, so branching would mean trusting a client-declared
+  # flag that any client could set on every request — a per-type ceiling that
+  # does not hold is worse than one honest number.
   # Deliberately distinct from ClaudeService::MAX_TOKENS, which is sized for
   # full review generation.
-  DUCK_RESPONSE_MAX_TOKENS = 150
+  DUCK_RESPONSE_MAX_TOKENS = 250
+
+  # The message the "Explain this simply" button sends on the user's behalf.
+  # Server-owned so its wording lives beside the prompt it is tuned against: it
+  # names the exercise rather than the answer, so it reads as a kind-1 request
+  # under DUCK_SYSTEM_PROMPT without the prompt having to recognize it
+  # specially. It reaches the endpoint as an ordinary message and counts
+  # against the same turn cap as one.
+  DUCK_EXPLAIN_REQUEST = "Explain what this exercise is asking, in plain language."
 
   DUCK_SYSTEM_PROMPT = <<~PROMPT.chomp
     You are a Socratic thinking partner helping an engineer work through a
     problem they have NOT yet submitted or been graded on.
 
-    Rules, no exceptions:
-    - Never state the correct answer, the specific fix, or write corrected or
-      complete code — not even as an illustrative example.
-    - Respond ONLY with a guiding question or a brief reflective observation
-      that helps them think it through themselves.
-    - If they explicitly ask you to just tell them the answer, do not comply —
-      respond with a further guiding question instead.
-    - Keep it to 1-3 sentences. No preamble.
+    Every message they send is one of two kinds. Decide which before replying.
+
+    1. UNDERSTANDING THE PROBLEM — they are asking what the exercise means, what
+       a term or a piece of the snippet does, or for a plainer restatement of the
+       question. Examples: "what is this even asking?", "what does memoization
+       mean?", "explain this scenario simply", "what does this line do?"
+       Answer these DIRECTLY and simply: plain words, one concrete everyday
+       analogy if it helps, no jargon. Describe only what is already on their
+       screen — the situation as written, the vocabulary, the shape of the
+       question. Explaining what a problem IS is always allowed.
+
+    2. SOLVING THE PROBLEM — they are asking for the fix, the answer, corrected
+       code, which option to pick, or what is wrong with the snippet. Examples:
+       "what's the bug?", "how do I fix this?", "which option is right?", "just
+       tell me the answer", "is my approach correct?"
+       Never comply. Never state the correct answer, the specific fix, or write
+       corrected or complete code — not even as an illustrative example. Respond
+       with a single guiding question that helps them find it themselves.
+
+    When a message mixes both ("what does this method do, and what's wrong with
+    it?"), explain the first part and answer the second with a guiding question.
+    When you genuinely cannot tell which kind it is, treat it as kind 2.
+
+    Keep it short: 1-3 sentences for a guiding question, up to 4 for an
+    explanation. No preamble.
   PROMPT
 
   # Fixed concept vocabularies, one per generation language. Embedded in the
@@ -211,6 +242,11 @@ class AiService
   # free of large/undesired provider content.
   RAW_SNIPPET_LIMIT = 500
 
+  # Upper bound on a section's Mermaid `diagram`. The prompt asks for at most
+  # 8 nodes with short labels, which lands well under half this — so the bound
+  # rejects runaway output without rejecting anything actually asked for.
+  MAX_DIAGRAM_LENGTH = 1_000
+
   def initialize(api_key)
     @api_key = api_key
     @conn    = build_connection
@@ -256,6 +292,7 @@ class AiService
 
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
     normalize_answer_scaffolds!(problem_set)
+    normalize_diagrams!(problem_set)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
     problem_set
@@ -688,7 +725,8 @@ class AiService
               "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
               "starter_code": "string — optional skeleton (empty string if none)",
               "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
+              "concept": "string — exactly one concept from the provided vocabulary",
+              "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
             }
         CH
       end
@@ -700,7 +738,8 @@ class AiService
           "snippet":  "string — #{label} code, ~10-15 lines",
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'"
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+          "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
         },
         "pattern": {
           "title":    "string — pattern name",
@@ -709,7 +748,8 @@ class AiService
           "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
           "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
           "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary"
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
         },
         #{third_section}
       }
@@ -805,10 +845,7 @@ class AiService
           - The architecture question itself is one sentence — do not restate the scenario in it.
           - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
           - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
-          - The architecture reference's "diagram" must be valid Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not.
-          - Node labels must be short (a few words). Use quoted labels like A["Order service"] when a label contains spaces or punctuation.
-          - The diagram should show the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
-          - Return an empty string for "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
+          - The architecture reference's "diagram" shows the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
         ARCH
       when :security_review
         <<~SEC.chomp
@@ -852,6 +889,9 @@ class AiService
       - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - answer_scaffold (pattern and architecture only): #{ExerciseSection::MAX_SCAFFOLD_LABELS} labels at most, #{ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH} characters at most each, ending in a colon. These pre-fill the answer box, so write them for THIS question specifically — name the parts a complete answer to it must cover, in the order someone should think them through (e.g. for a caching decision: "Which option, and why:", "How you'd handle a stale entry:"). Generic prompts that would fit any question of this kind are a wasted scaffold. Each is a heading the engineer writes UNDER, so it must ask for something, never state or hint at the answer — the teaching_note rules apply here too.
+      - Every "diagram" field is Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not. Node labels must be short (a few words); use quoted labels like A["Order service"] when a label contains spaces or punctuation.
+      - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
+      - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
       #{third_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
@@ -1100,6 +1140,27 @@ class AiService
 
       labels = kind.normalize_scaffold(section_data["answer_scaffold"])
       labels.any? ? section_data["answer_scaffold"] = labels : section_data.delete("answer_scaffold")
+    end
+    problem_set
+  end
+
+  # Mermaid source is provider output rendered straight into an HTML data
+  # attribute, so it is bounded here rather than trusted downstream. Anything
+  # unusable is deleted, not repaired: the reader then takes the same "no
+  # diagram" path every pre-diagram row already takes.
+  #
+  # Only the top-level key — architecture's diagram lives at
+  # reference.diagram, predates this field, and is not touched.
+  def normalize_diagrams!(problem_set)
+    problem_set.each do |section_key, section_data|
+      next unless section_data.is_a?(Hash)
+
+      diagram = section_data["diagram"]
+      usable  = ExerciseSection.find(section_key)&.diagrammable? &&
+                diagram.is_a?(String) &&
+                diagram.strip.length.between?(1, MAX_DIAGRAM_LENGTH)
+
+      usable ? section_data["diagram"] = diagram.strip : section_data.delete("diagram")
     end
     problem_set
   end
