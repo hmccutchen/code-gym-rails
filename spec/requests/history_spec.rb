@@ -149,6 +149,7 @@ RSpec.describe "History", type: :request do
       # outer, unrelated box. Scoped to the div's own tag, since the shared
       # module script's comments legitimately mention the attribute by name.
       diagram_div = response.body[/<div class="mermaid-diagram"[^>]*>/]
+      expect(diagram_div).to be_present
       expect(diagram_div).not_to include("data-owns-details")
     end
 
