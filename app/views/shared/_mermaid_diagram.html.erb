@@ -47,7 +47,7 @@
         // Architecture's div sits inside its own pre-existing "Reference —
         // tradeoffs" <details> that this partial doesn't own and must never
         // remove — a failed diagram there should take out only the div.
-        const removeFailed = (el) => (el.dataset.ownsDetails ? el.closest("details") || el : el).remove();
+        const removeFailed = (el) => (el.dataset.ownsDetails === "1" ? el.closest("details") || el : el).remove();
         try {
           const mermaid = (await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs")).default;
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });

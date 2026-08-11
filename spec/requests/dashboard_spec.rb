@@ -954,7 +954,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body.scan('<details class="ref">').size).to eq(3)
+      expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
       expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
@@ -988,7 +988,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include("✓ Submitted")
       expect(response.body).to include("graph LR")
-      expect(response.body.scan('<details class="ref">').size).to eq(3)
+      expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
       expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
