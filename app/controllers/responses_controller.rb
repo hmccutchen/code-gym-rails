@@ -136,6 +136,7 @@ class ResponsesController < ApplicationController
       @response.save!
     end
     release_review_claim!
+    log_review_diagnostics(@response, successes.keys) if successes.any?
 
     if failures.empty?
       redirect_to history_anchor, notice: "Review ready!"
@@ -426,6 +427,31 @@ class ResponsesController < ApplicationController
 
   def release_review_claim!
     @response.update_column(:reviewing_since, nil)
+  end
+
+  # Nearly all difficulty adaptation in this app is advisory; nothing
+  # verifies the AI's rating and the engineer's own self-rating ever agree,
+  # or that either one shifts with how the prompt says it should. This pairs
+  # both per section so a week of entries can be read alongside
+  # AiService#log_difficulty_diagnostics (correlated by user_id + date) as
+  # "here's what we asked for, here's what we got, here's how it was rated."
+  # Safe to remove once that question is settled. See
+  # docs/superpowers/specs/2026-08-11-difficulty-diagnostics-logging-design.md.
+  def log_review_diagnostics(response, sections)
+    payload = {
+      event: "review",
+      user_id: response.user_id,
+      # daily_exercise.date, not response.date: DailyResponse#date is set
+      # independently at save time, so a set generated late at night and
+      # first saved after midnight would otherwise log a review event dated
+      # a day after the generation event it's meant to correlate with.
+      date: response.daily_exercise.date.to_s,
+      sections: sections.index_with { |section|
+        { ai_rating: response.ai_rating_for(section), self_rating: response.self_rating_for(section) }
+      }
+    }
+
+    Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
   end
 
   def zero_success_alert(failures)
