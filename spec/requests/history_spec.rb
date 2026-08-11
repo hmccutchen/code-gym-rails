@@ -128,15 +128,30 @@ RSpec.describe "History", type: :request do
       )
     end
 
-    it "renders a hidden diagram container and the mermaid module when a diagram is present" do
+    it "renders a collapsed disclosure and the mermaid module when a diagram is present" do
       architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
       login_as(user)
       get history_path
 
+      # Architecture's diagram is collapsible: false (it already lives inside
+      # its own "Reference — tradeoffs" <details class="ref">), so it must
+      # NOT get its own nested disclosure — only the outer one.
+      expect(response.body.scan('<details class="ref">').size).to eq(1)
+      expect(response.body).not_to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
       expect(response.body).to include("flowchart TD")
       expect(response.body).to include("cdn.jsdelivr.net")
       expect(response.body).to match(/securityLevel:\s*["']strict["']/)
+
+      # collapsible: false means this partial did not create the enclosing
+      # <details> (that's architecture's own pre-existing tradeoffs box), so
+      # the div itself must carry no data-owns-details attribute — a failed
+      # parse/render must remove only the .mermaid-diagram div, never that
+      # outer, unrelated box. Scoped to the div's own tag, since the shared
+      # module script's comments legitimately mention the attribute by name.
+      diagram_div = response.body[/<div class="mermaid-diagram"[^>]*>/]
+      expect(diagram_div).to be_present
+      expect(diagram_div).not_to include("data-owns-details")
     end
 
     it "renders no container and no mermaid script when the diagram is an empty string" do
