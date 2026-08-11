@@ -1,10 +1,22 @@
-<%# A hidden Mermaid container plus, once per page, the module script that
-    renders every such container on it. Local: source (Mermaid text) — a blank
+<%# A Mermaid container plus, once per page, the module script that renders
+    every such container on it. Local: source (Mermaid text) — a blank
     source renders nothing at all, so call sites stay a single unconditional
     line and a pre-diagram row is indistinguishable from a section that chose
-    not to have one. %>
+    not to have one. Local: collapsible (default true) — wraps the container
+    in its own closed <details>, matching shared/_concept_reference.html.erb's
+    dropdown. Architecture's diagram passes collapsible: false since it
+    already renders inside its own <details class="ref"> (the "Reference —
+    tradeoffs" box) — a second nested disclosure there would turn a one-click
+    reveal into two. %>
 <% if source.present? %>
-  <div class="mermaid-diagram" data-diagram="<%= source %>"></div>
+  <% if local_assigns.fetch(:collapsible, true) %>
+    <details class="ref">
+      <summary>🗺️ Structure diagram</summary>
+      <div class="mermaid-diagram" data-diagram="<%= source %>"></div>
+    </details>
+  <% else %>
+    <div class="mermaid-diagram" data-diagram="<%= source %>"></div>
+  <% end %>
   <%# This partial renders up to three times per exercise and once per history
       entry, so the module script goes into the layout's shared :page_scripts
       region only on the FIRST call with a diagram — otherwise every container
@@ -14,35 +26,42 @@
     <% @mermaid_diagram_script_emitted = true %>
     <% content_for :page_scripts do %>
       <script type="module">
-        // Loaded only on pages that actually have a diagram. The container starts
-        // hidden and is revealed ONLY after a successful parse and render, which is
-        // what makes every failure mode identical and harmless: malformed syntax, a
-        // blocked CDN, an offline user, or a Mermaid change all produce "no diagram"
-        // rather than a broken box. Nothing else on the page depends on this running.
-        // securityLevel stays strict — the diagram source is model-generated.
+        // Loaded only on pages that actually have a diagram. The container lives
+        // inside a closed <details> for every call site except architecture's,
+        // which is already nested inside its own — so visibility is the
+        // disclosure's job, not this script's. A failed parse/render removes the
+        // WHOLE <details> ancestor, not just the diagram div — same for a CDN or
+        // module load failure below, which can leave several diagrams pending at
+        // once — so a bad diagram never leaves behind an empty, clickable
+        // disclosure with nothing inside. Nothing else on the page depends on
+        // this running. securityLevel stays strict — the diagram source is
+        // model-generated.
         //
         // Version is pinned exactly (not "@11") so a Mermaid release can't change
         // behavior under us without a deliberate bump. SRI/CSP hardening for this
         // CDN import is a known gap, deliberately deferred to its own PR — enabling
         // a CSP here interacts with every inline script in this app.
+        const pending = () => document.querySelectorAll(".mermaid-diagram[data-diagram]:not([data-mermaid-done])");
         try {
           const mermaid = (await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs")).default;
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
 
-          for (const el of document.querySelectorAll(".mermaid-diagram[data-diagram]:not([data-mermaid-done])")) {
+          for (const el of pending()) {
             el.dataset.mermaidDone = "1";
             const src = el.dataset.diagram;
             try {
               await mermaid.parse(src);
               const { svg } = await mermaid.render("mmd-" + Math.random().toString(36).slice(2), src);
               el.innerHTML = svg;
-              el.style.display = "block";
             } catch {
-              el.remove();
+              (el.closest("details") || el).remove();
             }
           }
         } catch {
-          // CDN unreachable or module failed to load — containers simply stay hidden.
+          // CDN unreachable or module failed to load before any diagram could be
+          // parsed — remove every pending disclosure so none are left clickable
+          // with nothing inside, matching the per-diagram failure path above.
+          for (const el of pending()) (el.closest("details") || el).remove();
         }
       </script>
     <% end %>

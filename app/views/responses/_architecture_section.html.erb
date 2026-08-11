@@ -21,7 +21,7 @@
           <ul><% arch.dig("reference", "tradeoffs").each do |t| %><li><%= t %></li><% end %></ul>
         <% end %>
         <p>🔭 <%= arch.dig("reference", "senior_lens") %></p>
-        <%= render "shared/mermaid_diagram", source: arch.dig("reference", "diagram") %>
+        <%= render "shared/mermaid_diagram", source: arch.dig("reference", "diagram"), collapsible: false %>
       </div>
     </details>
   <% end %>

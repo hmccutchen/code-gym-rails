@@ -923,7 +923,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   describe "structure diagrams" do
     # Visible BEFORE answering, unlike improved_code — the whole point is
     # understanding what is being asked.
-    it "renders a hidden container and the mermaid module on an unsubmitted set" do
+    it "renders a collapsed disclosure and the mermaid module on an unsubmitted set" do
       ps = base_problem_set
       ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
       create_exercise(problem_set: ps)
@@ -931,13 +931,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
+      expect(response.body).to include('<details class="ref">')
+      expect(response.body).to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
       expect(response.body).to include("flowchart TD")
       expect(response.body).to include("mermaid@11.4.1")
       expect(response.body).to match(/securityLevel:\s*["']strict["']/)
     end
 
-    it "renders one script for several diagrams across sections" do
+    it "renders one script for several diagrams across sections, each in its own disclosure" do
       ps = base_problem_set
       ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
       ps["pattern"]["diagram"]     = "graph LR\n  A[Caller] --> B[Service]"
@@ -947,19 +949,21 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
+      expect(response.body.scan('<details class="ref">').size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
       expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
 
     # The old-data guarantee: a row generated before this field existed must
     # render exactly as it did before.
-    it "renders no container and no script for an exercise generated before diagrams existed" do
+    it "renders no disclosure, no container, and no script for an exercise generated before diagrams existed" do
       create_exercise(problem_set: base_problem_set)
       login_as(user)
 
       get root_path
 
       expect(response.body).not_to include('class="mermaid-diagram"')
+      expect(response.body).not_to include("🗺️ Structure diagram")
       expect(response.body).not_to include("mermaid@11.4.1")
     end
 
@@ -967,7 +971,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     # (responses/_answered_sections, shared with history), so every
     # diagrammable section needs asserting here too — covering only one of
     # them would let the other two renders be deleted silently.
-    it "still shows every section's diagram on a submitted day, where the questions are still on screen" do
+    it "still shows every section's diagram, each collapsed, on a submitted day, where the questions are still on screen" do
       ps = base_problem_set
       ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
       ps["pattern"]["diagram"]     = "graph LR\n  A[Caller] --> B[Service]"
@@ -979,6 +983,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include("✓ Submitted")
       expect(response.body).to include("graph LR")
+      expect(response.body.scan('<details class="ref">').size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
       expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
