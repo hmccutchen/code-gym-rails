@@ -32,6 +32,33 @@ would be lost on every deploy/restart, so that option is out), each prefixed
 prefixes its lines with `[retention]`. Correlated by `user_id` + `date` — no
 new identifier needed, matching how `log_retention` already correlates.
 
+**Known edge case:** `DailyResponse.date` is set independently at save time
+(`find_or_initialize_by(daily_exercise:, date: Date.current)`), so a set
+generated late at night and first saved after midnight can get a review
+event dated the day *after* its generation event, silently breaking the
+`user_id` + `date` correlation for that one case.
+
+Generation-time logging runs on the `worker` Solid Queue service; review-time
+logging runs on the `web` service — they're two different Railway log
+streams, so reading a week of correlated data means exporting/reading both,
+not just one.
+
+**Extracting these logs from production.** `config/environments/production.rb`
+sets `config.log_tags = [:request_id]`, which prefixes every emitted line
+with a request-id tag — so `[difficulty_diagnostics]` is not actually at the
+start of the line in production (it only appears at the start in test, which
+sets no log tags). Generation runs on the worker outside a request (so it
+likely carries no tag prefix there) while review runs on web inside a request
+(so it does) — the two correlated events won't even share the same prefix
+shape. Don't grep/strip assuming the tag starts the line; match on the
+`[difficulty_diagnostics]` marker itself and strip everything up through it:
+
+```sh
+grep '\[difficulty_diagnostics\]' production.log \
+  | sed 's/.*\[difficulty_diagnostics\] //' \
+  | jq
+```
+
 ### Generation event
 
 Logged from a new private `AiService#log_difficulty_diagnostics(user,
@@ -39,6 +66,11 @@ language, plan, problem_set)`, called from `#generate_exercise` right beside
 the existing `log_retention` call. Because cron generation, on-demand
 generation, and `RegenerateExerciseJob` all call `AiService#generate_exercise`,
 this one hook point covers all three with no other call sites touched.
+
+`RegenerateExerciseJob` calls this same hook, so a single `user_id` + `date`
+can have more than one `"generation"` event if the user regenerated that day
+— a reader should take the *last* one for a given day, since earlier ones
+describe a set the user never actually saw.
 
 ```jsonc
 {
@@ -114,6 +146,18 @@ logfmt key=value pairs, natural as a JSON blob.
   to revisit — not a reason to build a table now.
 - **No migration.** Nothing here is persisted in the database.
 - **No change to what any generation call actually asks for or receives.**
+
+**Accepted tradeoff.** The generation payload includes user-authored
+`feedback_text` (via `recent_performance`) and full problem-set content,
+going to the log stream. This is accepted given this app's internal-team-only
+scope (see CONTEXT.md) and this instrumentation's short intended lifespan —
+it should be removed once the difficulty question is settled, not left
+indefinitely.
+
+**Known follow-up (not addressed here).** Very large payloads could get
+truncated by Railway's log pipeline; this needs an empirical check against a
+real production generation rather than a speculative code change to shrink
+the payload shape.
 
 ## Testing
 

@@ -135,8 +135,8 @@ class ResponsesController < ApplicationController
                                           .merge(failures.transform_values { |r| { "code" => r[:error_code], "message" => r[:message] } })
       @response.save!
     end
-    log_review_diagnostics(@response, successes.keys) if successes.any?
     release_review_claim!
+    log_review_diagnostics(@response, successes.keys) if successes.any?
 
     if failures.empty?
       redirect_to history_anchor, notice: "Review ready!"

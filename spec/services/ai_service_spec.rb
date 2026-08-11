@@ -1235,7 +1235,7 @@ RSpec.describe AiService do
 
       logged = nil
       allow(Rails.logger).to receive(:info) do |msg|
-        logged = msg if msg.start_with?("[difficulty_diagnostics]")
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
 
       svc.generate_exercise(user, language: "ruby_rails")
@@ -1265,7 +1265,7 @@ RSpec.describe AiService do
 
       logged = nil
       allow(Rails.logger).to receive(:info) do |msg|
-        logged = msg if msg.start_with?("[difficulty_diagnostics]")
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
       end
 
       svc.generate_exercise(user, language: "ruby_rails")
