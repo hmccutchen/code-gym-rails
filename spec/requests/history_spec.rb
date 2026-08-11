@@ -136,6 +136,7 @@ RSpec.describe "History", type: :request do
       # Architecture's diagram is collapsible: false (it already lives inside
       # its own "Reference — tradeoffs" <details class="ref">), so it must
       # NOT get its own nested disclosure — only the outer one.
+      expect(response.body.scan('<details class="ref">').size).to eq(1)
       expect(response.body).not_to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
       expect(response.body).to include("flowchart TD")
