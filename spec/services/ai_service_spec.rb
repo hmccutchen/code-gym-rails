@@ -795,6 +795,20 @@ RSpec.describe AiService do
       expect(prompt).to match(/never diagram the fix/i)
       expect(prompt).to match(/never annotate a node as the problem/i)
     end
+
+    it "instructs the diagram to show repetition when a loop wraps the flow" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge)
+
+      expect(prompt).to include("repeated invocation that wraps the flow")
+      expect(prompt).to include("per-item cardinality")
+      expect(prompt).to include("once per customer")
+    end
+
+    it "does not force a loop cue on snippets without one" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge)
+
+      expect(prompt).to include("Do not manufacture a loop or cardinality label when the snippet has none")
+    end
   end
 
   describe "#normalize_concepts" do
