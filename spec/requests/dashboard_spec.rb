@@ -937,6 +937,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("flowchart TD")
       expect(response.body).to include("mermaid@11.4.1")
       expect(response.body).to match(/securityLevel:\s*["']strict["']/)
+
+      # collapsible: true call sites mark the div as owning the <details> this
+      # partial created, so a failed parse/render's cleanup knows it's safe to
+      # remove that whole disclosure rather than some other, unrelated one.
+      expect(response.body).to include('data-owns-details="1"')
     end
 
     it "renders one script for several diagrams across sections, each in its own disclosure" do

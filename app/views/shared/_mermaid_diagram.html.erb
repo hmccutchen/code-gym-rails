@@ -12,7 +12,7 @@
   <% if local_assigns.fetch(:collapsible, true) %>
     <details class="ref">
       <summary>🗺️ Structure diagram</summary>
-      <div class="mermaid-diagram" data-diagram="<%= source %>"></div>
+      <div class="mermaid-diagram" data-diagram="<%= source %>" data-owns-details="1"></div>
     </details>
   <% else %>
     <div class="mermaid-diagram" data-diagram="<%= source %>"></div>
@@ -42,6 +42,12 @@
         // CDN import is a known gap, deliberately deferred to its own PR — enabling
         // a CSP here interacts with every inline script in this app.
         const pending = () => document.querySelectorAll(".mermaid-diagram[data-diagram]:not([data-mermaid-done])");
+        // Only walk up to the enclosing <details> when THIS partial created it
+        // (data-owns-details, set only on the collapsible: true branch).
+        // Architecture's div sits inside its own pre-existing "Reference —
+        // tradeoffs" <details> that this partial doesn't own and must never
+        // remove — a failed diagram there should take out only the div.
+        const removeFailed = (el) => (el.dataset.ownsDetails ? el.closest("details") || el : el).remove();
         try {
           const mermaid = (await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs")).default;
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
@@ -54,14 +60,14 @@
               const { svg } = await mermaid.render("mmd-" + Math.random().toString(36).slice(2), src);
               el.innerHTML = svg;
             } catch {
-              (el.closest("details") || el).remove();
+              removeFailed(el);
             }
           }
         } catch {
           // CDN unreachable or module failed to load before any diagram could be
-          // parsed — remove every pending disclosure so none are left clickable
+          // parsed — remove every pending disclosure/div so none are left clickable
           // with nothing inside, matching the per-diagram failure path above.
-          for (const el of pending()) (el.closest("details") || el).remove();
+          for (const el of pending()) removeFailed(el);
         }
       </script>
     <% end %>
