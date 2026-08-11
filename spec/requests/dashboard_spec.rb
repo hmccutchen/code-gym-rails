@@ -963,9 +963,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("mermaid@11.4.1")
     end
 
-    it "still shows the diagram on a submitted day, where the question is still on screen" do
+    # The submitted day renders a different partial than the unsubmitted one
+    # (responses/_answered_sections, shared with history), so every
+    # diagrammable section needs asserting here too — covering only one of
+    # them would let the other two renders be deleted silently.
+    it "still shows every section's diagram on a submitted day, where the questions are still on screen" do
       ps = base_problem_set
-      ps["pattern"]["diagram"] = "graph LR\n  A[Caller] --> B[Service]"
+      ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
+      ps["pattern"]["diagram"]     = "graph LR\n  A[Caller] --> B[Service]"
+      ps["challenge"]["diagram"]   = "flowchart TD\n  A[Page] --> B[Count]"
       create_response(create_exercise(problem_set: ps))
       login_as(user)
 
@@ -973,6 +979,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to include("✓ Submitted")
       expect(response.body).to include("graph LR")
+      expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
+      expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
   end
 end
