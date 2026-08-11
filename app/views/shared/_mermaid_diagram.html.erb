@@ -33,9 +33,16 @@
         // WHOLE <details> ancestor, not just the diagram div — same for a CDN or
         // module load failure below, which can leave several diagrams pending at
         // once — so a bad diagram never leaves behind an empty, clickable
-        // disclosure with nothing inside. Nothing else on the page depends on
-        // this running. securityLevel stays strict — the diagram source is
-        // model-generated.
+        // disclosure with nothing inside PROVIDED this script itself runs. If
+        // the module never executes at all (a CSP blocking `type="module"`, or
+        // something intercepting the script tag before it parses — a narrower
+        // case than the CDN import merely rejecting, which the outer catch
+        // below does handle), the disclosure stays visible with nothing behind
+        // it once opened; the rest of this app already requires JavaScript for
+        // its core interactions (rating, autosave, submit), so this is an
+        // accepted, narrow residual risk rather than one this script can guard
+        // against itself. Nothing else on the page depends on this running.
+        // securityLevel stays strict — the diagram source is model-generated.
         //
         // Version is pinned exactly (not "@11") so a Mermaid release can't change
         // behavior under us without a deliberate bump. SRI/CSP hardening for this
@@ -46,8 +53,11 @@
         // (data-owns-details, set only on the collapsible: true branch).
         // Architecture's div sits inside its own pre-existing "Reference —
         // tradeoffs" <details> that this partial doesn't own and must never
-        // remove — a failed diagram there should take out only the div.
-        const removeFailed = (el) => (el.dataset.ownsDetails === "1" ? el.closest("details") || el : el).remove();
+        // remove — a failed diagram there should take out only the div. Always
+        // finds an ancestor when the flag is set, since that div is always a
+        // direct child of the <details> this partial renders right above it.
+        const removeFailed = (el) => (el.dataset.ownsDetails === "1" ? el.closest("details") : el).remove();
+        const cleanupAllPending = () => { for (const el of pending()) removeFailed(el); };
         try {
           const mermaid = (await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs")).default;
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
@@ -67,7 +77,7 @@
           // CDN unreachable or module failed to load before any diagram could be
           // parsed — remove every pending disclosure/div so none are left clickable
           // with nothing inside, matching the per-diagram failure path above.
-          for (const el of pending()) removeFailed(el);
+          cleanupAllPending();
         }
       </script>
     <% end %>

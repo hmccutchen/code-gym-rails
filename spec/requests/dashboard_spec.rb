@@ -992,5 +992,31 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
       expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
+
+    # Nothing else exercises collapsible: true and collapsible: false diagrams
+    # on the same page — the data-owns-details scoping and the
+    # once-per-page script-emission guard both have to hold across the mix,
+    # not just within either kind on its own.
+    it "renders collapsible code_review/pattern diagrams alongside architecture's non-collapsible one on the same page" do
+      ps = base_problem_set.except("challenge")
+      ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
+      ps["pattern"]["diagram"]     = "graph LR\n  A[Caller] --> B[Service]"
+      ps["architecture"] = {
+        "title" => "Datastore", "question" => "Which approach?", "scenario" => "10x traffic",
+        "reference" => { "tagline" => "t", "explanation" => "e", "tradeoffs" => [ "a" ], "senior_lens" => "s",
+                         "diagram" => "flowchart TD\n  A[Client] --> B[API]" }
+      }
+      create_exercise(problem_set: ps)
+      login_as(user)
+
+      get root_path
+
+      # code_review and pattern each get their own "Structure diagram"
+      # disclosure; architecture's diagram doesn't (collapsible: false), so
+      # its own "Reference — tradeoffs" summary is the only wrapper around it.
+      expect(response.body.scan("🗺️ Structure diagram").size).to eq(2)
+      expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
+      expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
+    end
   end
 end

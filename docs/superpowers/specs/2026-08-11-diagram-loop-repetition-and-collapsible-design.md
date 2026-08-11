@@ -135,6 +135,18 @@ any reason no ancestor `<details>` is found), preserving the original "no
 diagram" guarantee rather than trading it for "an empty disclosure
 triangle."
 
+**Accepted residual risk:** the guarantee above holds only if the module
+script itself runs. If it never executes at all — a CSP blocking
+`type="module"` scripts, or something intercepting the script tag before it
+parses, as opposed to the CDN import merely rejecting (which the outer catch
+does handle) — the disclosure stays visible with nothing behind it once
+opened. This is a narrower failure mode than "CDN blocked," and one this
+script cannot guard against by construction (it never runs to guard
+against anything). Accepted rather than engineered around: the rest of this
+app already requires JavaScript for its core interactions (rating, autosave,
+submit — see CLAUDE.md), so a user in a state where this one module fails to
+even start is already in a degraded experience elsewhere on the page.
+
 **Not changing:** the Mermaid module script's loading, parsing, and
 rendering logic itself (CDN import, `mermaid.initialize`, `mermaid.parse`/
 `mermaid.render`, the dedup-across-multiple-diagrams guard via
