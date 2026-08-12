@@ -109,11 +109,11 @@ RSpec.describe AiService do
   end
 
   describe "#exercise_schema_for" do
-    it "defines a teaching_note and a concept for each of the three sections, for any language" do
+    it "defines a teaching_note and a concept for each of the four sections, for any language" do
       %w[ruby_rails javascript].each do |language|
         schema = service.send(:exercise_schema_for, language)
-        expect(schema.scan('"teaching_note"').size).to eq(3)
-        expect(schema.scan('"concept"').size).to eq(3)
+        expect(schema.scan('"teaching_note"').size).to eq(4)
+        expect(schema.scan('"concept"').size).to eq(4)
       end
     end
 
@@ -131,9 +131,9 @@ RSpec.describe AiService do
       expect(service.send(:exercise_schema_for)).to eq(service.send(:exercise_schema_for, "ruby_rails"))
     end
 
-    it "defines a scenario field for each of the three sections" do
+    it "defines a scenario field for each of the four sections" do
       schema = service.send(:exercise_schema_for)
-      expect(schema.scan(/"scenario"/).size).to eq(3)
+      expect(schema.scan(/"scenario"/).size).to eq(4)
     end
 
     it "no longer asks the model for a per-section glossary array" do
@@ -219,6 +219,47 @@ RSpec.describe AiService do
         "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold", "diagram"
       )
       expect(pattern).not_to have_key("reference")
+    end
+  end
+
+  describe "#exercise_schema_for fourth section" do
+    it "includes the plan_review block by default (fourth: :plan_review)" do
+      schema = service.send(:exercise_schema_for, "ruby_rails")
+      expect(schema).to include('"plan_review"')
+      expect(schema).to include("plan_excerpt")
+      expect(schema).not_to include('"ambiguity_hunt"')
+    end
+
+    it "swaps in the ambiguity_hunt block when fourth: :ambiguity_hunt" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :ambiguity_hunt)
+      expect(schema).to include('"ambiguity_hunt"')
+      expect(schema).to include("planted_ambiguities")
+      expect(schema).to include("request")
+      expect(schema).not_to include('"plan_review"')
+    end
+
+    it "asks for exactly AMBIGUITY_HUNT_PLANTED_COUNT planted ambiguities" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :ambiguity_hunt)
+      expect(schema).to include(AiService::AMBIGUITY_HUNT_PLANTED_COUNT.to_s)
+    end
+
+    it "asks for a plan_review answer_scaffold, matching pattern/architecture" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :plan_review)
+      plan_review = JSON.parse(schema)["plan_review"]
+      expect(plan_review).to have_key("answer_scaffold")
+    end
+
+    it "does not ask for a diagram on either fourth kind" do
+      %i[plan_review ambiguity_hunt].each do |fourth|
+        schema = service.send(:exercise_schema_for, "ruby_rails", fourth: fourth)
+        section = JSON.parse(schema)[fourth.to_s]
+        expect(section).not_to have_key("diagram")
+      end
+    end
+
+    it "always includes both third and fourth alongside code_review/pattern" do
+      schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt))
+      expect(schema.keys).to contain_exactly("code_review", "pattern", "architecture", "ambiguity_hunt")
     end
   end
 
@@ -740,13 +781,13 @@ RSpec.describe AiService do
 
   describe "answer_scaffold in the generation schema" do
     it "asks for a scaffold on pattern and architecture" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt)
 
       expect(schema.scan("answer_scaffold").size).to eq(2)
     end
 
     it "does not ask for one on an unscaffolded third" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge, fourth: :ambiguity_hunt)
 
       expect(schema.scan("answer_scaffold").size).to eq(1)
     end

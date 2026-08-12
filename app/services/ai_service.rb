@@ -722,7 +722,7 @@ class AiService
   # code-bearing fields' label switches with `language` so instructions never
   # assume Ruby idioms when generating JS — the structure itself never
   # changes across languages.
-  def exercise_schema_for(language = "ruby_rails", third: :challenge)
+  def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review)
     label = config_for(language)[:label]
 
     third_section =
@@ -788,6 +788,34 @@ class AiService
         CH
       end
 
+    fourth_section =
+      case fourth
+      when :ambiguity_hunt
+        <<~AH.chomp
+          "ambiguity_hunt": {
+              "title":    "string",
+              "scenario": "string — the concrete business-domain framing, drawn from Code Gym-style feature requests (e.g. a daily-practice app's own features)",
+              "request":  "string — a vague feature request, 2-4 sentences, phrased the way a stakeholder or PM would ask for it, not an engineer",
+              "planted_ambiguities": ["string — one specific ambiguity deliberately left in \\"request\\"", "... (exactly #{AMBIGUITY_HUNT_PLANTED_COUNT} total)"],
+              "question": "string — e.g. 'What would you need clarified before writing a spec for this?'",
+              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary"
+            }
+        AH
+      else
+        <<~PR.chomp
+          "plan_review": {
+              "title":    "string — short name for the plan/decision under review",
+              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+              "plan_excerpt": "string — a short prose implementation plan, framed as if written by an AI assistant, containing 2-3 planted flaws spanning levels: one real technical anti-pattern, one scope-creep item, one unflagged behavior change",
+              "question": "string — what to evaluate before approving this plan",
+              "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
+              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary"
+            }
+        PR
+      end
+
     <<~SCHEMA
       {
         "code_review": {
@@ -808,7 +836,8 @@ class AiService
           "concept": "string — exactly one concept from the provided vocabulary",
           "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
         },
-        #{third_section}
+        #{third_section},
+        #{fourth_section}
       }
     SCHEMA
   end
