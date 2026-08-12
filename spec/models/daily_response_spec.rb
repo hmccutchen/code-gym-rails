@@ -150,8 +150,26 @@ RSpec.describe DailyResponse, type: :model do
       end
     end
 
-    it "leaves untemplated kinds on the plain length rule" do
+    # A regenerated day can leave an answer behind for a section its exercise
+    # no longer presents; counting it would report more answered sections than
+    # the day has and push completeness past 100%.
+    it "ignores an answer for a section the exercise no longer presents" do
       daily_response = user.daily_responses.create!(
+        daily_exercise: exercise,
+        date: Date.current,
+        answers: {
+          "code_review"  => "Found the N+1 in the loop",
+          "pattern"      => "Service objects, because the callback chain hides the order",
+          "challenge"    => "Memoize the tier lookup outside the loop",
+          "architecture" => "A stale answer from before this day was regenerated"
+        }
+      )
+
+      expect(daily_response.answered_sections).to eq(%w[code_review pattern challenge])
+      expect(daily_response.completeness).to eq(100)
+    end
+
+    it "leaves untemplated kinds on the plain length rule" do      daily_response = user.daily_responses.create!(
         daily_exercise: exercise,
         date: Date.current,
         answers: { "code_review" => "Which option, and why:" }

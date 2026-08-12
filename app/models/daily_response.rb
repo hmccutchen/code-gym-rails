@@ -72,7 +72,7 @@ class DailyResponse < ApplicationRecord
   def reviewed?  = ai_review.present?
 
   def fully_reviewed?
-    daily_exercise.active_section_keys.all? { |key| section_reviewed?(key) }
+    section_keys.all? { |key| section_reviewed?(key) }
   end
 
   def section_reviewed?(section)
@@ -135,14 +135,23 @@ class DailyResponse < ApplicationRecord
     self.class.answered?(section, answers[section.to_s], section_data(section))
   end
 
+  # The sections this response is measured against — the exercise's own, never
+  # `answers.keys`. A row can hold an answer for a section its exercise no
+  # longer presents (a regenerated day whose third changed), and counting it
+  # would report more answered sections than exist and push #completeness past
+  # 100%.
+  def section_keys
+    daily_exercise&.active_section_keys || []
+  end
+
   def answered_sections
-    answers.keys.select { |section| answered?(section) }
+    section_keys.select { |section| answered?(section) }
   end
 
   # Zero-guarded: a payload whose every section key holds a non-Hash presents no
   # answerable sections, and dividing by it yields NaN, which #round raises on.
   def completeness
-    total = daily_exercise.active_section_keys.size
+    total = section_keys.size
     return 0 if total.zero?
 
     (answered_sections.size / total.to_f * 100).round

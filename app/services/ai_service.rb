@@ -1415,9 +1415,16 @@ class AiService
   # a list of 3 or 5 grades exactly as well — and rejecting it would throw away
   # the day's other three sections over the likeliest deviation an LLM makes on
   # a counted list. Only the empty case is fatal; the long case is truncated.
+  #
+  # Scoped to the RESOLVED fourth section, not to the mere presence of the key:
+  # a provider that returns both fourth shapes leaves an ambiguity_hunt nothing
+  # downstream will ever render or grade (plan_review wins the slot), and
+  # discarding a good day over an answer key no one reads would be a strictly
+  # worse outcome than ignoring it.
   def normalize_planted_ambiguities!(problem_set)
+    return problem_set unless ExerciseSection.resolved_fourth_key(problem_set) == "ambiguity_hunt"
+
     section = problem_set["ambiguity_hunt"]
-    return problem_set unless section.is_a?(Hash)
 
     # Shape is held to the schema even though count isn't: a bare string here
     # is not four ambiguities, it's a provider that ignored the field's type,

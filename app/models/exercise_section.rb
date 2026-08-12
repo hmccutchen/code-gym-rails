@@ -40,6 +40,15 @@ class ExerciseSection
     [ PlanReview, AmbiguityHunt ]
   end
 
+  # Which fourth-slot key a raw problem_set resolves to, by .fourths
+  # precedence — nil when it holds none. Lives here rather than on
+  # DailyExercise because the generation-time normalizers have to resolve the
+  # same slot on a payload that isn't a row yet, and two copies of a
+  # precedence rule is one copy too many.
+  def self.resolved_fourth_key(problem_set)
+    fourths.map(&:key).find { |key| problem_set[key].is_a?(Hash) }
+  end
+
   # nil for anything outside the closed set. Callers decide what an unrecognized
   # section means; a provider can put arbitrary keys in a jsonb payload, so this
   # never raises.

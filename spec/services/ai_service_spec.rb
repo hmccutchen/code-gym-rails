@@ -1089,6 +1089,18 @@ RSpec.describe AiService do
       set = { "plan_review" => { "plan_excerpt" => "a plan" } }
       expect { service.send(:normalize_planted_ambiguities!, set) }.not_to raise_error
     end
+
+    # plan_review wins the fourth slot when both shapes come back, so the
+    # ambiguity hunt's answer key is never read — discarding the day's other
+    # three sections over it would be strictly worse than ignoring it.
+    it "ignores an unusable list on an ambiguity_hunt that lost the fourth slot to plan_review" do
+      set = {
+        "plan_review"    => { "plan_excerpt" => "a plan" },
+        "ambiguity_hunt" => { "request" => "vague" }
+      }
+
+      expect { service.send(:normalize_planted_ambiguities!, set) }.not_to raise_error
+    end
   end
 
   describe "#parse_json_response" do

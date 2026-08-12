@@ -55,7 +55,7 @@ class DailyExercise < ApplicationRecord
   # caller (views, prompt building) treats a nil fourth_key as "nothing to
   # render/prompt here" rather than needing a default kind to fall back to.
   def fourth_key
-    ExerciseSection.fourths.map(&:key).find { |key| problem_set[key].is_a?(Hash) }
+    ExerciseSection.resolved_fourth_key(problem_set)
   end
 
   # The sections this exercise actually presents: the two fixed kinds plus the

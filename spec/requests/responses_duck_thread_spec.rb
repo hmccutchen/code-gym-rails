@@ -191,6 +191,27 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     expect(fake).not_to have_received(:duck_response)
   end
 
+  # A payload can carry more third-/fourth-shaped keys than the page renders;
+  # only the resolved ones are on screen, and a section the engineer can't see
+  # isn't one they can think out loud about.
+  it "returns 422 for a payload key the exercise holds but never renders, without calling the provider" do
+    create_exercise_for(user, problem_set: {
+      "code_review"    => { "question" => "Find the bug", "snippet" => "def a; end" },
+      "pattern"        => { "title" => "Service Objects", "question" => "When?" },
+      "architecture"   => { "question" => "Which store?" },
+      "challenge"      => { "title" => "Build", "question" => "Implement X" },
+      "plan_review"    => { "title" => "Cache it", "plan_excerpt" => "1. cache", "question" => "What's wrong?" },
+      "ambiguity_hunt" => { "title" => "Leaderboard", "request" => "add one", "question" => "What's unclear?" }
+    })
+    fake = stub_answer
+    login_as(user)
+
+    post duck_thread_responses_path, params: { section: "ambiguity_hunt", message: "hi", thread: [] }, as: :json
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(fake).not_to have_received(:duck_response)
+  end
+
   it "returns a JSON error body on 404, not an empty one — the client always calls res.json() before checking res.ok" do
     login_as(user)
 
