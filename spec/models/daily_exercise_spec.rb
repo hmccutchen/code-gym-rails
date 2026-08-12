@@ -64,6 +64,48 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#plan_review" do
+    it "reads the plan_review blob with indifferent access, nil when absent" do
+      with_pr = DailyExercise.new(problem_set: { "plan_review" => { "concept" => "scope_creep" } })
+      without = DailyExercise.new(problem_set: { "challenge" => { "concept" => "n_plus_one" } })
+
+      expect(with_pr.plan_review[:concept]).to eq("scope_creep")
+      expect(without.plan_review).to be_nil
+    end
+  end
+
+  describe "#ambiguity_hunt" do
+    it "reads the ambiguity_hunt blob with indifferent access, nil when absent" do
+      with_ah = DailyExercise.new(problem_set: { "ambiguity_hunt" => { "title" => "Vague ask" } })
+      without = DailyExercise.new(problem_set: {})
+
+      expect(with_ah.ambiguity_hunt[:title]).to eq("Vague ask")
+      expect(without.ambiguity_hunt).to be_nil
+    end
+  end
+
+  describe "#fourth_key" do
+    it "returns 'plan_review' when present" do
+      exercise = DailyExercise.new(problem_set: { "plan_review" => {} })
+      expect(exercise.fourth_key).to eq("plan_review")
+    end
+
+    it "returns 'ambiguity_hunt' when present without plan_review" do
+      exercise = DailyExercise.new(problem_set: { "ambiguity_hunt" => {} })
+      expect(exercise.fourth_key).to eq("ambiguity_hunt")
+    end
+
+    it "returns nil for an old exercise with neither fourth-slot key — no fallback kind" do
+      exercise = DailyExercise.new(problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {} })
+      expect(exercise.fourth_key).to be_nil
+    end
+
+    it "skips a fourth key holding a non-Hash value, falling through to the next real section" do
+      exercise = DailyExercise.new(problem_set: { "plan_review" => "not a section", "ambiguity_hunt" => {} })
+      expect(exercise.fourth_key).to eq("ambiguity_hunt")
+    end
+  end
+
   describe "#third_key" do
     it "returns 'architecture' when the architecture key is present" do
       exercise = DailyExercise.new(problem_set: { "architecture" => {} })
