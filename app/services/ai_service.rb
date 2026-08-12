@@ -879,7 +879,14 @@ class AiService
         ""
       end
 
-    fourth_guidance = generation_guidance_for(fourth, language)
+    # Both slots resolved once, through the same call the schema assembles
+    # from, so guidance and schema can never disagree about which kind a slot
+    # holds — and a symbol rolled into a slot it can't occupy fails here rather
+    # than reaching a kind that has no guidance to give.
+    _code_review, _pattern, third_kind, fourth_kind =
+      ExerciseSection.for_plan(third: third, fourth: fourth)
+
+    fourth_guidance = generation_guidance_for(fourth_kind, language)
 
     ts_guidance =
       if language == "javascript"
@@ -901,7 +908,7 @@ class AiService
         ""
       end
 
-    third_guidance = generation_guidance_for(third, language)
+    third_guidance = generation_guidance_for(third_kind, language)
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -948,12 +955,13 @@ class AiService
     PROMPT
   end
 
-  # A rolled kind's generation instructions. The kind's own vocabulary is
-  # resolved through concept_vocabulary_for — the same lookup normalize_concepts
-  # validates against — so the guidance can never name a vocabulary the
-  # normalizer would then rewrite a concept away from.
-  def generation_guidance_for(rolled, language)
-    kind = ExerciseSection.for(rolled.to_s)
+  # A rolled kind's generation instructions. Takes the kind ExerciseSection
+  # .for_plan already resolved rather than the raw symbol, so slot eligibility
+  # is validated in one place. The kind's own vocabulary is resolved through
+  # concept_vocabulary_for — the same lookup normalize_concepts validates
+  # against — so the guidance can never name a vocabulary the normalizer would
+  # then rewrite a concept away from.
+  def generation_guidance_for(kind, language)
     _bucket, vocabulary = concept_vocabulary_for(kind.key, language)
 
     kind.generation_guidance(

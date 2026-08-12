@@ -2170,6 +2170,20 @@ RSpec.describe AiService do
       expect(prompt).not_to match(/AMBIGUITY HUNT/)
     end
 
+    # Guidance and schema resolve their slots through the same ExerciseSection
+    # .for_plan call, so a kind rolled into a slot it cannot occupy fails with
+    # the same message either way rather than reaching a kind with no guidance
+    # to give.
+    it "refuses a kind rolled into a slot it cannot occupy, in either slot" do
+      expect {
+        service.send(:build_exercise_prompt, user, "ruby_rails", third: :plan_review)
+      }.to raise_error(ArgumentError, /plan_review/)
+
+      expect {
+        service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :challenge)
+      }.to raise_error(ArgumentError, /challenge/)
+    end
+
     it "names the fourth-slot concept needing reinforcement" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :plan_review,
                             fourth_reinforcement: [ { concept: "scope_creep", tier: "standard" } ])

@@ -103,10 +103,10 @@
     .duck-status { display: block; font-size: .75rem; color: var(--muted); margin-top: .4rem; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
-    /* Shared submission-rendering styles. Used by responses/_answered_sections,
-       responses/_architecture_section, and responses/_submission — all of which
-       render on BOTH the dashboard and the history page, so these cannot live in
-       a per-page <style> block. */
+    /* Shared submission-rendering styles. Used by responses/_section (and the
+       per-kind partials it renders), responses/_answered_sections, and
+       responses/_submission — all of which render on BOTH the dashboard and the
+       history page, so these cannot live in a per-page <style> block. */
     .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
     .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .95rem; }
     .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
@@ -425,8 +425,8 @@
     })();
   </script>
   <%# Per-page scripts that would otherwise be duplicated once per rendered
-      partial instance (e.g. shared/_ai_review, responses/_architecture_section
-      on /history) — those partials emit into this region exactly once per
+      partial instance (e.g. shared/_ai_review, shared/_mermaid_diagram on
+      /history) — those partials emit into this region exactly once per
       request regardless of how many times they render. %>
   <%= yield :page_scripts %>
 </body>
