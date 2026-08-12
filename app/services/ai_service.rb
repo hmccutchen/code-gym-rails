@@ -190,6 +190,28 @@ class AiService
     idempotency_at_scale observability_tradeoffs
   ].freeze
 
+  # Vocabulary for the plan_review fourth-slot kind. Entirely disjoint from
+  # RAILS_CONCEPTS/JS_CONCEPTS/ARCHITECTURE_CONCEPTS — a plan_review concept
+  # can never appear in code_review/pattern/third, and vice versa. All four
+  # pass the same depth filter used to trim the security vocabulary: each has
+  # room to be approached multiple ways and to get harder or easier.
+  PLAN_REVIEW_CONCEPTS = %w[
+    unjustified_constant contradicts_existing_pattern scope_creep silent_behavior_change
+  ].freeze
+
+  # Vocabulary for the ambiguity_hunt fourth-slot kind. Same disjointness rule
+  # as PLAN_REVIEW_CONCEPTS.
+  AMBIGUITY_HUNT_CONCEPTS = %w[
+    undefined_scope_boundary unspecified_edge_cases missing_success_criteria
+    unstated_data_implications undefined_permissions_model
+  ].freeze
+
+  # Fixed, not a range: the review prompt must always know exactly how many
+  # ambiguities were planted to grade coverage against. 4 sits at the
+  # midpoint of the 3-5 range considered — few enough to find in one sitting,
+  # enough to force real coverage judgment.
+  AMBIGUITY_HUNT_PLANTED_COUNT = 4
+
   # Curated, real, job-adjacent scenario flavors for the "scenario" field's
   # business-domain framing — prompt-level grounding only, to keep generated
   # scenarios feeling like real engineering work rather than generic SaaS

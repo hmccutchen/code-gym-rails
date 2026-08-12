@@ -36,5 +36,24 @@ RSpec.describe ConceptBucket do
     it "still buckets architecture even when the language is nil" do
       expect(described_class.for("architecture", nil)).to eq("architecture")
     end
+
+    it "buckets plan_review independently of the day's language" do
+      expect(described_class.for("plan_review", "ruby_rails")).to eq("plan_review")
+      expect(described_class.for("plan_review", "javascript")).to eq("plan_review")
+    end
+
+    it "buckets ambiguity_hunt independently of the day's language" do
+      expect(described_class.for("ambiguity_hunt", "ruby_rails")).to eq("ambiguity_hunt")
+      expect(described_class.for("ambiguity_hunt", "javascript")).to eq("ambiguity_hunt")
+    end
+
+    it "takes the plan_review bucket when any section in a list is plan_review" do
+      expect(described_class.for(%w[code_review plan_review], "javascript")).to eq("plan_review")
+    end
+
+    it "still buckets plan_review and ambiguity_hunt even when the language is nil" do
+      expect(described_class.for("plan_review", nil)).to eq("plan_review")
+      expect(described_class.for("ambiguity_hunt", nil)).to eq("ambiguity_hunt")
+    end
   end
 end

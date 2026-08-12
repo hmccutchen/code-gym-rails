@@ -1,18 +1,38 @@
-# The vocabulary bucket a concept's history is recorded under. Architecture
-# concepts are language-independent — they transcend any one stack, so they are
-# tracked separately rather than under the day's generation language; every
-# other section buckets under that language.
+# The vocabulary bucket a concept's history is recorded under. Architecture,
+# plan_review, and ambiguity_hunt concepts are each language-independent —
+# they transcend any one stack, so they're tracked in their own bucket rather
+# than under the day's generation language; every other section buckets
+# under that language. Each of the three special buckets is entirely
+# disjoint vocabulary (see AiService::ARCHITECTURE_CONCEPTS/
+# PLAN_REVIEW_CONCEPTS/AMBIGUITY_HUNT_CONCEPTS), so each gets its own bucket
+# rather than being merged into one shared "meta-skills" bucket — the same
+# granularity ConceptMastery already uses everywhere else.
 #
-# Accepts one section or several: a concept tagged on multiple sections the same
-# day belongs to the architecture bucket if any of them is the architecture
-# section (see ConceptMastery.record_review!).
+# Accepts one section or several: a concept tagged on multiple sections the
+# same day belongs to a special bucket if any of them is that special
+# section (see ConceptMastery.record_review!). Only one special section can
+# ever appear in a given day's `sections` list in practice (a section only
+# occupies one slot), but the lookup is written to tolerate more than one
+# without preferring one arbitrarily — first match by key order wins.
 #
-# A nil language passes through as a nil bucket — callers reading history for a
-# response whose exercise is missing get no bucket rather than an exception.
+# A nil language passes through as a nil bucket — callers reading history for
+# a response whose exercise is missing get no bucket rather than an exception.
 class ConceptBucket
-  ARCHITECTURE = "architecture".freeze
+  ARCHITECTURE   = "architecture".freeze
+  PLAN_REVIEW    = "plan_review".freeze
+  AMBIGUITY_HUNT = "ambiguity_hunt".freeze
+
+  SPECIAL_BUCKETS = {
+    ARCHITECTURE   => ARCHITECTURE,
+    PLAN_REVIEW    => PLAN_REVIEW,
+    AMBIGUITY_HUNT => AMBIGUITY_HUNT
+  }.freeze
 
   def self.for(sections, language)
-    Array(sections).any? { |section| section.to_s == ARCHITECTURE } ? ARCHITECTURE : language
+    Array(sections).each do |section|
+      special = SPECIAL_BUCKETS[section.to_s]
+      return special if special
+    end
+    language
   end
 end
