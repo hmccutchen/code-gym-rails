@@ -19,9 +19,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
       )
 
-      %w[code_review pattern architecture].each do |field|
-        find(%(button[data-rating-for="#{field}"][data-rating="right_level"])).click
-      end
+      rate_all_sections
       click_button "Submit answers →"
       expect(page).to have_content("✓ Submitted")
 
