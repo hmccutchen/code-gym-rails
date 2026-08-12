@@ -3,7 +3,10 @@ require "rails_helper"
 RSpec.describe ExerciseSection do
   describe ".keys" do
     it "lists every section kind in the order the app has always enumerated them" do
-      expect(described_class.keys).to eq(%w[code_review pattern challenge architecture security_review parsons_problem])
+      expect(described_class.keys).to eq(%w[
+        code_review pattern challenge architecture security_review parsons_problem
+        plan_review ambiguity_hunt
+      ])
     end
   end
 
@@ -41,6 +44,24 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".fourths" do
+    it "lists the fourth-slot kinds" do
+      expect(described_class.fourths).to eq([ ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt ])
+    end
+
+    it "marks only the fourth-slot kinds as fourth?" do
+      expect(described_class.find("code_review").fourth?).to be(false)
+      expect(described_class.find("challenge").fourth?).to be(false)
+      expect(described_class.find("plan_review").fourth?).to be(true)
+      expect(described_class.find("ambiguity_hunt").fourth?).to be(true)
+    end
+
+    it "covers every fourth kind with a roll weight, so the two can't drift apart" do
+      skip "DailyPlan::FOURTH_SECTION_WEIGHTS lands in Task 5"
+      expect(DailyPlan::FOURTH_SECTION_WEIGHTS.keys.map(&:to_s)).to match_array(described_class.fourths.map(&:key))
+    end
+  end
+
   describe ".vocabulary_key" do
     it "sends architecture to the language-independent vocabulary" do
       expect(described_class.find("architecture").vocabulary_key).to eq(:architecture)
@@ -55,6 +76,14 @@ RSpec.describe ExerciseSection do
         expect(described_class.find(key).vocabulary_key).to eq(:concepts)
       end
     end
+
+    it "sends plan_review to its own vocabulary" do
+      expect(described_class.find("plan_review").vocabulary_key).to eq(:plan_review)
+    end
+
+    it "sends ambiguity_hunt to its own vocabulary" do
+      expect(described_class.find("ambiguity_hunt").vocabulary_key).to eq(:ambiguity_hunt)
+    end
   end
 
   describe ".improved_code?" do
@@ -64,6 +93,14 @@ RSpec.describe ExerciseSection do
 
     it "excludes parsons_problem, whose correct order is already the answer" do
       expect(described_class.find("parsons_problem").improved_code?).to be(false)
+    end
+
+    it "excludes ambiguity_hunt, which has no corrected form" do
+      expect(described_class.find("ambiguity_hunt").improved_code?).to be(false)
+    end
+
+    it "allows plan_review to carry a revised plan" do
+      expect(described_class.find("plan_review").improved_code?).to be(true)
     end
 
     it "allows every other kind to carry corrected code" do
@@ -90,6 +127,11 @@ RSpec.describe ExerciseSection do
       expect(described_class.find("security_review").diagrammable?).to be(false)
       expect(described_class.find("parsons_problem").diagrammable?).to be(false)
       expect(described_class.find("architecture").diagrammable?).to be(false)
+    end
+
+    it "excludes plan_review and ambiguity_hunt, where a diagram would restate prose or hint at the answer" do
+      expect(described_class.find("plan_review").diagrammable?).to be(false)
+      expect(described_class.find("ambiguity_hunt").diagrammable?).to be(false)
     end
   end
 
@@ -200,9 +242,9 @@ RSpec.describe ExerciseSection do
   end
 
   describe "answer scaffolds" do
-    it "scaffolds only pattern and architecture" do
+    it "scaffolds pattern, architecture, and plan_review" do
       expect(ExerciseSection.all.select(&:scaffolded?))
-        .to contain_exactly(ExerciseSection::Pattern, ExerciseSection::Architecture)
+        .to contain_exactly(ExerciseSection::Pattern, ExerciseSection::Architecture, ExerciseSection::PlanReview)
     end
 
     describe ".scaffold_labels" do

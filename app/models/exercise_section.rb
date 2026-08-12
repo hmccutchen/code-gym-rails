@@ -18,7 +18,8 @@ class ExerciseSection
   # (strong params, concept tagging, scenario collection) so anything deriving a
   # Hash or Array from it keeps the ordering it already had.
   def self.all
-    [ CodeReview, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem ]
+    [ CodeReview, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem,
+      PlanReview, AmbiguityHunt ]
   end
 
   def self.keys
@@ -31,6 +32,12 @@ class ExerciseSection
   # parsons_problem.
   def self.thirds
     [ Architecture, SecurityReview, Challenge, ParsonsProblem ]
+  end
+
+  # Precedence order for the fourth slot, mirroring .thirds: if a provider
+  # somehow returned both fourth-shaped keys, plan_review wins.
+  def self.fourths
+    [ PlanReview, AmbiguityHunt ]
   end
 
   # nil for anything outside the closed set. Callers decide what an unrecognized
@@ -47,6 +54,10 @@ class ExerciseSection
 
     def third?
       ExerciseSection.thirds.include?(self)
+    end
+
+    def fourth?
+      ExerciseSection.fourths.include?(self)
     end
 
     # Names which vocabulary this kind's concept is validated against. AiService
