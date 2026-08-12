@@ -8,12 +8,14 @@
 # reads which section to grade out of `prompt:`, since #review_sections
 # sends the same shared system context to every section's call.
 class FakeService < AiService
-  # All six ExerciseSection kinds populated at once. DailyExercise#third_key
+  # All eight ExerciseSection kinds populated at once. DailyExercise#third_key
   # resolves by precedence over whichever keys are present hashes
   # (ExerciseSection.thirds: architecture, security_review, challenge,
   # parsons_problem) — architecture wins here every time, regardless of
   # which third DailyPlan actually asked for, since normalize_concepts and
-  # shuffle_parsons_blocks! only ever touch keys that exist.
+  # shuffle_parsons_blocks! only ever touch keys that exist. Same precedence
+  # story for the fourth slot (ExerciseSection.fourths): plan_review wins
+  # over ambiguity_hunt whenever both are present, via DailyExercise#fourth_key.
   EXERCISE_PROBLEM_SET = {
     "code_review" => {
       "question" => "This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?",
@@ -119,6 +121,36 @@ class FakeService < AiService
       ],
       "teaching_note" => "Think about what should happen before any division is attempted.",
       "concept" => "idempotency"
+    },
+    "plan_review" => {
+      "title" => "Add response caching to the profile endpoint",
+      "scenario" => "a profile page that's slow under load",
+      "plan_excerpt" => <<~PLAN.strip,
+        1. Cache the profile response in Rails.cache for exactly 300 seconds — a magic number chosen because it felt about right.
+        2. While we're in here, also add an admin-only endpoint to manually clear any user's cache, since that might be handy someday.
+        3. Skip cache invalidation on profile update — the 300-second expiry will eventually catch it, so stale data for up to 5 minutes after a save is fine.
+      PLAN
+      "question" => "What's wrong with this plan, and what would you push back on before approving it?",
+      "teaching_note" => "Look at where a number appears with no stated reason, where the scope grew past the original ask, and where a user-visible behavior quietly changed.",
+      "concept" => "unjustified_constant",
+      "answer_scaffold" => [
+        "What's wrong:",
+        "What you'd push back on before approving:"
+      ]
+    },
+    "ambiguity_hunt" => {
+      "title" => "Add a leaderboard to the dashboard",
+      "scenario" => "a request dropped into the team's backlog with no further detail",
+      "request" => "Can we add a leaderboard showing our top performers? Should be easy to slot into the dashboard.",
+      "planted_ambiguities" => [
+        "Which metric ranks performers (streak length? sections answered? review ratings?) is never stated",
+        "Whether the leaderboard is team-wide or scoped to some subset of users is never stated",
+        "How ties are broken is never addressed",
+        "Whether a user can opt out of appearing on the leaderboard is never addressed"
+      ],
+      "question" => "What would you need clarified before writing a spec for this?",
+      "teaching_note" => "Read the request as if you had to start writing code from it right now — where would you have to just guess?",
+      "concept" => "missing_success_criteria"
     }
   }.freeze
 

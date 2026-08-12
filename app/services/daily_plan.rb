@@ -11,7 +11,8 @@
 # `.for` is the only public entry point and everything below it is a step
 # toward building one. Result is the value it hands back.
 class DailyPlan
-  Result = Data.define(:third, :reinforcement, :due_checks, :established)
+  Result = Data.define(:third, :reinforcement, :due_checks, :established,
+                        :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established)
 
   # Which third section this set gets. Named, tunable weights rather than a
   # bare literal: architecture-reasoning most of the time, the other three kinds
@@ -20,6 +21,28 @@ class DailyPlan
   # chosen kind is not tracked separately; the persisted third key
   # (ExerciseSection.thirds) is the record.
   THIRD_SECTION_WEIGHTS = { architecture: 0.40, security_review: 0.20, challenge: 0.20, parsons_problem: 0.20 }.freeze
+
+  # The fourth slot's two kinds, 50/50 — unlike the third slot's four-way
+  # rotation (biased toward architecture), there's no reason to favor one of
+  # these two skills over the other.
+  FOURTH_SECTION_WEIGHTS = { plan_review: 0.5, ambiguity_hunt: 0.5 }.freeze
+
+  # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket
+  # per kind (not a single shared bucket), matching how ARCHITECTURE already
+  # gets its own bucket rather than folding into a language bucket.
+  FOURTH_BUCKET_FOR = { plan_review: ConceptBucket::PLAN_REVIEW, ambiguity_hunt: ConceptBucket::AMBIGUITY_HUNT }.freeze
+
+  # Always excluded from the 3-slot reinforcement pool, regardless of which
+  # fourth kind rolls today — neither bucket is ever hostable in
+  # code_review/pattern/third, so a fourth-bucket concept must never compete
+  # for or claim one of those three slots.
+  FOURTH_BUCKETS = FOURTH_BUCKET_FOR.values.freeze
+
+  # The fourth slot is exactly one section holding exactly one concept (see
+  # AiService#exercise_schema_for). Everything competing for it — reinforcement
+  # and retention alike — is sized against this, so the prompt can never ask a
+  # one-concept section to carry two.
+  FOURTH_SLOT_CAPACITY = 1
 
   # A vocabulary is at most 16 concepts (see AiService::RAILS_CONCEPTS /
   # JS_CONCEPTS / ARCHITECTURE_CONCEPTS), so "every due concept in a bucket" is
@@ -34,7 +57,7 @@ class DailyPlan
   # that (see AiService#log_retention).
   def self.for(user, language:)
     third         = roll_third_section
-    reinforcement = user.concepts_needing_reinforcement
+    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS)
     # An exercise has only 3 sections, so only the first 3 reinforcement concepts
     # can ever occupy one — sizing against the full (often 4-8 entry) list left
     # slots permanently at 0 for any active user. Reinforcement keeps all 3 slots
@@ -50,7 +73,30 @@ class DailyPlan
     established   = established_concepts_for(user, language, third: third,
                                              reinforcement: reinforcement, due_checks: due_checks)
 
-    Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established)
+    # The fourth slot's own independent track — a parallel state machine
+    # rather than a generalization of the 3-slot one above, because the two
+    # vocabularies can never mix: keeping them structurally separate means a
+    # cross-vocab item can never be placed somewhere it structurally cannot go.
+    fourth               = roll_fourth_section
+    fourth_bucket        = FOURTH_BUCKET_FOR.fetch(fourth)
+    # Truncated to the slot's capacity before anything else reads it: the full
+    # list runs 4-5 entries deep on a small vocabulary, and every entry past
+    # the first is a concept the prompt would demand of a section that can only
+    # carry one.
+    fourth_reinforcement = user.concepts_needing_reinforcement(bucket: fourth_bucket).first(FOURTH_SLOT_CAPACITY)
+    # An overdue retention check doesn't share the slot, it takes it — leaving
+    # reinforcement in place alongside would put two mutually exclusive
+    # concepts in the same prompt.
+    fourth_reinforcement = [] if fourth_reinforcement.any? &&
+                                 overdue_retention_check_pending_for_bucket?(user, fourth_bucket)
+    fourth_slots         = FOURTH_SLOT_CAPACITY - fourth_reinforcement.size
+    fourth_due_checks    = retention_checks_for_bucket(user, fourth_bucket, slots: fourth_slots)
+    fourth_established   = established_concepts_for_bucket(user, fourth_bucket,
+                                                            reinforcement: fourth_reinforcement, due_checks: fourth_due_checks)
+
+    Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established,
+               fourth: fourth, fourth_reinforcement: fourth_reinforcement,
+               fourth_due_checks: fourth_due_checks, fourth_established: fourth_established)
   end
 
   # Cumulative weights are rounded before comparison: summing float weights
@@ -68,6 +114,58 @@ class DailyPlan
     THIRD_SECTION_WEIGHTS.keys.last
   end
   private_class_method :roll_third_section
+
+  # Same cumulative-weight pattern as roll_third_section, over
+  # FOURTH_SECTION_WEIGHTS instead.
+  def self.roll_fourth_section
+    r = rand
+    cumulative = 0.0
+
+    FOURTH_SECTION_WEIGHTS.each do |kind, weight|
+      cumulative += weight
+      return kind if r < cumulative.round(10)
+    end
+
+    FOURTH_SECTION_WEIGHTS.keys.last
+  end
+  private_class_method :roll_fourth_section
+
+  # Single-bucket analog of retention_checks_for. Simpler than the 3-slot
+  # version: the fourth slot's bucket is always exactly one fixed value
+  # (today's rolled kind), never a multi-bucket set the way hostable_buckets
+  # can return for the third slot.
+  def self.retention_checks_for_bucket(user, bucket, slots:)
+    return [] if slots.zero?
+
+    user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP)
+        .to_a
+        .sort_by { |cm| -(overdue_ratio(cm)) }
+        .first(slots)
+  end
+  private_class_method :retention_checks_for_bucket
+
+  # Single-bucket analog of established_concepts_for.
+  def self.established_concepts_for_bucket(user, bucket, reinforcement:, due_checks:)
+    claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
+
+    user.concept_masteries
+      .where(language: bucket, tier: :standard)
+      .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
+      .reject { |cm| claimed.include?(cm.concept) }
+  end
+  private_class_method :established_concepts_for_bucket
+
+  # Single-bucket analog of overdue_retention_check_pending? — required, not
+  # optional: each fourth-slot vocabulary is only 4-5 concepts, so it will
+  # commonly have at least one concept needing reinforcement, which would
+  # otherwise claim the slot every day and starve fourth_due_checks
+  # permanently (the fourth slot has exactly one slot total, unlike the
+  # 3-slot pool's three, so a single reinforcement concept blocks 100% of its
+  # retention capacity rather than a third of it).
+  def self.overdue_retention_check_pending_for_bucket?(user, bucket)
+    user.concepts_overdue_for_retention_check(bucket: bucket).exists?
+  end
+  private_class_method :overdue_retention_check_pending_for_bucket?
 
   # The concept buckets today's set can actually host. Architecture concepts have
   # no home outside the architecture third, and a language concept must match the

@@ -26,6 +26,8 @@ class DailyExercise < ApplicationRecord
   def architecture       = problem_set["architecture"]&.with_indifferent_access
   def security_review    = problem_set["security_review"]&.with_indifferent_access
   def parsons_problem    = problem_set["parsons_problem"]&.with_indifferent_access
+  def plan_review        = problem_set["plan_review"]&.with_indifferent_access
+  def ambiguity_hunt     = problem_set["ambiguity_hunt"]&.with_indifferent_access
 
   def regenerating?
     regenerating_since.present? && regenerating_since > REGENERATION_STALE_AFTER.ago
@@ -44,5 +46,29 @@ class DailyExercise < ApplicationRecord
   # raised outright on a non-Hash value rather than falling through.
   def third_key
     ExerciseSection.thirds.map(&:key).find { |key| problem_set[key].is_a?(Hash) } || "challenge"
+  end
+
+  # Which fourth-slot shape this exercise's problem_set holds, resolved the
+  # same shape-checked way as third_key. Unlike third_key, there is no
+  # fallback kind: an exercise generated before this slot existed has neither
+  # key at all, and nil is the correct answer for it — every fourth-slot
+  # caller (views, prompt building) treats a nil fourth_key as "nothing to
+  # render/prompt here" rather than needing a default kind to fall back to.
+  def fourth_key
+    ExerciseSection.resolved_fourth_key(problem_set)
+  end
+
+  # The sections this exercise actually presents: the two fixed kinds plus the
+  # precedence-resolved third and fourth.
+  #
+  # NOT `problem_set.keys`. A payload can hold more than one third- or
+  # fourth-shaped key — FakeService persists all eight deliberately, and a real
+  # provider can return an extra alternate — but only the resolved one is ever
+  # rendered, answerable, or rateable. Every "N of M sections" denominator
+  # derives from this, so a count can never exceed what is on screen.
+  def active_section_keys
+    ([ "code_review", "pattern" ] + [ third_key, fourth_key ])
+      .compact
+      .select { |key| problem_set[key].is_a?(Hash) }
   end
 end

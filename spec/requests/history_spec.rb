@@ -85,6 +85,57 @@ RSpec.describe "History", type: :request do
     end
   end
 
+  describe "fourth-slot rendering" do
+    def create_exercise_with_fourth(fourth_key, fourth_section)
+      DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current,
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern" => { "title" => "Pat", "question" => "pattern-q" },
+          "challenge" => { "question" => "challenge-q" },
+          fourth_key => fourth_section
+        }
+      )
+    end
+
+    it "renders a submitted plan_review fourth section with its label and answer" do
+      exercise = create_exercise_with_fourth("plan_review", {
+        "title" => "Cache plan", "question" => "What's wrong?",
+        "plan_excerpt" => "Cache for 300 seconds. Also add an admin cache-clear endpoint."
+      })
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20, "plan_review" => "This ignores cache invalidation on writes." }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("4 — Plan Review")
+      expect(response.body).to include("This ignores cache invalidation on writes.")
+    end
+
+    it "renders a submitted ambiguity_hunt fourth section, never leaking planted_ambiguities" do
+      exercise = create_exercise_with_fourth("ambiguity_hunt", {
+        "title" => "Leaderboard ask", "question" => "What's unclear?",
+        "request" => "Add a leaderboard to the dashboard.",
+        "planted_ambiguities" => [ "Which metric ranks users is unstated", "Tie-breaking is unstated" ]
+      })
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+        answers: { "code_review" => "x" * 20, "ambiguity_hunt" => "Which metric ranks users, and how are ties broken?" }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("4 — Ambiguity Hunt")
+      expect(response.body).to include("Which metric ranks users, and how are ties broken?")
+      expect(response.body).not_to include("Which metric ranks users is unstated")
+      expect(response.body).not_to include("Tie-breaking is unstated")
+    end
+  end
+
   describe "GET /history" do
     it "requires login" do
       get history_path
@@ -218,6 +269,35 @@ RSpec.describe "History", type: :request do
       get history_path
 
       expect(response.body).to include("pattern_improved_marker")
+    end
+
+    # A revised implementation plan is prose. Sending it through the shared
+    # code renderer syntax-highlights English as Ruby and labels it "Improved
+    # code" — see ExerciseSection::PlanReview.improved_code_prose?.
+    it "renders plan_review's improved_code as a labelled prose plan, not highlighted source" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "Pat", "question" => "pattern-q" },
+          "challenge"   => { "question" => "challenge-q" },
+          "plan_review" => { "title" => "Plan", "question" => "plan-q", "plan_excerpt" => "the plan" }
+        }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "plan_review" => "The migration step is a behavior change" },
+        submitted_at: Time.current,
+        concept_tags: { "plan_review" => "other" },
+        ai_review: { "plan_review" => { "rating" => "solid", "improved_code" => "revised_plan_marker" } }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("Revised plan")
+      expect(response.body).to include(%(<div class="plan-excerpt" style="margin-top:.4rem">revised_plan_marker</div>))
+      expect(response.body).not_to include(%(<code data-hljs="ruby">revised_plan_marker</code>))
     end
 
     it "lists only the current user's submitted responses, newest first" do

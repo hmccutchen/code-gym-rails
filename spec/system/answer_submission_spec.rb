@@ -24,11 +24,13 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       fill_in_answer("pattern", "A service object because checkout has three unrelated responsibilities.")
       fill_in_answer("architecture", "Move the email to a background job; checkout latency matters more than instant confirmation.")
 
-      rate("code_review")
-      rate("pattern")
-      # Still disabled with one section unrated.
+      # Rate every section but the last: whatever sections the page actually
+      # holds (rate_all_sections reads that from the DOM, see system_test_helper),
+      # the gate must still be blocked with one left unrated.
+      fields = rating_row_fields
+      fields[0..-2].each { |field| rate_section(field) }
       expect(page).to have_button("Submit answers →", disabled: true)
-      rate("architecture")
+      rate_section(fields.last)
 
       expect(page).to have_button("Submit answers →", disabled: false)
       click_button "Submit answers →"
@@ -39,9 +41,5 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
   def fill_in_answer(field, text)
     find(%(textarea[data-field="#{field}"])).fill_in(with: text)
-  end
-
-  def rate(field, value: "right_level")
-    find(%(button[data-rating-for="#{field}"][data-rating="#{value}"])).click
   end
 end

@@ -190,6 +190,42 @@ class AiService
     idempotency_at_scale observability_tradeoffs
   ].freeze
 
+  # Vocabulary for the plan_review fourth-slot kind. Entirely disjoint from
+  # RAILS_CONCEPTS/JS_CONCEPTS/ARCHITECTURE_CONCEPTS — a plan_review concept
+  # can never appear in code_review/pattern/third, and vice versa. All four
+  # pass the same depth filter used to trim the security vocabulary: each has
+  # room to be approached multiple ways and to get harder or easier.
+  PLAN_REVIEW_CONCEPTS = %w[
+    unjustified_constant contradicts_existing_pattern scope_creep silent_behavior_change
+  ].freeze
+
+  # Vocabulary for the ambiguity_hunt fourth-slot kind. Same disjointness rule
+  # as PLAN_REVIEW_CONCEPTS.
+  AMBIGUITY_HUNT_CONCEPTS = %w[
+    undefined_scope_boundary unspecified_edge_cases missing_success_criteria
+    unstated_data_implications undefined_permissions_model
+  ].freeze
+
+  # Fixed, not a range: the review prompt must always know exactly how many
+  # ambiguities were planted to grade coverage against. 4 sits at the
+  # midpoint of the 3-5 range considered — few enough to find in one sitting,
+  # enough to force real coverage judgment.
+  AMBIGUITY_HUNT_PLANTED_COUNT = 4
+
+  # What the planted list is bounded to on ingest, as opposed to what the
+  # prompt asks for. The count above is the generator's target; nothing
+  # downstream reads it, since the review prompt lists the ambiguities rather
+  # than counting them (see #fourth_context_summary). So a provider that lands
+  # on 3 or 5 has still produced a gradable section, and only the runaway case
+  # needs bounding — this is provider text going into another prompt.
+  MAX_PLANTED_AMBIGUITIES = AMBIGUITY_HUNT_PLANTED_COUNT * 2
+
+  # The one field in a problem set that is answer-key data rather than exercise
+  # content. Named here because two places have to know it by name: the
+  # boundary validation that guarantees it is usable, and the diagnostics log
+  # that must never carry it.
+  ANSWER_KEY_FIELD = "planted_ambiguities"
+
   # Curated, real, job-adjacent scenario flavors for the "scenario" field's
   # business-domain framing — prompt-level grounding only, to keep generated
   # scenarios feeling like real engineering work rather than generic SaaS
@@ -231,8 +267,25 @@ class AiService
       concepts: ARCHITECTURE_CONCEPTS,
       coach:    "software architecture",
       focus:    "system-design tradeoffs: service boundaries, consistency, failure modes, scale, coupling."
+    },
+    "plan_review" => {
+      label:    "language-agnostic",
+      concepts: PLAN_REVIEW_CONCEPTS,
+      coach:    "engineering plan review",
+      focus:    "spotting flaws in a written implementation plan before it's built: unjustified complexity, scope creep, and unflagged behavior changes."
+    },
+    "ambiguity_hunt" => {
+      label:    "language-agnostic",
+      concepts: AMBIGUITY_HUNT_CONCEPTS,
+      coach:    "requirements analysis",
+      focus:    "interrogating an underspecified feature request: missing scope boundaries, unhandled edge cases, and unstated success criteria."
     }
   }.freeze
+
+  # Vocabularies with no code of their own to reference — a concept from any
+  # of these has nothing language-specific to show, so their concept
+  # reference asks for illustrative pseudocode instead of real source.
+  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS, AMBIGUITY_HUNT_CONCEPTS ].freeze
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
@@ -293,14 +346,23 @@ class AiService
       system: build_system_prompt(language),
       prompt: build_exercise_prompt(user, language, third: plan.third,
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
-                                    established: plan.established, history: history)
+                                    established: plan.established, history: history,
+                                    fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
+                                    fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established)
     )
 
-    problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    problem_set = parse_json_object(result[:text], subject: "problem set")
+    # Ahead of the normalizers because it is the only one that can reject the
+    # response: normalize_concepts writes SuggestedConcept rows as a side
+    # effect, and a set that is about to be thrown away should not leave a
+    # vocabulary suggestion behind.
+    normalize_planted_ambiguities!(problem_set)
+    normalize_concepts(problem_set, language)
     normalize_answer_scaffolds!(problem_set)
     normalize_diagrams!(problem_set)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
+    log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set)
     log_difficulty_diagnostics(user, language, plan, problem_set, history)
     problem_set
   end
@@ -311,26 +373,33 @@ class AiService
   # section's failure is caught and tagged rather than raised, so one bad
   # section can never keep the other threads' results from being usable by
   # the caller.
+  #
+  # No pooled DB connection is held for the duration of a thread — only the
+  # provider HTTP call happens here, and that can run up to READ_TIMEOUT
+  # seconds. The one bit of real DB work (ApiUsage.create! inside #log_usage)
+  # checks out a connection for itself, scoped narrowly in #call_and_log, so
+  # a multi-section review never pins (section count) pooled connections for
+  # the length of an HTTP round trip — with Puma's thread count and
+  # database.yml's pool sized 1:1, that used to leave zero spare connections
+  # for any concurrent request.
   def review_sections(user, exercise, daily_response, sections:)
     coach   = config_for(exercise.language)[:coach]
     context = build_review_day_context(coach, exercise, daily_response)
 
     threads = sections.map do |section|
       Thread.new do
-        ActiveRecord::Base.connection_pool.with_connection do
-          service = self.class.new(@api_key)
-          begin
-            result = service.send(
-              :call_and_log, user, purpose: "review_response",
-              system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
-              cache_system: true
-            )
-            review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
-            review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-            [ section, { ok: true, review: review } ]
-          rescue AiService::Error => e
-            [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
-          end
+        service = self.class.new(@api_key)
+        begin
+          result = service.send(
+            :call_and_log, user, purpose: "review_response",
+            system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
+            cache_system: true
+          )
+          review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+          review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+          [ section, { ok: true, review: review } ]
+        rescue AiService::Error => e
+          [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
         end
       end
     end
@@ -478,8 +547,10 @@ class AiService
 
   # Plain-text summary of whichever fields a given section actually has
   # (code_review/pattern/challenge/architecture/security_review/
-  # parsons_problem all carry a different subset) — enough context for a
-  # Socratic prompt without needing per-section-kind branching.
+  # parsons_problem/plan_review/ambiguity_hunt all carry a different subset)
+  # — enough context for a Socratic prompt without needing per-section-kind
+  # branching. `planted_ambiguities` is deliberately excluded: it's the
+  # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
   def duck_section_context(exercise, section)
     data = exercise.problem_set.dig(section.to_s) || {}
 
@@ -491,6 +562,8 @@ class AiService
       ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
       ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
       ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
+      ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
+      ("Feature request:\n#{data["request"]}" if data["request"].present?),
       duck_parsons_blocks(data)
     ].compact.join("\n")
   end
@@ -627,7 +700,11 @@ class AiService
   # the concepts actually persisted, not whatever the provider first returned.
   # `tagged` makes a miss diagnosable rather than merely countable: it shows what
   # the model picked instead.
-  def log_retention(user, language, due_checks, problem_set)
+  #
+  # Takes a ConceptBucket rather than a language because the fourth slot's
+  # track is bucket-scoped and language-independent; for the three-slot track
+  # the bucket IS the day's language (see ConceptBucket.for).
+  def log_retention(user, bucket, due_checks, problem_set)
     return if due_checks.empty?
 
     offered = due_checks.map(&:concept)
@@ -635,7 +712,7 @@ class AiService
     honored = offered & tagged
 
     Rails.logger.info(
-      "[retention] user=#{user.id} date=#{Date.current} language=#{language} " \
+      "[retention] user=#{user.id} date=#{Date.current} bucket=#{bucket} " \
       "offered=#{offered.join(',').presence || '-'} " \
       "honored=#{honored.join(',').presence || '-'} " \
       "tagged=#{tagged.join(',').presence || '-'}"
@@ -664,10 +741,22 @@ class AiService
         established: plan.established.map(&:concept),
         recent_performance: history
       },
-      delivered: problem_set
+      delivered: without_answer_key(problem_set)
     }
 
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
+  end
+
+  # Log storage is not one of the places the ambiguity hunt's answer key is
+  # allowed to reach. Every other consumer of a problem_set renders a closed
+  # enumeration of named fields; this is the only one that serializes the whole
+  # thing, so the exclusion lives here rather than in a rule the next
+  # whole-payload logger would have to remember. Returns a copy — the caller's
+  # problem_set is what gets persisted.
+  def without_answer_key(problem_set)
+    problem_set.transform_values do |section|
+      section.is_a?(Hash) ? section.except(ANSWER_KEY_FIELD) : section
+    end
   end
 
   # Subclasses must implement: makes the provider-specific HTTP call and
@@ -700,7 +789,7 @@ class AiService
   # code-bearing fields' label switches with `language` so instructions never
   # assume Ruby idioms when generating JS — the structure itself never
   # changes across languages.
-  def exercise_schema_for(language = "ruby_rails", third: :challenge)
+  def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review)
     label = config_for(language)[:label]
 
     third_section =
@@ -766,6 +855,34 @@ class AiService
         CH
       end
 
+    fourth_section =
+      case fourth
+      when :ambiguity_hunt
+        <<~AH.chomp
+          "ambiguity_hunt": {
+              "title":    "string",
+              "scenario": "string — the concrete business-domain framing, drawn from Code Gym-style feature requests (e.g. a daily-practice app's own features)",
+              "request":  "string — a vague feature request, 2-4 sentences, phrased the way a stakeholder or PM would ask for it, not an engineer",
+              "planted_ambiguities": ["string — one specific ambiguity deliberately left in \\"request\\"", "... (exactly #{AMBIGUITY_HUNT_PLANTED_COUNT} total)"],
+              "question": "string — e.g. 'What would you need clarified before writing a spec for this?'",
+              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary"
+            }
+        AH
+      else
+        <<~PR.chomp
+          "plan_review": {
+              "title":    "string — short name for the plan/decision under review",
+              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+              "plan_excerpt": "string — a short prose implementation plan, framed as if written by an AI assistant, containing 2-3 planted flaws spanning levels: one real technical anti-pattern, one scope-creep item, one unflagged behavior change",
+              "question": "string — what to evaluate before approving this plan",
+              "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
+              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+              "concept": "string — exactly one concept from the provided vocabulary"
+            }
+        PR
+      end
+
     <<~SCHEMA
       {
         "code_review": {
@@ -786,7 +903,8 @@ class AiService
           "concept": "string — exactly one concept from the provided vocabulary",
           "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
         },
-        #{third_section}
+        #{third_section},
+        #{fourth_section}
       }
     SCHEMA
   end
@@ -796,7 +914,8 @@ class AiService
   # already-fetched value instead so the prompt and the diagnostics log
   # never see two different snapshots of the same user's history.
   def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [],
-                            established: [], history: user.recent_performance)
+                            established: [], history: user.recent_performance,
+                            fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [])
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -811,7 +930,7 @@ class AiService
         framings     = h[:scenarios].presence || []
         framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
         feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/3 answered#{concept_text}#{framing_text}#{feedback}"
+        "#{h[:date]}: #{h[:sections_answered]}/#{h[:sections_total]} answered#{concept_text}#{framing_text}#{feedback}"
       }.join("\n")
     end
 
@@ -850,6 +969,47 @@ class AiService
         EST
       else
         ""
+      end
+
+    fourth_reinforcement_text = fourth_reinforcement.any? ?
+      fourth_reinforcement.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
+
+    fourth_retention_block =
+      if fourth_due_checks.any?
+        <<~RET.chomp
+
+          Retention check due for the fourth section today: #{fourth_due_checks.map(&:concept).join(', ')} (#{fourth} bucket).
+          - This is a concept the engineer previously MASTERED in this skill. Work it into the fourth section as its concept.
+          - Use a completely FRESH scenario — never reuse a prior framing. Pitch at FULL difficulty, no extra scaffolding — the engineer is not struggling with this, making it easier defeats the point of checking.
+        RET
+      else
+        ""
+      end
+
+    fourth_established_block =
+      if fourth_established.any?
+        <<~EST.chomp
+
+          Established fourth-section concept (well past first mastery, survived a retention check): #{fourth_established.map(&:concept).join(', ')}
+          - If you were already going to select this for the fourth section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
+        EST
+      else
+        ""
+      end
+
+    fourth_guidance =
+      case fourth
+      when :ambiguity_hunt
+        <<~AH.chomp
+          - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{AMBIGUITY_HUNT_PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
+          - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.
+          - Choose the ambiguity_hunt concept from this vocabulary, exactly one: #{AMBIGUITY_HUNT_CONCEPTS.join(", ")}
+        AH
+      else
+        <<~PR.chomp
+          - The fourth section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
+          - Choose the plan_review concept from this vocabulary, exactly one: #{PLAN_REVIEW_CONCEPTS.join(", ")}
+        PR
       end
 
     ts_guidance =
@@ -915,6 +1075,7 @@ class AiService
       #{history_text}
 
       Concepts needing reinforcement right now: #{reinforcement_text}
+      Fourth-section (#{fourth}) concept needing reinforcement: #{fourth_reinforcement_text}
 
       Instructions:
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
@@ -932,15 +1093,18 @@ class AiService
       - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
       - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
       #{third_guidance}
+      #{fourth_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
       #{established_block}
+      #{fourth_retention_block}
+      #{fourth_established_block}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{exercise_schema_for(language, third: third)}
+      #{exercise_schema_for(language, third: third, fourth: fourth)}
     PROMPT
   end
 
@@ -950,7 +1114,7 @@ class AiService
     ratings = daily_response.section_ratings
 
     <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's three sections in a follow-up instruction — the other two are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
+      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's four sections in a follow-up instruction — the other three are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
 
       Code Review question: #{exercise.code_review["question"]}
       Code snippet: #{exercise.code_review["snippet"]}
@@ -962,6 +1126,8 @@ class AiService
       Their self-rating: #{ratings["pattern"] || "(none given)"}
 
       #{third_context_summary(exercise, answers, ratings)}
+
+      #{fourth_context_summary(exercise, answers, ratings)}
     CONTEXT
   end
 
@@ -990,6 +1156,30 @@ class AiService
     end
   end
 
+  # Contributes nothing (empty string) for an old exercise with no fourth-slot
+  # key — exercise.fourth_key is nil there, and the CONTEXT heredoc above
+  # simply gets a blank line, matching how every other nil-safe read in this
+  # method already degrades for pre-this-ship rows.
+  def fourth_context_summary(exercise, answers, ratings)
+    case exercise.fourth_key
+    when "ambiguity_hunt"
+      ah = exercise.ambiguity_hunt
+      "Ambiguity Hunt (#{ah["title"]}): #{ah["question"]}\n" \
+      "Request: #{ah["request"]}\n" \
+      "Planted ambiguities (hidden from the engineer, known here for grading): #{Array(ah["planted_ambiguities"]).join('; ')}\n" \
+      "Their answer: #{answers["ambiguity_hunt"].presence || "(skipped)"}\n" \
+      "Their self-rating: #{ratings["ambiguity_hunt"] || "(none given)"}"
+    when "plan_review"
+      pr = exercise.plan_review
+      "Plan Review (#{pr["title"]}): #{pr["question"]}\n" \
+      "Plan excerpt: #{pr["plan_excerpt"]}\n" \
+      "Their answer: #{answers["plan_review"].presence || "(skipped)"}\n" \
+      "Their self-rating: #{ratings["plan_review"] || "(none given)"}"
+    else
+      ""
+    end
+  end
+
   def build_review_section_prompt(exercise, daily_response, section)
     <<~PROMPT
       Grade ONLY the "#{section}" section from the day's context above.
@@ -1012,9 +1202,10 @@ class AiService
   end
 
   def improved_code_instruction(section)
-    ExerciseSection.find(section)&.improved_code? == false ?
-      "must be an empty string for this section" :
-      "corrected/improved code for this section"
+    kind = ExerciseSection.for(section)
+    kind.improved_code? ?
+      "the #{kind.improved_code_label.downcase} for this section" :
+      "must be an empty string for this section"
   end
 
   def section_grading_note(exercise, daily_response, section)
@@ -1034,6 +1225,11 @@ class AiService
       "For \"pattern\", improved_code must show the refactored structure that addresses what they missed — " \
       "the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
       "structural; show enough of the shape to make the structure obvious."
+    when "ambiguity_hunt"
+      "Grade coverage against the PLANTED ambiguities listed in the context above (the \"Planted ambiguities\" line) — do not invent your own list. In \"missed\", name each planted ambiguity the engineer did not identify. In \"correct\", credit each planted ambiguity they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted.\n" \
+      "For this section \"improved_code\" must be an empty string."
+    when "plan_review"
+      "Evaluate on whether they correctly identified the planted flaws (a technical anti-pattern, a scope-creep item, an unflagged behavior change) and whether their pushback is well-reasoned — not against one exact expected wording. \"improved_code\" for this section is a revised version of the plan that addresses what they missed."
     else
       ""
     end
@@ -1042,7 +1238,7 @@ class AiService
   def build_concept_reference_prompt(concept, config)
     label = config[:label]
     code_example_desc =
-      if config[:concepts] == ARCHITECTURE_CONCEPTS
+      if LANGUAGE_AGNOSTIC_VOCABULARIES.include?(config[:concepts])
         "illustrative pseudocode or a short language-agnostic snippet, ~15 lines"
       else
         "annotated #{label} code, ~15 lines"
@@ -1204,6 +1400,46 @@ class AiService
     problem_set
   end
 
+  # Unlike every other normalizer here, this one can raise rather than repair.
+  # The planted list is the ambiguity hunt's entire grading ground truth — the
+  # review prompt grades coverage against it and nothing else — so an empty or
+  # unusable list doesn't degrade the section, it silently turns coverage
+  # grading back into the freehand judgement the kind exists to replace, and
+  # there is no fallback to fall back to. InvalidResponseError is already a
+  # surfaced, retryable generation failure
+  # (GenerateDailyExercisesJob#persist_failure), so failing costs the user a
+  # retry rather than a day of ungrounded grading.
+  #
+  # A WRONG COUNT IS NOT A FAILURE, though. The prompt asks for exactly
+  # AMBIGUITY_HUNT_PLANTED_COUNT, but nothing downstream reads that number, so
+  # a list of 3 or 5 grades exactly as well — and rejecting it would throw away
+  # the day's other three sections over the likeliest deviation an LLM makes on
+  # a counted list. Only the empty case is fatal; the long case is truncated.
+  #
+  # Scoped to the RESOLVED fourth section, not to the mere presence of the key:
+  # a provider that returns both fourth shapes leaves an ambiguity_hunt nothing
+  # downstream will ever render or grade (plan_review wins the slot), and
+  # discarding a good day over an answer key no one reads would be a strictly
+  # worse outcome than ignoring it.
+  def normalize_planted_ambiguities!(problem_set)
+    return problem_set unless ExerciseSection.resolved_fourth_key(problem_set) == "ambiguity_hunt"
+
+    section = problem_set["ambiguity_hunt"]
+
+    # Shape is held to the schema even though count isn't: a bare string here
+    # is not four ambiguities, it's a provider that ignored the field's type,
+    # and Array() would quietly launder it into a single-entry answer key.
+    raw     = section[ANSWER_KEY_FIELD]
+    planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []
+    if planted.empty?
+      raise InvalidResponseError,
+            "Ambiguity hunt returned no usable #{ANSWER_KEY_FIELD} to grade coverage against"
+    end
+
+    section[ANSWER_KEY_FIELD] = planted.first(MAX_PLANTED_AMBIGUITIES)
+    problem_set
+  end
+
   # The (suggestion-bucket, vocabulary) a section's concept is validated against.
   # The section kind names which vocabulary applies (see ExerciseSection); the
   # constants themselves stay here. An unrecognized section key — a provider can
@@ -1213,6 +1449,8 @@ class AiService
       case ExerciseSection.find(section_key)&.vocabulary_key
       when :architecture      then ARCHITECTURE_CONCEPTS
       when :security_concepts then config_for(language)[:security_concepts]
+      when :plan_review       then PLAN_REVIEW_CONCEPTS
+      when :ambiguity_hunt    then AMBIGUITY_HUNT_CONCEPTS
       else                         config_for(language)[:concepts]
       end
 
@@ -1249,11 +1487,20 @@ class AiService
   # themselves: recognizing a stop reason is provider-specific, but deciding
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
+  #
+  # The connection checkout wraps only #log_usage, not the `call` above it —
+  # `call` is the provider HTTP round trip, the one part of this method with
+  # no DB work in it, and it's shared by #review_sections' per-section
+  # threads (see that method's comment). A caller that already holds a
+  # connection (every non-threaded caller, via Rails' request-cycle checkout)
+  # sees a harmless no-op here: ActiveRecord's with_connection reuses a
+  # connection already leased to the current thread rather than checking out
+  # a second one.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
                    read_timeout: READ_TIMEOUT, max_tokens: nil)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
                   read_timeout: read_timeout, max_tokens: max_tokens)
-    log_usage(user, result, purpose: purpose)
+    ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
 
     if result[:truncated]
       raise TruncatedResponseError,

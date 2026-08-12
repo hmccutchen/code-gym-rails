@@ -638,6 +638,70 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "fourth-slot rendering" do
+    it "renders no fourth section at all when the exercise has neither fourth-slot key" do
+      create_exercise(problem_set: base_problem_set)
+
+      get root_path
+
+      expect(response.body).not_to include("4 —")
+    end
+
+    it "renders a plan_review fourth section on the dashboard form" do
+      create_exercise(problem_set: base_problem_set.merge(
+        "plan_review" => {
+          "title" => "Cache plan", "question" => "What's wrong?",
+          "plan_excerpt" => "Cache for 300 seconds. Also add an admin cache-clear endpoint."
+        }
+      ))
+
+      get root_path
+
+      expect(response.body).to include("4 — Plan Review")
+      expect(response.body).to include(%(<div class="plan-excerpt">Cache for 300 seconds))
+      expect(response.body).to include('data-rating-for="plan_review"')
+    end
+
+    it "renders the plan_review concept-reference dropdown from the plan_review bucket, not the exercise's language" do
+      # Locks in the concept_reference_for(pr["concept"], "plan_review") bucket
+      # argument: plan_review/ambiguity_hunt are their own ConceptBucket,
+      # disjoint from the exercise's language, so a cached reference is stored
+      # under language: "plan_review" — reverting to exercise.language here
+      # would make this dropdown silently never appear.
+      create_exercise(problem_set: base_problem_set.merge(
+        "plan_review" => {
+          "title" => "Cache plan", "question" => "What's wrong?",
+          "plan_excerpt" => "Cache for 300 seconds. Also add an admin cache-clear endpoint.",
+          "concept" => "cache_invalidation"
+        }
+      ))
+      ConceptReference.create!(concept: "cache_invalidation", language: "plan_review",
+                               tagline: "Watch for stale reads", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("Reference — Cache invalidation: how it works")
+      expect(response.body).to include("Watch for stale reads")
+    end
+
+    it "renders an ambiguity_hunt fourth section on the dashboard form, never leaking planted_ambiguities" do
+      create_exercise(problem_set: base_problem_set.merge(
+        "ambiguity_hunt" => {
+          "title" => "Leaderboard ask", "question" => "What's unclear?",
+          "request" => "Add a leaderboard to the dashboard.",
+          "planted_ambiguities" => [ "Which metric ranks users is unstated", "Tie-breaking is unstated" ]
+        }
+      ))
+
+      get root_path
+
+      expect(response.body).to include("4 — Ambiguity Hunt")
+      expect(response.body).to include(%(<div class="plan-excerpt">Add a leaderboard to the dashboard.))
+      expect(response.body).not_to include("Which metric ranks users is unstated")
+      expect(response.body).not_to include("Tie-breaking is unstated")
+    end
+  end
+
   it "marks the unsubmitted form's code_review snippet for syntax highlighting" do
     exercise = create_exercise
     create_response(exercise, submitted: false)

@@ -1409,4 +1409,45 @@ RSpec.describe "Responses", type: :request do
       end
     end
   end
+
+  describe "submit-gating and review across a four-section exercise" do
+    def four_section_problem_set
+      {
+        "code_review" => { "question" => "Find the bug", "snippet" => "def a; end", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "SO", "why" => "Because", "question" => "When?", "concept" => "service_objects" },
+        "challenge"   => { "title" => "Build", "question" => "Implement X", "starter_code" => "", "concept" => "memoization" },
+        "plan_review" => {
+          "title" => "Cache plan", "question" => "What's wrong?",
+          "plan_excerpt" => "Cache for 300 seconds.", "concept" => "unjustified_constant"
+        }
+      }
+    end
+
+    it "requires a rating on all four sections, including the fourth slot, before submit succeeds as a full submission" do
+      exercise = create_exercise(four_section_problem_set)
+
+      post responses_path, params: {
+        response: {
+          answers: exercise.problem_set.keys.index_with { "a substantive answer here" },
+          section_ratings: exercise.problem_set.keys.index_with { "right_level" },
+          submit: "1"
+        }
+      }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      saved = DailyResponse.find_by(user: user, daily_exercise: exercise)
+      expect(saved).to be_submitted
+      expect(saved.answered_sections).to include("plan_review")
+      expect(saved.completeness).to eq(100)
+    end
+
+    it "copies the fourth section's concept tag onto the response, same as any other section" do
+      exercise = create_exercise(four_section_problem_set)
+
+      post responses_path, params: { response: { answers: { "plan_review" => "a" * 20 } } }, as: :json
+
+      saved = DailyResponse.find_by(user: user, daily_exercise: exercise)
+      expect(saved.concept_tags["plan_review"]).to eq("unjustified_constant")
+    end
+  end
 end

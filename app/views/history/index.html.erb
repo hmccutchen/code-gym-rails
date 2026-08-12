@@ -61,7 +61,7 @@
 
     <div class="history-meta">
       <span class="history-pill">
-        <%= daily_response.answered_sections.size %>/3 sections<% if daily_response.answered_sections.any? %> — <%= daily_response.answered_sections.map(&:humanize).join(", ") %><% end %>
+        <%= daily_response.answered_sections.size %>/<%= daily_response.section_keys.size %> sections<% if daily_response.answered_sections.any? %> — <%= daily_response.answered_sections.map(&:humanize).join(", ") %><% end %>
       </span>
       <% daily_response.section_ratings.each do |section, value| %>
         <span class="history-pill"><%= section.humanize %>: <%= DailyResponse::SELF_RATING_LABELS[value] %></span>

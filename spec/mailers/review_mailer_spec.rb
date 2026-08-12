@@ -60,6 +60,18 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(mail.body.encoded).not_to include("Improved code:")
     end
 
+    it "labels plan_review's improved_code as a revised plan, not as code" do
+      daily_response.update!(
+        concept_tags: { "plan_review" => "other" },
+        ai_review: { "plan_review" => { "rating" => "solid", "improved_code" => "revised_plan_marker" } }
+      )
+
+      body = mail.body.encoded
+      expect(body).to include("Revised plan:")
+      expect(body).to include("revised_plan_marker")
+      expect(body).not_to include("Improved code:")
+    end
+
     it "skips blank fields" do
       daily_response.ai_review["code_review"]["improved_code"] = ""
       daily_response.ai_review["code_review"]["missed"] = ""

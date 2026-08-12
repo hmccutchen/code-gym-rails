@@ -57,3 +57,9 @@
     <div class="answer-display"><%= response.answers["challenge"].presence || "(skipped)" %></div>
   </div>
 <% end %>
+
+<% if (pr = exercise.plan_review) %>
+  <%= render "responses/plan_review_section", pr: pr, response: response, submitted: true %>
+<% elsif (ah = exercise.ambiguity_hunt) %>
+  <%= render "responses/ambiguity_hunt_section", ah: ah, response: response, submitted: true %>
+<% end %>

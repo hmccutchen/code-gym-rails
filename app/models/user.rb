@@ -140,6 +140,7 @@ class User < ApplicationRecord
         concepts:          r.concept_tags,
         scenarios:         scenarios,
         sections_answered: r.answered_sections.size,
+        sections_total:    r.section_keys.size,
         self_ratings:      r.section_ratings,
         ai_ratings:        ai_ratings
       }
@@ -153,7 +154,25 @@ class User < ApplicationRecord
   # never counts toward mastery (uncertain data defaults to reinforcement).
   # Total absence of both signals is out of scope, same as an unrated
   # concept today. See docs/superpowers/specs/2026-07-20-mastery-loop-combined-signal-design.md.
-  def concepts_needing_reinforcement(limit: 10)
+  #
+  # `bucket:`/`exclude_buckets:` scope the result by ConceptBucket — added for
+  # the fourth slot's independent reinforcement track, which must never mix
+  # with the three-slot vocabulary. Both default to a no-op filter, so every
+  # caller that doesn't pass them (every
+  # caller as of this comment) sees identical behavior to before either
+  # keyword existed. Marking a concept resolved happens before either filter
+  # runs; that's safe for the special ConceptBucket vocabularies (architecture,
+  # plan_review, ambiguity_hunt) because each is disjoint from every other
+  # vocabulary, including both language vocabularies — a filtered-out
+  # most-recent occurrence implies every older occurrence of that same concept
+  # would be filtered too, so dedup and filter order can never disagree. It is
+  # NOT safe for a language bucket ("ruby_rails"/"javascript"): RAILS_CONCEPTS
+  # and JS_CONCEPTS share a few concept names (e.g. over_mocking), so for a
+  # mixed-language user the same concept can carry different buckets on
+  # different days, and dedup-before-filter could drop an occurrence the
+  # filter should have kept. `bucket:`/`exclude_buckets:` are for the special
+  # buckets only; no caller today passes a language bucket.
+  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [])
     resolved = {}
     result   = []
 
@@ -166,8 +185,11 @@ class User < ApplicationRecord
 
         next if r.self_rating_favorable?(section) && r.ai_rating_favorable?(section) # mastered
 
-        bucket = ConceptBucket.for(section, r.daily_exercise&.language)
-        tier   = concept_masteries.find_by(concept: concept, language: bucket)&.tier || "standard"
+        tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)
+        next if bucket && tag_bucket != bucket
+        next if exclude_buckets.include?(tag_bucket)
+
+        tier = concept_masteries.find_by(concept: concept, language: tag_bucket)&.tier || "standard"
         next if tier == "paused"
 
         result << { concept: concept, tier: tier }

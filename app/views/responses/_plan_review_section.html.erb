@@ -1,0 +1,30 @@
+<%# Plan Review fourth section, shared by the dashboard form (submitted: false)
+    and the read-only render of a submitted day (submitted: true), which appears
+    on the dashboard after submitting and on every history entry.
+    Locals: pr, response, submitted.
+
+    plan_excerpt goes through glossary_wrap like every other prose field in
+    this app (scenario, question, pattern's "why") — it's prose, not code, so
+    there's no reason to withhold glossary tooltips from it specifically. %>
+<div class="section">
+  <div class="section-label">4 — Plan Review: <%= glossary_wrap(pr["title"]) %></div>
+  <% if pr["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(pr["scenario"]) %></div><% end %>
+  <div class="question"><%= glossary_wrap(pr["question"]) %></div>
+  <div class="plan-excerpt"><%= glossary_wrap(pr["plan_excerpt"]) %></div>
+  <% if (ref = concept_reference_for(pr["concept"], "plan_review")) %>
+    <%= render "shared/concept_reference", reference: ref,
+          open: !submitted && first_exposure?(pr["concept"], "plan_review", response.date) %>
+  <% end %>
+  <%= render "dashboard/teaching_hint", note: pr["teaching_note"], field: "plan_review", submitted: submitted, response: response %>
+  <% if submitted %>
+    <div class="answer-display"><%= response.answers["plan_review"].presence || "(skipped)" %></div>
+  <% else %>
+    <textarea name="response[answers][plan_review]" class="answer" placeholder="Your review…" data-field="plan_review" <%= tag.attributes(answer_scaffold_labels_attr(response, "plan_review")) %>><%= answer_starting_value(response, "plan_review") %></textarea>
+    <div class="rating-row" data-rating-for="plan_review">
+      <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+        <button type="button" class="rating-btn<%= " active" if response.self_rating_for("plan_review") == value %>" data-rating-for="plan_review" data-rating="<%= value %>"><%= label.upcase_first %></button>
+      <% end %>
+    </div>
+    <%= render "shared/duck_thread", field: "plan_review" %>
+  <% end %>
+</div>

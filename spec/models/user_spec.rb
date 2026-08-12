@@ -236,6 +236,18 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_performance sections_total" do
+    it "reports the historical exercise's own section count" do
+      user = User.create!(email: "sections-total@example.com", name: "Total")
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {}, "plan_review" => {} })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+                            answers: { "code_review" => "a" * 20 })
+
+      expect(user.recent_performance.first[:sections_total]).to eq(4)
+    end
+  end
+
   describe "#recent_performance concepts" do
     it "includes each session's concept_tags map, empty for untagged history" do
       user = create_user
@@ -486,6 +498,53 @@ RSpec.describe User, type: :model do
       user.concept_masteries.find_by(concept: "n_plus_one").update!(tier: :paused, cooldown_remaining: 2)
 
       expect(user.concepts_needing_reinforcement.map { |h| h[:concept] }).not_to include("n_plus_one")
+    end
+  end
+
+  describe "#concepts_needing_reinforcement with bucket filters" do
+    let(:user) { User.create!(email: "bucket-filter@example.com", name: "Bucket") }
+
+    def submit_response(concept:, section:, language: "ruby_rails", self_rating: "too_hard", ai_rating: "developing")
+      # Distinct, strictly-decreasing dates per call — random dates within a small
+      # range risked colliding on DailyExercise's date-uniqueness validation
+      # (scoped to user_id) when a test submits more than one response.
+      @next_response_date ||= Date.current
+      @next_response_date -= 1
+      exercise = DailyExercise.create!(
+        user: user, date: @next_response_date, generated_at: Time.current, language: language,
+        problem_set: { section => { "concept" => concept } }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+        answers: { section => "an answer" },
+        section_ratings: { section => self_rating },
+        concept_tags: { section => concept },
+        ai_review: { section => { "rating" => ai_rating } }
+      )
+    end
+
+    it "with bucket:, includes only concepts from that bucket" do
+      submit_response(concept: "scope_creep", section: "plan_review")
+      submit_response(concept: "n_plus_one", section: "code_review")
+
+      result = user.concepts_needing_reinforcement(bucket: "plan_review")
+      expect(result.map { |h| h[:concept] }).to eq([ "scope_creep" ])
+    end
+
+    it "with exclude_buckets:, drops concepts from those buckets" do
+      submit_response(concept: "scope_creep", section: "plan_review")
+      submit_response(concept: "n_plus_one", section: "code_review")
+
+      result = user.concepts_needing_reinforcement(exclude_buckets: %w[plan_review ambiguity_hunt])
+      expect(result.map { |h| h[:concept] }).to eq([ "n_plus_one" ])
+    end
+
+    it "with neither filter, behaves exactly as before" do
+      submit_response(concept: "scope_creep", section: "plan_review")
+      submit_response(concept: "n_plus_one", section: "code_review")
+
+      result = user.concepts_needing_reinforcement
+      expect(result.map { |h| h[:concept] }).to match_array(%w[scope_creep n_plus_one])
     end
   end
 

@@ -18,7 +18,8 @@ class ExerciseSection
   # (strong params, concept tagging, scenario collection) so anything deriving a
   # Hash or Array from it keeps the ordering it already had.
   def self.all
-    [ CodeReview, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem ]
+    [ CodeReview, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem,
+      PlanReview, AmbiguityHunt ]
   end
 
   def self.keys
@@ -33,11 +34,34 @@ class ExerciseSection
     [ Architecture, SecurityReview, Challenge, ParsonsProblem ]
   end
 
+  # Precedence order for the fourth slot, mirroring .thirds: if a provider
+  # somehow returned both fourth-shaped keys, plan_review wins.
+  def self.fourths
+    [ PlanReview, AmbiguityHunt ]
+  end
+
+  # Which fourth-slot key a raw problem_set resolves to, by .fourths
+  # precedence — nil when it holds none. Lives here rather than on
+  # DailyExercise because the generation-time normalizers have to resolve the
+  # same slot on a payload that isn't a row yet, and two copies of a
+  # precedence rule is one copy too many.
+  def self.resolved_fourth_key(problem_set)
+    fourths.map(&:key).find { |key| problem_set[key].is_a?(Hash) }
+  end
+
   # nil for anything outside the closed set. Callers decide what an unrecognized
   # section means; a provider can put arbitrary keys in a jsonb payload, so this
   # never raises.
   def self.find(key)
     all.find { |section| section.key == key.to_s }
+  end
+
+  # #find, for callers that only want to read a facet and have no interesting
+  # answer for an unrecognized key. The base class carries every default, so
+  # this keeps the fallback in one place instead of making each caller restate
+  # it (`ExerciseSection.find(k)&.improved_code_label || "Improved code"`).
+  def self.for(key)
+    find(key) || self
   end
 
   class << self
@@ -47,6 +71,10 @@ class ExerciseSection
 
     def third?
       ExerciseSection.thirds.include?(self)
+    end
+
+    def fourth?
+      ExerciseSection.fourths.include?(self)
     end
 
     # Names which vocabulary this kind's concept is validated against. AiService
@@ -59,6 +87,19 @@ class ExerciseSection
     # Whether a review of this kind can carry corrected code.
     def improved_code?
       true
+    end
+
+    # What the review's improved_code actually IS for this kind, and whether it
+    # is prose rather than source. Both default to corrected source, which is
+    # what every code-bearing kind carries — a kind whose "improvement" is
+    # written English says so here, so the review view and the review email
+    # don't each have to special-case it.
+    def improved_code_label
+      "Improved code"
+    end
+
+    def improved_code_prose?
+      false
     end
 
     # Whether this kind's problem_set may carry a Mermaid `diagram` of the

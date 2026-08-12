@@ -109,11 +109,11 @@ RSpec.describe AiService do
   end
 
   describe "#exercise_schema_for" do
-    it "defines a teaching_note and a concept for each of the three sections, for any language" do
+    it "defines a teaching_note and a concept for each of the four sections, for any language" do
       %w[ruby_rails javascript].each do |language|
         schema = service.send(:exercise_schema_for, language)
-        expect(schema.scan('"teaching_note"').size).to eq(3)
-        expect(schema.scan('"concept"').size).to eq(3)
+        expect(schema.scan('"teaching_note"').size).to eq(4)
+        expect(schema.scan('"concept"').size).to eq(4)
       end
     end
 
@@ -131,9 +131,9 @@ RSpec.describe AiService do
       expect(service.send(:exercise_schema_for)).to eq(service.send(:exercise_schema_for, "ruby_rails"))
     end
 
-    it "defines a scenario field for each of the three sections" do
+    it "defines a scenario field for each of the four sections" do
       schema = service.send(:exercise_schema_for)
-      expect(schema.scan(/"scenario"/).size).to eq(3)
+      expect(schema.scan(/"scenario"/).size).to eq(4)
     end
 
     it "no longer asks the model for a per-section glossary array" do
@@ -219,6 +219,47 @@ RSpec.describe AiService do
         "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold", "diagram"
       )
       expect(pattern).not_to have_key("reference")
+    end
+  end
+
+  describe "#exercise_schema_for fourth section" do
+    it "includes the plan_review block by default (fourth: :plan_review)" do
+      schema = service.send(:exercise_schema_for, "ruby_rails")
+      expect(schema).to include('"plan_review"')
+      expect(schema).to include("plan_excerpt")
+      expect(schema).not_to include('"ambiguity_hunt"')
+    end
+
+    it "swaps in the ambiguity_hunt block when fourth: :ambiguity_hunt" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :ambiguity_hunt)
+      expect(schema).to include('"ambiguity_hunt"')
+      expect(schema).to include("planted_ambiguities")
+      expect(schema).to include("request")
+      expect(schema).not_to include('"plan_review"')
+    end
+
+    it "asks for exactly AMBIGUITY_HUNT_PLANTED_COUNT planted ambiguities" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :ambiguity_hunt)
+      expect(schema).to include(AiService::AMBIGUITY_HUNT_PLANTED_COUNT.to_s)
+    end
+
+    it "asks for a plan_review answer_scaffold, matching pattern/architecture" do
+      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :plan_review)
+      plan_review = JSON.parse(schema)["plan_review"]
+      expect(plan_review).to have_key("answer_scaffold")
+    end
+
+    it "does not ask for a diagram on either fourth kind" do
+      %i[plan_review ambiguity_hunt].each do |fourth|
+        schema = service.send(:exercise_schema_for, "ruby_rails", fourth: fourth)
+        section = JSON.parse(schema)[fourth.to_s]
+        expect(section).not_to have_key("diagram")
+      end
+    end
+
+    it "always includes both third and fourth alongside code_review/pattern" do
+      schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt))
+      expect(schema.keys).to contain_exactly("code_review", "pattern", "architecture", "ambiguity_hunt")
     end
   end
 
@@ -359,6 +400,48 @@ RSpec.describe AiService do
       config = service.send(:config_for, "ruby_rails")
       prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
       expect(prompt).to include("annotated Ruby/Rails code")
+    end
+  end
+
+  describe "LANGUAGE_CONFIG for the fourth-slot pseudo-language buckets" do
+    it "resolves plan_review and ambiguity_hunt via config_for, like architecture" do
+      plan_review_config    = service.send(:config_for, "plan_review")
+      ambiguity_hunt_config = service.send(:config_for, "ambiguity_hunt")
+
+      expect(plan_review_config[:concepts]).to eq(AiService::PLAN_REVIEW_CONCEPTS)
+      expect(ambiguity_hunt_config[:concepts]).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
+    end
+
+    it "frames code_example as language-agnostic pseudocode for both fourth-slot configs" do
+      plan_review_prompt = service.send(:build_concept_reference_prompt, "scope_creep",
+                                        service.send(:config_for, "plan_review"))
+      ambiguity_prompt    = service.send(:build_concept_reference_prompt, "missing_success_criteria",
+                                        service.send(:config_for, "ambiguity_hunt"))
+
+      expect(plan_review_prompt.downcase).to include("pseudocode")
+      expect(ambiguity_prompt.downcase).to include("pseudocode")
+    end
+
+    it "generates a real concept reference for plan_review and ambiguity_hunt (the job path this unblocks)" do
+      valid_json = {
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "l"
+      }.to_json
+      service = double_class.new(canned_text: valid_json)
+
+      plan_review_reference    = service.generate_concept_reference(user, "scope_creep", "plan_review")
+      ambiguity_hunt_reference = service.generate_concept_reference(user, "missing_success_criteria", "ambiguity_hunt")
+
+      expect(plan_review_reference).to include("tagline", "explanation", "code_example", "senior_lens")
+      expect(ambiguity_hunt_reference).to include("tagline", "explanation", "code_example", "senior_lens")
+    end
+  end
+
+  describe "#build_exercise_prompt history text" do
+    it "reads the section denominator per historical day rather than assuming 3" do
+      history = [ { date: "2026-08-01", concepts: {}, scenarios: [], sections_answered: 2,
+                    sections_total: 4, self_ratings: {}, ai_ratings: {}, feedback: nil } ]
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", history: history)
+      expect(prompt).to include("2/4 answered")
     end
   end
 
@@ -740,13 +823,13 @@ RSpec.describe AiService do
 
   describe "answer_scaffold in the generation schema" do
     it "asks for a scaffold on pattern and architecture" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt)
 
       expect(schema.scan("answer_scaffold").size).to eq(2)
     end
 
     it "does not ask for one on an unscaffolded third" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
+      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge, fourth: :ambiguity_hunt)
 
       expect(schema.scan("answer_scaffold").size).to eq(1)
     end
@@ -918,6 +1001,105 @@ RSpec.describe AiService do
 
       expect(set["security_review"]["concept"]).to eq("other")
       expect(SuggestedConcept.last.language).to eq("ruby_rails")
+    end
+  end
+
+  describe "#normalize_concepts with the fourth-slot vocabularies" do
+    it "keeps a valid plan_review concept and buckets suggestions under plan_review" do
+      set = { "plan_review" => { "concept" => "scope_creep" } }
+      result = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(result["plan_review"]["concept"]).to eq("scope_creep")
+    end
+
+    it "normalizes an off-vocabulary plan_review concept to other" do
+      set = { "plan_review" => { "concept" => "n_plus_one" } } # a RAILS_CONCEPTS entry, not plan_review's
+      result = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(result["plan_review"]["concept"]).to eq("other")
+    end
+
+    it "keeps a valid ambiguity_hunt concept regardless of the day's language" do
+      set = { "ambiguity_hunt" => { "concept" => "missing_success_criteria" } }
+      result = service.send(:normalize_concepts, set, "javascript")
+      expect(result["ambiguity_hunt"]["concept"]).to eq("missing_success_criteria")
+    end
+  end
+
+  describe "#normalize_planted_ambiguities!" do
+    def planted(*entries)
+      { "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => entries.flatten(1) } }
+    end
+
+    def exactly_enough
+      Array.new(AiService::AMBIGUITY_HUNT_PLANTED_COUNT) { |i| "ambiguity #{i}" }
+    end
+
+    it "passes a list of exactly the planted count through" do
+      set = planted(exactly_enough)
+      result = service.send(:normalize_planted_ambiguities!, set)
+      expect(result["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
+    end
+
+    it "strips whitespace off each entry" do
+      set = planted(exactly_enough.map { |a| "  #{a}\n" })
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
+    end
+
+    it "raises when the field is missing entirely" do
+      set = { "ambiguity_hunt" => { "request" => "vague" } }
+      expect { service.send(:normalize_planted_ambiguities!, set) }
+        .to raise_error(AiService::InvalidResponseError, /no usable planted_ambiguities/)
+    end
+
+    it "raises when the field is not an array" do
+      set = { "ambiguity_hunt" => { "planted_ambiguities" => "one; two; three; four" } }
+      expect { service.send(:normalize_planted_ambiguities!, set) }
+        .to raise_error(AiService::InvalidResponseError)
+    end
+
+    it "raises when every entry is unusable" do
+      set = planted([ "   ", nil, 42, "" ])
+      expect { service.send(:normalize_planted_ambiguities!, set) }
+        .to raise_error(AiService::InvalidResponseError)
+    end
+
+    # The prompt asks for an exact count, but nothing downstream reads it: the
+    # review prompt lists the ambiguities rather than counting them. Rejecting
+    # a short list would discard the day's other three sections over the
+    # likeliest deviation an LLM makes on a counted list.
+    it "keeps a gradable list that came back short of the asked-for count" do
+      set = planted(exactly_enough.first(2) + [ "  ", nil ])
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough.first(2))
+    end
+
+    it "keeps a list that came back over the asked-for count, up to the ingest bound" do
+      set = planted(exactly_enough + [ "one more" ])
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough + [ "one more" ])
+    end
+
+    it "truncates a runaway list at MAX_PLANTED_AMBIGUITIES" do
+      set = planted(Array.new(40) { |i| "ambiguity #{i}" })
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"].size).to eq(AiService::MAX_PLANTED_AMBIGUITIES)
+    end
+
+    it "does nothing for a problem set with no ambiguity_hunt section" do
+      set = { "plan_review" => { "plan_excerpt" => "a plan" } }
+      expect { service.send(:normalize_planted_ambiguities!, set) }.not_to raise_error
+    end
+
+    # plan_review wins the fourth slot when both shapes come back, so the
+    # ambiguity hunt's answer key is never read — discarding the day's other
+    # three sections over it would be strictly worse than ignoring it.
+    it "ignores an unusable list on an ambiguity_hunt that lost the fourth slot to plan_review" do
+      set = {
+        "plan_review"    => { "plan_excerpt" => "a plan" },
+        "ambiguity_hunt" => { "request" => "vague" }
+      }
+
+      expect { service.send(:normalize_planted_ambiguities!, set) }.not_to raise_error
     end
   end
 
@@ -1239,6 +1421,28 @@ RSpec.describe AiService do
       expect(Rails.logger).not_to receive(:info).with(/\[retention\]/)
       svc.generate_exercise(user, language: "ruby_rails")
     end
+
+    # The fourth slot's retention offers ride a bucket, not the day's language,
+    # and this log line is the only offered-vs-honored evidence there is — an
+    # offer that never appears here can be silently ignored forever.
+    it "logs the fourth slot's offer under its own bucket" do
+      user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 2)
+      set = { "plan_review" => { "concept" => "scope_creep" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:plan_review)
+
+      logged = []
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged << msg if msg.is_a?(String) && msg.start_with?("[retention]")
+      end
+
+      svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(logged).to include(/bucket=plan_review.*offered=scope_creep.*honored=scope_creep/)
+    end
   end
 
   describe "difficulty diagnostics instrumentation" do
@@ -1295,6 +1499,34 @@ RSpec.describe AiService do
       expect(payload["requested"]["due_checks"]).to eq([ "memoization" ])
       expect(payload["requested"]["established"]).to eq([ "transaction_safety" ])
     end
+
+    # This is the only place a whole problem_set is serialized, so it is the
+    # only place the ambiguity hunt's answer key could reach log storage.
+    it "redacts the ambiguity hunt's planted answer key from the delivered payload" do
+      planted = Array.new(AiService::AMBIGUITY_HUNT_PLANTED_COUNT) { |i| "secret ambiguity #{i}" }
+      set = {
+        "code_review"    => { "concept" => "n_plus_one" },
+        "ambiguity_hunt" => { "concept" => "missing_success_criteria",
+                              "request" => "Build us a leaderboard",
+                              "planted_ambiguities" => planted }
+      }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      problem_set = svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(logged).not_to include("secret ambiguity")
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+      expect(payload["delivered"]["ambiguity_hunt"]).not_to have_key("planted_ambiguities")
+      expect(payload["delivered"]["ambiguity_hunt"]["request"]).to eq("Build us a leaderboard")
+      # Redaction is for the log only — the persisted set still carries the key.
+      expect(problem_set["ambiguity_hunt"]["planted_ambiguities"]).to eq(planted)
+    end
   end
 
   describe "#build_review_day_context" do
@@ -1332,6 +1564,64 @@ RSpec.describe AiService do
       resp = DailyResponse.new(answers: {}, section_ratings: {})
       context = service.send(:build_review_day_context, "Rails", exercise, resp)
       expect(context).to match(/grade exactly one/i)
+    end
+  end
+
+  describe "#build_review_day_context with a fourth section" do
+    it "includes the plan_review excerpt, question, answer, and self-rating" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?" }, "pattern" => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "ch?" },
+        "plan_review" => { "title" => "Plan", "question" => "What's wrong?", "plan_excerpt" => "Step 1: hardcode a magic number." }
+      })
+      resp = DailyResponse.new(answers: { "plan_review" => "The magic number is unjustified" },
+                               section_ratings: { "plan_review" => "right_level" })
+
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(context).to include("What's wrong?", "Step 1: hardcode a magic number.", "The magic number is unjustified", "right_level")
+    end
+
+    it "includes the ambiguity_hunt request, planted ambiguities, answer, and self-rating" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?" }, "pattern" => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "ch?" },
+        "ambiguity_hunt" => {
+          "title" => "Req", "question" => "What's unclear?", "request" => "Add a leaderboard feature.",
+          "planted_ambiguities" => [ "No scope for which users appear", "No tie-breaking rule" ]
+        }
+      })
+      resp = DailyResponse.new(answers: { "ambiguity_hunt" => "Which users are ranked?" },
+                               section_ratings: { "ambiguity_hunt" => "too_hard" })
+
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(context).to include("Add a leaderboard feature.", "No scope for which users appear", "No tie-breaking rule",
+                                 "Which users are ranked?", "too_hard")
+    end
+
+    it "contributes nothing for an old exercise with no fourth-slot key" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?" }, "pattern" => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "ch?" }
+      })
+      resp = DailyResponse.new(answers: {}, section_ratings: {})
+
+      expect(exercise.fourth_key).to be_nil
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(service.send(:fourth_context_summary, exercise, resp.answers, resp.section_ratings)).to eq("")
+      expect(context).not_to match(/plan review|ambiguity hunt/i)
+    end
+  end
+
+  describe "#section_grading_note for the fourth-slot kinds" do
+    it "instructs grading against the planted list for ambiguity_hunt" do
+      note = service.send(:section_grading_note, nil, nil, "ambiguity_hunt")
+      expect(note).to match(/planted/i)
+      expect(note).to match(/empty string/i)
+    end
+
+    it "instructs evaluating pushback quality and a revised plan for plan_review" do
+      note = service.send(:section_grading_note, nil, nil, "plan_review")
+      expect(note).to match(/revised/i)
     end
   end
 
@@ -1557,6 +1847,43 @@ RSpec.describe AiService do
 
       expect(results["code_review"][:ok]).to be(true)
       expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", message: "rate limited")
+    end
+
+    # Regression for a pool-exhaustion bug: each review thread used to hold a
+    # checked-out connection for the entire (up to READ_TIMEOUT-second)
+    # provider call, even though the only DB work is ApiUsage.create! in
+    # #log_usage. With Puma's thread count matching database.yml's pool size,
+    # that left zero spare connections for any concurrent request. #call_and_log
+    # now scopes the checkout to #log_usage alone, so the thread must hold no
+    # connection while #call — the provider HTTP round trip — is running.
+    it "holds no pooled connection for the review thread while the provider call is in flight" do
+      exercise, response = exercise_and_response
+
+      probing_class = Class.new(AiService) do
+        class << self
+          attr_accessor :held_connection_during_call
+        end
+
+        def initialize(_api_key = nil)
+          @canned_text = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [],
+                           "next_step" => "", "improved_code" => "" }.to_json
+        end
+
+        private
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+          # #active_connection? returns the leased connection object or nil (not a
+          # boolean) — see ActiveRecord::ConnectionAdapters::ConnectionPool#active_connection?.
+          self.class.held_connection_during_call = ActiveRecord::Base.connection_pool.active_connection?
+          { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
+        end
+
+        def build_connection = nil
+      end
+
+      probing_class.new.review_sections(user, exercise, response, sections: %w[code_review])
+
+      expect(probing_class.held_connection_during_call).to be_nil
     end
 
     it "maps AuthenticationError to its error code" do
@@ -1912,6 +2239,55 @@ RSpec.describe AiService do
         expect(svc.last_prompt).not_to include("NOT the correct order")
       end
     end
+
+    context "for a plan_review section" do
+      let(:plan_review_exercise) do
+        DailyExercise.new(language: "ruby_rails", problem_set: {
+          "plan_review" => {
+            "title" => "Cache plan", "question" => "What's wrong?",
+            "plan_excerpt" => "Cache the response for 300 seconds and add an admin cache-clear endpoint."
+          }
+        })
+      end
+
+      it "includes the plan excerpt, without which the duck cannot see what's under review" do
+        svc = duck_spy_class.new(canned_text: "What happens to a stale cache entry after 300 seconds?")
+
+        svc.duck_response(user, plan_review_exercise, section: "plan_review", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("Cache the response for 300 seconds")
+      end
+    end
+
+    context "for an ambiguity_hunt section" do
+      let(:ambiguity_hunt_exercise) do
+        DailyExercise.new(language: "ruby_rails", problem_set: {
+          "ambiguity_hunt" => {
+            "title" => "Leaderboard ask", "question" => "What's unclear?",
+            "request" => "Add a leaderboard to the dashboard.",
+            "planted_ambiguities" => [ "Which metric ranks users is unstated", "Tie-breaking is unstated" ]
+          }
+        })
+      end
+
+      it "includes the feature request, without which the duck cannot see what's being asked" do
+        svc = duck_spy_class.new(canned_text: "What would 'top' mean here — most sessions, most points?")
+
+        svc.duck_response(user, ambiguity_hunt_exercise, section: "ambiguity_hunt", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("Add a leaderboard to the dashboard.")
+      end
+
+      it "never leaks planted_ambiguities — that is the hidden grading answer key" do
+        svc = duck_spy_class.new(canned_text: "What would 'top' mean here — most sessions, most points?")
+
+        svc.duck_response(user, ambiguity_hunt_exercise, section: "ambiguity_hunt", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).not_to include("Which metric ranks users is unstated")
+        expect(svc.last_prompt).not_to include("Tie-breaking is unstated")
+        expect(svc.last_prompt).not_to include("planted_ambiguities")
+      end
+    end
   end
 
   describe ".for" do
@@ -1992,6 +2368,63 @@ RSpec.describe AiService do
       expect {
         service.generate_concept_reference(user, "n_plus_one", "mixed")
       }.to raise_error(AiService::Error, /Unsupported generation language/)
+    end
+  end
+
+  describe "#build_exercise_prompt fourth-slot guidance" do
+    it "asks for a plan review with planted flaws when fourth: :plan_review" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: :plan_review)
+      expect(prompt).to match(/PLAN REVIEW/)
+      expect(prompt).to match(/technical anti-pattern/)
+      expect(prompt).to match(/scope-creep/)
+      expect(prompt).to match(/unflagged behavior change/)
+    end
+
+    it "asks for an ambiguity hunt with exactly AMBIGUITY_HUNT_PLANTED_COUNT planted ambiguities when fourth: :ambiguity_hunt" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: :ambiguity_hunt)
+      expect(prompt).to match(/AMBIGUITY HUNT/)
+      expect(prompt).to include(AiService::AMBIGUITY_HUNT_PLANTED_COUNT.to_s)
+    end
+
+    it "instructs that planted_ambiguities is hidden and must never leak into other fields" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :ambiguity_hunt)
+      expect(prompt).to match(/hidden/i)
+    end
+
+    it "names the fourth-slot concept needing reinforcement" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :plan_review,
+                            fourth_reinforcement: [ { concept: "scope_creep", tier: "standard" } ])
+      expect(prompt).to include("scope_creep")
+    end
+
+    it "names a fourth-slot retention check as a previously mastered concept" do
+      cm = user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :plan_review, fourth_due_checks: [ cm ])
+      expect(prompt).to match(/MASTERED/)
+      expect(prompt).to include("scope_creep")
+    end
+  end
+
+  describe "#generate_exercise threads the fourth slot through" do
+    it "asks the provider for a fourth section matching the plan's rolled kind" do
+      allow(DailyPlan).to receive(:for).and_call_original
+      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:ambiguity_hunt)
+
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "n_plus_one" },
+        "pattern"     => { "question" => "q", "concept" => "memoization" },
+        "challenge"   => { "question" => "q", "concept" => "idempotency" },
+        "ambiguity_hunt" => {
+          "title" => "t", "scenario" => "s", "request" => "r",
+          "planted_ambiguities" => [ "a", "b", "c", "d" ],
+          "question" => "q", "concept" => "missing_success_criteria"
+        }
+      }.to_json)
+
+      problem_set = svc.generate_exercise(user)
+      expect(problem_set).to have_key("ambiguity_hunt")
     end
   end
 end

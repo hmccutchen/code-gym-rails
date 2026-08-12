@@ -24,7 +24,7 @@ RSpec.describe FakeService do
       problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
 
       expect(problem_set.keys).to match_array(
-        %w[code_review pattern challenge architecture security_review parsons_problem]
+        %w[code_review pattern challenge architecture security_review parsons_problem plan_review ambiguity_hunt]
       )
       problem_set.each_value do |section|
         expect(section["concept"]).to be_present
@@ -38,6 +38,14 @@ RSpec.describe FakeService do
                                         language: "ruby_rails", generated_at: Time.current)
 
       expect(exercise.third_key).to eq("architecture")
+    end
+
+    it "resolves to the plan_review fourth section when persisted, since plan_review has top precedence" do
+      problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: problem_set,
+                                        language: "ruby_rails", generated_at: Time.current)
+
+      expect(exercise.fourth_key).to eq("plan_review")
     end
 
     it "logs API usage with zero cost" do
