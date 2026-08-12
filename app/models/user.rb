@@ -140,6 +140,7 @@ class User < ApplicationRecord
         concepts:          r.concept_tags,
         scenarios:         scenarios,
         sections_answered: r.answered_sections.size,
+        sections_total:    problem_set.keys.size,
         self_ratings:      r.section_ratings,
         ai_ratings:        ai_ratings
       }

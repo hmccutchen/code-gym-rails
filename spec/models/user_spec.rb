@@ -236,6 +236,18 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_performance sections_total" do
+    it "reports the historical exercise's own section count" do
+      user = User.create!(email: "sections-total@example.com", name: "Total")
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {}, "plan_review" => {} })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+                            answers: { "code_review" => "a" * 20 })
+
+      expect(user.recent_performance.first[:sections_total]).to eq(4)
+    end
+  end
+
   describe "#recent_performance concepts" do
     it "includes each session's concept_tags map, empty for untagged history" do
       user = create_user

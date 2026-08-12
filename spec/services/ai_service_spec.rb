@@ -403,6 +403,15 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#build_exercise_prompt history text" do
+    it "reads the section denominator per historical day rather than assuming 3" do
+      history = [ { date: "2026-08-01", concepts: {}, scenarios: [], sections_answered: 4,
+                    sections_total: 4, self_ratings: {}, ai_ratings: {}, feedback: nil } ]
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", history: history)
+      expect(prompt).to include("4/4 answered")
+    end
+  end
+
   describe "#build_exercise_prompt" do
     it "instructs that teaching notes hint without giving the answer" do
       prompt = service.send(:build_exercise_prompt, user)

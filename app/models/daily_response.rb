@@ -140,7 +140,7 @@ class DailyResponse < ApplicationRecord
   end
 
   def completeness
-    (answered_sections.size / 3.0 * 100).round
+    (answered_sections.size / daily_exercise.problem_set.keys.size.to_f * 100).round
   end
 
   # improved_code is revealed only from a concept's SECOND exposure onward — the

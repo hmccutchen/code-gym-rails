@@ -49,7 +49,11 @@ RSpec.describe DailyResponse, type: :model do
     user.daily_exercises.create!(
       date: Date.current,
       generated_at: Time.current,
-      problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "pattern"     => { "title" => "Pat", "question" => "pattern-q" },
+        "challenge"   => { "question" => "challenge-q" }
+      }
     )
   end
 
@@ -63,6 +67,17 @@ RSpec.describe DailyResponse, type: :model do
 
       expect(daily_response.answered_sections).to eq([ "code_review" ])
       expect(daily_response.completeness).to eq(33)
+    end
+
+    it "computes completeness against the exercise's own section count, not a hardcoded 3" do
+      exercise = DailyExercise.create!(user: User.create!(email: "four-section@example.com", name: "Four"),
+                                       date: Date.current, generated_at: Time.current,
+                                       problem_set: {
+                                         "code_review" => {}, "pattern" => {}, "challenge" => {}, "plan_review" => {}
+                                       })
+      response = DailyResponse.new(daily_exercise: exercise,
+                                   answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "", "plan_review" => "" })
+      expect(response.completeness).to eq(25) # 1 of 4
     end
 
     it "does not count whitespace-only answers, however long" do
