@@ -116,6 +116,22 @@ class ExerciseSection
       raise NotImplementedError, "#{self} must implement .schema_fragment"
     end
 
+    # The generation prompt's instruction block for this kind — how to write
+    # it, and which vocabulary its concept comes from. Asked only of the kinds
+    # that occupy the rolled third and fourth slots; code_review and pattern
+    # carry no per-kind instructions, so asking them is a bug and raises.
+    #
+    # `vocabulary` is this kind's own, resolved by the caller from
+    # .vocabulary_key. `language_vocabulary` is the day's language vocabulary,
+    # which is a *different* list for architecture and security_review — it is
+    # here only because three of the four thirds carry a stray instruction
+    # about code_review and pattern's vocabulary inside their own guidance.
+    # That misplacement is a live defect, tracked in issue #81; when it is
+    # fixed this parameter goes away.
+    def generation_guidance(vocabulary:, language_vocabulary:, label:)
+      raise NotImplementedError, "#{self} must implement .generation_guidance"
+    end
+
     # Whether a review of this kind can carry corrected code.
     def improved_code?
       true

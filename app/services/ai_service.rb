@@ -879,20 +879,7 @@ class AiService
         ""
       end
 
-    fourth_guidance =
-      case fourth
-      when :ambiguity_hunt
-        <<~AH.chomp
-          - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{ExerciseSection::AmbiguityHunt::PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
-          - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.
-          - Choose the ambiguity_hunt concept from this vocabulary, exactly one: #{AMBIGUITY_HUNT_CONCEPTS.join(", ")}
-        AH
-      else
-        <<~PR.chomp
-          - The fourth section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
-          - Choose the plan_review concept from this vocabulary, exactly one: #{PLAN_REVIEW_CONCEPTS.join(", ")}
-        PR
-      end
+    fourth_guidance = generation_guidance_for(fourth, language)
 
     ts_guidance =
       if language == "javascript"
@@ -903,10 +890,9 @@ class AiService
 
     scenario_domain_list = (SCENARIO_DOMAINS - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
 
-    config      = config_for(language)
-    label       = config[:label]
-    focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
-    concepts    = config[:concepts]
+    config = config_for(language)
+    label  = config[:label]
+    focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
 
     test_file_clause =
       if config[:test_framework].present?
@@ -915,35 +901,7 @@ class AiService
         ""
       end
 
-    third_guidance =
-      case third
-      when :architecture
-        <<~ARCH.chomp
-          - The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
-          - Keep the architecture scenario SHORT: 2-3 sentences, ~50 words maximum, and exactly 2-3 concrete constraints total. Usually the observable symptom plus one hard technical constraint is enough — pick only the constraints the decision actually turns on, and leave the rest out. Do NOT stack scale figures, team size, infrastructure detail, budget, and timeline into one scenario.
-          - Short does not mean vague: name real numbers and real systems for the 2-3 constraints you do include. Fewer constraints, not fuzzier ones.
-          - The architecture question itself is one sentence — do not restate the scenario in it.
-          - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
-          - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
-          - The architecture reference's "diagram" shows the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
-        ARCH
-      when :security_review
-        <<~SEC.chomp
-          - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
-          - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{config[:security_concepts].join(", ")}
-          - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
-        SEC
-      when :parsons_problem
-        <<~PB.chomp
-          - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
-          - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
-        PB
-      else
-        <<~CH.chomp
-          - The challenge starter_code should give enough scaffold to get started without giving away the answer.
-          - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
-        CH
-      end
+    third_guidance = generation_guidance_for(third, language)
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -988,6 +946,21 @@ class AiService
       Return JSON matching this schema exactly:
       #{exercise_schema_for(language, third: third, fourth: fourth)}
     PROMPT
+  end
+
+  # A rolled kind's generation instructions. The kind's own vocabulary is
+  # resolved through concept_vocabulary_for — the same lookup normalize_concepts
+  # validates against — so the guidance can never name a vocabulary the
+  # normalizer would then rewrite a concept away from.
+  def generation_guidance_for(rolled, language)
+    kind = ExerciseSection.for(rolled.to_s)
+    _bucket, vocabulary = concept_vocabulary_for(kind.key, language)
+
+    kind.generation_guidance(
+      vocabulary:          vocabulary,
+      language_vocabulary: config_for(language)[:concepts],
+      label:               config_for(language)[:label]
+    )
   end
 
   # Mirrors the pattern-section `reference` shape so both render identically.

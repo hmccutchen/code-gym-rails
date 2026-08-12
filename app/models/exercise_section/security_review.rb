@@ -6,6 +6,17 @@ class ExerciseSection::SecurityReview < ExerciseSection
     :security_concepts
   end
 
+  # Says nothing about code_review and pattern's vocabulary, unlike the other
+  # three thirds — carried over as-is from the case statement this replaced.
+  # See issue #81.
+  def self.generation_guidance(vocabulary:, language_vocabulary:, label:)
+    <<~GUIDANCE.chomp
+      - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
+      - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{vocabulary.join(", ")}
+      - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
+    GUIDANCE
+  end
+
   def self.schema_fragment(label:)
     <<~SCHEMA.chomp
       "security_review": {
