@@ -948,7 +948,6 @@ class AiService
   # — so the guidance can never name a vocabulary the normalizer would then
   # rewrite a concept away from.
   def generation_guidance_for(kind, language)
-
     kind.generation_guidance(
       vocabulary:          ProblemSetIngest.vocabulary_for(kind.key, language),
       language_vocabulary: config_for(language)[:concepts],
@@ -1175,8 +1174,16 @@ class AiService
 
   # Never allowed to break generation — a bug here is a lost analytics
   # signal, not a reason to fail the request.
+  #
+  # Rescued per suggestion, not around the loop: a single malformed or
+  # transiently failing name would otherwise discard every suggestion behind
+  # it, which is how one bad concept costs a whole day's analytics.
   def record_suggested_concepts(suggestions)
-    suggestions.each { |s| SuggestedConcept.record!(language: s.bucket, name: s.name) }
+    suggestions.each { |suggestion| record_suggested_concept(suggestion) }
+  end
+
+  def record_suggested_concept(suggestion)
+    SuggestedConcept.record!(language: suggestion.bucket, name: suggestion.name)
   rescue => e
     Rails.logger.warn("SuggestedConcept recording failed: #{e.message}")
   end

@@ -203,7 +203,7 @@ RSpec.describe "section rendering", type: :request do
         end
 
         # The ambiguity hunt's planted list is grading data. It must not reach
-        # any rendered page, in any state — see AiService::ANSWER_KEY_FIELD.
+        # any rendered page, in any state — see ProblemSetIngest::ANSWER_KEY_FIELD.
         it "never renders the answer key, in any of the three renders" do
           [ -> { exercise and get root_path },
             -> { submit!(exercise) and get root_path },

@@ -631,6 +631,24 @@ RSpec.describe AiService do
       expect(svc.generate_exercise(user)["code_review"]["concept"]).to eq("other")
     end
 
+    # The rescue is per suggestion, not around the loop: one failing name must
+    # not discard the signals queued behind it.
+    it "keeps recording the remaining suggestions after one of them fails" do
+      allow(SuggestedConcept).to receive(:record!).and_call_original
+      allow(SuggestedConcept).to receive(:record!)
+        .with(hash_including(name: "First Invention!!")).and_raise(StandardError, "db down")
+
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "First Invention!!" },
+        "pattern"     => { "title" => "t", "concept" => "Second Invention!!" }
+      }.to_json)
+
+      allow(Rails.logger).to receive(:warn)
+
+      expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
+      expect(SuggestedConcept.last.display_name).to eq("Second Invention!!")
+    end
+
     it "propagates an ingest rejection as a generation failure" do
       svc = double_class.new(canned_text: {
         "code_review"    => { "question" => "q", "concept" => "n_plus_one" },
