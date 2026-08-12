@@ -49,6 +49,24 @@ class ExerciseSection
     fourths.map(&:key).find { |key| problem_set[key].is_a?(Hash) }
   end
 
+  # The day's four kinds in slot order, for a set that hasn't been generated
+  # yet. Same reason .resolved_fourth_key lives here: the generation path has
+  # to resolve slots before a DailyExercise row exists, working from DailyPlan's
+  # rolled symbols rather than a persisted payload.
+  # DailyExercise#active_section_keys answers the same question after the fact.
+  def self.for_plan(third:, fourth:)
+    [ CodeReview, Pattern, slot_kind(third, thirds), slot_kind(fourth, fourths) ]
+  end
+
+  # Raises rather than returning nil: a kind that isn't eligible for the slot
+  # it was rolled into is a bug in the plan, and a set silently missing a
+  # section is worse than a failed generation the user can retry.
+  def self.slot_kind(rolled, eligible)
+    eligible.find { |kind| kind.key == rolled.to_s } ||
+      raise(ArgumentError, "#{rolled.inspect} is not one of: #{eligible.map(&:key).join(', ')}")
+  end
+  private_class_method :slot_kind
+
   # nil for anything outside the closed set. Callers decide what an unrecognized
   # section means; a provider can put arbitrary keys in a jsonb payload, so this
   # never raises.
@@ -84,6 +102,36 @@ class ExerciseSection
       :concepts
     end
 
+    # This kind's entry in the generation schema — the JSON object the provider
+    # is told to return for it, under this kind's own key. `label` names the
+    # day's language for the code-bearing fields; AiService still owns
+    # LANGUAGE_CONFIG, so a kind knows where the language name goes, never how
+    # it was resolved.
+    #
+    # Formatted to sit at one level of nesting inside the schema object: first
+    # line unindented, fields at 4, closing brace at 2. The assembler
+    # interpolates it directly (see AiService#exercise_schema_for), so this
+    # indentation is part of the contract, not incidental.
+    def schema_fragment(label:)
+      raise NotImplementedError, "#{self} must implement .schema_fragment"
+    end
+
+    # The generation prompt's instruction block for this kind — how to write
+    # it, and which vocabulary its concept comes from. Asked only of the kinds
+    # that occupy the rolled third and fourth slots; code_review and pattern
+    # carry no per-kind instructions, so asking them is a bug and raises.
+    #
+    # `vocabulary` is this kind's own, resolved by the caller from
+    # .vocabulary_key. `language_vocabulary` is the day's language vocabulary,
+    # which is a *different* list for architecture and security_review — it is
+    # here only because three of the four thirds carry a stray instruction
+    # about code_review and pattern's vocabulary inside their own guidance.
+    # That misplacement is a live defect, tracked in issue #81; when it is
+    # fixed this parameter goes away.
+    def generation_guidance(vocabulary:, language_vocabulary:, label:)
+      raise NotImplementedError, "#{self} must implement .generation_guidance"
+    end
+
     # Whether a review of this kind can carry corrected code.
     def improved_code?
       true
@@ -100,6 +148,38 @@ class ExerciseSection
 
     def improved_code_prose?
       false
+    end
+
+    # ── How this kind renders ────────────────────────────────────────────────
+    # Structural facts only. The user-facing strings (section name, textarea
+    # placeholder) live in config/locales/en.yml under `sections.<key>`, which
+    # is where this app already keeps user-facing copy — unlike the prompt
+    # text above, which is provider-facing and has no other home.
+
+    # The partial rendering the part of this section no shared wrapper can:
+    # the snippet, the plan excerpt, the option list, the block ladder.
+    def body_partial
+      "responses/bodies/#{key}"
+    end
+
+    # Whether the section label appends the day's title ("4 — Plan Review:
+    # Backfill the ledger"). False for the two kinds whose problem_set carries
+    # no title of its own.
+    def titled_label?
+      true
+    end
+
+    # The answer input this kind offers while unsubmitted. Every kind but one
+    # takes a plain textarea; parsons_problem's answer is an ordering, so it
+    # brings its own control.
+    def answer_partial
+      "responses/answers/textarea"
+    end
+
+    # Extra class on that textarea — challenge is answered in code, so it gets
+    # the monospace treatment.
+    def answer_class
+      "answer"
     end
 
     # Whether this kind's problem_set may carry a Mermaid `diagram` of the

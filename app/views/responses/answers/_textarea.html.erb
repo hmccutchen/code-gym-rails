@@ -1,0 +1,9 @@
+<%# The answer area for every kind but parsons_problem: the stored text when
+    submitted, a textarea when not. The scaffold helpers no-op for unscaffolded
+    kinds, so they are called unconditionally.
+    Locals: kind, key, data, exercise, response, submitted. %>
+<% if submitted %>
+  <div class="answer-display"><%= response.answers[key].presence || "(skipped)" %></div>
+<% else %>
+  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" placeholder="<%= t("sections.#{key}.placeholder") %>" data-field="<%= key %>" <%= tag.attributes(answer_scaffold_labels_attr(response, key)) %>><%= answer_starting_value(response, key) %></textarea>
+<% end %>

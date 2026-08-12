@@ -206,20 +206,6 @@ class AiService
     unstated_data_implications undefined_permissions_model
   ].freeze
 
-  # Fixed, not a range: the review prompt must always know exactly how many
-  # ambiguities were planted to grade coverage against. 4 sits at the
-  # midpoint of the 3-5 range considered — few enough to find in one sitting,
-  # enough to force real coverage judgment.
-  AMBIGUITY_HUNT_PLANTED_COUNT = 4
-
-  # What the planted list is bounded to on ingest, as opposed to what the
-  # prompt asks for. The count above is the generator's target; nothing
-  # downstream reads it, since the review prompt lists the ambiguities rather
-  # than counting them (see #fourth_context_summary). So a provider that lands
-  # on 3 or 5 has still produced a gradable section, and only the runaway case
-  # needs bounding — this is provider text going into another prompt.
-  MAX_PLANTED_AMBIGUITIES = AMBIGUITY_HUNT_PLANTED_COUNT * 2
-
   # The one field in a problem set that is answer-key data rather than exercise
   # content. Named here because two places have to know it by name: the
   # boundary validation that guarantees it is usable, and the diagnostics log
@@ -785,126 +771,22 @@ class AiService
     PROMPT
   end
 
-  # JSON schema every provider is asked to return for a problem set. The
-  # code-bearing fields' label switches with `language` so instructions never
-  # assume Ruby idioms when generating JS — the structure itself never
-  # changes across languages.
+  # JSON schema every provider is asked to return for a problem set. Each kind
+  # owns the fragment describing itself (ExerciseSection.schema_fragment); this
+  # decides which four kinds today's set holds and joins them. The code-bearing
+  # fields' label switches with `language` so instructions never assume Ruby
+  # idioms when generating JS — the structure itself never changes across
+  # languages.
   def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review)
     label = config_for(language)[:label]
 
-    third_section =
-      case third
-      when :architecture
-        <<~ARCH.chomp
-          "architecture": {
-              "title":     "string — short name for the decision",
-              "scenario":  "string — 2-3 sentences, ~50 words max. Exactly 2-3 concrete constraints total, no more",
-              "question":  "string — ONE sentence asking for a decision + justification",
-              "options":   ["string — a viable approach", "string — another viable approach", "string — an optional third approach (omit for 2)"],
-              "answer_scaffold": ["string — a labelled part of a complete answer to THIS decision", "string — another part"],
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the architecture vocabulary",
-              "reference": {
-                "tagline":     "string — bold one-liner",
-                "explanation": "string — 2-3 sentences",
-                "tradeoffs":   ["string — a tradeoff", "string — a tradeoff", "string — a tradeoff"],
-                "senior_lens": "string — how a senior frames the decision",
-                "diagram":     "string — Mermaid source visualizing the decision, or an empty string if no diagram would help"
-              }
-            }
-        ARCH
-      when :security_review
-        <<~SEC.chomp
-          "security_review": {
-              "title":        "string",
-              "question":     "string — what security vulnerability exists here, and how would you mitigate it",
-              "snippet":      "string — #{label} code, ~10-15 lines, containing one real, exploitable vulnerability",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              "reference": {
-                "tagline":      "string — bold one-liner",
-                "explanation":  "string — 2-3 sentences",
-                "code_example": "string — annotated #{label} code, ~15 lines",
-                "senior_lens":  "string — when to reach for it / tradeoffs"
-              }
-            }
-        SEC
-      when :parsons_problem
-        <<~PB.chomp
-          "parsons_problem": {
-              "title":    "string",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
-              "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
-              "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
-            }
-        PB
-      else
-        <<~CH.chomp
-          "challenge": {
-              "title":        "string",
-              "question":     "string — what to implement",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "starter_code": "string — optional skeleton (empty string if none)",
-              "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
-            }
-        CH
-      end
-
-    fourth_section =
-      case fourth
-      when :ambiguity_hunt
-        <<~AH.chomp
-          "ambiguity_hunt": {
-              "title":    "string",
-              "scenario": "string — the concrete business-domain framing, drawn from Code Gym-style feature requests (e.g. a daily-practice app's own features)",
-              "request":  "string — a vague feature request, 2-4 sentences, phrased the way a stakeholder or PM would ask for it, not an engineer",
-              "planted_ambiguities": ["string — one specific ambiguity deliberately left in \\"request\\"", "... (exactly #{AMBIGUITY_HUNT_PLANTED_COUNT} total)"],
-              "question": "string — e.g. 'What would you need clarified before writing a spec for this?'",
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
-            }
-        AH
-      else
-        <<~PR.chomp
-          "plan_review": {
-              "title":    "string — short name for the plan/decision under review",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "plan_excerpt": "string — a short prose implementation plan, framed as if written by an AI assistant, containing 2-3 planted flaws spanning levels: one real technical anti-pattern, one scope-creep item, one unflagged behavior change",
-              "question": "string — what to evaluate before approving this plan",
-              "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
-            }
-        PR
-      end
+    sections = ExerciseSection.for_plan(third: third, fourth: fourth)
+                              .map { |kind| kind.schema_fragment(label: label) }
+                              .join(",\n  ")
 
     <<~SCHEMA
       {
-        "code_review": {
-          "question": "string — what to find/fix",
-          "snippet":  "string — #{label} code, ~10-15 lines",
-          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
-        },
-        "pattern": {
-          "title":    "string — pattern name",
-          "why":      "string — one sentence on why the pattern exists",
-          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
-          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
-        },
-        #{third_section},
-        #{fourth_section}
+        #{sections}
       }
     SCHEMA
   end
@@ -997,20 +879,14 @@ class AiService
         ""
       end
 
-    fourth_guidance =
-      case fourth
-      when :ambiguity_hunt
-        <<~AH.chomp
-          - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{AMBIGUITY_HUNT_PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
-          - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.
-          - Choose the ambiguity_hunt concept from this vocabulary, exactly one: #{AMBIGUITY_HUNT_CONCEPTS.join(", ")}
-        AH
-      else
-        <<~PR.chomp
-          - The fourth section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
-          - Choose the plan_review concept from this vocabulary, exactly one: #{PLAN_REVIEW_CONCEPTS.join(", ")}
-        PR
-      end
+    # Both slots resolved once, through the same call the schema assembles
+    # from, so guidance and schema can never disagree about which kind a slot
+    # holds — and a symbol rolled into a slot it can't occupy fails here rather
+    # than reaching a kind that has no guidance to give.
+    _code_review, _pattern, third_kind, fourth_kind =
+      ExerciseSection.for_plan(third: third, fourth: fourth)
+
+    fourth_guidance = generation_guidance_for(fourth_kind, language)
 
     ts_guidance =
       if language == "javascript"
@@ -1021,10 +897,9 @@ class AiService
 
     scenario_domain_list = (SCENARIO_DOMAINS - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
 
-    config      = config_for(language)
-    label       = config[:label]
-    focus       = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
-    concepts    = config[:concepts]
+    config = config_for(language)
+    label  = config[:label]
+    focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
 
     test_file_clause =
       if config[:test_framework].present?
@@ -1033,35 +908,7 @@ class AiService
         ""
       end
 
-    third_guidance =
-      case third
-      when :architecture
-        <<~ARCH.chomp
-          - The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
-          - Keep the architecture scenario SHORT: 2-3 sentences, ~50 words maximum, and exactly 2-3 concrete constraints total. Usually the observable symptom plus one hard technical constraint is enough — pick only the constraints the decision actually turns on, and leave the rest out. Do NOT stack scale figures, team size, infrastructure detail, budget, and timeline into one scenario.
-          - Short does not mean vague: name real numbers and real systems for the 2-3 constraints you do include. Fewer constraints, not fuzzier ones.
-          - The architecture question itself is one sentence — do not restate the scenario in it.
-          - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{concepts.join(", ")}
-          - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{ARCHITECTURE_CONCEPTS.join(", ")}
-          - The architecture reference's "diagram" shows the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
-        ARCH
-      when :security_review
-        <<~SEC.chomp
-          - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
-          - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{config[:security_concepts].join(", ")}
-          - The security_review snippet should be realistic #{label} code, not a contrived toy example — the same bar as code_review's snippet.
-        SEC
-      when :parsons_problem
-        <<~PB.chomp
-          - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
-          - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
-        PB
-      else
-        <<~CH.chomp
-          - The challenge starter_code should give enough scaffold to get started without giving away the answer.
-          - Choose each section's concept from this fixed vocabulary, exactly one per section: #{concepts.join(", ")}
-        CH
-      end
+    third_guidance = generation_guidance_for(third_kind, language)
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -1106,6 +953,22 @@ class AiService
       Return JSON matching this schema exactly:
       #{exercise_schema_for(language, third: third, fourth: fourth)}
     PROMPT
+  end
+
+  # A rolled kind's generation instructions. Takes the kind ExerciseSection
+  # .for_plan already resolved rather than the raw symbol, so slot eligibility
+  # is validated in one place. The kind's own vocabulary is resolved through
+  # concept_vocabulary_for — the same lookup normalize_concepts validates
+  # against — so the guidance can never name a vocabulary the normalizer would
+  # then rewrite a concept away from.
+  def generation_guidance_for(kind, language)
+    _bucket, vocabulary = concept_vocabulary_for(kind.key, language)
+
+    kind.generation_guidance(
+      vocabulary:          vocabulary,
+      language_vocabulary: config_for(language)[:concepts],
+      label:               config_for(language)[:label]
+    )
   end
 
   # Mirrors the pattern-section `reference` shape so both render identically.
@@ -1411,10 +1274,11 @@ class AiService
   # retry rather than a day of ungrounded grading.
   #
   # A WRONG COUNT IS NOT A FAILURE, though. The prompt asks for exactly
-  # AMBIGUITY_HUNT_PLANTED_COUNT, but nothing downstream reads that number, so
-  # a list of 3 or 5 grades exactly as well — and rejecting it would throw away
-  # the day's other three sections over the likeliest deviation an LLM makes on
-  # a counted list. Only the empty case is fatal; the long case is truncated.
+  # ExerciseSection::AmbiguityHunt::PLANTED_COUNT, but nothing downstream reads
+  # that number, so a list of 3 or 5 grades exactly as well — and rejecting it
+  # would throw away the day's other three sections over the likeliest
+  # deviation an LLM makes on a counted list. Only the empty case is fatal;
+  # the long case is truncated.
   #
   # Scoped to the RESOLVED fourth section, not to the mere presence of the key:
   # a provider that returns both fourth shapes leaves an ambiguity_hunt nothing
@@ -1436,7 +1300,7 @@ class AiService
             "Ambiguity hunt returned no usable #{ANSWER_KEY_FIELD} to grade coverage against"
     end
 
-    section[ANSWER_KEY_FIELD] = planted.first(MAX_PLANTED_AMBIGUITIES)
+    section[ANSWER_KEY_FIELD] = planted.first(ExerciseSection::AmbiguityHunt::MAX_PLANTED)
     problem_set
   end
 

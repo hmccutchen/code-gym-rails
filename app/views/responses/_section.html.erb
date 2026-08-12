@@ -1,0 +1,46 @@
+<%# One section, in either state. The single place a section's shared skeleton
+    lives: label, scenario, question, diagram, concept reference, teaching hint,
+    and the answer area. Only the body — the snippet, the plan excerpt, the
+    option list — is per kind, and each kind names its own body partial.
+
+    Rendered from one loop over DailyExercise#active_section_keys, by both the
+    dashboard form and the read-only render, so the two can no longer drift.
+
+    Locals: kind, key, data, slot, exercise, response, submitted. %>
+<% bucket = ConceptBucket.for(key, exercise.language) %>
+<div class="section">
+  <div class="section-label">
+    <%= slot %> — <%= t("sections.#{key}.name") %><% if kind.titled_label? %>: <%= glossary_wrap(data["title"]) %><% end %>
+  </div>
+  <% if data["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(data["scenario"]) %></div><% end %>
+  <div class="question"><%= glossary_wrap(data["question"]) %></div>
+
+  <%= render kind.body_partial, data: data, exercise: exercise, response: response, submitted: submitted %>
+  <%= render "shared/mermaid_diagram", source: data["diagram"] %>
+
+  <%# The bucket a concept's history records under is ConceptBucket's rule, not
+      a literal repeated per kind — architecture, plan_review, and ambiguity_hunt
+      are language-independent, everything else buckets by the day's language. %>
+  <% if (ref = concept_reference_for(data["concept"], bucket)) %>
+    <%= render "shared/concept_reference", reference: ref,
+          open: !submitted && first_exposure?(data["concept"], bucket, exercise.date) %>
+  <% end %>
+
+  <%= render "dashboard/teaching_hint", note: data["teaching_note"], field: key,
+        submitted: submitted, response: response %>
+
+  <%# The answer area owns BOTH states: a submitted parsons_problem replays its
+      blocks in the order they were arranged rather than echoing the stored
+      "order:..." string, so "show the answer" is per kind, not shared. %>
+  <%= render kind.answer_partial, kind: kind, key: key, data: data,
+        exercise: exercise, response: response, submitted: submitted %>
+
+  <% unless submitted %>
+    <div class="rating-row" data-rating-for="<%= key %>">
+      <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+        <button type="button" class="rating-btn<%= " active" if response.self_rating_for(key) == value %>" data-rating-for="<%= key %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
+      <% end %>
+    </div>
+    <%= render "shared/duck_thread", field: key %>
+  <% end %>
+</div>

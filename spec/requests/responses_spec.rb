@@ -1173,8 +1173,8 @@ RSpec.describe "Responses", type: :request do
 
       get history_path
       # "Injection risk" is security_review["title"] — the only place in this
-      # page that string can come from is the _security_review_section partial
-      # itself. (A weaker assertion on "Security review" would also pass off
+      # page that string can come from is the section's own render, via
+      # responses/_section's label. (A weaker assertion on "Security review" would also pass off
       # history/index.html.erb's independent section.humanize pill, which
       # renders for any rated section regardless of whether the answer
       # partial rendered anything.)

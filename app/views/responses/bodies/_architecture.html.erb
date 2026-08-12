@@ -1,0 +1,20 @@
+<%# Locals: data, exercise, response, submitted. %>
+<% if data["options"].present? %>
+  <ul class="arch-options">
+    <% data["options"].each do |opt| %><li><%= glossary_wrap(opt) %></li><% end %>
+  </ul>
+<% end %>
+<% if data["reference"].present? %>
+  <details class="ref">
+    <summary>Reference — <%= data["title"] %>: tradeoffs</summary>
+    <div class="ref-body">
+      <p style="margin-bottom:.75rem"><strong><%= data.dig("reference", "tagline") %></strong></p>
+      <p style="margin-bottom:.75rem"><%= data.dig("reference", "explanation") %></p>
+      <% if data.dig("reference", "tradeoffs").present? %>
+        <ul><% data.dig("reference", "tradeoffs").each do |t| %><li><%= t %></li><% end %></ul>
+      <% end %>
+      <p>🔭 <%= data.dig("reference", "senior_lens") %></p>
+      <%= render "shared/mermaid_diagram", source: data.dig("reference", "diagram"), collapsible: false %>
+    </div>
+  </details>
+<% end %>

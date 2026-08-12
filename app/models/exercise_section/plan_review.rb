@@ -29,4 +29,25 @@ class ExerciseSection::PlanReview < ExerciseSection
   def self.improved_code_prose?
     true
   end
+
+  def self.generation_guidance(vocabulary:, language_vocabulary:, label:)
+    <<~GUIDANCE.chomp
+      - The fourth section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
+      - Choose the plan_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
+    GUIDANCE
+  end
+
+  def self.schema_fragment(label:)
+    <<~SCHEMA.chomp
+      "plan_review": {
+          "title":    "string — short name for the plan/decision under review",
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+          "plan_excerpt": "string — a short prose implementation plan, framed as if written by an AI assistant, containing 2-3 planted flaws spanning levels: one real technical anti-pattern, one scope-creep item, one unflagged behavior change",
+          "question": "string — what to evaluate before approving this plan",
+          "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
+          "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary"
+        }
+    SCHEMA
+  end
 end

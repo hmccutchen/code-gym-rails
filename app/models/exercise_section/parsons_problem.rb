@@ -10,6 +10,35 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
+    # The answer is an ordering, not prose: a draggable, keyboard-reorderable
+    # block ladder writing into a hidden field.
+    def answer_partial
+      "responses/answers/parsons_problem"
+    end
+
+    # The "each section's concept" line covers code_review and pattern as well
+    # as this one, so it reads `language_vocabulary` even though that happens
+    # to equal this kind's own vocabulary. See issue #81.
+    def generation_guidance(vocabulary:, language_vocabulary:, label:)
+      <<~GUIDANCE.chomp
+        - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
+        - Choose each section's concept from this fixed vocabulary, exactly one per section: #{language_vocabulary.join(", ")}
+      GUIDANCE
+    end
+
+    def schema_fragment(label:)
+      <<~SCHEMA.chomp
+        "parsons_problem": {
+            "title":    "string",
+            "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+            "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
+            "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
+            "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+            "concept": "string — exactly one concept from the provided vocabulary"
+          }
+      SCHEMA
+    end
+
     # Returns [] for a blank, prefix-missing, or malformed answer so grading
     # degrades to "everything misplaced" rather than raising on a skipped or
     # corrupted submission.

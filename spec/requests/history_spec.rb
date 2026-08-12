@@ -233,8 +233,8 @@ RSpec.describe "History", type: :request do
 
     it "emits the ai_review autosave script and the mermaid module exactly once across multiple entries" do
       # shared/_ai_review renders once per reviewed entry, and
-      # responses/_architecture_section's mermaid module renders once per
-      # architecture section with a diagram — both would otherwise ship one
+      # shared/_mermaid_diagram's module renders once per architecture
+      # section with a diagram — both would otherwise ship one
       # duplicate ~4-5 KB script per entry. Verifies they're deduped into the
       # layout's shared :page_scripts region instead.
       3.times { |i| create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true) }

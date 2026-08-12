@@ -21,4 +21,19 @@ class ExerciseSection::Pattern < ExerciseSection
   def self.diagrammable?
     true
   end
+
+  def self.schema_fragment(label:)
+    <<~SCHEMA.chomp
+      "pattern": {
+          "title":    "string — pattern name",
+          "why":      "string — one sentence on why the pattern exists",
+          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
+          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+          "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
+          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+          "concept": "string — exactly one concept from the provided vocabulary",
+          "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
+        }
+    SCHEMA
+  end
 end

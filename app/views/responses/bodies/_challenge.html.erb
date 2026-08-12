@@ -1,0 +1,4 @@
+<%# Locals: data, exercise, response, submitted. %>
+<% if data["starter_code"].present? %>
+  <pre class="snippet"><code<% if (lang = hljs_language(exercise.language)) %> data-hljs="<%= lang %>"<% end %>><%= data["starter_code"] %></code></pre>
+<% end %>
