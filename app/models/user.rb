@@ -160,11 +160,17 @@ class User < ApplicationRecord
   # default to a no-op filter, so every caller that doesn't pass them (every
   # caller as of this comment) sees identical behavior to before either
   # keyword existed. Marking a concept resolved happens before either filter
-  # runs; that's safe only because a concept's bucket is a function of the
-  # concept itself (each vocabulary's names are disjoint from every other
-  # vocabulary's), so a filtered-out most-recent occurrence implies every
-  # older occurrence of that same concept would be filtered too — dedup and
-  # filter order can never disagree.
+  # runs; that's safe for the special ConceptBucket vocabularies (architecture,
+  # plan_review, ambiguity_hunt) because each is disjoint from every other
+  # vocabulary, including both language vocabularies — a filtered-out
+  # most-recent occurrence implies every older occurrence of that same concept
+  # would be filtered too, so dedup and filter order can never disagree. It is
+  # NOT safe for a language bucket ("ruby_rails"/"javascript"): RAILS_CONCEPTS
+  # and JS_CONCEPTS share a few concept names (e.g. over_mocking), so for a
+  # mixed-language user the same concept can carry different buckets on
+  # different days, and dedup-before-filter could drop an occurrence the
+  # filter should have kept. `bucket:`/`exclude_buckets:` are for the special
+  # buckets only; no caller today passes a language bucket.
   def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [])
     resolved = {}
     result   = []

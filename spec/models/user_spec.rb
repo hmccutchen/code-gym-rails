@@ -494,8 +494,8 @@ RSpec.describe User, type: :model do
 
     def submit_response(concept:, section:, language: "ruby_rails", self_rating: "too_hard", ai_rating: "developing")
       # Distinct, strictly-decreasing dates per call — random dates within a small
-      # range risked colliding on User's date-uniqueness validation when a test
-      # submits more than one response.
+      # range risked colliding on DailyExercise's date-uniqueness validation
+      # (scoped to user_id) when a test submits more than one response.
       @next_response_date ||= Date.current
       @next_response_date -= 1
       exercise = DailyExercise.create!(
