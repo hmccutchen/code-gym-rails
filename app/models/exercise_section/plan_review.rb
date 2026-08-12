@@ -17,4 +17,16 @@ class ExerciseSection::PlanReview < ExerciseSection
   def self.vocabulary_key
     :plan_review
   end
+
+  # The reviewed artifact is a prose plan, so the "improvement" is a rewritten
+  # plan — not source. Syntax-highlighting it as the day's language and calling
+  # it "Improved code" would misdescribe it in both the review view and the
+  # review email.
+  def self.improved_code_label
+    "Revised plan"
+  end
+
+  def self.improved_code_prose?
+    true
+  end
 end

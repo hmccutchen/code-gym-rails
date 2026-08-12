@@ -47,6 +47,14 @@ class ExerciseSection
     all.find { |section| section.key == key.to_s }
   end
 
+  # #find, for callers that only want to read a facet and have no interesting
+  # answer for an unrecognized key. The base class carries every default, so
+  # this keeps the fallback in one place instead of making each caller restate
+  # it (`ExerciseSection.find(k)&.improved_code_label || "Improved code"`).
+  def self.for(key)
+    find(key) || self
+  end
+
   class << self
     def key
       name.demodulize.underscore
@@ -70,6 +78,19 @@ class ExerciseSection
     # Whether a review of this kind can carry corrected code.
     def improved_code?
       true
+    end
+
+    # What the review's improved_code actually IS for this kind, and whether it
+    # is prose rather than source. Both default to corrected source, which is
+    # what every code-bearing kind carries — a kind whose "improvement" is
+    # written English says so here, so the review view and the review email
+    # don't each have to special-case it.
+    def improved_code_label
+      "Improved code"
+    end
+
+    def improved_code_prose?
+      false
     end
 
     # Whether this kind's problem_set may carry a Mermaid `diagram` of the

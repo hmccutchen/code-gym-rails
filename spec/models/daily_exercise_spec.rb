@@ -106,6 +106,37 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#active_section_keys" do
+    it "returns the four sections a current exercise presents" do
+      exercise = DailyExercise.new(problem_set: {
+        "code_review" => {}, "pattern" => {}, "architecture" => {}, "plan_review" => {}
+      })
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern architecture plan_review])
+    end
+
+    it "returns three for an exercise generated before the fourth slot existed" do
+      exercise = DailyExercise.new(problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {} })
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern challenge])
+    end
+
+    # The count the user sees is the count of sections on screen, not of raw
+    # payload keys — FakeService persists all eight deliberately, and a real
+    # provider can return an extra alternate third or fourth.
+    it "counts only the precedence-resolved third and fourth when a payload holds several" do
+      exercise = DailyExercise.new(problem_set: {
+        "code_review"     => {}, "pattern"        => {},
+        "architecture"    => {}, "challenge"      => {}, "security_review" => {}, "parsons_problem" => {},
+        "plan_review"     => {}, "ambiguity_hunt" => {}
+      })
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern architecture plan_review])
+    end
+
+    it "drops a fixed key holding a non-Hash value" do
+      exercise = DailyExercise.new(problem_set: { "code_review" => "junk", "pattern" => {}, "challenge" => {} })
+      expect(exercise.active_section_keys).to eq(%w[pattern challenge])
+    end
+  end
+
   describe "#third_key" do
     it "returns 'architecture' when the architecture key is present" do
       exercise = DailyExercise.new(problem_set: { "architecture" => {} })

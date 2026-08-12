@@ -72,7 +72,7 @@ class DailyResponse < ApplicationRecord
   def reviewed?  = ai_review.present?
 
   def fully_reviewed?
-    daily_exercise.problem_set.keys.all? { |key| section_reviewed?(key) }
+    daily_exercise.active_section_keys.all? { |key| section_reviewed?(key) }
   end
 
   def section_reviewed?(section)
@@ -139,8 +139,13 @@ class DailyResponse < ApplicationRecord
     answers.keys.select { |section| answered?(section) }
   end
 
+  # Zero-guarded: a payload whose every section key holds a non-Hash presents no
+  # answerable sections, and dividing by it yields NaN, which #round raises on.
   def completeness
-    (answered_sections.size / daily_exercise.problem_set.keys.size.to_f * 100).round
+    total = daily_exercise.active_section_keys.size
+    return 0 if total.zero?
+
+    (answered_sections.size / total.to_f * 100).round
   end
 
   # improved_code is revealed only from a concept's SECOND exposure onward — the

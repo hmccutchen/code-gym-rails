@@ -28,7 +28,7 @@ Rating: <%= fb["rating"] %>
 <% end -%>
 <% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) -%>
 <% if improved_code.present? && @response.improved_code_visible?(section) -%>
-Improved code:
+<%= ExerciseSection.for(section).improved_code_label %>:
 
 <%= improved_code %>
 

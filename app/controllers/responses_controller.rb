@@ -49,13 +49,16 @@ class ResponsesController < ApplicationController
       date: Date.current
     )
 
-    # Only persist answers for sections this exercise actually has. Strong params
-    # permit every third-slot key (`challenge`, `architecture`, `security_review`,
-    # `parsons_problem`) and every fourth-slot key (`plan_review`,
-    # `ambiguity_hunt`), so without this a crafted request could store keys this
-    # exercise never generated and push DailyResponse#answered_sections /
-    # #completeness past this exercise's actual section count / 100%.
-    submitted_answers = response_params[:answers]&.slice(*exercise.problem_set.keys)
+    # Only persist answers for sections this exercise actually presents. Strong
+    # params permit every third-slot key (`challenge`, `architecture`,
+    # `security_review`, `parsons_problem`) and every fourth-slot key
+    # (`plan_review`, `ambiguity_hunt`), so without this a crafted request could
+    # store keys this exercise never rendered and push
+    # DailyResponse#answered_sections / #completeness past this exercise's actual
+    # section count / 100%. Sliced against #active_section_keys rather than the
+    # raw payload keys, since those are the same sections #completeness counts
+    # against — a payload holding two third-shaped keys renders only one.
+    submitted_answers = response_params[:answers]&.slice(*exercise.active_section_keys)
     submitted_answers = DailyResponse.normalize_answers(submitted_answers, exercise) if submitted_answers
 
     @response.assign_attributes(
@@ -65,7 +68,7 @@ class ResponsesController < ApplicationController
     )
 
     incoming_ratings = (response_params[:section_ratings] || {})
-                         .slice(*exercise.problem_set.keys)
+                         .slice(*exercise.active_section_keys)
                          .select { |_, value| DailyResponse::SELF_RATINGS.include?(value) }
     @response.section_ratings = @response.section_ratings.merge(incoming_ratings)
     @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
@@ -100,7 +103,7 @@ class ResponsesController < ApplicationController
   def review
     return redirect_to root_path, alert: "Submit your answers first." unless @response.submitted?
 
-    missing = @response.daily_exercise.problem_set.keys - Array(@response.ai_review&.keys)
+    missing = @response.daily_exercise.active_section_keys - Array(@response.ai_review&.keys)
     return redirect_to history_anchor, notice: "Already reviewed." if missing.empty?
 
     unless claim_review!
@@ -109,7 +112,7 @@ class ResponsesController < ApplicationController
 
     # Recompute after reload to close the race: another request may have
     # finished the last missing section between our first check and the claim.
-    missing = @response.daily_exercise.problem_set.keys - Array(@response.ai_review&.keys)
+    missing = @response.daily_exercise.active_section_keys - Array(@response.ai_review&.keys)
     if missing.empty?
       release_review_claim!
       return redirect_to history_anchor, notice: "Already reviewed."

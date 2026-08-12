@@ -300,5 +300,37 @@ RSpec.describe DailyPlan do
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.fourth_due_checks.map(&:concept)).to eq(%w[scope_creep])
     end
+
+    # The fourth section's schema permits exactly one concept, so anything past
+    # the first reinforcement entry is a concept the prompt would demand of a
+    # section that structurally cannot host it.
+    it "caps fourth-slot reinforcement at the slot's single capacity" do
+      allow(user).to receive(:concepts_needing_reinforcement).and_call_original
+      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
+        .and_return([ { concept: "scope_creep",           tier: "standard" },
+                      { concept: "unjustified_constant",  tier: "standard" },
+                      { concept: "unflagged_behavior_change", tier: "standard" } ])
+      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:plan_review)
+
+      result = DailyPlan.for(user, language: "ruby_rails")
+
+      expect(result.fourth_reinforcement.size).to eq(DailyPlan::FOURTH_SLOT_CAPACITY)
+      expect(result.fourth_reinforcement.map { |h| h[:concept] }).to eq(%w[scope_creep])
+    end
+
+    it "drops fourth-slot reinforcement entirely when an overdue retention check takes the slot" do
+      user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 10)
+      allow(user).to receive(:concepts_needing_reinforcement).and_call_original
+      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
+        .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
+      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:plan_review)
+
+      result = DailyPlan.for(user, language: "ruby_rails")
+
+      expect(result.fourth_due_checks.map(&:concept)).to eq(%w[scope_creep])
+      expect(result.fourth_reinforcement).to eq([])
+    end
   end
 end

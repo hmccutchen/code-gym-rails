@@ -271,6 +271,35 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("pattern_improved_marker")
     end
 
+    # A revised implementation plan is prose. Sending it through the shared
+    # code renderer syntax-highlights English as Ruby and labels it "Improved
+    # code" — see ExerciseSection::PlanReview.improved_code_prose?.
+    it "renders plan_review's improved_code as a labelled prose plan, not highlighted source" do
+      exercise = DailyExercise.create!(
+        user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s" },
+          "pattern"     => { "title" => "Pat", "question" => "pattern-q" },
+          "challenge"   => { "question" => "challenge-q" },
+          "plan_review" => { "title" => "Plan", "question" => "plan-q", "plan_excerpt" => "the plan" }
+        }
+      )
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
+        answers: { "plan_review" => "The migration step is a behavior change" },
+        submitted_at: Time.current,
+        concept_tags: { "plan_review" => "other" },
+        ai_review: { "plan_review" => { "rating" => "solid", "improved_code" => "revised_plan_marker" } }
+      )
+
+      login_as(user)
+      get history_path
+
+      expect(response.body).to include("Revised plan")
+      expect(response.body).to include(%(<div class="plan-excerpt" style="margin-top:.4rem">revised_plan_marker</div>))
+      expect(response.body).not_to include(%(<code data-hljs="ruby">revised_plan_marker</code>))
+    end
+
     it "lists only the current user's submitted responses, newest first" do
       other = create_user_with_key(email: "other@example.com", name: "Other")
       old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")

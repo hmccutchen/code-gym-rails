@@ -212,6 +212,12 @@ class AiService
   # enough to force real coverage judgment.
   AMBIGUITY_HUNT_PLANTED_COUNT = 4
 
+  # The one field in a problem set that is answer-key data rather than exercise
+  # content. Named here because two places have to know it by name: the
+  # boundary validation that guarantees it is usable, and the diagnostics log
+  # that must never carry it.
+  ANSWER_KEY_FIELD = "planted_ambiguities"
+
   # Curated, real, job-adjacent scenario flavors for the "scenario" field's
   # business-domain framing — prompt-level grounding only, to keep generated
   # scenarios feeling like real engineering work rather than generic SaaS
@@ -337,11 +343,18 @@ class AiService
                                     fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established)
     )
 
-    problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
+    problem_set = parse_json_object(result[:text], subject: "problem set")
+    # Ahead of the normalizers because it is the only one that can reject the
+    # response: normalize_concepts writes SuggestedConcept rows as a side
+    # effect, and a set that is about to be thrown away should not leave a
+    # vocabulary suggestion behind.
+    normalize_planted_ambiguities!(problem_set)
+    normalize_concepts(problem_set, language)
     normalize_answer_scaffolds!(problem_set)
     normalize_diagrams!(problem_set)
     shuffle_parsons_blocks!(problem_set)
     log_retention(user, language, plan.due_checks, problem_set)
+    log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set)
     log_difficulty_diagnostics(user, language, plan, problem_set, history)
     problem_set
   end
@@ -679,7 +692,11 @@ class AiService
   # the concepts actually persisted, not whatever the provider first returned.
   # `tagged` makes a miss diagnosable rather than merely countable: it shows what
   # the model picked instead.
-  def log_retention(user, language, due_checks, problem_set)
+  #
+  # Takes a ConceptBucket rather than a language because the fourth slot's
+  # track is bucket-scoped and language-independent; for the three-slot track
+  # the bucket IS the day's language (see ConceptBucket.for).
+  def log_retention(user, bucket, due_checks, problem_set)
     return if due_checks.empty?
 
     offered = due_checks.map(&:concept)
@@ -687,7 +704,7 @@ class AiService
     honored = offered & tagged
 
     Rails.logger.info(
-      "[retention] user=#{user.id} date=#{Date.current} language=#{language} " \
+      "[retention] user=#{user.id} date=#{Date.current} bucket=#{bucket} " \
       "offered=#{offered.join(',').presence || '-'} " \
       "honored=#{honored.join(',').presence || '-'} " \
       "tagged=#{tagged.join(',').presence || '-'}"
@@ -716,10 +733,22 @@ class AiService
         established: plan.established.map(&:concept),
         recent_performance: history
       },
-      delivered: problem_set
+      delivered: without_answer_key(problem_set)
     }
 
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
+  end
+
+  # Log storage is not one of the places the ambiguity hunt's answer key is
+  # allowed to reach. Every other consumer of a problem_set renders a closed
+  # enumeration of named fields; this is the only one that serializes the whole
+  # thing, so the exclusion lives here rather than in a rule the next
+  # whole-payload logger would have to remember. Returns a copy — the caller's
+  # problem_set is what gets persisted.
+  def without_answer_key(problem_set)
+    problem_set.transform_values do |section|
+      section.is_a?(Hash) ? section.except(ANSWER_KEY_FIELD) : section
+    end
   end
 
   # Subclasses must implement: makes the provider-specific HTTP call and
@@ -1165,9 +1194,10 @@ class AiService
   end
 
   def improved_code_instruction(section)
-    ExerciseSection.find(section)&.improved_code? == false ?
-      "must be an empty string for this section" :
-      "corrected/improved code for this section"
+    kind = ExerciseSection.for(section)
+    kind.improved_code? ?
+      "the #{kind.improved_code_label.downcase} for this section" :
+      "must be an empty string for this section"
   end
 
   def section_grading_note(exercise, daily_response, section)
@@ -1359,6 +1389,29 @@ class AiService
 
       usable ? section_data["diagram"] = diagram.strip : section_data.delete("diagram")
     end
+    problem_set
+  end
+
+  # Unlike every other normalizer here, this one raises rather than repairs.
+  # The planted list is the ambiguity hunt's entire grading ground truth — the
+  # review prompt grades coverage against it and nothing else — so a missing,
+  # short, or non-string list doesn't degrade the section, it silently turns
+  # coverage grading back into the freehand judgement the kind exists to
+  # replace. There is no fallback to fall back to. InvalidResponseError is
+  # already a surfaced, retryable generation failure
+  # (GenerateDailyExercisesJob#persist_failure), so failing here costs the user
+  # a retry rather than a day of miscounted grading.
+  def normalize_planted_ambiguities!(problem_set)
+    section = problem_set["ambiguity_hunt"]
+    return problem_set unless section.is_a?(Hash)
+
+    planted = Array(section[ANSWER_KEY_FIELD]).grep(String).filter_map { |entry| entry.strip.presence }
+    unless planted.size == AMBIGUITY_HUNT_PLANTED_COUNT
+      raise InvalidResponseError,
+            "Ambiguity hunt returned #{planted.size} usable planted ambiguities, expected #{AMBIGUITY_HUNT_PLANTED_COUNT}"
+    end
+
+    section[ANSWER_KEY_FIELD] = planted
     problem_set
   end
 

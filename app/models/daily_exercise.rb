@@ -57,4 +57,18 @@ class DailyExercise < ApplicationRecord
   def fourth_key
     ExerciseSection.fourths.map(&:key).find { |key| problem_set[key].is_a?(Hash) }
   end
+
+  # The sections this exercise actually presents: the two fixed kinds plus the
+  # precedence-resolved third and fourth.
+  #
+  # NOT `problem_set.keys`. A payload can hold more than one third- or
+  # fourth-shaped key — FakeService persists all eight deliberately, and a real
+  # provider can return an extra alternate — but only the resolved one is ever
+  # rendered, answerable, or rateable. Every "N of M sections" denominator
+  # derives from this, so a count can never exceed what is on screen.
+  def active_section_keys
+    ([ "code_review", "pattern" ] + [ third_key, fourth_key ])
+      .compact
+      .select { |key| problem_set[key].is_a?(Hash) }
+  end
 end

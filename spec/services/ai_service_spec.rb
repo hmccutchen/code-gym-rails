@@ -1024,6 +1024,57 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#normalize_planted_ambiguities!" do
+    def planted(*entries)
+      { "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => entries.flatten(1) } }
+    end
+
+    def exactly_enough
+      Array.new(AiService::AMBIGUITY_HUNT_PLANTED_COUNT) { |i| "ambiguity #{i}" }
+    end
+
+    it "passes a list of exactly the planted count through" do
+      set = planted(exactly_enough)
+      result = service.send(:normalize_planted_ambiguities!, set)
+      expect(result["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
+    end
+
+    it "strips whitespace off each entry" do
+      set = planted(exactly_enough.map { |a| "  #{a}\n" })
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
+    end
+
+    it "raises when the field is missing entirely" do
+      set = { "ambiguity_hunt" => { "request" => "vague" } }
+      expect { service.send(:normalize_planted_ambiguities!, set) }
+        .to raise_error(AiService::InvalidResponseError, /0 usable planted ambiguities/)
+    end
+
+    it "raises when the field is not an array" do
+      set = { "ambiguity_hunt" => { "planted_ambiguities" => "one; two; three; four" } }
+      expect { service.send(:normalize_planted_ambiguities!, set) }
+        .to raise_error(AiService::InvalidResponseError)
+    end
+
+    it "raises when too few usable entries survive normalization" do
+      set = planted(exactly_enough.first(2) + [ "   ", nil, 42 ])
+      expect { service.send(:normalize_planted_ambiguities!, set) }
+        .to raise_error(AiService::InvalidResponseError, /2 usable planted ambiguities/)
+    end
+
+    it "raises when the provider returns more than the planted count" do
+      set = planted(exactly_enough + [ "one too many" ])
+      expect { service.send(:normalize_planted_ambiguities!, set) }
+        .to raise_error(AiService::InvalidResponseError)
+    end
+
+    it "does nothing for a problem set with no ambiguity_hunt section" do
+      set = { "plan_review" => { "plan_excerpt" => "a plan" } }
+      expect { service.send(:normalize_planted_ambiguities!, set) }.not_to raise_error
+    end
+  end
+
   describe "#parse_json_response" do
     it "strips markdown fences before parsing" do
       fenced = "```json\n{\"a\":1}\n```"
@@ -1342,6 +1393,28 @@ RSpec.describe AiService do
       expect(Rails.logger).not_to receive(:info).with(/\[retention\]/)
       svc.generate_exercise(user, language: "ruby_rails")
     end
+
+    # The fourth slot's retention offers ride a bucket, not the day's language,
+    # and this log line is the only offered-vs-honored evidence there is — an
+    # offer that never appears here can be silently ignored forever.
+    it "logs the fourth slot's offer under its own bucket" do
+      user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 2)
+      set = { "plan_review" => { "concept" => "scope_creep" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:plan_review)
+
+      logged = []
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged << msg if msg.is_a?(String) && msg.start_with?("[retention]")
+      end
+
+      svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(logged).to include(/bucket=plan_review.*offered=scope_creep.*honored=scope_creep/)
+    end
   end
 
   describe "difficulty diagnostics instrumentation" do
@@ -1397,6 +1470,34 @@ RSpec.describe AiService do
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
       expect(payload["requested"]["due_checks"]).to eq([ "memoization" ])
       expect(payload["requested"]["established"]).to eq([ "transaction_safety" ])
+    end
+
+    # This is the only place a whole problem_set is serialized, so it is the
+    # only place the ambiguity hunt's answer key could reach log storage.
+    it "redacts the ambiguity hunt's planted answer key from the delivered payload" do
+      planted = Array.new(AiService::AMBIGUITY_HUNT_PLANTED_COUNT) { |i| "secret ambiguity #{i}" }
+      set = {
+        "code_review"    => { "concept" => "n_plus_one" },
+        "ambiguity_hunt" => { "concept" => "missing_success_criteria",
+                              "request" => "Build us a leaderboard",
+                              "planted_ambiguities" => planted }
+      }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      problem_set = svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(logged).not_to include("secret ambiguity")
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+      expect(payload["delivered"]["ambiguity_hunt"]).not_to have_key("planted_ambiguities")
+      expect(payload["delivered"]["ambiguity_hunt"]["request"]).to eq("Build us a leaderboard")
+      # Redaction is for the log only — the persisted set still carries the key.
+      expect(problem_set["ambiguity_hunt"]["planted_ambiguities"]).to eq(planted)
     end
   end
 

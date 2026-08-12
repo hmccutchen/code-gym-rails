@@ -44,7 +44,7 @@
     <div class="progress-bar">
       <div class="progress-fill" id="progress-fill" style="width:0%"></div>
     </div>
-    <div class="progress-label" id="progress-label">0 of <%= exercise.problem_set.keys.size %> answered</div>
+    <div class="progress-label" id="progress-label">0 of <%= exercise.active_section_keys.size %> answered</div>
   </div>
 
   <%# Always POST, never PATCH — ResponsesController#create is idempotent via
@@ -137,7 +137,7 @@
     </div>
 
     <% rated_sections = response.section_ratings.keys %>
-    <% section_keys   = exercise.problem_set.keys %>
+    <% section_keys   = exercise.active_section_keys %>
     <% all_rated      = (section_keys - rated_sections).empty? %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>

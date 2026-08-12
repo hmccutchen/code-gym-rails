@@ -26,7 +26,13 @@
     <% end %>
     <% improved_code = DailyResponse.improved_code_text(fb["improved_code"]) %>
     <% if improved_code.present? && response.improved_code_visible?(section) %>
-      <pre class="snippet" style="margin-top:.75rem"><code<% if (lang = hljs_language(exercise_language)) %> data-hljs="<%= lang %>"<% end %>><%= improved_code %></code></pre>
+      <% kind = ExerciseSection.for(section) %>
+      <% if kind.improved_code_prose? %>
+        <p class="review-item"><strong><%= kind.improved_code_label %>:</strong></p>
+        <div class="plan-excerpt" style="margin-top:.4rem"><%= improved_code %></div>
+      <% else %>
+        <pre class="snippet" style="margin-top:.75rem"><code<% if (lang = hljs_language(exercise_language)) %> data-hljs="<%= lang %>"<% end %>><%= improved_code %></code></pre>
+      <% end %>
     <% end %>
     <div class="alternates" data-section="<%= section %>">
       <% Array(response.review_alternates[section]).each do |alt| %>

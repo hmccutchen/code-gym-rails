@@ -38,6 +38,12 @@ class DailyPlan
   # for or claim one of those three slots.
   FOURTH_BUCKETS = FOURTH_BUCKET_FOR.values.freeze
 
+  # The fourth slot is exactly one section holding exactly one concept (see
+  # AiService#exercise_schema_for). Everything competing for it — reinforcement
+  # and retention alike — is sized against this, so the prompt can never ask a
+  # one-concept section to carry two.
+  FOURTH_SLOT_CAPACITY = 1
+
   # A vocabulary is at most 16 concepts (see AiService::RAILS_CONCEPTS /
   # JS_CONCEPTS / ARCHITECTURE_CONCEPTS), so "every due concept in a bucket" is
   # never a large fetch — this exists only so the per-bucket query below doesn't
@@ -73,9 +79,17 @@ class DailyPlan
     # cross-vocab item can never be placed somewhere it structurally cannot go.
     fourth               = roll_fourth_section
     fourth_bucket        = FOURTH_BUCKET_FOR.fetch(fourth)
-    fourth_reinforcement = user.concepts_needing_reinforcement(bucket: fourth_bucket)
-    fourth_slots         = 1 - fourth_reinforcement.first(1).size
-    fourth_slots         = 1 if fourth_slots.zero? && overdue_retention_check_pending_for_bucket?(user, fourth_bucket)
+    # Truncated to the slot's capacity before anything else reads it: the full
+    # list runs 4-5 entries deep on a small vocabulary, and every entry past
+    # the first is a concept the prompt would demand of a section that can only
+    # carry one.
+    fourth_reinforcement = user.concepts_needing_reinforcement(bucket: fourth_bucket).first(FOURTH_SLOT_CAPACITY)
+    # An overdue retention check doesn't share the slot, it takes it — leaving
+    # reinforcement in place alongside would put two mutually exclusive
+    # concepts in the same prompt.
+    fourth_reinforcement = [] if fourth_reinforcement.any? &&
+                                 overdue_retention_check_pending_for_bucket?(user, fourth_bucket)
+    fourth_slots         = FOURTH_SLOT_CAPACITY - fourth_reinforcement.size
     fourth_due_checks    = retention_checks_for_bucket(user, fourth_bucket, slots: fourth_slots)
     fourth_established   = established_concepts_for_bucket(user, fourth_bucket,
                                                             reinforcement: fourth_reinforcement, due_checks: fourth_due_checks)

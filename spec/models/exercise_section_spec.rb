@@ -109,6 +109,35 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".improved_code_label / .improved_code_prose?" do
+    it "describes plan_review's improvement as a revised plan rendered as prose" do
+      kind = described_class.find("plan_review")
+      expect(kind.improved_code_label).to eq("Revised plan")
+      expect(kind.improved_code_prose?).to be(true)
+    end
+
+    it "leaves every code-bearing kind as syntax-highlighted improved code" do
+      %w[code_review pattern challenge security_review].each do |key|
+        kind = described_class.find(key)
+        expect(kind.improved_code_label).to eq("Improved code")
+        expect(kind.improved_code_prose?).to be(false)
+      end
+    end
+  end
+
+  describe ".for" do
+    it "resolves a known key to its kind" do
+      expect(described_class.for("plan_review")).to eq(ExerciseSection::PlanReview)
+    end
+
+    # A provider can put an arbitrary key in a jsonb payload; a view reading a
+    # facet off it wants the default, not a nil to guard.
+    it "falls back to the base class's defaults for an unrecognized key" do
+      expect(described_class.for("invented_by_a_provider").improved_code_label).to eq("Improved code")
+      expect(described_class.for("invented_by_a_provider").improved_code_prose?).to be(false)
+    end
+  end
+
   describe ".diagrammable?" do
     # code_review, pattern, and challenge all describe a structure in prose or
     # in code already on screen, so a diagram of it restates what is visible.
