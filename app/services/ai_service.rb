@@ -206,20 +206,6 @@ class AiService
     unstated_data_implications undefined_permissions_model
   ].freeze
 
-  # Fixed, not a range: the review prompt must always know exactly how many
-  # ambiguities were planted to grade coverage against. 4 sits at the
-  # midpoint of the 3-5 range considered — few enough to find in one sitting,
-  # enough to force real coverage judgment.
-  AMBIGUITY_HUNT_PLANTED_COUNT = 4
-
-  # What the planted list is bounded to on ingest, as opposed to what the
-  # prompt asks for. The count above is the generator's target; nothing
-  # downstream reads it, since the review prompt lists the ambiguities rather
-  # than counting them (see #fourth_context_summary). So a provider that lands
-  # on 3 or 5 has still produced a gradable section, and only the runaway case
-  # needs bounding — this is provider text going into another prompt.
-  MAX_PLANTED_AMBIGUITIES = AMBIGUITY_HUNT_PLANTED_COUNT * 2
-
   # The one field in a problem set that is answer-key data rather than exercise
   # content. Named here because two places have to know it by name: the
   # boundary validation that guarantees it is usable, and the diagnostics log
@@ -785,126 +771,22 @@ class AiService
     PROMPT
   end
 
-  # JSON schema every provider is asked to return for a problem set. The
-  # code-bearing fields' label switches with `language` so instructions never
-  # assume Ruby idioms when generating JS — the structure itself never
-  # changes across languages.
+  # JSON schema every provider is asked to return for a problem set. Each kind
+  # owns the fragment describing itself (ExerciseSection.schema_fragment); this
+  # decides which four kinds today's set holds and joins them. The code-bearing
+  # fields' label switches with `language` so instructions never assume Ruby
+  # idioms when generating JS — the structure itself never changes across
+  # languages.
   def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review)
     label = config_for(language)[:label]
 
-    third_section =
-      case third
-      when :architecture
-        <<~ARCH.chomp
-          "architecture": {
-              "title":     "string — short name for the decision",
-              "scenario":  "string — 2-3 sentences, ~50 words max. Exactly 2-3 concrete constraints total, no more",
-              "question":  "string — ONE sentence asking for a decision + justification",
-              "options":   ["string — a viable approach", "string — another viable approach", "string — an optional third approach (omit for 2)"],
-              "answer_scaffold": ["string — a labelled part of a complete answer to THIS decision", "string — another part"],
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the architecture vocabulary",
-              "reference": {
-                "tagline":     "string — bold one-liner",
-                "explanation": "string — 2-3 sentences",
-                "tradeoffs":   ["string — a tradeoff", "string — a tradeoff", "string — a tradeoff"],
-                "senior_lens": "string — how a senior frames the decision",
-                "diagram":     "string — Mermaid source visualizing the decision, or an empty string if no diagram would help"
-              }
-            }
-        ARCH
-      when :security_review
-        <<~SEC.chomp
-          "security_review": {
-              "title":        "string",
-              "question":     "string — what security vulnerability exists here, and how would you mitigate it",
-              "snippet":      "string — #{label} code, ~10-15 lines, containing one real, exploitable vulnerability",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              "reference": {
-                "tagline":      "string — bold one-liner",
-                "explanation":  "string — 2-3 sentences",
-                "code_example": "string — annotated #{label} code, ~15 lines",
-                "senior_lens":  "string — when to reach for it / tradeoffs"
-              }
-            }
-        SEC
-      when :parsons_problem
-        <<~PB.chomp
-          "parsons_problem": {
-              "title":    "string",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
-              "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
-              "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
-            }
-        PB
-      else
-        <<~CH.chomp
-          "challenge": {
-              "title":        "string",
-              "question":     "string — what to implement",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "starter_code": "string — optional skeleton (empty string if none)",
-              "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary",
-              "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
-            }
-        CH
-      end
-
-    fourth_section =
-      case fourth
-      when :ambiguity_hunt
-        <<~AH.chomp
-          "ambiguity_hunt": {
-              "title":    "string",
-              "scenario": "string — the concrete business-domain framing, drawn from Code Gym-style feature requests (e.g. a daily-practice app's own features)",
-              "request":  "string — a vague feature request, 2-4 sentences, phrased the way a stakeholder or PM would ask for it, not an engineer",
-              "planted_ambiguities": ["string — one specific ambiguity deliberately left in \\"request\\"", "... (exactly #{AMBIGUITY_HUNT_PLANTED_COUNT} total)"],
-              "question": "string — e.g. 'What would you need clarified before writing a spec for this?'",
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
-            }
-        AH
-      else
-        <<~PR.chomp
-          "plan_review": {
-              "title":    "string — short name for the plan/decision under review",
-              "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-              "plan_excerpt": "string — a short prose implementation plan, framed as if written by an AI assistant, containing 2-3 planted flaws spanning levels: one real technical anti-pattern, one scope-creep item, one unflagged behavior change",
-              "question": "string — what to evaluate before approving this plan",
-              "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
-              "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
-              "concept": "string — exactly one concept from the provided vocabulary"
-            }
-        PR
-      end
+    sections = ExerciseSection.for_plan(third: third, fourth: fourth)
+                              .map { |kind| kind.schema_fragment(label: label) }
+                              .join(",\n  ")
 
     <<~SCHEMA
       {
-        "code_review": {
-          "question": "string — what to find/fix",
-          "snippet":  "string — #{label} code, ~10-15 lines",
-          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
-        },
-        "pattern": {
-          "title":    "string — pattern name",
-          "why":      "string — one sentence on why the pattern exists",
-          "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \\\"the code below\\\" — none is shown for this section.",
-          "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-          "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
-          "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
-          "concept": "string — exactly one concept from the provided vocabulary",
-          "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
-        },
-        #{third_section},
-        #{fourth_section}
+        #{sections}
       }
     SCHEMA
   end
@@ -1001,7 +883,7 @@ class AiService
       case fourth
       when :ambiguity_hunt
         <<~AH.chomp
-          - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{AMBIGUITY_HUNT_PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
+          - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{ExerciseSection::AmbiguityHunt::PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
           - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.
           - Choose the ambiguity_hunt concept from this vocabulary, exactly one: #{AMBIGUITY_HUNT_CONCEPTS.join(", ")}
         AH
@@ -1411,10 +1293,11 @@ class AiService
   # retry rather than a day of ungrounded grading.
   #
   # A WRONG COUNT IS NOT A FAILURE, though. The prompt asks for exactly
-  # AMBIGUITY_HUNT_PLANTED_COUNT, but nothing downstream reads that number, so
-  # a list of 3 or 5 grades exactly as well — and rejecting it would throw away
-  # the day's other three sections over the likeliest deviation an LLM makes on
-  # a counted list. Only the empty case is fatal; the long case is truncated.
+  # ExerciseSection::AmbiguityHunt::PLANTED_COUNT, but nothing downstream reads
+  # that number, so a list of 3 or 5 grades exactly as well — and rejecting it
+  # would throw away the day's other three sections over the likeliest
+  # deviation an LLM makes on a counted list. Only the empty case is fatal;
+  # the long case is truncated.
   #
   # Scoped to the RESOLVED fourth section, not to the mere presence of the key:
   # a provider that returns both fourth shapes leaves an ambiguity_hunt nothing
@@ -1436,7 +1319,7 @@ class AiService
             "Ambiguity hunt returned no usable #{ANSWER_KEY_FIELD} to grade coverage against"
     end
 
-    section[ANSWER_KEY_FIELD] = planted.first(MAX_PLANTED_AMBIGUITIES)
+    section[ANSWER_KEY_FIELD] = planted.first(ExerciseSection::AmbiguityHunt::MAX_PLANTED)
     problem_set
   end
 

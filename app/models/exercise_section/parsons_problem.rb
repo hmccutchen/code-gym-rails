@@ -10,6 +10,19 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
+    def schema_fragment(label:)
+      <<~SCHEMA.chomp
+        "parsons_problem": {
+            "title":    "string",
+            "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+            "question": "string — e.g. 'Arrange these blocks into the correct working solution'",
+            "blocks":   ["string — one logical line or short cohesive group of lines, IN THE CORRECT FINAL ORDER", "string — the next block in correct order", "... (5-8 blocks total)"],
+            "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+            "concept": "string — exactly one concept from the provided vocabulary"
+          }
+      SCHEMA
+    end
+
     # Returns [] for a blank, prefix-missing, or malformed answer so grading
     # degrades to "everything misplaced" rather than raising on a skipped or
     # corrupted submission.

@@ -238,9 +238,9 @@ RSpec.describe AiService do
       expect(schema).not_to include('"plan_review"')
     end
 
-    it "asks for exactly AMBIGUITY_HUNT_PLANTED_COUNT planted ambiguities" do
+    it "asks for exactly AmbiguityHunt::PLANTED_COUNT planted ambiguities" do
       schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :ambiguity_hunt)
-      expect(schema).to include(AiService::AMBIGUITY_HUNT_PLANTED_COUNT.to_s)
+      expect(schema).to include(ExerciseSection::AmbiguityHunt::PLANTED_COUNT.to_s)
     end
 
     it "asks for a plan_review answer_scaffold, matching pattern/architecture" do
@@ -1030,7 +1030,7 @@ RSpec.describe AiService do
     end
 
     def exactly_enough
-      Array.new(AiService::AMBIGUITY_HUNT_PLANTED_COUNT) { |i| "ambiguity #{i}" }
+      Array.new(ExerciseSection::AmbiguityHunt::PLANTED_COUNT) { |i| "ambiguity #{i}" }
     end
 
     it "passes a list of exactly the planted count through" do
@@ -1079,10 +1079,10 @@ RSpec.describe AiService do
       expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough + [ "one more" ])
     end
 
-    it "truncates a runaway list at MAX_PLANTED_AMBIGUITIES" do
+    it "truncates a runaway list at AmbiguityHunt::MAX_PLANTED" do
       set = planted(Array.new(40) { |i| "ambiguity #{i}" })
       service.send(:normalize_planted_ambiguities!, set)
-      expect(set["ambiguity_hunt"]["planted_ambiguities"].size).to eq(AiService::MAX_PLANTED_AMBIGUITIES)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"].size).to eq(ExerciseSection::AmbiguityHunt::MAX_PLANTED)
     end
 
     it "does nothing for a problem set with no ambiguity_hunt section" do
@@ -1503,7 +1503,7 @@ RSpec.describe AiService do
     # This is the only place a whole problem_set is serialized, so it is the
     # only place the ambiguity hunt's answer key could reach log storage.
     it "redacts the ambiguity hunt's planted answer key from the delivered payload" do
-      planted = Array.new(AiService::AMBIGUITY_HUNT_PLANTED_COUNT) { |i| "secret ambiguity #{i}" }
+      planted = Array.new(ExerciseSection::AmbiguityHunt::PLANTED_COUNT) { |i| "secret ambiguity #{i}" }
       set = {
         "code_review"    => { "concept" => "n_plus_one" },
         "ambiguity_hunt" => { "concept" => "missing_success_criteria",
@@ -2380,10 +2380,10 @@ RSpec.describe AiService do
       expect(prompt).to match(/unflagged behavior change/)
     end
 
-    it "asks for an ambiguity hunt with exactly AMBIGUITY_HUNT_PLANTED_COUNT planted ambiguities when fourth: :ambiguity_hunt" do
+    it "asks for an ambiguity hunt with exactly AmbiguityHunt::PLANTED_COUNT planted ambiguities when fourth: :ambiguity_hunt" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: :ambiguity_hunt)
       expect(prompt).to match(/AMBIGUITY HUNT/)
-      expect(prompt).to include(AiService::AMBIGUITY_HUNT_PLANTED_COUNT.to_s)
+      expect(prompt).to include(ExerciseSection::AmbiguityHunt::PLANTED_COUNT.to_s)
     end
 
     it "instructs that planted_ambiguities is hidden and must never leak into other fields" do

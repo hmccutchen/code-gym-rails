@@ -49,6 +49,24 @@ class ExerciseSection
     fourths.map(&:key).find { |key| problem_set[key].is_a?(Hash) }
   end
 
+  # The day's four kinds in slot order, for a set that hasn't been generated
+  # yet. Same reason .resolved_fourth_key lives here: the generation path has
+  # to resolve slots before a DailyExercise row exists, working from DailyPlan's
+  # rolled symbols rather than a persisted payload.
+  # DailyExercise#active_section_keys answers the same question after the fact.
+  def self.for_plan(third:, fourth:)
+    [ CodeReview, Pattern, slot_kind(third, thirds), slot_kind(fourth, fourths) ]
+  end
+
+  # Raises rather than returning nil: a kind that isn't eligible for the slot
+  # it was rolled into is a bug in the plan, and a set silently missing a
+  # section is worse than a failed generation the user can retry.
+  def self.slot_kind(rolled, eligible)
+    eligible.find { |kind| kind.key == rolled.to_s } ||
+      raise(ArgumentError, "#{rolled.inspect} is not one of: #{eligible.map(&:key).join(', ')}")
+  end
+  private_class_method :slot_kind
+
   # nil for anything outside the closed set. Callers decide what an unrecognized
   # section means; a provider can put arbitrary keys in a jsonb payload, so this
   # never raises.
@@ -82,6 +100,20 @@ class ExerciseSection
     # vocabularies stay closed Ruby constants in one place.
     def vocabulary_key
       :concepts
+    end
+
+    # This kind's entry in the generation schema — the JSON object the provider
+    # is told to return for it, under this kind's own key. `label` names the
+    # day's language for the code-bearing fields; AiService still owns
+    # LANGUAGE_CONFIG, so a kind knows where the language name goes, never how
+    # it was resolved.
+    #
+    # Formatted to sit at one level of nesting inside the schema object: first
+    # line unindented, fields at 4, closing brace at 2. The assembler
+    # interpolates it directly (see AiService#exercise_schema_for), so this
+    # indentation is part of the contract, not incidental.
+    def schema_fragment(label:)
+      raise NotImplementedError, "#{self} must implement .schema_fragment"
     end
 
     # Whether a review of this kind can carry corrected code.
