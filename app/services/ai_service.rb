@@ -212,6 +212,14 @@ class AiService
   # enough to force real coverage judgment.
   AMBIGUITY_HUNT_PLANTED_COUNT = 4
 
+  # What the planted list is bounded to on ingest, as opposed to what the
+  # prompt asks for. The count above is the generator's target; nothing
+  # downstream reads it, since the review prompt lists the ambiguities rather
+  # than counting them (see #fourth_context_summary). So a provider that lands
+  # on 3 or 5 has still produced a gradable section, and only the runaway case
+  # needs bounding — this is provider text going into another prompt.
+  MAX_PLANTED_AMBIGUITIES = AMBIGUITY_HUNT_PLANTED_COUNT * 2
+
   # The one field in a problem set that is answer-key data rather than exercise
   # content. Named here because two places have to know it by name: the
   # boundary validation that guarantees it is usable, and the diagnostics log
@@ -1392,26 +1400,36 @@ class AiService
     problem_set
   end
 
-  # Unlike every other normalizer here, this one raises rather than repairs.
+  # Unlike every other normalizer here, this one can raise rather than repair.
   # The planted list is the ambiguity hunt's entire grading ground truth — the
-  # review prompt grades coverage against it and nothing else — so a missing,
-  # short, or non-string list doesn't degrade the section, it silently turns
-  # coverage grading back into the freehand judgement the kind exists to
-  # replace. There is no fallback to fall back to. InvalidResponseError is
-  # already a surfaced, retryable generation failure
-  # (GenerateDailyExercisesJob#persist_failure), so failing here costs the user
-  # a retry rather than a day of miscounted grading.
+  # review prompt grades coverage against it and nothing else — so an empty or
+  # unusable list doesn't degrade the section, it silently turns coverage
+  # grading back into the freehand judgement the kind exists to replace, and
+  # there is no fallback to fall back to. InvalidResponseError is already a
+  # surfaced, retryable generation failure
+  # (GenerateDailyExercisesJob#persist_failure), so failing costs the user a
+  # retry rather than a day of ungrounded grading.
+  #
+  # A WRONG COUNT IS NOT A FAILURE, though. The prompt asks for exactly
+  # AMBIGUITY_HUNT_PLANTED_COUNT, but nothing downstream reads that number, so
+  # a list of 3 or 5 grades exactly as well — and rejecting it would throw away
+  # the day's other three sections over the likeliest deviation an LLM makes on
+  # a counted list. Only the empty case is fatal; the long case is truncated.
   def normalize_planted_ambiguities!(problem_set)
     section = problem_set["ambiguity_hunt"]
     return problem_set unless section.is_a?(Hash)
 
-    planted = Array(section[ANSWER_KEY_FIELD]).grep(String).filter_map { |entry| entry.strip.presence }
-    unless planted.size == AMBIGUITY_HUNT_PLANTED_COUNT
+    # Shape is held to the schema even though count isn't: a bare string here
+    # is not four ambiguities, it's a provider that ignored the field's type,
+    # and Array() would quietly launder it into a single-entry answer key.
+    raw     = section[ANSWER_KEY_FIELD]
+    planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []
+    if planted.empty?
       raise InvalidResponseError,
-            "Ambiguity hunt returned #{planted.size} usable planted ambiguities, expected #{AMBIGUITY_HUNT_PLANTED_COUNT}"
+            "Ambiguity hunt returned no usable #{ANSWER_KEY_FIELD} to grade coverage against"
     end
 
-    section[ANSWER_KEY_FIELD] = planted
+    section[ANSWER_KEY_FIELD] = planted.first(MAX_PLANTED_AMBIGUITIES)
     problem_set
   end
 

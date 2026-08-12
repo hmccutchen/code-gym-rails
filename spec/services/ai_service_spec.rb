@@ -1048,7 +1048,7 @@ RSpec.describe AiService do
     it "raises when the field is missing entirely" do
       set = { "ambiguity_hunt" => { "request" => "vague" } }
       expect { service.send(:normalize_planted_ambiguities!, set) }
-        .to raise_error(AiService::InvalidResponseError, /0 usable planted ambiguities/)
+        .to raise_error(AiService::InvalidResponseError, /no usable planted_ambiguities/)
     end
 
     it "raises when the field is not an array" do
@@ -1057,16 +1057,32 @@ RSpec.describe AiService do
         .to raise_error(AiService::InvalidResponseError)
     end
 
-    it "raises when too few usable entries survive normalization" do
-      set = planted(exactly_enough.first(2) + [ "   ", nil, 42 ])
-      expect { service.send(:normalize_planted_ambiguities!, set) }
-        .to raise_error(AiService::InvalidResponseError, /2 usable planted ambiguities/)
-    end
-
-    it "raises when the provider returns more than the planted count" do
-      set = planted(exactly_enough + [ "one too many" ])
+    it "raises when every entry is unusable" do
+      set = planted([ "   ", nil, 42, "" ])
       expect { service.send(:normalize_planted_ambiguities!, set) }
         .to raise_error(AiService::InvalidResponseError)
+    end
+
+    # The prompt asks for an exact count, but nothing downstream reads it: the
+    # review prompt lists the ambiguities rather than counting them. Rejecting
+    # a short list would discard the day's other three sections over the
+    # likeliest deviation an LLM makes on a counted list.
+    it "keeps a gradable list that came back short of the asked-for count" do
+      set = planted(exactly_enough.first(2) + [ "  ", nil ])
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough.first(2))
+    end
+
+    it "keeps a list that came back over the asked-for count, up to the ingest bound" do
+      set = planted(exactly_enough + [ "one more" ])
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough + [ "one more" ])
+    end
+
+    it "truncates a runaway list at MAX_PLANTED_AMBIGUITIES" do
+      set = planted(Array.new(40) { |i| "ambiguity #{i}" })
+      service.send(:normalize_planted_ambiguities!, set)
+      expect(set["ambiguity_hunt"]["planted_ambiguities"].size).to eq(AiService::MAX_PLANTED_AMBIGUITIES)
     end
 
     it "does nothing for a problem set with no ambiguity_hunt section" do
