@@ -1235,6 +1235,8 @@ class AiService
       case ExerciseSection.find(section_key)&.vocabulary_key
       when :architecture      then ARCHITECTURE_CONCEPTS
       when :security_concepts then config_for(language)[:security_concepts]
+      when :plan_review       then PLAN_REVIEW_CONCEPTS
+      when :ambiguity_hunt    then AMBIGUITY_HUNT_CONCEPTS
       else                         config_for(language)[:concepts]
       end
 

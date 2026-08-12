@@ -921,6 +921,26 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#normalize_concepts with the fourth-slot vocabularies" do
+    it "keeps a valid plan_review concept and buckets suggestions under plan_review" do
+      set = { "plan_review" => { "concept" => "scope_creep" } }
+      result = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(result["plan_review"]["concept"]).to eq("scope_creep")
+    end
+
+    it "normalizes an off-vocabulary plan_review concept to other" do
+      set = { "plan_review" => { "concept" => "n_plus_one" } } # a RAILS_CONCEPTS entry, not plan_review's
+      result = service.send(:normalize_concepts, set, "ruby_rails")
+      expect(result["plan_review"]["concept"]).to eq("other")
+    end
+
+    it "keeps a valid ambiguity_hunt concept regardless of the day's language" do
+      set = { "ambiguity_hunt" => { "concept" => "missing_success_criteria" } }
+      result = service.send(:normalize_concepts, set, "javascript")
+      expect(result["ambiguity_hunt"]["concept"]).to eq("missing_success_criteria")
+    end
+  end
+
   describe "#parse_json_response" do
     it "strips markdown fences before parsing" do
       fenced = "```json\n{\"a\":1}\n```"
