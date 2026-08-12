@@ -58,6 +58,10 @@
        allows breaks at spaces/newlines, so snippets wrap on phones instead of
        forcing horizontal scroll. */
     pre.snippet { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+    /* Plan-review excerpts are prose, not code — a left-border quote block
+       instead of the monospace snippet treatment, so multi-paragraph text
+       reads as an excerpt from a doc rather than malformed code. */
+    .plan-excerpt { background: #0d0d1a; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; color: var(--text); }
     .hljs { color: var(--text); }
     .hljs-keyword, .hljs-title.function_, .hljs-title.class_ { color: var(--accent); }
     .hljs-string, .hljs-regexp { color: var(--green); }

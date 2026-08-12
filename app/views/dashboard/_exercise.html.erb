@@ -44,7 +44,7 @@
     <div class="progress-bar">
       <div class="progress-fill" id="progress-fill" style="width:0%"></div>
     </div>
-    <div class="progress-label" id="progress-label">0 of 3 answered</div>
+    <div class="progress-label" id="progress-label">0 of <%= exercise.problem_set.keys.size %> answered</div>
   </div>
 
   <%# Always POST, never PATCH — ResponsesController#create is idempotent via
@@ -125,6 +125,12 @@
       </div>
     <% end %>
 
+    <% if (pr = exercise.plan_review) %>
+      <%= render "responses/plan_review_section", pr: pr, response: response, submitted: false %>
+    <% elsif (ah = exercise.ambiguity_hunt) %>
+      <%= render "responses/ambiguity_hunt_section", ah: ah, response: response, submitted: false %>
+    <% end %>
+
     <div class="section rating-section">
       <p class="feedback-title">Anything to adjust next time?</p>
       <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
@@ -186,8 +192,8 @@
 
     function updateProgress() {
       const filled = [...textareas].filter(answered).length;
-      progressFill.style.width = (filled / 3 * 100) + "%";
-      progressLabel.textContent = filled === 3 ? "✓ All answered — ready to submit!" : `${filled} of 3 answered`;
+      progressFill.style.width = (filled / sectionFields.length * 100) + "%";
+      progressLabel.textContent = filled === sectionFields.length ? "✓ All answered — ready to submit!" : `${filled} of ${sectionFields.length} answered`;
       document.querySelectorAll("details.hint[data-hint-for]").forEach(d => {
         const t = form.querySelector(`textarea[data-field="${d.dataset.hintFor}"]`);
         if (t) d.classList.toggle("locked", !answered(t));

@@ -638,6 +638,40 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "fourth-slot rendering" do
+    it "renders a plan_review fourth section on the dashboard form" do
+      create_exercise(problem_set: base_problem_set.merge(
+        "plan_review" => {
+          "title" => "Cache plan", "question" => "What's wrong?",
+          "plan_excerpt" => "Cache for 300 seconds. Also add an admin cache-clear endpoint."
+        }
+      ))
+
+      get root_path
+
+      expect(response.body).to include("4 — Plan Review")
+      expect(response.body).to include("plan-excerpt")
+      expect(response.body).to include('data-rating-for="plan_review"')
+    end
+
+    it "renders an ambiguity_hunt fourth section on the dashboard form, never leaking planted_ambiguities" do
+      create_exercise(problem_set: base_problem_set.merge(
+        "ambiguity_hunt" => {
+          "title" => "Leaderboard ask", "question" => "What's unclear?",
+          "request" => "Add a leaderboard to the dashboard.",
+          "planted_ambiguities" => [ "Which metric ranks users is unstated", "Tie-breaking is unstated" ]
+        }
+      ))
+
+      get root_path
+
+      expect(response.body).to include("4 — Ambiguity Hunt")
+      expect(response.body).to include("Add a leaderboard to the dashboard.")
+      expect(response.body).not_to include("Which metric ranks users is unstated")
+      expect(response.body).not_to include("Tie-breaking is unstated")
+    end
+  end
+
   it "marks the unsubmitted form's code_review snippet for syntax highlighting" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
