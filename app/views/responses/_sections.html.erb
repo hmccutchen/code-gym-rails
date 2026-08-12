@@ -1,0 +1,12 @@
+<%# Every section this exercise presents, in slot order, in one state.
+    The single loop both the dashboard form and the read-only render go
+    through — #active_section_keys is the authority on which sections a day
+    has, and the slot number is this loop's position rather than a number
+    hardcoded per kind.
+    Locals: exercise, response, submitted. %>
+<% exercise.active_section_keys.each_with_index do |key, index| %>
+  <%= render "responses/section",
+        kind: ExerciseSection.for(key), key: key,
+        data: exercise.problem_set[key], slot: index + 1,
+        exercise: exercise, response: response, submitted: submitted %>
+<% end %>

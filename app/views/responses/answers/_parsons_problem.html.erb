@@ -1,60 +1,47 @@
-<%# Parsons Problem third section, shared by the dashboard form (submitted: false)
-    and the read-only render of a submitted day (submitted: true), which appears
-    on the dashboard after submitting and on every history entry.
-    Locals: parsons, response, submitted. %>
-<% language = response.daily_exercise.language %>
-<% blocks   = Array(parsons["blocks"]) %>
-<div class="section">
-  <div class="section-label">3 — Parsons Problem: <%= glossary_wrap(parsons["title"]) %></div>
-  <% if parsons["scenario"].present? %><div class="section-scenario"><%= glossary_wrap(parsons["scenario"]) %></div><% end %>
-  <div class="question"><%= glossary_wrap(parsons["question"]) %></div>
+<%# The answer area for parsons_problem, in both states. Unlike every other
+    kind, the stored answer is a positional order rather than prose, so a
+    submitted section replays the blocks in the order they were arranged —
+    marking each correct or misplaced — instead of echoing "order:0,2,1".
 
-  <% if (ref = concept_reference_for(parsons["concept"], language)) %>
-    <%= render "shared/concept_reference", reference: ref,
-          open: !submitted && first_exposure?(parsons["concept"], language, response.date) %>
-  <% end %>
-  <%= render "dashboard/teaching_hint", note: parsons["teaching_note"], field: "parsons_problem", submitted: submitted, response: response %>
+    The hidden textarea stays a sibling of the <ol> inside .section: the script
+    below finds it with list.parentElement.querySelector.
 
-  <% if submitted %>
-    <% submitted_ids = ExerciseSection::ParsonsProblem.parse_order(response.answers["parsons_problem"]) %>
-    <ol class="parsons-list parsons-list-readonly">
-      <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>
-        <li class="parsons-block <%= block_id == position ? "parsons-correct" : "parsons-misplaced" %>">
-          <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= ExerciseSection::ParsonsProblem.valid_id?(block_id, blocks.size) ? blocks[block_id] : "(skipped)" %></code></pre>
-        </li>
-      <% end %>
-    </ol>
-  <% else %>
-    <%# The learner's own saved arrangement wins over the original scramble, so
-        a reload doesn't undo their work. Each candidate is rejected unless it
-        is a complete permutation of the blocks, so a corrupted answer or a row
-        missing display_order falls back rather than dropping blocks. %>
-    <% initial_order = ExerciseSection::ParsonsProblem.initial_order(
-         answer: response.answers["parsons_problem"],
-         display_order: parsons["display_order"],
-         block_count: blocks.size
-       ) %>
-    <ol class="parsons-list" data-parsons-blocks>
-      <% initial_order.each do |block_id| %>
-        <li class="parsons-block" data-block-id="<%= block_id %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
-          <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= blocks[block_id] %></code></pre>
-        </li>
-      <% end %>
-    </ol>
-    <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
-        not using a mouse. The hint is clipped until a block takes focus, which
-        keeps it out of the way of the people who will never need it. %>
-    <p class="parsons-keyhint">Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks.</p>
-    <p class="parsons-status" aria-live="polite"></p>
-    <textarea name="response[answers][parsons_problem]" class="answer" data-field="parsons_problem" style="display:none"><%= response.answers["parsons_problem"] %></textarea>
-    <div class="rating-row" data-rating-for="parsons_problem">
-      <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
-        <button type="button" class="rating-btn<%= " active" if response.self_rating_for("parsons_problem") == value %>" data-rating-for="parsons_problem" data-rating="<%= value %>"><%= label.upcase_first %></button>
-      <% end %>
-    </div>
-    <%= render "shared/duck_thread", field: "parsons_problem" %>
-  <% end %>
-</div>
+    Locals: kind, key, data, exercise, response, submitted. %>
+<% language = exercise.language %>
+<% blocks   = Array(data["blocks"]) %>
+<% if submitted %>
+  <% submitted_ids = ExerciseSection::ParsonsProblem.parse_order(response.answers[key]) %>
+  <ol class="parsons-list parsons-list-readonly">
+    <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>
+      <li class="parsons-block <%= block_id == position ? "parsons-correct" : "parsons-misplaced" %>">
+        <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= ExerciseSection::ParsonsProblem.valid_id?(block_id, blocks.size) ? blocks[block_id] : "(skipped)" %></code></pre>
+      </li>
+    <% end %>
+  </ol>
+<% else %>
+  <%# The learner's own saved arrangement wins over the original scramble, so
+      a reload doesn't undo their work. Each candidate is rejected unless it
+      is a complete permutation of the blocks, so a corrupted answer or a row
+      missing display_order falls back rather than dropping blocks. %>
+  <% initial_order = ExerciseSection::ParsonsProblem.initial_order(
+       answer: response.answers[key],
+       display_order: data["display_order"],
+       block_count: blocks.size
+     ) %>
+  <ol class="parsons-list" data-parsons-blocks>
+    <% initial_order.each do |block_id| %>
+      <li class="parsons-block" data-block-id="<%= block_id %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
+        <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= blocks[block_id] %></code></pre>
+      </li>
+    <% end %>
+  </ol>
+  <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
+      not using a mouse. The hint is clipped until a block takes focus, which
+      keeps it out of the way of the people who will never need it. %>
+  <p class="parsons-keyhint">Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks.</p>
+  <p class="parsons-status" aria-live="polite"></p>
+  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" style="display:none"><%= response.answers[key] %></textarea>
+<% end %>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>
   <% content_for :page_scripts do %>
@@ -149,7 +136,7 @@
     </script>
     <script type="module">
       // Version pinned exactly, same posture as the Mermaid import in
-      // _architecture_section — a blocked CDN falls back to the injected
+      // shared/_mermaid_diagram — a blocked CDN falls back to the injected
       // up/down buttons above.
       try {
         const { default: Sortable } = await import("https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js");

@@ -3,6 +3,15 @@ class ExerciseSection::Challenge < ExerciseSection
     true
   end
 
+  def self.titled_label?
+    false
+  end
+
+  # Answered in code, so the textarea gets the monospace treatment.
+  def self.answer_class
+    "answer code-answer"
+  end
+
   # As in ParsonsProblem, the "each section's concept" line speaks for
   # code_review and pattern too. See issue #81.
   def self.generation_guidance(vocabulary:, language_vocabulary:, label:)

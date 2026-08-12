@@ -150,6 +150,38 @@ class ExerciseSection
       false
     end
 
+    # ── How this kind renders ────────────────────────────────────────────────
+    # Structural facts only. The user-facing strings (section name, textarea
+    # placeholder) live in config/locales/en.yml under `sections.<key>`, which
+    # is where this app already keeps user-facing copy — unlike the prompt
+    # text above, which is provider-facing and has no other home.
+
+    # The partial rendering the part of this section no shared wrapper can:
+    # the snippet, the plan excerpt, the option list, the block ladder.
+    def body_partial
+      "responses/bodies/#{key}"
+    end
+
+    # Whether the section label appends the day's title ("4 — Plan Review:
+    # Backfill the ledger"). False for the two kinds whose problem_set carries
+    # no title of its own.
+    def titled_label?
+      true
+    end
+
+    # The answer input this kind offers while unsubmitted. Every kind but one
+    # takes a plain textarea; parsons_problem's answer is an ordering, so it
+    # brings its own control.
+    def answer_partial
+      "responses/answers/textarea"
+    end
+
+    # Extra class on that textarea — challenge is answered in code, so it gets
+    # the monospace treatment.
+    def answer_class
+      "answer"
+    end
+
     # Whether this kind's problem_set may carry a Mermaid `diagram` of the
     # structure its scenario describes. False by default: a diagram is only
     # safe pre-answer where it restates something already on screen, which is

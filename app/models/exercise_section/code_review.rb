@@ -3,6 +3,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
+  def self.titled_label?
+    false
+  end
+
   def self.schema_fragment(label:)
     <<~SCHEMA.chomp
       "code_review": {

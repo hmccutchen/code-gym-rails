@@ -37,6 +37,31 @@ en:
     ruby_rails: "Ruby / Rails"
     javascript: "JavaScript"
     mixed: "Mixed"
+  sections:
+    code_review:
+      name: "Code Review"
+      placeholder: "What's the issue and how would you fix it?"
+    pattern:
+      name: "Pattern of the Month"
+      placeholder: "Your answer…"
+    challenge:
+      name: "Coding Challenge"
+      placeholder: "# Your implementation…"
+    architecture:
+      name: "Architecture Decision"
+      placeholder: "Your decision and why — weigh the tradeoffs…"
+    security_review:
+      name: "Security Review"
+      placeholder: "What's exploitable here, and how would you mitigate it?"
+    parsons_problem:
+      name: "Parsons Problem"
+      placeholder: ""
+    plan_review:
+      name: "Plan Review"
+      placeholder: "Your review…"
+    ambiguity_hunt:
+      name: "Ambiguity Hunt"
+      placeholder: "What would you need clarified?"
   review:
     get_button: "Get %{provider} review →"
     finish_button: "Finish review →"

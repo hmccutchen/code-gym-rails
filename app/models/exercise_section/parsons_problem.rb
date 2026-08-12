@@ -10,6 +10,12 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
+    # The answer is an ordering, not prose: a draggable, keyboard-reorderable
+    # block ladder writing into a hidden field.
+    def answer_partial
+      "responses/answers/parsons_problem"
+    end
+
     # The "each section's concept" line covers code_review and pattern as well
     # as this one, so it reads `language_vocabulary` even though that happens
     # to equal this kind's own vocabulary. See issue #81.
