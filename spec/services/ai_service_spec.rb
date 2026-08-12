@@ -1396,6 +1396,64 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#build_review_day_context with a fourth section" do
+    it "includes the plan_review excerpt, question, answer, and self-rating" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?" }, "pattern" => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "ch?" },
+        "plan_review" => { "title" => "Plan", "question" => "What's wrong?", "plan_excerpt" => "Step 1: hardcode a magic number." }
+      })
+      resp = DailyResponse.new(answers: { "plan_review" => "The magic number is unjustified" },
+                               section_ratings: { "plan_review" => "right_level" })
+
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(context).to include("What's wrong?", "Step 1: hardcode a magic number.", "The magic number is unjustified", "right_level")
+    end
+
+    it "includes the ambiguity_hunt request, planted ambiguities, answer, and self-rating" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?" }, "pattern" => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "ch?" },
+        "ambiguity_hunt" => {
+          "title" => "Req", "question" => "What's unclear?", "request" => "Add a leaderboard feature.",
+          "planted_ambiguities" => [ "No scope for which users appear", "No tie-breaking rule" ]
+        }
+      })
+      resp = DailyResponse.new(answers: { "ambiguity_hunt" => "Which users are ranked?" },
+                               section_ratings: { "ambiguity_hunt" => "too_hard" })
+
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(context).to include("Add a leaderboard feature.", "No scope for which users appear", "No tie-breaking rule",
+                                 "Which users are ranked?", "too_hard")
+    end
+
+    it "contributes nothing for an old exercise with no fourth-slot key" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "cr?" }, "pattern" => { "title" => "P", "question" => "pat?" },
+        "challenge"   => { "question" => "ch?" }
+      })
+      resp = DailyResponse.new(answers: {}, section_ratings: {})
+
+      expect(exercise.fourth_key).to be_nil
+      context = service.send(:build_review_day_context, "Rails", exercise, resp)
+      expect(service.send(:fourth_context_summary, exercise, resp.answers, resp.section_ratings)).to eq("")
+      expect(context).not_to match(/plan review|ambiguity hunt/i)
+    end
+  end
+
+  describe "#section_grading_note for the fourth-slot kinds" do
+    it "instructs grading against the planted list for ambiguity_hunt" do
+      note = service.send(:section_grading_note, nil, nil, "ambiguity_hunt")
+      expect(note).to match(/planted/i)
+      expect(note).to match(/empty string/i)
+    end
+
+    it "instructs evaluating pushback quality and a revised plan for plan_review" do
+      note = service.send(:section_grading_note, nil, nil, "plan_review")
+      expect(note).to match(/revised/i)
+    end
+  end
+
   describe "#build_review_section_prompt" do
     def exercise_with_third(third_key, third_section)
       DailyExercise.new(language: "ruby_rails", problem_set: {

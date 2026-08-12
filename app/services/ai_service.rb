@@ -1049,7 +1049,7 @@ class AiService
     ratings = daily_response.section_ratings
 
     <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's three sections in a follow-up instruction — the other two are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
+      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's four sections in a follow-up instruction — the other three are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
 
       Code Review question: #{exercise.code_review["question"]}
       Code snippet: #{exercise.code_review["snippet"]}
@@ -1061,6 +1061,8 @@ class AiService
       Their self-rating: #{ratings["pattern"] || "(none given)"}
 
       #{third_context_summary(exercise, answers, ratings)}
+
+      #{fourth_context_summary(exercise, answers, ratings)}
     CONTEXT
   end
 
@@ -1086,6 +1088,30 @@ class AiService
       "Coding Challenge: #{exercise.challenge["question"]}\n" \
       "Their answer: #{answers["challenge"].presence || "(skipped)"}\n" \
       "Their self-rating: #{ratings["challenge"] || "(none given)"}"
+    end
+  end
+
+  # Contributes nothing (empty string) for an old exercise with no fourth-slot
+  # key — exercise.fourth_key is nil there, and the CONTEXT heredoc above
+  # simply gets a blank line, matching how every other nil-safe read in this
+  # method already degrades for pre-this-ship rows.
+  def fourth_context_summary(exercise, answers, ratings)
+    case exercise.fourth_key
+    when "ambiguity_hunt"
+      ah = exercise.ambiguity_hunt
+      "Ambiguity Hunt (#{ah["title"]}): #{ah["question"]}\n" \
+      "Request: #{ah["request"]}\n" \
+      "Planted ambiguities (hidden from the engineer, known here for grading): #{Array(ah["planted_ambiguities"]).join('; ')}\n" \
+      "Their answer: #{answers["ambiguity_hunt"].presence || "(skipped)"}\n" \
+      "Their self-rating: #{ratings["ambiguity_hunt"] || "(none given)"}"
+    when "plan_review"
+      pr = exercise.plan_review
+      "Plan Review (#{pr["title"]}): #{pr["question"]}\n" \
+      "Plan excerpt: #{pr["plan_excerpt"]}\n" \
+      "Their answer: #{answers["plan_review"].presence || "(skipped)"}\n" \
+      "Their self-rating: #{ratings["plan_review"] || "(none given)"}"
+    else
+      ""
     end
   end
 
@@ -1133,6 +1159,11 @@ class AiService
       "For \"pattern\", improved_code must show the refactored structure that addresses what they missed — " \
       "the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
       "structural; show enough of the shape to make the structure obvious."
+    when "ambiguity_hunt"
+      "Grade coverage against the PLANTED ambiguities listed in the context above (the \"Planted ambiguities\" line) — do not invent your own list. In \"missed\", name each planted ambiguity the engineer did not identify. In \"correct\", credit each planted ambiguity they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted.\n" \
+      "For this section \"improved_code\" must be an empty string."
+    when "plan_review"
+      "Evaluate on whether they correctly identified the planted flaws (a technical anti-pattern, a scope-creep item, an unflagged behavior change) and whether their pushback is well-reasoned — not against one exact expected wording. \"improved_code\" for this section is a revised version of the plan that addresses what they missed."
     else
       ""
     end
