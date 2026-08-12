@@ -388,4 +388,309 @@ RSpec.describe ExerciseSection do
       end
     end
   end
+
+  describe ".for_plan" do
+    it "returns the day's kinds in slot order" do
+      expect(ExerciseSection.for_plan(third: :architecture, fourth: :ambiguity_hunt))
+        .to eq([ ExerciseSection::CodeReview, ExerciseSection::Pattern,
+                 ExerciseSection::Architecture, ExerciseSection::AmbiguityHunt ])
+    end
+
+    it "accepts the symbols DailyPlan rolls" do
+      DailyPlan::THIRD_SECTION_WEIGHTS.each_key do |third|
+        DailyPlan::FOURTH_SECTION_WEIGHTS.each_key do |fourth|
+          expect(ExerciseSection.for_plan(third: third, fourth: fourth).map(&:key))
+            .to eq([ "code_review", "pattern", third.to_s, fourth.to_s ])
+        end
+      end
+    end
+
+    # A set silently missing a section is worse than a failed generation the
+    # user can retry, so an ineligible roll raises rather than resolving to nil.
+    it "refuses a kind rolled into a slot it cannot occupy" do
+      expect { ExerciseSection.for_plan(third: :plan_review, fourth: :plan_review) }
+        .to raise_error(ArgumentError, /plan_review is not one of/)
+      expect { ExerciseSection.for_plan(third: :challenge, fourth: :challenge) }
+        .to raise_error(ArgumentError, /challenge is not one of/)
+    end
+  end
+
+  describe ".schema_fragment" do
+    RUBY_LABEL = "Ruby/Rails".freeze
+    JS_LABEL   = "JavaScript/React".freeze
+
+    def parse(kind, label: RUBY_LABEL)
+      JSON.parse("{#{kind.schema_fragment(label: label)}}").fetch(kind.key)
+    end
+
+    # Invariants every kind's fragment has to satisfy, asserted over .all rather
+    # than kind by kind so a ninth kind inherits them without anyone having to
+    # remember. These replace the cross-section counts that used to run against
+    # the assembled schema (`scan('"scenario"').size == 4`), which could only
+    # ever check the four kinds a given day happened to roll.
+    shared_examples "a section kind's schema fragment" do |kind|
+      it "is keyed by the kind's own key and parses as JSON" do
+        expect(JSON.parse("{#{kind.schema_fragment(label: RUBY_LABEL)}}").keys).to eq([ kind.key ])
+      end
+
+      it "defines a teaching_note, a concept, and a scenario" do
+        expect(parse(kind)).to include("teaching_note", "concept", "scenario")
+      end
+
+      # Catches a kind that hardcodes a language instead of interpolating the
+      # label it was handed — invisible on a Rails day, wrong every JS day.
+      it "names only the language it was given" do
+        expect(parse(kind, label: JS_LABEL).to_s).not_to include(RUBY_LABEL)
+        expect(parse(kind, label: RUBY_LABEL).to_s).not_to include(JS_LABEL)
+      end
+
+      it "asks for a diagram only when the kind is diagrammable" do
+        expect(parse(kind).key?("diagram")).to eq(kind.diagrammable?)
+      end
+
+      it "asks for an answer_scaffold only when the kind is scaffolded" do
+        expect(parse(kind).key?("answer_scaffold")).to eq(kind.scaffolded?)
+      end
+
+      # The glossary array was removed from the schema; a kind reintroducing one
+      # would put an unrendered field back in every problem set.
+      it "asks for no glossary array" do
+        expect(parse(kind)).not_to have_key("glossary")
+      end
+    end
+
+    ExerciseSection.all.each do |kind|
+      context kind.key do
+        it_behaves_like "a section kind's schema fragment", kind
+      end
+    end
+
+    it "raises rather than silently omitting a section for a kind that defines none" do
+      undefined_kind = Class.new(ExerciseSection)
+      expect { undefined_kind.schema_fragment(label: RUBY_LABEL) }
+        .to raise_error(NotImplementedError, /schema_fragment/)
+    end
+
+    describe ExerciseSection::CodeReview do
+      it "labels the snippet with the day's language" do
+        expect(parse(described_class)["snippet"]).to include("#{RUBY_LABEL} code")
+        expect(parse(described_class, label: JS_LABEL)["snippet"]).to include("#{JS_LABEL} code")
+      end
+    end
+
+    describe ExerciseSection::Pattern do
+      it "demands a self-contained question that references no snippet" do
+        expect(parse(described_class)["question"]).to include("fully self-contained")
+      end
+
+      it "asks for no reference block" do
+        expect(parse(described_class).keys).to contain_exactly(
+          "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold", "diagram"
+        )
+      end
+    end
+
+    describe ExerciseSection::Challenge do
+      it "asks for starter code" do
+        expect(parse(described_class)).to have_key("starter_code")
+      end
+    end
+
+    describe ExerciseSection::Architecture do
+      it "asks for options and a tradeoffs-plural reference" do
+        fragment = parse(described_class)
+        expect(fragment).to have_key("options")
+        expect(fragment["reference"]).to have_key("tradeoffs")
+      end
+
+      it "caps the scenario at 2-3 sentences and 2-3 constraints, with no team size" do
+        scenario = parse(described_class)["scenario"]
+        expect(scenario).to include("2-3 sentences", "2-3 concrete constraints")
+        expect(scenario).not_to include("team size")
+      end
+
+      it "caps the question at one sentence" do
+        expect(parse(described_class)["question"]).to include("ONE sentence")
+      end
+
+      # The one diagram this kind carries lives in its reference, not at the
+      # top level — .diagrammable? is false and the shared example enforces that.
+      it "asks for a Mermaid diagram inside the reference" do
+        expect(parse(described_class)["reference"]["diagram"]).to match(/mermaid/i)
+      end
+
+      it "asks for no starter code" do
+        expect(parse(described_class)).not_to have_key("starter_code")
+      end
+    end
+
+    describe ExerciseSection::SecurityReview do
+      it "asks for a vulnerable snippet and a mitigation question" do
+        fragment = parse(described_class)
+        expect(fragment["snippet"]).to include("exploitable vulnerability")
+        expect(fragment["question"].downcase).to include("mitigate")
+      end
+
+      it "labels both the snippet and the reference's code example" do
+        fragment = parse(described_class, label: JS_LABEL)
+        expect(fragment["snippet"]).to include("#{JS_LABEL} code")
+        expect(fragment["reference"]["code_example"]).to include("#{JS_LABEL} code")
+      end
+
+      it "shapes its reference like a normal concept reference, not architecture's" do
+        expect(parse(described_class)["reference"].keys)
+          .to contain_exactly("tagline", "explanation", "code_example", "senior_lens")
+      end
+    end
+
+    describe ExerciseSection::ParsonsProblem do
+      it "asks for blocks in the correct final order" do
+        expect(parse(described_class)["blocks"].join(" ")).to match(/IN THE CORRECT FINAL ORDER/)
+      end
+    end
+
+    describe ExerciseSection::PlanReview do
+      it "asks for a plan excerpt carrying planted flaws" do
+        expect(parse(described_class)["plan_excerpt"]).to include("planted flaws")
+      end
+    end
+
+    describe ExerciseSection::AmbiguityHunt do
+      it "asks for a vague request and exactly PLANTED_COUNT planted ambiguities" do
+        fragment = parse(described_class)
+        expect(fragment["request"]).to include("vague feature request")
+        expect(fragment["planted_ambiguities"].join(" "))
+          .to include("exactly #{ExerciseSection::AmbiguityHunt::PLANTED_COUNT} total")
+      end
+    end
+  end
+
+  describe ".generation_guidance" do
+    RAILS_VOCAB = AiService::RAILS_CONCEPTS.freeze
+
+    def guidance(kind, vocabulary:, language_vocabulary: RAILS_VOCAB, label: "Ruby/Rails")
+      kind.generation_guidance(vocabulary: vocabulary, language_vocabulary: language_vocabulary, label: label)
+    end
+
+    # Only the rolled third and fourth are asked for guidance; the two fixed
+    # kinds carry no per-kind instructions, so being asked is a bug.
+    [ ExerciseSection::CodeReview, ExerciseSection::Pattern ].each do |kind|
+      it "raises for #{kind.key}, which carries no guidance" do
+        expect { guidance(kind, vocabulary: RAILS_VOCAB) }
+          .to raise_error(NotImplementedError, /generation_guidance/)
+      end
+    end
+
+    describe ExerciseSection::Architecture do
+      it "names the architecture vocabulary for its own section" do
+        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS)
+        expect(text).to include("SEPARATE vocabulary", "service_boundaries")
+      end
+
+      it "demands a short scenario and drops the old team-size/budget/timeline list" do
+        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS)
+        expect(text).to include("~50 words maximum")
+        expect(text).to include("Do NOT stack scale figures")
+      end
+
+      it "says the diagram shows the structure under decision, not how to decide" do
+        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS)
+        expect(text).to include("not a flowchart of how to decide")
+      end
+
+      # Carried verbatim from the case statement this replaced. The instruction
+      # belongs to code_review and pattern, not to architecture, and the other
+      # thirds word it differently or omit it — see issue #81. Asserted so the
+      # defect stays visible and a fix has to come here deliberately.
+      it "still carries code_review and pattern's vocabulary line (issue #81)" do
+        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS,
+                                          language_vocabulary: AiService::JS_CONCEPTS)
+        expect(text).to include("Choose the code_review and pattern concepts from this vocabulary")
+        expect(text).to include("closures_in_loops")
+      end
+    end
+
+    describe ExerciseSection::SecurityReview do
+      it "frames the section adversarially and restricts the vocabulary to security concepts" do
+        text = guidance(described_class, vocabulary: AiService::RAILS_SECURITY_CONCEPTS)
+        expect(text).to include("SECURITY REVIEW", "exploitable vulnerability")
+        expect(text).to include("these are the ONLY concepts security_review may use")
+        expect(text).to include("mass_assignment_protection")
+        expect(text).not_to include("memoization")
+      end
+
+      it "names the day's language for the snippet's realism bar" do
+        text = guidance(described_class, vocabulary: AiService::JS_SECURITY_CONCEPTS, label: "JavaScript/React")
+        expect(text).to include("realistic JavaScript/React code")
+      end
+
+      # The one third that says nothing about code_review/pattern's vocabulary
+      # — the other half of issue #81.
+      it "says nothing about code_review and pattern's vocabulary (issue #81)" do
+        text = guidance(described_class, vocabulary: AiService::RAILS_SECURITY_CONCEPTS)
+        expect(text).not_to include("Choose the code_review and pattern concepts")
+        expect(text).not_to include("Choose each section's concept")
+      end
+    end
+
+    describe ExerciseSection::ParsonsProblem do
+      it "asks for 5-8 correct-order blocks that are never bare tokens" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB)
+        expect(text).to include("5 to 8 short code blocks IN THE CORRECT FINAL ORDER")
+        expect(text).to include("never a single token")
+      end
+
+      it "names the language vocabulary for every section" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB, language_vocabulary: AiService::JS_CONCEPTS)
+        expect(text).to include("Choose each section's concept from this fixed vocabulary")
+        expect(text).to include("closures_in_loops")
+      end
+    end
+
+    describe ExerciseSection::Challenge do
+      it "asks starter_code to scaffold without giving the answer" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB)
+        expect(text).to include("without giving away the answer")
+      end
+
+      it "names the language vocabulary for every section" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB, language_vocabulary: AiService::JS_CONCEPTS)
+        expect(text).to include("Choose each section's concept from this fixed vocabulary")
+        expect(text).to include("closures_in_loops")
+      end
+    end
+
+    describe ExerciseSection::PlanReview do
+      it "asks for 2-3 planted flaws spanning levels, never three of a kind" do
+        text = guidance(described_class, vocabulary: AiService::PLAN_REVIEW_CONCEPTS)
+        expect(text).to include("2-3 planted flaws that span levels")
+        expect(text).to include("never three of the same category")
+      end
+
+      it "restricts the concept to the plan_review vocabulary" do
+        text = guidance(described_class, vocabulary: AiService::PLAN_REVIEW_CONCEPTS)
+        expect(text).to include("scope_creep")
+        expect(text).not_to include("memoization")
+      end
+    end
+
+    describe ExerciseSection::AmbiguityHunt do
+      it "asks for exactly PLANTED_COUNT planted ambiguities" do
+        text = guidance(described_class, vocabulary: AiService::AMBIGUITY_HUNT_CONCEPTS)
+        expect(text).to include("EXACTLY #{ExerciseSection::AmbiguityHunt::PLANTED_COUNT} deliberately planted ambiguities")
+      end
+
+      it "forbids leaking the planted list into any field the engineer reads" do
+        text = guidance(described_class, vocabulary: AiService::AMBIGUITY_HUNT_CONCEPTS)
+        expect(text).to include("HIDDEN test data")
+        expect(text).to include('Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note"')
+      end
+
+      it "restricts the concept to the ambiguity_hunt vocabulary" do
+        text = guidance(described_class, vocabulary: AiService::AMBIGUITY_HUNT_CONCEPTS)
+        expect(text).to include("undefined_scope_boundary")
+        expect(text).not_to include("memoization")
+      end
+    end
+  end
 end

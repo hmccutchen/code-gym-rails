@@ -108,181 +108,39 @@ RSpec.describe AiService do
     end
   end
 
+  # Assembly only. Each kind's own fragment is specified at its interface in
+  # spec/models/exercise_section_spec.rb, and the exact assembled bytes are
+  # pinned in spec/services/generation_prompt_characterization_spec.rb.
   describe "#exercise_schema_for" do
-    it "defines a teaching_note and a concept for each of the four sections, for any language" do
-      %w[ruby_rails javascript].each do |language|
-        schema = service.send(:exercise_schema_for, language)
-        expect(schema.scan('"teaching_note"').size).to eq(4)
-        expect(schema.scan('"concept"').size).to eq(4)
-      end
-    end
-
-    it "labels code fields with Ruby/Rails for ruby_rails" do
-      schema = service.send(:exercise_schema_for, "ruby_rails")
-      expect(schema).to include("Ruby/Rails code")
-    end
-
-    it "labels code fields with JavaScript/React for javascript" do
-      schema = service.send(:exercise_schema_for, "javascript")
-      expect(schema).to include("JavaScript/React code")
-    end
-
     it "defaults to ruby_rails when no language is given" do
       expect(service.send(:exercise_schema_for)).to eq(service.send(:exercise_schema_for, "ruby_rails"))
     end
 
-    it "defines a scenario field for each of the four sections" do
-      schema = service.send(:exercise_schema_for)
-      expect(schema.scan(/"scenario"/).size).to eq(4)
+    it "defaults to the challenge third and the plan_review fourth" do
+      schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails"))
+      expect(schema.keys).to eq(%w[code_review pattern challenge plan_review])
     end
 
-    it "no longer asks the model for a per-section glossary array" do
-      schema = service.send(:exercise_schema_for)
-      expect(schema).not_to match(/"glossary"/)
+    # The kinds assert their own label interpolation; this asserts AiService
+    # resolves the day's language and hands it down, which no kind can check.
+    it "threads the day's language label into the kinds that take one" do
+      expect(service.send(:exercise_schema_for, "ruby_rails")).to include("Ruby/Rails code")
+      expect(service.send(:exercise_schema_for, "javascript")).to include("JavaScript/React code")
     end
 
-    it "does not ask for a glossary array on the architecture block either" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
-      architecture = JSON.parse(schema)["architecture"]
-      expect(architecture).not_to have_key("glossary")
-    end
-
-    it "includes the challenge block by default (third: :challenge)" do
-      schema = service.send(:exercise_schema_for, "ruby_rails")
-      expect(schema).to include("\"challenge\"")
-      expect(schema).to include("starter_code")
-      expect(schema).not_to include("\"architecture\"")
-    end
-
-    it "swaps in the architecture block with options + tradeoffs when third: :architecture" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
-      expect(schema).to include("\"architecture\"")
-      expect(schema).to include("\"options\"")
-      expect(schema).to include("\"tradeoffs\"")
-      expect(schema).not_to include("\"challenge\"")
-      expect(schema).not_to include("starter_code")
-    end
-
-    it "caps the architecture scenario at 2-3 sentences and 2-3 constraints" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
-      expect(schema).to include("2-3 sentences")
-      expect(schema).to include("2-3 concrete constraints")
-      expect(schema).not_to include("team size")
-    end
-
-    it "caps the architecture question at one sentence" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
-      expect(schema).to include("ONE sentence")
-    end
-
-    it "swaps in the security_review block with a vulnerable snippet and a mitigation question when third: :security_review" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
-      expect(schema).to include("\"security_review\"")
-      expect(schema).to include("snippet")
-      expect(schema.downcase).to include("mitigate")
-      expect(schema).not_to include("\"architecture\"")
-      expect(schema).not_to include("\"challenge\"")
-    end
-
-    it "gives security_review's reference the same shape as a normal concept reference, not architecture's tradeoffs-plural shape" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
-      security_review = JSON.parse(schema)["security_review"]
-      expect(security_review["reference"].keys).to contain_exactly("tagline", "explanation", "code_example", "senior_lens")
-    end
-
-    it "does not ask for a diagram on the security_review section itself" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
-      security_review = JSON.parse(schema)["security_review"]
-      expect(security_review).not_to have_key("diagram")
-    end
-
-    it "defines a scenario field for security_review, matching code_review/pattern/challenge" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :security_review)
-      security_review = JSON.parse(schema)["security_review"]
-      expect(security_review).to have_key("scenario")
-    end
-
-    it "includes a parsons_problem section with blocks in correct order, teaching_note, and concept when third: :parsons_problem" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :parsons_problem)
-      expect(schema).to include('"parsons_problem"')
-      expect(schema).to include('"blocks"')
-      expect(schema).to match(/IN THE CORRECT FINAL ORDER/)
-      expect(schema).to include('"teaching_note"')
-      expect(schema).to include('"concept"')
-    end
-
-    it "no longer asks the model for a pattern.reference block" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
-      pattern = JSON.parse(schema)["pattern"]
-
-      expect(pattern.keys).to contain_exactly(
-        "title", "why", "question", "scenario", "teaching_note", "concept", "answer_scaffold", "diagram"
-      )
-      expect(pattern).not_to have_key("reference")
-    end
-  end
-
-  describe "#exercise_schema_for fourth section" do
-    it "includes the plan_review block by default (fourth: :plan_review)" do
-      schema = service.send(:exercise_schema_for, "ruby_rails")
-      expect(schema).to include('"plan_review"')
-      expect(schema).to include("plan_excerpt")
-      expect(schema).not_to include('"ambiguity_hunt"')
-    end
-
-    it "swaps in the ambiguity_hunt block when fourth: :ambiguity_hunt" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :ambiguity_hunt)
-      expect(schema).to include('"ambiguity_hunt"')
-      expect(schema).to include("planted_ambiguities")
-      expect(schema).to include("request")
-      expect(schema).not_to include('"plan_review"')
-    end
-
-    it "asks for exactly AmbiguityHunt::PLANTED_COUNT planted ambiguities" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :ambiguity_hunt)
-      expect(schema).to include(ExerciseSection::AmbiguityHunt::PLANTED_COUNT.to_s)
-    end
-
-    it "asks for a plan_review answer_scaffold, matching pattern/architecture" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", fourth: :plan_review)
-      plan_review = JSON.parse(schema)["plan_review"]
-      expect(plan_review).to have_key("answer_scaffold")
-    end
-
-    it "does not ask for a diagram on either fourth kind" do
-      %i[plan_review ambiguity_hunt].each do |fourth|
-        schema = service.send(:exercise_schema_for, "ruby_rails", fourth: fourth)
-        section = JSON.parse(schema)[fourth.to_s]
-        expect(section).not_to have_key("diagram")
-      end
-    end
-
-    it "always includes both third and fourth alongside code_review/pattern" do
+    it "assembles the rolled third and fourth in slot order" do
       schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt))
-      expect(schema.keys).to contain_exactly("code_review", "pattern", "architecture", "ambiguity_hunt")
+      expect(schema.keys).to eq(%w[code_review pattern architecture ambiguity_hunt])
     end
   end
 
-  describe "architecture diagram generation" do
-    it "asks for a Mermaid diagram in the architecture reference, with syntax constraints" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
-
-      expect(schema).to include("diagram")
-      expect(schema).to match(/mermaid/i)
-    end
-
+  describe "diagram syntax constraints" do
     it "constrains the diagram to a narrow, parseable subset" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
 
       expect(prompt).to match(/flowchart TD|graph LR/)
       expect(prompt).to match(/8 nodes|eight nodes/i)
       expect(prompt).to match(/empty string/i) # opting out is allowed
-    end
-
-    it "asks for a diagram on a challenge third" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
-      challenge = JSON.parse(schema)["challenge"]
-      expect(challenge).to have_key("diagram")
     end
   end
 
@@ -543,17 +401,16 @@ RSpec.describe AiService do
       expect(prompt.downcase).to include("business-domain scenario")
     end
 
-    it "lists the architecture vocabulary for the architecture section when third: :architecture" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
-      expect(prompt).to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
-      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))   # still governs code_review/pattern
-      expect(prompt.downcase).to include("architecture")
-    end
-
-    it "lists only the language vocabulary when third: :challenge" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge)
-      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
-      expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
+    # What each kind does with its vocabulary is specified at the kind's own
+    # interface. This asserts the half only AiService can get wrong: handing a
+    # rolled kind the vocabulary its concepts are later validated against.
+    # Both sides resolve it through concept_vocabulary_for, so they cannot drift.
+    it "hands each rolled kind the vocabulary normalize_concepts will hold it to" do
+      %i[architecture security_review challenge parsons_problem].each do |third|
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: third)
+        _bucket, vocabulary = service.send(:concept_vocabulary_for, third.to_s, "ruby_rails")
+        expect(prompt).to include(vocabulary.join(", "))
+      end
     end
 
     it "includes recent problem framings pulled from the stored problem_set" do
@@ -571,18 +428,6 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include("framings:")
       expect(prompt).to include("inventory restocking")
-    end
-
-    it "instructs a short architecture scenario with a hard constraint cap" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
-      expect(prompt).to include("~50 words maximum")
-      expect(prompt).to include("exactly 2-3 concrete constraints")
-      expect(prompt).to include("Fewer constraints, not fuzzier ones")
-    end
-
-    it "no longer enumerates team size, budget, and timeline as things to include" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
-      expect(prompt).not_to include("team size, scale, reliability needs, existing tech debt")
     end
 
     it "includes TypeScript-syntax guidance keyed off the TS-flavored concepts when language is javascript" do
@@ -610,23 +455,6 @@ RSpec.describe AiService do
         prompt = service.send(:build_exercise_prompt, user, language)
         expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
       end
-    end
-
-    it "instructs adversarial security framing and restricts the concept vocabulary to the four security concepts when third: :security_review" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review)
-      expect(prompt.downcase).to include("security review")
-      expect(prompt.downcase).to include("mitigation")
-      expect(prompt).to include(AiService::RAILS_SECURITY_CONCEPTS.join(", "))
-      expect(prompt).not_to include(AiService::RAILS_CONCEPTS.join(", "))
-      expect(prompt).not_to include(AiService::ARCHITECTURE_CONCEPTS.join(", "))
-    end
-
-    it "instructs 5-8 correct-order blocks and restricts the concept vocabulary to the normal set when third: :parsons_problem" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :parsons_problem)
-      expect(prompt.downcase).to include("parsons problem")
-      expect(prompt).to match(/5 to 8/)
-      expect(prompt.downcase).to include("correct final order")
-      expect(prompt).to include(AiService::RAILS_CONCEPTS.join(", "))
     end
   end
 
@@ -821,43 +649,7 @@ RSpec.describe AiService do
     end
   end
 
-  describe "answer_scaffold in the generation schema" do
-    it "asks for a scaffold on pattern and architecture" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt)
-
-      expect(schema.scan("answer_scaffold").size).to eq(2)
-    end
-
-    it "does not ask for one on an unscaffolded third" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge, fourth: :ambiguity_hunt)
-
-      expect(schema.scan("answer_scaffold").size).to eq(1)
-    end
-  end
-
-  describe "diagram in the generation schema and prompt" do
-    it "asks for a diagram on code_review, pattern, and the challenge third" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :challenge)
-
-      expect(schema.scan('"diagram"').size).to eq(3)
-    end
-
-    # architecture's own reference diagram is the one occurrence here — its
-    # top-level section never gains one.
-    it "asks for no section-level diagram on a non-diagrammable third" do
-      schema = service.send(:exercise_schema_for, "ruby_rails", third: :architecture)
-
-      expect(schema.scan('"diagram"').size).to eq(3)
-      expect(schema).to include('"reference"')
-    end
-
-    it "asks for none on parsons_problem or security_review beyond the two always-present kinds" do
-      %i[parsons_problem security_review].each do |third|
-        schema = service.send(:exercise_schema_for, "ruby_rails", third: third)
-        expect(schema.scan('"diagram"').size).to eq(2)
-      end
-    end
-
+  describe "diagram instructions in the generation prompt" do
     # The syntax rules used to live in the architecture-only branch. They now
     # govern code_review and pattern, which are present every single day.
     it "states the Mermaid syntax constraints regardless of which third was rolled" do
@@ -2372,23 +2164,10 @@ RSpec.describe AiService do
   end
 
   describe "#build_exercise_prompt fourth-slot guidance" do
-    it "asks for a plan review with planted flaws when fourth: :plan_review" do
+    it "renders the rolled fourth kind's guidance, not the other one's" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: :plan_review)
       expect(prompt).to match(/PLAN REVIEW/)
-      expect(prompt).to match(/technical anti-pattern/)
-      expect(prompt).to match(/scope-creep/)
-      expect(prompt).to match(/unflagged behavior change/)
-    end
-
-    it "asks for an ambiguity hunt with exactly AmbiguityHunt::PLANTED_COUNT planted ambiguities when fourth: :ambiguity_hunt" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: :ambiguity_hunt)
-      expect(prompt).to match(/AMBIGUITY HUNT/)
-      expect(prompt).to include(ExerciseSection::AmbiguityHunt::PLANTED_COUNT.to_s)
-    end
-
-    it "instructs that planted_ambiguities is hidden and must never leak into other fields" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :ambiguity_hunt)
-      expect(prompt).to match(/hidden/i)
+      expect(prompt).not_to match(/AMBIGUITY HUNT/)
     end
 
     it "names the fourth-slot concept needing reinforcement" do
