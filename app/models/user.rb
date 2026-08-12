@@ -153,7 +153,19 @@ class User < ApplicationRecord
   # never counts toward mastery (uncertain data defaults to reinforcement).
   # Total absence of both signals is out of scope, same as an unrated
   # concept today. See docs/superpowers/specs/2026-07-20-mastery-loop-combined-signal-design.md.
-  def concepts_needing_reinforcement(limit: 10)
+  #
+  # `bucket:`/`exclude_buckets:` scope the result by ConceptBucket — added for
+  # the fourth slot's independent reinforcement track (see
+  # docs/superpowers/specs/2026-08-11-fourth-section-slot-design.md). Both
+  # default to a no-op filter, so every caller that doesn't pass them (every
+  # caller as of this comment) sees identical behavior to before either
+  # keyword existed. Marking a concept resolved happens before either filter
+  # runs; that's safe only because a concept's bucket is a function of the
+  # concept itself (each vocabulary's names are disjoint from every other
+  # vocabulary's), so a filtered-out most-recent occurrence implies every
+  # older occurrence of that same concept would be filtered too — dedup and
+  # filter order can never disagree.
+  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [])
     resolved = {}
     result   = []
 
@@ -166,8 +178,11 @@ class User < ApplicationRecord
 
         next if r.self_rating_favorable?(section) && r.ai_rating_favorable?(section) # mastered
 
-        bucket = ConceptBucket.for(section, r.daily_exercise&.language)
-        tier   = concept_masteries.find_by(concept: concept, language: bucket)&.tier || "standard"
+        tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)
+        next if bucket && tag_bucket != bucket
+        next if exclude_buckets.include?(tag_bucket)
+
+        tier = concept_masteries.find_by(concept: concept, language: tag_bucket)&.tier || "standard"
         next if tier == "paused"
 
         result << { concept: concept, tier: tier }
