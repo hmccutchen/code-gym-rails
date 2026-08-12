@@ -50,9 +50,11 @@ class ResponsesController < ApplicationController
     )
 
     # Only persist answers for sections this exercise actually has. Strong params
-    # permit `challenge`, `architecture`, and `security_review` (the three possible
-    # third keys), so without this a crafted request could store multiple and push
-    # DailyResponse#answered_sections / #completeness past 3 sections / 100%.
+    # permit every third-slot key (`challenge`, `architecture`, `security_review`,
+    # `parsons_problem`) and every fourth-slot key (`plan_review`,
+    # `ambiguity_hunt`), so without this a crafted request could store keys this
+    # exercise never generated and push DailyResponse#answered_sections /
+    # #completeness past this exercise's actual section count / 100%.
     submitted_answers = response_params[:answers]&.slice(*exercise.problem_set.keys)
     submitted_answers = DailyResponse.normalize_answers(submitted_answers, exercise) if submitted_answers
 

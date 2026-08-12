@@ -7,12 +7,12 @@ class ClaudeService < AiService
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
   # headroom-heavy cap costs nothing on the common case. It has to clear the
-  # largest response we ask for: a three-section review, each section
-  # carrying prose arrays plus a structural `improved_code` block. The
-  # original 2500 predated those fields and silently truncated reviews
-  # mid-string, which surfaced as a JSON parse error. claude-sonnet-5 thinks
-  # by default and max_tokens caps thinking + response text together, so this
-  # also has to clear whatever the model spends on unrequested thinking.
+  # largest response we ask for: a full-day review, each section carrying
+  # prose arrays plus a structural `improved_code` block. The original 2500
+  # predated those fields and silently truncated reviews mid-string, which
+  # surfaced as a JSON parse error. claude-sonnet-5 thinks by default and
+  # max_tokens caps thinking + response text together, so this also has to
+  # clear whatever the model spends on unrequested thinking.
   MAX_TOKENS = 16_000
 
   # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces

@@ -403,12 +403,45 @@ RSpec.describe AiService do
     end
   end
 
+  describe "LANGUAGE_CONFIG for the fourth-slot pseudo-language buckets" do
+    it "resolves plan_review and ambiguity_hunt via config_for, like architecture" do
+      plan_review_config    = service.send(:config_for, "plan_review")
+      ambiguity_hunt_config = service.send(:config_for, "ambiguity_hunt")
+
+      expect(plan_review_config[:concepts]).to eq(AiService::PLAN_REVIEW_CONCEPTS)
+      expect(ambiguity_hunt_config[:concepts]).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
+    end
+
+    it "frames code_example as language-agnostic pseudocode for both fourth-slot configs" do
+      plan_review_prompt = service.send(:build_concept_reference_prompt, "scope_creep",
+                                        service.send(:config_for, "plan_review"))
+      ambiguity_prompt    = service.send(:build_concept_reference_prompt, "missing_success_criteria",
+                                        service.send(:config_for, "ambiguity_hunt"))
+
+      expect(plan_review_prompt.downcase).to include("pseudocode")
+      expect(ambiguity_prompt.downcase).to include("pseudocode")
+    end
+
+    it "generates a real concept reference for plan_review and ambiguity_hunt (the job path this unblocks)" do
+      valid_json = {
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "l"
+      }.to_json
+      service = double_class.new(canned_text: valid_json)
+
+      plan_review_reference    = service.generate_concept_reference(user, "scope_creep", "plan_review")
+      ambiguity_hunt_reference = service.generate_concept_reference(user, "missing_success_criteria", "ambiguity_hunt")
+
+      expect(plan_review_reference).to include("tagline", "explanation", "code_example", "senior_lens")
+      expect(ambiguity_hunt_reference).to include("tagline", "explanation", "code_example", "senior_lens")
+    end
+  end
+
   describe "#build_exercise_prompt history text" do
     it "reads the section denominator per historical day rather than assuming 3" do
-      history = [ { date: "2026-08-01", concepts: {}, scenarios: [], sections_answered: 4,
+      history = [ { date: "2026-08-01", concepts: {}, scenarios: [], sections_answered: 2,
                     sections_total: 4, self_ratings: {}, ai_ratings: {}, feedback: nil } ]
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", history: history)
-      expect(prompt).to include("4/4 answered")
+      expect(prompt).to include("2/4 answered")
     end
   end
 
@@ -1687,6 +1720,43 @@ RSpec.describe AiService do
       expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", message: "rate limited")
     end
 
+    # Regression for a pool-exhaustion bug: each review thread used to hold a
+    # checked-out connection for the entire (up to READ_TIMEOUT-second)
+    # provider call, even though the only DB work is ApiUsage.create! in
+    # #log_usage. With Puma's thread count matching database.yml's pool size,
+    # that left zero spare connections for any concurrent request. #call_and_log
+    # now scopes the checkout to #log_usage alone, so the thread must hold no
+    # connection while #call — the provider HTTP round trip — is running.
+    it "holds no pooled connection for the review thread while the provider call is in flight" do
+      exercise, response = exercise_and_response
+
+      probing_class = Class.new(AiService) do
+        class << self
+          attr_accessor :held_connection_during_call
+        end
+
+        def initialize(_api_key = nil)
+          @canned_text = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [],
+                           "next_step" => "", "improved_code" => "" }.to_json
+        end
+
+        private
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+          # #active_connection? returns the leased connection object or nil (not a
+          # boolean) — see ActiveRecord::ConnectionAdapters::ConnectionPool#active_connection?.
+          self.class.held_connection_during_call = ActiveRecord::Base.connection_pool.active_connection?
+          { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
+        end
+
+        def build_connection = nil
+      end
+
+      probing_class.new.review_sections(user, exercise, response, sections: %w[code_review])
+
+      expect(probing_class.held_connection_during_call).to be_nil
+    end
+
     it "maps AuthenticationError to its error code" do
       exercise, response = exercise_and_response
 
@@ -2038,6 +2108,55 @@ RSpec.describe AiService do
         svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
 
         expect(svc.last_prompt).not_to include("NOT the correct order")
+      end
+    end
+
+    context "for a plan_review section" do
+      let(:plan_review_exercise) do
+        DailyExercise.new(language: "ruby_rails", problem_set: {
+          "plan_review" => {
+            "title" => "Cache plan", "question" => "What's wrong?",
+            "plan_excerpt" => "Cache the response for 300 seconds and add an admin cache-clear endpoint."
+          }
+        })
+      end
+
+      it "includes the plan excerpt, without which the duck cannot see what's under review" do
+        svc = duck_spy_class.new(canned_text: "What happens to a stale cache entry after 300 seconds?")
+
+        svc.duck_response(user, plan_review_exercise, section: "plan_review", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("Cache the response for 300 seconds")
+      end
+    end
+
+    context "for an ambiguity_hunt section" do
+      let(:ambiguity_hunt_exercise) do
+        DailyExercise.new(language: "ruby_rails", problem_set: {
+          "ambiguity_hunt" => {
+            "title" => "Leaderboard ask", "question" => "What's unclear?",
+            "request" => "Add a leaderboard to the dashboard.",
+            "planted_ambiguities" => [ "Which metric ranks users is unstated", "Tie-breaking is unstated" ]
+          }
+        })
+      end
+
+      it "includes the feature request, without which the duck cannot see what's being asked" do
+        svc = duck_spy_class.new(canned_text: "What would 'top' mean here — most sessions, most points?")
+
+        svc.duck_response(user, ambiguity_hunt_exercise, section: "ambiguity_hunt", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).to include("Add a leaderboard to the dashboard.")
+      end
+
+      it "never leaks planted_ambiguities — that is the hidden grading answer key" do
+        svc = duck_spy_class.new(canned_text: "What would 'top' mean here — most sessions, most points?")
+
+        svc.duck_response(user, ambiguity_hunt_exercise, section: "ambiguity_hunt", message: "stuck", thread: [])
+
+        expect(svc.last_prompt).not_to include("Which metric ranks users is unstated")
+        expect(svc.last_prompt).not_to include("Tie-breaking is unstated")
+        expect(svc.last_prompt).not_to include("planted_ambiguities")
       end
     end
   end

@@ -253,8 +253,25 @@ class AiService
       concepts: ARCHITECTURE_CONCEPTS,
       coach:    "software architecture",
       focus:    "system-design tradeoffs: service boundaries, consistency, failure modes, scale, coupling."
+    },
+    "plan_review" => {
+      label:    "language-agnostic",
+      concepts: PLAN_REVIEW_CONCEPTS,
+      coach:    "engineering plan review",
+      focus:    "spotting flaws in a written implementation plan before it's built: unjustified complexity, scope creep, and unflagged behavior changes."
+    },
+    "ambiguity_hunt" => {
+      label:    "language-agnostic",
+      concepts: AMBIGUITY_HUNT_CONCEPTS,
+      coach:    "requirements analysis",
+      focus:    "interrogating an underspecified feature request: missing scope boundaries, unhandled edge cases, and unstated success criteria."
     }
   }.freeze
+
+  # Vocabularies with no code of their own to reference — a concept from any
+  # of these has nothing language-specific to show, so their concept
+  # reference asks for illustrative pseudocode instead of real source.
+  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS, AMBIGUITY_HUNT_CONCEPTS ].freeze
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
@@ -335,26 +352,33 @@ class AiService
   # section's failure is caught and tagged rather than raised, so one bad
   # section can never keep the other threads' results from being usable by
   # the caller.
+  #
+  # No pooled DB connection is held for the duration of a thread — only the
+  # provider HTTP call happens here, and that can run up to READ_TIMEOUT
+  # seconds. The one bit of real DB work (ApiUsage.create! inside #log_usage)
+  # checks out a connection for itself, scoped narrowly in #call_and_log, so
+  # a multi-section review never pins (section count) pooled connections for
+  # the length of an HTTP round trip — with Puma's thread count and
+  # database.yml's pool sized 1:1, that used to leave zero spare connections
+  # for any concurrent request.
   def review_sections(user, exercise, daily_response, sections:)
     coach   = config_for(exercise.language)[:coach]
     context = build_review_day_context(coach, exercise, daily_response)
 
     threads = sections.map do |section|
       Thread.new do
-        ActiveRecord::Base.connection_pool.with_connection do
-          service = self.class.new(@api_key)
-          begin
-            result = service.send(
-              :call_and_log, user, purpose: "review_response",
-              system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
-              cache_system: true
-            )
-            review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
-            review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-            [ section, { ok: true, review: review } ]
-          rescue AiService::Error => e
-            [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
-          end
+        service = self.class.new(@api_key)
+        begin
+          result = service.send(
+            :call_and_log, user, purpose: "review_response",
+            system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
+            cache_system: true
+          )
+          review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+          review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+          [ section, { ok: true, review: review } ]
+        rescue AiService::Error => e
+          [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
         end
       end
     end
@@ -502,8 +526,10 @@ class AiService
 
   # Plain-text summary of whichever fields a given section actually has
   # (code_review/pattern/challenge/architecture/security_review/
-  # parsons_problem all carry a different subset) — enough context for a
-  # Socratic prompt without needing per-section-kind branching.
+  # parsons_problem/plan_review/ambiguity_hunt all carry a different subset)
+  # — enough context for a Socratic prompt without needing per-section-kind
+  # branching. `planted_ambiguities` is deliberately excluded: it's the
+  # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
   def duck_section_context(exercise, section)
     data = exercise.problem_set.dig(section.to_s) || {}
 
@@ -515,6 +541,8 @@ class AiService
       ("Options: #{Array(data["options"]).join(" / ")}" if data["options"].present?),
       ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
       ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
+      ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
+      ("Feature request:\n#{data["request"]}" if data["request"].present?),
       duck_parsons_blocks(data)
     ].compact.join("\n")
   end
@@ -1172,7 +1200,7 @@ class AiService
   def build_concept_reference_prompt(concept, config)
     label = config[:label]
     code_example_desc =
-      if config[:concepts] == ARCHITECTURE_CONCEPTS
+      if LANGUAGE_AGNOSTIC_VOCABULARIES.include?(config[:concepts])
         "illustrative pseudocode or a short language-agnostic snippet, ~15 lines"
       else
         "annotated #{label} code, ~15 lines"
@@ -1381,11 +1409,20 @@ class AiService
   # themselves: recognizing a stop reason is provider-specific, but deciding
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
+  #
+  # The connection checkout wraps only #log_usage, not the `call` above it —
+  # `call` is the provider HTTP round trip, the one part of this method with
+  # no DB work in it, and it's shared by #review_sections' per-section
+  # threads (see that method's comment). A caller that already holds a
+  # connection (every non-threaded caller, via Rails' request-cycle checkout)
+  # sees a harmless no-op here: ActiveRecord's with_connection reuses a
+  # connection already leased to the current thread rather than checking out
+  # a second one.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
                    read_timeout: READ_TIMEOUT, max_tokens: nil)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
                   read_timeout: read_timeout, max_tokens: max_tokens)
-    log_usage(user, result, purpose: purpose)
+    ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
 
     if result[:truncated]
       raise TruncatedResponseError,

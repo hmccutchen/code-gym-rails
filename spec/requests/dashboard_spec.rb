@@ -639,6 +639,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   describe "fourth-slot rendering" do
+    it "renders no fourth section at all when the exercise has neither fourth-slot key" do
+      create_exercise(problem_set: base_problem_set)
+
+      get root_path
+
+      expect(response.body).not_to include("4 —")
+    end
+
     it "renders a plan_review fourth section on the dashboard form" do
       create_exercise(problem_set: base_problem_set.merge(
         "plan_review" => {

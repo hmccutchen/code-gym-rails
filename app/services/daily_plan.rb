@@ -67,12 +67,10 @@ class DailyPlan
     established   = established_concepts_for(user, language, third: third,
                                              reinforcement: reinforcement, due_checks: due_checks)
 
-    # The fourth slot's own independent track — see
-    # docs/superpowers/specs/2026-08-11-fourth-section-slot-design.md for why
-    # this is a parallel state machine rather than a generalization of the
-    # 3-slot one above: the two vocabularies can never mix, so keeping them
-    # structurally separate means a cross-vocab item can never be placed
-    # somewhere it structurally cannot go.
+    # The fourth slot's own independent track — a parallel state machine
+    # rather than a generalization of the 3-slot one above, because the two
+    # vocabularies can never mix: keeping them structurally separate means a
+    # cross-vocab item can never be placed somewhere it structurally cannot go.
     fourth               = roll_fourth_section
     fourth_bucket        = FOURTH_BUCKET_FOR.fetch(fourth)
     fourth_reinforcement = user.concepts_needing_reinforcement(bucket: fourth_bucket)
