@@ -57,7 +57,6 @@ RSpec.describe ExerciseSection do
     end
 
     it "covers every fourth kind with a roll weight, so the two can't drift apart" do
-      skip "DailyPlan::FOURTH_SECTION_WEIGHTS lands in Task 5"
       expect(DailyPlan::FOURTH_SECTION_WEIGHTS.keys.map(&:to_s)).to match_array(described_class.fourths.map(&:key))
     end
   end
