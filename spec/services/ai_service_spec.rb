@@ -404,12 +404,11 @@ RSpec.describe AiService do
     # What each kind does with its vocabulary is specified at the kind's own
     # interface. This asserts the half only AiService can get wrong: handing a
     # rolled kind the vocabulary its concepts are later validated against.
-    # Both sides resolve it through concept_vocabulary_for, so they cannot drift.
-    it "hands each rolled kind the vocabulary normalize_concepts will hold it to" do
+    # Both sides call ProblemSetIngest.vocabulary_for, so they cannot drift.
+    it "hands each rolled kind the vocabulary ingest will hold it to" do
       %i[architecture security_review challenge parsons_problem].each do |third|
         prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: third)
-        _bucket, vocabulary = service.send(:concept_vocabulary_for, third.to_s, "ruby_rails")
-        expect(prompt).to include(vocabulary.join(", "))
+        expect(prompt).to include(ProblemSetIngest.vocabulary_for(third.to_s, "ruby_rails").join(", "))
       end
     end
 
@@ -558,97 +557,6 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#normalize_answer_scaffolds!" do
-    it "keeps a usable scaffold on a scaffolded section" do
-      set = { "pattern" => { "answer_scaffold" => [ "  Your approach:  ", "What breaks:" ] } }
-
-      expect(service.send(:normalize_answer_scaffolds!, set)["pattern"]["answer_scaffold"])
-        .to eq([ "Your approach:", "What breaks:" ])
-    end
-
-    it "bounds a scaffold the model let run long or wide" do
-      set = { "architecture" => { "answer_scaffold" => (1..9).map { |i| "L#{i}: " + "x" * 200 } } }
-
-      labels = service.send(:normalize_answer_scaffolds!, set)["architecture"]["answer_scaffold"]
-      expect(labels.size).to eq(ExerciseSection::MAX_SCAFFOLD_LABELS)
-      expect(labels.map(&:length)).to all(be <= ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH)
-    end
-
-    # Dropped rather than repaired: the reader then takes the same fallback path
-    # every pre-scaffold row already takes.
-    it "drops an unusable scaffold instead of persisting it" do
-      [ "not an array", [], [ "", nil ], [ 42, true ], 42 ].each do |bad|
-        set = { "pattern" => { "question" => "q", "answer_scaffold" => bad } }
-        expect(service.send(:normalize_answer_scaffolds!, set)["pattern"]).not_to have_key("answer_scaffold")
-      end
-    end
-
-    it "strips a scaffold the model volunteered for an unscaffolded section" do
-      set = { "code_review" => { "answer_scaffold" => [ "Nope:" ] } }
-
-      expect(service.send(:normalize_answer_scaffolds!, set)["code_review"]).not_to have_key("answer_scaffold")
-    end
-
-    it "leaves a section that carries no scaffold alone" do
-      set = { "pattern" => { "question" => "q" } }
-
-      expect(service.send(:normalize_answer_scaffolds!, set)).to eq("pattern" => { "question" => "q" })
-    end
-  end
-
-  describe "#normalize_diagrams!" do
-    it "keeps a usable diagram on a diagrammable section" do
-      set = { "code_review" => { "diagram" => "  flowchart TD\n  A[Job] --> B[(DB)]  " } }
-
-      expect(service.send(:normalize_diagrams!, set)["code_review"]["diagram"])
-        .to eq("flowchart TD\n  A[Job] --> B[(DB)]")
-    end
-
-    # Dropped rather than truncated: a half a diagram is broken Mermaid, which
-    # the renderer rejects anyway — dropping says the same thing without the
-    # CDN round trip.
-    it "drops an unusable diagram instead of persisting it" do
-      [ "", "   ", nil, 42, [ "flowchart TD" ], "x" * (AiService::MAX_DIAGRAM_LENGTH + 1) ].each do |bad|
-        set = { "pattern" => { "question" => "q", "diagram" => bad } }
-        expect(service.send(:normalize_diagrams!, set)["pattern"]).not_to have_key("diagram")
-      end
-    end
-
-    it "strips a diagram the model volunteered for a non-diagrammable section" do
-      set = { "security_review" => { "diagram" => "flowchart TD\n  A --> B" } }
-
-      expect(service.send(:normalize_diagrams!, set)["security_review"]).not_to have_key("diagram")
-    end
-
-    # Architecture's diagram lives at reference.diagram, not at the top level,
-    # and predates this field — normalizing the top level must not reach into
-    # it.
-    it "leaves architecture's existing reference diagram untouched" do
-      set = { "architecture" => { "reference" => { "diagram" => "flowchart TD\n  A --> B" } } }
-
-      expect(service.send(:normalize_diagrams!, set)["architecture"]["reference"]["diagram"])
-        .to eq("flowchart TD\n  A --> B")
-    end
-
-    it "leaves a section that carries no diagram alone" do
-      set = { "pattern" => { "question" => "q" } }
-
-      expect(service.send(:normalize_diagrams!, set)).to eq("pattern" => { "question" => "q" })
-    end
-
-    it "runs on generation, so a bad diagram never reaches a persisted problem set" do
-      svc = double_class.new(canned_text: {
-        "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
-        "pattern"     => { "question" => "q", "concept" => "memoization", "diagram" => "flowchart TD\n  A --> B" }
-      }.to_json)
-
-      problem_set = svc.generate_exercise(user)
-
-      expect(problem_set["code_review"]).not_to have_key("diagram")
-      expect(problem_set["pattern"]["diagram"]).to eq("flowchart TD\n  A --> B")
-    end
-  end
-
   describe "diagram instructions in the generation prompt" do
     # The syntax rules used to live in the architecture-only branch. They now
     # govern code_review and pattern, which are present every single day.
@@ -686,212 +594,79 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#normalize_concepts" do
-    it "keeps on-list concepts and maps off-list ones to 'other'" do
-      set = {
-        "code_review" => { "concept" => "n_plus_one" },
-        "pattern" => { "concept" => "N+1 Queries!!" },
-        "challenge" => { "question" => "no concept key" }
-      }
-      out = service.send(:normalize_concepts, set)
-      expect(out["code_review"]["concept"]).to eq("n_plus_one")
-      expect(out["pattern"]["concept"]).to eq("other")
-      expect(out["challenge"]).not_to have_key("concept")
+  # Ingest owns each step and specs them at its own interface; these assert the
+  # wiring only AiService can get wrong — that generation runs ingest at all,
+  # and that the suggestions it returns get written.
+  describe "generation runs the ingest boundary" do
+    it "runs on generation, so a bad diagram never reaches a persisted problem set" do
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
+        "pattern"     => { "question" => "q", "concept" => "memoization", "diagram" => "flowchart TD\n  A --> B" }
+      }.to_json)
+
+      problem_set = svc.generate_exercise(user)
+
+      expect(problem_set["code_review"]).not_to have_key("diagram")
+      expect(problem_set["pattern"]["diagram"]).to eq("flowchart TD\n  A --> B")
     end
 
-    it "validates against the JS vocabulary when language is javascript" do
-      set = {
-        "code_review" => { "concept" => "closures" },
-        "pattern" => { "concept" => "n_plus_one" }
-      }
-      out = service.send(:normalize_concepts, set, "javascript")
-      expect(out["code_review"]["concept"]).to eq("closures")
-      expect(out["pattern"]["concept"]).to eq("other")
-    end
+    it "writes the SuggestedConcept rows ingest reports" do
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
+      }.to_json)
 
-    it "records a SuggestedConcept for an off-list concept" do
-      set = { "pattern" => { "concept" => "N+1 Queries!!" } }
-
-      expect {
-        service.send(:normalize_concepts, set)
-      }.to change(SuggestedConcept, :count).by(1)
-
-      concept = SuggestedConcept.last
-      expect(concept.language).to eq("ruby_rails")
-      expect(concept.display_name).to eq("N+1 Queries!!")
-    end
-
-    it "does not record a SuggestedConcept for an on-list concept" do
-      set = { "code_review" => { "concept" => "n_plus_one" } }
-
-      expect {
-        service.send(:normalize_concepts, set)
-      }.not_to change(SuggestedConcept, :count)
-    end
-
-    it "does not record a SuggestedConcept for a section with no concept key" do
-      set = { "challenge" => { "question" => "no concept key" } }
-
-      expect {
-        service.send(:normalize_concepts, set)
-      }.not_to change(SuggestedConcept, :count)
-    end
-
-    it "swallows a recording failure and still returns the normalized problem set" do
-      allow(SuggestedConcept).to receive(:record!).and_raise(StandardError, "db down")
-      set = { "pattern" => { "concept" => "N+1 Queries!!" } }
-
-      result = nil
-      expect(Rails.logger).to receive(:warn).with(/SuggestedConcept recording failed.*db down/)
-      expect { result = service.send(:normalize_concepts, set) }.not_to raise_error
-      expect(result["pattern"]["concept"]).to eq("other")
-    end
-
-    it "validates the architecture section against ARCHITECTURE_CONCEPTS regardless of language" do
-      set = {
-        "code_review"  => { "concept" => "n_plus_one" },
-        "architecture" => { "concept" => "service_boundaries" }
-      }
-      out = service.send(:normalize_concepts, set, "javascript")
-      expect(out["architecture"]["concept"]).to eq("service_boundaries")   # in arch vocab, kept
-      expect(out["code_review"]["concept"]).to eq("other")                 # not in JS vocab
-    end
-
-    it "maps an off-list architecture concept to 'other' and records it under the 'architecture' bucket" do
-      set = { "architecture" => { "concept" => "Microservices Everywhere!!" } }
-
-      expect {
-        service.send(:normalize_concepts, set, "ruby_rails")
-      }.to change(SuggestedConcept, :count).by(1)
-
-      expect(set["architecture"]["concept"]).to eq("other")
-      expect(SuggestedConcept.last.language).to eq("architecture")
-    end
-
-    it "does not treat a Rails concept as valid in the architecture section" do
-      set = { "architecture" => { "concept" => "n_plus_one" } }
-      out = service.send(:normalize_concepts, set, "ruby_rails")
-      expect(out["architecture"]["concept"]).to eq("other")
-    end
-
-    it "validates the security_review section against that language's security_concepts, not the full vocabulary" do
-      set = {
-        "code_review"     => { "concept" => "memoization" },
-        "security_review" => { "concept" => "sql_injection_prevention" }
-      }
-      out = service.send(:normalize_concepts, set, "ruby_rails")
-      expect(out["code_review"]["concept"]).to eq("memoization")
-      expect(out["security_review"]["concept"]).to eq("sql_injection_prevention")
-    end
-
-    it "maps an on-language-vocabulary but off-security-list concept in security_review to 'other'" do
-      set = { "security_review" => { "concept" => "memoization" } }
-
-      expect {
-        service.send(:normalize_concepts, set, "ruby_rails")
-      }.to change(SuggestedConcept, :count).by(1)
-
-      expect(set["security_review"]["concept"]).to eq("other")
+      expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
+      expect(SuggestedConcept.last.display_name).to eq("Invented Concept!!")
       expect(SuggestedConcept.last.language).to eq("ruby_rails")
     end
-  end
 
-  describe "#normalize_concepts with the fourth-slot vocabularies" do
-    it "keeps a valid plan_review concept and buckets suggestions under plan_review" do
-      set = { "plan_review" => { "concept" => "scope_creep" } }
-      result = service.send(:normalize_concepts, set, "ruby_rails")
-      expect(result["plan_review"]["concept"]).to eq("scope_creep")
+    # A lost analytics signal is not a reason to fail someone's morning set.
+    it "swallows a recording failure and still returns the problem set" do
+      allow(SuggestedConcept).to receive(:record!).and_raise(StandardError, "db down")
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
+      }.to_json)
+
+      expect(Rails.logger).to receive(:warn).with(/SuggestedConcept recording failed.*db down/)
+      expect(svc.generate_exercise(user)["code_review"]["concept"]).to eq("other")
     end
 
-    it "normalizes an off-vocabulary plan_review concept to other" do
-      set = { "plan_review" => { "concept" => "n_plus_one" } } # a RAILS_CONCEPTS entry, not plan_review's
-      result = service.send(:normalize_concepts, set, "ruby_rails")
-      expect(result["plan_review"]["concept"]).to eq("other")
+    # The rescue is per suggestion, not around the loop: one failing name must
+    # not discard the signals queued behind it.
+    it "keeps recording the remaining suggestions after one of them fails" do
+      allow(SuggestedConcept).to receive(:record!).and_call_original
+      allow(SuggestedConcept).to receive(:record!)
+        .with(hash_including(name: "First Invention!!")).and_raise(StandardError, "db down")
+
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "First Invention!!" },
+        "pattern"     => { "title" => "t", "concept" => "Second Invention!!" }
+      }.to_json)
+
+      allow(Rails.logger).to receive(:warn)
+
+      expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
+      expect(SuggestedConcept.last.display_name).to eq("Second Invention!!")
     end
 
-    it "keeps a valid ambiguity_hunt concept regardless of the day's language" do
-      set = { "ambiguity_hunt" => { "concept" => "missing_success_criteria" } }
-      result = service.send(:normalize_concepts, set, "javascript")
-      expect(result["ambiguity_hunt"]["concept"]).to eq("missing_success_criteria")
-    end
-  end
+    it "propagates an ingest rejection as a generation failure" do
+      svc = double_class.new(canned_text: {
+        "code_review"    => { "question" => "q", "concept" => "n_plus_one" },
+        "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
+      }.to_json)
 
-  describe "#normalize_planted_ambiguities!" do
-    def planted(*entries)
-      { "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => entries.flatten(1) } }
+      expect { svc.generate_exercise(user) }.to raise_error(AiService::InvalidResponseError)
     end
 
-    def exactly_enough
-      Array.new(ExerciseSection::AmbiguityHunt::PLANTED_COUNT) { |i| "ambiguity #{i}" }
-    end
+    # The guarantee ingest's purity buys: a rejected set cannot have written a
+    # vocabulary suggestion, because the write only happens after ingest returns.
+    it "writes no suggestion when ingest rejects the set" do
+      svc = double_class.new(canned_text: {
+        "code_review"    => { "question" => "q", "concept" => "Invented Concept!!" },
+        "ambiguity_hunt" => { "request" => "vague", "planted_ambiguities" => [] }
+      }.to_json)
 
-    it "passes a list of exactly the planted count through" do
-      set = planted(exactly_enough)
-      result = service.send(:normalize_planted_ambiguities!, set)
-      expect(result["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
-    end
-
-    it "strips whitespace off each entry" do
-      set = planted(exactly_enough.map { |a| "  #{a}\n" })
-      service.send(:normalize_planted_ambiguities!, set)
-      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
-    end
-
-    it "raises when the field is missing entirely" do
-      set = { "ambiguity_hunt" => { "request" => "vague" } }
-      expect { service.send(:normalize_planted_ambiguities!, set) }
-        .to raise_error(AiService::InvalidResponseError, /no usable planted_ambiguities/)
-    end
-
-    it "raises when the field is not an array" do
-      set = { "ambiguity_hunt" => { "planted_ambiguities" => "one; two; three; four" } }
-      expect { service.send(:normalize_planted_ambiguities!, set) }
-        .to raise_error(AiService::InvalidResponseError)
-    end
-
-    it "raises when every entry is unusable" do
-      set = planted([ "   ", nil, 42, "" ])
-      expect { service.send(:normalize_planted_ambiguities!, set) }
-        .to raise_error(AiService::InvalidResponseError)
-    end
-
-    # The prompt asks for an exact count, but nothing downstream reads it: the
-    # review prompt lists the ambiguities rather than counting them. Rejecting
-    # a short list would discard the day's other three sections over the
-    # likeliest deviation an LLM makes on a counted list.
-    it "keeps a gradable list that came back short of the asked-for count" do
-      set = planted(exactly_enough.first(2) + [ "  ", nil ])
-      service.send(:normalize_planted_ambiguities!, set)
-      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough.first(2))
-    end
-
-    it "keeps a list that came back over the asked-for count, up to the ingest bound" do
-      set = planted(exactly_enough + [ "one more" ])
-      service.send(:normalize_planted_ambiguities!, set)
-      expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough + [ "one more" ])
-    end
-
-    it "truncates a runaway list at AmbiguityHunt::MAX_PLANTED" do
-      set = planted(Array.new(40) { |i| "ambiguity #{i}" })
-      service.send(:normalize_planted_ambiguities!, set)
-      expect(set["ambiguity_hunt"]["planted_ambiguities"].size).to eq(ExerciseSection::AmbiguityHunt::MAX_PLANTED)
-    end
-
-    it "does nothing for a problem set with no ambiguity_hunt section" do
-      set = { "plan_review" => { "plan_excerpt" => "a plan" } }
-      expect { service.send(:normalize_planted_ambiguities!, set) }.not_to raise_error
-    end
-
-    # plan_review wins the fourth slot when both shapes come back, so the
-    # ambiguity hunt's answer key is never read — discarding the day's other
-    # three sections over it would be strictly worse than ignoring it.
-    it "ignores an unusable list on an ambiguity_hunt that lost the fourth slot to plan_review" do
-      set = {
-        "plan_review"    => { "plan_excerpt" => "a plan" },
-        "ambiguity_hunt" => { "request" => "vague" }
-      }
-
-      expect { service.send(:normalize_planted_ambiguities!, set) }.not_to raise_error
+      expect { svc.generate_exercise(user) rescue nil }.not_to change(SuggestedConcept, :count)
     end
   end
 
