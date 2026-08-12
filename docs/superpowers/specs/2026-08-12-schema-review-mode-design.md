@@ -95,12 +95,9 @@ DATA_MODELING_CONCEPTS = %w[
   missing_index wrong_cardinality missing_constraint
   denormalization_tradeoffs unsafe_migration
 ].freeze
-
-# Already identical in both vocabularies today, just never named.
-TESTING_CONCEPTS = %w[over_mocking testing_implementation_not_behavior].freeze
 ```
 
-Both are folded into `RAILS_CONCEPTS` and `JS_CONCEPTS`. **No new
+Folded into `RAILS_CONCEPTS` and `JS_CONCEPTS`. **No new
 `ConceptBucket`, no `ConceptBucket` change** — the section key is still
 `code_review`, so a language-independent bucket could not be selected even if
 one existed. Per-language mastery tracking is the accepted cost, and is
@@ -130,23 +127,28 @@ that is one flat rule with no harder version to graduate toward:
 
 #### Mode-scoped concepts
 
-All three modes are restricted, so mastery history records the skill the day
-actually exercised:
+Only the new mode is scoped. The other two keep the vocabulary they have
+today, minus the five new concepts, which have no business on a day that isn't
+about schemas:
 
 | Mode | Draws from |
 | --- | --- |
-| `application_code` | the language vocabulary **minus** both specialty subsets |
-| `test_file` | `TESTING_CONCEPTS` |
+| `application_code` | the language vocabulary **minus** `DATA_MODELING_CONCEPTS` |
+| `test_file` | the language vocabulary **minus** `DATA_MODELING_CONCEPTS` |
 | `schema_review` | `DATA_MODELING_CONCEPTS` |
 
-The `application_code` row means the baseline mode's vocabulary is *unchanged*
-by this work, not merely similar — it keeps exactly the 18 Rails concepts it
-effectively had, since the two testing concepts were already inappropriate
-there and the five new ones never enter.
+This means **no existing mode's vocabulary changes at all** — subtracting the
+five additions from the extended list returns exactly the 20 Rails concepts
+app-code and test-file days draw from today. The only vocabulary behavior this
+change introduces is the restriction on schema days.
 
-Retrofitting `test_file` was not in the original brief. It is included because
-adding a second unconstrained mode alongside an existing one would double a
-known source of noise rather than contain it.
+An earlier draft also scoped `test_file` to a `TESTING_CONCEPTS` subset, so
+that `over_mocking` could not be tagged on a non-test day. That is a real
+improvement and it is **deliberately deferred**: it changes behavior for a mode
+this work otherwise leaves alone, and this change already carries a new content
+mode, five concepts across two vocabularies, a three-way roll, and a rotation
+reweight. It is a clean standalone follow-up — and by then the retention
+instrumentation may say whether mode-scoped concept selection matters at all.
 
 `pattern` keeps the full language vocabulary, unchanged. This is load-bearing:
 it is the only section that can host a data-modeling concept on a non-schema
@@ -200,10 +202,8 @@ account for the mode:
 
 - a **data-modeling** concept: `pattern` always, `code_review` only on a
   schema-review day
-- a **testing** concept: `pattern` always, `code_review` only on a test-file
-  day
-- an **ordinary** concept: `code_review` only on an application-code day, plus
-  `pattern` and the day's third as today
+- an **ordinary** concept: `pattern` and the day's third as today, plus
+  `code_review` on any day that is *not* a schema-review day
 
 That last line has a consequence. `DailyPlan.for` computes:
 
@@ -213,16 +213,25 @@ That last line has a consequence. `DailyPlan.for` computes:
 slots = 3 - reinforcement.first(3).size
 ```
 
-For ordinary concepts that `3` becomes 2 on two days in three.
+For ordinary concepts that `3` becomes 2 on the one day in three that rolls
+schema review.
 
-**Decision: annotate correctly, leave the arithmetic at 3, and comment why.**
-The arithmetic is advisory end to end — nothing verifies placement, the
-reinforcement list is routinely truncated, and over-requesting by one costs a
-concept the model could not have placed anyway. Making `slots` mode-aware adds
-conditional complexity to the subtlest code in `DailyPlan`, the
-overdue-threshold reservation policy, to fix something no evidence says is
-broken. `log_retention` already records offered-versus-honored per bucket, so
-if it does matter it will show up in a week of logs.
+**Decision: annotate correctly, leave the arithmetic at 3, and comment the
+approximation at the point of the read so it is not later mistaken for
+exactness.** The arithmetic is advisory end to end — nothing verifies
+placement, the reinforcement list is routinely truncated, and over-requesting
+by one costs a concept the model could not have placed anyway.
+
+Making `slots` mode-aware would reopen the subtlest state machine in the app
+for marginal gain. `DailyPlan`'s correctness rests on structural separation
+rather than on arguments about interacting conditions — which is exactly why
+candidate 3 of the architecture review (collapsing its two parallel slot
+tracks) was declined. Threading a `code_review` content variant into slot math
+is the same trade, for less.
+
+"Instrument and see" is not deferral here: `log_retention` already records
+offered-versus-honored per bucket, so the question routes to something that
+answers it with data rather than to a later judgement call.
 
 ## Change 2: equal third-slot weights
 
@@ -263,7 +272,8 @@ this change deliberately removes:
 - `roll_weighted` as one shared helper, replacing two copies
 - `CODE_REVIEW_MODE_WEIGHTS` sums to 1.0; every mode reachable
 - `code_review_mode` on `DailyPlan::Result` and in the diagnostics payload
-- `CodeReview.generation_guidance` per mode, each naming only its own subset
+- `CodeReview.generation_guidance` per mode: schema-review names only
+  `DATA_MODELING_CONCEPTS`, the other two name the vocabulary minus it
 - `Pattern.generation_guidance`
 - `vocabulary_for` returning the mode-scoped list
 - `annotate_retention_concept` naming the right hosts for a data-modeling
@@ -282,9 +292,22 @@ field.
 - **No mastery-tier changes.** New concepts flow through existing machinery.
 - **No `FakeService` change.** No new section kind, so its canned payload
   already covers everything.
+- **No `test_file` scoping.** Deferred to a standalone follow-up, so this
+  change alters no existing mode's vocabulary.
+- **This spec is not committed to the PR.** Planning docs stay out of PRs by
+  standing preference; the file is committed locally to be read and removed
+  before the branch is pushed.
 
 ## Commit sequence
 
+0. Repoint six code comments at design docs that do not exist —
+   `docs/superpowers/specs/` is untracked, so the paths in `user.rb`,
+   `sessions_controller.rb`, `responses_controller.rb` (x2) and
+   `ai_service.rb` (x2) resolve to nothing. Repoint the two with a tracked
+   counterpart under `docs/superpowers/plans/`, drop the rest. Unrelated to
+   the feature, so it lands first and alone. Files under
+   `docs/superpowers/plans/` are left as-is: they were accurate when written
+   and are historical records, not live guidance.
 1. Fix #81 — `CodeReview` and `Pattern` gain `generation_guidance`, the stray
    vocabulary line is removed from the thirds, `language_vocabulary:` is
    dropped. Snapshots rebaseline.
