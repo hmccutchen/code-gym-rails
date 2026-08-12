@@ -2055,4 +2055,61 @@ RSpec.describe AiService do
       }.to raise_error(AiService::Error, /Unsupported generation language/)
     end
   end
+
+  describe "#build_exercise_prompt fourth-slot guidance" do
+    it "asks for a plan review with planted flaws when fourth: :plan_review" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: :plan_review)
+      expect(prompt).to match(/PLAN REVIEW/)
+      expect(prompt).to match(/technical anti-pattern/)
+      expect(prompt).to match(/scope-creep/)
+      expect(prompt).to match(/unflagged behavior change/)
+    end
+
+    it "asks for an ambiguity hunt with exactly AMBIGUITY_HUNT_PLANTED_COUNT planted ambiguities when fourth: :ambiguity_hunt" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: :ambiguity_hunt)
+      expect(prompt).to match(/AMBIGUITY HUNT/)
+      expect(prompt).to include(AiService::AMBIGUITY_HUNT_PLANTED_COUNT.to_s)
+    end
+
+    it "instructs that planted_ambiguities is hidden and must never leak into other fields" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :ambiguity_hunt)
+      expect(prompt).to match(/hidden/i)
+    end
+
+    it "names the fourth-slot concept needing reinforcement" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :plan_review,
+                            fourth_reinforcement: [ { concept: "scope_creep", tier: "standard" } ])
+      expect(prompt).to include("scope_creep")
+    end
+
+    it "names a fourth-slot retention check as a previously mastered concept" do
+      cm = user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current)
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :plan_review, fourth_due_checks: [ cm ])
+      expect(prompt).to match(/MASTERED/)
+      expect(prompt).to include("scope_creep")
+    end
+  end
+
+  describe "#generate_exercise threads the fourth slot through" do
+    it "asks the provider for a fourth section matching the plan's rolled kind" do
+      allow(DailyPlan).to receive(:for).and_call_original
+      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:ambiguity_hunt)
+
+      svc = double_class.new(canned_text: {
+        "code_review" => { "question" => "q", "concept" => "n_plus_one" },
+        "pattern"     => { "question" => "q", "concept" => "memoization" },
+        "challenge"   => { "question" => "q", "concept" => "idempotency" },
+        "ambiguity_hunt" => {
+          "title" => "t", "scenario" => "s", "request" => "r",
+          "planted_ambiguities" => [ "a", "b", "c", "d" ],
+          "question" => "q", "concept" => "missing_success_criteria"
+        }
+      }.to_json)
+
+      problem_set = svc.generate_exercise(user)
+      expect(problem_set).to have_key("ambiguity_hunt")
+    end
+  end
 end

@@ -315,7 +315,9 @@ class AiService
       system: build_system_prompt(language),
       prompt: build_exercise_prompt(user, language, third: plan.third,
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
-                                    established: plan.established, history: history)
+                                    established: plan.established, history: history,
+                                    fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
+                                    fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established)
     )
 
     problem_set = normalize_concepts(parse_json_object(result[:text], subject: "problem set"), language)
@@ -847,7 +849,8 @@ class AiService
   # already-fetched value instead so the prompt and the diagnostics log
   # never see two different snapshots of the same user's history.
   def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [],
-                            established: [], history: user.recent_performance)
+                            established: [], history: user.recent_performance,
+                            fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [])
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -901,6 +904,47 @@ class AiService
         EST
       else
         ""
+      end
+
+    fourth_reinforcement_text = fourth_reinforcement.any? ?
+      fourth_reinforcement.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
+
+    fourth_retention_block =
+      if fourth_due_checks.any?
+        <<~RET.chomp
+
+          Retention check due for the fourth section today: #{fourth_due_checks.map(&:concept).join(', ')} (#{fourth} bucket).
+          - This is a concept the engineer previously MASTERED in this skill. Work it into the fourth section as its concept.
+          - Use a completely FRESH scenario — never reuse a prior framing. Pitch at FULL difficulty, no extra scaffolding — the engineer is not struggling with this, making it easier defeats the point of checking.
+        RET
+      else
+        ""
+      end
+
+    fourth_established_block =
+      if fourth_established.any?
+        <<~EST.chomp
+
+          Established fourth-section concept (well past first mastery, survived a retention check): #{fourth_established.map(&:concept).join(', ')}
+          - If you were already going to select this for the fourth section's concept, keep the teaching_note minimal and pitch at full difficulty, the same as you would for any other established concept.
+        EST
+      else
+        ""
+      end
+
+    fourth_guidance =
+      case fourth
+      when :ambiguity_hunt
+        <<~AH.chomp
+          - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{AMBIGUITY_HUNT_PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
+          - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.
+          - Choose the ambiguity_hunt concept from this vocabulary, exactly one: #{AMBIGUITY_HUNT_CONCEPTS.join(", ")}
+        AH
+      else
+        <<~PR.chomp
+          - The fourth section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
+          - Choose the plan_review concept from this vocabulary, exactly one: #{PLAN_REVIEW_CONCEPTS.join(", ")}
+        PR
       end
 
     ts_guidance =
@@ -966,6 +1010,7 @@ class AiService
       #{history_text}
 
       Concepts needing reinforcement right now: #{reinforcement_text}
+      Fourth-section (#{fourth}) concept needing reinforcement: #{fourth_reinforcement_text}
 
       Instructions:
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
@@ -983,15 +1028,18 @@ class AiService
       - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
       - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
       #{third_guidance}
+      #{fourth_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
       #{established_block}
+      #{fourth_retention_block}
+      #{fourth_established_block}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{exercise_schema_for(language, third: third)}
+      #{exercise_schema_for(language, third: third, fourth: fourth)}
     PROMPT
   end
 
