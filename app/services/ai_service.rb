@@ -206,16 +206,10 @@ class AiService
     unstated_data_implications undefined_permissions_model
   ].freeze
 
-  # The one field in a problem set that is answer-key data rather than exercise
-  # content. Named here because two places have to know it by name: the
-  # boundary validation that guarantees it is usable, and the diagnostics log
-  # that must never carry it.
-  ANSWER_KEY_FIELD = "planted_ambiguities"
-
   # Curated, real, job-adjacent scenario flavors for the "scenario" field's
   # business-domain framing — prompt-level grounding only, to keep generated
   # scenarios feeling like real engineering work rather than generic SaaS
-  # examples. Never concept-tagged, never fed into concept_vocabulary_for or
+  # examples. Never concept-tagged, never fed into ProblemSetIngest.vocabulary_for or
   # any mastery-loop bucket. `legacy_graphql_maintenance` is scenario dressing
   # only, for occasional legacy-app relevance — see build_exercise_prompt's
   # explicit low-frequency instruction. It must never appear as a "concept"
@@ -281,11 +275,6 @@ class AiService
   # free of large/undesired provider content.
   RAW_SNIPPET_LIMIT = 500
 
-  # Upper bound on a section's Mermaid `diagram`. The prompt asks for at most
-  # 8 nodes with short labels, which lands well under half this — so the bound
-  # rejects runaway output without rejecting anything actually asked for.
-  MAX_DIAGRAM_LENGTH = 1_000
-
   def initialize(api_key)
     @api_key = api_key
     @conn    = build_connection
@@ -337,16 +326,13 @@ class AiService
                                     fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established)
     )
 
-    problem_set = parse_json_object(result[:text], subject: "problem set")
-    # Ahead of the normalizers because it is the only one that can reject the
-    # response: normalize_concepts writes SuggestedConcept rows as a side
-    # effect, and a set that is about to be thrown away should not leave a
-    # vocabulary suggestion behind.
-    normalize_planted_ambiguities!(problem_set)
-    normalize_concepts(problem_set, language)
-    normalize_answer_scaffolds!(problem_set)
-    normalize_diagrams!(problem_set)
-    shuffle_parsons_blocks!(problem_set)
+    ingested = ProblemSetIngest.call(
+      parse_json_object(result[:text], subject: "problem set"), language: language
+    )
+    problem_set = ingested.problem_set
+    # After ingest, never during: ingest writes nothing and raises on an
+    # unusable set, so a rejected response cannot have left a suggestion behind.
+    record_suggested_concepts(ingested.suggested_concepts)
     log_retention(user, language, plan.due_checks, problem_set)
     log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set)
     log_difficulty_diagnostics(user, language, plan, problem_set, history)
@@ -556,7 +542,7 @@ class AiService
 
   # A Parsons question is only "arrange these blocks", so without the blocks
   # the model cannot say anything section-specific. But blocks are persisted
-  # already-solved (see #shuffle_parsons_blocks!), so their stored order IS
+  # already-solved (see ProblemSetIngest#shuffle_parsons_blocks!), so their stored order IS
   # the answer the duck prompt forbids revealing. Positions are therefore only
   # ever quoted from a genuine persisted scramble; with no trustworthy
   # scramble to quote, the blocks go over unordered rather than in the stored
@@ -618,7 +604,7 @@ class AiService
   # A due retention concept's `language` bucket names which vocabulary it was
   # validated against, but not which section(s) that vocabulary is legal in
   # today — without this the model has no way to know an architecture-vocabulary
-  # concept can't go in code_review, guesses wrong, and normalize_concepts
+  # concept can't go in code_review, guesses wrong, and ProblemSetIngest
   # rewrites a correctly-honored check into a false "miss". A language-bucket
   # concept is legal in challenge always, but in security_review only when
   # it's one of that language's security_concepts (RAILS_SECURITY_CONCEPTS/
@@ -682,7 +668,7 @@ class AiService
   end
 
   # Delivery is advisory, so the only way to know whether retention checks actually
-  # land is to record both halves. Logged after normalize_concepts so it reflects
+  # land is to record both halves. Logged after ingest so it reflects
   # the concepts actually persisted, not whatever the provider first returned.
   # `tagged` makes a miss diagnosable rather than merely countable: it shows what
   # the model picked instead.
@@ -741,7 +727,7 @@ class AiService
   # problem_set is what gets persisted.
   def without_answer_key(problem_set)
     problem_set.transform_values do |section|
-      section.is_a?(Hash) ? section.except(ANSWER_KEY_FIELD) : section
+      section.is_a?(Hash) ? section.except(ProblemSetIngest::ANSWER_KEY_FIELD) : section
     end
   end
 
@@ -958,14 +944,13 @@ class AiService
   # A rolled kind's generation instructions. Takes the kind ExerciseSection
   # .for_plan already resolved rather than the raw symbol, so slot eligibility
   # is validated in one place. The kind's own vocabulary is resolved through
-  # concept_vocabulary_for — the same lookup normalize_concepts validates
-  # against — so the guidance can never name a vocabulary the normalizer would
-  # then rewrite a concept away from.
+  # ProblemSetIngest.vocabulary_for — the same lookup ingest validates against
+  # — so the guidance can never name a vocabulary the normalizer would then
+  # rewrite a concept away from.
   def generation_guidance_for(kind, language)
-    _bucket, vocabulary = concept_vocabulary_for(kind.key, language)
 
     kind.generation_guidance(
-      vocabulary:          vocabulary,
+      vocabulary:          ProblemSetIngest.vocabulary_for(kind.key, language),
       language_vocabulary: config_for(language)[:concepts],
       label:               config_for(language)[:label]
     )
@@ -1171,24 +1156,6 @@ class AiService
     Rails.logger.error("#{label}: #{snippet}")
   end
 
-  # A provider occasionally invents tags; keep the vocabulary closed so
-  # aggregation over concept history stays clean. Off-list concepts are
-  # still recorded (via SuggestedConcept) as a background signal for future
-  # vocabulary growth — this never changes what's persisted to the response
-  # itself, which still gets "other".
-  def normalize_concepts(problem_set, language = "ruby_rails")
-    problem_set.each do |section_key, section|
-      next unless section.is_a?(Hash) && section.key?("concept")
-      bucket, vocab = concept_vocabulary_for(section_key, language)
-      original = section["concept"]
-      unless vocab.include?(original)
-        section["concept"] = "other"
-        record_suggested_concept(bucket, original)
-      end
-    end
-    problem_set
-  end
-
   # Parsons correctness is decided in Ruby, never by the model — whatever rating it returned
   # is discarded and replaced. Skipped when the stored section has no blocks, since there is
   # nothing to grade against and the grader would report a spurious perfect score. Operates on
@@ -1206,125 +1173,10 @@ class AiService
     review
   end
 
-  # The provider returns "blocks" already in correct order, so the scramble is
-  # rolled once here and persisted — refreshes and the history view then show
-  # the same arrangement. Never the identity permutation, which would ship an
-  # already-solved problem.
-  def shuffle_parsons_blocks!(problem_set)
-    parsons = problem_set["parsons_problem"]
-    return problem_set unless parsons.is_a?(Hash) && parsons["blocks"].is_a?(Array)
-
-    identity = (0...parsons["blocks"].size).to_a
-    order    = identity.shuffle
-    order    = identity.shuffle while order == identity && identity.size > 1
-    parsons["display_order"] = order
-    problem_set
-  end
-
-  # Bounds and sanitizes the model-generated answer_scaffold before it is
-  # persisted, so what reaches the form is always a short list of short labels.
-  # An unusable or missing scaffold is dropped entirely rather than repaired —
-  # ExerciseSection.scaffold_labels then falls back to the kind's default, which
-  # is the same path every pre-scaffold row already takes.
-  def normalize_answer_scaffolds!(problem_set)
-    problem_set.each do |section_key, section_data|
-      kind = ExerciseSection.find(section_key)
-      next unless section_data.is_a?(Hash)
-
-      unless kind&.scaffolded?
-        section_data.delete("answer_scaffold")
-        next
-      end
-
-      labels = kind.normalize_scaffold(section_data["answer_scaffold"])
-      labels.any? ? section_data["answer_scaffold"] = labels : section_data.delete("answer_scaffold")
-    end
-    problem_set
-  end
-
-  # Mermaid source is provider output rendered straight into an HTML data
-  # attribute, so it is bounded here rather than trusted downstream. Anything
-  # unusable is deleted, not repaired: the reader then takes the same "no
-  # diagram" path every pre-diagram row already takes.
-  #
-  # Only the top-level key — architecture's diagram lives at
-  # reference.diagram, predates this field, and is not touched.
-  def normalize_diagrams!(problem_set)
-    problem_set.each do |section_key, section_data|
-      next unless section_data.is_a?(Hash)
-
-      diagram = section_data["diagram"]
-      usable  = ExerciseSection.find(section_key)&.diagrammable? &&
-                diagram.is_a?(String) &&
-                diagram.strip.length.between?(1, MAX_DIAGRAM_LENGTH)
-
-      usable ? section_data["diagram"] = diagram.strip : section_data.delete("diagram")
-    end
-    problem_set
-  end
-
-  # Unlike every other normalizer here, this one can raise rather than repair.
-  # The planted list is the ambiguity hunt's entire grading ground truth — the
-  # review prompt grades coverage against it and nothing else — so an empty or
-  # unusable list doesn't degrade the section, it silently turns coverage
-  # grading back into the freehand judgement the kind exists to replace, and
-  # there is no fallback to fall back to. InvalidResponseError is already a
-  # surfaced, retryable generation failure
-  # (GenerateDailyExercisesJob#persist_failure), so failing costs the user a
-  # retry rather than a day of ungrounded grading.
-  #
-  # A WRONG COUNT IS NOT A FAILURE, though. The prompt asks for exactly
-  # ExerciseSection::AmbiguityHunt::PLANTED_COUNT, but nothing downstream reads
-  # that number, so a list of 3 or 5 grades exactly as well — and rejecting it
-  # would throw away the day's other three sections over the likeliest
-  # deviation an LLM makes on a counted list. Only the empty case is fatal;
-  # the long case is truncated.
-  #
-  # Scoped to the RESOLVED fourth section, not to the mere presence of the key:
-  # a provider that returns both fourth shapes leaves an ambiguity_hunt nothing
-  # downstream will ever render or grade (plan_review wins the slot), and
-  # discarding a good day over an answer key no one reads would be a strictly
-  # worse outcome than ignoring it.
-  def normalize_planted_ambiguities!(problem_set)
-    return problem_set unless ExerciseSection.resolved_fourth_key(problem_set) == "ambiguity_hunt"
-
-    section = problem_set["ambiguity_hunt"]
-
-    # Shape is held to the schema even though count isn't: a bare string here
-    # is not four ambiguities, it's a provider that ignored the field's type,
-    # and Array() would quietly launder it into a single-entry answer key.
-    raw     = section[ANSWER_KEY_FIELD]
-    planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []
-    if planted.empty?
-      raise InvalidResponseError,
-            "Ambiguity hunt returned no usable #{ANSWER_KEY_FIELD} to grade coverage against"
-    end
-
-    section[ANSWER_KEY_FIELD] = planted.first(ExerciseSection::AmbiguityHunt::MAX_PLANTED)
-    problem_set
-  end
-
-  # The (suggestion-bucket, vocabulary) a section's concept is validated against.
-  # The section kind names which vocabulary applies (see ExerciseSection); the
-  # constants themselves stay here. An unrecognized section key — a provider can
-  # invent one — falls back to the language's full vocabulary, as it always has.
-  private def concept_vocabulary_for(section_key, language)
-    vocabulary =
-      case ExerciseSection.find(section_key)&.vocabulary_key
-      when :architecture      then ARCHITECTURE_CONCEPTS
-      when :security_concepts then config_for(language)[:security_concepts]
-      when :plan_review       then PLAN_REVIEW_CONCEPTS
-      when :ambiguity_hunt    then AMBIGUITY_HUNT_CONCEPTS
-      else                         config_for(language)[:concepts]
-      end
-
-    [ ConceptBucket.for(section_key, language), vocabulary ]
-  end
-
   # Never allowed to break generation — a bug here is a lost analytics
   # signal, not a reason to fail the request.
-  def record_suggested_concept(language, name)
-    SuggestedConcept.record!(language: language, name: name)
+  def record_suggested_concepts(suggestions)
+    suggestions.each { |s| SuggestedConcept.record!(language: s.bucket, name: s.name) }
   rescue => e
     Rails.logger.warn("SuggestedConcept recording failed: #{e.message}")
   end
