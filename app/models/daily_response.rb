@@ -170,7 +170,13 @@ class DailyResponse < ApplicationRecord
 
     concept = concept_tags[section.to_s]
     return true if concept.blank? || concept == "other"
-    bucket = daily_exercise.language
+    # Resolved the same way User#concept_exposure_index builds its keys. Reading
+    # the day's language directly was correct until the fourth slot gave
+    # plan_review a bucket of its own, at which point the two sides of this
+    # lookup silently stopped agreeing and plan_review's revised plan — the one
+    # kind that both carries improved_code and buckets independently — could
+    # never become visible.
+    bucket = ConceptBucket.for(section, daily_exercise.language)
     user.concept_exposure_count(concept, bucket, on_or_before: date) >= 2
   end
 end
