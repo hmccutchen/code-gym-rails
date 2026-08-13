@@ -61,7 +61,7 @@ Rails.application.routes.draw do
     end
     collection do
       # Pre-submission Socratic thinking partner. No :id — fully unpersisted,
-      # nothing to look up by id (see docs/superpowers/specs/2026-08-06-duck-thread-design.md).
+      # nothing to look up by id.
       post :duck_thread
     end
   end

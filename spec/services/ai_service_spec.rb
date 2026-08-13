@@ -124,9 +124,13 @@ RSpec.describe AiService do
 
     # The kinds assert their own label interpolation; this asserts AiService
     # resolves the day's language and hands it down, which no kind can check.
+    # code_review's own fragment stopped restating the label (see
+    # ExerciseSection::CodeReview.schema_fragment), so security_review — whose
+    # fragment does interpolate it directly — is the one that still proves the
+    # thread here.
     it "threads the day's language label into the kinds that take one" do
-      expect(service.send(:exercise_schema_for, "ruby_rails")).to include("Ruby/Rails code")
-      expect(service.send(:exercise_schema_for, "javascript")).to include("JavaScript/React code")
+      expect(service.send(:exercise_schema_for, "ruby_rails", third: :security_review)).to include("Ruby/Rails code")
+      expect(service.send(:exercise_schema_for, "javascript", third: :security_review)).to include("JavaScript/React code")
     end
 
     it "assembles the rolled third and fourth in slot order" do
@@ -362,17 +366,17 @@ RSpec.describe AiService do
       )
     end
 
-    it "asks for the language's test code in the code_review guidance on a test-file day" do
+    it "asks for the language's test code, in its test framework, in the code_review guidance on a test-file day" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :test_file)
       expect(prompt).to include(
-        "The code_review snippet must be Ruby/Rails test code — a realistic test file exhibiting one real test smell"
+        "The code_review snippet must be an RSpec-style Ruby/Rails test file — a realistic test file exhibiting one real test smell"
       )
     end
 
-    it "asks for JavaScript/React test code in the code_review guidance on a test-file day" do
+    it "asks for JavaScript/React test code, in its test framework, in the code_review guidance on a test-file day" do
       prompt = service.send(:build_exercise_prompt, user, "javascript", code_review_mode: :test_file)
       expect(prompt).to include(
-        "The code_review snippet must be JavaScript/React test code — a realistic test file exhibiting one real test smell"
+        "The code_review snippet must be a Jest/Vitest-style JavaScript/React test file — a realistic test file exhibiting one real test smell"
       )
     end
 

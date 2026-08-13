@@ -25,7 +25,7 @@ Instructions:
 - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
 - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
 - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
-- The code_review snippet must be Ruby/Rails test code — a realistic test file exhibiting one real test smell, same question shape ("what's the issue here, and how would you fix it").
+- The code_review snippet must be an RSpec-style Ruby/Rails test file — a realistic test file exhibiting one real test smell, same question shape ("what's the issue here, and how would you fix it").
 - Choose the code_review concept from this vocabulary, exactly one: n_plus_one, transaction_safety, memoization, service_objects, scope_chaining, idempotency, authorization, background_jobs, caching, validations, callbacks_vs_service, query_objects, policy_objects, indexing, concurrency, error_handling, mass_assignment_protection, sql_injection_prevention, over_mocking, testing_implementation_not_behavior
 - Choose the pattern concept from this vocabulary, exactly one: n_plus_one, transaction_safety, memoization, service_objects, scope_chaining, idempotency, authorization, background_jobs, caching, validations, callbacks_vs_service, query_objects, policy_objects, indexing, concurrency, error_handling, mass_assignment_protection, sql_injection_prevention, over_mocking, testing_implementation_not_behavior, missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
 - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to Ruby/Rails. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
@@ -46,7 +46,7 @@ Return JSON matching this schema exactly:
 {
   "code_review": {
     "question": "string — what to find/fix",
-    "snippet":  "string — Ruby/Rails code, ~10-15 lines",
+    "snippet":  "string — ~10-15 lines, matching the code_review snippet instruction above",
     "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
     "concept": "string — exactly one concept from the provided vocabulary",
     "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",

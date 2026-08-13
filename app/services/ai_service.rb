@@ -361,8 +361,8 @@ class AiService
     # After ingest, never during: ingest writes nothing and raises on an
     # unusable set, so a rejected response cannot have left a suggestion behind.
     record_suggested_concepts(ingested.suggested_concepts)
-    log_retention(user, language, plan.due_checks, problem_set)
-    log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set)
+    log_retention(user, language, plan.due_checks, problem_set, plan.code_review_mode)
+    log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set, plan.code_review_mode)
     log_difficulty_diagnostics(user, language, plan, problem_set, history)
     problem_set
   end
@@ -719,7 +719,7 @@ class AiService
   # Takes a ConceptBucket rather than a language because the fourth slot's
   # track is bucket-scoped and language-independent; for the three-slot track
   # the bucket IS the day's language (see ConceptBucket.for).
-  def log_retention(user, bucket, due_checks, problem_set)
+  def log_retention(user, bucket, due_checks, problem_set, code_review_mode)
     return if due_checks.empty?
 
     offered = due_checks.map(&:concept)
@@ -728,6 +728,7 @@ class AiService
 
     Rails.logger.info(
       "[retention] user=#{user.id} date=#{Date.current} bucket=#{bucket} " \
+      "code_review_mode=#{code_review_mode} " \
       "offered=#{offered.join(',').presence || '-'} " \
       "honored=#{honored.join(',').presence || '-'} " \
       "tagged=#{tagged.join(',').presence || '-'}"
@@ -996,7 +997,8 @@ class AiService
 
     if kind == ExerciseSection::CodeReview
       kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
-                               artifact: config_for(language)[:schema_artifact])
+                               artifact: config_for(language)[:schema_artifact],
+                               test_framework: config_for(language)[:test_framework])
     else
       kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode)
     end

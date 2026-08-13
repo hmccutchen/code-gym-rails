@@ -472,9 +472,16 @@ RSpec.describe ExerciseSection do
     end
 
     describe ExerciseSection::CodeReview do
-      it "labels the snippet with the day's language" do
-        expect(parse(described_class)["snippet"]).to include("#{RUBY_LABEL} code")
-        expect(parse(described_class, label: JS_LABEL)["snippet"]).to include("#{JS_LABEL} code")
+      # The snippet's language/framing is mode-specific (an RSpec-style test
+      # file, a Prisma schema change, realistic Ruby/Rails code…), so the
+      # fragment defers to the content_instruction line above it in the
+      # prompt rather than restating a label here — restating it is what
+      # made a JS schema-review day describe a Prisma schema as "JavaScript
+      # code" (see #content_instruction). `label:` stays part of the
+      # contract without appearing in this string.
+      it "defers the snippet's language description to the guidance instruction" do
+        expect(parse(described_class)["snippet"]).to eq("string — ~10-15 lines, matching the code_review snippet instruction above")
+        expect(parse(described_class, label: JS_LABEL)["snippet"]).to eq("string — ~10-15 lines, matching the code_review snippet instruction above")
       end
     end
 
@@ -568,8 +575,9 @@ RSpec.describe ExerciseSection do
   describe ".generation_guidance" do
     RAILS_VOCAB = AiService::RAILS_CONCEPTS.freeze
 
-    def guidance(kind, vocabulary:, label: "Ruby/Rails", mode: nil)
-      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode)
+    def guidance(kind, vocabulary:, label: "Ruby/Rails", mode: nil, artifact: nil, test_framework: nil)
+      extra = kind == ExerciseSection::CodeReview ? { artifact: artifact, test_framework: test_framework } : {}
+      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode, **extra)
     end
 
     describe ExerciseSection::CodeReview do
@@ -595,8 +603,9 @@ RSpec.describe ExerciseSection do
       end
 
       it "asks for a test file on a test-file day" do
-        text = guidance(described_class, vocabulary: non_schema_vocabulary, mode: :test_file)
-        expect(text).to include("test file")
+        text = guidance(described_class, vocabulary: non_schema_vocabulary, mode: :test_file,
+                                          test_framework: "an RSpec-style")
+        expect(text).to include("an RSpec-style Ruby/Rails test file")
         expect(text).not_to include("migration")
       end
 
@@ -611,8 +620,9 @@ RSpec.describe ExerciseSection do
 
       it "asks for the language's schema artifact on a schema-review day" do
         text = guidance(described_class, vocabulary: AiService::DATA_MODELING_CONCEPTS,
-                                          label: "Ruby/Rails", mode: :schema_review)
-        expect(text).to include("one planted data-modeling flaw")
+                                          label: "Ruby/Rails", mode: :schema_review,
+                                          artifact: "a Rails migration")
+        expect(text).to include("a Rails migration, ~10-15 lines, containing one planted data-modeling flaw")
         expect(text).to include("missing_index")
         expect(text).not_to include("n_plus_one")
       end

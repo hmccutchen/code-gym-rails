@@ -46,7 +46,7 @@ Return JSON matching this schema exactly:
 {
   "code_review": {
     "question": "string — what to find/fix",
-    "snippet":  "string — Ruby/Rails code, ~10-15 lines",
+    "snippet":  "string — ~10-15 lines, matching the code_review snippet instruction above",
     "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
     "concept": "string — exactly one concept from the provided vocabulary",
     "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
