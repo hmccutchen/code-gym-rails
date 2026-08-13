@@ -95,7 +95,7 @@ Expected: no output.
 - [ ] **Step 5: Run the suite**
 
 Run: `bundle exec rspec --exclude-pattern "system/**/*_spec.rb"`
-Expected: 1198 examples, 0 failures. Comments only — nothing should move.
+Expected: 1200 examples, 0 failures. Comments only — nothing should move.
 
 - [ ] **Step 6: Commit**
 
