@@ -37,7 +37,7 @@ RSpec.describe AiService do
   let(:double_class) do
     Class.new(AiService) do
       attr_writer :canned_text, :input_tokens, :output_tokens, :truncated
-      attr_reader :last_read_timeout, :last_max_tokens
+      attr_reader :last_read_timeout, :last_max_tokens, :last_prompt
 
       # #review_sections builds a fresh service per section thread, so a plain
       # ivar on the instance under test never sees those calls.
@@ -59,6 +59,7 @@ RSpec.describe AiService do
       def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
         @last_read_timeout = read_timeout
         @last_max_tokens   = max_tokens
+        @last_prompt       = prompt
         self.class.read_timeouts << read_timeout
         { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
@@ -1154,6 +1155,34 @@ RSpec.describe AiService do
       expect(payload["delivered"]["ambiguity_hunt"]["request"]).to eq("Build us a leaderboard")
       # Redaction is for the log only — the persisted set still carries the key.
       expect(problem_set["ambiguity_hunt"]["planted_ambiguities"]).to eq(planted)
+    end
+
+    # Every other code_review_mode example in this file calls
+    # build_exercise_prompt directly, which defaults code_review_mode to
+    # :application_code — so none of them would notice if generate_exercise
+    # stopped passing plan.code_review_mode through. This is the one example
+    # on the real #generate_exercise path: it proves the rolled mode reaches
+    # both the prompt the provider receives and the logged payload.
+    it "threads the rolled mode into both the prompt and the diagnostics payload" do
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+
+      set = { "code_review" => { "concept" => "missing_index" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(svc.last_prompt).to include("The code_review snippet must be a Rails migration")
+
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+      expect(payload["requested"]["code_review_mode"]).to eq("schema_review")
     end
   end
 
