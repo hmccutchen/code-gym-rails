@@ -1,4 +1,4 @@
-# Blocks are always persisted in correct order (AiService#shuffle_parsons_blocks!
+# Blocks are always persisted in correct order (ProblemSetIngest#shuffle_parsons_blocks!
 # scrambles only the display order), so a correct submission is always the
 # identity permutation. That is what keeps grading local and deterministic —
 # the AI is never asked to judge correctness for this kind, only to explain it.

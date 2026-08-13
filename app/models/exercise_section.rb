@@ -148,7 +148,6 @@ class ExerciseSection
       raise NotImplementedError, "#{self} must implement .generation_guidance"
     end
 
-    # Whether a review of this kind can carry corrected code.
     def improved_code?
       true
     end

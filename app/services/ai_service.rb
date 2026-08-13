@@ -1227,8 +1227,7 @@ class AiService
   # Parsons correctness is decided in Ruby, never by the model — whatever rating it returned
   # is discarded and replaced. Skipped when the stored section has no blocks, since there is
   # nothing to grade against and the grader would report a spurious perfect score. Operates on
-  # a single un-nested section hash (the shape #review_sections works with), unlike the old
-  # whole-review override_parsons_rating! this replaces.
+  # a single un-nested section hash — the shape #review_sections works with.
   def override_parsons_section_rating!(review, exercise, daily_response)
     parsons = exercise.parsons_problem
     return review unless parsons.is_a?(Hash)

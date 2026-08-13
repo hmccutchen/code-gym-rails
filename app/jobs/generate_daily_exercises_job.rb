@@ -26,14 +26,12 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   private
 
-  # Batch gate: local weekday, local hour >= 8, and not already generated today.
   def generate_if_due(user)
     return unless Date.current.on_weekday?
     return unless Time.current.hour >= 8
     generate_now(user)
   end
 
-  # Generate today's (local) exercise unless it already exists.
   def generate_now(user)
     return if DailyExercise.exists?(user: user, date: Date.current)
     generate_for(user)
