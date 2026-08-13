@@ -16,7 +16,22 @@ block needs a comment to be followed, extract it into a named method instead.
 **Comments are extremely minimal.** Write one only for a non-obvious *why* — a
 hidden constraint, a workaround, an invariant a future reader would otherwise
 break. Never restate *what* the code does. A comment that would go stale the
-next time the line changes shouldn't be written.
+next time the line changes shouldn't be written. One that already has gone
+stale is worse than either kind — fix it or delete it, don't leave it.
+
+**Some comments must survive a cleanup.** The rule above cuts restatement, not
+explanation, and a few categories read as obvious while carrying something the
+code genuinely doesn't say. Keep: a non-RESTful route (`# GET /login` above
+`SessionsController#new` — the path isn't derivable from the controller and
+action), a partial's required locals, an abstract method's contract, and a
+deliberately empty branch where the emptiness *is* the behavior (see
+`User#current_streak`'s weekend case). The test runs both directions: if
+deleting it would let someone reintroduce a bug, it stays; if it only repeats
+the line beneath it, it goes.
+
+When auditing comments mechanically, note that `#{...}` interpolations and `#`
+lines *inside* a heredoc are content, not comments — in `AiService` they are
+prompt text sent to the provider, and in `FakeService` canned provider output.
 
 **Modular, so it's easy to change.** Following pragmatic-programming principles:
 
