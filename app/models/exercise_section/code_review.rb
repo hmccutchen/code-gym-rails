@@ -7,6 +7,12 @@ class ExerciseSection::CodeReview < ExerciseSection
     false
   end
 
+  def self.generation_guidance(vocabulary:, label:, mode: nil)
+    <<~GUIDANCE.chomp
+      - Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
+    GUIDANCE
+  end
+
   def self.schema_fragment(label:)
     <<~SCHEMA.chomp
       "code_review": {

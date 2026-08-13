@@ -895,6 +895,9 @@ class AiService
 
     third_guidance = generation_guidance_for(third_kind, language)
 
+    code_review_guidance = generation_guidance_for(ExerciseSection::CodeReview, language)
+    pattern_guidance     = generation_guidance_for(ExerciseSection::Pattern, language)
+
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
 
@@ -924,6 +927,8 @@ class AiService
       - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
       - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
       - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
+      #{code_review_guidance}
+      #{pattern_guidance}
       #{third_guidance}
       #{fourth_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
@@ -940,17 +945,14 @@ class AiService
     PROMPT
   end
 
-  # A rolled kind's generation instructions. Takes the kind ExerciseSection
-  # .for_plan already resolved rather than the raw symbol, so slot eligibility
-  # is validated in one place. The kind's own vocabulary is resolved through
-  # ProblemSetIngest.vocabulary_for — the same lookup ingest validates against
-  # — so the guidance can never name a vocabulary the normalizer would then
-  # rewrite a concept away from.
+  # A kind's generation instructions. The kind's own vocabulary is resolved
+  # through ProblemSetIngest.vocabulary_for — the same lookup ingest validates
+  # against — so the guidance can never name a vocabulary the normalizer would
+  # then rewrite a concept away from.
   def generation_guidance_for(kind, language)
     kind.generation_guidance(
-      vocabulary:          ProblemSetIngest.vocabulary_for(kind.key, language),
-      language_vocabulary: config_for(language)[:concepts],
-      label:               config_for(language)[:label]
+      vocabulary: ProblemSetIngest.vocabulary_for(kind.key, language),
+      label:      config_for(language)[:label]
     )
   end
 

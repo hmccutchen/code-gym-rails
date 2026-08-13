@@ -16,13 +16,10 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       "responses/answers/parsons_problem"
     end
 
-    # The "each section's concept" line covers code_review and pattern as well
-    # as this one, so it reads `language_vocabulary` even though that happens
-    # to equal this kind's own vocabulary. See issue #81.
-    def generation_guidance(vocabulary:, language_vocabulary:, label:)
+    def generation_guidance(vocabulary:, label:, mode: nil)
       <<~GUIDANCE.chomp
         - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
-        - Choose each section's concept from this fixed vocabulary, exactly one per section: #{language_vocabulary.join(", ")}
+        - Choose the parsons_problem concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
       GUIDANCE
     end
 

@@ -22,6 +22,12 @@ class ExerciseSection::Pattern < ExerciseSection
     true
   end
 
+  def self.generation_guidance(vocabulary:, label:, mode: nil)
+    <<~GUIDANCE.chomp
+      - Choose the pattern concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
+    GUIDANCE
+  end
+
   def self.schema_fragment(label:)
     <<~SCHEMA.chomp
       "pattern": {
