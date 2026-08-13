@@ -4,7 +4,7 @@ class GenerateConceptReferenceJob < ApplicationJob
   # Best-effort: any failure is logged and swallowed, so a missing reference
   # renders as nothing and is retried the next time anyone submits the concept.
   def perform(concept:, language:, user_id:)
-    # "other" is the off-vocabulary catch-all from AiService#normalize_concepts,
+    # "other" is the off-vocabulary catch-all from ProblemSetIngest#normalize_concepts!,
     # not a real concept worth a reference.
     return if concept == "other"
 

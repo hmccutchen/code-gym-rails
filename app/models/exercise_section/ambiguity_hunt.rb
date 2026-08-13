@@ -20,7 +20,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
   #
   # Lives beside PLANTED_COUNT rather than beside the normalizer that enforces
   # it, the same way MAX_SCAFFOLD_LABELS sits on ExerciseSection while
-  # AiService#normalize_answer_scaffolds! enforces that one. Splitting a
+  # ProblemSetIngest#normalize_answer_scaffolds! enforces that one. Splitting a
   # constant from the constant it derives from is how the two drift.
   MAX_PLANTED = PLANTED_COUNT * 2
 

@@ -288,7 +288,9 @@ class User < ApplicationRecord
     day = Date.current
     while day >= earliest
       if day.on_weekend?
-        # skipped
+        # Neither breaks the streak nor counts toward it — the empty branch is
+        # what skips the day, so collapsing it into the elsif would end streaks
+        # every Saturday.
       elsif submitted.include?(day)
         streak += 1
       elsif exercised.include?(day) && day != Date.current
