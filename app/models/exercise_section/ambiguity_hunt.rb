@@ -32,7 +32,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     false
   end
 
-  def self.generation_guidance(vocabulary:, label:, mode: nil)
+  def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
       - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.

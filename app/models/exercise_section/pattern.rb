@@ -22,7 +22,7 @@ class ExerciseSection::Pattern < ExerciseSection
     true
   end
 
-  def self.generation_guidance(vocabulary:, label:, mode: nil)
+  def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - Choose the pattern concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
     GUIDANCE

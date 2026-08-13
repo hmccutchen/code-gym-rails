@@ -970,6 +970,7 @@ class AiService
       #{pattern_guidance}
       #{third_guidance}
       #{fourth_guidance}
+      #{data_modeling_idiom_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -984,24 +985,42 @@ class AiService
     PROMPT
   end
 
+  # Data-modeling concepts sit in both language vocabularies, so pattern and
+  # the rotating third can draw one on any day — that reachability is the
+  # point (a due retention check must have somewhere to land when code_review
+  # isn't in schema-review mode). What it must not do is turn those sections
+  # into a second schema review: only a schema-review code_review presents an
+  # artifact. Stated once, for every section, rather than repeated into each
+  # kind's guidance, since it is a rule about the concept and not about any
+  # one kind.
+  def data_modeling_idiom_guidance
+    "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section. " \
+      "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
+      "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
+      "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
+      "migration to review."
+  end
+
   # A kind's generation instructions. The kind's own vocabulary is resolved
   # through ProblemSetIngest.vocabulary_for — the same lookup ingest validates
   # against — so the guidance can never name a vocabulary the normalizer would
   # then rewrite a concept away from.
-  # code_review is the only kind with a content mode, and so the only one that
-  # needs the day's schema artifact. Branching here rather than widening every
-  # kind's signature with a keyword seven of them would ignore.
+  #
+  # Every kind gets the same context and reads what it needs (see
+  # ExerciseSection.generation_guidance). No branch on which kind this is:
+  # one lived here for code_review's mode arguments, which put per-kind
+  # knowledge back into the shared assembler that .generation_guidance exists
+  # to keep it out of.
   def generation_guidance_for(kind, language, mode: nil)
-    vocabulary = ProblemSetIngest.vocabulary_for(kind.key, language, mode: mode)
-    label      = config_for(language)[:label]
+    config = config_for(language)
 
-    if kind == ExerciseSection::CodeReview
-      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
-                               artifact: config_for(language)[:schema_artifact],
-                               test_framework: config_for(language)[:test_framework])
-    else
-      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode)
-    end
+    kind.generation_guidance(
+      vocabulary:     ProblemSetIngest.vocabulary_for(kind.key, language, mode: mode),
+      label:          config[:label],
+      mode:           mode,
+      artifact:       config[:schema_artifact],
+      test_framework: config[:test_framework]
+    )
   end
 
   # Mirrors the pattern-section `reference` shape so both render identically.

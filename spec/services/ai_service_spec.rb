@@ -391,6 +391,34 @@ RSpec.describe AiService do
       expect(prompt).to include("The code_review snippet must be realistic Ruby/Rails code — not toy examples.")
     end
 
+    # pattern and the rotating third keep the data-modeling concepts in their
+    # vocabulary on every day, so the model can draw one when no schema
+    # artifact is on offer. This line is what keeps that from being read as
+    # license to write a second schema review into a section that isn't one.
+    it "tells the model to express a data-modeling concept in the host section's own idiom" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include("may be tagged on any section")
+      expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
+      expect(prompt).to include("not for a migration to review")
+    end
+
+    # Named from the constant, not retyped: a concept added to the vocabulary
+    # without appearing here would be one the model has no idiom rule for.
+    it "names every data-modeling concept in that line" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include(
+        "The data-modeling concepts (#{AiService::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section."
+      )
+    end
+
+    # It applies to the day's other sections regardless of what code_review is
+    # doing — on a schema-review day the sentence is what tells the model the
+    # other sections are NOT also schema reviews.
+    it "states the idiom rule on a schema-review day too" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :schema_review)
+      expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
+    end
+
     it "embeds per-session concepts with per-section self and AI ratings" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)

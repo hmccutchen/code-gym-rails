@@ -12,7 +12,7 @@ class ExerciseSection::Challenge < ExerciseSection
     "answer code-answer"
   end
 
-  def self.generation_guidance(vocabulary:, label:, mode: nil)
+  def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
       - Choose the challenge concept from this vocabulary, exactly one: #{vocabulary.join(", ")}

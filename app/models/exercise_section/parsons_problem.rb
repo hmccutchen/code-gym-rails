@@ -16,7 +16,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       "responses/answers/parsons_problem"
     end
 
-    def generation_guidance(vocabulary:, label:, mode: nil)
+    def generation_guidance(vocabulary:, label:, **)
       <<~GUIDANCE.chomp
         - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
         - Choose the parsons_problem concept from this vocabulary, exactly one: #{vocabulary.join(", ")}

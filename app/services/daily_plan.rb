@@ -23,9 +23,8 @@ class DailyPlan
   # (ExerciseSection.thirds) is the record.
   THIRD_SECTION_WEIGHTS = { architecture: 0.25, security_review: 0.25, challenge: 0.25, parsons_problem: 0.25 }.freeze
 
-  # The fourth slot's two kinds, 50/50 — unlike the third slot's four-way
-  # rotation (biased toward architecture), there's no reason to favor one of
-  # these two skills over the other.
+  # The fourth slot's two kinds, 50/50 — as with the third slot, there's no
+  # reason to favor one of these two skills over the other.
   FOURTH_SECTION_WEIGHTS = { plan_review: 0.5, ambiguity_hunt: 0.5 }.freeze
 
   # Which content mode code_review takes. Equal thirds, as close as float
@@ -125,9 +124,11 @@ class DailyPlan
                code_review_mode: code_review_mode)
   end
 
-  # Cumulative weights are rounded before comparison: summing float weights
-  # (0.40 + 0.20 == 0.6000000000000001) otherwise shifts each boundary by an
-  # ulp and hands the wrong kind back at the exact boundary value.
+  # Cumulative weights are rounded before comparison: summing float weights can
+  # land an ulp off the intended boundary (0.40 + 0.20 == 0.6000000000000001,
+  # from the earlier third-slot weights), handing the wrong kind back at the
+  # exact boundary value. No table here drifts today; the guard stays because
+  # the next set of weights added may.
   # Extracted so tests can stub it — never assert on real randomness.
   def self.roll_weighted(weights)
     r = rand

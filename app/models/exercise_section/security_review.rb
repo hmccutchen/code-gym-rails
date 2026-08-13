@@ -6,7 +6,7 @@ class ExerciseSection::SecurityReview < ExerciseSection
     :security_concepts
   end
 
-  def self.generation_guidance(vocabulary:, label:, mode: nil)
+  def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
       - Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: #{vocabulary.join(", ")}

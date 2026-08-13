@@ -576,8 +576,21 @@ RSpec.describe ExerciseSection do
     RAILS_VOCAB = AiService::RAILS_CONCEPTS.freeze
 
     def guidance(kind, vocabulary:, label: "Ruby/Rails", mode: nil, artifact: nil, test_framework: nil)
-      extra = kind == ExerciseSection::CodeReview ? { artifact: artifact, test_framework: test_framework } : {}
-      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode, **extra)
+      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
+                                artifact: artifact, test_framework: test_framework)
+    end
+
+    # The contract is uniform on purpose: AiService#generation_guidance_for
+    # hands every kind the same context and never asks which kind it holds. A
+    # kind that narrowed its signature to only what it reads would put that
+    # branch back into the shared assembler — which is the thing "adding a
+    # kind means adding a class, not editing shared code" rules out.
+    it "is accepted by every kind with the full context the assembler passes" do
+      ExerciseSection.all.each do |kind|
+        expect { guidance(kind, vocabulary: RAILS_VOCAB, mode: :application_code,
+                                 artifact: "a Rails migration", test_framework: "an RSpec-style") }
+          .not_to raise_error, "#{kind} rejected the assembler's context"
+      end
     end
 
     describe ExerciseSection::CodeReview do
