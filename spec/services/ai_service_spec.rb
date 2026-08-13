@@ -824,7 +824,8 @@ RSpec.describe AiService do
     it "threads the rolled third-section kind into the exercise prompt" do
       set = { "code_review" => { "concept" => "n_plus_one" } }
       svc = double_class.new(canned_text: set.to_json)
-      allow(DailyPlan).to receive(:roll_third_section).and_return(:architecture)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
     end
@@ -866,7 +867,8 @@ RSpec.describe AiService do
       end
       set = { "code_review" => { "concept" => "n_plus_one" } }
       svc = spy_class.new(canned_text: set.to_json)
-      allow(DailyPlan).to receive(:roll_third_section).and_return(:challenge)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
 
       svc.generate_exercise(user, language: "ruby_rails")
 
@@ -905,7 +907,8 @@ RSpec.describe AiService do
           end
         end
         svc = spy_class.new(canned_text: { "code_review" => { "concept" => "n_plus_one" } }.to_json)
-        allow(DailyPlan).to receive(:roll_third_section).and_return(third)
+        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(third)
+        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
 
         svc.generate_exercise(user, language: "ruby_rails")
         captured_prompt
@@ -999,7 +1002,8 @@ RSpec.describe AiService do
       set = { "plan_review" => { "concept" => "scope_creep" } }
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
-      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
 
       logged = []
       allow(Rails.logger).to receive(:info) do |msg|
@@ -1978,7 +1982,8 @@ RSpec.describe AiService do
   describe "#generate_exercise threads the fourth slot through" do
     it "asks the provider for a fourth section matching the plan's rolled kind" do
       allow(DailyPlan).to receive(:for).and_call_original
-      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:ambiguity_hunt)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:ambiguity_hunt)
 
       svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },

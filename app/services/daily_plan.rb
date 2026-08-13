@@ -56,7 +56,7 @@ class DailyPlan
   # the prompt builder is private and returns only a string, so it cannot report
   # that (see AiService#log_retention).
   def self.for(user, language:)
-    third         = roll_third_section
+    third         = roll_weighted(THIRD_SECTION_WEIGHTS)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS)
     # An exercise has only 3 sections, so only the first 3 reinforcement concepts
     # can ever occupy one — sizing against the full (often 4-8 entry) list left
@@ -77,7 +77,7 @@ class DailyPlan
     # rather than a generalization of the 3-slot one above, because the two
     # vocabularies can never mix: keeping them structurally separate means a
     # cross-vocab item can never be placed somewhere it structurally cannot go.
-    fourth               = roll_fourth_section
+    fourth               = roll_weighted(FOURTH_SECTION_WEIGHTS)
     fourth_bucket        = FOURTH_BUCKET_FOR.fetch(fourth)
     # Truncated to the slot's capacity before anything else reads it: the full
     # list runs 4-5 entries deep on a small vocabulary, and every entry past
@@ -102,33 +102,19 @@ class DailyPlan
   # Cumulative weights are rounded before comparison: summing float weights
   # (0.40 + 0.20 == 0.6000000000000001) otherwise shifts each boundary by an
   # ulp and hands the wrong kind back at the exact boundary value.
-  def self.roll_third_section
+  # Extracted so tests can stub it — never assert on real randomness.
+  def self.roll_weighted(weights)
     r = rand
     cumulative = 0.0
 
-    THIRD_SECTION_WEIGHTS.each do |kind, weight|
+    weights.each do |kind, weight|
       cumulative += weight
       return kind if r < cumulative.round(10)
     end
 
-    THIRD_SECTION_WEIGHTS.keys.last
+    weights.keys.last
   end
-  private_class_method :roll_third_section
-
-  # Same cumulative-weight pattern as roll_third_section, over
-  # FOURTH_SECTION_WEIGHTS instead.
-  def self.roll_fourth_section
-    r = rand
-    cumulative = 0.0
-
-    FOURTH_SECTION_WEIGHTS.each do |kind, weight|
-      cumulative += weight
-      return kind if r < cumulative.round(10)
-    end
-
-    FOURTH_SECTION_WEIGHTS.keys.last
-  end
-  private_class_method :roll_fourth_section
+  private_class_method :roll_weighted
 
   # Single-bucket analog of retention_checks_for. Simpler than the 3-slot
   # version: the fourth slot's bucket is always exactly one fixed value
