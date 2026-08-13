@@ -30,41 +30,29 @@ RSpec.describe DailyPlan do
     end
   end
 
-  describe "THIRD_SECTION_WEIGHTS" do
+  describe "the third-section roll" do
+    it "returns each third in an equal quarter band" do
+      {
+        0.0 => :architecture, 0.24 => :architecture,
+        0.25 => :security_review, 0.49 => :security_review,
+        0.50 => :challenge, 0.74 => :challenge,
+        0.75 => :parsons_problem, 0.99 => :parsons_problem
+      }.each do |value, expected|
+        allow(DailyPlan).to receive(:rand).and_return(value)
+        expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(expected)
+      end
+    end
+
+    it "gives every third the same weight" do
+      expect(DailyPlan::THIRD_SECTION_WEIGHTS.values.uniq).to eq([ 0.25 ])
+    end
+
     it "sums to 1.0 across all four weights" do
       expect(DailyPlan::THIRD_SECTION_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
     end
 
     it "includes parsons_problem" do
       expect(DailyPlan::THIRD_SECTION_WEIGHTS).to have_key(:parsons_problem)
-    end
-  end
-
-  describe "#roll_third_section" do
-    it "returns :architecture below 0.40, :security_review from 0.40-0.60, :challenge from 0.60-0.80, :parsons_problem from 0.80 up" do
-      allow(DailyPlan).to receive(:rand).and_return(0.10)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:architecture)
-
-      allow(DailyPlan).to receive(:rand).and_return(0.39)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:architecture)
-
-      allow(DailyPlan).to receive(:rand).and_return(0.40)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:security_review)
-
-      allow(DailyPlan).to receive(:rand).and_return(0.59)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:security_review)
-
-      allow(DailyPlan).to receive(:rand).and_return(0.60)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:challenge)
-
-      allow(DailyPlan).to receive(:rand).and_return(0.79)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:challenge)
-
-      allow(DailyPlan).to receive(:rand).and_return(0.80)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:parsons_problem)
-
-      allow(DailyPlan).to receive(:rand).and_return(0.99)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(:parsons_problem)
     end
   end
 
@@ -207,7 +195,7 @@ RSpec.describe DailyPlan do
     end
   end
 
-  describe "#roll_fourth_section" do
+  describe "the fourth-section roll" do
     it "returns :plan_review below 0.5, :ambiguity_hunt from 0.5 up" do
       allow(DailyPlan).to receive(:rand).and_return(0.10)
       expect(DailyPlan.send(:roll_weighted, DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:plan_review)

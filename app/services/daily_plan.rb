@@ -14,13 +14,13 @@ class DailyPlan
   Result = Data.define(:third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established)
 
-  # Which third section this set gets. Named, tunable weights rather than a
-  # bare literal: architecture-reasoning most of the time, the other three kinds
-  # evenly splitting the rest.
-  # Extracted so tests can stub it — never assert on real randomness. The
-  # chosen kind is not tracked separately; the persisted third key
+  # Which third section this set gets. Equal weights: the four kinds exercise
+  # different reasoning and none is the baseline the others vary from, so
+  # variety beats depth-in-one-area here. This deliberately reverses an
+  # earlier bias toward architecture (0.75, then 0.50, then 0.40).
+  # The chosen kind is not tracked separately; the persisted third key
   # (ExerciseSection.thirds) is the record.
-  THIRD_SECTION_WEIGHTS = { architecture: 0.40, security_review: 0.20, challenge: 0.20, parsons_problem: 0.20 }.freeze
+  THIRD_SECTION_WEIGHTS = { architecture: 0.25, security_review: 0.25, challenge: 0.25, parsons_problem: 0.25 }.freeze
 
   # The fourth slot's two kinds, 50/50 — unlike the third slot's four-way
   # rotation (biased toward architecture), there's no reason to favor one of
