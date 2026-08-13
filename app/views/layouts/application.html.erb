@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <%# interactive-widget=resizes-content is spec-correct and included for
+      Chromium and any future WebKit support, but WebKit is believed not to
+      implement it yet — it is NOT what keeps iOS from zooming on focus.
+      That's --input-font-size below, on every focusable control's rule. %>
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>Code Gym</title>
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
@@ -12,6 +16,10 @@
       --bg: #0f0f1a; --surface: #1a1a2e; --border: #2a2a4a;
       --accent: #7c6af7; --text: #e0e0f0; --muted: #888;
       --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
+      /* iOS auto-zooms a focused input below 16px, which shifts the layout and
+         doesn't cleanly restore. max() keeps the floor without overriding a
+         user who has set a larger default. */
+      --input-font-size: max(1rem, 16px);
     }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
     a { color: var(--accent); text-decoration: none; }
@@ -78,7 +86,7 @@
     .review-points li { font-size: .9rem; line-height: 1.6; margin-top: .3rem; }
     .self-explanation { margin-top: .9rem; }
     .self-explanation label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .3rem; }
-    .self-explanation-input { width: 100%; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .5rem; font-size: .85rem; font-family: inherit; resize: vertical; }
+    .self-explanation-input { width: 100%; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .5rem; font-size: var(--input-font-size); font-family: inherit; resize: vertical; }
     .self-explanation-status { font-size: .75rem; color: var(--muted); }
     .alternates { margin-top: .75rem; }
     .alternate-item { font-size: .9rem; line-height: 1.7; border-left: 2px solid var(--accent); padding-left: .6rem; margin-bottom: .5rem; }
@@ -87,8 +95,8 @@
     .follow-up-turn { font-size: .88rem; line-height: 1.65; margin-bottom: .5rem; padding-left: .6rem; border-left: 2px solid var(--border); }
     .follow-up-user { color: var(--muted); }
     .follow-up-assistant { border-left-color: var(--accent); }
-    .follow-up-form { display: flex; gap: .5rem; }
-    .follow-up-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: .85rem; font-family: inherit; }
+    .follow-up-form { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .follow-up-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
     .follow-up-capped { font-size: .78rem; color: var(--muted); font-style: italic; }
     .follow-up-status { font-size: .75rem; color: var(--muted); }
 
@@ -99,7 +107,7 @@
     .duck-user { color: var(--muted); }
     .duck-assistant { border-left-color: var(--accent); }
     .duck-form { display: flex; gap: .5rem; flex-wrap: wrap; }
-    .duck-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: .85rem; font-family: inherit; }
+    .duck-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
     .duck-status { display: block; font-size: .75rem; color: var(--muted); margin-top: .4rem; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
@@ -202,7 +210,7 @@
       background: transparent;
       border: 1px solid transparent;
       color: var(--text);
-      font-size: inherit;
+      font-size: var(--input-font-size);
       font-family: inherit;
       padding: .15rem .3rem;
       width: 9rem;
