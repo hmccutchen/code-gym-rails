@@ -12,7 +12,8 @@
 # toward building one. Result is the value it hands back.
 class DailyPlan
   Result = Data.define(:third, :reinforcement, :due_checks, :established,
-                        :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established)
+                        :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
+                        :code_review_mode)
 
   # Which third section this set gets. Equal weights: the four kinds exercise
   # different reasoning and none is the baseline the others vary from, so
@@ -26,6 +27,18 @@ class DailyPlan
   # rotation (biased toward architecture), there's no reason to favor one of
   # these two skills over the other.
   FOURTH_SECTION_WEIGHTS = { plan_review: 0.5, ambiguity_hunt: 0.5 }.freeze
+
+  # Which content mode code_review takes. Equal thirds, as close as float
+  # weights get — application_code keeps a 1% edge rather than the split
+  # pretending to be exact.
+  #
+  # One roll across all three modes, not a probability per mode: the previous
+  # arrangement asked the model for "roughly 1 in 4" test-file days in the
+  # prompt itself, so nothing decided or recorded the mode and a second
+  # "occasional" mode would have compounded with the first unpredictably.
+  CODE_REVIEW_MODE_WEIGHTS = {
+    application_code: 0.34, test_file: 0.33, schema_review: 0.33
+  }.freeze
 
   # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket
   # per kind (not a single shared bucket), matching how ARCHITECTURE already
@@ -94,9 +107,12 @@ class DailyPlan
     fourth_established   = established_concepts_for_bucket(user, fourth_bucket,
                                                             reinforcement: fourth_reinforcement, due_checks: fourth_due_checks)
 
+    code_review_mode = roll_weighted(CODE_REVIEW_MODE_WEIGHTS)
+
     Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established,
                fourth: fourth, fourth_reinforcement: fourth_reinforcement,
-               fourth_due_checks: fourth_due_checks, fourth_established: fourth_established)
+               fourth_due_checks: fourth_due_checks, fourth_established: fourth_established,
+               code_review_mode: code_review_mode)
   end
 
   # Cumulative weights are rounded before comparison: summing float weights

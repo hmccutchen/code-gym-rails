@@ -15,7 +15,6 @@ Instructions:
 - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
 - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
 - Prioritize focus areas they've missed or rated hard recently.
-- The code_review snippet must be realistic JavaScript/React code — not toy examples. Roughly 1 in 4 sessions, make it a Jest/Vitest-style test file exhibiting a real test smell instead — same question shape ("what's the issue here, and how would you fix it").
 - Rotate between topics across sessions — avoid the same pattern two days in a row.
 - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
 - If a section's tagged concept is one of generics, type_guards_narrowing, union_intersection_types, mapped_conditional_types, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.
@@ -27,11 +26,11 @@ Instructions:
 - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
 - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
 - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
-- Choose the code_review concept from this vocabulary, exactly one: callback_hell, promise_chaining, closures, prototype_chain, event_loop_blocking, this_binding, array_mutation_pitfalls, debouncing_throttling, closures_in_loops, memory_leaks_listeners, hooks_dependencies, component_re_renders, state_lifting, controlled_vs_uncontrolled, xss_prevention, insecure_client_storage, generics, type_guards_narrowing, union_intersection_types, mapped_conditional_types, over_mocking, testing_implementation_not_behavior
-- Choose the pattern concept from this vocabulary, exactly one: callback_hell, promise_chaining, closures, prototype_chain, event_loop_blocking, this_binding, array_mutation_pitfalls, debouncing_throttling, closures_in_loops, memory_leaks_listeners, hooks_dependencies, component_re_renders, state_lifting, controlled_vs_uncontrolled, xss_prevention, insecure_client_storage, generics, type_guards_narrowing, union_intersection_types, mapped_conditional_types, over_mocking, testing_implementation_not_behavior
-- The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to JavaScript/React. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
-- Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: xss_prevention, insecure_client_storage
-- The security_review snippet should be realistic JavaScript/React code, not a contrived toy example — the same bar as code_review's snippet.
+- The code_review snippet must be a Prisma schema change, with the migration it generates, ~10-15 lines, containing one planted data-modeling flaw. Same question shape as any other code_review ("what's the issue here, and how would you fix it") — the engineer reviews the proposed change, not prose about it.
+- Choose the code_review concept from this vocabulary, exactly one: missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
+- Choose the pattern concept from this vocabulary, exactly one: callback_hell, promise_chaining, closures, prototype_chain, event_loop_blocking, this_binding, array_mutation_pitfalls, debouncing_throttling, closures_in_loops, memory_leaks_listeners, hooks_dependencies, component_re_renders, state_lifting, controlled_vs_uncontrolled, xss_prevention, insecure_client_storage, generics, type_guards_narrowing, union_intersection_types, mapped_conditional_types, over_mocking, testing_implementation_not_behavior, missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
+- The challenge starter_code should give enough scaffold to get started without giving away the answer.
+- Choose the challenge concept from this vocabulary, exactly one: callback_hell, promise_chaining, closures, prototype_chain, event_loop_blocking, this_binding, array_mutation_pitfalls, debouncing_throttling, closures_in_loops, memory_leaks_listeners, hooks_dependencies, component_re_renders, state_lifting, controlled_vs_uncontrolled, xss_prevention, insecure_client_storage, generics, type_guards_narrowing, union_intersection_types, mapped_conditional_types, over_mocking, testing_implementation_not_behavior, missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
 - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY 4 deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.
 - "planted_ambiguities" is HIDDEN test data used only for grading. Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note" — doing so would give away the answer before the engineer reads the request.
 - Choose the ambiguity_hunt concept from this vocabulary, exactly one: undefined_scope_boundary, unspecified_edge_cases, missing_success_criteria, unstated_data_implications, undefined_permissions_model
@@ -64,19 +63,14 @@ Return JSON matching this schema exactly:
     "concept": "string — exactly one concept from the provided vocabulary",
     "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
   },
-  "security_review": {
+  "challenge": {
     "title":        "string",
-    "question":     "string — what security vulnerability exists here, and how would you mitigate it",
-    "snippet":      "string — JavaScript/React code, ~10-15 lines, containing one real, exploitable vulnerability",
+    "question":     "string — what to implement",
     "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
-    "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+    "starter_code": "string — optional skeleton (empty string if none)",
+    "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
     "concept": "string — exactly one concept from the provided vocabulary",
-    "reference": {
-      "tagline":      "string — bold one-liner",
-      "explanation":  "string — 2-3 sentences",
-      "code_example": "string — annotated JavaScript/React code, ~15 lines",
-      "senior_lens":  "string — when to reach for it / tradeoffs"
-    }
+    "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
   },
   "ambiguity_hunt": {
     "title":    "string",

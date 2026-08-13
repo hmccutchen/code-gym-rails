@@ -168,22 +168,22 @@ class AiService
     denormalization_tradeoffs unsafe_migration
   ].freeze
 
-  RAILS_CONCEPTS = %w[
+  RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ].freeze
+  ] + DATA_MODELING_CONCEPTS).freeze
 
-  JS_CONCEPTS = %w[
+  JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
     this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
     memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ].freeze
+  ] + DATA_MODELING_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -350,7 +350,8 @@ class AiService
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
                                     established: plan.established, history: history,
                                     fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
-                                    fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established)
+                                    fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
+                                    code_review_mode: plan.code_review_mode)
     )
 
     ingested = ProblemSetIngest.call(
@@ -734,6 +735,7 @@ class AiService
       language: language,
       requested: {
         skill_level: user.skill_level,
+        code_review_mode: plan.code_review_mode,
         reinforcement: plan.reinforcement,
         due_checks: plan.due_checks.map(&:concept),
         established: plan.established.map(&:concept),
@@ -809,7 +811,8 @@ class AiService
   # never see two different snapshots of the same user's history.
   def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [],
                             established: [], history: user.recent_performance,
-                            fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [])
+                            fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
+                            code_review_mode: :application_code)
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -913,16 +916,9 @@ class AiService
     label  = config[:label]
     focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
 
-    test_file_clause =
-      if config[:test_framework].present?
-        " Roughly 1 in 4 sessions, make it #{config[:test_framework]} test file exhibiting a real test smell instead — same question shape (\"what's the issue here, and how would you fix it\")."
-      else
-        ""
-      end
-
     third_guidance = generation_guidance_for(third_kind, language)
 
-    code_review_guidance = generation_guidance_for(ExerciseSection::CodeReview, language)
+    code_review_guidance = generation_guidance_for(ExerciseSection::CodeReview, language, mode: code_review_mode)
     pattern_guidance     = generation_guidance_for(ExerciseSection::Pattern, language)
 
     <<~PROMPT
@@ -943,7 +939,6 @@ class AiService
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
-      - The code_review snippet must be realistic #{label} code — not toy examples.#{test_file_clause}
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
@@ -976,11 +971,19 @@ class AiService
   # through ProblemSetIngest.vocabulary_for — the same lookup ingest validates
   # against — so the guidance can never name a vocabulary the normalizer would
   # then rewrite a concept away from.
-  def generation_guidance_for(kind, language)
-    kind.generation_guidance(
-      vocabulary: ProblemSetIngest.vocabulary_for(kind.key, language),
-      label:      config_for(language)[:label]
-    )
+  # code_review is the only kind with a content mode, and so the only one that
+  # needs the day's schema artifact. Branching here rather than widening every
+  # kind's signature with a keyword seven of them would ignore.
+  def generation_guidance_for(kind, language, mode: nil)
+    vocabulary = ProblemSetIngest.vocabulary_for(kind.key, language, mode: mode)
+    label      = config_for(language)[:label]
+
+    if kind == ExerciseSection::CodeReview
+      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
+                               artifact: config_for(language)[:schema_artifact])
+    else
+      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode)
+    end
   end
 
   # Mirrors the pattern-section `reference` shape so both render identically.

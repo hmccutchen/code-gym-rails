@@ -43,9 +43,17 @@ class ProblemSetIngest
   # answer to — AiService#generation_guidance_for calls this, so guidance and
   # validation cannot name different vocabularies.
   #
+  # `mode` narrows code_review to its content mode and is passed only by
+  # generation. Ingest validates a persisted set and does not know which mode
+  # produced it, so it passes none and gets the full list: the narrowing
+  # steers what is generated, and is not a reason to reject a concept after
+  # the fact.
+  #
   # An unrecognized section key — a provider can invent one — falls back to the
   # language's full vocabulary, as it always has.
-  def self.vocabulary_for(section_key, language)
+  def self.vocabulary_for(section_key, language, mode: nil)
+    return code_review_vocabulary(language, mode) if mode && section_key == ExerciseSection::CodeReview.key
+
     case ExerciseSection.find(section_key)&.vocabulary_key
     when :architecture      then AiService::ARCHITECTURE_CONCEPTS
     when :security_concepts then language_config(language)[:security_concepts]
@@ -54,6 +62,15 @@ class ProblemSetIngest
     else                         language_config(language)[:concepts]
     end
   end
+
+  # Only the new mode is scoped. Subtracting the data-modeling concepts from
+  # the other two returns exactly the vocabulary they had before those
+  # concepts existed, so no existing mode's behavior changes.
+  def self.code_review_vocabulary(language, mode)
+    full = language_config(language)[:concepts]
+    mode == :schema_review ? AiService::DATA_MODELING_CONCEPTS : full - AiService::DATA_MODELING_CONCEPTS
+  end
+  private_class_method :code_review_vocabulary
 
   # The vocabularies still live on AiService, which is the wrong home for them
   # now that this module is their other reader — they are domain data, not

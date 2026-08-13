@@ -71,6 +71,37 @@ RSpec.describe ProblemSetIngest do
     it "falls back to the language vocabulary for a section key a provider invented" do
       expect(described_class.vocabulary_for("made_up_section", "ruby_rails")).to eq(AiService::RAILS_CONCEPTS)
     end
+
+    # Ingest validates a persisted set and does not know which mode produced
+    # it, so it passes no mode and gets the full list. The narrowing exists to
+    # steer generation, not to reject a concept after the fact.
+    it "returns the full language vocabulary for code_review with no mode" do
+      expect(described_class.vocabulary_for("code_review", "ruby_rails"))
+        .to eq(AiService::RAILS_CONCEPTS)
+    end
+
+    it "narrows code_review to the data-modeling concepts on a schema-review day" do
+      expect(described_class.vocabulary_for("code_review", "ruby_rails", mode: :schema_review))
+        .to eq(AiService::DATA_MODELING_CONCEPTS)
+    end
+
+    it "excludes the data-modeling concepts on the other two modes" do
+      %i[application_code test_file].each do |mode|
+        vocabulary = described_class.vocabulary_for("code_review", "ruby_rails", mode: mode)
+        expect(vocabulary).not_to include(*AiService::DATA_MODELING_CONCEPTS)
+        expect(vocabulary).to include("n_plus_one")
+      end
+    end
+
+    # pattern keeps the full vocabulary: it is the only section that can host
+    # a data-modeling concept on a non-schema day, which keeps a due retention
+    # check reachable.
+    it "leaves pattern unnarrowed on every mode" do
+      %i[application_code test_file schema_review].each do |mode|
+        expect(described_class.vocabulary_for("pattern", "ruby_rails", mode: mode))
+          .to eq(AiService::RAILS_CONCEPTS)
+      end
+    end
   end
 
   describe "parsons block scrambling" do

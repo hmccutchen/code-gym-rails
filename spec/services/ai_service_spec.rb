@@ -169,7 +169,7 @@ RSpec.describe AiService do
 
   describe "RAILS_CONCEPTS" do
     it "is a frozen 20-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(20)
+      expect(AiService::RAILS_CONCEPTS.size).to eq(25)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -189,7 +189,7 @@ RSpec.describe AiService do
 
   describe "JS_CONCEPTS" do
     it "is a frozen 22-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(22)
+      expect(AiService::JS_CONCEPTS.size).to eq(27)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -232,6 +232,13 @@ RSpec.describe AiService do
         AiService::JS_SECURITY_CONCEPTS ].each do |other|
         expect(AiService::DATA_MODELING_CONCEPTS & other).to be_empty
       end
+    end
+
+    it "is folded into both language vocabularies, which stay frozen" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
+      expect(AiService::RAILS_CONCEPTS).to be_frozen
+      expect(AiService::JS_CONCEPTS).to be_frozen
     end
   end
 
@@ -354,20 +361,29 @@ RSpec.describe AiService do
       )
     end
 
-    it "names only RSpec in the code_review test-file clause on a Rails day" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+    it "asks for the language's test code in the code_review guidance on a test-file day" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :test_file)
       expect(prompt).to include(
-        "Roughly 1 in 4 sessions, make it an RSpec-style test file exhibiting a real test smell instead"
+        "The code_review snippet must be Ruby/Rails test code — a realistic test file exhibiting one real test smell"
       )
-      expect(prompt).not_to include("Jest/Vitest")
     end
 
-    it "names only Jest/Vitest in the code_review test-file clause on a JavaScript day" do
-      prompt = service.send(:build_exercise_prompt, user, "javascript")
+    it "asks for JavaScript/React test code in the code_review guidance on a test-file day" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript", code_review_mode: :test_file)
       expect(prompt).to include(
-        "Roughly 1 in 4 sessions, make it a Jest/Vitest-style test file exhibiting a real test smell instead"
+        "The code_review snippet must be JavaScript/React test code — a realistic test file exhibiting one real test smell"
       )
-      expect(prompt).not_to include("RSpec")
+    end
+
+    it "asks for the day's schema artifact in the code_review guidance on a schema-review day" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :schema_review)
+      expect(prompt).to include("The code_review snippet must be a Rails migration")
+      expect(prompt).to include("one planted data-modeling flaw")
+    end
+
+    it "asks for realistic application code by default" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+      expect(prompt).to include("The code_review snippet must be realistic Ruby/Rails code — not toy examples.")
     end
 
     it "embeds per-session concepts with per-section self and AI ratings" do
@@ -863,6 +879,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
     end
@@ -906,6 +923,7 @@ RSpec.describe AiService do
       svc = spy_class.new(canned_text: set.to_json)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc.generate_exercise(user, language: "ruby_rails")
 
@@ -946,6 +964,7 @@ RSpec.describe AiService do
         svc = spy_class.new(canned_text: { "code_review" => { "concept" => "n_plus_one" } }.to_json)
         allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(third)
         allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
         svc.generate_exercise(user, language: "ruby_rails")
         captured_prompt
@@ -1041,6 +1060,7 @@ RSpec.describe AiService do
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       logged = []
       allow(Rails.logger).to receive(:info) do |msg|
@@ -2021,6 +2041,7 @@ RSpec.describe AiService do
       allow(DailyPlan).to receive(:for).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:ambiguity_hunt)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },

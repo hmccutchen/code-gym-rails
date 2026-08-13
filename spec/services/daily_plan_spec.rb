@@ -294,6 +294,7 @@ RSpec.describe DailyPlan do
       # 50% of rolls landing on ambiguity_hunt instead.
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.reinforcement.map { |h| h[:concept] }).not_to include("scope_creep")
@@ -309,6 +310,7 @@ RSpec.describe DailyPlan do
         .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.fourth_due_checks).to eq([]) # not yet meaningfully overdue
@@ -329,6 +331,7 @@ RSpec.describe DailyPlan do
                       { concept: "unflagged_behavior_change", tier: "standard" } ])
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
 
@@ -345,11 +348,36 @@ RSpec.describe DailyPlan do
         .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
 
       expect(result.fourth_due_checks.map(&:concept)).to eq(%w[scope_creep])
       expect(result.fourth_reinforcement).to eq([])
+    end
+  end
+
+  describe "CODE_REVIEW_MODE_WEIGHTS" do
+    it "splits three ways, summing to 1.0" do
+      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys)
+        .to eq(%i[application_code test_file schema_review])
+      expect(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
+    end
+
+    it "reaches every mode" do
+      { 0.0 => :application_code, 0.34 => :test_file, 0.67 => :schema_review }.each do |value, expected|
+        allow(DailyPlan).to receive(:rand).and_return(value)
+        expect(DailyPlan.send(:roll_weighted, DailyPlan::CODE_REVIEW_MODE_WEIGHTS)).to eq(expected)
+      end
+    end
+  end
+
+  describe "#code_review_mode on the plan" do
+    let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+
+    it "is carried on the Result" do
+      allow(DailyPlan).to receive(:rand).and_return(0.67)
+      expect(DailyPlan.for(user, language: "ruby_rails").code_review_mode).to eq(:schema_review)
     end
   end
 end
