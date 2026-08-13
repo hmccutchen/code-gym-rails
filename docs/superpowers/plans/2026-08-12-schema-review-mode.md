@@ -809,17 +809,33 @@ In `spec/services/problem_set_ingest_spec.rb`, inside `describe ".vocabulary_for
 In `spec/models/exercise_section_spec.rb`, under `describe ExerciseSection::CodeReview` in the `.generation_guidance` block:
 
 ```ruby
+      # These two modes never receive the data-modeling concepts in
+      # production — ProblemSetIngest.vocabulary_for subtracts them — so the
+      # test must hand over the same narrowed list, or the vocabulary line
+      # renders `unsafe_migration` and the assertions below collide with a
+      # substring that has nothing to do with the mode's instruction.
+      let(:non_schema_vocabulary) { RAILS_VOCAB - AiService::DATA_MODELING_CONCEPTS }
+
       it "asks for application code by default" do
-        text = guidance(described_class, vocabulary: RAILS_VOCAB, mode: :application_code)
+        text = guidance(described_class, vocabulary: non_schema_vocabulary, mode: :application_code)
         expect(text).to include("realistic Ruby/Rails code")
         expect(text).not_to include("test file")
         expect(text).not_to include("migration")
       end
 
       it "asks for a test file on a test-file day" do
-        text = guidance(described_class, vocabulary: RAILS_VOCAB, mode: :test_file)
+        text = guidance(described_class, vocabulary: non_schema_vocabulary, mode: :test_file)
         expect(text).to include("test file")
         expect(text).not_to include("migration")
+      end
+
+      # The narrowing above is what production does, not a convenience: prove
+      # the two agree, so this block cannot drift from the real resolution.
+      it "is handed exactly the vocabulary ingest resolves for these modes" do
+        %i[application_code test_file].each do |mode|
+          expect(ProblemSetIngest.vocabulary_for("code_review", "ruby_rails", mode: mode))
+            .to eq(non_schema_vocabulary)
+        end
       end
 
       it "asks for the language's schema artifact on a schema-review day" do
