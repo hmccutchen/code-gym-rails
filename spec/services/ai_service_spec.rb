@@ -37,7 +37,7 @@ RSpec.describe AiService do
   let(:double_class) do
     Class.new(AiService) do
       attr_writer :canned_text, :input_tokens, :output_tokens, :truncated
-      attr_reader :last_read_timeout, :last_max_tokens
+      attr_reader :last_read_timeout, :last_max_tokens, :last_prompt
 
       # #review_sections builds a fresh service per section thread, so a plain
       # ivar on the instance under test never sees those calls.
@@ -59,6 +59,7 @@ RSpec.describe AiService do
       def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
         @last_read_timeout = read_timeout
         @last_max_tokens   = max_tokens
+        @last_prompt       = prompt
         self.class.read_timeouts << read_timeout
         { text: @canned_text, input_tokens: @input_tokens, output_tokens: @output_tokens, truncated: @truncated }
       end
@@ -123,9 +124,13 @@ RSpec.describe AiService do
 
     # The kinds assert their own label interpolation; this asserts AiService
     # resolves the day's language and hands it down, which no kind can check.
+    # code_review's own fragment stopped restating the label (see
+    # ExerciseSection::CodeReview.schema_fragment), so security_review — whose
+    # fragment does interpolate it directly — is the one that still proves the
+    # thread here.
     it "threads the day's language label into the kinds that take one" do
-      expect(service.send(:exercise_schema_for, "ruby_rails")).to include("Ruby/Rails code")
-      expect(service.send(:exercise_schema_for, "javascript")).to include("JavaScript/React code")
+      expect(service.send(:exercise_schema_for, "ruby_rails", third: :security_review)).to include("Ruby/Rails code")
+      expect(service.send(:exercise_schema_for, "javascript", third: :security_review)).to include("JavaScript/React code")
     end
 
     it "assembles the rolled third and fourth in slot order" do
@@ -169,7 +174,7 @@ RSpec.describe AiService do
 
   describe "RAILS_CONCEPTS" do
     it "is a frozen 20-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(20)
+      expect(AiService::RAILS_CONCEPTS.size).to eq(25)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -189,7 +194,7 @@ RSpec.describe AiService do
 
   describe "JS_CONCEPTS" do
     it "is a frozen 22-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(22)
+      expect(AiService::JS_CONCEPTS.size).to eq(27)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -211,6 +216,50 @@ RSpec.describe AiService do
       expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS).to contain_exactly(
         "generics", "type_guards_narrowing", "union_intersection_types", "mapped_conditional_types"
       )
+    end
+  end
+
+  describe "DATA_MODELING_CONCEPTS" do
+    it "holds the five data-modeling concepts" do
+      expect(AiService::DATA_MODELING_CONCEPTS).to eq(%w[
+        missing_index wrong_cardinality missing_constraint
+        denormalization_tradeoffs unsafe_migration
+      ])
+    end
+
+    it "is frozen" do
+      expect(AiService::DATA_MODELING_CONCEPTS).to be_frozen
+    end
+
+    it "overlaps no other closed vocabulary" do
+      [ AiService::ARCHITECTURE_CONCEPTS, AiService::PLAN_REVIEW_CONCEPTS,
+        AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::RAILS_SECURITY_CONCEPTS,
+        AiService::JS_SECURITY_CONCEPTS ].each do |other|
+        expect(AiService::DATA_MODELING_CONCEPTS & other).to be_empty
+      end
+    end
+
+    it "is folded into both language vocabularies, which stay frozen" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
+      expect(AiService::RAILS_CONCEPTS).to be_frozen
+      expect(AiService::JS_CONCEPTS).to be_frozen
+    end
+  end
+
+  describe "schema_artifact in LANGUAGE_CONFIG" do
+    it "names a per-language artifact for the two real languages" do
+      expect(AiService::LANGUAGE_CONFIG["ruby_rails"][:schema_artifact]).to eq("a Rails migration")
+      expect(AiService::LANGUAGE_CONFIG["javascript"][:schema_artifact])
+        .to eq("a Prisma schema change, with the migration it generates")
+    end
+
+    # Mirrors test_framework: absent for the pseudo-language buckets, which
+    # never generate a code_review section.
+    it "is absent for the pseudo-language buckets" do
+      %w[architecture plan_review ambiguity_hunt].each do |bucket|
+        expect(AiService::LANGUAGE_CONFIG[bucket][:schema_artifact]).to be_nil
+      end
     end
   end
 
@@ -317,20 +366,57 @@ RSpec.describe AiService do
       )
     end
 
-    it "names only RSpec in the code_review test-file clause on a Rails day" do
-      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+    it "asks for the language's test code, in its test framework, in the code_review guidance on a test-file day" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :test_file)
       expect(prompt).to include(
-        "Roughly 1 in 4 sessions, make it an RSpec-style test file exhibiting a real test smell instead"
+        "The code_review snippet must be an RSpec-style Ruby/Rails test file — a realistic test file exhibiting one real test smell"
       )
-      expect(prompt).not_to include("Jest/Vitest")
     end
 
-    it "names only Jest/Vitest in the code_review test-file clause on a JavaScript day" do
+    it "asks for JavaScript/React test code, in its test framework, in the code_review guidance on a test-file day" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript", code_review_mode: :test_file)
+      expect(prompt).to include(
+        "The code_review snippet must be a Jest/Vitest-style JavaScript/React test file — a realistic test file exhibiting one real test smell"
+      )
+    end
+
+    it "asks for the day's schema artifact in the code_review guidance on a schema-review day" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :schema_review)
+      expect(prompt).to include("The code_review snippet must be a Rails migration")
+      expect(prompt).to include("one planted data-modeling flaw")
+    end
+
+    it "asks for realistic application code by default" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+      expect(prompt).to include("The code_review snippet must be realistic Ruby/Rails code — not toy examples.")
+    end
+
+    # pattern and the rotating third keep the data-modeling concepts in their
+    # vocabulary on every day, so the model can draw one when no schema
+    # artifact is on offer. This line is what keeps that from being read as
+    # license to write a second schema review into a section that isn't one.
+    it "tells the model to express a data-modeling concept in the host section's own idiom" do
+      prompt = service.send(:build_exercise_prompt, user, "javascript")
+      expect(prompt).to include("may be tagged on any section")
+      expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
+      expect(prompt).to include("not for a migration to review")
+    end
+
+    # Named from the constant, not retyped: a concept added to the vocabulary
+    # without appearing here would be one the model has no idiom rule for.
+    it "names every data-modeling concept in that line" do
       prompt = service.send(:build_exercise_prompt, user, "javascript")
       expect(prompt).to include(
-        "Roughly 1 in 4 sessions, make it a Jest/Vitest-style test file exhibiting a real test smell instead"
+        "The data-modeling concepts (#{AiService::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section."
       )
-      expect(prompt).not_to include("RSpec")
+    end
+
+    # It applies to the day's other sections regardless of what code_review is
+    # doing — on a schema-review day the sentence is what tells the model the
+    # other sections are NOT also schema reviews.
+    it "states the idiom rule on a schema-review day too" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :schema_review)
+      expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
     end
 
     it "embeds per-session concepts with per-section self and AI ratings" do
@@ -519,6 +605,41 @@ RSpec.describe AiService do
                             reinforcement: [], due_checks: [ cm ])
 
       expect(prompt).to include("Retention checks due today: service_boundaries (architecture section)")
+    end
+
+    def annotation(concept, language:, third:, mode:)
+      cm = ConceptMastery.new(user: user, concept: concept, language: language,
+                              tier: :standard, next_retention_check_on: Date.current,
+                              retention_interval_days: 7)
+      service.send(:annotate_retention_concept, cm, third, mode)
+    end
+
+    it "offers code_review for a data-modeling concept only on a schema-review day" do
+      expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("missing_index (code_review, pattern, or challenge)")
+      expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :application_code))
+        .to eq("missing_index (pattern or challenge)")
+    end
+
+    it "withholds code_review from an ordinary concept on a schema-review day" do
+      expect(annotation("n_plus_one", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("n_plus_one (pattern or challenge)")
+    end
+
+    it "is unchanged for an ordinary concept on a non-schema day" do
+      expect(annotation("n_plus_one", language: "ruby_rails", third: :challenge, mode: :application_code))
+        .to eq("n_plus_one (code_review, pattern, or challenge)")
+      expect(annotation("n_plus_one", language: "ruby_rails", third: :architecture, mode: :application_code))
+        .to eq("n_plus_one (code_review or pattern)")
+      expect(annotation("memoization", language: "ruby_rails", third: :security_review, mode: :application_code))
+        .to eq("memoization (code_review or pattern)")
+      expect(annotation("sql_injection_prevention", language: "ruby_rails", third: :security_review, mode: :application_code))
+        .to eq("sql_injection_prevention (code_review, pattern, or security_review)")
+    end
+
+    it "still routes an architecture-bucket concept to its own section" do
+      expect(annotation("service_boundaries", language: "architecture", third: :architecture, mode: :application_code))
+        .to eq("service_boundaries (architecture section)")
     end
   end
 
@@ -824,7 +945,9 @@ RSpec.describe AiService do
     it "threads the rolled third-section kind into the exercise prompt" do
       set = { "code_review" => { "concept" => "n_plus_one" } }
       svc = double_class.new(canned_text: set.to_json)
-      allow(DailyPlan).to receive(:roll_third_section).and_return(:architecture)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
     end
@@ -866,7 +989,9 @@ RSpec.describe AiService do
       end
       set = { "code_review" => { "concept" => "n_plus_one" } }
       svc = spy_class.new(canned_text: set.to_json)
-      allow(DailyPlan).to receive(:roll_third_section).and_return(:challenge)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc.generate_exercise(user, language: "ruby_rails")
 
@@ -905,7 +1030,9 @@ RSpec.describe AiService do
           end
         end
         svc = spy_class.new(canned_text: { "code_review" => { "concept" => "n_plus_one" } }.to_json)
-        allow(DailyPlan).to receive(:roll_third_section).and_return(third)
+        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(third)
+        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
         svc.generate_exercise(user, language: "ruby_rails")
         captured_prompt
@@ -999,7 +1126,9 @@ RSpec.describe AiService do
       set = { "plan_review" => { "concept" => "scope_creep" } }
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
-      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       logged = []
       allow(Rails.logger).to receive(:info) do |msg|
@@ -1093,6 +1222,34 @@ RSpec.describe AiService do
       expect(payload["delivered"]["ambiguity_hunt"]["request"]).to eq("Build us a leaderboard")
       # Redaction is for the log only — the persisted set still carries the key.
       expect(problem_set["ambiguity_hunt"]["planted_ambiguities"]).to eq(planted)
+    end
+
+    # Every other code_review_mode example in this file calls
+    # build_exercise_prompt directly, which defaults code_review_mode to
+    # :application_code — so none of them would notice if generate_exercise
+    # stopped passing plan.code_review_mode through. This is the one example
+    # on the real #generate_exercise path: it proves the rolled mode reaches
+    # both the prompt the provider receives and the logged payload.
+    it "threads the rolled mode into both the prompt and the diagnostics payload" do
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+
+      set = { "code_review" => { "concept" => "missing_index" } }
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(svc.last_prompt).to include("The code_review snippet must be a Rails migration")
+
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+      expect(payload["requested"]["code_review_mode"]).to eq("schema_review")
     end
   end
 
@@ -1978,7 +2135,9 @@ RSpec.describe AiService do
   describe "#generate_exercise threads the fourth slot through" do
     it "asks the provider for a fourth section matching the plan's rolled kind" do
       allow(DailyPlan).to receive(:for).and_call_original
-      allow(DailyPlan).to receive(:roll_fourth_section).and_return(:ambiguity_hunt)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:ambiguity_hunt)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },

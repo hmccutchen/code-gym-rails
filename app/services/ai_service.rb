@@ -144,22 +144,46 @@ class AiService
   # `dependency_vulnerability_management` is a process/tooling habit (running
   # an audit tool, reviewing a Dependabot PR) that no code snippet can test —
   # the wrong shape for this app's format entirely.
-  RAILS_CONCEPTS = %w[
+
+  # Data-modeling concepts, folded into BOTH language vocabularies rather than
+  # given a bucket of their own. A bucket is not possible here: ConceptBucket
+  # dispatches on section key, and this content mode's key is still
+  # "code_review". Per-language mastery tracking is the accepted cost, and is
+  # arguably correct — indexing and migration-safety concerns differ enough
+  # between an ActiveRecord/Postgres context and a Prisma one to track apart.
+  #
+  # One shared list rather than two, unlike RAILS_SECURITY_CONCEPTS /
+  # JS_SECURITY_CONCEPTS, whose contents genuinely differ. These do not: the
+  # Prisma artifact is relational, so every entry means the same thing in both
+  # languages. Two identical lists would only be somewhere to drift.
+  #
+  # `unsafe_migration` is operational rather than structural, and belongs
+  # anyway: the artifact under review IS a migration, so its safety is in
+  # frame by construction. It passes the same depth filter as the rest — a
+  # lock is the easy version, backfill-then-constrain across deploys the
+  # harder one, knowing when the safe path isn't worth its complexity the
+  # hardest.
+  DATA_MODELING_CONCEPTS = %w[
+    missing_index wrong_cardinality missing_constraint
+    denormalization_tradeoffs unsafe_migration
+  ].freeze
+
+  RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ].freeze
+  ] + DATA_MODELING_CONCEPTS).freeze
 
-  JS_CONCEPTS = %w[
+  JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
     this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
     memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ].freeze
+  ] + DATA_MODELING_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -232,6 +256,7 @@ class AiService
       security_concepts: RAILS_SECURITY_CONCEPTS,
       coach:             "Rails",
       test_framework:    "an RSpec-style",
+      schema_artifact:   "a Rails migration",
       focus:             "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
     },
     "javascript" => {
@@ -240,6 +265,8 @@ class AiService
       security_concepts: JS_SECURITY_CONCEPTS,
       coach:             "JavaScript/React",
       test_framework:    "a Jest/Vitest-style",
+      # Prisma schema change with its migration: unsafe_migration cannot be planted in a schema.prisma, which has no migration semantics.
+      schema_artifact:   "a Prisma schema change, with the migration it generates",
       focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
     },
     "architecture" => {
@@ -323,7 +350,8 @@ class AiService
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
                                     established: plan.established, history: history,
                                     fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
-                                    fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established)
+                                    fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
+                                    code_review_mode: plan.code_review_mode)
     )
 
     ingested = ProblemSetIngest.call(
@@ -333,8 +361,8 @@ class AiService
     # After ingest, never during: ingest writes nothing and raises on an
     # unusable set, so a rejected response cannot have left a suggestion behind.
     record_suggested_concepts(ingested.suggested_concepts)
-    log_retention(user, language, plan.due_checks, problem_set)
-    log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set)
+    log_retention(user, language, plan.due_checks, problem_set, plan.code_review_mode)
+    log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set, plan.code_review_mode)
     log_difficulty_diagnostics(user, language, plan, problem_set, history)
     problem_set
   end
@@ -480,8 +508,7 @@ class AiService
   # Fully unpersisted: no `daily_response` argument, no draft-answer context,
   # no read of any stored state. `thread` is the client's own in-memory
   # conversation so far, sent back on every request — used only to build this
-  # one prompt, never written anywhere. See
-  # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
+  # one prompt, never written anywhere.
   def duck_response(user, exercise, section:, message:, thread: [])
     context = duck_section_context(exercise, section)
     thread_text = render_thread(thread, empty_message: "(no prior messages)")
@@ -604,21 +631,37 @@ class AiService
   # A due retention concept's `language` bucket names which vocabulary it was
   # validated against, but not which section(s) that vocabulary is legal in
   # today — without this the model has no way to know an architecture-vocabulary
-  # concept can't go in code_review, guesses wrong, and ProblemSetIngest
-  # rewrites a correctly-honored check into a false "miss". A language-bucket
-  # concept is legal in challenge always, but in security_review only when
-  # it's one of that language's security_concepts (RAILS_SECURITY_CONCEPTS/
-  # JS_SECURITY_CONCEPTS) — security_review draws from that restricted list
-  # exclusively, so any other concept can only land in code_review/pattern.
-  def annotate_retention_concept(cm, third)
-    if cm.language == "architecture"
-      "#{cm.concept} (architecture section)"
-    elsif third == :architecture
-      "#{cm.concept} (code_review or pattern)"
-    elsif third == :security_review && !config_for(cm.language)[:security_concepts].include?(cm.concept)
-      "#{cm.concept} (code_review or pattern)"
-    else
-      "#{cm.concept} (code_review, pattern, or #{third})"
+  # concept can't go in code_review, guesses wrong, and ingest rewrites a
+  # correctly-honored check into a false "miss".
+  #
+  # code_review's legal concepts now depend on the day's content mode as well:
+  # a schema-review day hosts only data-modeling concepts, and every other day
+  # hosts only the rest. pattern and the language-vocabulary thirds are
+  # unscoped, which is what keeps a due data-modeling concept reachable on a
+  # non-schema day.
+  def annotate_retention_concept(cm, third, code_review_mode)
+    return "#{cm.concept} (architecture section)" if cm.language == "architecture"
+
+    hosts = []
+    hosts << "code_review" if data_modeling?(cm.concept) == (code_review_mode == :schema_review)
+    hosts << "pattern"
+    hosts << third.to_s if third_can_host?(cm, third)
+
+    "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
+  end
+
+  def data_modeling?(concept)
+    DATA_MODELING_CONCEPTS.include?(concept)
+  end
+
+  # An architecture third draws from its own vocabulary, and a security_review
+  # third from a restricted subset, so neither can host an arbitrary
+  # language-bucket concept.
+  def third_can_host?(cm, third)
+    case third
+    when :architecture    then false
+    when :security_review then config_for(cm.language)[:security_concepts].include?(cm.concept)
+    else                       true
     end
   end
 
@@ -676,7 +719,7 @@ class AiService
   # Takes a ConceptBucket rather than a language because the fourth slot's
   # track is bucket-scoped and language-independent; for the three-slot track
   # the bucket IS the day's language (see ConceptBucket.for).
-  def log_retention(user, bucket, due_checks, problem_set)
+  def log_retention(user, bucket, due_checks, problem_set, code_review_mode)
     return if due_checks.empty?
 
     offered = due_checks.map(&:concept)
@@ -685,6 +728,7 @@ class AiService
 
     Rails.logger.info(
       "[retention] user=#{user.id} date=#{Date.current} bucket=#{bucket} " \
+      "code_review_mode=#{code_review_mode} " \
       "offered=#{offered.join(',').presence || '-'} " \
       "honored=#{honored.join(',').presence || '-'} " \
       "tagged=#{tagged.join(',').presence || '-'}"
@@ -699,7 +743,7 @@ class AiService
   # working before changing any generation logic on a hunch. Read alongside
   # ResponsesController#log_review_diagnostics (correlated by user_id + date).
   # Safe to remove once that question is settled. See
-  # docs/superpowers/specs/2026-08-11-difficulty-diagnostics-logging-design.md.
+  # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
   def log_difficulty_diagnostics(user, language, plan, problem_set, history)
     payload = {
       event: "generation",
@@ -708,6 +752,7 @@ class AiService
       language: language,
       requested: {
         skill_level: user.skill_level,
+        code_review_mode: plan.code_review_mode,
         reinforcement: plan.reinforcement,
         due_checks: plan.due_checks.map(&:concept),
         established: plan.established.map(&:concept),
@@ -783,7 +828,8 @@ class AiService
   # never see two different snapshots of the same user's history.
   def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [],
                             established: [], history: user.recent_performance,
-                            fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [])
+                            fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
+                            code_review_mode: :application_code)
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -815,7 +861,7 @@ class AiService
       if due_checks.any?
         <<~RET.chomp
 
-          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third) }.join(', ')}
+          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third, code_review_mode) }.join(', ')}
           - These are concepts the engineer previously MASTERED. Each is annotated with the section(s) it may occupy — work it into one of those in the schema below, alongside the reinforcement concepts.
           - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
           - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.
@@ -887,14 +933,10 @@ class AiService
     label  = config[:label]
     focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
 
-    test_file_clause =
-      if config[:test_framework].present?
-        " Roughly 1 in 4 sessions, make it #{config[:test_framework]} test file exhibiting a real test smell instead — same question shape (\"what's the issue here, and how would you fix it\")."
-      else
-        ""
-      end
-
     third_guidance = generation_guidance_for(third_kind, language)
+
+    code_review_guidance = generation_guidance_for(ExerciseSection::CodeReview, language, mode: code_review_mode)
+    pattern_guidance     = generation_guidance_for(ExerciseSection::Pattern, language)
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -914,7 +956,6 @@ class AiService
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
       - If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
       - Prioritize focus areas they've missed or rated hard recently.
-      - The code_review snippet must be realistic #{label} code — not toy examples.#{test_file_clause}
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
@@ -925,8 +966,11 @@ class AiService
       - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
       - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
       - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
+      #{code_review_guidance}
+      #{pattern_guidance}
       #{third_guidance}
       #{fourth_guidance}
+      #{data_modeling_idiom_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -941,17 +985,42 @@ class AiService
     PROMPT
   end
 
-  # A rolled kind's generation instructions. Takes the kind ExerciseSection
-  # .for_plan already resolved rather than the raw symbol, so slot eligibility
-  # is validated in one place. The kind's own vocabulary is resolved through
-  # ProblemSetIngest.vocabulary_for — the same lookup ingest validates against
-  # — so the guidance can never name a vocabulary the normalizer would then
-  # rewrite a concept away from.
-  def generation_guidance_for(kind, language)
+  # Data-modeling concepts sit in both language vocabularies, so pattern and
+  # the rotating third can draw one on any day — that reachability is the
+  # point (a due retention check must have somewhere to land when code_review
+  # isn't in schema-review mode). What it must not do is turn those sections
+  # into a second schema review: only a schema-review code_review presents an
+  # artifact. Stated once, for every section, rather than repeated into each
+  # kind's guidance, since it is a rule about the concept and not about any
+  # one kind.
+  def data_modeling_idiom_guidance
+    "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section. " \
+      "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
+      "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
+      "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
+      "migration to review."
+  end
+
+  # A kind's generation instructions. The vocabulary comes from
+  # ProblemSetIngest.selectable_vocabulary_for, which is always a subset of
+  # what ingest validates against — so the guidance can never name a concept
+  # the normalizer would then rewrite away, and never has to name one the
+  # kind's own format cannot express.
+  #
+  # Every kind gets the same context and reads what it needs (see
+  # ExerciseSection.generation_guidance). No branch on which kind this is:
+  # one lived here for code_review's mode arguments, which put per-kind
+  # knowledge back into the shared assembler that .generation_guidance exists
+  # to keep it out of.
+  def generation_guidance_for(kind, language, mode: nil)
+    config = config_for(language)
+
     kind.generation_guidance(
-      vocabulary:          ProblemSetIngest.vocabulary_for(kind.key, language),
-      language_vocabulary: config_for(language)[:concepts],
-      label:               config_for(language)[:label]
+      vocabulary:     ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode),
+      label:          config[:label],
+      mode:           mode,
+      artifact:       config[:schema_artifact],
+      test_framework: config[:test_framework]
     )
   end
 

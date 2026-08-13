@@ -320,8 +320,7 @@ class ResponsesController < ApplicationController
   # created or written to. The client sends its own full in-memory thread on
   # every request; the server uses it only to build this one prompt. Reads
   # today's exercise/response only to build context and enforce the
-  # unsubmitted gate — never writes to either. See
-  # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
+  # unsubmitted gate — never writes to either.
   def duck_thread
     exercise = current_user.daily_exercises.for_date.first
     # A JSON body, not head :not_found — the client's fetch handler always
@@ -444,7 +443,7 @@ class ResponsesController < ApplicationController
   # AiService#log_difficulty_diagnostics (correlated by user_id + date) as
   # "here's what we asked for, here's what we got, here's how it was rated."
   # Safe to remove once that question is settled. See
-  # docs/superpowers/specs/2026-08-11-difficulty-diagnostics-logging-design.md.
+  # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
   def log_review_diagnostics(response, sections)
     payload = {
       event: "review",

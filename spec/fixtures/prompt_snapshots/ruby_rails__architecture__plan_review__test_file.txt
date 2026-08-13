@@ -1,0 +1,95 @@
+Generate a daily Code Gym exercise set for this engineer.
+
+Engineer profile:
+- Name: Snapshot
+- Skill level: developing (beginner → developing → solid → strong)
+- Priority focus areas: general Ruby/Rails patterns
+
+Recent performance (last 10 sessions):
+No history yet — this is their first exercise set.
+
+Concepts needing reinforcement right now: none
+Fourth-section (plan_review) concept needing reinforcement: none
+
+Instructions:
+- If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
+- If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
+- Prioritize focus areas they've missed or rated hard recently.
+- Rotate between topics across sessions — avoid the same pattern two days in a row.
+- Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
+
+- Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: background job processing, api versioning and deprecation, activerecord query construction, component state management, data export and reporting, webhook delivery, rate limiting, multi tenant data isolation (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
+- Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
+- answer_scaffold (pattern and architecture only): 4 labels at most, 80 characters at most each, ending in a colon. These pre-fill the answer box, so write them for THIS question specifically — name the parts a complete answer to it must cover, in the order someone should think them through (e.g. for a caching decision: "Which option, and why:", "How you'd handle a stale entry:"). Generic prompts that would fit any question of this kind are a wasted scaffold. Each is a heading the engineer writes UNDER, so it must ask for something, never state or hint at the answer — the teaching_note rules apply here too.
+- Every "diagram" field is Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not. Node labels must be short (a few words); use quoted labels like A["Order service"] when a label contains spaces or punctuation.
+- A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
+- When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
+- Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
+- The code_review snippet must be an RSpec-style Ruby/Rails test file — a realistic test file exhibiting one real test smell, same question shape ("what's the issue here, and how would you fix it").
+- Choose the code_review concept from this vocabulary, exactly one: n_plus_one, transaction_safety, memoization, service_objects, scope_chaining, idempotency, authorization, background_jobs, caching, validations, callbacks_vs_service, query_objects, policy_objects, indexing, concurrency, error_handling, mass_assignment_protection, sql_injection_prevention, over_mocking, testing_implementation_not_behavior
+- Choose the pattern concept from this vocabulary, exactly one: n_plus_one, transaction_safety, memoization, service_objects, scope_chaining, idempotency, authorization, background_jobs, caching, validations, callbacks_vs_service, query_objects, policy_objects, indexing, concurrency, error_handling, mass_assignment_protection, sql_injection_prevention, over_mocking, testing_implementation_not_behavior, missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
+- The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
+- Keep the architecture scenario SHORT: 2-3 sentences, ~50 words maximum, and exactly 2-3 concrete constraints total. Usually the observable symptom plus one hard technical constraint is enough — pick only the constraints the decision actually turns on, and leave the rest out. Do NOT stack scale figures, team size, infrastructure detail, budget, and timeline into one scenario.
+- Short does not mean vague: name real numbers and real systems for the 2-3 constraints you do include. Fewer constraints, not fuzzier ones.
+- The architecture question itself is one sentence — do not restate the scenario in it.
+- Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: sync_vs_async, service_boundaries, coupling_cohesion, data_consistency_tradeoffs, caching_strategy, build_vs_buy, scaling_bottlenecks, failure_mode_design, api_versioning, event_driven_vs_request_response, data_ownership, idempotency_at_scale, observability_tradeoffs
+- The architecture reference's "diagram" shows the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
+- The fourth section is a PLAN REVIEW: "plan_excerpt" is a short prose implementation plan, framed as if written by an AI assistant, short enough to review in one sitting (2-4 short paragraphs or a short numbered list, never a full design doc). It must contain 2-3 planted flaws that span levels — one real technical anti-pattern, one scope-creep item, one unflagged behavior change — never three of the same category.
+- Choose the plan_review concept from this vocabulary, exactly one: unjustified_constant, contradicts_existing_pattern, scope_creep, silent_behavior_change
+- The data-modeling concepts (missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration) may be tagged on any section. Only a schema-review code_review presents a schema artifact to review — anywhere else, express the concept in that section's own idiom: a pattern question about wrong_cardinality asks how the relationship should be modeled and what the wrong shape costs the code that uses it, not for a migration to review.
+- Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
+- Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
+
+
+
+
+- Concepts most recently rated "too easy" must not repeat within the same week.
+- Concepts most recently rated "right level" have no special weighting.
+
+Return JSON matching this schema exactly:
+{
+  "code_review": {
+    "question": "string — what to find/fix",
+    "snippet":  "string — ~10-15 lines, matching the code_review snippet instruction above",
+    "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+    "concept": "string — exactly one concept from the provided vocabulary",
+    "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+    "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
+  },
+  "pattern": {
+    "title":    "string — pattern name",
+    "why":      "string — one sentence on why the pattern exists",
+    "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \"the code below\" — none is shown for this section.",
+    "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+    "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
+    "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+    "concept": "string — exactly one concept from the provided vocabulary",
+    "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
+  },
+  "architecture": {
+    "title":     "string — short name for the decision",
+    "scenario":  "string — 2-3 sentences, ~50 words max. Exactly 2-3 concrete constraints total, no more",
+    "question":  "string — ONE sentence asking for a decision + justification",
+    "options":   ["string — a viable approach", "string — another viable approach", "string — an optional third approach (omit for 2)"],
+    "answer_scaffold": ["string — a labelled part of a complete answer to THIS decision", "string — another part"],
+    "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+    "concept": "string — exactly one concept from the architecture vocabulary",
+    "reference": {
+      "tagline":     "string — bold one-liner",
+      "explanation": "string — 2-3 sentences",
+      "tradeoffs":   ["string — a tradeoff", "string — a tradeoff", "string — a tradeoff"],
+      "senior_lens": "string — how a senior frames the decision",
+      "diagram":     "string — Mermaid source visualizing the decision, or an empty string if no diagram would help"
+    }
+  },
+  "plan_review": {
+    "title":    "string — short name for the plan/decision under review",
+    "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+    "plan_excerpt": "string — a short prose implementation plan, framed as if written by an AI assistant, containing 2-3 planted flaws spanning levels: one real technical anti-pattern, one scope-creep item, one unflagged behavior change",
+    "question": "string — what to evaluate before approving this plan",
+    "answer_scaffold": ["string — a labelled part of a complete answer to THIS review", "string — another part"],
+    "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+    "concept": "string — exactly one concept from the provided vocabulary"
+  }
+}
+

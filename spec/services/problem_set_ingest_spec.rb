@@ -58,6 +58,46 @@ RSpec.describe ProblemSetIngest do
     end
   end
 
+  describe ".selectable_vocabulary_for" do
+    # Parsons grades by positional diff against one correct sequence, and the
+    # data-modeling concepts are not sequential — see
+    # ExerciseSection::ParsonsProblem.excluded_vocabulary_key.
+    it "withholds every data-modeling concept from parsons_problem" do
+      vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
+
+      expect(vocabulary).not_to include(*AiService::DATA_MODELING_CONCEPTS)
+      expect(vocabulary).to include("n_plus_one")
+    end
+
+    it "withholds them in both languages" do
+      %w[ruby_rails javascript].each do |language|
+        expect(described_class.selectable_vocabulary_for("parsons_problem", language))
+          .not_to include(*AiService::DATA_MODELING_CONCEPTS)
+      end
+    end
+
+    # The exclusion is exactly the five and nothing else: parsons ends up with
+    # the same list every other language-bucket kind gets, minus that group.
+    it "changes nothing about parsons beyond the exclusion" do
+      %w[ruby_rails javascript].each do |language|
+        expect(described_class.selectable_vocabulary_for("parsons_problem", language))
+          .to eq(described_class.selectable_vocabulary_for("challenge", language) - AiService::DATA_MODELING_CONCEPTS)
+      end
+    end
+
+    it "leaves every other kind's selectable vocabulary alone" do
+      %w[pattern challenge security_review architecture plan_review ambiguity_hunt].each do |key|
+        expect(described_class.selectable_vocabulary_for(key, "ruby_rails"))
+          .to eq(described_class.vocabulary_for(key, "ruby_rails")), "#{key} was narrowed unexpectedly"
+      end
+    end
+
+    it "still narrows code_review by its content mode" do
+      expect(described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review))
+        .to eq(AiService::DATA_MODELING_CONCEPTS)
+    end
+  end
+
   describe ".vocabulary_for" do
     it "resolves each kind's vocabulary through its vocabulary_key" do
       expect(described_class.vocabulary_for("code_review", "ruby_rails")).to eq(AiService::RAILS_CONCEPTS)
@@ -68,8 +108,51 @@ RSpec.describe ProblemSetIngest do
       expect(described_class.vocabulary_for("ambiguity_hunt", "ruby_rails")).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
     end
 
+    # The asymmetry that matters: generation declines to ASK parsons for a
+    # data-modeling concept, but if one arrives anyway it is a real tag and is
+    # kept. Rewriting it to "other" would destroy history over a preference.
+    it "still accepts a data-modeling concept tagged on parsons_problem" do
+      expect(described_class.vocabulary_for("parsons_problem", "ruby_rails")).to include("missing_index")
+
+      result = described_class.call({ "parsons_problem" => { "concept" => "missing_index" } }, language: "ruby_rails")
+
+      expect(result.problem_set["parsons_problem"]["concept"]).to eq("missing_index")
+      expect(result.suggested_concepts).to be_empty
+    end
+
     it "falls back to the language vocabulary for a section key a provider invented" do
       expect(described_class.vocabulary_for("made_up_section", "ruby_rails")).to eq(AiService::RAILS_CONCEPTS)
+    end
+
+    # Ingest validates a persisted set and does not know which mode produced
+    # it, so it passes no mode and gets the full list. The narrowing exists to
+    # steer generation, not to reject a concept after the fact.
+    it "returns the full language vocabulary for code_review with no mode" do
+      expect(described_class.vocabulary_for("code_review", "ruby_rails"))
+        .to eq(AiService::RAILS_CONCEPTS)
+    end
+
+    it "narrows code_review to the data-modeling concepts on a schema-review day" do
+      expect(described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review))
+        .to eq(AiService::DATA_MODELING_CONCEPTS)
+    end
+
+    it "excludes the data-modeling concepts on the other two modes" do
+      %i[application_code test_file].each do |mode|
+        vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: mode)
+        expect(vocabulary).not_to include(*AiService::DATA_MODELING_CONCEPTS)
+        expect(vocabulary).to include("n_plus_one")
+      end
+    end
+
+    # pattern keeps the full vocabulary: it is the only section that can host
+    # a data-modeling concept on a non-schema day, which keeps a due retention
+    # check reachable.
+    it "leaves pattern unnarrowed on every mode" do
+      %i[application_code test_file schema_review].each do |mode|
+        expect(described_class.selectable_vocabulary_for("pattern", "ruby_rails", mode: mode))
+          .to eq(AiService::RAILS_CONCEPTS)
+      end
     end
   end
 

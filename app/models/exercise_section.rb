@@ -102,6 +102,19 @@ class ExerciseSection
       :concepts
     end
 
+    # A group of concepts this kind may never be assigned at generation, named
+    # the same way vocabulary_key names a vocabulary: the kind says which
+    # group, the resolver owns the constant.
+    #
+    # Generation-time only. A concept excluded here is still perfectly valid if
+    # it arrives on this kind anyway — ingest validates against the full
+    # vocabulary and normalizes it as usual, because rewriting a concept the
+    # provider actually tagged would destroy history over a preference about
+    # what to ask for.
+    def excluded_vocabulary_key
+      nil
+    end
+
     # This kind's entry in the generation schema — the JSON object the provider
     # is told to return for it, under this kind's own key. `label` names the
     # day's language for the code-bearing fields; AiService still owns
@@ -117,18 +130,21 @@ class ExerciseSection
     end
 
     # The generation prompt's instruction block for this kind — how to write
-    # it, and which vocabulary its concept comes from. Asked only of the kinds
-    # that occupy the rolled third and fourth slots; code_review and pattern
-    # carry no per-kind instructions, so asking them is a bug and raises.
+    # it, and which vocabulary its concept comes from. Every kind states its
+    # own vocabulary and none speaks for another, which is what keeps the
+    # instruction a reader sees for one section independent of what rolled
+    # into another (see issue #81, fixed by that rule).
     #
-    # `vocabulary` is this kind's own, resolved by the caller from
-    # .vocabulary_key. `language_vocabulary` is the day's language vocabulary,
-    # which is a *different* list for architecture and security_review — it is
-    # here only because three of the four thirds carry a stray instruction
-    # about code_review and pattern's vocabulary inside their own guidance.
-    # That misplacement is a live defect, tracked in issue #81; when it is
-    # fixed this parameter goes away.
-    def generation_guidance(vocabulary:, language_vocabulary:, label:)
+    # Every kind is handed the same context and reads only the part it needs:
+    # `vocabulary` (this kind's own, resolved by the caller from
+    # .vocabulary_key), `label`, `mode` (the rolled content mode — only
+    # code_review has one today), and `artifact`/`test_framework` (the day's
+    # language config, which only a code_review mode reads). Uniform, so the
+    # assembler never has to know which kind it is holding; a kind that reads
+    # none of the optional values absorbs them with `**` rather than naming
+    # them. Widening this context stays a one-line change here and at the
+    # single call site, and touches no other kind.
+    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil)
       raise NotImplementedError, "#{self} must implement .generation_guidance"
     end
 

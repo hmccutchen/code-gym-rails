@@ -12,12 +12,10 @@ class ExerciseSection::Challenge < ExerciseSection
     "answer code-answer"
   end
 
-  # As in ParsonsProblem, the "each section's concept" line speaks for
-  # code_review and pattern too. See issue #81.
-  def self.generation_guidance(vocabulary:, language_vocabulary:, label:)
+  def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.
-      - Choose each section's concept from this fixed vocabulary, exactly one per section: #{language_vocabulary.join(", ")}
+      - Choose the challenge concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
     GUIDANCE
   end
 

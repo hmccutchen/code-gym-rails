@@ -472,9 +472,16 @@ RSpec.describe ExerciseSection do
     end
 
     describe ExerciseSection::CodeReview do
-      it "labels the snippet with the day's language" do
-        expect(parse(described_class)["snippet"]).to include("#{RUBY_LABEL} code")
-        expect(parse(described_class, label: JS_LABEL)["snippet"]).to include("#{JS_LABEL} code")
+      # The snippet's language/framing is mode-specific (an RSpec-style test
+      # file, a Prisma schema change, realistic Ruby/Rails code…), so the
+      # fragment defers to the content_instruction line above it in the
+      # prompt rather than restating a label here — restating it is what
+      # made a JS schema-review day describe a Prisma schema as "JavaScript
+      # code" (see #content_instruction). `label:` stays part of the
+      # contract without appearing in this string.
+      it "defers the snippet's language description to the guidance instruction" do
+        expect(parse(described_class)["snippet"]).to eq("string — ~10-15 lines, matching the code_review snippet instruction above")
+        expect(parse(described_class, label: JS_LABEL)["snippet"]).to eq("string — ~10-15 lines, matching the code_review snippet instruction above")
       end
     end
 
@@ -568,16 +575,89 @@ RSpec.describe ExerciseSection do
   describe ".generation_guidance" do
     RAILS_VOCAB = AiService::RAILS_CONCEPTS.freeze
 
-    def guidance(kind, vocabulary:, language_vocabulary: RAILS_VOCAB, label: "Ruby/Rails")
-      kind.generation_guidance(vocabulary: vocabulary, language_vocabulary: language_vocabulary, label: label)
+    def guidance(kind, vocabulary:, label: "Ruby/Rails", mode: nil, artifact: nil, test_framework: nil)
+      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
+                                artifact: artifact, test_framework: test_framework)
     end
 
-    # Only the rolled third and fourth are asked for guidance; the two fixed
-    # kinds carry no per-kind instructions, so being asked is a bug.
-    [ ExerciseSection::CodeReview, ExerciseSection::Pattern ].each do |kind|
-      it "raises for #{kind.key}, which carries no guidance" do
-        expect { guidance(kind, vocabulary: RAILS_VOCAB) }
-          .to raise_error(NotImplementedError, /generation_guidance/)
+    # The contract is uniform on purpose: AiService#generation_guidance_for
+    # hands every kind the same context and never asks which kind it holds. A
+    # kind that narrowed its signature to only what it reads would put that
+    # branch back into the shared assembler — which is the thing "adding a
+    # kind means adding a class, not editing shared code" rules out.
+    it "is accepted by every kind with the full context the assembler passes" do
+      ExerciseSection.all.each do |kind|
+        expect { guidance(kind, vocabulary: RAILS_VOCAB, mode: :application_code,
+                                 artifact: "a Rails migration", test_framework: "an RSpec-style") }
+          .not_to raise_error, "#{kind} rejected the assembler's context"
+      end
+    end
+
+    describe ExerciseSection::CodeReview do
+      it "names its own vocabulary and no other kind's" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB)
+        expect(text).to include("Choose the code_review concept from this vocabulary")
+        expect(text).to include("n_plus_one")
+        expect(text).not_to include("pattern concept")
+      end
+
+      # These two modes never receive the data-modeling concepts in
+      # production — ProblemSetIngest.vocabulary_for subtracts them — so the
+      # test must hand over the same narrowed list, or the vocabulary line
+      # renders `unsafe_migration` and the assertions below collide with a
+      # substring that has nothing to do with the mode's instruction.
+      let(:non_schema_vocabulary) { RAILS_VOCAB - AiService::DATA_MODELING_CONCEPTS }
+
+      it "asks for application code by default" do
+        text = guidance(described_class, vocabulary: non_schema_vocabulary, mode: :application_code)
+        expect(text).to include("realistic Ruby/Rails code")
+        expect(text).not_to include("test file")
+        expect(text).not_to include("migration")
+      end
+
+      it "asks for a test file on a test-file day" do
+        text = guidance(described_class, vocabulary: non_schema_vocabulary, mode: :test_file,
+                                          test_framework: "an RSpec-style")
+        expect(text).to include("an RSpec-style Ruby/Rails test file")
+        expect(text).not_to include("migration")
+      end
+
+      # The narrowing above is what production does, not a convenience: prove
+      # the two agree, so this block cannot drift from the real resolution.
+      it "is handed exactly the vocabulary ingest resolves for these modes" do
+        %i[application_code test_file].each do |mode|
+          expect(ProblemSetIngest.selectable_vocabulary_for("code_review", "ruby_rails", mode: mode))
+            .to eq(non_schema_vocabulary)
+        end
+      end
+
+      it "asks for the language's schema artifact on a schema-review day" do
+        text = guidance(described_class, vocabulary: AiService::DATA_MODELING_CONCEPTS,
+                                          label: "Ruby/Rails", mode: :schema_review,
+                                          artifact: "a Rails migration")
+        expect(text).to include("a Rails migration, ~10-15 lines, containing one planted data-modeling flaw")
+        expect(text).to include("missing_index")
+        expect(text).not_to include("n_plus_one")
+      end
+    end
+
+    describe ExerciseSection::Pattern do
+      it "names its own vocabulary and no other kind's" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB)
+        expect(text).to include("Choose the pattern concept from this vocabulary")
+        expect(text).to include("n_plus_one")
+        expect(text).not_to include("code_review concept")
+      end
+    end
+
+    # Issue #81: every kind's guidance now speaks only for itself.
+    it "has no kind stating another kind's vocabulary" do
+      ExerciseSection.all.each do |kind|
+        next if [ ExerciseSection::CodeReview, ExerciseSection::Pattern ].include?(kind)
+
+        text = guidance(kind, vocabulary: ProblemSetIngest.vocabulary_for(kind.key, "ruby_rails"))
+        expect(text).not_to include("code_review and pattern concepts"), "#{kind.key} still speaks for code_review"
+        expect(text).not_to include("each section's concept"), "#{kind.key} still speaks for every section"
       end
     end
 
@@ -597,17 +677,6 @@ RSpec.describe ExerciseSection do
         text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS)
         expect(text).to include("not a flowchart of how to decide")
       end
-
-      # Carried verbatim from the case statement this replaced. The instruction
-      # belongs to code_review and pattern, not to architecture, and the other
-      # thirds word it differently or omit it — see issue #81. Asserted so the
-      # defect stays visible and a fix has to come here deliberately.
-      it "still carries code_review and pattern's vocabulary line (issue #81)" do
-        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS,
-                                          language_vocabulary: AiService::JS_CONCEPTS)
-        expect(text).to include("Choose the code_review and pattern concepts from this vocabulary")
-        expect(text).to include("closures_in_loops")
-      end
     end
 
     describe ExerciseSection::SecurityReview do
@@ -624,9 +693,7 @@ RSpec.describe ExerciseSection do
         expect(text).to include("realistic JavaScript/React code")
       end
 
-      # The one third that says nothing about code_review/pattern's vocabulary
-      # — the other half of issue #81.
-      it "says nothing about code_review and pattern's vocabulary (issue #81)" do
+      it "says nothing about code_review and pattern's vocabulary" do
         text = guidance(described_class, vocabulary: AiService::RAILS_SECURITY_CONCEPTS)
         expect(text).not_to include("Choose the code_review and pattern concepts")
         expect(text).not_to include("Choose each section's concept")
@@ -640,10 +707,10 @@ RSpec.describe ExerciseSection do
         expect(text).to include("never a single token")
       end
 
-      it "names the language vocabulary for every section" do
-        text = guidance(described_class, vocabulary: RAILS_VOCAB, language_vocabulary: AiService::JS_CONCEPTS)
-        expect(text).to include("Choose each section's concept from this fixed vocabulary")
-        expect(text).to include("closures_in_loops")
+      it "names its own vocabulary and no other kind's" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB)
+        expect(text).to include("Choose the parsons_problem concept from this vocabulary")
+        expect(text).to include("n_plus_one")
       end
     end
 
@@ -653,10 +720,10 @@ RSpec.describe ExerciseSection do
         expect(text).to include("without giving away the answer")
       end
 
-      it "names the language vocabulary for every section" do
-        text = guidance(described_class, vocabulary: RAILS_VOCAB, language_vocabulary: AiService::JS_CONCEPTS)
-        expect(text).to include("Choose each section's concept from this fixed vocabulary")
-        expect(text).to include("closures_in_loops")
+      it "names its own vocabulary and no other kind's" do
+        text = guidance(described_class, vocabulary: RAILS_VOCAB)
+        expect(text).to include("Choose the challenge concept from this vocabulary")
+        expect(text).to include("n_plus_one")
       end
     end
 

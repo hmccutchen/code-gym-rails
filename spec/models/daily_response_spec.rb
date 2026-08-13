@@ -341,6 +341,25 @@ RSpec.describe DailyResponse, type: :model do
       expect(second.improved_code_visible?("pattern")).to be(true)
     end
 
+    # plan_review is the only kind that both carries improved_code and records
+    # its concepts under a language-independent bucket, so it is the only place
+    # the reader's bucket can disagree with the exposure index's. When it did,
+    # the "Revised plan" this section exists to show could never appear.
+    def submit_plan_review(concept:, date:)
+      ex = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "plan_review" => { "concept" => concept } })
+      user.daily_responses.create!(daily_exercise: ex, date: date, submitted_at: Time.current,
+        answers: { "plan_review" => "x" * 20 }, concept_tags: { "plan_review" => concept })
+    end
+
+    it "reveals the revised plan on a repeat exposure, despite plan_review's own bucket" do
+      first  = submit_plan_review(concept: "scope_creep", date: Date.current - 3)
+      second = submit_plan_review(concept: "scope_creep", date: Date.current - 1)
+
+      expect(first.improved_code_visible?("plan_review")).to be(false)
+      expect(second.improved_code_visible?("plan_review")).to be(true)
+    end
+
     it "is always false for the architecture section, even on a repeat exposure" do
       first  = submit(concept: "service_boundaries", date: Date.current - 3)
       second = submit(concept: "service_boundaries", date: Date.current - 1)

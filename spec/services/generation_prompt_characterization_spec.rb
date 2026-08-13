@@ -47,41 +47,43 @@ RSpec.describe "generation prompt characterization" do
     )
   end
 
-  def render(language, third, fourth)
+  def render(language, third, fourth, mode)
     service.send(
       :build_exercise_prompt, user, language,
-      third: third, fourth: fourth,
+      third: third, fourth: fourth, code_review_mode: mode,
       reinforcement: [], due_checks: [], established: [], history: [],
       fourth_reinforcement: [], fourth_due_checks: [], fourth_established: []
     )
   end
 
-  def snapshot_path(language, third, fourth)
-    SNAPSHOT_DIR.join("#{language}__#{third}__#{fourth}.txt")
+  def snapshot_path(language, third, fourth, mode)
+    SNAPSHOT_DIR.join("#{language}__#{third}__#{fourth}__#{mode}.txt")
   end
 
   DailyExercise::LANGUAGES.each do |language|
     DailyPlan::THIRD_SECTION_WEIGHTS.each_key do |third|
       DailyPlan::FOURTH_SECTION_WEIGHTS.each_key do |fourth|
-        context "#{language} / #{third} / #{fourth}" do
-          let(:prompt) { render(language, third, fourth) }
-          let(:path)   { snapshot_path(language, third, fourth) }
+        DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
+          context "#{language} / #{third} / #{fourth} / #{mode}" do
+            let(:prompt) { render(language, third, fourth, mode) }
+            let(:path)   { snapshot_path(language, third, fourth, mode) }
 
-          it "renders every section this combination presents" do
-            expect(prompt).to include(*%W[code_review pattern #{third} #{fourth}])
-          end
-
-          it "matches its recorded snapshot byte for byte" do
-            if ENV["UPDATE_PROMPT_SNAPSHOTS"]
-              FileUtils.mkdir_p(SNAPSHOT_DIR)
-              File.write(path, prompt)
+            it "renders every section this combination presents" do
+              expect(prompt).to include(*%W[code_review pattern #{third} #{fourth}])
             end
 
-            expect(path).to exist,
-              "No snapshot at #{path.relative_path_from(Rails.root)}. " \
-              "Record it against unmodified code with UPDATE_PROMPT_SNAPSHOTS=1."
+            it "matches its recorded snapshot byte for byte" do
+              if ENV["UPDATE_PROMPT_SNAPSHOTS"]
+                FileUtils.mkdir_p(SNAPSHOT_DIR)
+                File.write(path, prompt)
+              end
 
-            expect(prompt).to eq(File.read(path))
+              expect(path).to exist,
+                "No snapshot at #{path.relative_path_from(Rails.root)}. " \
+                "Record it against unmodified code with UPDATE_PROMPT_SNAPSHOTS=1."
+
+              expect(prompt).to eq(File.read(path))
+            end
           end
         end
       end
@@ -91,7 +93,9 @@ RSpec.describe "generation prompt characterization" do
   it "has no snapshot left behind for a combination that no longer exists" do
     expected = DailyExercise::LANGUAGES.flat_map { |language|
       DailyPlan::THIRD_SECTION_WEIGHTS.each_key.flat_map { |third|
-        DailyPlan::FOURTH_SECTION_WEIGHTS.each_key.map { |fourth| snapshot_path(language, third, fourth).basename.to_s }
+        DailyPlan::FOURTH_SECTION_WEIGHTS.each_key.flat_map { |fourth|
+          DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key.map { |mode| snapshot_path(language, third, fourth, mode).basename.to_s }
+        }
       }
     }
 

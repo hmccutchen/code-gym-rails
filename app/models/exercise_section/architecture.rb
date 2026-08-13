@@ -21,20 +21,12 @@ class ExerciseSection::Architecture < ExerciseSection
     false
   end
 
-  # The `code_review and pattern` line below is not architecture's instruction
-  # and does not belong here — it is carried verbatim from the case statement
-  # this replaced, where three of the four thirds each stated code_review and
-  # pattern's vocabulary differently and security_review stated it not at all.
-  # Which instruction the model gets therefore depends on which third rolled.
-  # See issue #81; fixing it changes what the provider is asked for, so it is
-  # deliberately not folded into this move.
-  def self.generation_guidance(vocabulary:, language_vocabulary:, label:)
+  def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).
       - Keep the architecture scenario SHORT: 2-3 sentences, ~50 words maximum, and exactly 2-3 concrete constraints total. Usually the observable symptom plus one hard technical constraint is enough — pick only the constraints the decision actually turns on, and leave the rest out. Do NOT stack scale figures, team size, infrastructure detail, budget, and timeline into one scenario.
       - Short does not mean vague: name real numbers and real systems for the 2-3 constraints you do include. Fewer constraints, not fuzzier ones.
       - The architecture question itself is one sentence — do not restate the scenario in it.
-      - Choose the code_review and pattern concepts from this vocabulary, exactly one each: #{language_vocabulary.join(", ")}
       - Choose the architecture section's concept from this SEPARATE vocabulary, exactly one: #{vocabulary.join(", ")}
       - The architecture reference's "diagram" shows the STRUCTURE the decision is about — the services, data stores, and flows in tension — not a flowchart of how to decide.
     GUIDANCE

@@ -12,20 +12,32 @@
 # toward building one. Result is the value it hands back.
 class DailyPlan
   Result = Data.define(:third, :reinforcement, :due_checks, :established,
-                        :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established)
+                        :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
+                        :code_review_mode)
 
-  # Which third section this set gets. Named, tunable weights rather than a
-  # bare literal: architecture-reasoning most of the time, the other three kinds
-  # evenly splitting the rest.
-  # Extracted so tests can stub it — never assert on real randomness. The
-  # chosen kind is not tracked separately; the persisted third key
+  # Which third section this set gets. Equal weights: the four kinds exercise
+  # different reasoning and none is the baseline the others vary from, so
+  # variety beats depth-in-one-area here. This deliberately reverses an
+  # earlier bias toward architecture (0.75, then 0.50, then 0.40).
+  # The chosen kind is not tracked separately; the persisted third key
   # (ExerciseSection.thirds) is the record.
-  THIRD_SECTION_WEIGHTS = { architecture: 0.40, security_review: 0.20, challenge: 0.20, parsons_problem: 0.20 }.freeze
+  THIRD_SECTION_WEIGHTS = { architecture: 0.25, security_review: 0.25, challenge: 0.25, parsons_problem: 0.25 }.freeze
 
-  # The fourth slot's two kinds, 50/50 — unlike the third slot's four-way
-  # rotation (biased toward architecture), there's no reason to favor one of
-  # these two skills over the other.
+  # The fourth slot's two kinds, 50/50 — as with the third slot, there's no
+  # reason to favor one of these two skills over the other.
   FOURTH_SECTION_WEIGHTS = { plan_review: 0.5, ambiguity_hunt: 0.5 }.freeze
+
+  # Which content mode code_review takes. Equal thirds, as close as float
+  # weights get — application_code keeps a 1% edge rather than the split
+  # pretending to be exact.
+  #
+  # One roll across all three modes, not a probability per mode: the previous
+  # arrangement asked the model for "roughly 1 in 4" test-file days in the
+  # prompt itself, so nothing decided or recorded the mode and a second
+  # "occasional" mode would have compounded with the first unpredictably.
+  CODE_REVIEW_MODE_WEIGHTS = {
+    application_code: 0.34, test_file: 0.33, schema_review: 0.33
+  }.freeze
 
   # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket
   # per kind (not a single shared bucket), matching how ARCHITECTURE already
@@ -56,7 +68,7 @@ class DailyPlan
   # the prompt builder is private and returns only a string, so it cannot report
   # that (see AiService#log_retention).
   def self.for(user, language:)
-    third         = roll_third_section
+    third         = roll_weighted(THIRD_SECTION_WEIGHTS)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS)
     # An exercise has only 3 sections, so only the first 3 reinforcement concepts
     # can ever occupy one — sizing against the full (often 4-8 entry) list left
@@ -67,6 +79,16 @@ class DailyPlan
     # ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER). A merely-due check
     # is not enough to spend a reinforcement slot on — only a check nobody's
     # gotten to in a while earns the trade.
+    #
+    # This 3 is approximate, deliberately. On a schema-review day code_review
+    # hosts only data-modeling concepts, so an ordinary concept has two hosts
+    # rather than three. Left approximate because the arithmetic is advisory
+    # end to end — nothing verifies placement, and over-requesting by one costs
+    # a concept the model could not have placed anyway. Making it mode-aware
+    # would reopen this state machine, whose correctness rests on structural
+    # separation rather than on arguments about interacting conditions.
+    # AiService#log_retention already records offered-versus-honored per
+    # bucket, so if this matters it will show up there first.
     slots         = 3 - reinforcement.first(3).size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, third: third)
     due_checks    = retention_checks_for(user, language, third: third, slots: slots)
@@ -77,7 +99,7 @@ class DailyPlan
     # rather than a generalization of the 3-slot one above, because the two
     # vocabularies can never mix: keeping them structurally separate means a
     # cross-vocab item can never be placed somewhere it structurally cannot go.
-    fourth               = roll_fourth_section
+    fourth               = roll_weighted(FOURTH_SECTION_WEIGHTS)
     fourth_bucket        = FOURTH_BUCKET_FOR.fetch(fourth)
     # Truncated to the slot's capacity before anything else reads it: the full
     # list runs 4-5 entries deep on a small vocabulary, and every entry past
@@ -94,41 +116,32 @@ class DailyPlan
     fourth_established   = established_concepts_for_bucket(user, fourth_bucket,
                                                             reinforcement: fourth_reinforcement, due_checks: fourth_due_checks)
 
+    code_review_mode = roll_weighted(CODE_REVIEW_MODE_WEIGHTS)
+
     Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established,
                fourth: fourth, fourth_reinforcement: fourth_reinforcement,
-               fourth_due_checks: fourth_due_checks, fourth_established: fourth_established)
+               fourth_due_checks: fourth_due_checks, fourth_established: fourth_established,
+               code_review_mode: code_review_mode)
   end
 
-  # Cumulative weights are rounded before comparison: summing float weights
-  # (0.40 + 0.20 == 0.6000000000000001) otherwise shifts each boundary by an
-  # ulp and hands the wrong kind back at the exact boundary value.
-  def self.roll_third_section
+  # Cumulative weights are rounded before comparison: summing float weights can
+  # land an ulp off the intended boundary (0.40 + 0.20 == 0.6000000000000001,
+  # from the earlier third-slot weights), handing the wrong kind back at the
+  # exact boundary value. No table here drifts today; the guard stays because
+  # the next set of weights added may.
+  # Extracted so tests can stub it — never assert on real randomness.
+  def self.roll_weighted(weights)
     r = rand
     cumulative = 0.0
 
-    THIRD_SECTION_WEIGHTS.each do |kind, weight|
+    weights.each do |kind, weight|
       cumulative += weight
       return kind if r < cumulative.round(10)
     end
 
-    THIRD_SECTION_WEIGHTS.keys.last
+    weights.keys.last
   end
-  private_class_method :roll_third_section
-
-  # Same cumulative-weight pattern as roll_third_section, over
-  # FOURTH_SECTION_WEIGHTS instead.
-  def self.roll_fourth_section
-    r = rand
-    cumulative = 0.0
-
-    FOURTH_SECTION_WEIGHTS.each do |kind, weight|
-      cumulative += weight
-      return kind if r < cumulative.round(10)
-    end
-
-    FOURTH_SECTION_WEIGHTS.keys.last
-  end
-  private_class_method :roll_fourth_section
+  private_class_method :roll_weighted
 
   # Single-bucket analog of retention_checks_for. Simpler than the 3-slot
   # version: the fourth slot's bucket is always exactly one fixed value
