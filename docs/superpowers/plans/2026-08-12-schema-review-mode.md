@@ -613,7 +613,15 @@ In `app/services/ai_service.rb`, directly above `RAILS_CONCEPTS`:
   ].freeze
 ```
 
-Append `+ DATA_MODELING_CONCEPTS` to both vocabularies:
+**Do NOT fold the constant into the vocabularies in this task.** Task 2 gave
+`code_review` and `pattern` guidance that interpolates their full vocabulary,
+so folding here would put five unscoped concepts into every day's prompt and
+change all 16 snapshots — a state where an ordinary application-code day could
+be tagged `missing_index`. Task 6 folds them in at the same moment it scopes
+them, so that state never exists in a commit.
+
+For reference, the shape Task 6 will use — note the parentheses, since
+`%w[...].freeze + OTHER` returns a new UNFROZEN array:
 
 ```ruby
   RAILS_CONCEPTS = (%w[
@@ -642,6 +650,37 @@ Add an assertion for it in the same spec block:
     end
 ```
 
+- [ ] **Step 3b: Add glossary entries for the five concepts**
+
+`spec/models/glossary_spec.rb` carries a regression guard requiring every
+entry in `RAILS_CONCEPTS + JS_CONCEPTS + ARCHITECTURE_CONCEPTS` to resolve in
+`Glossary::TERMS`, in its literal or space-normalized form. Its comment cites
+a production bug where `concurrency` had no glossary hit. Task 6 folds the
+five concepts into both vocabularies, which trips that guard unless the terms
+exist first.
+
+`Glossary::TERMS` is hand-curated, alphabetically ordered, lowercase keys,
+space-separated (the guard normalizes `_` to a space). Add these five, each
+in its correct alphabetical position, matching the surrounding entries' voice
+— one sentence, plain, explaining the idea rather than defining the words:
+
+```ruby
+    "denormalization tradeoffs" => "Deliberately duplicating data to make reads cheaper, accepting that every copy is now something you have to keep in sync.",
+    "missing constraint" => "A rule the data must obey — not null, unique, a valid foreign key — that lives only in application code, so anything writing to the database directly can violate it.",
+    "missing index" => "A column the database searches often but has no index for, so each lookup scans the whole table instead of jumping straight to the rows.",
+    "unsafe migration" => "A schema change that locks a table or rewrites it in place, blocking reads and writes for as long as it runs — usually avoidable by splitting it across deploys.",
+    "wrong cardinality" => "Modelling a relationship with the wrong shape — one-to-one where the real world has many, or a join table missing entirely — so the schema cannot represent cases the business actually has.",
+```
+
+Then verify the guard passes ahead of Task 6:
+
+```bash
+bundle exec rspec spec/models/glossary_spec.rb
+```
+
+Expected: PASS. (The guard only fires once Task 6 folds the concepts in; this
+lands the entries ahead of it so that task stays about mechanism.)
+
 - [ ] **Step 4: Add the artifact to LANGUAGE_CONFIG**
 
 Add `schema_artifact:` to the two real languages only, beside `test_framework:`:
@@ -666,9 +705,10 @@ The JavaScript artifact is the schema change *and* its migration: `unsafe_migrat
 - [ ] **Step 5: Run the suite**
 
 Run: `bundle exec rspec --exclude-pattern "system/**/*_spec.rb"`
-Expected: PASS. Snapshots untouched — nothing reads `schema_artifact` yet, and the vocabulary additions only reach the prompt via a `vocabulary.join`, which Task 6 scopes. **If snapshots change here, stop:** it means a guidance block is interpolating the full vocabulary somewhere Task 2 did not account for.
-
-Note: `RAILS_CONCEPTS.size` goes 20 → 25. Any existing example asserting a vocabulary size will need updating.
+Expected: PASS, snapshots untouched. Everything this task adds is inert: the
+constant is referenced by nothing, `schema_artifact` is read by nothing, and
+the glossary entries are additive. Vocabulary sizes are unchanged in this task
+— they grow in Task 6.
 
 - [ ] **Step 6: Commit**
 
@@ -798,6 +838,40 @@ In `spec/models/exercise_section_spec.rb`, under `describe ExerciseSection::Code
 
 Run: `bundle exec rspec spec/services/daily_plan_spec.rb spec/services/problem_set_ingest_spec.rb spec/models/exercise_section_spec.rb`
 Expected: FAIL — uninitialized `CODE_REVIEW_MODE_WEIGHTS`, unknown keyword `:mode` on `vocabulary_for`, missing mode text.
+
+- [ ] **Step 2b: Fold the concepts into both vocabularies**
+
+Deferred from Task 5 so that no commit exists in which the five concepts are
+offered to the prompt unscoped. In `app/services/ai_service.rb`:
+
+```ruby
+  RAILS_CONCEPTS = (%w[
+    n_plus_one transaction_safety memoization service_objects scope_chaining
+    idempotency authorization background_jobs caching validations
+    callbacks_vs_service query_objects policy_objects indexing concurrency
+    error_handling mass_assignment_protection sql_injection_prevention
+    over_mocking testing_implementation_not_behavior
+  ] + DATA_MODELING_CONCEPTS).freeze
+```
+
+The parentheses matter: `%w[...].freeze + OTHER` returns a new **unfrozen**
+array, silently un-freezing a vocabulary the closed-vocabulary design depends
+on. Apply the same shape to `JS_CONCEPTS`.
+
+Add to the `DATA_MODELING_CONCEPTS` spec block from Task 5:
+
+```ruby
+    it "is folded into both language vocabularies, which stay frozen" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
+      expect(AiService::RAILS_CONCEPTS).to be_frozen
+      expect(AiService::JS_CONCEPTS).to be_frozen
+    end
+```
+
+`RAILS_CONCEPTS.size` goes 20 → 25 and `JS_CONCEPTS` 22 → 27. Update any
+existing example asserting a vocabulary size or exact array equality — that is
+expected fallout. Do not weaken an assertion to make it pass; correct it.
 
 - [ ] **Step 3: Roll the mode in DailyPlan**
 
