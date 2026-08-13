@@ -153,7 +153,7 @@ class User < ApplicationRecord
   # both signals to explicitly agree the user is solid; an absent signal
   # never counts toward mastery (uncertain data defaults to reinforcement).
   # Total absence of both signals is out of scope, same as an unrated
-  # concept today. See docs/superpowers/specs/2026-07-20-mastery-loop-combined-signal-design.md.
+  # concept today.
   #
   # `bucket:`/`exclude_buckets:` scope the result by ConceptBucket — added for
   # the fourth slot's independent reinforcement track, which must never mix

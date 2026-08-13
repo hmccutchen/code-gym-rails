@@ -11,7 +11,7 @@ class SessionsController < ApplicationController
   # request came from a touch device. The code is redeemable solely in the
   # browser that requested it (see #verify_code), so mailing one to a desktop
   # requester would be noise they could never act on.
-  # See docs/superpowers/specs/2026-08-03-touch-device-gated-login-code-design.md
+  # See docs/superpowers/plans/2026-08-03-touch-device-gated-login-code.md
   def create
     email = params[:email].to_s.strip.downcase
     name  = params[:name].to_s.strip

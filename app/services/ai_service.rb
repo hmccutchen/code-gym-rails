@@ -480,8 +480,7 @@ class AiService
   # Fully unpersisted: no `daily_response` argument, no draft-answer context,
   # no read of any stored state. `thread` is the client's own in-memory
   # conversation so far, sent back on every request — used only to build this
-  # one prompt, never written anywhere. See
-  # docs/superpowers/specs/2026-08-06-duck-thread-design.md.
+  # one prompt, never written anywhere.
   def duck_response(user, exercise, section:, message:, thread: [])
     context = duck_section_context(exercise, section)
     thread_text = render_thread(thread, empty_message: "(no prior messages)")
@@ -699,7 +698,7 @@ class AiService
   # working before changing any generation logic on a hunch. Read alongside
   # ResponsesController#log_review_diagnostics (correlated by user_id + date).
   # Safe to remove once that question is settled. See
-  # docs/superpowers/specs/2026-08-11-difficulty-diagnostics-logging-design.md.
+  # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
   def log_difficulty_diagnostics(user, language, plan, problem_set, history)
     payload = {
       event: "generation",
