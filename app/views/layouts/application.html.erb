@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <%# interactive-widget=resizes-content is spec-correct and included for
+      Chromium and any future WebKit support, but WebKit is believed not to
+      implement it yet — it is NOT what keeps iOS from zooming on focus.
+      That's --input-font-size below, on every focusable control's rule. %>
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>Code Gym</title>
   <%= csrf_meta_tags %>
@@ -91,7 +95,7 @@
     .follow-up-turn { font-size: .88rem; line-height: 1.65; margin-bottom: .5rem; padding-left: .6rem; border-left: 2px solid var(--border); }
     .follow-up-user { color: var(--muted); }
     .follow-up-assistant { border-left-color: var(--accent); }
-    .follow-up-form { display: flex; gap: .5rem; }
+    .follow-up-form { display: flex; gap: .5rem; flex-wrap: wrap; }
     .follow-up-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
     .follow-up-capped { font-size: .78rem; color: var(--muted); font-style: italic; }
     .follow-up-status { font-size: .75rem; color: var(--muted); }
