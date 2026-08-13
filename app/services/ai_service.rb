@@ -631,21 +631,37 @@ class AiService
   # A due retention concept's `language` bucket names which vocabulary it was
   # validated against, but not which section(s) that vocabulary is legal in
   # today — without this the model has no way to know an architecture-vocabulary
-  # concept can't go in code_review, guesses wrong, and ProblemSetIngest
-  # rewrites a correctly-honored check into a false "miss". A language-bucket
-  # concept is legal in challenge always, but in security_review only when
-  # it's one of that language's security_concepts (RAILS_SECURITY_CONCEPTS/
-  # JS_SECURITY_CONCEPTS) — security_review draws from that restricted list
-  # exclusively, so any other concept can only land in code_review/pattern.
-  def annotate_retention_concept(cm, third)
-    if cm.language == "architecture"
-      "#{cm.concept} (architecture section)"
-    elsif third == :architecture
-      "#{cm.concept} (code_review or pattern)"
-    elsif third == :security_review && !config_for(cm.language)[:security_concepts].include?(cm.concept)
-      "#{cm.concept} (code_review or pattern)"
-    else
-      "#{cm.concept} (code_review, pattern, or #{third})"
+  # concept can't go in code_review, guesses wrong, and ingest rewrites a
+  # correctly-honored check into a false "miss".
+  #
+  # code_review's legal concepts now depend on the day's content mode as well:
+  # a schema-review day hosts only data-modeling concepts, and every other day
+  # hosts only the rest. pattern and the language-vocabulary thirds are
+  # unscoped, which is what keeps a due data-modeling concept reachable on a
+  # non-schema day.
+  def annotate_retention_concept(cm, third, code_review_mode)
+    return "#{cm.concept} (architecture section)" if cm.language == "architecture"
+
+    hosts = []
+    hosts << "code_review" if data_modeling?(cm.concept) == (code_review_mode == :schema_review)
+    hosts << "pattern"
+    hosts << third.to_s if third_can_host?(cm, third)
+
+    "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
+  end
+
+  def data_modeling?(concept)
+    DATA_MODELING_CONCEPTS.include?(concept)
+  end
+
+  # An architecture third draws from its own vocabulary, and a security_review
+  # third from a restricted subset, so neither can host an arbitrary
+  # language-bucket concept.
+  def third_can_host?(cm, third)
+    case third
+    when :architecture    then false
+    when :security_review then config_for(cm.language)[:security_concepts].include?(cm.concept)
+    else                       true
     end
   end
 
@@ -844,7 +860,7 @@ class AiService
       if due_checks.any?
         <<~RET.chomp
 
-          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third) }.join(', ')}
+          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third, code_review_mode) }.join(', ')}
           - These are concepts the engineer previously MASTERED. Each is annotated with the section(s) it may occupy — work it into one of those in the schema below, alongside the reinforcement concepts.
           - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
           - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.

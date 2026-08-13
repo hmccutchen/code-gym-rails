@@ -574,6 +574,41 @@ RSpec.describe AiService do
 
       expect(prompt).to include("Retention checks due today: service_boundaries (architecture section)")
     end
+
+    def annotation(concept, language:, third:, mode:)
+      cm = ConceptMastery.new(user: user, concept: concept, language: language,
+                              tier: :standard, next_retention_check_on: Date.current,
+                              retention_interval_days: 7)
+      service.send(:annotate_retention_concept, cm, third, mode)
+    end
+
+    it "offers code_review for a data-modeling concept only on a schema-review day" do
+      expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("missing_index (code_review, pattern, or challenge)")
+      expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :application_code))
+        .to eq("missing_index (pattern or challenge)")
+    end
+
+    it "withholds code_review from an ordinary concept on a schema-review day" do
+      expect(annotation("n_plus_one", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("n_plus_one (pattern or challenge)")
+    end
+
+    it "is unchanged for an ordinary concept on a non-schema day" do
+      expect(annotation("n_plus_one", language: "ruby_rails", third: :challenge, mode: :application_code))
+        .to eq("n_plus_one (code_review, pattern, or challenge)")
+      expect(annotation("n_plus_one", language: "ruby_rails", third: :architecture, mode: :application_code))
+        .to eq("n_plus_one (code_review or pattern)")
+      expect(annotation("memoization", language: "ruby_rails", third: :security_review, mode: :application_code))
+        .to eq("memoization (code_review or pattern)")
+      expect(annotation("sql_injection_prevention", language: "ruby_rails", third: :security_review, mode: :application_code))
+        .to eq("sql_injection_prevention (code_review, pattern, or security_review)")
+    end
+
+    it "still routes an architecture-bucket concept to its own section" do
+      expect(annotation("service_boundaries", language: "architecture", third: :architecture, mode: :application_code))
+        .to eq("service_boundaries (architecture section)")
+    end
   end
 
   describe "established prompt block" do

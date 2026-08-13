@@ -80,6 +80,16 @@ class DailyPlan
     # ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER). A merely-due check
     # is not enough to spend a reinforcement slot on — only a check nobody's
     # gotten to in a while earns the trade.
+    #
+    # This 3 is approximate, deliberately. On a schema-review day code_review
+    # hosts only data-modeling concepts, so an ordinary concept has two hosts
+    # rather than three. Left approximate because the arithmetic is advisory
+    # end to end — nothing verifies placement, and over-requesting by one costs
+    # a concept the model could not have placed anyway. Making it mode-aware
+    # would reopen this state machine, whose correctness rests on structural
+    # separation rather than on arguments about interacting conditions.
+    # AiService#log_retention already records offered-versus-honored per
+    # bucket, so if this matters it will show up there first.
     slots         = 3 - reinforcement.first(3).size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, third: third)
     due_checks    = retention_checks_for(user, language, third: third, slots: slots)
