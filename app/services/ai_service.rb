@@ -144,6 +144,30 @@ class AiService
   # `dependency_vulnerability_management` is a process/tooling habit (running
   # an audit tool, reviewing a Dependabot PR) that no code snippet can test —
   # the wrong shape for this app's format entirely.
+
+  # Data-modeling concepts, folded into BOTH language vocabularies rather than
+  # given a bucket of their own. A bucket is not possible here: ConceptBucket
+  # dispatches on section key, and this content mode's key is still
+  # "code_review". Per-language mastery tracking is the accepted cost, and is
+  # arguably correct — indexing and migration-safety concerns differ enough
+  # between an ActiveRecord/Postgres context and a Prisma one to track apart.
+  #
+  # One shared list rather than two, unlike RAILS_SECURITY_CONCEPTS /
+  # JS_SECURITY_CONCEPTS, whose contents genuinely differ. These do not: the
+  # Prisma artifact is relational, so every entry means the same thing in both
+  # languages. Two identical lists would only be somewhere to drift.
+  #
+  # `unsafe_migration` is operational rather than structural, and belongs
+  # anyway: the artifact under review IS a migration, so its safety is in
+  # frame by construction. It passes the same depth filter as the rest — a
+  # lock is the easy version, backfill-then-constrain across deploys the
+  # harder one, knowing when the safe path isn't worth its complexity the
+  # hardest.
+  DATA_MODELING_CONCEPTS = %w[
+    missing_index wrong_cardinality missing_constraint
+    denormalization_tradeoffs unsafe_migration
+  ].freeze
+
   RAILS_CONCEPTS = %w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
@@ -232,6 +256,7 @@ class AiService
       security_concepts: RAILS_SECURITY_CONCEPTS,
       coach:             "Rails",
       test_framework:    "an RSpec-style",
+      schema_artifact:   "a Rails migration",
       focus:             "real Rails patterns: N+1 queries, idempotency, background jobs, authorization, service objects, query objects, policy objects."
     },
     "javascript" => {
@@ -240,6 +265,8 @@ class AiService
       security_concepts: JS_SECURITY_CONCEPTS,
       coach:             "JavaScript/React",
       test_framework:    "a Jest/Vitest-style",
+      # Prisma schema change with its migration: unsafe_migration cannot be planted in a schema.prisma, which has no migration semantics.
+      schema_artifact:   "a Prisma schema change, with the migration it generates",
       focus:             "real JavaScript/React patterns: closures, async/event-loop pitfalls, prototypal inheritance, `this` binding, and hooks/re-renders."
     },
     "architecture" => {

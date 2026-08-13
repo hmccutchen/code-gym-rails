@@ -214,6 +214,43 @@ RSpec.describe AiService do
     end
   end
 
+  describe "DATA_MODELING_CONCEPTS" do
+    it "holds the five data-modeling concepts" do
+      expect(AiService::DATA_MODELING_CONCEPTS).to eq(%w[
+        missing_index wrong_cardinality missing_constraint
+        denormalization_tradeoffs unsafe_migration
+      ])
+    end
+
+    it "is frozen" do
+      expect(AiService::DATA_MODELING_CONCEPTS).to be_frozen
+    end
+
+    it "overlaps no other closed vocabulary" do
+      [ AiService::ARCHITECTURE_CONCEPTS, AiService::PLAN_REVIEW_CONCEPTS,
+        AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::RAILS_SECURITY_CONCEPTS,
+        AiService::JS_SECURITY_CONCEPTS ].each do |other|
+        expect(AiService::DATA_MODELING_CONCEPTS & other).to be_empty
+      end
+    end
+  end
+
+  describe "schema_artifact in LANGUAGE_CONFIG" do
+    it "names a per-language artifact for the two real languages" do
+      expect(AiService::LANGUAGE_CONFIG["ruby_rails"][:schema_artifact]).to eq("a Rails migration")
+      expect(AiService::LANGUAGE_CONFIG["javascript"][:schema_artifact])
+        .to eq("a Prisma schema change, with the migration it generates")
+    end
+
+    # Mirrors test_framework: absent for the pseudo-language buckets, which
+    # never generate a code_review section.
+    it "is absent for the pseudo-language buckets" do
+      %w[architecture plan_review ambiguity_hunt].each do |bucket|
+        expect(AiService::LANGUAGE_CONFIG[bucket][:schema_artifact]).to be_nil
+      end
+    end
+  end
+
   describe "ARCHITECTURE_CONCEPTS" do
     it "is a frozen 13-entry language-independent vocabulary" do
       expect(AiService::ARCHITECTURE_CONCEPTS.size).to eq(13)
