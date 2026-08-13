@@ -626,7 +626,7 @@ RSpec.describe ExerciseSection do
       # the two agree, so this block cannot drift from the real resolution.
       it "is handed exactly the vocabulary ingest resolves for these modes" do
         %i[application_code test_file].each do |mode|
-          expect(ProblemSetIngest.vocabulary_for("code_review", "ruby_rails", mode: mode))
+          expect(ProblemSetIngest.selectable_vocabulary_for("code_review", "ruby_rails", mode: mode))
             .to eq(non_schema_vocabulary)
         end
       end

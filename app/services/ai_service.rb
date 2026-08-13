@@ -1001,10 +1001,11 @@ class AiService
       "migration to review."
   end
 
-  # A kind's generation instructions. The kind's own vocabulary is resolved
-  # through ProblemSetIngest.vocabulary_for — the same lookup ingest validates
-  # against — so the guidance can never name a vocabulary the normalizer would
-  # then rewrite a concept away from.
+  # A kind's generation instructions. The vocabulary comes from
+  # ProblemSetIngest.selectable_vocabulary_for, which is always a subset of
+  # what ingest validates against — so the guidance can never name a concept
+  # the normalizer would then rewrite away, and never has to name one the
+  # kind's own format cannot express.
   #
   # Every kind gets the same context and reads what it needs (see
   # ExerciseSection.generation_guidance). No branch on which kind this is:
@@ -1015,7 +1016,7 @@ class AiService
     config = config_for(language)
 
     kind.generation_guidance(
-      vocabulary:     ProblemSetIngest.vocabulary_for(kind.key, language, mode: mode),
+      vocabulary:     ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode),
       label:          config[:label],
       mode:           mode,
       artifact:       config[:schema_artifact],

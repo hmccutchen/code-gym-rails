@@ -38,22 +38,22 @@ class ProblemSetIngest
     new(problem_set, language: language).call
   end
 
-  # The closed vocabulary a section's concept is validated against. Public
-  # because the generation prompt has to name the same list this will hold the
-  # answer to — AiService#generation_guidance_for calls this, so guidance and
-  # validation cannot name different vocabularies.
-  #
-  # `mode` narrows code_review to its content mode and is passed only by
-  # generation. Ingest validates a persisted set and does not know which mode
-  # produced it, so it passes none and gets the full list: the narrowing
-  # steers what is generated, and is not a reason to reject a concept after
-  # the fact.
+  # ── Two lookups, deliberately not one ────────────────────────────────────
+  # What a section's concept is VALIDATED against, and what generation may
+  # OFFER it, are different questions, and the answers diverge on purpose.
+  # They were briefly one method distinguished by whether a `mode:` was
+  # passed, which only worked while code_review was the sole kind that
+  # narrowed — parsons_problem narrows without a mode, and a nil-check cannot
+  # tell "generating a parsons problem" from "validating one".
+
+  # The closed vocabulary a section's concept is validated against, at ingest.
+  # Never narrowed: a concept the provider actually tagged is history, and
+  # rewriting it to "other" over a preference about what to ask for would
+  # destroy the record rather than correct it.
   #
   # An unrecognized section key — a provider can invent one — falls back to the
   # language's full vocabulary, as it always has.
-  def self.vocabulary_for(section_key, language, mode: nil)
-    return code_review_vocabulary(language, mode) if mode && section_key == ExerciseSection::CodeReview.key
-
+  def self.vocabulary_for(section_key, language)
     case ExerciseSection.find(section_key)&.vocabulary_key
     when :architecture      then AiService::ARCHITECTURE_CONCEPTS
     when :security_concepts then language_config(language)[:security_concepts]
@@ -63,14 +63,46 @@ class ProblemSetIngest
     end
   end
 
-  # Only the new mode is scoped. Subtracting the data-modeling concepts from
-  # the other two returns exactly the vocabulary they had before those
-  # concepts existed, so no existing mode's behavior changes.
+  # What the generation prompt may offer a section, which is the validation
+  # vocabulary minus two narrowings:
+  #
+  #   - code_review's content mode, which swaps the list wholesale
+  #   - the kind's own excluded group, for concepts whose shape its format
+  #     cannot express (see ExerciseSection.excluded_vocabulary_key)
+  #
+  # AiService#generation_guidance_for is the only caller, so guidance can never
+  # name a list ingest would reject a concept from — the narrowing is always a
+  # subset of what validation accepts.
+  def self.selectable_vocabulary_for(section_key, language, mode: nil)
+    vocabulary =
+      if mode && section_key == ExerciseSection::CodeReview.key
+        code_review_vocabulary(language, mode)
+      else
+        vocabulary_for(section_key, language)
+      end
+
+    excluded = excluded_concepts_for(section_key)
+    excluded.empty? ? vocabulary : vocabulary - excluded
+  end
+
+  # Only code_review's mode narrows this way. Subtracting the data-modeling
+  # concepts from the other two returns exactly the vocabulary they had before
+  # those concepts existed, so no existing mode's behavior changes.
   def self.code_review_vocabulary(language, mode)
     full = language_config(language)[:concepts]
     mode == :schema_review ? AiService::DATA_MODELING_CONCEPTS : full - AiService::DATA_MODELING_CONCEPTS
   end
   private_class_method :code_review_vocabulary
+
+  # The kind names its excluded group; the constant lives here, matching how
+  # vocabulary_key resolves.
+  def self.excluded_concepts_for(section_key)
+    case ExerciseSection.find(section_key)&.excluded_vocabulary_key
+    when :data_modeling then AiService::DATA_MODELING_CONCEPTS
+    else                     []
+    end
+  end
+  private_class_method :excluded_concepts_for
 
   # The vocabularies still live on AiService, which is the wrong home for them
   # now that this module is their other reader — they are domain data, not

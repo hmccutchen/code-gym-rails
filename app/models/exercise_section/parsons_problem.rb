@@ -10,6 +10,26 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
+    # Parsons is a SEQUENCING format: 5-8 blocks reordered into one correct
+    # sequence, graded by positional diff against a known-correct order. The
+    # data-modeling concepts are not sequential — "these columns are in the
+    # wrong order" is not what wrong_cardinality or missing_index means — so a
+    # Parsons problem tagged with one either degenerates into nonsense or
+    # quietly becomes about something else. A nonsense exercise costs more
+    # trust than a missed retention check does, and a due data-modeling concept
+    # still has other hosts (see AiService#annotate_retention_concept).
+    #
+    # unsafe_migration is the arguable exception: backfill-then-constrain has a
+    # genuinely correct step order, which is exactly this format's shape. It is
+    # excluded anyway, because the case for it is really evidence that
+    # unsafe_migration sits on a different axis from the other four —
+    # operational rather than structural — and the fix for that is to stop
+    # grouping it with them, not to special-case one consumer. Revisit here if
+    # that regrouping ever happens.
+    def excluded_vocabulary_key
+      :data_modeling
+    end
+
     # The answer is an ordering, not prose: a draggable, keyboard-reorderable
     # block ladder writing into a hidden field.
     def answer_partial

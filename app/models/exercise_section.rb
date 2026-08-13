@@ -102,6 +102,19 @@ class ExerciseSection
       :concepts
     end
 
+    # A group of concepts this kind may never be assigned at generation, named
+    # the same way vocabulary_key names a vocabulary: the kind says which
+    # group, the resolver owns the constant.
+    #
+    # Generation-time only. A concept excluded here is still perfectly valid if
+    # it arrives on this kind anyway — ingest validates against the full
+    # vocabulary and normalizes it as usual, because rewriting a concept the
+    # provider actually tagged would destroy history over a preference about
+    # what to ask for.
+    def excluded_vocabulary_key
+      nil
+    end
+
     # This kind's entry in the generation schema — the JSON object the provider
     # is told to return for it, under this kind's own key. `label` names the
     # day's language for the code-bearing fields; AiService still owns
