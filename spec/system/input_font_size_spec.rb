@@ -13,13 +13,18 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
   let(:user)    { create_fake_provider_user }
   let(:weekday) { a_weekday }
 
-  # Every visible control iOS would zoom on focus, with the size it renders at.
+  # Every control iOS would zoom on focus, with the size it renders at.
+  # Not filtered to currently-visible elements: computed font-size is a
+  # property of the control, not of whether it's on screen right now. A
+  # control hidden behind a toggle (the duck-thread panel, a history
+  # review's follow-up/self-explanation inputs) gets focused the moment
+  # the user opens that panel, and iOS zooms then — filtering by
+  # visibility would measure the wrong thing.
   def undersized_controls
     page.evaluate_script(<<~JS)
       Array.from(
         document.querySelectorAll("textarea, select, input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button])")
       )
-        .filter(el => el.offsetParent !== null)
         .map(el => ({
           id: el.id || el.name || el.className || el.tagName.toLowerCase(),
           size: parseFloat(getComputedStyle(el).fontSize)
