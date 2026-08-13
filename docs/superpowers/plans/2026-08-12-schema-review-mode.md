@@ -546,11 +546,8 @@ In `spec/services/ai_service_spec.rb`:
       ])
     end
 
-    # One shared list, not one per language: the Prisma artifact is relational,
-    # so every concept means the same thing in both.
-    it "is folded into both language vocabularies" do
-      expect(AiService::RAILS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
-      expect(AiService::JS_CONCEPTS).to include(*AiService::DATA_MODELING_CONCEPTS)
+    it "is frozen" do
+      expect(AiService::DATA_MODELING_CONCEPTS).to be_frozen
     end
 
     it "overlaps no other closed vocabulary" do
