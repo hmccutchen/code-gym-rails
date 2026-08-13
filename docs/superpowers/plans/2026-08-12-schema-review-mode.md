@@ -374,16 +374,15 @@ In `spec/services/daily_plan_spec.rb`:
 
     it "returns each key within its band" do
       expect(roll(0.0)).to eq(:a)
-      expect(roll(0.49)).to eq(:b == :b ? :a : :a)
+      expect(roll(0.49)).to eq(:a)
       expect(roll(0.5)).to eq(:b)
       expect(roll(0.79)).to eq(:b)
-      expect(roll(0.8)).to eq(:c)
       expect(roll(0.999)).to eq(:c)
     end
 
-    # Summing floats (0.5 + 0.3 == 0.8) can land an ulp below the boundary and
-    # hand back the wrong key at the exact boundary value.
-    it "is exact at a boundary that float addition would miss" do
+    # 0.5 + 0.3 sums to 0.7999999999999999, an ulp below the boundary, so
+    # without the .round(10) this returns :b at exactly 0.8.
+    it "is exact at a boundary float addition would miss" do
       expect(roll(0.8)).to eq(:c)
     end
 
@@ -617,16 +616,31 @@ In `app/services/ai_service.rb`, directly above `RAILS_CONCEPTS`:
 Append `+ DATA_MODELING_CONCEPTS` to both vocabularies:
 
 ```ruby
-  RAILS_CONCEPTS = %w[
+  RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ].freeze + DATA_MODELING_CONCEPTS
+  ] + DATA_MODELING_CONCEPTS).freeze
 ```
 
-Apply the same `.freeze + DATA_MODELING_CONCEPTS` to `JS_CONCEPTS`.
+Note the parenthesis placement: `%w[...].freeze + OTHER` returns a NEW,
+**unfrozen** array, silently un-freezing a vocabulary the whole "closed
+vocabulary" design depends on. The concatenation happens inside the parens
+and `.freeze` applies to the result.
+
+Apply the same `(%w[...] + DATA_MODELING_CONCEPTS).freeze` shape to
+`JS_CONCEPTS`.
+
+Add an assertion for it in the same spec block:
+
+```ruby
+    it "leaves both vocabularies frozen" do
+      expect(AiService::RAILS_CONCEPTS).to be_frozen
+      expect(AiService::JS_CONCEPTS).to be_frozen
+    end
+```
 
 - [ ] **Step 4: Add the artifact to LANGUAGE_CONFIG**
 
@@ -886,14 +900,19 @@ In `app/models/exercise_section/code_review.rb`, replace `generation_guidance`:
 In `app/services/ai_service.rb`, change `generation_guidance_for` to accept and forward the mode:
 
 ```ruby
+  # code_review is the only kind with a content mode, and so the only one that
+  # needs the day's schema artifact. Branching here rather than widening every
+  # kind's signature with a keyword seven of them would ignore.
   def generation_guidance_for(kind, language, mode: nil)
-    kind.generation_guidance(
-      **{ vocabulary: ProblemSetIngest.vocabulary_for(kind.key, language, mode: mode),
-          label:      config_for(language)[:label],
-          mode:       mode }.merge(
-            kind == ExerciseSection::CodeReview ? { artifact: config_for(language)[:schema_artifact] } : {}
-          )
-    )
+    vocabulary = ProblemSetIngest.vocabulary_for(kind.key, language, mode: mode)
+    label      = config_for(language)[:label]
+
+    if kind == ExerciseSection::CodeReview
+      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
+                               artifact: config_for(language)[:schema_artifact])
+    else
+      kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode)
+    end
   end
 ```
 
