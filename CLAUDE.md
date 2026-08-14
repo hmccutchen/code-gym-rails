@@ -54,6 +54,73 @@ prompt text sent to the provider, and in `FakeService` canned provider output.
 - **YAGNI** — build what's needed now. Don't add configuration, abstraction, or
   a table for a case that doesn't exist yet.
 
+## Standards and Authorities
+
+The principles above say what to aim for. This section says what this project
+treats as authoritative when "well-tested standard" would otherwise be left to
+interpretation.
+
+**Style baseline: `rubocop-rails-omakase`.** `.rubocop.yml` inherits it whole
+and overrides nothing. Where omakase has an opinion, that opinion wins — don't
+argue formatting in review. Two things it deliberately does *not* cover, so
+neither is machine-checkable here: `Metrics` and `Naming` are disabled outright
+(no method-length, class-length, ABC, or complexity cop runs, and no naming cop
+at all), and `Lint` is off except for three re-enabled cops.
+`Lint/UselessAssignment` is not among them, so dead locals left behind by an
+extraction are a known blind spot — grep for them yourself.
+
+**Rails-native concerns follow Rails Guides conventions.** Validations,
+callbacks, migrations, strong params, routing, and Active Record query
+construction should look the way the Guides write them. Reach for a Rails
+idiom before inventing one; if the Guides' way is wrong for a case here, say
+why in the PR description rather than quietly diverging.
+
+**Patterns this codebase has deliberately adopted.** These are settled
+decisions, not defaults that drifted into place:
+
+- **Template method for providers** — `AiService` owns prompts, vocabularies,
+  parsing, and usage logging; subclasses implement only `#call` and
+  `#build_connection`. Adding a provider is adding a subclass.
+- **Registry for section kinds** — `ExerciseSection` and its subclasses answer
+  every per-kind question (which are thirds, which scaffold, what the prompt
+  says). Adding a kind is adding a class.
+- **Pure decision objects** — `DailyPlan` decides the day's shape before any
+  provider is contacted; `ProblemSetIngest` normalizes provider output and
+  writes nothing, returning a `Result` instead. Both are pure, so their specs
+  need no database. Keep them that way.
+- **Single authority per fact** — `DailyExercise#active_section_keys` for how
+  many sections a day has, `ConceptBucket` for which vocabulary a concept
+  records under. Derive from the authority; never recount.
+
+**Deviating from an established in-repo pattern requires stating why in the PR
+description.** Deviation is allowed — patterns outlive their reasons sometimes
+— but silent deviation is not. An unexplained departure is treated as an
+oversight and blocks review.
+
+### Rules that block review
+
+These are enforced at review time (see `.github/copilot-instructions.md` for
+the full checklist), and they are here so they shape code as it is written
+rather than only catching it afterward:
+
+- No branch on section kind, provider, or concept bucket in shared code — that
+  is what the kind/provider class is for.
+- No rule stated in two places that can disagree.
+- No denominator, count, or threshold hardcoded where an authority computes it.
+- No provider-facing input read without boundary validation in
+  `ProblemSetIngest`.
+- No new behavior without a test; no assertion weakened to make one pass.
+- No comment left false by the change that touched it.
+- New methods stay under 25 lines (excluding heredoc bodies), new `app/` files
+  under 300 — or the PR says why not. Nothing enforces this mechanically;
+  `Metrics` is disabled.
+
+**What CI does and doesn't tell you.** The workflow runs RSpec, system specs,
+RuboCop, Brakeman, and `importmap audit`. It does *not* run a Ruby dependency
+CVE audit (`bundle-audit` is not installed) or any complexity check, and this
+repository has no branch protection — so no check gates a merge. CI is
+advisory signal; it is not evidence that anything was verified.
+
 ## Stack
 
 - **Rails 8.0.5** + PostgreSQL
@@ -129,7 +196,7 @@ User interacts:
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**: `code_review` rolls one of three content modes per day (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`, roughly even) — `application_code` (realistic snippet, unchanged from before modes existed), `test_file` (a realistic test file exhibiting one test smell, in the day's `test_framework`), or `schema_review` (the day's `schema_artifact` — a Rails migration or a Prisma schema change with its migration — carrying one planted data-modeling flaw). Only `schema_review` narrows the vocabulary, to `AiService::DATA_MODELING_CONCEPTS` (`ProblemSetIngest.code_review_vocabulary`); the other two modes get the full list minus those concepts, unchanged from before modes existed. `pattern` and the rotating third deliberately keep the full vocabulary regardless of the day's `code_review` mode, so a due data-modeling retention check always has somewhere to land even on a non-schema-review day. Because that lets a data-modeling concept surface where no schema artifact is shown, `AiService#data_modeling_idiom_guidance` adds one prompt line — stated once for all sections, named from the constant — telling the model to express such a concept in the host section's own idiom (a `pattern` question about `wrong_cardinality` asks how the relationship should be modeled, not for a migration to review). Advisory prompt text, no new machinery; `[retention]` logs are the check on whether it lands.
-- **The fourth slot**: a permanent fourth `problem_set` key, alongside `code_review`/`pattern`/the rotating third. Rotates 50/50 between `plan_review` (review a flawed implementation plan) and `ambiguity_hunt` (list what needs clarifying about a vague feature request). Each has its own closed vocabulary (`AiService::PLAN_REVIEW_CONCEPTS` / `AMBIGUITY_HUNT_CONCEPTS`) and its own `ConceptBucket` — language-independent, like `architecture`, so its mastery/reinforcement history never mixes with a programming-language bucket. `DailyPlan#for` decides the fourth slot's kind and its reinforcement/retention state on a track fully independent of the three-slot one, since the vocabularies can never mix. The slot holds exactly one concept (`DailyPlan::FOURTH_SLOT_CAPACITY`), so reinforcement is truncated to one and gives the slot up entirely when an overdue retention check claims it — never both. `ambiguity_hunt` also returns a hidden `planted_ambiguities` list — the answer key for grading coverage — which must never reach the rendered page, a pre-submission AI context (e.g. the duck thread), or log storage (`AiService#without_answer_key` strips it from the difficulty-diagnostics payload, the one place a whole `problem_set` is serialized); `plan_review`/`ambiguity_hunt`'s `plan_excerpt`/`request` fields are visible on screen and so are safe to include there. Since coverage grading has no meaning without that list, `ProblemSetIngest#reject_unusable_answer_key!` validates it at the provider boundary and raises `InvalidResponseError` when no usable entry came back — but only when `ambiguity_hunt` actually won the fourth slot, since an answer key nothing downstream will read is no reason to discard the day's other sections — the one normalizer that can refuse rather than repair. A *wrong count* is not a failure: `ExerciseSection::AmbiguityHunt::PLANTED_COUNT` is the generator's target, but nothing downstream reads it (the review prompt lists the ambiguities, never counts them), so a short list still grades and rejecting it would discard the day's other three sections over the likeliest deviation an LLM makes on a counted list. Long lists are truncated to `AmbiguityHunt::MAX_PLANTED`.
+- **The fourth slot**: a permanent fourth `problem_set` key, alongside `code_review`/`pattern`/the rotating third. Rotates 50/50 between `plan_review` (review a flawed implementation plan) and `ambiguity_hunt` (list what needs clarifying about a vague feature request). Each has its own closed vocabulary (`AiService::PLAN_REVIEW_CONCEPTS` / `AMBIGUITY_HUNT_CONCEPTS`) and its own `ConceptBucket` — language-independent, like `architecture`, so its mastery/reinforcement history never mixes with a programming-language bucket. `DailyPlan#for` decides the fourth slot's kind and its reinforcement/retention state on a track fully independent of the three-slot one, since the vocabularies can never mix. The slot holds exactly one concept (`DailyPlan::FOURTH_SLOT_CAPACITY`), so reinforcement is truncated to one and gives the slot up entirely when an overdue retention check claims it — never both. `ambiguity_hunt` also returns a hidden `planted_ambiguities` list — the answer key for grading coverage — which must never reach the rendered page, a pre-submission AI context (e.g. the duck thread), or log storage (`AiService#without_answer_key` strips it from the difficulty-diagnostics payload, the one place a whole `problem_set` is serialized); `plan_review`/`ambiguity_hunt`'s `plan_excerpt`/`request` fields are visible on screen and so are safe to include there. Since coverage grading has no meaning without that list, `ProblemSetIngest#reject_unusable_answer_key!` validates it at the provider boundary and raises `InvalidResponseError` when no usable entry came back — but only when `ambiguity_hunt` actually won the fourth slot, since an answer key nothing downstream will read is no reason to discard the day's other sections — the one normalizer that can refuse rather than repair. A *wrong count* is not a failure: `ExerciseSection::AmbiguityHunt::PLANTED_COUNT` is the generator's target, but nothing downstream reads it (the review prompt lists the ambiguities, never counts them), so a short list still grades and rejecting it would discard the day's other three sections over the likeliest deviation an LLM makes on a counted list. Long lists are truncated to `ExerciseSection::AmbiguityHunt::MAX_PLANTED`.
 - **Which sections count**: `DailyExercise#active_section_keys` — the two fixed kinds plus the precedence-resolved third and fourth — is the single authority for "how many sections does this day have." Every denominator (progress bar, `completeness`, history's count, the generation prompt's history line), the numerator (`DailyResponse#answered_sections`, via `DailyResponse#section_keys`), the submit gate, the answer/rating param slices, the duck-thread section guard, and the review fan-out derive from it. Never `problem_set.keys`, and never `answers.keys`: a payload can hold more third- or fourth-shaped keys than the page renders (`FakeService` holds all eight deliberately, and a provider can return an extra alternate), and a regenerated day can leave an answer behind for a section it no longer presents — counting either reports a section count the page never showed.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory.
 - **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule).
