@@ -463,6 +463,19 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).not_to include("Automatic generation is paused")
         expect(response.body).to include('data-rating-for="code_review"')
       end
+
+      context "on a weekend" do
+        let(:anchor_date) { Date.new(2026, 7, 18) } # Saturday
+
+        it "gives the weekend message, since the pause isn't why the day is empty" do
+          expect {
+            get root_path
+          }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+          expect(response.body).to include("No exercises are generated automatically on weekends")
+          expect(response.body).not_to include("Automatic generation is paused")
+        end
+      end
     end
   end
 
