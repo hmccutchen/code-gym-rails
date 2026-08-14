@@ -90,8 +90,9 @@ class User < ApplicationRecord
     anonymized_at.present?
   end
 
-  # Only affects GenerateDailyExercisesJob's unattended cron batch path — the
-  # on-demand path (dashboard open, /generate) ignores this column entirely.
+  # Suppresses every generation the user didn't ask for — the cron batch and
+  # the dashboard's auto-trigger. An explicit /generate or /regenerate click
+  # still runs while paused.
   def paused_generation_at?
     paused_generation_at.present?
   end

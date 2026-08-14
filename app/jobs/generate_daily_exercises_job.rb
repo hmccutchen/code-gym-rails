@@ -16,8 +16,8 @@ class GenerateDailyExercisesJob < ApplicationJob
       end
     else
       # Hourly batch: each user in their own zone, gated to local weekday morning.
-      # A user with paused_generation_at set is skipped here only — the
-      # on-demand path (user_id given, above) still generates for them.
+      # A paused user is skipped; the on-demand path above still serves them,
+      # but DashboardController only takes it on an explicit /generate click.
       User.active.where.not(api_key: nil).where(paused_generation_at: nil).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
       end

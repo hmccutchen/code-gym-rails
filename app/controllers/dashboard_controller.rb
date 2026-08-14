@@ -22,6 +22,11 @@ class DashboardController < ApplicationController
       # An earlier attempt today failed and nothing has retried since — show
       # the failure instead of silently auto-enqueuing another attempt.
       @generation_failed = true
+    elsif current_user.paused_generation_at?
+      # Opening the dashboard is not a request for a set — pausing has to stop
+      # this trigger too, or the cron skip it performs buys the user nothing.
+      # The button the paused state renders is the way back in.
+      @generation_paused = true
     elsif Date.current.on_weekday?
       GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
       @generating = true

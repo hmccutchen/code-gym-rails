@@ -18,9 +18,8 @@ class AccountsController < ApplicationController
   end
 
   # PATCH /account/toggle_generation
-  # Flips paused_generation_at between nil and now. Only affects
-  # GenerateDailyExercisesJob's unattended cron batch path — on-demand
-  # generation (dashboard open, /generate) is unaffected either way.
+  # Flips paused_generation_at between nil and now. While paused, nothing
+  # generates unless the user asks for it explicitly (/generate, /regenerate).
   def toggle_generation
     if current_user.paused_generation_at?
       current_user.update!(paused_generation_at: nil)

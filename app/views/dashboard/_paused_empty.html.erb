@@ -1,0 +1,6 @@
+<div class="section" style="text-align:center;padding:3rem;">
+  <p style="color:var(--muted);margin-bottom:1rem;">Automatic generation is paused, so today's set wasn't created. You can still generate one whenever you want it.</p>
+  <%= button_to "Generate today's set anyway", generate_path, method: :post, class: "btn btn-ghost btn-sm",
+        form: { data: { loading_form: true, loading_label: "Generating…" } } %>
+  <p style="margin-top:1rem;font-size:.85rem;"><%= link_to "Resume automatic generation →", account_path %></p>
+</div>
