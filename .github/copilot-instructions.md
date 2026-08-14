@@ -66,7 +66,8 @@ authority for how many sections a day has. Before accepting any numeric literal
 that describes the data, search for an existing method that derives it. Current
 authorities include `active_section_keys` (section count and identity),
 `DailyResponse::HISTORY_PAGE_SIZE`, `ExerciseSection::MAX_SCAFFOLD_LABELS`,
-`DailyPlan::FOURTH_SLOT_CAPACITY`, and `AmbiguityHunt::MAX_PLANTED`. Counting
+`DailyPlan::FOURTH_SLOT_CAPACITY`, and
+`ExerciseSection::AmbiguityHunt::MAX_PLANTED`. Counting
 `problem_set.keys` or `answers.keys` instead of `active_section_keys` is the
 same violation wearing a different hat.
 
