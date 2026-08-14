@@ -422,6 +422,61 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).to include('data-loading-label="Generating…"')
       end
     end
+
+    context "when the user has paused automatic generation" do
+      let(:anchor_date) { Date.new(2026, 7, 13) } # Monday
+
+      before { user.update!(paused_generation_at: Time.current) }
+
+      it "does not auto-enqueue generation on a weekday" do
+        expect {
+          get root_path
+        }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+        expect(response.body).to include("Automatic generation is paused")
+        expect(response.body).not_to include("Generating your personalized exercise set")
+      end
+
+      it "still offers an explicit generate button" do
+        get root_path
+
+        expect(response.body).to include("Generate today&#39;s set anyway")
+
+        expect {
+          post generate_path
+        }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
+      end
+
+      it "shows the generating state after an explicit trigger rather than the paused message" do
+        post generate_path
+        get root_path
+
+        expect(response.body).to include("Generating your personalized exercise set")
+        expect(response.body).not_to include("Automatic generation is paused")
+      end
+
+      it "shows today's exercise when one already exists" do
+        create_exercise
+
+        get root_path
+
+        expect(response.body).not_to include("Automatic generation is paused")
+        expect(response.body).to include('data-rating-for="code_review"')
+      end
+
+      context "on a weekend" do
+        let(:anchor_date) { Date.new(2026, 7, 18) } # Saturday
+
+        it "gives the weekend message, since the pause isn't why the day is empty" do
+          expect {
+            get root_path
+          }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+          expect(response.body).to include("No exercises are generated automatically on weekends")
+          expect(response.body).not_to include("Automatic generation is paused")
+        end
+      end
+    end
   end
 
   describe "generation failure recovery" do
