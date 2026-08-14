@@ -30,7 +30,7 @@ module AuthHelpers
   # user with no polling tab would.
   def visit_as(user)
     visit verify_auth_path(token: user.generate_login_token!)
-    click_link "Continue to today's set →"
+    click_link "Continue to Code Gym →"
   end
 end
 

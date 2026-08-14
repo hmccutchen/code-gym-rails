@@ -37,7 +37,7 @@ RSpec.describe "Magic link login across two tabs", type: :system do
 
   it "lets a user with no requesting tab continue into the app" do
     visit verify_auth_path(token: user.generate_login_token!)
-    click_link "Continue to today's set →"
+    click_link "Continue to Code Gym →"
 
     expect(page).to have_current_path(root_path)
   end

@@ -66,7 +66,7 @@ RSpec.describe "Sessions", type: :request do
     it "offers a continue link for anyone with no tab to return to" do
       get verify_auth_path(token: user.generate_login_token!)
 
-      expect(response.body).to include(%(href="#{root_path}"))
+      assert_select "a[href=?]", root_path, count: 1
     end
 
     it "sends the continue link to the pre-login destination when there is one" do
@@ -75,7 +75,20 @@ RSpec.describe "Sessions", type: :request do
 
       get verify_auth_path(token: user.generate_login_token!)
 
-      expect(response.body).to include(%(href="#{history_path}"))
+      assert_select "a[href=?]", history_path, count: 1
+    end
+
+    # The label is the link's accessible name, and the destination varies with
+    # return_to — so naming a specific page would misdescribe where it goes for
+    # anyone bounced here from somewhere other than the dashboard.
+    it "labels the continue link without promising a specific destination" do
+      get history_path
+
+      get verify_auth_path(token: user.generate_login_token!)
+
+      assert_select "a[href=?]", history_path do |links|
+        expect(links.first.text).not_to match(/today's set/i)
+      end
     end
 
     # Flash rides the same cookie every tab shares, so a notice set here would

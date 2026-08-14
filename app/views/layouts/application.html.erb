@@ -226,9 +226,10 @@
   </style>
 </head>
 <body>
-  <%# A page declaring :hide_nav is a terminal one — it authenticates the
-      session but deliberately offers no way deeper into the app, so the nav
-      would contradict the page. See sessions/verify. %>
+  <%# A page declaring :hide_nav authenticates the session without meaning to
+      run the app in this tab. It may still offer a single deliberate way
+      forward; what it must not grow is the full app nav, which is what would
+      turn it into a second app instance. See sessions/verify. %>
   <% unless content_for?(:hide_nav) %>
   <nav>
     <div class="container inner">
