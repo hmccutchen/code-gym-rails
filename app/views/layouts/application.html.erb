@@ -226,6 +226,10 @@
   </style>
 </head>
 <body>
+  <%# A page declaring :hide_nav is a terminal one — it authenticates the
+      session but deliberately offers no way deeper into the app, so the nav
+      would contradict the page. See sessions/verify. %>
+  <% unless content_for?(:hide_nav) %>
   <nav>
     <div class="container inner">
       <% if logged_in? %>
@@ -321,6 +325,7 @@
       <% end %>
     </div>
   </nav>
+  <% end %>
 
   <div class="container">
     <% if flash[:notice] %>

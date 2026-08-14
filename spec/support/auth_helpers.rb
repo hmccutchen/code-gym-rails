@@ -25,9 +25,12 @@ module AuthHelpers
   end
 
   # System specs drive a real browser via Capybara, so login must be a real
-  # page load rather than a bare `get`.
+  # page load rather than a bare `get`. Verify is a terminal confirmation
+  # page, so getting into the app means following its continue link the way a
+  # user with no polling tab would.
   def visit_as(user)
     visit verify_auth_path(token: user.generate_login_token!)
+    click_link "Continue to today's set →"
   end
 end
 

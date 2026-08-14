@@ -40,6 +40,14 @@ class SessionsController < ApplicationController
   end
 
   # GET /auth/verify?token=...
+  #
+  # Renders a terminal confirmation rather than redirecting into the app: the
+  # tab that requested the link is already polling #status and will move
+  # itself to the dashboard off this same cookie, so redirecting here would
+  # leave the user with two tabs running the app. The continue link is the
+  # way out for anyone who has no such tab — a link opened on a different
+  # device, or from a phone's mail app. It carries no flash for the same
+  # reason: flash rides the shared cookie and would surface in the other tab.
   def verify
     user = User.find_by_login_token(params[:token].to_s)
 
@@ -49,9 +57,8 @@ class SessionsController < ApplicationController
     end
 
     user.clear_login_token!
-    destination = start_new_session_for(user)
-
-    redirect_to destination || root_path, notice: "Welcome back, #{user.name}!"
+    @user = user
+    @continue_path = start_new_session_for(user) || root_path
   end
 
   # POST /login/code — the PWA-friendly alternate to clicking the link.

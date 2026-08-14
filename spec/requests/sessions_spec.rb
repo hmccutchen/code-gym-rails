@@ -41,12 +41,49 @@ RSpec.describe "Sessions", type: :request do
       raw_token = user.generate_login_token!
 
       get verify_auth_path(token: raw_token)
-      expect(response).to redirect_to(root_path)
+      expect(response).to have_http_status(:ok)
+      expect(session[:user_id]).to eq(user.id)
 
       # Token is single-use: a second visit must fail.
       get verify_auth_path(token: raw_token)
       expect(response).to redirect_to(login_path)
       expect(flash[:alert]).to match(/invalid or expired/i)
+    end
+
+    # Terminal by design: the tab that requested the link is polling and will
+    # move itself to the dashboard, so redirecting here would run the app in
+    # two tabs at once.
+    it "renders a confirmation instead of redirecting into the app" do
+      get verify_auth_path(token: user.generate_login_token!)
+
+      expect(response).not_to have_http_status(:redirect)
+      expect(response.body).to include("close this tab")
+      expect(response.body).not_to include("<nav>")
+    end
+
+    # The only way forward for someone with no polling tab — a link opened on
+    # a different device, or from a phone's mail app.
+    it "offers a continue link for anyone with no tab to return to" do
+      get verify_auth_path(token: user.generate_login_token!)
+
+      expect(response.body).to include(%(href="#{root_path}"))
+    end
+
+    it "sends the continue link to the pre-login destination when there is one" do
+      get history_path
+      expect(session[:return_to]).to eq(history_path)
+
+      get verify_auth_path(token: user.generate_login_token!)
+
+      expect(response.body).to include(%(href="#{history_path}"))
+    end
+
+    # Flash rides the same cookie every tab shares, so a notice set here would
+    # surface in the polling tab when it lands on the dashboard.
+    it "sets no flash that could leak into the polling tab" do
+      get verify_auth_path(token: user.generate_login_token!)
+
+      expect(flash[:notice]).to be_nil
     end
 
     it "rejects an expired token" do
@@ -163,7 +200,7 @@ RSpec.describe "Sessions", type: :request do
 
       get verify_auth_path(token: raw_token)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to have_http_status(:ok)
       expect(session[:user_id]).to be_present
     end
 
@@ -280,8 +317,8 @@ RSpec.describe "Sessions", type: :request do
     end
 
     # The rotation discards the whole session, so return_to has to be read out
-    # before reset_session or the post-login redirect silently loses it.
-    it "still returns the user to the page they were bounced from" do
+    # before reset_session or the verify page's continue link silently loses it.
+    it "still points the user at the page they were bounced from" do
       user = User.create!(email: "dev@example.com", name: "Dev")
       raw_token = user.generate_login_token!
 
@@ -290,7 +327,7 @@ RSpec.describe "Sessions", type: :request do
 
       get verify_auth_path(token: raw_token)
 
-      expect(response).to redirect_to(history_path)
+      expect(response.body).to include(%(href="#{history_path}"))
     end
 
     it "clears the pending-login state on code login" do

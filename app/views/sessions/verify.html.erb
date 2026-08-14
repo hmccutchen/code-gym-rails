@@ -1,0 +1,16 @@
+<%# Valued rather than bare: content_for with no value reads instead of
+    writing, so the layout's content_for?(:hide_nav) would never see it. %>
+<% content_for :hide_nav, "true" %>
+
+<style>
+  .verify-wrap { max-width: 400px; margin: 6rem auto; text-align: center; }
+  .verify-wrap h1 { font-size: 1.8rem; margin-bottom: .5rem; }
+  .verify-wrap p { color: var(--muted); margin-bottom: 2rem; }
+  .verify-wrap .continue { font-size: .9rem; color: var(--muted); }
+</style>
+
+<div class="verify-wrap">
+  <h1>You're logged in, <%= @user.name %>.</h1>
+  <p>You can close this tab and return to the one you started in.</p>
+  <%= link_to "Continue to today's set →", @continue_path, class: "continue" %>
+</div>
