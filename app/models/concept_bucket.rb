@@ -46,9 +46,12 @@ class ConceptBucket
   # ConceptMastery.record_review! skips "other"). Filtering on membership is
   # what keeps such a row from claiming a slot it can never use.
   #
-  # Every bucket .for can return is a LANGUAGE_CONFIG key, so a miss is a
-  # bucket that escaped that mapping — fetch raises rather than yielding an
-  # empty list, which a caller would read as "nothing is due" instead of a bug.
+  # Every NON-NIL bucket .for can return is a LANGUAGE_CONFIG key — .for also
+  # passes a nil language through as a nil bucket (see above), which no
+  # retention caller does, since those resolve their bucket from
+  # hostable_buckets or FOURTH_BUCKET_FOR. So a miss here is a bucket that
+  # escaped that mapping: fetch raises rather than yielding an empty list,
+  # which a caller would read as "nothing is due" instead of as a bug.
   def self.vocabulary_for(bucket)
     AiService::LANGUAGE_CONFIG.fetch(bucket).fetch(:concepts)
   end
