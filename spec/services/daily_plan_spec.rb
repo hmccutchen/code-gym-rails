@@ -57,15 +57,13 @@ RSpec.describe DailyPlan do
   end
 
   describe "RETENTION_BUCKET_FETCH_CAP" do
-    # A bucket can never hold more ConceptMastery rows than its vocabulary has
-    # concepts: the unique index on (user_id, concept, language) allows one row
-    # per concept, and ConceptMastery.record_review! skips "other". So a cap at
-    # or above the largest vocabulary cannot truncate, which is what makes the
-    # date-ordered fetch safe to re-rank by ratio afterwards. Derived rather
-    # than written down — a hardcoded number went stale twice as the
-    # vocabularies grew.
-    it "is large enough that no bucket's due concepts can be truncated" do
-      largest_vocabulary = AiService::LANGUAGE_CONFIG.values.map { |config| config[:concepts].size }.max
+    # Deliberately restates the constant's own expression, so it cannot fail
+    # when a vocabulary grows — that is the point. What it catches is someone
+    # replacing the derivation with a literal again, which is how this became a
+    # truncating cap in the first place (issue #93). The ordering test below is
+    # what actually proves the fetch reaches the right row.
+    it "stays derived from the vocabularies rather than hardcoded" do
+      largest_vocabulary = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
 
       expect(DailyPlan::RETENTION_BUCKET_FETCH_CAP).to be >= largest_vocabulary
     end
