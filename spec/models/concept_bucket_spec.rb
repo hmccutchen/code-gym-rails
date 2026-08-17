@@ -55,5 +55,14 @@ RSpec.describe ConceptBucket do
       expect(described_class.for("plan_review", nil)).to eq("plan_review")
       expect(described_class.for("ambiguity_hunt", nil)).to eq("ambiguity_hunt")
     end
+
+    # Pins design question 1: these concepts are language-independent in
+    # meaning, but ConceptBucket dispatches on section key and never on
+    # concept, so a bucket of their own would require a section kind — which
+    # this deliberately is not. Per-language mastery is the accepted cost.
+    it "buckets a meta-skill concept's section under the day's language like any other" do
+      expect(described_class.for("code_review", "ruby_rails")).to eq("ruby_rails")
+      expect(described_class.for("pattern", "javascript")).to eq("javascript")
+    end
   end
 end

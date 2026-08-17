@@ -68,7 +68,7 @@ class ProblemSetIngest
   #
   #   - code_review's content mode, which swaps the list wholesale
   #   - the kind's own excluded group, for concepts whose shape its format
-  #     cannot express (see ExerciseSection.excluded_vocabulary_key)
+  #     cannot express (see ExerciseSection.excluded_vocabulary_keys)
   #
   # AiService#generation_guidance_for is the only caller, so guidance can never
   # name a list ingest would reject a concept from — the narrowing is always a
@@ -94,12 +94,16 @@ class ProblemSetIngest
   end
   private_class_method :code_review_vocabulary
 
-  # The kind names its excluded group; the constant lives here, matching how
-  # vocabulary_key resolves.
+  # The kind names its excluded groups; the constants live here, matching how
+  # vocabulary_key resolves. ExerciseSection.for carries the empty default, so
+  # a section key the provider invented excludes nothing rather than raising.
   def self.excluded_concepts_for(section_key)
-    case ExerciseSection.find(section_key)&.excluded_vocabulary_key
-    when :data_modeling then AiService::DATA_MODELING_CONCEPTS
-    else                     []
+    ExerciseSection.for(section_key).excluded_vocabulary_keys.flat_map do |key|
+      case key
+      when :data_modeling then AiService::DATA_MODELING_CONCEPTS
+      when :meta_skill    then AiService::META_SKILL_CONCEPTS
+      else                     []
+      end
     end
   end
   private_class_method :excluded_concepts_for

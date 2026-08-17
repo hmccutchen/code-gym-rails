@@ -168,13 +168,25 @@ class AiService
     denormalization_tradeoffs unsafe_migration
   ].freeze
 
+  # Reasoning skills rather than technical topics — how to approach a problem,
+  # not a thing to know about it. They sit in both language vocabularies rather
+  # than a bucket of their own because ConceptBucket dispatches on section key,
+  # never on concept: a bucket would require a section kind, and this is
+  # deliberately not one. The cost is per-language mastery. The gain is that
+  # these are absent from LANGUAGE_AGNOSTIC_VOCABULARIES, so their concept
+  # reference shows real Rails or JavaScript code — the better illustration for
+  # a concept about reading code than pseudocode would be.
+  META_SKILL_CONCEPTS = %w[
+    reading_for_intent spotting_unstated_assumptions separating_symptom_from_cause
+  ].freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -183,7 +195,7 @@ class AiService
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on

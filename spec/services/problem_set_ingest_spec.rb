@@ -59,9 +59,9 @@ RSpec.describe ProblemSetIngest do
   end
 
   describe ".selectable_vocabulary_for" do
-    # Parsons grades by positional diff against one correct sequence, and the
-    # data-modeling concepts are not sequential — see
-    # ExerciseSection::ParsonsProblem.excluded_vocabulary_key.
+    # Parsons grades by positional diff against one correct sequence, and
+    # neither the data-modeling nor the meta-skill concepts are sequential —
+    # see ExerciseSection::ParsonsProblem.excluded_vocabulary_keys.
     it "withholds every data-modeling concept from parsons_problem" do
       vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
 
@@ -76,12 +76,14 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-    # The exclusion is exactly the five and nothing else: parsons ends up with
-    # the same list every other language-bucket kind gets, minus that group.
+    # The exclusion is exactly those two groups and nothing else: parsons ends
+    # up with the same list every other language-bucket kind gets, minus them.
     it "changes nothing about parsons beyond the exclusion" do
+      excluded = AiService::DATA_MODELING_CONCEPTS + AiService::META_SKILL_CONCEPTS
+
       %w[ruby_rails javascript].each do |language|
         expect(described_class.selectable_vocabulary_for("parsons_problem", language))
-          .to eq(described_class.selectable_vocabulary_for("challenge", language) - AiService::DATA_MODELING_CONCEPTS)
+          .to eq(described_class.selectable_vocabulary_for("challenge", language) - excluded)
       end
     end
 
@@ -95,6 +97,38 @@ RSpec.describe ProblemSetIngest do
     it "still narrows code_review by its content mode" do
       expect(described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review))
         .to eq(AiService::DATA_MODELING_CONCEPTS)
+    end
+
+    it "withholds every meta-skill concept from parsons_problem in both languages" do
+      %w[ruby_rails javascript].each do |language|
+        expect(described_class.selectable_vocabulary_for("parsons_problem", language))
+          .not_to include(*AiService::META_SKILL_CONCEPTS)
+      end
+    end
+
+    # The three kinds that draw the day's full language vocabulary are the only
+    # hosts these concepts can ever have: every other kind draws a disjoint
+    # vocabulary of its own, so it is excluded without anyone writing an
+    # exclusion (see the design doc, question 2).
+    it "offers the meta-skill concepts to code_review, pattern, and challenge" do
+      %w[ruby_rails javascript].each do |language|
+        %w[pattern challenge].each do |key|
+          expect(described_class.selectable_vocabulary_for(key, language))
+            .to include(*AiService::META_SKILL_CONCEPTS), "#{key}/#{language} was missing the group"
+        end
+
+        %i[application_code test_file].each do |mode|
+          expect(described_class.selectable_vocabulary_for("code_review", language, mode: mode))
+            .to include(*AiService::META_SKILL_CONCEPTS)
+        end
+      end
+    end
+
+    it "withholds them from the kinds whose own vocabulary is disjoint" do
+      %w[security_review architecture plan_review ambiguity_hunt].each do |key|
+        expect(described_class.selectable_vocabulary_for(key, "ruby_rails"))
+          .not_to include(*AiService::META_SKILL_CONCEPTS), "#{key} could be offered a meta-skill concept"
+      end
     end
   end
 

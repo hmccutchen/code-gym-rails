@@ -173,8 +173,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 20-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(25)
+    it "is a frozen 28-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(28)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -193,8 +193,8 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 22-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(27)
+    it "is a frozen 30-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(30)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
