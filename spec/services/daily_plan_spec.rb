@@ -56,6 +56,19 @@ RSpec.describe DailyPlan do
     end
   end
 
+  describe "RETENTION_BUCKET_FETCH_CAP" do
+    # Deliberately restates the constant's own expression, so it cannot fail
+    # when a vocabulary grows — that is the point. What it catches is someone
+    # replacing the derivation with a literal again, which is how this became a
+    # truncating cap in the first place (issue #93). The ordering test below is
+    # what actually proves the fetch reaches the right row.
+    it "stays derived from the vocabularies rather than hardcoded" do
+      largest_vocabulary = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
+
+      expect(DailyPlan::RETENTION_BUCKET_FETCH_CAP).to be >= largest_vocabulary
+    end
+  end
+
   describe "retention check selection" do
     def mastery(concept:, bucket:, due_on:)
       user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
@@ -84,6 +97,28 @@ RSpec.describe DailyPlan do
       user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 10)
+
+      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
+      expect(checks.map(&:concept)).to eq(%w[memoization])
+    end
+
+    # The SQL orders by next_retention_check_on — absolute days overdue — and
+    # the LIMIT is applied against THAT ordering, while the Ruby re-rank below
+    # sorts by overdue ratio against each concept's own interval. Two different
+    # orderings, so a truncating cap can discard the row the re-rank would have
+    # put first. The concept here is the most overdue by ratio and the LEAST
+    # overdue by date, which is exactly the row a date-ordered LIMIT drops first.
+    it "sees a high-ratio concept whose due date sorts it past a fixed 20-row fetch" do
+      (AiService::RAILS_CONCEPTS - %w[memoization]).first(20).each do |concept|
+        user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard,
+                                       mastered_at: 6.months.ago, retention_interval_days: 90,
+                                       next_retention_check_on: Date.current - 40)
+      end
+      # 5/7 ≈ 0.71 beats every 40/90 ≈ 0.44 above, but its due date is the most
+      # recent of the 21, so it sorts last in the query the cap truncates.
+      user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 1.month.ago, retention_interval_days: 7,
+                                     next_retention_check_on: Date.current - 5)
 
       checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])

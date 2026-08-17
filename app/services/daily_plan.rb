@@ -56,14 +56,25 @@ class DailyPlan
   # one-concept section to carry two.
   FOURTH_SLOT_CAPACITY = 1
 
-  # Smaller than the language vocabularies (see AiService::RAILS_CONCEPTS /
-  # JS_CONCEPTS / ARCHITECTURE_CONCEPTS) — a bucket with more due concepts
-  # than this cap truncates before the Ruby-side overdue-ratio re-rank below
-  # ever sees the rest. Tracked as issue #93; this exists only so the
-  # per-bucket query doesn't truncate to `slots` before that re-rank gets a
-  # chance to run across whatever it did fetch (see retention_checks_for's
-  # comment).
-  RETENTION_BUCKET_FETCH_CAP = 20
+  # Bounds the per-bucket due-concept fetch without truncating it. Not
+  # truncating is the point, not a nicety: the query orders by
+  # next_retention_check_on — absolute days overdue — while
+  # retention_checks_for re-ranks by overdue RATIO against each concept's own
+  # interval. Those orderings disagree, so a cap that actually cut rows would
+  # discard by date the row the re-rank was about to pick by ratio (issue #93,
+  # where a hardcoded 20 outlived two vocabulary additions).
+  #
+  # A bucket holds at most one row per concept — unique index on
+  # (user_id, concept, language), and ConceptMastery.record_review! never
+  # records "other" — so sizing against the largest vocabulary covers every
+  # concept currently in one.
+  #
+  # It does NOT cover a concept later renamed or removed from a vocabulary:
+  # concepts_due_for_retention_check filters by bucket, never by vocabulary
+  # membership, so that row stays fetchable and the real ceiling is every name
+  # ever valid in the bucket. Only additions have happened so far. Filtering
+  # the query by membership is the durable fix — see issue #97.
+  RETENTION_BUCKET_FETCH_CAP = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
 
   # Concept selection happens HERE rather than inside the prompt builder so the
   # caller can compare what was offered against what the model actually used —
