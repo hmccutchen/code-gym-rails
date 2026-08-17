@@ -398,6 +398,45 @@ RSpec.describe User, type: :model do
       expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
     end
 
+    # concept_tags is persisted provider output, so it keeps the name a section
+    # was tagged with even after that concept leaves the vocabulary. Left
+    # unfiltered, a renamed concept keeps being reinforced for the whole
+    # 10-session window: the model can no longer tag it, and because
+    # DailyPlan sizes retention as `3 - reinforcement.first(3).size`, the dead
+    # entry suppresses a retention check that could have used the slot.
+    it "skips a tagged concept that is no longer in its bucket's vocabulary" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            concept_tags: { "code_review" => "retired_concept" })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
+
+    # The membership filter applies to language buckets, unlike bucket:/
+    # exclude_buckets:, so it must run before the dedup marker. RAILS_CONCEPTS
+    # and JS_CONCEPTS overlap only partially: n_plus_one is Rails-only, so a
+    # JavaScript-day tag naming it is exactly the post-rename orphan this
+    # filters. Filtering after the dedup marker would let that dead newer
+    # occurrence consume the slot and hide the live Rails-day one.
+    it "does not let an out-of-vocabulary occurrence hide an older one in a bucket where the name is still valid" do
+      user = create_user
+      older = DailyExercise.create!(user: user, date: Date.current - 1, language: "ruby_rails",
+                                    problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 1,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      newer = DailyExercise.create!(user: user, date: Date.current, language: "javascript",
+                                    problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
+    end
+
     it "keeps reinforcing when self-rating is unfavorable even if the AI review was favorable" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
@@ -578,6 +617,16 @@ RSpec.describe User, type: :model do
       mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 10)
       expect(user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 1).map(&:concept)).to eq(%w[memoization])
     end
+
+    # The orphan here is the MOST overdue of the two, so it would sort first
+    # without the filter — this fails on membership, not on ordering luck.
+    it "excludes a concept no longer in the bucket's vocabulary" do
+      mastery(concept: "memoization",      bucket: "ruby_rails", due_on: Date.current - 3)
+      mastery(concept: "retired_concept",  bucket: "ruby_rails", due_on: Date.current - 30)
+
+      expect(user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 5).map(&:concept))
+        .to eq(%w[memoization])
+    end
   end
 
   describe "#concepts_overdue_for_retention_check" do
@@ -600,17 +649,32 @@ RSpec.describe User, type: :model do
       expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails").map(&:concept)).to eq(%w[memoization])
     end
 
+    # Named from the real vocabulary rather than "short_interval"/"long_interval":
+    # the query filters by vocabulary membership, so an invented name would pass
+    # this test for the wrong reason. The intervals carry the meaning here.
     it "scales the threshold with each concept's own interval, not a flat number" do
-      mastery(concept: "short_interval", due_on: Date.current - 8, interval: 7)   # 8 > 7: crossed
-      mastery(concept: "long_interval",  due_on: Date.current - 8, interval: 28)  # 8 < 28: not crossed
-      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails").map(&:concept)).to eq(%w[short_interval])
+      mastery(concept: "memoization", due_on: Date.current - 8, interval: 7)   # 8 > 7: crossed
+      mastery(concept: "n_plus_one",  due_on: Date.current - 8, interval: 28)  # 8 < 28: not crossed
+      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails").map(&:concept)).to eq(%w[memoization])
     end
 
     it "excludes rows with a null retention_interval_days even when next_retention_check_on is far in the past" do
-      user.concept_masteries.create!(concept: "no_interval", language: "ruby_rails", tier: :standard,
+      user.concept_masteries.create!(concept: "indexing", language: "ruby_rails", tier: :standard,
                                      mastered_at: 1.month.ago,
                                      retention_interval_days: nil,
                                      next_retention_check_on: Date.current - 100)
+      expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails")).to be_empty
+    end
+
+    # A concept dropped or renamed out of a vocabulary leaves its mastery row
+    # behind, and that row can never resolve: the generator is only ever offered
+    # vocabulary concepts, anything else ingest normalizes to "other", and
+    # record_review! skips "other". Unfiltered it is therefore permanently
+    # overdue, so overdue_retention_check_pending? would return true every day
+    # forever and take a reinforcement slot back each time (issue #97).
+    it "excludes a concept no longer in the bucket's vocabulary, however overdue" do
+      mastery(concept: "retired_concept", due_on: Date.current - 90, interval: 7)
+
       expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails")).to be_empty
     end
 

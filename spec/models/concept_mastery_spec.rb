@@ -95,6 +95,36 @@ RSpec.describe ConceptMastery, type: :model do
     expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_nil
   end
 
+  # The membership rule has one home so a future selection query cannot filter
+  # on `language:` alone and silently reintroduce issue #97 — a row whose
+  # concept has left the vocabulary can never resolve, so it would claim a slot
+  # forever.
+  describe ".in_bucket" do
+    def mastery(concept:, bucket:)
+      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard)
+    end
+
+    it "keeps a concept still in the bucket's vocabulary" do
+      mastery(concept: "memoization", bucket: "ruby_rails")
+
+      expect(user.concept_masteries.in_bucket("ruby_rails").map(&:concept)).to eq(%w[memoization])
+    end
+
+    it "drops a concept that has left the bucket's vocabulary" do
+      mastery(concept: "retired_concept", bucket: "ruby_rails")
+
+      expect(user.concept_masteries.in_bucket("ruby_rails")).to be_empty
+    end
+
+    # Scopes the bucket too, so a concept valid in another bucket's vocabulary
+    # cannot qualify here.
+    it "drops a row from a different bucket" do
+      mastery(concept: "closures", bucket: "javascript")
+
+      expect(user.concept_masteries.in_bucket("ruby_rails")).to be_empty
+    end
+  end
+
   describe "retention scheduling" do
     it "schedules the first check 7 days out on initial mastery" do
       cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong")

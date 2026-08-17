@@ -153,6 +153,62 @@ RSpec.describe DailyPlan do
                                      next_retention_check_on: Date.current + 5)
     end
 
+    # Same membership rule as the retention queries — stated once, so a concept
+    # dropped from a vocabulary cannot keep showing up in the prompt as an
+    # established concept the generator has no way to use (issue #97).
+    it "excludes a concept no longer in the bucket's vocabulary" do
+      established_mastery(concept: "memoization")
+      established_mastery(concept: "retired_concept")
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+                              reinforcement: [], due_checks: [])
+      expect(result.map(&:concept)).to eq(%w[memoization])
+    end
+
+    # An architecture day spans two buckets, so membership has to be checked per
+    # bucket: a language concept must not qualify by matching the architecture
+    # vocabulary, or vice versa. A flattened "any vocabulary" check would let
+    # this through.
+    it "matches each bucket against its own vocabulary, not the union" do
+      established_mastery(concept: "service_boundaries", bucket: "ruby_rails")
+      established_mastery(concept: "memoization",        bucket: "architecture")
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :architecture,
+                              reinforcement: [], due_checks: [])
+      expect(result.map(&:concept)).to eq([])
+    end
+
+    it "excludes a concept no longer in the fourth slot's vocabulary" do
+      established_mastery(concept: "scope_creep",      bucket: "plan_review")
+      established_mastery(concept: "retired_concept",  bucket: "plan_review")
+
+      result = DailyPlan.send(:established_concepts_for_bucket, user, "plan_review",
+                              reinforcement: [], due_checks: [])
+      expect(result.map(&:concept)).to eq(%w[scope_creep])
+    end
+
+    # An architecture day spans two buckets. Each contributes its own
+    # vocabulary condition, but they are OR-ed into one relation rather than
+    # enumerated, so the per-bucket pairing costs no extra round trip.
+    it "spans both buckets in a single query" do
+      established_mastery(concept: "memoization",        bucket: "ruby_rails")
+      established_mastery(concept: "service_boundaries", bucket: "architecture")
+
+      queries = 0
+      sub = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        queries += 1 unless payload[:name].to_s =~ /SCHEMA|TRANSACTION/
+      end
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :architecture,
+                              reinforcement: [], due_checks: [])
+      result.map(&:concept)
+
+      expect(queries).to eq(1)
+      expect(result.map(&:concept)).to match_array(%w[memoization service_boundaries])
+    ensure
+      ActiveSupport::Notifications.unsubscribe(sub)
+    end
+
     it "includes standard-tier concepts past their initial retention interval" do
       established_mastery(concept: "memoization", interval: 14)
 
