@@ -407,8 +407,20 @@ RSpec.describe AiService do
     it "names every data-modeling concept in that line" do
       prompt = service.send(:build_exercise_prompt, user, "javascript")
       expect(prompt).to include(
-        "The data-modeling concepts (#{AiService::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section."
+        "The data-modeling concepts (#{AiService::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section"
       )
+    end
+
+    # parsons_problem withholds this group, so a blanket "any section" would
+    # contradict that section's own vocabulary line in the same prompt — and
+    # ingest validates against the FULL vocabulary, so a model resolving the
+    # conflict the wrong way produces a parsons problem tagged wrong_cardinality
+    # that nothing downstream rejects.
+    it "defers to each section's own vocabulary rather than claiming every section" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :parsons_problem)
+
+      expect(prompt).to include("may be tagged on any section whose own vocabulary list above includes them")
+      expect(prompt).not_to include("may be tagged on any section.")
     end
 
     # It applies to the day's other sections regardless of what code_review is

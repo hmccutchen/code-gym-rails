@@ -999,16 +999,22 @@ class AiService
     PROMPT
   end
 
-  # Data-modeling concepts sit in both language vocabularies, so pattern and
-  # the rotating third can draw one on any day — that reachability is the
-  # point (a due retention check must have somewhere to land when code_review
-  # isn't in schema-review mode). What it must not do is turn those sections
-  # into a second schema review: only a schema-review code_review presents an
-  # artifact. Stated once, for every section, rather than repeated into each
-  # kind's guidance, since it is a rule about the concept and not about any
-  # one kind.
+  # Data-modeling concepts sit in both language vocabularies, so pattern — and
+  # any rotating third except parsons_problem, which excludes them — can draw
+  # one on any day. That reachability is the point (a due retention check must
+  # have somewhere to land when code_review isn't in schema-review mode). What
+  # it must not do is turn those sections into a second schema review: only a
+  # schema-review code_review presents an artifact. Stated once, for every
+  # section, rather than repeated into each kind's guidance, since it is a rule
+  # about the concept and not about any one kind.
+  #
+  # The sentence defers to each section's own vocabulary list rather than
+  # claiming every section: a kind that excludes the group would otherwise read
+  # this as license to tag it anyway, and ingest validates against the full
+  # vocabulary, so nothing downstream would catch it.
   def data_modeling_idiom_guidance
-    "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section. " \
+    "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section whose own " \
+      "vocabulary list above includes them. " \
       "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
       "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
       "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
