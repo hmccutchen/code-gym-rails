@@ -437,6 +437,15 @@ RSpec.describe AiService do
       expect(service.send(:build_exercise_prompt, user)).to include("Where no code is shown (pattern)")
     end
 
+    # challenge is a third host for a meta-skill concept, graded by the same
+    # generic rubric as code_review and pattern — this is its worked example.
+    it "gives a worked example for a meta-skill concept hosted by challenge" do
+      prompt = service.send(:build_exercise_prompt, user)
+
+      expect(prompt).to include("A challenge tagged separating_symptom_from_cause")
+      expect(prompt).to include("never asks for an essay about how to debug")
+    end
+
     it "embeds per-session concepts with per-section self and AI ratings" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)

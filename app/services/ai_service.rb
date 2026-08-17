@@ -1029,7 +1029,10 @@ class AiService
       "concept shapes only how the question is framed, never whether there is a right " \
       "answer. A code_review tagged reading_for_intent plants one real divergence between " \
       "what the code is evidently for and what it does, and asks the engineer to name both; " \
-      "it never asks an open question about the code's purpose. Where no code is shown " \
+      "it never asks an open question about the code's purpose. A challenge tagged " \
+      "separating_symptom_from_cause states a failing behavior whose obvious fix treats " \
+      "the symptom, and is graded on whether the submitted implementation addresses the " \
+      "cause; it never asks for an essay about how to debug. Where no code is shown " \
       "(pattern), express the concept against the described design instead: what the " \
       "proposed approach takes for granted, or which layer the real cause sits at."
   end
