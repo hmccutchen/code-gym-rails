@@ -419,6 +419,24 @@ RSpec.describe AiService do
       expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
     end
 
+    # Everything this vocabulary claims about grading rests on this paragraph:
+    # the generic review rubric has no `missed` array to fill unless the
+    # section still contains one findable issue.
+    it "tells the model a meta-skill concept frames a findable issue rather than replacing it" do
+      prompt = service.send(:build_exercise_prompt, user)
+
+      expect(prompt).to include("reading_for_intent, spotting_unstated_assumptions, separating_symptom_from_cause")
+      expect(prompt).to include("must still contain exactly one specific, findable issue")
+      expect(prompt).to include("never asks an open question about the code's purpose")
+    end
+
+    # pattern renders no snippet, so the concept has to be expressed against
+    # the described design there — the one weak host cell, handled by this line
+    # rather than by a per-concept exclusion.
+    it "says how to express the concept where no code is shown" do
+      expect(service.send(:build_exercise_prompt, user)).to include("Where no code is shown (pattern)")
+    end
+
     it "embeds per-session concepts with per-section self and AI ratings" do
       exercise = DailyExercise.create!(user: user, date: Date.current,
                                        problem_set: { "code_review" => {} }, generated_at: Time.current)

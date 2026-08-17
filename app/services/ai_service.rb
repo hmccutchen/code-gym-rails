@@ -984,6 +984,7 @@ class AiService
       #{third_guidance}
       #{fourth_guidance}
       #{data_modeling_idiom_guidance}
+      #{meta_skill_framing_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1012,6 +1013,25 @@ class AiService
       "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
       "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
       "migration to review."
+  end
+
+  # The meta-skill concepts name a way of reasoning, which makes them the one
+  # group that can quietly cost a section its grade: code_review and challenge
+  # have no section_grading_note and are graded by the generic rubric, and that
+  # rubric has nothing to put in "missed" if the question had no wrong answer
+  # to begin with. So the concept is confined to framing here, once for every
+  # section, rather than restated into each kind's guidance — like
+  # data_modeling_idiom_guidance, it is a rule about the concept, not the kind.
+  def meta_skill_framing_guidance
+    "- The meta-skill concepts (#{META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
+      "about a problem, not a topic to write about. A section tagged with one must still " \
+      "contain exactly one specific, findable issue and be gradeable against it — the " \
+      "concept shapes only how the question is framed, never whether there is a right " \
+      "answer. A code_review tagged reading_for_intent plants one real divergence between " \
+      "what the code is evidently for and what it does, and asks the engineer to name both; " \
+      "it never asks an open question about the code's purpose. Where no code is shown " \
+      "(pattern), express the concept against the described design instead: what the " \
+      "proposed approach takes for granted, or which layer the real cause sits at."
   end
 
   # A kind's generation instructions. The vocabulary comes from
