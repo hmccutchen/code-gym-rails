@@ -190,6 +190,19 @@ class User < ApplicationRecord
         next if bucket && tag_bucket != bucket
         next if exclude_buckets.include?(tag_bucket)
 
+        # concept_tags is persisted provider output, so it keeps the name a
+        # section was tagged with even after that concept leaves the
+        # vocabulary. Reinforcing one the generator can no longer tag wastes an
+        # entry AND a retention slot, since DailyPlan sizes retention as
+        # `3 - reinforcement.first(3).size`.
+        #
+        # Guarded on tag_bucket because vocabulary_for raises on nil. A nil
+        # bucket needs both a nil language and a missing exercise row, which
+        # the NOT NULL foreign key on daily_responses.daily_exercise_id makes
+        # unreachable — the guard keeps an unreachable state from raising
+        # during generation rather than describing a case that happens.
+        next if tag_bucket && ConceptBucket.vocabulary_for(tag_bucket).exclude?(concept)
+
         tier = concept_masteries.find_by(concept: concept, language: tag_bucket)&.tier || "standard"
         next if tier == "paused"
 
