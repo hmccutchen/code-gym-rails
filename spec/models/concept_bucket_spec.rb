@@ -60,7 +60,7 @@ RSpec.describe ConceptBucket do
     # meaning, but ConceptBucket dispatches on section key and never on
     # concept, so a bucket of their own would require a section kind — which
     # this deliberately is not. Per-language mastery is the accepted cost.
-    it "buckets a meta-skill concept's section under the day's language like any other" do
+    it "buckets on section key alone, so no concept can claim a bucket of its own" do
       expect(described_class.for("code_review", "ruby_rails")).to eq("ruby_rails")
       expect(described_class.for("pattern", "javascript")).to eq("javascript")
     end

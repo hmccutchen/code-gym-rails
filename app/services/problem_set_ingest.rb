@@ -86,8 +86,8 @@ class ProblemSetIngest
   end
 
   # Only code_review's mode narrows this way. Subtracting the data-modeling
-  # concepts from the other two returns exactly the vocabulary they had before
-  # those concepts existed, so no existing mode's behavior changes.
+  # concepts leaves the other two modes drawing the day's full language
+  # vocabulary minus that group.
   def self.code_review_vocabulary(language, mode)
     full = language_config(language)[:concepts]
     mode == :schema_review ? AiService::DATA_MODELING_CONCEPTS : full - AiService::DATA_MODELING_CONCEPTS
