@@ -66,14 +66,11 @@ class DailyPlan
   #
   # A bucket holds at most one row per concept — unique index on
   # (user_id, concept, language), and ConceptMastery.record_review! never
-  # records "other" — so sizing against the largest vocabulary covers every
-  # concept currently in one.
-  #
-  # It does NOT cover a concept later renamed or removed from a vocabulary:
-  # concepts_due_for_retention_check filters by bucket, never by vocabulary
-  # membership, so that row stays fetchable and the real ceiling is every name
-  # ever valid in the bucket. Only additions have happened so far. Filtering
-  # the query by membership is the durable fix — see issue #97.
+  # records "other". concepts_due_for_retention_check additionally filters on
+  # vocabulary membership, so a concept later renamed or removed drops out of
+  # the fetch rather than lingering: the ceiling is the bucket's CURRENT
+  # vocabulary, not every name ever valid in it. Sizing against the largest
+  # vocabulary therefore cannot truncate.
   RETENTION_BUCKET_FETCH_CAP = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
 
   # Concept selection happens HERE rather than inside the prompt builder so the
@@ -174,10 +171,7 @@ class DailyPlan
   def self.established_concepts_for_bucket(user, bucket, reinforcement:, due_checks:)
     claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
 
-    user.concept_masteries
-      .where(language: bucket, tier: :standard)
-      .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
-      .reject { |cm| claimed.include?(cm.concept) }
+    established_in_bucket(user, bucket).reject { |cm| claimed.include?(cm.concept) }
   end
   private_class_method :established_concepts_for_bucket
 
@@ -244,12 +238,22 @@ class DailyPlan
   def self.established_concepts_for(user, language, third:, reinforcement:, due_checks:)
     claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
 
-    user.concept_masteries
-      .where(language: hostable_buckets(language, third: third), tier: :standard)
-      .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
+    hostable_buckets(language, third: third)
+      .flat_map { |bucket| established_in_bucket(user, bucket) }
       .reject { |cm| claimed.include?(cm.concept) }
   end
   private_class_method :established_concepts_for
+
+  # One bucket at a time, so each row's concept is checked against ITS OWN
+  # bucket's vocabulary. An architecture day spans two buckets, and a single
+  # query over their union would let a language concept qualify by matching the
+  # architecture list, or the reverse.
+  def self.established_in_bucket(user, bucket)
+    user.concept_masteries
+      .where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket), tier: :standard)
+      .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
+  end
+  private_class_method :established_in_bucket
 
   # Whether reinforcement should give up its 3rd slot: only when some retention
   # check, in a bucket today's third can actually host, has crossed the

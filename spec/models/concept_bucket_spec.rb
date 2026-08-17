@@ -65,4 +65,22 @@ RSpec.describe ConceptBucket do
       expect(described_class.for("pattern", "javascript")).to eq("javascript")
     end
   end
+
+  describe ".vocabulary_for" do
+    it "answers with the vocabulary each bucket draws from" do
+      expect(described_class.vocabulary_for("ruby_rails")).to eq(AiService::RAILS_CONCEPTS)
+      expect(described_class.vocabulary_for("javascript")).to eq(AiService::JS_CONCEPTS)
+      expect(described_class.vocabulary_for("architecture")).to eq(AiService::ARCHITECTURE_CONCEPTS)
+      expect(described_class.vocabulary_for("plan_review")).to eq(AiService::PLAN_REVIEW_CONCEPTS)
+      expect(described_class.vocabulary_for("ambiguity_hunt")).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
+    end
+
+    # Every bucket .for can return is a LANGUAGE_CONFIG key, so a miss here is a
+    # bucket that escaped that mapping. Raise rather than hand back an empty
+    # list, which would silently filter every concept out of a retention query
+    # and read as "nothing is due" instead of as a bug.
+    it "raises for a bucket with no vocabulary rather than returning nothing" do
+      expect { described_class.vocabulary_for("not_a_bucket") }.to raise_error(KeyError)
+    end
+  end
 end

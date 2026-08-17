@@ -206,7 +206,7 @@ class User < ApplicationRecord
   # JavaScript day.
   def concepts_due_for_retention_check(bucket:, limit:)
     concept_masteries
-      .where(language: bucket)
+      .where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket))
       .where.not(next_retention_check_on: nil)
       .where(next_retention_check_on: ..Date.current)
       .order(:next_retention_check_on)
@@ -222,7 +222,7 @@ class User < ApplicationRecord
   # excluded explicitly rather than risking a null comparison silently matching.
   def concepts_overdue_for_retention_check(bucket:)
     concept_masteries
-      .where(language: bucket)
+      .where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket))
       .where.not(next_retention_check_on: nil)
       .where.not(retention_interval_days: nil)
       .where(
