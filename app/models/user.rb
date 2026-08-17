@@ -215,7 +215,7 @@ class User < ApplicationRecord
   # JavaScript day.
   def concepts_due_for_retention_check(bucket:, limit:)
     concept_masteries
-      .where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket))
+      .in_bucket(bucket)
       .where.not(next_retention_check_on: nil)
       .where(next_retention_check_on: ..Date.current)
       .order(:next_retention_check_on)
@@ -231,7 +231,7 @@ class User < ApplicationRecord
   # excluded explicitly rather than risking a null comparison silently matching.
   def concepts_overdue_for_retention_check(bucket:)
     concept_masteries
-      .where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket))
+      .in_bucket(bucket)
       .where.not(next_retention_check_on: nil)
       .where.not(retention_interval_days: nil)
       .where(
@@ -328,8 +328,6 @@ class User < ApplicationRecord
 
   private
 
-  # Shared by #recent_performance and #concepts_needing_reinforcement so
-  # neither issues its own duplicate "last N sessions" query.
   # concept_tags is persisted provider output, so it keeps the name a section
   # was tagged with even after that concept leaves the vocabulary. Reinforcing
   # one the generator can no longer tag wastes an entry AND a retention slot,
@@ -346,6 +344,8 @@ class User < ApplicationRecord
     ConceptBucket.vocabulary_for(bucket).include?(concept)
   end
 
+  # Shared by #recent_performance and #concepts_needing_reinforcement so
+  # neither issues its own duplicate "last N sessions" query.
   def recent_daily_responses(limit)
     daily_responses.includes(:daily_exercise).order(date: :desc).limit(limit)
   end

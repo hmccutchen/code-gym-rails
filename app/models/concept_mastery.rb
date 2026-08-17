@@ -3,6 +3,17 @@ class ConceptMastery < ApplicationRecord
 
   enum :tier, { standard: 0, reduced: 1, paused: 2 }, prefix: true
 
+  # The one place selection says "rows of this bucket that its vocabulary still
+  # holds." Both halves belong together: a row survives a concept being renamed
+  # or dropped from a vocabulary, and such a row can never resolve — the
+  # generator is only offered vocabulary concepts, ingest normalizes anything
+  # else to "other", and .record_review! skips "other" — so it would stay due
+  # and keep claiming a slot forever (issue #97).
+  #
+  # Filtering on `language:` alone is exactly that bug. Every selection query
+  # goes through here so a new one cannot reintroduce it by omission.
+  scope :in_bucket, ->(bucket) { where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket)) }
+
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
 
   # Once a concept is mastered it would otherwise never resurface. These schedule

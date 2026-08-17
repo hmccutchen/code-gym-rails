@@ -255,7 +255,8 @@ class DailyPlan
 
   def self.established_in_bucket(user, bucket)
     user.concept_masteries
-      .where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket), tier: :standard)
+      .in_bucket(bucket)
+      .where(tier: :standard)
       .where("retention_interval_days > ?", ConceptMastery::RETENTION_INITIAL_INTERVAL_DAYS)
   end
   private_class_method :established_in_bucket
