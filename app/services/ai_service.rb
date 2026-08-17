@@ -654,28 +654,38 @@ class AiService
   def annotate_retention_concept(cm, third, code_review_mode)
     return "#{cm.concept} (architecture section)" if cm.language == "architecture"
 
-    hosts = []
-    hosts << "code_review" if data_modeling?(cm.concept) == (code_review_mode == :schema_review)
-    hosts << "pattern"
-    hosts << third.to_s if third_can_host?(cm, third)
+    hosts = [
+      [ ExerciseSection::CodeReview.key, code_review_mode ],
+      [ ExerciseSection::Pattern.key,    nil ],
+      [ third.to_s,                      nil ]
+    ].filter_map { |section_key, mode| section_key if can_host?(cm, section_key, mode: mode) }
+
+    # nil, not "concept ()": with every line derived, a day can present no
+    # section able to carry this concept, and listing it anyway would tell the
+    # model to "work it into one of those" over an empty set. The caller drops
+    # it from the prompt instead. The old unconditional `pattern` line made
+    # this unreachable; deriving it is what put the case back on the table.
+    return nil if hosts.empty?
 
     "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
   end
 
-  def data_modeling?(concept)
-    DATA_MODELING_CONCEPTS.include?(concept)
-  end
-
-  # Answered by the same authority that decides what the generation prompt may
-  # offer that section, so a host can never be named for a concept the prompt
-  # would then withhold from it. This restated the rule locally before, and
-  # drifted: it answered "yes" for a data-modeling concept on a parsons_problem
-  # third, which that kind excludes.
+  # Every slot answered by the same authority that decides what the generation
+  # prompt may offer that section, so an annotation can never name a host whose
+  # own vocabulary line in the same prompt withholds the concept.
   #
-  # No mode: — the third slot is never code_review, whose mode narrowing
-  # annotate_retention_concept applies on its own line.
-  def third_can_host?(cm, third)
-    ProblemSetIngest.selectable_vocabulary_for(third.to_s, cm.language).include?(cm.concept)
+  # All three derive, deliberately. Two of them used to be restated by hand —
+  # an unconditional `pattern` and a `code_review` line that re-derived the
+  # schema-review rule from DATA_MODELING_CONCEPTS — and the third had already
+  # drifted that way before, answering "yes" for a data-modeling concept on a
+  # parsons_problem third. A restatement here cannot be kept honest by tests
+  # that only cover today's kinds: it goes wrong the day a kind gains an
+  # exclusion, which is exactly what adding a second concept group did.
+  #
+  # `mode` is passed only for code_review, the one kind whose selectable
+  # vocabulary depends on it; the third slot is never code_review.
+  def can_host?(cm, section_key, mode: nil)
+    ProblemSetIngest.selectable_vocabulary_for(section_key, cm.language, mode: mode).include?(cm.concept)
   end
 
   # A provider can return a parsons_problem object with no "blocks" — that
@@ -870,11 +880,16 @@ class AiService
     # toward the directive phrasing used for reinforcement above ("reintroduce
     # every concept listed"). It is not a reason to revisit the schedule, the data
     # model, or the decision not to track delivery.
+    # filter_map, not map: a due concept no section can host today annotates as
+    # nil and is dropped, so the block disappears entirely rather than listing
+    # a concept the prompt cannot ask for.
+    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, third, code_review_mode) }
+
     retention_block =
-      if due_checks.any?
+      if annotated_due_checks.any?
         <<~RET.chomp
 
-          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third, code_review_mode) }.join(', ')}
+          Retention checks due today: #{annotated_due_checks.join(', ')}
           - These are concepts the engineer previously MASTERED. Each is annotated with the section(s) it may occupy — work it into one of those in the schema below, alongside the reinforcement concepts.
           - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
           - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.
