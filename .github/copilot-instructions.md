@@ -71,6 +71,23 @@ authorities include `active_section_keys` (section count and identity),
 `problem_set.keys` or `answers.keys` instead of `active_section_keys` is the
 same violation wearing a different hat.
 
+**Is any constant justified by how large a vocabulary is?** BLOCKING unless the
+constant derives from that size or a spec asserts the assumption. This is the
+check above applied to *reasoning* rather than values: the number may be right
+while the argument for it silently stops being true. Precedent: as the
+vocabularies grew from 13-16 concepts to 28 and 30, three constants' comments
+went false — `DailyPlan::RETENTION_BUCKET_FETCH_CAP` (justified by vocabulary
+size, quietly became a cap that truncated the fetch before its own re-rank ran,
+issue #93), `AiService#data_modeling_idiom_guidance` ("may be tagged on any
+section", contradicted once a kind excluded that group), and
+`ConceptMastery::RETENTION_MAX_INTERVAL_DAYS` (issue #98). Every one was found
+by accident while someone happened to be editing nearby, which is why this is a
+review check rather than a convention. Nothing mechanical can catch it: a
+justification is prose. So the diff must either make the value derive — as the
+fetch cap now does — or add a spec that fails when the vocabulary grows past
+what the reasoning assumed. A comment that merely restates a fresh number is
+not a fix; it is the same defect with a later expiry date.
+
 **Does any new class or method exceed the size threshold?** A method over **25
 lines** (excluding heredoc bodies) or a new file in `app/` over **300 lines**
 must be justified in the PR description or split. These numbers are drawn from
