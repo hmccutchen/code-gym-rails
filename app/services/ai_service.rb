@@ -660,6 +660,13 @@ class AiService
       [ third.to_s,                      nil ]
     ].filter_map { |section_key, mode| section_key if can_host?(cm, section_key, mode: mode) }
 
+    # nil, not "concept ()": with every line derived, a day can present no
+    # section able to carry this concept, and listing it anyway would tell the
+    # model to "work it into one of those" over an empty set. The caller drops
+    # it from the prompt instead. The old unconditional `pattern` line made
+    # this unreachable; deriving it is what put the case back on the table.
+    return nil if hosts.empty?
+
     "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
   end
 
@@ -873,11 +880,16 @@ class AiService
     # toward the directive phrasing used for reinforcement above ("reintroduce
     # every concept listed"). It is not a reason to revisit the schedule, the data
     # model, or the decision not to track delivery.
+    # filter_map, not map: a due concept no section can host today annotates as
+    # nil and is dropped, so the block disappears entirely rather than listing
+    # a concept the prompt cannot ask for.
+    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, third, code_review_mode) }
+
     retention_block =
-      if due_checks.any?
+      if annotated_due_checks.any?
         <<~RET.chomp
 
-          Retention checks due today: #{due_checks.map { |cm| annotate_retention_concept(cm, third, code_review_mode) }.join(', ')}
+          Retention checks due today: #{annotated_due_checks.join(', ')}
           - These are concepts the engineer previously MASTERED. Each is annotated with the section(s) it may occupy — work it into one of those in the schema below, alongside the reinforcement concepts.
           - Use a completely FRESH scenario for these — a new business domain, new class and method names, a new narrative. Never reuse any framing listed above. This tests whether they retained the idea, not whether they recognize a memorized example.
           - Pitch these at FULL difficulty. Do NOT ease them, add scaffolding, or write a more direct teaching_note the way you would for a `(reduced)` concept — the engineer is not struggling with these, and making them easier defeats the point of checking.

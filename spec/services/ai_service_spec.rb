@@ -700,6 +700,24 @@ RSpec.describe AiService do
         .to eq("missing_index (pattern or challenge)")
     end
 
+    # Deriving all three lines removed the old unconditional `pattern`, and with
+    # it the guarantee that a concept always has somewhere to go. A concept no
+    # section can host must not be listed at all: "reading_for_intent ()"
+    # followed by "work it into one of those" tells the model to place it in an
+    # empty set, and DailyPlan has already spent a retention slot on it.
+    it "omits a due concept no section can host rather than annotating it with nothing" do
+      allow(ExerciseSection::Pattern).to receive(:excluded_vocabulary_keys).and_return([ :meta_skill ])
+      cm = user.concept_masteries.create!(concept: "reading_for_intent", language: "ruby_rails", tier: :standard,
+                                          mastered_at: 1.month.ago, retention_interval_days: 7,
+                                          next_retention_check_on: Date.current - 2)
+
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :parsons_problem,
+                            code_review_mode: :schema_review, reinforcement: [], due_checks: [ cm ])
+
+      expect(prompt).not_to include("reading_for_intent ()")
+      expect(prompt).not_to match(/retention check/i)
+    end
+
     # The regression the third slot's derivation fixed: parsons_problem
     # excludes the data-modeling group at generation, but the local `case` that
     # once answered this said "yes" anyway, so the annotation offered the
