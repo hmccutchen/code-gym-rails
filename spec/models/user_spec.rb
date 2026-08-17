@@ -414,6 +414,29 @@ RSpec.describe User, type: :model do
       expect(user.concepts_needing_reinforcement).to eq([])
     end
 
+    # The membership filter applies to language buckets, unlike bucket:/
+    # exclude_buckets:, so it must run before the dedup marker. RAILS_CONCEPTS
+    # and JS_CONCEPTS overlap only partially: n_plus_one is Rails-only, so a
+    # JavaScript-day tag naming it is exactly the post-rename orphan this
+    # filters. Filtering after the dedup marker would let that dead newer
+    # occurrence consume the slot and hide the live Rails-day one.
+    it "does not let an out-of-vocabulary occurrence hide an older one in a bucket where the name is still valid" do
+      user = create_user
+      older = DailyExercise.create!(user: user, date: Date.current - 1, language: "ruby_rails",
+                                    problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 1,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      newer = DailyExercise.create!(user: user, date: Date.current, language: "javascript",
+                                    problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
+                            concept_tags: { "code_review" => "n_plus_one" })
+
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
+    end
+
     it "keeps reinforcing when self-rating is unfavorable even if the AI review was favorable" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)

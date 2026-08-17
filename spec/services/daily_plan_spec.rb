@@ -187,6 +187,28 @@ RSpec.describe DailyPlan do
       expect(result.map(&:concept)).to eq(%w[scope_creep])
     end
 
+    # An architecture day spans two buckets. Each contributes its own
+    # vocabulary condition, but they are OR-ed into one relation rather than
+    # enumerated, so the per-bucket pairing costs no extra round trip.
+    it "spans both buckets in a single query" do
+      established_mastery(concept: "memoization",        bucket: "ruby_rails")
+      established_mastery(concept: "service_boundaries", bucket: "architecture")
+
+      queries = 0
+      sub = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        queries += 1 unless payload[:name].to_s =~ /SCHEMA|TRANSACTION/
+      end
+
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :architecture,
+                              reinforcement: [], due_checks: [])
+      result.map(&:concept)
+
+      expect(queries).to eq(1)
+      expect(result.map(&:concept)).to match_array(%w[memoization service_boundaries])
+    ensure
+      ActiveSupport::Notifications.unsubscribe(sub)
+    end
+
     it "includes standard-tier concepts past their initial retention interval" do
       established_mastery(concept: "memoization", interval: 14)
 

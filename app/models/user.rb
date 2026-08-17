@@ -173,35 +173,31 @@ class User < ApplicationRecord
   # different days, and dedup-before-filter could drop an occurrence the
   # filter should have kept. `bucket:`/`exclude_buckets:` are for the special
   # buckets only; no caller today passes a language bucket.
+  #
+  # The vocabulary-membership filter DOES apply to language buckets, and so
+  # runs BEFORE the dedup marker rather than after it: an occurrence naming a
+  # concept that has left its own bucket's vocabulary is not an occurrence of a
+  # live concept at all, and must not consume the dedup slot that an older
+  # occurrence in a bucket where the name is still valid would fill.
   def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [])
     resolved = {}
     result   = []
 
     recent_daily_responses(limit).each do |r|
       r.concept_tags.each do |section, concept|
-        next if concept.blank? || concept == "other" || resolved.key?(concept)
+        next if concept.blank? || concept == "other"
+
+        tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)
+        next unless still_in_vocabulary?(concept, tag_bucket)
+        next if resolved.key?(concept)
         resolved[concept] = true
 
         next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil? # out of scope
 
         next if r.self_rating_favorable?(section) && r.ai_rating_favorable?(section) # mastered
 
-        tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)
         next if bucket && tag_bucket != bucket
         next if exclude_buckets.include?(tag_bucket)
-
-        # concept_tags is persisted provider output, so it keeps the name a
-        # section was tagged with even after that concept leaves the
-        # vocabulary. Reinforcing one the generator can no longer tag wastes an
-        # entry AND a retention slot, since DailyPlan sizes retention as
-        # `3 - reinforcement.first(3).size`.
-        #
-        # Guarded on tag_bucket because vocabulary_for raises on nil. A nil
-        # bucket needs both a nil language and a missing exercise row, which
-        # the NOT NULL foreign key on daily_responses.daily_exercise_id makes
-        # unreachable — the guard keeps an unreachable state from raising
-        # during generation rather than describing a case that happens.
-        next if tag_bucket && ConceptBucket.vocabulary_for(tag_bucket).exclude?(concept)
 
         tier = concept_masteries.find_by(concept: concept, language: tag_bucket)&.tier || "standard"
         next if tier == "paused"
@@ -334,6 +330,22 @@ class User < ApplicationRecord
 
   # Shared by #recent_performance and #concepts_needing_reinforcement so
   # neither issues its own duplicate "last N sessions" query.
+  # concept_tags is persisted provider output, so it keeps the name a section
+  # was tagged with even after that concept leaves the vocabulary. Reinforcing
+  # one the generator can no longer tag wastes an entry AND a retention slot,
+  # since DailyPlan sizes retention as `3 - reinforcement.first(3).size`.
+  #
+  # A nil bucket passes, because vocabulary_for raises on nil and there is no
+  # vocabulary to check against. Reaching it needs both a nil language and a
+  # missing exercise row, which the NOT NULL foreign key on
+  # daily_responses.daily_exercise_id makes unreachable — this keeps an
+  # unreachable state from raising during generation rather than describing a
+  # case that happens.
+  def still_in_vocabulary?(concept, bucket)
+    return true if bucket.nil?
+    ConceptBucket.vocabulary_for(bucket).include?(concept)
+  end
+
   def recent_daily_responses(limit)
     daily_responses.includes(:daily_exercise).order(date: :desc).limit(limit)
   end

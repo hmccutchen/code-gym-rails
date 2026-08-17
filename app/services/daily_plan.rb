@@ -171,7 +171,7 @@ class DailyPlan
   def self.established_concepts_for_bucket(user, bucket, reinforcement:, due_checks:)
     claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
 
-    established_in_bucket(user, bucket).reject { |cm| claimed.include?(cm.concept) }
+    established_in_buckets(user, [ bucket ]).reject { |cm| claimed.include?(cm.concept) }
   end
   private_class_method :established_concepts_for_bucket
 
@@ -238,16 +238,21 @@ class DailyPlan
   def self.established_concepts_for(user, language, third:, reinforcement:, due_checks:)
     claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
 
-    hostable_buckets(language, third: third)
-      .flat_map { |bucket| established_in_bucket(user, bucket) }
+    established_in_buckets(user, hostable_buckets(language, third: third))
       .reject { |cm| claimed.include?(cm.concept) }
   end
   private_class_method :established_concepts_for
 
-  # One bucket at a time, so each row's concept is checked against ITS OWN
-  # bucket's vocabulary. An architecture day spans two buckets, and a single
-  # query over their union would let a language concept qualify by matching the
-  # architecture list, or the reverse.
+  # Each bucket contributes its OWN vocabulary condition, and the scopes are
+  # OR-ed into one relation rather than enumerated per bucket, so an
+  # architecture day still costs a single query. A single query over the union
+  # of both vocabularies would instead let a language concept qualify by
+  # matching the architecture list, or the reverse.
+  def self.established_in_buckets(user, buckets)
+    buckets.map { |bucket| established_in_bucket(user, bucket) }.reduce(:or)
+  end
+  private_class_method :established_in_buckets
+
   def self.established_in_bucket(user, bucket)
     user.concept_masteries
       .where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket), tier: :standard)
