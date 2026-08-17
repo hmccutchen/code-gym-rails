@@ -641,6 +641,32 @@ RSpec.describe AiService do
       expect(annotation("service_boundaries", language: "architecture", third: :architecture, mode: :application_code))
         .to eq("service_boundaries (architecture section)")
     end
+
+    # The regression this derivation fixes: parsons_problem excludes the
+    # data-modeling group at generation, but the old local `case` in
+    # third_can_host? answered "yes" for it anyway, so the annotation offered
+    # the engineer a host that would never be asked for it.
+    it "withholds a parsons_problem third for a group that kind excludes" do
+      expect(annotation("missing_index", language: "ruby_rails", third: :parsons_problem, mode: :application_code))
+        .to eq("missing_index (pattern)")
+      expect(annotation("reading_for_intent", language: "ruby_rails", third: :parsons_problem, mode: :application_code))
+        .to eq("reading_for_intent (code_review or pattern)")
+    end
+
+    it "offers every ordinary host for a meta-skill concept" do
+      expect(annotation("reading_for_intent", language: "ruby_rails", third: :challenge, mode: :application_code))
+        .to eq("reading_for_intent (code_review, pattern, or challenge)")
+      expect(annotation("separating_symptom_from_cause", language: "javascript", third: :challenge, mode: :application_code))
+        .to eq("separating_symptom_from_cause (code_review, pattern, or challenge)")
+    end
+
+    # A meta-skill concept is an ordinary language-bucket concept as far as
+    # code_review's mode narrowing goes: schema-review days offer only the
+    # data-modeling group, so code_review drops off the host list.
+    it "withholds code_review from a meta-skill concept on a schema-review day" do
+      expect(annotation("spotting_unstated_assumptions", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("spotting_unstated_assumptions (pattern or challenge)")
+    end
   end
 
   describe "established prompt block" do

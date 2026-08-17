@@ -666,15 +666,16 @@ class AiService
     DATA_MODELING_CONCEPTS.include?(concept)
   end
 
-  # An architecture third draws from its own vocabulary, and a security_review
-  # third from a restricted subset, so neither can host an arbitrary
-  # language-bucket concept.
+  # Answered by the same authority that decides what the generation prompt may
+  # offer that section, so a host can never be named for a concept the prompt
+  # would then withhold from it. This restated the rule locally before, and
+  # drifted: it answered "yes" for a data-modeling concept on a parsons_problem
+  # third, which that kind excludes.
+  #
+  # No mode: — the third slot is never code_review, whose mode narrowing
+  # annotate_retention_concept applies on its own line.
   def third_can_host?(cm, third)
-    case third
-    when :architecture    then false
-    when :security_review then config_for(cm.language)[:security_concepts].include?(cm.concept)
-    else                       true
-    end
+    ProblemSetIngest.selectable_vocabulary_for(third.to_s, cm.language).include?(cm.concept)
   end
 
   # A provider can return a parsons_problem object with no "blocks" — that
