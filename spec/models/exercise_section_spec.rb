@@ -85,6 +85,22 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".excluded_vocabulary_keys" do
+    it "withholds nothing from any kind but parsons_problem" do
+      (ExerciseSection.all - [ ExerciseSection::ParsonsProblem ]).each do |kind|
+        expect(kind.excluded_vocabulary_keys).to eq([]), "#{kind} withheld a group unexpectedly"
+      end
+    end
+
+    # A sequencing format graded by positional diff can express neither
+    # "these columns are modeled wrong" nor "what is this code for" — see the
+    # comment on ParsonsProblem.
+    it "withholds both the data-modeling and meta-skill groups from parsons_problem" do
+      expect(ExerciseSection::ParsonsProblem.excluded_vocabulary_keys)
+        .to eq([ :data_modeling, :meta_skill ])
+    end
+  end
+
   describe ".improved_code?" do
     it "excludes architecture, whose review has no single corrected form" do
       expect(described_class.find("architecture").improved_code?).to be(false)

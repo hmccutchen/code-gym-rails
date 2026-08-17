@@ -56,11 +56,13 @@ class DailyPlan
   # one-concept section to carry two.
   FOURTH_SLOT_CAPACITY = 1
 
-  # A vocabulary is at most 16 concepts (see AiService::RAILS_CONCEPTS /
-  # JS_CONCEPTS / ARCHITECTURE_CONCEPTS), so "every due concept in a bucket" is
-  # never a large fetch — this exists only so the per-bucket query below doesn't
-  # truncate to `slots` before the overdue-ratio re-rank gets a chance to run
-  # across all of them (see retention_checks_for's comment).
+  # Smaller than the language vocabularies (see AiService::RAILS_CONCEPTS /
+  # JS_CONCEPTS / ARCHITECTURE_CONCEPTS) — a bucket with more due concepts
+  # than this cap truncates before the Ruby-side overdue-ratio re-rank below
+  # ever sees the rest. Tracked as issue #93; this exists only so the
+  # per-bucket query doesn't truncate to `slots` before that re-rank gets a
+  # chance to run across whatever it did fetch (see retention_checks_for's
+  # comment).
   RETENTION_BUCKET_FETCH_CAP = 20
 
   # Concept selection happens HERE rather than inside the prompt builder so the

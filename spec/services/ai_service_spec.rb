@@ -173,8 +173,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 20-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(25)
+    it "is a frozen 28-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(28)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -193,8 +193,8 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 22-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(27)
+    it "is a frozen 30-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(30)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -407,8 +407,20 @@ RSpec.describe AiService do
     it "names every data-modeling concept in that line" do
       prompt = service.send(:build_exercise_prompt, user, "javascript")
       expect(prompt).to include(
-        "The data-modeling concepts (#{AiService::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section."
+        "The data-modeling concepts (#{AiService::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section"
       )
+    end
+
+    # parsons_problem withholds this group, so a blanket "any section" would
+    # contradict that section's own vocabulary line in the same prompt — and
+    # ingest validates against the FULL vocabulary, so a model resolving the
+    # conflict the wrong way produces a parsons problem tagged wrong_cardinality
+    # that nothing downstream rejects.
+    it "defers to each section's own vocabulary rather than claiming every section" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :parsons_problem)
+
+      expect(prompt).to include("may be tagged on any section whose own vocabulary list above includes them")
+      expect(prompt).not_to include("may be tagged on any section.")
     end
 
     # It applies to the day's other sections regardless of what code_review is
@@ -417,6 +429,33 @@ RSpec.describe AiService do
     it "states the idiom rule on a schema-review day too" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :schema_review)
       expect(prompt).to include("Only a schema-review code_review presents a schema artifact to review")
+    end
+
+    # Everything this vocabulary claims about grading rests on this paragraph:
+    # the generic review rubric has no `missed` array to fill unless the
+    # section still contains one findable issue.
+    it "tells the model a meta-skill concept frames a findable issue rather than replacing it" do
+      prompt = service.send(:build_exercise_prompt, user)
+
+      expect(prompt).to include("reading_for_intent, spotting_unstated_assumptions, separating_symptom_from_cause")
+      expect(prompt).to include("must still contain exactly one specific, findable issue")
+      expect(prompt).to include("never asks an open question about the code's purpose")
+    end
+
+    # pattern renders no snippet, so the concept has to be expressed against
+    # the described design there — the one weak host cell, handled by this line
+    # rather than by a per-concept exclusion.
+    it "says how to express the concept where no code is shown" do
+      expect(service.send(:build_exercise_prompt, user)).to include("Where no code is shown (pattern)")
+    end
+
+    # challenge is a third host for a meta-skill concept, graded by the same
+    # generic rubric as code_review and pattern — this is its worked example.
+    it "gives a worked example for a meta-skill concept hosted by challenge" do
+      prompt = service.send(:build_exercise_prompt, user)
+
+      expect(prompt).to include("A challenge tagged separating_symptom_from_cause")
+      expect(prompt).to include("never asks for an essay about how to debug")
     end
 
     it "embeds per-session concepts with per-section self and AI ratings" do
@@ -640,6 +679,32 @@ RSpec.describe AiService do
     it "still routes an architecture-bucket concept to its own section" do
       expect(annotation("service_boundaries", language: "architecture", third: :architecture, mode: :application_code))
         .to eq("service_boundaries (architecture section)")
+    end
+
+    # The regression this derivation fixes: parsons_problem excludes the
+    # data-modeling group at generation, but the old local `case` in
+    # third_can_host? answered "yes" for it anyway, so the annotation offered
+    # the engineer a host that would never be asked for it.
+    it "withholds a parsons_problem third for a group that kind excludes" do
+      expect(annotation("missing_index", language: "ruby_rails", third: :parsons_problem, mode: :application_code))
+        .to eq("missing_index (pattern)")
+      expect(annotation("reading_for_intent", language: "ruby_rails", third: :parsons_problem, mode: :application_code))
+        .to eq("reading_for_intent (code_review or pattern)")
+    end
+
+    it "offers every ordinary host for a meta-skill concept" do
+      expect(annotation("reading_for_intent", language: "ruby_rails", third: :challenge, mode: :application_code))
+        .to eq("reading_for_intent (code_review, pattern, or challenge)")
+      expect(annotation("separating_symptom_from_cause", language: "javascript", third: :challenge, mode: :application_code))
+        .to eq("separating_symptom_from_cause (code_review, pattern, or challenge)")
+    end
+
+    # A meta-skill concept is an ordinary language-bucket concept as far as
+    # code_review's mode narrowing goes: schema-review days offer only the
+    # data-modeling group, so code_review drops off the host list.
+    it "withholds code_review from a meta-skill concept on a schema-review day" do
+      expect(annotation("spotting_unstated_assumptions", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("spotting_unstated_assumptions (pattern or challenge)")
     end
   end
 

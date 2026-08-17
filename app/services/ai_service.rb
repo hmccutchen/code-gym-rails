@@ -168,13 +168,25 @@ class AiService
     denormalization_tradeoffs unsafe_migration
   ].freeze
 
+  # Reasoning skills rather than technical topics — how to approach a problem,
+  # not a thing to know about it. They sit in both language vocabularies rather
+  # than a bucket of their own because ConceptBucket dispatches on section key,
+  # never on concept: a bucket would require a section kind, and this is
+  # deliberately not one. The cost is per-language mastery. The gain is that
+  # these are absent from LANGUAGE_AGNOSTIC_VOCABULARIES, so their concept
+  # reference shows real Rails or JavaScript code — the better illustration for
+  # a concept about reading code than pseudocode would be.
+  META_SKILL_CONCEPTS = %w[
+    reading_for_intent spotting_unstated_assumptions separating_symptom_from_cause
+  ].freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -183,7 +195,7 @@ class AiService
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -654,15 +666,16 @@ class AiService
     DATA_MODELING_CONCEPTS.include?(concept)
   end
 
-  # An architecture third draws from its own vocabulary, and a security_review
-  # third from a restricted subset, so neither can host an arbitrary
-  # language-bucket concept.
+  # Answered by the same authority that decides what the generation prompt may
+  # offer that section, so a host can never be named for a concept the prompt
+  # would then withhold from it. This restated the rule locally before, and
+  # drifted: it answered "yes" for a data-modeling concept on a parsons_problem
+  # third, which that kind excludes.
+  #
+  # No mode: — the third slot is never code_review, whose mode narrowing
+  # annotate_retention_concept applies on its own line.
   def third_can_host?(cm, third)
-    case third
-    when :architecture    then false
-    when :security_review then config_for(cm.language)[:security_concepts].include?(cm.concept)
-    else                       true
-    end
+    ProblemSetIngest.selectable_vocabulary_for(third.to_s, cm.language).include?(cm.concept)
   end
 
   # A provider can return a parsons_problem object with no "blocks" — that
@@ -971,6 +984,7 @@ class AiService
       #{third_guidance}
       #{fourth_guidance}
       #{data_modeling_idiom_guidance}
+      #{meta_skill_framing_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -985,20 +999,48 @@ class AiService
     PROMPT
   end
 
-  # Data-modeling concepts sit in both language vocabularies, so pattern and
-  # the rotating third can draw one on any day — that reachability is the
-  # point (a due retention check must have somewhere to land when code_review
-  # isn't in schema-review mode). What it must not do is turn those sections
-  # into a second schema review: only a schema-review code_review presents an
-  # artifact. Stated once, for every section, rather than repeated into each
-  # kind's guidance, since it is a rule about the concept and not about any
-  # one kind.
+  # Data-modeling concepts sit in both language vocabularies, so pattern — and
+  # any rotating third except parsons_problem, which excludes them — can draw
+  # one on any day. That reachability is the point (a due retention check must
+  # have somewhere to land when code_review isn't in schema-review mode). What
+  # it must not do is turn those sections into a second schema review: only a
+  # schema-review code_review presents an artifact. Stated once, for every
+  # section, rather than repeated into each kind's guidance, since it is a rule
+  # about the concept and not about any one kind.
+  #
+  # The sentence defers to each section's own vocabulary list rather than
+  # claiming every section: a kind that excludes the group would otherwise read
+  # this as license to tag it anyway, and ingest validates against the full
+  # vocabulary, so nothing downstream would catch it.
   def data_modeling_idiom_guidance
-    "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section. " \
+    "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section whose own " \
+      "vocabulary list above includes them. " \
       "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
       "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
       "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
       "migration to review."
+  end
+
+  # The meta-skill concepts name a way of reasoning, which makes them the one
+  # group that can quietly cost a section its grade: code_review and challenge
+  # have no section_grading_note and are graded by the generic rubric, and that
+  # rubric has nothing to put in "missed" if the question had no wrong answer
+  # to begin with. So the concept is confined to framing here, once for every
+  # section, rather than restated into each kind's guidance — like
+  # data_modeling_idiom_guidance, it is a rule about the concept, not the kind.
+  def meta_skill_framing_guidance
+    "- The meta-skill concepts (#{META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
+      "about a problem, not a topic to write about. A section tagged with one must still " \
+      "contain exactly one specific, findable issue and be gradeable against it — the " \
+      "concept shapes only how the question is framed, never whether there is a right " \
+      "answer. A code_review tagged reading_for_intent plants one real divergence between " \
+      "what the code is evidently for and what it does, and asks the engineer to name both; " \
+      "it never asks an open question about the code's purpose. A challenge tagged " \
+      "separating_symptom_from_cause states a failing behavior whose obvious fix treats " \
+      "the symptom, and is graded on whether the submitted implementation addresses the " \
+      "cause; it never asks for an essay about how to debug. Where no code is shown " \
+      "(pattern), express the concept against the described design instead: what the " \
+      "proposed approach takes for granted, or which layer the real cause sits at."
   end
 
   # A kind's generation instructions. The vocabulary comes from
