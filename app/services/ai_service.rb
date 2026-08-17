@@ -654,28 +654,31 @@ class AiService
   def annotate_retention_concept(cm, third, code_review_mode)
     return "#{cm.concept} (architecture section)" if cm.language == "architecture"
 
-    hosts = []
-    hosts << "code_review" if data_modeling?(cm.concept) == (code_review_mode == :schema_review)
-    hosts << "pattern"
-    hosts << third.to_s if third_can_host?(cm, third)
+    hosts = [
+      [ ExerciseSection::CodeReview.key, code_review_mode ],
+      [ ExerciseSection::Pattern.key,    nil ],
+      [ third.to_s,                      nil ]
+    ].filter_map { |section_key, mode| section_key if can_host?(cm, section_key, mode: mode) }
 
     "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
   end
 
-  def data_modeling?(concept)
-    DATA_MODELING_CONCEPTS.include?(concept)
-  end
-
-  # Answered by the same authority that decides what the generation prompt may
-  # offer that section, so a host can never be named for a concept the prompt
-  # would then withhold from it. This restated the rule locally before, and
-  # drifted: it answered "yes" for a data-modeling concept on a parsons_problem
-  # third, which that kind excludes.
+  # Every slot answered by the same authority that decides what the generation
+  # prompt may offer that section, so an annotation can never name a host whose
+  # own vocabulary line in the same prompt withholds the concept.
   #
-  # No mode: — the third slot is never code_review, whose mode narrowing
-  # annotate_retention_concept applies on its own line.
-  def third_can_host?(cm, third)
-    ProblemSetIngest.selectable_vocabulary_for(third.to_s, cm.language).include?(cm.concept)
+  # All three derive, deliberately. Two of them used to be restated by hand —
+  # an unconditional `pattern` and a `code_review` line that re-derived the
+  # schema-review rule from DATA_MODELING_CONCEPTS — and the third had already
+  # drifted that way before, answering "yes" for a data-modeling concept on a
+  # parsons_problem third. A restatement here cannot be kept honest by tests
+  # that only cover today's kinds: it goes wrong the day a kind gains an
+  # exclusion, which is exactly what adding a second concept group did.
+  #
+  # `mode` is passed only for code_review, the one kind whose selectable
+  # vocabulary depends on it; the third slot is never code_review.
+  def can_host?(cm, section_key, mode: nil)
+    ProblemSetIngest.selectable_vocabulary_for(section_key, cm.language, mode: mode).include?(cm.concept)
   end
 
   # A provider can return a parsons_problem object with no "blocks" — that

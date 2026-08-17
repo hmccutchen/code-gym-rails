@@ -681,10 +681,30 @@ RSpec.describe AiService do
         .to eq("service_boundaries (architecture section)")
     end
 
-    # The regression this derivation fixes: parsons_problem excludes the
-    # data-modeling group at generation, but the old local `case` in
-    # third_can_host? answered "yes" for it anyway, so the annotation offered
-    # the engineer a host that would never be asked for it.
+    # The drift this derivation closes, made reachable: give a fixed kind an
+    # exclusion and the annotation must stop naming it. Nothing excludes
+    # code_review or pattern today, so the only way to prove hosting is derived
+    # rather than restated is to introduce an exclusion and watch it take
+    # effect. A hand-rolled `hosts << "pattern"` cannot honor this.
+    it "drops a fixed section once its kind excludes the concept's group" do
+      allow(ExerciseSection::Pattern).to receive(:excluded_vocabulary_keys).and_return([ :data_modeling ])
+
+      expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("missing_index (code_review or challenge)")
+    end
+
+    it "drops code_review once its kind excludes the concept's group" do
+      allow(ExerciseSection::CodeReview).to receive(:excluded_vocabulary_keys).and_return([ :data_modeling ])
+
+      expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :schema_review))
+        .to eq("missing_index (pattern or challenge)")
+    end
+
+    # The regression the third slot's derivation fixed: parsons_problem
+    # excludes the data-modeling group at generation, but the local `case` that
+    # once answered this said "yes" anyway, so the annotation offered the
+    # engineer a host that would never be asked for it. All three slots now
+    # derive through #can_host?, so the same drift cannot return to any of them.
     it "withholds a parsons_problem third for a group that kind excludes" do
       expect(annotation("missing_index", language: "ruby_rails", third: :parsons_problem, mode: :application_code))
         .to eq("missing_index (pattern)")
