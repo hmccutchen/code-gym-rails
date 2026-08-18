@@ -214,8 +214,40 @@ RSpec.describe ExerciseSection do
         expect(ExerciseSection::ParsonsProblem.grade([], 5)).to eq(mismatches: 5, rating: "beginner")
       end
 
-      it "treats an out-of-range or short submission as mismatched for the missing positions" do
-        expect(ExerciseSection::ParsonsProblem.grade([ 0, 1 ], 5)).to eq(mismatches: 3, rating: "developing")
+      # Anything short of a complete permutation scores as fully mismatched
+      # rather than earning partial credit for the positions that happen to
+      # line up. Padding alone used to award that credit, which made a correct
+      # prefix followed by junk indistinguishable from a correct answer.
+      it "treats a short submission as fully mismatched rather than partially correct" do
+        expect(ExerciseSection::ParsonsProblem.grade([ 0, 1 ], 5)).to eq(mismatches: 5, rating: "beginner")
+      end
+
+      it "refuses a correct permutation carrying extra ids instead of scoring it perfect" do
+        expect(ExerciseSection::ParsonsProblem.grade([ 0, 1, 2, 3, 4, 999 ], 5))
+          .to eq(mismatches: 5, rating: "beginner")
+      end
+
+      it "refuses an out-of-range id even at the right length" do
+        expect(ExerciseSection::ParsonsProblem.grade([ 0, 1, 2, 3, 99 ], 5))
+          .to eq(mismatches: 5, rating: "beginner")
+      end
+    end
+
+    describe ".submitted_order" do
+      it "reads a complete permutation out of a stored answer" do
+        expect(ExerciseSection::ParsonsProblem.submitted_order("order:2,0,1", 3)).to eq([ 2, 0, 1 ])
+      end
+
+      # The defect this exists to close: parse_order alone returns a list whose
+      # first block_count entries are the identity, so every positional reader
+      # would call this answer perfect.
+      it "rejects a correct permutation with extra ids appended" do
+        expect(ExerciseSection::ParsonsProblem.submitted_order("order:0,1,2,999", 3)).to eq([])
+      end
+
+      it "rejects a missing or prefix-less answer" do
+        expect(ExerciseSection::ParsonsProblem.submitted_order(nil, 3)).to eq([])
+        expect(ExerciseSection::ParsonsProblem.submitted_order("0,1,2", 3)).to eq([])
       end
     end
 
@@ -842,6 +874,18 @@ RSpec.describe ExerciseSection do
       expect(note).to include("Correct blocks, in order:")
     end
 
+    # The prompt states the mismatch count as verified ground truth the model
+    # is forbidden to re-judge, so an answer that only looks complete must not
+    # be reported as an exact match.
+    it "does not report a parsons answer padded with extra ids as an exact match" do
+      note = ExerciseSection::ParsonsProblem.grading_note(
+        section: { "blocks" => %w[a b c d e] }, answer: "order:0,1,2,3,4,999"
+      )
+
+      expect(note).to match(/5 block\(s\) out of place/)
+      expect(note).not_to include("exact match")
+    end
+
     it "refuses to claim a verified parsons result with no stored blocks" do
       note = ExerciseSection::ParsonsProblem.grading_note(section: {}, answer: "order:1,0")
 
@@ -866,6 +910,47 @@ RSpec.describe ExerciseSection do
 
       expect(context).to include("Restock", "Order these", "right_level")
       expect(context).not_to include("Their answer:")
+    end
+
+    # Both are on screen while the engineer answers, and answers routinely
+    # complete the skeleton, so a reviewer without them misgrades valid code.
+    it "carries the challenge's scenario and starter code, which the answer is written against" do
+      context = ExerciseSection::Challenge.review_context(
+        section: { "question" => "Implement restock", "scenario" => "inventory restocking service",
+                   "starter_code" => "def restock(item)\nend" },
+        answer: "def restock(item); item.save; end", rating: "right_level"
+      )
+
+      expect(context).to include("inventory restocking service", "def restock(item)")
+    end
+
+    it "omits the challenge's optional fields rather than rendering them empty" do
+      context = ExerciseSection::Challenge.review_context(
+        section: { "question" => "Implement restock" }, answer: "a", rating: nil
+      )
+
+      expect(context).not_to include("Scenario:", "Starter code")
+    end
+
+    # The grading note asks whether the answer weighed the alternatives, which
+    # is unanswerable unless the alternatives are in the context.
+    it "carries the architecture options the grading note asks the reviewer to weigh" do
+      context = ExerciseSection::Architecture.review_context(
+        section: { "title" => "Queue", "question" => "Which?", "scenario" => "10k jobs/min",
+                   "options" => [ "Solid Queue", "Sidekiq" ] },
+        answer: "Solid Queue", rating: nil
+      )
+
+      expect(context).to include("Solid Queue", "Sidekiq")
+    end
+
+    it "omits the architecture option line when the section carries none" do
+      context = ExerciseSection::Architecture.review_context(
+        section: { "title" => "Queue", "question" => "Which?", "scenario" => "10k jobs/min" },
+        answer: "a", rating: nil
+      )
+
+      expect(context).not_to include("Options offered:")
     end
 
     it "carries the ambiguity hunt's hidden answer key, which is what coverage is graded against" do

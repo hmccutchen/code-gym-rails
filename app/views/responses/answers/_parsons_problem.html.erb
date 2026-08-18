@@ -10,6 +10,10 @@
 <% language = exercise.language %>
 <% blocks   = Array(data["blocks"]) %>
 <% if submitted %>
+  <%# parse_order, not submitted_order: grading rejects anything short of a
+      complete permutation, but this is a replay of what they arranged, and
+      showing every block as "(skipped)" because one id is corrupt hides work
+      they did do. Strict at the boundary, lenient in the UI. %>
   <% submitted_ids = ExerciseSection::ParsonsProblem.parse_order(response.answers[key]) %>
   <ol class="parsons-list parsons-list-readonly">
     <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>

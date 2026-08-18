@@ -561,6 +561,41 @@ RSpec.describe ProblemSetIngest do
       expect(result.problem_set).to have_key("challenge")
     end
 
+    it "warns when the provider returns a section the day did not intend" do
+      extra = full_set.merge("challenge" => { "concept" => "caching" })
+
+      expect(Rails.logger).to receive(:warn).with(/\[unrequested_sections\].*challenge/)
+
+      described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
+    end
+
+    it "names what was intended alongside what arrived unasked for" do
+      extra = full_set.merge("challenge" => { "concept" => "caching" })
+
+      expect(Rails.logger).to receive(:warn).with(/code_review.*pattern/)
+
+      described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
+    end
+
+    # Section names are provider-controlled JSON keys, so a newline in one
+    # would forge a second log line if they were interpolated raw.
+    it "escapes a section name rather than letting it forge a log line" do
+      forged = full_set.merge("challenge\nFATAL -- : owned" => { "concept" => "caching" })
+
+      expect(Rails.logger).to receive(:warn) do |message|
+        expect(message.lines.size).to eq(1)
+        expect(message).to include('challenge\\nFATAL')
+      end
+
+      described_class.call(forged, language: "ruby_rails", expected_keys: %w[code_review pattern])
+    end
+
+    it "stays quiet when the delivered set is exactly the intended one" do
+      expect(Rails.logger).not_to receive(:warn)
+
+      described_class.call(full_set, language: "ruby_rails", expected_keys: %w[code_review pattern])
+    end
+
     it "reports a missing section rather than its unusable answer key" do
       expect {
         described_class.call(full_set, language: "ruby_rails",

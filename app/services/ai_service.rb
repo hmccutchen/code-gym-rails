@@ -1276,7 +1276,7 @@ class AiService
     blocks = Array(parsons["blocks"])
     return review if blocks.empty?
 
-    submitted = ExerciseSection::ParsonsProblem.parse_order(daily_response.answers["parsons_problem"])
+    submitted = ExerciseSection::ParsonsProblem.submitted_order(daily_response.answers["parsons_problem"], blocks.size)
     review["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
     review
   end

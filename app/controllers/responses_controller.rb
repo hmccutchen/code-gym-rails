@@ -481,8 +481,12 @@ class ResponsesController < ApplicationController
     )
   end
 
+  # active_section_keys, never ExerciseSection.keys: a payload can hold more
+  # third- or fourth-shaped keys than the day resolved, and tagging one the
+  # engineer never saw both pollutes the concept history that shapes tomorrow
+  # and bills a reference job for a section that was never on screen.
   def exercise_concept_tags(exercise)
-    ExerciseSection.keys
+    exercise.active_section_keys
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
   end

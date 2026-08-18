@@ -58,9 +58,12 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.resolved_fourth_key(problem_set)
   end
 
-  # The sections this exercise actually presents: code_review plus whichever
-  # of pattern, the third, and the fourth today's plan chose, each resolved by
-  # precedence. A day holds 2-4 of them.
+  # The sections this exercise actually presents: code_review, pattern, and the
+  # resolved third and fourth keys, keeping only those the payload holds. This
+  # reads the payload, not the plan — the plan is gone by the time anything
+  # asks — so a section the provider added unasked for still counts here if it
+  # resolves (ProblemSetIngest logs that case; see warn_unrequested_sections!).
+  # A day holds 2-4 of them.
   #
   # NOT `problem_set.keys`. A payload can hold more than one third- or
   # fourth-shaped key — FakeService persists all eight deliberately, and a real
