@@ -180,13 +180,21 @@ class AiService
     reading_for_intent spotting_unstated_assumptions separating_symptom_from_cause
   ].freeze
 
+  # Named smells rather than the remedies the language vocabularies already
+  # carry (service_objects, query_objects, state_lifting name the cure). Shared
+  # across both languages because each means the same thing in a Rails class
+  # and a React component.
+  CODE_SMELL_CONCEPTS = %w[
+    god_object primitive_obsession shotgun_surgery feature_envy
+  ].freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -195,7 +203,7 @@ class AiService
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
