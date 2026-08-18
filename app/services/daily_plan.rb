@@ -94,8 +94,14 @@ class DailyPlan
     # conditions. AiService#log_retention already records offered-versus-
     # honored per bucket, so if this matters it will show up there first.
     capacity      = kinds.count { |kind| !kind.fourth? }
-    slots         = capacity - reinforcement.first(capacity).size
+    reinforcement = reinforcement.first(capacity)
+    slots         = capacity - reinforcement.size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds)
+    # Truncated to what today can actually host, and again when a retention
+    # check takes a slot back: the prompt's mastery instruction demands every
+    # concept listed here be reintroduced, so an entry past capacity is an
+    # instruction no section is left to satisfy.
+    reinforcement = reinforcement.first(capacity - slots)
     due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots)
     established   = established_concepts_for(user, language, kinds: kinds,
                                              reinforcement: reinforcement, due_checks: due_checks)

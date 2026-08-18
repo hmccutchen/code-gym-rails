@@ -441,9 +441,10 @@ RSpec.describe User, type: :model do
     # concept_tags is persisted provider output, so it keeps the name a section
     # was tagged with even after that concept leaves the vocabulary. Left
     # unfiltered, a renamed concept keeps being reinforced for the whole
-    # 10-session window: the model can no longer tag it, and because
-    # DailyPlan sizes retention as `3 - reinforcement.first(3).size`, the dead
-    # entry suppresses a retention check that could have used the slot.
+    # 10-session window: the model can no longer tag it, and because DailyPlan
+    # sizes retention as the day's hostable sections minus the reinforcement
+    # entries claiming them, the dead entry suppresses a retention check that
+    # could have used the slot.
     it "skips a tagged concept that is no longer in its bucket's vocabulary" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)

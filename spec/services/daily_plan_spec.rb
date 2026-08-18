@@ -420,6 +420,38 @@ RSpec.describe DailyPlan do
       expect(code_review_and_fourth_only.due_checks.size).to eq(1)
       expect(code_review_and_third.due_checks.size).to eq(2)
     end
+
+    # The prompt's mastery instruction demands every listed concept be
+    # reintroduced, so an entry the day has no section left to carry is an
+    # instruction that cannot be honored.
+    it "truncates the reinforcement list itself to what the day can host" do
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything).and_return(
+        [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" },
+          { concept: "idempotency", tier: "standard" } ]
+      )
+      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization])
+    end
+
+    it "gives a reinforcement entry up when an overdue check takes the slot back" do
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything).and_return(
+        [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" } ]
+      )
+      allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
+      user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
+                                     mastered_at: 6.months.ago, retention_interval_days: 7,
+                                     next_retention_check_on: 6.months.ago.to_date)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one])
+      expect(plan.due_checks.map(&:concept)).to eq(%w[transaction_safety])
+    end
   end
 
   describe "#code_review_mode on the plan" do

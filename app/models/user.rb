@@ -349,7 +349,8 @@ class User < ApplicationRecord
   # concept_tags is persisted provider output, so it keeps the name a section
   # was tagged with even after that concept leaves the vocabulary. Reinforcing
   # one the generator can no longer tag wastes an entry AND a retention slot,
-  # since DailyPlan sizes retention as `3 - reinforcement.first(3).size`.
+  # since DailyPlan sizes retention as whatever the day's non-fourth sections
+  # can host minus the reinforcement entries that claim them.
   #
   # A nil bucket passes, because vocabulary_for raises on nil and there is no
   # vocabulary to check against. Reaching it needs both a nil language and a
