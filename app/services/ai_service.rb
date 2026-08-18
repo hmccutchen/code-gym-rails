@@ -1130,7 +1130,7 @@ class AiService
   # rubric, which has nothing to put in "missed" if nothing was missable. So
   # the requirement here is the same one meta_skill_framing_guidance enforces —
   # the concept frames the question, it never replaces the findable issue.
-  # Stated once for every section, like the other three group rules, because it
+  # Stated once for every section, like the other group rules, because it
   # is a rule about the concept and not about any one kind.
   def oo_design_violation_guidance
     "- The OO design-principle concepts (#{OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
@@ -1139,7 +1139,12 @@ class AiService
       "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
       "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
       "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
-      "costs. The challenge section is the exception to the answer shape, since its answer is code: there the " \
+      "costs; on a test-file code_review the planted test smell must BE the violation rather than sit beside it, " \
+      "which every principle in the group can express — a dependency_inversion violation is a test that can only " \
+      "reach its subject by stubbing one hard-coded collaborator, an open_closed violation is a conditional " \
+      "inside the test that gains a branch for every case added, and a composition_over_inheritance violation is " \
+      "a test-case base class whose subclasses inherit setup they do not use. " \
+      "The challenge section is the exception to the answer shape, since its answer is code: there the " \
       "starter_code violates the principle — a behavior that cannot be tested without reaching through a " \
       "hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies " \
       "it, so writing the corrected design IS the answer rather than describing it."

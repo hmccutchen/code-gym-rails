@@ -353,6 +353,29 @@ RSpec.describe AiService do
       expect(guidance).to match(/writing the corrected design IS the answer/i)
     end
 
+    # A test-file code_review must also exhibit a real test smell, and every
+    # concept in this group is selectable there — code_review's :test_file
+    # vocabulary is the day's full language list minus the data-modeling group.
+    # A clause naming only one principle leaves the other two with two
+    # unrelated requirements and no stated way to satisfy both (issue #114),
+    # so the idiom is asserted per concept and derived from the constant: a
+    # fourth principle has to arrive with its own idiom or fail here.
+    it "gives every selectable design principle a test-file idiom" do
+      clause = service.send(:oo_design_violation_guidance)[/on a test-file code_review.*?(?=The challenge section)/m]
+
+      expect(clause).to be_present
+      AiService::OO_DESIGN_CONCEPTS.each do |concept|
+        expect(clause).to include(concept), "no test-file idiom for #{concept}"
+      end
+    end
+
+    # The general rule, stated independently of any one principle: a smell
+    # planted next to the violation satisfies both instructions separately and
+    # is exactly what #114 reported.
+    it "requires the planted test smell to be the violation itself" do
+      expect(service.send(:oo_design_violation_guidance)).to match(/rather than sit beside it/i)
+    end
+
     it "is stated once in the generation prompt, for every section rather than per kind" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
 
