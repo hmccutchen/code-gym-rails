@@ -19,8 +19,20 @@ class ConceptMastery < ApplicationRecord
   # Once a concept is mastered it would otherwise never resurface. These schedule
   # a re-check at expanding intervals: 7 days ≈ 5 weekday sessions (long enough to
   # forget, short enough to catch decay), doubling per successful check, capped at
-  # 60 days because each vocabulary is only 13-16 concepts — past two months
-  # ordinary rotation resurfaces the concept anyway.
+  # 60 days because two months is the outer edge where a re-check still measures
+  # RETENTION. Past it, a correct answer is indistinguishable from having
+  # relearned the concept elsewhere and a wrong one from never having held it, so
+  # the check stops telling us the thing it exists to ask.
+  #
+  # The cap is about what the check can still measure, not about how often
+  # ordinary rotation happens to resurface a concept. It was once justified that
+  # second way — "each vocabulary is only 13-16 concepts" — which stopped being
+  # true as the vocabularies grew and was never the right argument anyway: an
+  # architecture day draws no language concept at all, security_review draws a
+  # restricted subset, and a schema-review code_review draws only the
+  # data-modeling group, so real coverage of any one concept is far thinner than
+  # counting sections per weekday suggests. Nothing here should be derived from a
+  # vocabulary's size (issue #98).
   RETENTION_INITIAL_INTERVAL_DAYS = 7
   RETENTION_GROWTH_FACTOR         = 2
   RETENTION_MAX_INTERVAL_DAYS     = 60
