@@ -28,7 +28,7 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement)
         .and_return([ { concept: "a", tier: "standard" }, { concept: "b", tier: "standard" } ])
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
@@ -45,7 +45,7 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 10)
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
@@ -67,20 +67,20 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 5)
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
     it "offers nothing when reinforcement already claims three slots" do
       mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
-      expect(DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 0)).to eq([])
+      expect(DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 0)).to eq([])
     end
 
     it "offers architecture-bucket concepts only on architecture days" do
       mastery(concept: "service_boundaries", bucket: "architecture", due_on: Date.current - 2)
 
-      on_challenge = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 3)
-      on_arch      = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :architecture, slots: 3)
+      on_challenge = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
+      on_arch      = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Architecture ], slots: 3)
 
       expect(on_challenge.map(&:concept)).to eq([])
       expect(on_arch.map(&:concept)).to eq(%w[service_boundaries])
@@ -88,7 +88,7 @@ RSpec.describe DailyPlan do
 
     it "never offers a concept from the other language's bucket" do
       mastery(concept: "closures", bucket: "javascript", due_on: Date.current - 2)
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", third: :challenge, slots: 3)
+      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
       expect(checks.map(&:concept)).to eq([])
     end
   end
@@ -107,7 +107,7 @@ RSpec.describe DailyPlan do
       established_mastery(concept: "memoization")
       established_mastery(concept: "retired_concept")
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
                               reinforcement: [], due_checks: [])
       expect(result.map(&:concept)).to eq(%w[memoization])
     end
@@ -120,7 +120,7 @@ RSpec.describe DailyPlan do
       established_mastery(concept: "service_boundaries", bucket: "ruby_rails")
       established_mastery(concept: "memoization",        bucket: "architecture")
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :architecture,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Architecture ],
                               reinforcement: [], due_checks: [])
       expect(result.map(&:concept)).to eq([])
     end
@@ -146,7 +146,7 @@ RSpec.describe DailyPlan do
         queries += 1 unless payload[:name].to_s =~ /SCHEMA|TRANSACTION/
       end
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :architecture,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Architecture ],
                               reinforcement: [], due_checks: [])
       result.map(&:concept)
 
@@ -159,7 +159,7 @@ RSpec.describe DailyPlan do
     it "includes standard-tier concepts past their initial retention interval" do
       established_mastery(concept: "memoization", interval: 14)
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
                               reinforcement: [], due_checks: [])
       expect(result.map(&:concept)).to eq(%w[memoization])
     end
@@ -167,7 +167,7 @@ RSpec.describe DailyPlan do
     it "excludes concepts still on their initial interval (never survived a retention check)" do
       established_mastery(concept: "memoization", interval: 7)
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
                               reinforcement: [], due_checks: [])
       expect(result).to eq([])
     end
@@ -175,7 +175,7 @@ RSpec.describe DailyPlan do
     it "excludes concepts already claimed by reinforcement" do
       established_mastery(concept: "memoization", interval: 14)
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
                               reinforcement: [ { concept: "memoization", tier: "standard" } ], due_checks: [])
       expect(result).to eq([])
     end
@@ -183,7 +183,7 @@ RSpec.describe DailyPlan do
     it "excludes concepts already claimed by today's due retention checks" do
       cm = established_mastery(concept: "memoization", interval: 14)
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
                               reinforcement: [], due_checks: [ cm ])
       expect(result).to eq([])
     end
@@ -194,7 +194,7 @@ RSpec.describe DailyPlan do
       user.concept_masteries.create!(concept: "scope_chaining", language: "ruby_rails", tier: :paused,
                                      retention_interval_days: nil, cooldown_remaining: 2)
 
-      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+      result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
                               reinforcement: [], due_checks: [])
       expect(result).to eq([])
     end
@@ -202,9 +202,9 @@ RSpec.describe DailyPlan do
     it "only includes architecture-bucket concepts on architecture days, like retention checks do" do
       established_mastery(concept: "service_boundaries", bucket: "architecture", interval: 14)
 
-      on_challenge = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :challenge,
+      on_challenge = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
                                     reinforcement: [], due_checks: [])
-      on_arch      = DailyPlan.send(:established_concepts_for, user, "ruby_rails", third: :architecture,
+      on_arch      = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Architecture ],
                                     reinforcement: [], due_checks: [])
 
       expect(on_challenge).to eq([])
@@ -292,7 +292,7 @@ RSpec.describe DailyPlan do
       expect(result.fourth_established).to eq([])
     end
 
-    it "excludes fourth-slot buckets from the 3-slot reinforcement pool" do
+    it "excludes fourth-slot buckets from the non-fourth reinforcement pool" do
       exercise = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current,
                                        problem_set: { "plan_review" => { "concept" => "scope_creep" } })
       DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
@@ -373,6 +373,39 @@ RSpec.describe DailyPlan do
         allow(WeightedRoll).to receive(:rand).and_return(value)
         expect(WeightedRoll.pick(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)).to eq(expected)
       end
+    end
+  end
+
+  describe ".for with a variable-length day" do
+    let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+
+    before { allow(SectionCount).to receive(:for).and_return(2) }
+
+    it "carries the chosen slots, leaving the unchosen ones nil" do
+      plan = described_class.for(user, language: "ruby_rails")
+
+      chosen = [ plan.pattern, plan.third, plan.fourth ].compact
+
+      expect(chosen.size).to eq(1)
+    end
+
+    it "skips the fourth track entirely when no fourth section was chosen" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.fourth).to be_nil
+      expect(plan.fourth_reinforcement).to eq([])
+      expect(plan.fourth_due_checks).to eq([])
+      expect(plan.fourth_established).to eq([])
+    end
+
+    it "sizes the reinforcement pool to the slots that can host a language concept" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect(plan.due_checks.size).to be <= 1
     end
   end
 
