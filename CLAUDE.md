@@ -107,6 +107,10 @@ rather than only catching it afterward:
   is what the kind/provider class is for.
 - No rule stated in two places that can disagree.
 - No denominator, count, or threshold hardcoded where an authority computes it.
+- No constant *justified* by a vocabulary's size unless it derives from that
+  size or a spec asserts the assumption — the same rule as above applied to
+  reasoning rather than values. Three separate comments went false as the
+  vocabularies grew; each was found by accident.
 - No provider-facing input read without boundary validation in
   `ProblemSetIngest`.
 - No new behavior without a test; no assertion weakened to make one pass.
