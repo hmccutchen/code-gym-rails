@@ -1079,4 +1079,12 @@ RSpec.describe User, type: :model do
       end
     end
   end
+
+  describe "#adaptive_set_size" do
+    it "defaults on" do
+      user = User.create!(email: "toggle@example.com", name: "Toggle")
+
+      expect(user.adaptive_set_size?).to be(true)
+    end
+  end
 end
