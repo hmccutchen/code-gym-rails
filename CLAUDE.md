@@ -96,11 +96,13 @@ decisions, not defaults that drifted into place:
   many sections a day has, `ConceptBucket` for which vocabulary a concept
   records under. Derive from the authority; never recount.
 - **One prompt line per vocabulary group** — a concept group that needs a
-  cross-section rule (`DATA_MODELING_CONCEPTS`, `META_SKILL_CONCEPTS`,
-  `CODE_SMELL_CONCEPTS`) gets one `AiService#<group>_guidance` method naming
-  the group from its constant and stated once for all sections, never repeated
+  cross-section rule gets one `AiService#<group>_guidance` method naming the
+  group from its constant and stated once for all sections, never repeated
   into each kind's `.generation_guidance`. The rule is about the concept, not
-  about any one kind. A fourth group adds a fourth method here.
+  about any one kind, so every such group has exactly one of these methods and
+  a new group adds another. Don't enumerate the groups here — the constants
+  and their guidance methods sit next to each other in `AiService`, and a
+  count kept in this file has already gone stale once.
 
 **Deviating from an established in-repo pattern requires stating why in the PR
 description.** Deviation is allowed — patterns outlive their reasons sometimes

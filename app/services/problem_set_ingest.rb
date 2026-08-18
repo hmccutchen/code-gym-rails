@@ -108,6 +108,7 @@ class ProblemSetIngest
       when :meta_skill    then AiService::META_SKILL_CONCEPTS
       when :code_smell    then AiService::CODE_SMELL_CONCEPTS
       when :oo_design     then AiService::OO_DESIGN_CONCEPTS
+      when :module_design then AiService::MODULE_DESIGN_CONCEPTS
       else                     []
       end
     end
