@@ -1048,6 +1048,9 @@ RSpec.describe AiService do
         "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
       ).to_json)
 
+      # full_problem_set returns every kind, so the set also trips the
+      # unrequested-sections warning. Only the recording failure is asserted.
+      allow(Rails.logger).to receive(:warn)
       expect(Rails.logger).to receive(:warn).with(/SuggestedConcept recording failed.*db down/)
       expect(svc.generate_exercise(user)["code_review"]["concept"]).to eq("other")
     end

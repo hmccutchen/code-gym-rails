@@ -99,6 +99,27 @@ RSpec.describe "Responses", type: :request do
       expect(resp.completeness).to be <= 100
     end
 
+    # A payload can hold more third- or fourth-shaped keys than the page ever
+    # renders — FakeService returns all eight, and a provider can throw in an
+    # alternate. Tagging what was never shown puts a concept the engineer
+    # never saw into the history that shapes tomorrow's set.
+    it "omits a section the exercise holds but never presented" do
+      create_exercise(
+        "code_review"  => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"      => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" },
+        "challenge"    => { "title" => "t", "question" => "q", "concept" => "service_objects" }
+      )
+
+      post responses_path,
+        params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
+        headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      resp = DailyResponse.last
+      expect(resp.concept_tags.keys).to match_array(DailyExercise.last.active_section_keys)
+      expect(resp.concept_tags).not_to have_key("challenge")
+    end
+
     it "stores an empty map for exercises that predate tagging" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" },
                       "pattern" => { "title" => "t", "why" => "w", "question" => "q" },
@@ -677,6 +698,22 @@ RSpec.describe "Responses", type: :request do
         .and have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "memoization", language: "ruby_rails", user_id: user.id)
         .exactly(:once)
+    end
+
+    it "does not enqueue for a section the exercise holds but never presented" do
+      create_exercise(
+        "code_review"  => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"      => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
+        "architecture" => { "title" => "t", "question" => "q", "concept" => "service_boundaries" },
+        "challenge"    => { "title" => "t", "question" => "q", "concept" => "service_objects" }
+      )
+
+      expect {
+        post responses_path,
+          params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
+          headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "service_objects", language: "ruby_rails", user_id: user.id)
     end
 
     it "does not enqueue for a concept that already has a reference" do

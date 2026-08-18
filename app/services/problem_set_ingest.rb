@@ -138,6 +138,7 @@ class ProblemSetIngest
   # can leave a stray row behind.
   def call
     reject_missing_sections!
+    warn_unrequested_sections!
     reject_unusable_answer_key!
     normalize_concepts!
     normalize_answer_scaffolds!
@@ -159,6 +160,22 @@ class ProblemSetIngest
 
     raise AiService::InvalidResponseError,
           "Provider omitted intended section(s): #{missing.join(', ')}"
+  end
+
+  # The other half of the rule above: extras are accepted, but not invisibly.
+  # DailyPlan sizes the day and names its sections, yet active_section_keys
+  # derives from what is *present*, so an unrequested section the provider
+  # threw in is rendered — a day sized at 2 can show 3, defeating the sizing
+  # decision with no trace anywhere that it happened. Rejecting would discard
+  # usable days over a harmless provider quirk, so this warns instead.
+  def warn_unrequested_sections!
+    unrequested = @problem_set.keys - @expected_keys
+    return if unrequested.empty?
+
+    Rails.logger.warn(
+      "[unrequested_sections] provider returned section(s) the day did not intend: " \
+      "#{unrequested.join(', ')} (intended: #{@expected_keys.join(', ')})"
+    )
   end
 
   # Unlike every other step, this one rejects rather than repairs. The planted
