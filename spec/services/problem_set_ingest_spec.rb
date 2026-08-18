@@ -76,11 +76,12 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-    # The exclusion is exactly those three groups and nothing else: parsons
+    # The exclusion is exactly those four groups and nothing else: parsons
     # ends up with the same list every other language-bucket kind gets, minus
     # them.
     it "changes nothing about parsons beyond the exclusion" do
-      excluded = AiService::DATA_MODELING_CONCEPTS + AiService::META_SKILL_CONCEPTS + AiService::CODE_SMELL_CONCEPTS
+      excluded = AiService::DATA_MODELING_CONCEPTS + AiService::META_SKILL_CONCEPTS +
+                 AiService::CODE_SMELL_CONCEPTS + AiService::OO_DESIGN_CONCEPTS
 
       %w[ruby_rails javascript].each do |language|
         expect(described_class.selectable_vocabulary_for("parsons_problem", language))
@@ -148,6 +149,24 @@ RSpec.describe ProblemSetIngest do
       vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review)
 
       expect(vocabulary).not_to include(*AiService::CODE_SMELL_CONCEPTS)
+    end
+
+    it "withholds OO design principles from parsons_problem, whose grade is an ordering" do
+      vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
+
+      expect(vocabulary).not_to include(*AiService::OO_DESIGN_CONCEPTS)
+    end
+
+    it "offers OO design principles to code_review outside schema-review mode" do
+      vocabulary = described_class.selectable_vocabulary_for("code_review", "javascript", mode: :application_code)
+
+      expect(vocabulary).to include(*AiService::OO_DESIGN_CONCEPTS)
+    end
+
+    it "withholds OO design principles from a schema-review code_review" do
+      vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review)
+
+      expect(vocabulary).not_to include(*AiService::OO_DESIGN_CONCEPTS)
     end
   end
 

@@ -173,8 +173,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 32-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(32)
+    it "is a frozen 35-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(35)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -193,8 +193,8 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 34-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(34)
+    it "is a frozen 37-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(37)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -218,6 +218,40 @@ RSpec.describe AiService do
     it "is reachable from both language vocabularies" do
       expect(AiService::RAILS_CONCEPTS).to include(*AiService::CODE_SMELL_CONCEPTS)
       expect(AiService::JS_CONCEPTS).to include(*AiService::CODE_SMELL_CONCEPTS)
+    end
+  end
+
+  describe "OO_DESIGN_CONCEPTS" do
+    it "names the three principles that survived the depth and relevance filters" do
+      expect(AiService::OO_DESIGN_CONCEPTS)
+        .to contain_exactly("open_closed", "dependency_inversion", "composition_over_inheritance")
+      expect(AiService::OO_DESIGN_CONCEPTS).to be_frozen
+    end
+
+    it "is reachable from both language vocabularies" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::OO_DESIGN_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::OO_DESIGN_CONCEPTS)
+    end
+
+    # single_responsibility duplicates god_object from the rule side, and
+    # program_to_interface duplicates dependency_inversion. Both were cut
+    # rather than shipped as twins; liskov_substitution and
+    # interface_segregation were cut on relevance, not to complete SOLID.
+    it "omits the candidates that duplicated an existing concept or failed the relevance filter" do
+      expect(AiService::RAILS_CONCEPTS).not_to include(
+        "single_responsibility", "program_to_interface", "encapsulate_what_varies",
+        "liskov_substitution", "interface_segregation"
+      )
+      expect(AiService::JS_CONCEPTS).not_to include(
+        "single_responsibility", "program_to_interface", "encapsulate_what_varies",
+        "liskov_substitution", "interface_segregation"
+      )
+    end
+
+    it "stays out of the language-agnostic vocabularies, so its references show real code" do
+      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
+        expect(vocabulary).not_to include(*AiService::OO_DESIGN_CONCEPTS)
+      end
     end
   end
 
@@ -247,6 +281,47 @@ RSpec.describe AiService do
 
       expect(guidance).to match(/challenge/i)
       expect(guidance).to match(/restructur/i)
+    end
+  end
+
+  describe "#oo_design_violation_guidance" do
+    let(:user) { User.create!(email: "principles@example.com", name: "Principles") }
+    let(:service) { FakeService.new("fake-key") }
+
+    it "names the group from the constant" do
+      expect(service.send(:oo_design_violation_guidance)).to include(*AiService::OO_DESIGN_CONCEPTS)
+    end
+
+    # code_review and challenge have no section_grading_note and are graded by
+    # the generic rubric, which has nothing to put in "missed" unless the
+    # section planted something missable. A principle invites an essay without
+    # this constraint.
+    it "requires one findable violation the section can be graded against" do
+      guidance = service.send(:oo_design_violation_guidance)
+
+      expect(guidance).to match(/exactly one specific, findable violation/i)
+      expect(guidance).to match(/gradeable/i)
+    end
+
+    it "asks the discussion sections for the violation named rather than rewritten" do
+      expect(service.send(:oo_design_violation_guidance)).to match(/rather than a rewrite/i)
+    end
+
+    # challenge draws the full language vocabulary, and its schema asks what to
+    # implement with a code answer. A blanket "never rewrite" would hand the
+    # provider a coding exercise whose answer must not be code.
+    it "gives challenge a corrected-design shape rather than a prose answer" do
+      guidance = service.send(:oo_design_violation_guidance)
+
+      expect(guidance).to match(/challenge section is the exception/i)
+      expect(guidance).to match(/writing the corrected design IS the answer/i)
+    end
+
+    it "is stated once in the generation prompt, for every section rather than per kind" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+
+      expect(prompt).to include(service.send(:oo_design_violation_guidance))
+      expect(prompt.scan("The OO design-principle concepts").size).to eq(1)
     end
   end
 

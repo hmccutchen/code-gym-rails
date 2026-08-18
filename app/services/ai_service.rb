@@ -188,13 +188,35 @@ class AiService
     god_object primitive_obsession shotgun_surgery feature_envy
   ].freeze
 
+  # The rule underneath the smell: the code smells name a shape to recognize
+  # and the language vocabularies name a remedy, but nothing named the design
+  # principle either one appeals to. Evaluative rather than situational — "does
+  # this violate open/closed?" is askable of almost any snippet, which is what
+  # makes three principles a better fit here than the GoF catalog, whose 22
+  # patterns would nearly double both vocabularies and starve the mastery loop.
+  #
+  # Five candidates were cut rather than shipped as twins. single_responsibility
+  # is god_object named from the rule side and generates the same section;
+  # program_to_interface is dependency_inversion with a less findable violation;
+  # encapsulate_what_varies is open_closed with a blurrier one. Neither
+  # liskov_substitution nor interface_segregation survives the relevance filter
+  # in duck-typed Ruby and hooks-based React, and completing SOLID is not a
+  # reason to carry a concept this app's sections cannot host well.
+  #
+  # Shared across both languages because each means the same thing in a Rails
+  # class and a React component, and deliberately outside
+  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code.
+  OO_DESIGN_CONCEPTS = %w[
+    open_closed dependency_inversion composition_over_inheritance
+  ].freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -203,7 +225,7 @@ class AiService
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -1009,6 +1031,7 @@ class AiService
       #{data_modeling_idiom_guidance}
       #{meta_skill_framing_guidance}
       #{code_smell_naming_guidance}
+      #{oo_design_violation_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1076,6 +1099,27 @@ class AiService
       "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
       "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
       "restructure it, so writing the better shape IS the answer rather than describing it."
+  end
+
+  # A principle is a rule, not a thing to find, which makes this the group most
+  # likely to produce a section with no wrong answer in it: code_review and
+  # challenge have no section_grading_note and are graded by the generic
+  # rubric, which has nothing to put in "missed" if nothing was missable. So
+  # the requirement here is the same one meta_skill_framing_guidance enforces —
+  # the concept frames the question, it never replaces the findable issue.
+  # Stated once for every section, like the other three group rules, because it
+  # is a rule about the concept and not about any one kind.
+  def oo_design_violation_guidance
+    "- The OO design-principle concepts (#{OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
+      "topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that " \
+      "rule and be gradeable against it, and the answer is naming the violation and saying which future change it " \
+      "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
+      "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
+      "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
+      "costs. The challenge section is the exception to the answer shape, since its answer is code: there the " \
+      "starter_code violates the principle — a behavior that cannot be tested without reaching through a " \
+      "hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies " \
+      "it, so writing the corrected design IS the answer rather than describing it."
   end
 
   # A kind's generation instructions. The vocabulary comes from

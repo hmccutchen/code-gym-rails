@@ -27,6 +27,13 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # concept from any of them still has other hosts (see
     # AiService#annotate_retention_concept).
     #
+    # The OO design principles fail on the same axis as the code smells and
+    # for a sharper reason: this format's entire grade is a positional diff,
+    # and none of open_closed, dependency_inversion, or
+    # composition_over_inheritance has an ordering that is right or wrong. An
+    # extension seam, an injected collaborator, and a composed object are
+    # structural judgments a permutation score cannot measure at all.
+    #
     # unsafe_migration is the arguable exception: backfill-then-constrain has a
     # genuinely correct step order, which is exactly this format's shape. It is
     # excluded anyway, because the case for it is really evidence that
@@ -35,7 +42,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # grouping it with them, not to special-case one consumer. Revisit here if
     # that regrouping ever happens.
     def excluded_vocabulary_keys
-      [ :data_modeling, :meta_skill, :code_smell ]
+      [ :data_modeling, :meta_skill, :code_smell, :oo_design ]
     end
 
     # The answer is an ordering, not prose: a draggable, keyboard-reorderable
