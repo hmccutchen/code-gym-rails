@@ -238,6 +238,16 @@ RSpec.describe AiService do
       expect(prompt.scan("god_object").size).to be >= 1
       expect(prompt).to include(service.send(:code_smell_naming_guidance))
     end
+
+    # challenge draws the full language vocabulary, and its answer is code. A
+    # blanket "never patch, just name it" would hand the provider a coding
+    # exercise whose answer must not be code.
+    it "gives challenge a refactoring shape rather than a prose answer" do
+      guidance = service.send(:code_smell_naming_guidance)
+
+      expect(guidance).to match(/challenge/i)
+      expect(guidance).to match(/restructur/i)
+    end
   end
 
   describe "TYPESCRIPT_FLAVORED_CONCEPTS" do
@@ -339,6 +349,23 @@ RSpec.describe AiService do
       config = service.send(:config_for, "ruby_rails")
       prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
       expect(prompt).to include("annotated Ruby/Rails code")
+    end
+
+    # "When to reach for it" is the right lens for a remedy and nonsense for a
+    # smell: nothing should ever tell an engineer when to choose a god object.
+    it "reframes senior_lens for a code smell, which is never a thing to reach for" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "god_object", config)
+
+      expect(prompt).to include("how to catch it early")
+      expect(prompt).not_to include("when to reach for it")
+    end
+
+    it "keeps the remedy framing for a concept that names a technique" do
+      config = service.send(:config_for, "javascript")
+      prompt = service.send(:build_concept_reference_prompt, "state_lifting", config)
+
+      expect(prompt).to include("when to reach for it")
     end
   end
 

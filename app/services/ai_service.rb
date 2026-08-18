@@ -1072,7 +1072,10 @@ class AiService
       "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
       "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
       "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
-      "section's own idiom: on a test-file code_review, a god_object is a bloated test class."
+      "section's own idiom: on a test-file code_review, a god_object is a bloated test class. The challenge " \
+      "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
+      "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
+      "restructure it, so writing the better shape IS the answer rather than describing it."
   end
 
   # A kind's generation instructions. The vocabulary comes from
@@ -1234,6 +1237,16 @@ class AiService
         "annotated #{label} code, ~15 lines"
       end
 
+    # A smell is never a technique to choose, so the remedy lens the other
+    # concepts get would have the provider explain when to reach for a god
+    # object. Same membership test the code_example lens above uses.
+    senior_lens_desc =
+      if CODE_SMELL_CONCEPTS.include?(concept)
+        "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"
+      else
+        "when to reach for it / tradeoffs"
+      end
+
     <<~PROMPT
       Write a durable reference for the #{config[:coach]} concept: "#{concept}".
       This is a stable explanation an engineer returns to across repeat exposure —
@@ -1244,7 +1257,7 @@ class AiService
         "tagline":      "string — bold one-liner",
         "explanation":  "string — 2-3 sentences",
         "code_example": "string — #{code_example_desc}",
-        "senior_lens":  "string — when to reach for it / tradeoffs"
+        "senior_lens":  "string — #{senior_lens_desc}"
       }
     PROMPT
   end
