@@ -455,12 +455,23 @@ RSpec.describe DailyPlan do
   end
 
   describe "adaptive_set_size off" do
+    # A user with no history already gets the full set through SectionCount's
+    # own MIN_SESSIONS floor, so asserting only the section count would still
+    # pass with the preference unwired.
     it "gives a user who turned adaptive sizing off the full set" do
       user = User.create!(email: "off@example.com", name: "Off", adaptive_set_size: false)
+      expect(SectionCount).to receive(:for).with(anything, adaptive: false).and_call_original
 
       plan = described_class.for(user, language: "ruby_rails")
 
       expect([ plan.pattern, plan.third, plan.fourth ]).to all(be_present)
+    end
+
+    it "leaves adaptive sizing on for a user who never turned it off" do
+      user = User.create!(email: "on@example.com", name: "On")
+      expect(SectionCount).to receive(:for).with(anything, adaptive: true).and_call_original
+
+      described_class.for(user, language: "ruby_rails")
     end
   end
 

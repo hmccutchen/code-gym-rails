@@ -61,7 +61,11 @@
 
   <script>
     (function () {
-      const csrf = () => document.querySelector('meta[name="csrf-token"]').content;
+      // Optional-chained because Rails renders no csrf meta tag when forgery
+      // protection is off (the test environment), where the empty token is
+      // accepted — without this the listeners below throw and silently stop
+      // saving, which is exactly what a browser spec needs to be able to see.
+      const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content ?? "";
 
       const save = (payload) => fetch("<%= profile_path %>", {
         method: "PATCH",
