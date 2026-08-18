@@ -91,6 +91,12 @@ decisions, not defaults that drifted into place:
 - **Single authority per fact** — `DailyExercise#active_section_keys` for how
   many sections a day has, `ConceptBucket` for which vocabulary a concept
   records under. Derive from the authority; never recount.
+- **One prompt line per vocabulary group** — a concept group that needs a
+  cross-section rule (`DATA_MODELING_CONCEPTS`, `META_SKILL_CONCEPTS`,
+  `CODE_SMELL_CONCEPTS`) gets one `AiService#<group>_guidance` method naming
+  the group from its constant and stated once for all sections, never repeated
+  into each kind's `.generation_guidance`. The rule is about the concept, not
+  about any one kind. A fourth group adds a fourth method here.
 
 **Deviating from an established in-repo pattern requires stating why in the PR
 description.** Deviation is allowed — patterns outlive their reasons sometimes
