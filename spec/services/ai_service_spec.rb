@@ -1442,6 +1442,7 @@ RSpec.describe AiService do
 
   describe "difficulty diagnostics instrumentation" do
     it "logs what was requested and what was delivered on every generation" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       set = full_problem_set("code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([ { concept: "n_plus_one", tier: "reduced" } ])
@@ -1465,6 +1466,10 @@ RSpec.describe AiService do
       expect(payload["requested"]).to have_key("due_checks")
       expect(payload["requested"]).to have_key("established")
       expect(payload["requested"]).to have_key("recent_performance")
+      expect(payload["requested"]["pattern"]).to eq("pattern")
+      expect(payload["requested"]["third"]).to eq("challenge")
+      expect(payload["requested"]["fourth"]).to eq("plan_review")
+      expect(payload["requested"]["section_count"]).to eq(4)
       expect(payload["delivered"]).to eq(JSON.parse(set.to_json))
     end
 
@@ -1664,6 +1669,19 @@ RSpec.describe AiService do
 
       expect(context).to include("the day's 2 sections")
       expect(context).not_to include("four sections")
+    end
+
+    it "pluralizes the 'others' clause correctly for a 2-section day" do
+      exercise = exercise_with(
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "challenge"   => { "question" => "c" }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      context = service.send(:build_review_day_context, "Rails", exercise, response)
+
+      expect(context).to include("the other section is given here")
+      expect(context).not_to include("the 1 others")
     end
   end
 

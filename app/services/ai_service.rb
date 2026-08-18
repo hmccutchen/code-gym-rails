@@ -773,6 +773,10 @@ class AiService
       requested: {
         skill_level: user.skill_level,
         code_review_mode: plan.code_review_mode,
+        pattern: plan.pattern,
+        third: plan.third,
+        fourth: plan.fourth,
+        section_count: ExerciseSection.for_plan(pattern: plan.pattern, third: plan.third, fourth: plan.fourth).size,
         reinforcement: plan.reinforcement,
         due_checks: plan.due_checks.map(&:concept),
         established: plan.established.map(&:concept),
@@ -1129,8 +1133,16 @@ class AiService
       )
     end
 
+    others = keys.size - 1
+    others_clause =
+      case others
+      when 0 then "no other sections today"
+      when 1 then "the other section is"
+      else "the other #{others} sections are"
+      end
+
     <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — the rest are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
+      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
 
       #{sections.join("\n\n")}
     CONTEXT

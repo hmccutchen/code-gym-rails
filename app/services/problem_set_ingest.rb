@@ -174,7 +174,7 @@ class ProblemSetIngest
   # A WRONG COUNT IS NOT A FAILURE, though. The prompt asks for exactly
   # ExerciseSection::AmbiguityHunt::PLANTED_COUNT, but nothing downstream reads
   # that number, so a list of 3 or 5 grades exactly as well — and rejecting it
-  # would throw away the day's other three sections over the likeliest
+  # would throw away the rest of the day's sections over the likeliest
   # deviation an LLM makes on a counted list. Only the empty case is fatal;
   # the long case is truncated.
   #
