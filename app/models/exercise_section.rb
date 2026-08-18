@@ -166,6 +166,14 @@ class ExerciseSection
       "Their self-rating: #{rating.presence || '(none given)'}"
     end
 
+    # What the reviewer needs beyond the generic rubric to grade this kind —
+    # how to weigh the answer, and what its improved_code must hold. Defaulted
+    # rather than abstract: the generic rubric grades most kinds on its own,
+    # and a kind with nothing extra to say should not have to say so.
+    def grading_note(section:, answer:)
+      ""
+    end
+
     # The generation prompt's instruction block for this kind — how to write
     # it, and which vocabulary its concept comes from. Every kind states its
     # own vocabulary and none speaks for another, which is what keeps the

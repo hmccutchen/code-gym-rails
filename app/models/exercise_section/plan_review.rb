@@ -58,4 +58,8 @@ class ExerciseSection::PlanReview < ExerciseSection
       #{answer_lines(answer, rating)}
     CONTEXT
   end
+
+  def self.grading_note(section:, answer:)
+    "Evaluate on whether they correctly identified the planted flaws (a technical anti-pattern, a scope-creep item, an unflagged behavior change) and whether their pushback is well-reasoned — not against one exact expected wording. \"improved_code\" for this section is a revised version of the plan that addresses what they missed."
+  end
 end

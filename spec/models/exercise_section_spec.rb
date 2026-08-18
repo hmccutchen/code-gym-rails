@@ -833,6 +833,31 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe "grading note per kind" do
+    it "answers for every registered kind, so no caller has to branch on section" do
+      ExerciseSection.all.each do |kind|
+        note = kind.grading_note(section: {}, answer: nil)
+        expect(note).to be_a(String), "#{kind}.grading_note did not return a String"
+      end
+    end
+
+    it "grounds parsons in the verified mismatch count rather than the raw answer" do
+      note = ExerciseSection::ParsonsProblem.grading_note(
+        section: { "blocks" => %w[a b c d e] }, answer: "order:0,2,1,3,4"
+      )
+
+      expect(note).to match(/2 block\(s\) out of place/)
+      expect(note).to include("Correct blocks, in order:")
+    end
+
+    it "refuses to claim a verified parsons result with no stored blocks" do
+      note = ExerciseSection::ParsonsProblem.grading_note(section: {}, answer: "order:1,0")
+
+      expect(note).to include("CANNOT be verified")
+      expect(note).not_to match(/block\(s\) out of place/)
+    end
+  end
+
   describe "review context per kind" do
     it "is implemented by every registered kind" do
       ExerciseSection.all.each do |kind|
@@ -841,7 +866,7 @@ RSpec.describe ExerciseSection do
       end
     end
 
-    it "gives parsons no answer line, since ordering is graded from display_order" do
+    it "gives parsons no answer line, since the ordering is scored in Ruby rather than read" do
       context = ExerciseSection::ParsonsProblem.review_context(
         section: { "title" => "Restock", "question" => "Order these" },
         answer: "order:2,1", rating: "right_level"

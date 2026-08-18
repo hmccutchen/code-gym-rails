@@ -62,4 +62,9 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
       #{answer_lines(answer, rating)}
     CONTEXT
   end
+
+  def self.grading_note(section:, answer:)
+    "Grade coverage against the PLANTED ambiguities listed in the context above (the \"Planted ambiguities\" line) — do not invent your own list. In \"missed\", name each planted ambiguity the engineer did not identify. In \"correct\", credit each planted ambiguity they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted.\n" \
+    "For this section \"improved_code\" must be an empty string."
+  end
 end

@@ -60,4 +60,11 @@ class ExerciseSection::Architecture < ExerciseSection
       #{answer_lines(answer, rating)}
     CONTEXT
   end
+
+  def self.grading_note(section:, answer:)
+    "Evaluate the architecture answer on the DEPTH of its reasoning, not a single correct answer:\n" \
+    "- Did they weigh real tradeoffs between the options?\n" \
+    "- Did they address the stated constraints (scale, team, reliability, tech debt)?\n" \
+    "- Did they consider alternatives rather than asserting one option?"
+  end
 end

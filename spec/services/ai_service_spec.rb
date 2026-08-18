@@ -1622,16 +1622,22 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#section_grading_note for the fourth-slot kinds" do
+  describe "grading notes for the fourth-slot kinds" do
     it "instructs grading against the planted list for ambiguity_hunt" do
-      note = service.send(:section_grading_note, nil, nil, "ambiguity_hunt")
+      note = ExerciseSection::AmbiguityHunt.grading_note(section: {}, answer: nil)
       expect(note).to match(/planted/i)
       expect(note).to match(/empty string/i)
     end
 
     it "instructs evaluating pushback quality and a revised plan for plan_review" do
-      note = service.send(:section_grading_note, nil, nil, "plan_review")
+      note = ExerciseSection::PlanReview.grading_note(section: {}, answer: nil)
       expect(note).to match(/revised/i)
+    end
+
+    # The registry answers every per-kind question; a kind with nothing extra
+    # to say gets the generic rubric rather than a branch at the call site.
+    it "is empty for a kind the generic rubric already grades" do
+      expect(ExerciseSection::Challenge.grading_note(section: {}, answer: nil)).to eq("")
     end
   end
 
