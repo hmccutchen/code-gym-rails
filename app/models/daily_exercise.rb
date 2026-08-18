@@ -45,7 +45,7 @@ class DailyExercise < ApplicationRecord
   # per-key readers it replaced (`problem_set["architecture"]&.with_indifferent_access`)
   # raised outright on a non-Hash value rather than falling through.
   def third_key
-    ExerciseSection.thirds.map(&:key).find { |key| problem_set[key].is_a?(Hash) } || "challenge"
+    ExerciseSection.thirds.map(&:key).find { |key| ExerciseSection.present?(problem_set, key) } || "challenge"
   end
 
   # Which fourth-slot shape this exercise's problem_set holds, resolved the
@@ -69,6 +69,6 @@ class DailyExercise < ApplicationRecord
   def active_section_keys
     ([ "code_review", "pattern" ] + [ third_key, fourth_key ])
       .compact
-      .select { |key| problem_set[key].is_a?(Hash) }
+      .select { |key| ExerciseSection.present?(problem_set, key) }
   end
 end

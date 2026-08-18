@@ -397,7 +397,9 @@ class AiService
     )
 
     ingested = ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "problem set"), language: language
+      parse_json_object(result[:text], subject: "problem set"),
+      language: language,
+      expected_keys: ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth).map(&:key)
     )
     problem_set = ingested.problem_set
     # After ingest, never during: ingest writes nothing and raises on an
@@ -972,9 +974,10 @@ class AiService
     # Both slots resolved once, through the same call the schema assembles
     # from, so guidance and schema can never disagree about which kind a slot
     # holds — and a symbol rolled into a slot it can't occupy fails here rather
-    # than reaching a kind that has no guidance to give.
-    _code_review, _pattern, third_kind, fourth_kind =
-      ExerciseSection.for_plan(third: third, fourth: fourth)
+    # than reaching a kind that has no guidance to give. Read by slot, never by
+    # position: an omitted slot shifts a positional read onto the wrong kind.
+    third_kind, fourth_kind =
+      ExerciseSection.slot_kinds(third: third, fourth: fourth).values_at(:third, :fourth)
 
     fourth_guidance = generation_guidance_for(fourth_kind, language)
 

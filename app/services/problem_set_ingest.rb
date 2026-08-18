@@ -34,8 +34,8 @@ class ProblemSetIngest
   Result = Data.define(:problem_set, :suggested_concepts)
 
   # Raises AiService::InvalidResponseError when the set cannot be used at all.
-  def self.call(problem_set, language:)
-    new(problem_set, language: language).call
+  def self.call(problem_set, language:, expected_keys:)
+    new(problem_set, language: language, expected_keys: expected_keys).call
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -125,17 +125,19 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:)
+  def initialize(problem_set, language:, expected_keys:)
     @problem_set        = problem_set
     @language           = language
+    @expected_keys      = expected_keys
     @suggested_concepts = []
   end
 
-  # Answer-key validation runs first because it is the only step that can
-  # reject the set, and there is no reason to bound scaffolds on a payload
-  # about to be thrown away. It is no longer load-bearing for correctness:
-  # nothing here writes, so no ordering can leave a stray row behind.
+  # Rejection runs before the normalizers: there is no reason to bound
+  # scaffolds or roll a scramble on a payload about to be thrown away. Neither
+  # step is load-bearing for correctness — nothing here writes, so no ordering
+  # can leave a stray row behind.
   def call
+    reject_missing_sections!
     reject_unusable_answer_key!
     normalize_concepts!
     normalize_answer_scaffolds!
@@ -146,6 +148,18 @@ class ProblemSetIngest
   end
 
   private
+
+  # A silently short set would make sections_total under-report, which feeds
+  # recent_performance, which sizes tomorrow's set — the day's own provider
+  # glitch nudging future days shorter. Extra sections are fine: FakeService
+  # returns all eight, and only the resolved ones are ever rendered.
+  def reject_missing_sections!
+    missing = @expected_keys.reject { |key| ExerciseSection.present?(@problem_set, key) }
+    return if missing.empty?
+
+    raise AiService::InvalidResponseError,
+          "Provider omitted intended section(s): #{missing.join(', ')}"
+  end
 
   # Unlike every other step, this one rejects rather than repairs. The planted
   # list is the ambiguity hunt's entire grading ground truth — the review

@@ -45,23 +45,47 @@ class ExerciseSection
   # DailyExercise because the generation-time normalizers have to resolve the
   # same slot on a payload that isn't a row yet, and two copies of a
   # precedence rule is one copy too many.
+  # A provider can emit a key holding null or a bare string alongside the real
+  # section; only a Hash is a section anything downstream can render.
+  def self.present?(problem_set, key)
+    problem_set[key].is_a?(Hash)
+  end
+
   def self.resolved_fourth_key(problem_set)
-    fourths.map(&:key).find { |key| problem_set[key].is_a?(Hash) }
+    fourths.map(&:key).find { |key| present?(problem_set, key) }
   end
 
-  # The day's four kinds in slot order, for a set that hasn't been generated
-  # yet. Same reason .resolved_fourth_key lives here: the generation path has
-  # to resolve slots before a DailyExercise row exists, working from DailyPlan's
-  # rolled symbols rather than a persisted payload.
-  # DailyExercise#active_section_keys answers the same question after the fact.
-  def self.for_plan(third:, fourth:)
-    [ CodeReview, Pattern, slot_kind(third, thirds), slot_kind(fourth, fourths) ]
+  # The day's shape, in slot order. Every slot but code_review may be nil,
+  # meaning the day does not include it.
+  def self.slots
+    { code_review: [ CodeReview ], pattern: [ Pattern ], third: thirds, fourth: fourths }
   end
 
-  # Raises rather than returning nil: a kind that isn't eligible for the slot
-  # it was rolled into is a bug in the plan, and a set silently missing a
-  # section is worse than a failed generation the user can retry.
+  def self.slot_count
+    slots.size
+  end
+
+  # DailyExercise#active_section_keys answers the same question after the fact;
+  # this one works from DailyPlan's rolled symbols, before a row exists.
+  def self.for_plan(third:, fourth:, pattern: :pattern)
+    slot_kinds(third: third, fourth: fourth, pattern: pattern).values.compact
+  end
+
+  # The same resolution keyed by slot, for callers that need to know which slot
+  # a kind came from. #for_plan drops omitted slots, which shifts every later
+  # kind left — so reading a slot out of it by position names the wrong kind on
+  # any day that omits one.
+  def self.slot_kinds(third:, fourth:, pattern: :pattern)
+    chosen = { code_review: :code_review, pattern: pattern, third: third, fourth: fourth }
+
+    slots.to_h { |slot, eligible| [ slot, slot_kind(chosen.fetch(slot), eligible) ] }
+  end
+
+  # nil means "not today"; an ineligible symbol is a bug in the plan, and a set
+  # silently missing a section is worse than a failed generation the user can retry.
   def self.slot_kind(rolled, eligible)
+    return nil if rolled.nil?
+
     eligible.find { |kind| kind.key == rolled.to_s } ||
       raise(ArgumentError, "#{rolled.inspect} is not one of: #{eligible.map(&:key).join(', ')}")
   end
