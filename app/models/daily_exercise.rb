@@ -58,8 +58,9 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.resolved_fourth_key(problem_set)
   end
 
-  # The sections this exercise actually presents: the two fixed kinds plus the
-  # precedence-resolved third and fourth.
+  # The sections this exercise actually presents: code_review plus whichever
+  # of pattern, the third, and the fourth today's plan chose, each resolved by
+  # precedence. A day holds 2-4 of them.
   #
   # NOT `problem_set.keys`. A payload can hold more than one third- or
   # fourth-shaped key — FakeService persists all eight deliberately, and a real

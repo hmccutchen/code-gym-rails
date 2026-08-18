@@ -376,6 +376,46 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_exercise_history" do
+    let(:user) { User.create!(email: "history@example.com", name: "History") }
+
+    def exercise_on(date, keys, answers: nil)
+      problem_set = keys.index_with { |key| { "question" => "q" } }
+      exercise = DailyExercise.create!(user: user, date: date, language: "ruby_rails",
+                                       generated_at: Time.current, problem_set: problem_set)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: date, answers: answers) if answers
+      exercise
+    end
+
+    it "reports nil answered for an exercise that was never opened" do
+      exercise_on(Date.current - 1, %w[code_review pattern])
+
+      expect(user.recent_exercise_history(limit: 5).first.answered).to be_nil
+    end
+
+    it "counts an autosaved draft's answered sections rather than treating it as skipped" do
+      exercise_on(Date.current - 1, %w[code_review pattern],
+                  answers: { "code_review" => "a real answer well past ten characters" })
+
+      expect(user.recent_exercise_history(limit: 5).first.answered).to eq(1)
+    end
+
+    it "excludes today, which has had no chance to be answered" do
+      exercise_on(Date.current, %w[code_review pattern])
+      exercise_on(Date.current - 1, %w[code_review challenge])
+
+      expect(user.recent_exercise_history(limit: 5).map(&:section_keys))
+        .to eq([ %w[code_review challenge] ])
+    end
+
+    it "returns newest first" do
+      exercise_on(Date.current - 1, %w[code_review pattern])
+      exercise_on(Date.current - 2, %w[code_review challenge])
+
+      expect(user.recent_exercise_history(limit: 5).first.section_keys).to eq(%w[code_review pattern])
+    end
+  end
+
   describe "#concepts_needing_reinforcement" do
     it "flags a concept whose most recent self-rating was too_hard, even with no AI review" do
       user = create_user
@@ -401,9 +441,10 @@ RSpec.describe User, type: :model do
     # concept_tags is persisted provider output, so it keeps the name a section
     # was tagged with even after that concept leaves the vocabulary. Left
     # unfiltered, a renamed concept keeps being reinforced for the whole
-    # 10-session window: the model can no longer tag it, and because
-    # DailyPlan sizes retention as `3 - reinforcement.first(3).size`, the dead
-    # entry suppresses a retention check that could have used the slot.
+    # 10-session window: the model can no longer tag it, and because DailyPlan
+    # sizes retention as the day's hostable sections minus the reinforcement
+    # entries claiming them, the dead entry suppresses a retention check that
+    # could have used the slot.
     it "skips a tagged concept that is no longer in its bucket's vocabulary" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)

@@ -148,6 +148,24 @@ class User < ApplicationRecord
     end
   end
 
+  # Recent exercises and whether each was answered, newest first, excluding
+  # today (which has had no chance to be). SectionCount/SectionRotation are
+  # pure and take this as an argument rather than touching the database
+  # themselves.
+  def recent_exercise_history(limit:)
+    daily_exercises
+      .includes(:daily_response)
+      .where(date: ...Date.current)
+      .order(date: :desc)
+      .limit(limit)
+      .map do |exercise|
+        ExerciseHistoryEntry.new(
+          section_keys: exercise.active_section_keys,
+          answered:     exercise.daily_response&.answered_sections&.size
+        )
+      end
+  end
+
   # Concepts still needing reinforcement, resolved on each concept's single
   # most-recent occurrence — not cumulative history, so a concept mastered
   # weeks ago never resurfaces because of an old bad day. Mastery requires
@@ -331,7 +349,8 @@ class User < ApplicationRecord
   # concept_tags is persisted provider output, so it keeps the name a section
   # was tagged with even after that concept leaves the vocabulary. Reinforcing
   # one the generator can no longer tag wastes an entry AND a retention slot,
-  # since DailyPlan sizes retention as `3 - reinforcement.first(3).size`.
+  # since DailyPlan sizes retention as whatever the day's non-fourth sections
+  # can host minus the reinforcement entries that claim them.
   #
   # A nil bucket passes, because vocabulary_for raises on nil and there is no
   # vocabulary to check against. Reaching it needs both a nil language and a
