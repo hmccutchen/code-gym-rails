@@ -49,21 +49,34 @@
           id: "tz-select" %>
     <p class="hint">Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser's zone.</p>
   </div>
+
+  <div class="form-field">
+    <label for="adaptive-set-size">
+      <%= check_box_tag "adaptive_set_size", "1", current_user.adaptive_set_size, id: "adaptive-set-size" %>
+      Adjust set size to my recent completion
+    </label>
+    <p class="hint">Shorter sets after days you don't finish, back to four as you do. Off means always four sections.</p>
+  </div>
+
   <script>
     (function () {
-      const sel = document.getElementById("tz-select");
-      if (!sel) return;
-      sel.addEventListener("change", () => {
-        fetch("<%= profile_path %>", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify({ user: { time_zone: sel.value } })
-        });
+      const csrf = () => document.querySelector('meta[name="csrf-token"]').content;
+
+      const save = (payload) => fetch("<%= profile_path %>", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-CSRF-Token": csrf()
+        },
+        body: JSON.stringify({ user: payload })
       });
+
+      const tz = document.getElementById("tz-select");
+      if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }));
+
+      const adaptive = document.getElementById("adaptive-set-size");
+      if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }));
     })();
   </script>
 </div>
