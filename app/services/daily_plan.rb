@@ -61,6 +61,9 @@ class DailyPlan
   # vocabulary therefore cannot truncate.
   RETENTION_BUCKET_FETCH_CAP = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
 
+  # fourth_track's early return when no fourth section was chosen today.
+  NO_FOURTH_TRACK = { fourth: nil, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
+
   # Concept selection happens HERE rather than inside the prompt builder so the
   # caller can compare what was offered against what the model actually used —
   # the prompt builder is private and returns only a string, so it cannot report
@@ -129,8 +132,6 @@ class DailyPlan
                                                           due_checks: due_checks) }
   end
   private_class_method :fourth_track
-
-  NO_FOURTH_TRACK = { fourth: nil, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
   # Single-bucket analog of retention_checks_for. Simpler than the non-fourth
   # version: the fourth slot's bucket is always exactly one fixed value

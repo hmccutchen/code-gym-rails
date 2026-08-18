@@ -401,11 +401,24 @@ RSpec.describe DailyPlan do
     end
 
     it "sizes the reinforcement pool to the slots that can host a language concept" do
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      %w[n_plus_one transaction_safety memoization].each_with_index do |concept, i|
+        user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard,
+                                       mastered_at: 1.month.ago, retention_interval_days: 7,
+                                       next_retention_check_on: Date.current - (i + 1))
+      end
+
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
+      code_review_and_fourth_only = described_class.for(user, language: "ruby_rails")
 
-      plan = described_class.for(user, language: "ruby_rails")
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+      code_review_and_third = described_class.for(user, language: "ruby_rails")
 
-      expect(plan.due_checks.size).to be <= 1
+      # code_review + fourth has one non-fourth host (capacity 1); code_review +
+      # third has two (capacity 2) — pinning capacity's derivation from the
+      # chosen kinds rather than a hardcoded slot count.
+      expect(code_review_and_fourth_only.due_checks.size).to eq(1)
+      expect(code_review_and_third.due_checks.size).to eq(2)
     end
   end
 

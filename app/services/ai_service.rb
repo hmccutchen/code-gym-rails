@@ -824,10 +824,10 @@ class AiService
 
   # JSON schema every provider is asked to return for a problem set. Each kind
   # owns the fragment describing itself (ExerciseSection.schema_fragment); this
-  # decides which four kinds today's set holds and joins them. The code-bearing
-  # fields' label switches with `language` so instructions never assume Ruby
-  # idioms when generating JS — the structure itself never changes across
-  # languages.
+  # joins the fragments for whichever kinds today's set holds (two to four).
+  # The code-bearing fields' label switches with `language` so instructions
+  # never assume Ruby idioms when generating JS — the structure itself never
+  # changes across languages.
   def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review, pattern: :pattern)
     label = config_for(language)[:label]
 
