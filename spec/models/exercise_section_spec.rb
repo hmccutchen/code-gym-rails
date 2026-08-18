@@ -818,4 +818,18 @@ RSpec.describe ExerciseSection do
       end
     end
   end
+
+  describe ".review_context" do
+    it "is required of every kind" do
+      expect { ExerciseSection.review_context(section: {}, answer: nil, rating: nil) }
+        .to raise_error(NotImplementedError, /must implement/)
+    end
+  end
+
+  describe ".answer_lines" do
+    it "marks an absent answer and rating rather than rendering blanks" do
+      expect(ExerciseSection.answer_lines(nil, nil))
+        .to eq("Their answer: (skipped)\nTheir self-rating: (none given)")
+    end
+  end
 end
