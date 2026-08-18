@@ -2311,13 +2311,16 @@ RSpec.describe AiService do
   end
 
   describe "#generate_exercise threads the fourth slot through" do
+    # The provider is given only the four sections the plan asked for: a
+    # payload carrying a plan_review hash too would win fourth-slot precedence
+    # and the assertion would hold no matter which kind was rolled.
     it "asks the provider for a fourth section matching the plan's rolled kind" do
       allow(DailyPlan).to receive(:for).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:ambiguity_hunt)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
-      svc = double_class.new(canned_text: full_problem_set(
+      svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },
         "pattern"     => { "question" => "q", "concept" => "memoization" },
         "challenge"   => { "question" => "q", "concept" => "idempotency" },
@@ -2326,10 +2329,13 @@ RSpec.describe AiService do
           "planted_ambiguities" => [ "a", "b", "c", "d" ],
           "question" => "q", "concept" => "missing_success_criteria"
         }
-      ).to_json)
+      }.to_json)
 
       problem_set = svc.generate_exercise(user)
-      expect(problem_set).to have_key("ambiguity_hunt")
+
+      expect(ExerciseSection.resolved_fourth_key(problem_set)).to eq("ambiguity_hunt")
+      expect(svc.last_prompt).to include("\"ambiguity_hunt\"")
+      expect(svc.last_prompt).not_to include("\"plan_review\"")
     end
   end
 end

@@ -449,6 +449,21 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".slot_kinds" do
+    it "keeps every slot, so an omitted one cannot shift a later kind into its place" do
+      kinds = described_class.slot_kinds(third: nil, fourth: :plan_review)
+
+      expect(kinds.keys).to eq(%i[code_review pattern third fourth])
+      expect(kinds[:third]).to be_nil
+      expect(kinds[:fourth]).to eq(ExerciseSection::PlanReview)
+    end
+
+    it "resolves the same kinds #for_plan lists" do
+      expect(described_class.slot_kinds(third: :challenge, fourth: :plan_review).values.compact)
+        .to eq(described_class.for_plan(third: :challenge, fourth: :plan_review))
+    end
+  end
+
   describe ".slot_count" do
     it "matches a fully populated plan, so the ceiling and the roster cannot drift" do
       full = described_class.for_plan(third: :challenge, fourth: :plan_review)

@@ -68,9 +68,17 @@ class ExerciseSection
   # DailyExercise#active_section_keys answers the same question after the fact;
   # this one works from DailyPlan's rolled symbols, before a row exists.
   def self.for_plan(third:, fourth:, pattern: :pattern)
+    slot_kinds(third: third, fourth: fourth, pattern: pattern).values.compact
+  end
+
+  # The same resolution keyed by slot, for callers that need to know which slot
+  # a kind came from. #for_plan drops omitted slots, which shifts every later
+  # kind left — so reading a slot out of it by position names the wrong kind on
+  # any day that omits one.
+  def self.slot_kinds(third:, fourth:, pattern: :pattern)
     chosen = { code_review: :code_review, pattern: pattern, third: third, fourth: fourth }
 
-    slots.filter_map { |slot, eligible| slot_kind(chosen.fetch(slot), eligible) }
+    slots.to_h { |slot, eligible| [ slot, slot_kind(chosen.fetch(slot), eligible) ] }
   end
 
   # nil means "not today"; an ineligible symbol is a bug in the plan, and a set

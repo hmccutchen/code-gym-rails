@@ -131,10 +131,10 @@ class ProblemSetIngest
     @suggested_concepts = []
   end
 
-  # Answer-key validation runs first because it is the only step that can
-  # reject the set, and there is no reason to bound scaffolds on a payload
-  # about to be thrown away. It is no longer load-bearing for correctness:
-  # nothing here writes, so no ordering can leave a stray row behind.
+  # Rejection runs before the normalizers: there is no reason to bound
+  # scaffolds or roll a scramble on a payload about to be thrown away. Neither
+  # step is load-bearing for correctness — nothing here writes, so no ordering
+  # can leave a stray row behind.
   def call
     reject_missing_sections!
     reject_unusable_answer_key!
