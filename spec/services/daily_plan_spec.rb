@@ -3,33 +3,6 @@ require "rails_helper"
 RSpec.describe DailyPlan do
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
-  describe ".roll_weighted" do
-    let(:weights) { { a: 0.5, b: 0.3, c: 0.2 } }
-
-    def roll(value)
-      allow(DailyPlan).to receive(:rand).and_return(value)
-      DailyPlan.send(:roll_weighted, weights)
-    end
-
-    it "returns each key within its band" do
-      expect(roll(0.0)).to eq(:a)
-      expect(roll(0.49)).to eq(:a)
-      expect(roll(0.5)).to eq(:b)
-      expect(roll(0.79)).to eq(:b)
-      expect(roll(0.999)).to eq(:c)
-    end
-
-    # 0.5 + 0.3 sums to 0.7999999999999999, an ulp below the boundary, so
-    # without the .round(10) this returns :b at exactly 0.8.
-    it "is exact at a boundary float addition would miss" do
-      expect(roll(0.8)).to eq(:c)
-    end
-
-    it "falls back to the last key if rand returns 1.0" do
-      expect(roll(1.0)).to eq(:c)
-    end
-  end
-
   describe "the third-section roll" do
     it "returns each third in an equal quarter band" do
       {
@@ -38,8 +11,8 @@ RSpec.describe DailyPlan do
         0.50 => :challenge, 0.74 => :challenge,
         0.75 => :parsons_problem, 0.99 => :parsons_problem
       }.each do |value, expected|
-        allow(DailyPlan).to receive(:rand).and_return(value)
-        expect(DailyPlan.send(:roll_weighted, DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(expected)
+        allow(WeightedRoll).to receive(:rand).and_return(value)
+        expect(WeightedRoll.pick(DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(expected)
       end
     end
 
@@ -288,17 +261,17 @@ RSpec.describe DailyPlan do
 
   describe "the fourth-section roll" do
     it "returns :plan_review below 0.5, :ambiguity_hunt from 0.5 up" do
-      allow(DailyPlan).to receive(:rand).and_return(0.10)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:plan_review)
+      allow(WeightedRoll).to receive(:rand).and_return(0.10)
+      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:plan_review)
 
-      allow(DailyPlan).to receive(:rand).and_return(0.49)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:plan_review)
+      allow(WeightedRoll).to receive(:rand).and_return(0.49)
+      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:plan_review)
 
-      allow(DailyPlan).to receive(:rand).and_return(0.50)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:ambiguity_hunt)
+      allow(WeightedRoll).to receive(:rand).and_return(0.50)
+      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:ambiguity_hunt)
 
-      allow(DailyPlan).to receive(:rand).and_return(0.99)
-      expect(DailyPlan.send(:roll_weighted, DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:ambiguity_hunt)
+      allow(WeightedRoll).to receive(:rand).and_return(0.99)
+      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:ambiguity_hunt)
     end
   end
 
@@ -383,9 +356,9 @@ RSpec.describe DailyPlan do
       # scope_creep is tagged under the plan_review bucket; pin today's fourth
       # roll to that bucket so the assertion isn't at the mercy of the other
       # 50% of rolls landing on ambiguity_hunt instead.
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.reinforcement.map { |h| h[:concept] }).not_to include("scope_creep")
@@ -399,9 +372,9 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
         .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.fourth_due_checks).to eq([]) # not yet meaningfully overdue
@@ -420,9 +393,9 @@ RSpec.describe DailyPlan do
         .and_return([ { concept: "scope_creep",           tier: "standard" },
                       { concept: "unjustified_constant",  tier: "standard" },
                       { concept: "unflagged_behavior_change", tier: "standard" } ])
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
 
@@ -437,9 +410,9 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
         .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       result = DailyPlan.for(user, language: "ruby_rails")
 
@@ -457,8 +430,8 @@ RSpec.describe DailyPlan do
 
     it "reaches every mode" do
       { 0.0 => :application_code, 0.34 => :test_file, 0.67 => :schema_review }.each do |value, expected|
-        allow(DailyPlan).to receive(:rand).and_return(value)
-        expect(DailyPlan.send(:roll_weighted, DailyPlan::CODE_REVIEW_MODE_WEIGHTS)).to eq(expected)
+        allow(WeightedRoll).to receive(:rand).and_return(value)
+        expect(WeightedRoll.pick(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)).to eq(expected)
       end
     end
   end
@@ -467,7 +440,7 @@ RSpec.describe DailyPlan do
     let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
 
     it "is carried on the Result" do
-      allow(DailyPlan).to receive(:rand).and_return(0.67)
+      allow(WeightedRoll).to receive(:rand).and_return(0.67)
       expect(DailyPlan.for(user, language: "ruby_rails").code_review_mode).to eq(:schema_review)
     end
   end

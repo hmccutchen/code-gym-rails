@@ -78,7 +78,7 @@ class DailyPlan
   # the prompt builder is private and returns only a string, so it cannot report
   # that (see AiService#log_retention).
   def self.for(user, language:)
-    third         = roll_weighted(THIRD_SECTION_WEIGHTS)
+    third         = WeightedRoll.pick(THIRD_SECTION_WEIGHTS)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS)
     # An exercise has only 3 sections, so only the first 3 reinforcement concepts
     # can ever occupy one — sizing against the full (often 4-8 entry) list left
@@ -109,7 +109,7 @@ class DailyPlan
     # rather than a generalization of the 3-slot one above, because the two
     # vocabularies can never mix: keeping them structurally separate means a
     # cross-vocab item can never be placed somewhere it structurally cannot go.
-    fourth               = roll_weighted(FOURTH_SECTION_WEIGHTS)
+    fourth               = WeightedRoll.pick(FOURTH_SECTION_WEIGHTS)
     fourth_bucket        = FOURTH_BUCKET_FOR.fetch(fourth)
     # Truncated to the slot's capacity before anything else reads it: the full
     # list runs 4-5 entries deep on a small vocabulary, and every entry past
@@ -126,32 +126,13 @@ class DailyPlan
     fourth_established   = established_concepts_for_bucket(user, fourth_bucket,
                                                             reinforcement: fourth_reinforcement, due_checks: fourth_due_checks)
 
-    code_review_mode = roll_weighted(CODE_REVIEW_MODE_WEIGHTS)
+    code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
 
     Result.new(third: third, reinforcement: reinforcement, due_checks: due_checks, established: established,
                fourth: fourth, fourth_reinforcement: fourth_reinforcement,
                fourth_due_checks: fourth_due_checks, fourth_established: fourth_established,
                code_review_mode: code_review_mode)
   end
-
-  # Cumulative weights are rounded before comparison: summing float weights can
-  # land an ulp off the intended boundary (0.40 + 0.20 == 0.6000000000000001,
-  # from the earlier third-slot weights), handing the wrong kind back at the
-  # exact boundary value. No table here drifts today; the guard stays because
-  # the next set of weights added may.
-  # Extracted so tests can stub it — never assert on real randomness.
-  def self.roll_weighted(weights)
-    r = rand
-    cumulative = 0.0
-
-    weights.each do |kind, weight|
-      cumulative += weight
-      return kind if r < cumulative.round(10)
-    end
-
-    weights.keys.last
-  end
-  private_class_method :roll_weighted
 
   # Single-bucket analog of retention_checks_for. Simpler than the 3-slot
   # version: the fourth slot's bucket is always exactly one fixed value

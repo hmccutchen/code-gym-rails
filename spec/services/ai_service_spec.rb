@@ -1144,9 +1144,9 @@ RSpec.describe AiService do
     end
 
     it "leaves problem sets without a parsons_problem section untouched" do
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
       set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => {},
               "architecture" => {}, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
@@ -1198,9 +1198,9 @@ RSpec.describe AiService do
     it "threads the rolled third-section kind into the exercise prompt" do
       set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = double_class.new(canned_text: set.to_json)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
     end
@@ -1242,9 +1242,9 @@ RSpec.describe AiService do
       end
       set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = spy_class.new(canned_text: set.to_json)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc.generate_exercise(user, language: "ruby_rails")
 
@@ -1283,9 +1283,9 @@ RSpec.describe AiService do
           end
         end
         svc = spy_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" }).to_json)
-        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(third)
-        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
-        allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+        allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(third)
+        allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+        allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
         svc.generate_exercise(user, language: "ruby_rails")
         captured_prompt
@@ -1379,9 +1379,9 @@ RSpec.describe AiService do
       set = full_problem_set("plan_review" => { "concept" => "scope_creep" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       logged = []
       allow(Rails.logger).to receive(:info) do |msg|
@@ -1484,9 +1484,9 @@ RSpec.describe AiService do
     # on the real #generate_exercise path: it proves the rolled mode reaches
     # both the prompt the provider receives and the logged payload.
     it "threads the rolled mode into both the prompt and the diagnostics payload" do
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
 
       set = full_problem_set("code_review" => { "concept" => "missing_index" })
       svc = double_class.new(canned_text: set.to_json)
@@ -2430,9 +2430,9 @@ RSpec.describe AiService do
     # and the assertion would hold no matter which kind was rolled.
     it "asks the provider for a fourth section matching the plan's rolled kind" do
       allow(DailyPlan).to receive(:for).and_call_original
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:ambiguity_hunt)
-      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:ambiguity_hunt)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },
