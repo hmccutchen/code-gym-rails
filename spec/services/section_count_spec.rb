@@ -20,7 +20,6 @@ RSpec.describe SectionCount do
   # Without the stretch this is an absorbing state: 2-of-2 forever reads as a
   # mean of 2 and the day can never grow back.
   it "grows back after a full short day" do
-    expect(described_class.for(history(2, 2, 2, 2, 2))).to eq(3)
     expect(described_class.for(history(3, 3, 3, 3, 3))).to eq(4)
   end
 

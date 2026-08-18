@@ -27,10 +27,14 @@ RSpec.describe SectionRotation do
     expect(chosen[:pattern]).to be_nil
   end
 
-  it "never exceeds the count, even when several kinds are starved" do
-    chosen = described_class.for(history, count: 2)
+  it "fills exactly two optional slots at count: 3" do
+    chosen = described_class.for(history, count: 3)
 
-    expect(chosen.values.compact.size).to eq(1)
+    expect(chosen.values.compact.size).to eq(2)
+  end
+
+  it "derives its slot roster from ExerciseSection.slots rather than restating it" do
+    expect(described_class::OPTIONAL_SLOTS).to eq(ExerciseSection.slots.keys - [ :code_review ])
   end
 
   # The regime this is designed for: seven kinds competing for one slot, all

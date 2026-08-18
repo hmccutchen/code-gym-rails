@@ -8,14 +8,18 @@ class SectionRotation
   LOOKBACK         = 20
   STARVATION_LIMIT = 10
 
-  OPTIONAL_SLOTS = %i[pattern third fourth].freeze
+  # code_review is the only mandatory slot; everything else ExerciseSection
+  # names is fair game for rotation, so a slot added there needs no matching
+  # edit here.
+  OPTIONAL_SLOTS       = (ExerciseSection.slots.keys - [ :code_review ]).freeze
+  MANDATORY_SLOT_COUNT = ExerciseSection.slot_count - OPTIONAL_SLOTS.size
 
   def self.for(history, count:)
     recent    = history.first(LOOKBACK)
-    available = count - 1
+    available = (count - MANDATORY_SLOT_COUNT).clamp(0, OPTIONAL_SLOTS.size)
 
     filled = OPTIONAL_SLOTS
-      .sort_by { |slot| -slot_staleness(slot, recent) }
+      .sort_by { |slot| [ -slot_staleness(slot, recent), OPTIONAL_SLOTS.index(slot) ] }
       .first(available)
 
     OPTIONAL_SLOTS.index_with { |slot| filled.include?(slot) ? pick_kind(slot, recent) : nil }
@@ -38,10 +42,12 @@ class SectionRotation
   end
   private_class_method :staleness
 
-  # A starved kind is taken outright rather than rolled for. Ties among equally
-  # stale kinds drain in registry order: scheduling one resets its staleness, so
-  # a fixed order empties the pool one per day and bounds the worst-case wait at
-  # the pool size, which a coin flip among equals would not.
+  # A starved kind is taken outright rather than rolled for, and ties among
+  # equally stale starved kinds drain in registry order: scheduling one resets
+  # its staleness, so a fixed order empties the pool one per day and bounds the
+  # worst-case wait at the pool size, which a coin flip among equals would not.
+  # Below starvation, equally stale kinds get equal weight and the tie breaks
+  # randomly — see the weighted-roll comment below.
   def self.pick_kind(slot, recent)
     kinds   = eligible(slot)
     starved = kinds.select { |kind| staleness(kind, recent) > STARVATION_LIMIT }
