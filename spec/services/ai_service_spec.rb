@@ -173,8 +173,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 28-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(28)
+    it "is a frozen 32-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(32)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -193,8 +193,8 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 30-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(30)
+    it "is a frozen 34-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(34)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -205,6 +205,48 @@ RSpec.describe AiService do
 
     it "includes the two test-analysis concepts added for code_review's occasional test-file variant" do
       expect(AiService::JS_CONCEPTS).to include("over_mocking", "testing_implementation_not_behavior")
+    end
+  end
+
+  describe "CODE_SMELL_CONCEPTS" do
+    it "names smells rather than the remedies the vocabularies already carry" do
+      expect(AiService::CODE_SMELL_CONCEPTS)
+        .to contain_exactly("god_object", "primitive_obsession", "shotgun_surgery", "feature_envy")
+      expect(AiService::CODE_SMELL_CONCEPTS).to be_frozen
+    end
+
+    it "is reachable from both language vocabularies" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::CODE_SMELL_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::CODE_SMELL_CONCEPTS)
+    end
+  end
+
+  describe "#code_smell_naming_guidance" do
+    let(:user) { User.create!(email: "smells@example.com", name: "Smells") }
+    let(:service) { FakeService.new("fake-key") }
+
+    it "names the group from the constant and asks for recognition, not a patch" do
+      guidance = service.send(:code_smell_naming_guidance)
+
+      expect(guidance).to include(*AiService::CODE_SMELL_CONCEPTS)
+      expect(guidance).to match(/naming and locating/i)
+    end
+
+    it "is stated once in the generation prompt" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+
+      expect(prompt.scan("god_object").size).to be >= 1
+      expect(prompt).to include(service.send(:code_smell_naming_guidance))
+    end
+
+    # challenge draws the full language vocabulary, and its answer is code. A
+    # blanket "never patch, just name it" would hand the provider a coding
+    # exercise whose answer must not be code.
+    it "gives challenge a refactoring shape rather than a prose answer" do
+      guidance = service.send(:code_smell_naming_guidance)
+
+      expect(guidance).to match(/challenge/i)
+      expect(guidance).to match(/restructur/i)
     end
   end
 
@@ -307,6 +349,23 @@ RSpec.describe AiService do
       config = service.send(:config_for, "ruby_rails")
       prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
       expect(prompt).to include("annotated Ruby/Rails code")
+    end
+
+    # "When to reach for it" is the right lens for a remedy and nonsense for a
+    # smell: nothing should ever tell an engineer when to choose a god object.
+    it "reframes senior_lens for a code smell, which is never a thing to reach for" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "god_object", config)
+
+      expect(prompt).to include("how to catch it early")
+      expect(prompt).not_to include("when to reach for it")
+    end
+
+    it "keeps the remedy framing for a concept that names a technique" do
+      config = service.send(:config_for, "javascript")
+      prompt = service.send(:build_concept_reference_prompt, "state_lifting", config)
+
+      expect(prompt).to include("when to reach for it")
     end
   end
 

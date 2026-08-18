@@ -17,11 +17,15 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # wrong order" is not what wrong_cardinality or missing_index means. The
     # meta-skill concepts fail the same way from the other direction: they are
     # about reading and interrogating something, and there is nothing to read
-    # in a pile of blocks whose only question is what order they go in. A
-    # Parsons problem tagged with either group degenerates into nonsense or
-    # quietly becomes about something else, and a nonsense exercise costs more
-    # trust than a missed retention check does — a due concept from either
-    # group still has other hosts (see AiService#annotate_retention_concept).
+    # in a pile of blocks whose only question is what order they go in. The
+    # code smells fail on scale rather than on sequence: each names a shape
+    # visible across a class or a call graph, and 5-8 blocks is neither — a
+    # god_object cannot be shown, let alone recognized, in a list short enough
+    # to reorder. A Parsons problem tagged from any of the three degenerates
+    # into nonsense or quietly becomes about something else, and a nonsense
+    # exercise costs more trust than a missed retention check does — a due
+    # concept from any of them still has other hosts (see
+    # AiService#annotate_retention_concept).
     #
     # unsafe_migration is the arguable exception: backfill-then-constrain has a
     # genuinely correct step order, which is exactly this format's shape. It is
@@ -31,7 +35,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # grouping it with them, not to special-case one consumer. Revisit here if
     # that regrouping ever happens.
     def excluded_vocabulary_keys
-      [ :data_modeling, :meta_skill ]
+      [ :data_modeling, :meta_skill, :code_smell ]
     end
 
     # The answer is an ordering, not prose: a draggable, keyboard-reorderable

@@ -180,13 +180,21 @@ class AiService
     reading_for_intent spotting_unstated_assumptions separating_symptom_from_cause
   ].freeze
 
+  # Named smells rather than the remedies the language vocabularies already
+  # carry (service_objects, query_objects, state_lifting name the cure). Shared
+  # across both languages because each means the same thing in a Rails class
+  # and a React component.
+  CODE_SMELL_CONCEPTS = %w[
+    god_object primitive_obsession shotgun_surgery feature_envy
+  ].freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -195,7 +203,7 @@ class AiService
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -1000,6 +1008,7 @@ class AiService
       #{fourth_guidance}
       #{data_modeling_idiom_guidance}
       #{meta_skill_framing_guidance}
+      #{code_smell_naming_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1056,6 +1065,17 @@ class AiService
       "cause; it never asks for an essay about how to debug. Where no code is shown " \
       "(pattern), express the concept against the described design instead: what the " \
       "proposed approach takes for granted, or which layer the real cause sits at."
+  end
+
+  def code_smell_naming_guidance
+    "- The code-smell concepts (#{CODE_SMELL_CONCEPTS.join(', ')}) name a shape to recognize, not a single " \
+      "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
+      "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
+      "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
+      "section's own idiom: on a test-file code_review, a god_object is a bloated test class. The challenge " \
+      "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
+      "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
+      "restructure it, so writing the better shape IS the answer rather than describing it."
   end
 
   # A kind's generation instructions. The vocabulary comes from
@@ -1217,6 +1237,16 @@ class AiService
         "annotated #{label} code, ~15 lines"
       end
 
+    # A smell is never a technique to choose, so the remedy lens the other
+    # concepts get would have the provider explain when to reach for a god
+    # object. Same membership test the code_example lens above uses.
+    senior_lens_desc =
+      if CODE_SMELL_CONCEPTS.include?(concept)
+        "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"
+      else
+        "when to reach for it / tradeoffs"
+      end
+
     <<~PROMPT
       Write a durable reference for the #{config[:coach]} concept: "#{concept}".
       This is a stable explanation an engineer returns to across repeat exposure —
@@ -1227,7 +1257,7 @@ class AiService
         "tagline":      "string — bold one-liner",
         "explanation":  "string — 2-3 sentences",
         "code_example": "string — #{code_example_desc}",
-        "senior_lens":  "string — when to reach for it / tradeoffs"
+        "senior_lens":  "string — #{senior_lens_desc}"
       }
     PROMPT
   end
