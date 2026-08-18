@@ -15,18 +15,6 @@ class DailyPlan
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
                         :code_review_mode)
 
-  # Which third section this set gets. Equal weights: the four kinds exercise
-  # different reasoning and none is the baseline the others vary from, so
-  # variety beats depth-in-one-area here. This deliberately reverses an
-  # earlier bias toward architecture (0.75, then 0.50, then 0.40).
-  # The chosen kind is not tracked separately; the persisted third key
-  # (ExerciseSection.thirds) is the record.
-  THIRD_SECTION_WEIGHTS = { architecture: 0.25, security_review: 0.25, challenge: 0.25, parsons_problem: 0.25 }.freeze
-
-  # The fourth slot's two kinds, 50/50 — as with the third slot, there's no
-  # reason to favor one of these two skills over the other.
-  FOURTH_SECTION_WEIGHTS = { plan_review: 0.5, ambiguity_hunt: 0.5 }.freeze
-
   # Which content mode code_review takes. Equal thirds, as close as float
   # weights get — application_code keeps a 1% edge rather than the split
   # pretending to be exact.
@@ -78,7 +66,14 @@ class DailyPlan
   # the prompt builder is private and returns only a string, so it cannot report
   # that (see AiService#log_retention).
   def self.for(user, language:)
-    third         = WeightedRoll.pick(THIRD_SECTION_WEIGHTS)
+    # count: ExerciseSection.slot_count is fixed here rather than sized from
+    # history — SectionCount (adaptive sizing) isn't threaded through yet, so
+    # every optional slot fills today, exactly as before this rolled through
+    # SectionRotation. Only WHICH kind fills third/fourth changed: staleness
+    # (SectionRotation) replaced the old fixed-weight tables.
+    rotation      = SectionRotation.for(user.recent_exercise_history(limit: SectionRotation::LOOKBACK),
+                                        count: ExerciseSection.slot_count)
+    third         = rotation.fetch(:third)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS)
     # An exercise has only 3 sections, so only the first 3 reinforcement concepts
     # can ever occupy one — sizing against the full (often 4-8 entry) list left
@@ -109,7 +104,7 @@ class DailyPlan
     # rather than a generalization of the 3-slot one above, because the two
     # vocabularies can never mix: keeping them structurally separate means a
     # cross-vocab item can never be placed somewhere it structurally cannot go.
-    fourth               = WeightedRoll.pick(FOURTH_SECTION_WEIGHTS)
+    fourth               = rotation.fetch(:fourth)
     fourth_bucket        = FOURTH_BUCKET_FOR.fetch(fourth)
     # Truncated to the slot's capacity before anything else reads it: the full
     # list runs 4-5 entries deep on a small vocabulary, and every entry past

@@ -131,8 +131,8 @@ RSpec.describe "section rendering", type: :request do
 
   before { login_as(user) }
 
-  DailyPlan::THIRD_SECTION_WEIGHTS.each_key do |third|
-    DailyPlan::FOURTH_SECTION_WEIGHTS.each_key do |fourth|
+  ExerciseSection.thirds.map { |kind| kind.key.to_sym }.each do |third|
+    ExerciseSection.fourths.map { |kind| kind.key.to_sym }.each do |fourth|
       context "#{third} + #{fourth}" do
         let(:exercise) { exercise_for(third, fourth) }
         let(:keys)     { exercise.active_section_keys }

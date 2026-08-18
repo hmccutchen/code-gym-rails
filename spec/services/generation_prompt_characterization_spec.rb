@@ -11,10 +11,10 @@ require "rails_helper"
 # so their indentation in the assembled prompt is partly incidental and would
 # be easy to normalize by accident.
 #
-# The combinations are enumerated from DailyPlan's own weight tables rather
-# than hardcoded, so adding a section kind to either rotation fails here until
-# a snapshot for it exists — a kind that silently drops out of assembly is the
-# specific failure this is meant to catch.
+# The combinations are enumerated from ExerciseSection's own third/fourth
+# rosters rather than hardcoded, so adding a section kind to either rotation
+# fails here until a snapshot for it exists — a kind that silently drops out
+# of assembly is the specific failure this is meant to catch.
 #
 # NOT covered, deliberately: retention/reinforcement/established blocks are
 # rendered from empty lists. Those need persisted ConceptMastery rows, and the
@@ -61,8 +61,8 @@ RSpec.describe "generation prompt characterization" do
   end
 
   DailyExercise::LANGUAGES.each do |language|
-    DailyPlan::THIRD_SECTION_WEIGHTS.each_key do |third|
-      DailyPlan::FOURTH_SECTION_WEIGHTS.each_key do |fourth|
+    ExerciseSection.thirds.map { |kind| kind.key.to_sym }.each do |third|
+      ExerciseSection.fourths.map { |kind| kind.key.to_sym }.each do |fourth|
         DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key do |mode|
           context "#{language} / #{third} / #{fourth} / #{mode}" do
             let(:prompt) { render(language, third, fourth, mode) }
@@ -92,8 +92,8 @@ RSpec.describe "generation prompt characterization" do
 
   it "has no snapshot left behind for a combination that no longer exists" do
     expected = DailyExercise::LANGUAGES.flat_map { |language|
-      DailyPlan::THIRD_SECTION_WEIGHTS.each_key.flat_map { |third|
-        DailyPlan::FOURTH_SECTION_WEIGHTS.each_key.flat_map { |fourth|
+      ExerciseSection.thirds.map { |kind| kind.key.to_sym }.flat_map { |third|
+        ExerciseSection.fourths.map { |kind| kind.key.to_sym }.flat_map { |fourth|
           DailyPlan::CODE_REVIEW_MODE_WEIGHTS.each_key.map { |mode| snapshot_path(language, third, fourth, mode).basename.to_s }
         }
       }

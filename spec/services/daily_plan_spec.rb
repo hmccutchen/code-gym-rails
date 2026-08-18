@@ -3,32 +3,6 @@ require "rails_helper"
 RSpec.describe DailyPlan do
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
-  describe "the third-section roll" do
-    it "returns each third in an equal quarter band" do
-      {
-        0.0 => :architecture, 0.24 => :architecture,
-        0.25 => :security_review, 0.49 => :security_review,
-        0.50 => :challenge, 0.74 => :challenge,
-        0.75 => :parsons_problem, 0.99 => :parsons_problem
-      }.each do |value, expected|
-        allow(WeightedRoll).to receive(:rand).and_return(value)
-        expect(WeightedRoll.pick(DailyPlan::THIRD_SECTION_WEIGHTS)).to eq(expected)
-      end
-    end
-
-    it "gives every third the same weight" do
-      expect(DailyPlan::THIRD_SECTION_WEIGHTS.values.uniq).to eq([ 0.25 ])
-    end
-
-    it "sums to 1.0 across all four weights" do
-      expect(DailyPlan::THIRD_SECTION_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
-    end
-
-    it "includes parsons_problem" do
-      expect(DailyPlan::THIRD_SECTION_WEIGHTS).to have_key(:parsons_problem)
-    end
-  end
-
   describe "RETENTION_BUCKET_FETCH_CAP" do
     # Deliberately restates the constant's own expression, so it cannot fail
     # when a vocabulary grows — that is the point. What it catches is someone
@@ -249,32 +223,6 @@ RSpec.describe DailyPlan do
     end
   end
 
-  describe "FOURTH_SECTION_WEIGHTS" do
-    it "sums to 1.0 across both weights" do
-      expect(DailyPlan::FOURTH_SECTION_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
-    end
-
-    it "is a 50/50 split" do
-      expect(DailyPlan::FOURTH_SECTION_WEIGHTS.values).to eq([ 0.5, 0.5 ])
-    end
-  end
-
-  describe "the fourth-section roll" do
-    it "returns :plan_review below 0.5, :ambiguity_hunt from 0.5 up" do
-      allow(WeightedRoll).to receive(:rand).and_return(0.10)
-      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:plan_review)
-
-      allow(WeightedRoll).to receive(:rand).and_return(0.49)
-      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:plan_review)
-
-      allow(WeightedRoll).to receive(:rand).and_return(0.50)
-      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:ambiguity_hunt)
-
-      allow(WeightedRoll).to receive(:rand).and_return(0.99)
-      expect(WeightedRoll.pick(DailyPlan::FOURTH_SECTION_WEIGHTS)).to eq(:ambiguity_hunt)
-    end
-  end
-
   describe "fourth-slot retention check selection" do
     it "offers a due plan_review-bucket concept only when the bucket matches" do
       user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
@@ -338,7 +286,7 @@ RSpec.describe DailyPlan do
     it "always includes a fourth kind, reinforcement, due_checks, and established" do
       result = DailyPlan.for(user, language: "ruby_rails")
 
-      expect(DailyPlan::FOURTH_SECTION_WEIGHTS).to have_key(result.fourth)
+      expect(%i[plan_review ambiguity_hunt]).to include(result.fourth)
       expect(result.fourth_reinforcement).to eq([])
       expect(result.fourth_due_checks).to eq([])
       expect(result.fourth_established).to eq([])
@@ -356,9 +304,7 @@ RSpec.describe DailyPlan do
       # scope_creep is tagged under the plan_review bucket; pin today's fourth
       # roll to that bucket so the assertion isn't at the mercy of the other
       # 50% of rolls landing on ambiguity_hunt instead.
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.reinforcement.map { |h| h[:concept] }).not_to include("scope_creep")
@@ -372,9 +318,7 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
         .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.fourth_due_checks).to eq([]) # not yet meaningfully overdue
@@ -393,9 +337,7 @@ RSpec.describe DailyPlan do
         .and_return([ { concept: "scope_creep",           tier: "standard" },
                       { concept: "unjustified_constant",  tier: "standard" },
                       { concept: "unflagged_behavior_change", tier: "standard" } ])
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
 
@@ -410,9 +352,7 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
         .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
 

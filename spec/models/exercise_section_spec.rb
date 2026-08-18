@@ -38,10 +38,6 @@ RSpec.describe ExerciseSection do
       expect(described_class.find("security_review").third?).to be(true)
       expect(described_class.find("parsons_problem").third?).to be(true)
     end
-
-    it "covers every third kind with a roll weight, so the two can't drift apart" do
-      expect(DailyPlan::THIRD_SECTION_WEIGHTS.keys.map(&:to_s)).to match_array(described_class.thirds.map(&:key))
-    end
   end
 
   describe ".fourths" do
@@ -54,10 +50,6 @@ RSpec.describe ExerciseSection do
       expect(described_class.find("challenge").fourth?).to be(false)
       expect(described_class.find("plan_review").fourth?).to be(true)
       expect(described_class.find("ambiguity_hunt").fourth?).to be(true)
-    end
-
-    it "covers every fourth kind with a roll weight, so the two can't drift apart" do
-      expect(DailyPlan::FOURTH_SECTION_WEIGHTS.keys.map(&:to_s)).to match_array(described_class.fourths.map(&:key))
     end
   end
 
@@ -414,8 +406,8 @@ RSpec.describe ExerciseSection do
     end
 
     it "accepts the symbols DailyPlan rolls" do
-      DailyPlan::THIRD_SECTION_WEIGHTS.each_key do |third|
-        DailyPlan::FOURTH_SECTION_WEIGHTS.each_key do |fourth|
+      ExerciseSection.thirds.map { |kind| kind.key.to_sym }.each do |third|
+        ExerciseSection.fourths.map { |kind| kind.key.to_sym }.each do |fourth|
           expect(ExerciseSection.for_plan(third: third, fourth: fourth).map(&:key))
             .to eq([ "code_review", "pattern", third.to_s, fourth.to_s ])
         end
