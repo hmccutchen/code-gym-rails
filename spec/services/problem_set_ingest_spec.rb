@@ -176,6 +176,15 @@ RSpec.describe ProblemSetIngest do
       expect(vocabulary).to include(*AiService::OO_DESIGN_CONCEPTS)
     end
 
+    # The premise of the test-file idiom in #oo_design_violation_guidance: all
+    # three principles can land on a day whose code_review must also exhibit a
+    # test smell. If selection ever narrows here, that clause is what to revisit.
+    it "offers every OO design principle to a test-file code_review" do
+      vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :test_file)
+
+      expect(vocabulary).to include(*AiService::OO_DESIGN_CONCEPTS)
+    end
+
     it "withholds OO design principles from a schema-review code_review" do
       vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review)
 
