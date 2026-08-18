@@ -151,6 +151,30 @@ RSpec.describe AiService do
     end
   end
 
+  describe "generating a short day" do
+    let(:user) { User.create!(email: "short@example.com", name: "Short") }
+
+    it "asks for only the chosen sections in the schema" do
+      schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :challenge,
+                                       fourth: nil, pattern: nil))
+
+      expect(schema.keys).to eq(%w[code_review challenge])
+    end
+
+    it "writes no fourth-section reinforcement line when there is no fourth" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :challenge, fourth: nil)
+
+      expect(prompt).not_to include("Fourth-section")
+    end
+
+    it "gives guidance for each chosen section and no others" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: nil, fourth: nil, pattern: nil)
+
+      expect(prompt).to include("code_review concept from this vocabulary")
+      expect(prompt).not_to include("PARSONS PROBLEM")
+    end
+  end
+
   describe "diagram syntax constraints" do
     it "constrains the diagram to a narrow, parseable subset" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture)
@@ -789,14 +813,20 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture,
                             reinforcement: [], due_checks: [ cm ])
 
-      expect(prompt).to include("Retention checks due today: service_boundaries (architecture section)")
+      expect(prompt).to include("Retention checks due today: service_boundaries (architecture)")
     end
 
-    def annotation(concept, language:, third:, mode:)
+    # day_language defaults to the concept's own bucket, which is correct for
+    # every language-bucket concept (its bucket IS the day's language); an
+    # architecture-bucket concept's bucket is the pseudo-language
+    # "architecture" instead, so those call sites pass the day's real
+    # language explicitly.
+    def annotation(concept, language:, third:, mode:, day_language: language)
       cm = ConceptMastery.new(user: user, concept: concept, language: language,
                               tier: :standard, next_retention_check_on: Date.current,
                               retention_interval_days: 7)
-      service.send(:annotate_retention_concept, cm, third, mode)
+      kinds = ExerciseSection.for_plan(third: third, fourth: nil)
+      service.send(:annotate_retention_concept, cm, kinds, day_language, mode)
     end
 
     it "offers code_review for a data-modeling concept only on a schema-review day" do
@@ -823,8 +853,9 @@ RSpec.describe AiService do
     end
 
     it "still routes an architecture-bucket concept to its own section" do
-      expect(annotation("service_boundaries", language: "architecture", third: :architecture, mode: :application_code))
-        .to eq("service_boundaries (architecture section)")
+      expect(annotation("service_boundaries", language: "architecture", third: :architecture, mode: :application_code,
+                        day_language: "ruby_rails"))
+        .to eq("service_boundaries (architecture)")
     end
 
     # The drift this derivation closes, made reachable: give a fixed kind an
@@ -889,6 +920,26 @@ RSpec.describe AiService do
     it "withholds code_review from a meta-skill concept on a schema-review day" do
       expect(annotation("spotting_unstated_assumptions", language: "ruby_rails", third: :challenge, mode: :schema_review))
         .to eq("spotting_unstated_assumptions (pattern or challenge)")
+    end
+  end
+
+  describe "#annotate_retention_concept" do
+    let(:concept) do
+      ConceptMastery.new(concept: "service_boundaries", language: "architecture",
+                         retention_interval_days: 7, next_retention_check_on: Date.current)
+    end
+
+    it "annotates an architecture concept to the architecture section when the day has one" do
+      kinds = ExerciseSection.for_plan(third: :architecture, fourth: nil)
+
+      expect(service.send(:annotate_retention_concept, concept, kinds, "ruby_rails", :application_code))
+        .to include("architecture")
+    end
+
+    it "drops an architecture concept on a day with no architecture section" do
+      kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
+
+      expect(service.send(:annotate_retention_concept, concept, kinds, "ruby_rails", :application_code)).to be_nil
     end
   end
 

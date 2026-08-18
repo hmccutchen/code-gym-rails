@@ -388,7 +388,7 @@ class AiService
       user, purpose: "generate_exercise",
       read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
       system: build_system_prompt(language),
-      prompt: build_exercise_prompt(user, language, third: plan.third,
+      prompt: build_exercise_prompt(user, language, third: plan.third, pattern: plan.pattern,
                                     reinforcement: plan.reinforcement, due_checks: plan.due_checks,
                                     established: plan.established, history: history,
                                     fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
@@ -399,14 +399,18 @@ class AiService
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set"),
       language: language,
-      expected_keys: ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth).map(&:key)
+      expected_keys: ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth,
+                                              pattern: plan.pattern).map(&:key)
     )
     problem_set = ingested.problem_set
     # After ingest, never during: ingest writes nothing and raises on an
     # unusable set, so a rejected response cannot have left a suggestion behind.
     record_suggested_concepts(ingested.suggested_concepts)
     log_retention(user, language, plan.due_checks, problem_set, plan.code_review_mode)
-    log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks, problem_set, plan.code_review_mode)
+    if plan.fourth
+      log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
+                    problem_set, plan.code_review_mode)
+    end
     log_difficulty_diagnostics(user, language, plan, problem_set, history)
     problem_set
   end
@@ -683,14 +687,11 @@ class AiService
   # hosts only the rest. pattern and the language-vocabulary thirds are
   # unscoped, which is what keeps a due data-modeling concept reachable on a
   # non-schema day.
-  def annotate_retention_concept(cm, third, code_review_mode)
-    return "#{cm.concept} (architecture section)" if cm.language == "architecture"
-
-    hosts = [
-      [ ExerciseSection::CodeReview.key, code_review_mode ],
-      [ ExerciseSection::Pattern.key,    nil ],
-      [ third.to_s,                      nil ]
-    ].filter_map { |section_key, mode| section_key if can_host?(cm, section_key, mode: mode) }
+  def annotate_retention_concept(cm, kinds, language, code_review_mode)
+    hosts = kinds.filter_map do |kind|
+      mode = code_review_mode if kind == ExerciseSection::CodeReview
+      kind.key if can_host?(cm, kind.key, language, mode: mode)
+    end
 
     # nil, not "concept ()": with every line derived, a day can present no
     # section able to carry this concept, and listing it anyway would tell the
@@ -716,8 +717,17 @@ class AiService
   #
   # `mode` is passed only for code_review, the one kind whose selectable
   # vocabulary depends on it; the third slot is never code_review.
-  def can_host?(cm, section_key, mode: nil)
-    ProblemSetIngest.selectable_vocabulary_for(section_key, cm.language, mode: mode).include?(cm.concept)
+  #
+  # `language` is the day's actual generation language, deliberately not
+  # `cm.language`: for an architecture-bucket concept the two diverge
+  # (cm.language is the pseudo-language "architecture"), and LANGUAGE_CONFIG
+  # happens to carry an "architecture" entry of its own for concept-reference
+  # generation — passing cm.language through would resolve non-architecture
+  # kinds against that entry's vocabulary instead of the day's real one,
+  # falsely reporting code_review/pattern as hosts for an architecture
+  # concept.
+  def can_host?(cm, section_key, language, mode: nil)
+    ProblemSetIngest.selectable_vocabulary_for(section_key, language, mode: mode).include?(cm.concept)
   end
 
   # Delivery is advisory, so the only way to know whether retention checks actually
@@ -818,10 +828,10 @@ class AiService
   # fields' label switches with `language` so instructions never assume Ruby
   # idioms when generating JS — the structure itself never changes across
   # languages.
-  def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review)
+  def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review, pattern: :pattern)
     label = config_for(language)[:label]
 
-    sections = ExerciseSection.for_plan(third: third, fourth: fourth)
+    sections = ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
                               .map { |kind| kind.schema_fragment(label: label) }
                               .join(",\n  ")
 
@@ -836,7 +846,8 @@ class AiService
   # included) keeps working unchanged; #generate_exercise passes its own
   # already-fetched value instead so the prompt and the diagnostics log
   # never see two different snapshots of the same user's history.
-  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, reinforcement: nil, due_checks: [],
+  def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, pattern: :pattern,
+                            reinforcement: nil, due_checks: [],
                             established: [], history: user.recent_performance,
                             fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
                             code_review_mode: :application_code)
@@ -862,6 +873,12 @@ class AiService
     reinforcement_text = reinforcement_list.any? ?
       reinforcement_list.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
 
+    # Both slots resolved once, through the same call the schema assembles
+    # from, so guidance, hosting, and schema can never disagree about which
+    # kind a slot holds — and a symbol rolled into a slot it can't occupy fails
+    # here rather than reaching a kind that has no guidance to give.
+    kinds = ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
+
     # Advisory, like every other concept instruction here — the model may ignore it.
     # If real-world hit rate turns out low, the fix is to escalate THIS wording
     # toward the directive phrasing used for reinforcement above ("reintroduce
@@ -870,7 +887,7 @@ class AiService
     # filter_map, not map: a due concept no section can host today annotates as
     # nil and is dropped, so the block disappears entirely rather than listing
     # a concept the prompt cannot ask for.
-    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, third, code_review_mode) }
+    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode) }
 
     retention_block =
       if annotated_due_checks.any?
@@ -903,6 +920,13 @@ class AiService
     fourth_reinforcement_text = fourth_reinforcement.any? ?
       fourth_reinforcement.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
 
+    fourth_reinforcement_line =
+      if fourth
+        "Fourth-section (#{fourth}) concept needing reinforcement: #{fourth_reinforcement_text}"
+      else
+        ""
+      end
+
     fourth_retention_block =
       if fourth_due_checks.any?
         <<~RET.chomp
@@ -926,16 +950,6 @@ class AiService
         ""
       end
 
-    # Both slots resolved once, through the same call the schema assembles
-    # from, so guidance and schema can never disagree about which kind a slot
-    # holds — and a symbol rolled into a slot it can't occupy fails here rather
-    # than reaching a kind that has no guidance to give. Read by slot, never by
-    # position: an omitted slot shifts a positional read onto the wrong kind.
-    third_kind, fourth_kind =
-      ExerciseSection.slot_kinds(third: third, fourth: fourth).values_at(:third, :fourth)
-
-    fourth_guidance = generation_guidance_for(fourth_kind, language)
-
     ts_guidance =
       if language == "javascript"
         "- If a section's tagged concept is one of #{TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
@@ -949,10 +963,14 @@ class AiService
     label  = config[:label]
     focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
 
-    third_guidance = generation_guidance_for(third_kind, language)
-
-    code_review_guidance = generation_guidance_for(ExerciseSection::CodeReview, language, mode: code_review_mode)
-    pattern_guidance     = generation_guidance_for(ExerciseSection::Pattern, language)
+    # Each chosen kind gives its own guidance line, keyed off the same `kinds`
+    # the schema and retention hosting derive from — so guidance can never
+    # disagree with what the schema actually asks for. code_review is the only
+    # kind whose guidance depends on the day's content mode.
+    sections_guidance = kinds.map { |kind|
+      mode = code_review_mode if kind == ExerciseSection::CodeReview
+      generation_guidance_for(kind, language, mode: mode)
+    }.join("\n")
 
     <<~PROMPT
       Generate a daily Code Gym exercise set for this engineer.
@@ -966,7 +984,7 @@ class AiService
       #{history_text}
 
       Concepts needing reinforcement right now: #{reinforcement_text}
-      Fourth-section (#{fourth}) concept needing reinforcement: #{fourth_reinforcement_text}
+      #{fourth_reinforcement_line}
 
       Instructions:
       - If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
@@ -982,10 +1000,7 @@ class AiService
       - A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
       - When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
       - Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
-      #{code_review_guidance}
-      #{pattern_guidance}
-      #{third_guidance}
-      #{fourth_guidance}
+      #{sections_guidance}
       #{data_modeling_idiom_guidance}
       #{meta_skill_framing_guidance}
       #{code_smell_naming_guidance}
@@ -1000,7 +1015,7 @@ class AiService
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{exercise_schema_for(language, third: third, fourth: fourth)}
+      #{exercise_schema_for(language, third: third, fourth: fourth, pattern: pattern)}
     PROMPT
   end
 
