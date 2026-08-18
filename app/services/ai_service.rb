@@ -1113,11 +1113,13 @@ class AiService
     "- The OO design-principle concepts (#{OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
       "topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that " \
       "rule and be gradeable against it, and the answer is naming the violation and saying which future change it " \
-      "makes hard — never a rewrite of the class. Express it in the host section's own idiom: a code_review " \
-      "tagged open_closed shows a conditional that must be edited every time a variant is added; a challenge " \
-      "tagged dependency_inversion states a behavior that cannot be tested without reaching through a " \
-      "hard-coded collaborator; a pattern, which shows no code, describes a hierarchy built for reuse and asks " \
-      "what the composed shape would be and what it costs."
+      "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
+      "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
+      "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
+      "costs. The challenge section is the exception to the answer shape, since its answer is code: there the " \
+      "starter_code violates the principle — a behavior that cannot be tested without reaching through a " \
+      "hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies " \
+      "it, so writing the corrected design IS the answer rather than describing it."
   end
 
   # A kind's generation instructions. The vocabulary comes from

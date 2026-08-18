@@ -303,8 +303,18 @@ RSpec.describe AiService do
       expect(guidance).to match(/gradeable/i)
     end
 
-    it "asks for the violation to be named rather than rewritten" do
-      expect(service.send(:oo_design_violation_guidance)).to match(/never (a )?rewrit/i)
+    it "asks the discussion sections for the violation named rather than rewritten" do
+      expect(service.send(:oo_design_violation_guidance)).to match(/rather than a rewrite/i)
+    end
+
+    # challenge draws the full language vocabulary, and its schema asks what to
+    # implement with a code answer. A blanket "never rewrite" would hand the
+    # provider a coding exercise whose answer must not be code.
+    it "gives challenge a corrected-design shape rather than a prose answer" do
+      guidance = service.send(:oo_design_violation_guidance)
+
+      expect(guidance).to match(/challenge section is the exception/i)
+      expect(guidance).to match(/writing the corrected design IS the answer/i)
     end
 
     it "is stated once in the generation prompt, for every section rather than per kind" do
