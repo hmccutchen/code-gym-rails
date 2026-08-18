@@ -42,4 +42,13 @@ RSpec.describe SectionCount do
   it "counts scattered skips in full, unlike a consecutive run" do
     expect(described_class.for(history(nil, 4, nil, 4, nil, 4))).to eq(3)
   end
+
+  describe "the hard override" do
+    it "returns the full set without consulting history" do
+      history = spy("history")
+
+      expect(described_class.for(history, adaptive: false)).to eq(ExerciseSection.slot_count)
+      expect(history).not_to have_received(:first)
+    end
+  end
 end

@@ -454,6 +454,16 @@ RSpec.describe DailyPlan do
     end
   end
 
+  describe "adaptive_set_size off" do
+    it "gives a user who turned adaptive sizing off the full set" do
+      user = User.create!(email: "off@example.com", name: "Off", adaptive_set_size: false)
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect([ plan.pattern, plan.third, plan.fourth ]).to all(be_present)
+    end
+  end
+
   describe "#code_review_mode on the plan" do
     let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
 

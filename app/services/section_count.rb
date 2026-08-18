@@ -10,7 +10,12 @@ class SectionCount
   # becomes absence. A week away must not return someone to a floored day.
   SKIP_RUN_CAP = 2
 
-  def self.for(history)
+  # An early return, not a default fed through the rule below: with no path
+  # from the sizing logic to the result, the override stays correct if that
+  # logic is later rewritten.
+  def self.for(history, adaptive: true)
+    return ceiling unless adaptive
+
     window = capped_window(history)
     return ceiling if window.size < MIN_SESSIONS
 
