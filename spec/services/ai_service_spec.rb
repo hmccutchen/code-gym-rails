@@ -1797,6 +1797,28 @@ RSpec.describe AiService do
       expect(review["rating"]).to eq("strong")
     end
 
+    # The stored answer is a free-form permitted param, so a correct
+    # permutation with junk appended must not persist a "strong" rating.
+    it "refuses an answer that is a correct permutation plus extra ids" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review"     => { "question" => "q", "snippet" => "s" },
+          "pattern"         => { "title" => "t", "question" => "q" },
+          "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "parsons_problem" => "order:0,1,2,3,4,999" }
+      )
+      review = { "rating" => "solid" }
+
+      service.send(:override_parsons_section_rating!, review, exercise, response)
+
+      expect(review["rating"]).to eq("beginner")
+    end
+
     it "does nothing when the exercise's parsons_problem has no blocks" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",

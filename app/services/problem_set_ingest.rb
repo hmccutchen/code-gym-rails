@@ -8,12 +8,13 @@
 # is shared with the review and concept-reference paths, so parsing belongs
 # there, not in a problem-set-specific module.
 #
-# WRITES NOTHING. Off-vocabulary concepts come back in the Result as
-# suggestions for the caller to record. That is what makes "a rejected set must
-# not leave a vocabulary suggestion behind" a structural guarantee rather than
-# a consequence of the order these steps run in — when this raises, nothing has
-# been written, because this never writes. It also means the whole module is
-# pure, so its tests need no database.
+# WRITES NOTHING TO THE DATABASE. Off-vocabulary concepts come back in the
+# Result as suggestions for the caller to record. That is what makes "a
+# rejected set must not leave a vocabulary suggestion behind" a structural
+# guarantee rather than a consequence of the order these steps run in — when
+# this raises, nothing has been persisted, because this never persists. Its
+# tests need no database for the same reason. The module is not side-effect
+# free, though: warn_unrequested_sections! logs.
 class ProblemSetIngest
   # The one field in a problem set that is answer-key data rather than exercise
   # content. Two places know it by name: the validation below that guarantees
@@ -168,13 +169,16 @@ class ProblemSetIngest
   # threw in is rendered — a day sized at 2 can show 3, defeating the sizing
   # decision with no trace anywhere that it happened. Rejecting would discard
   # usable days over a harmless provider quirk, so this warns instead.
+  #
+  # Serialized as JSON, not joined: these are provider-controlled hash keys, so
+  # a newline in one would otherwise forge a second log line.
   def warn_unrequested_sections!
     unrequested = @problem_set.keys - @expected_keys
     return if unrequested.empty?
 
     Rails.logger.warn(
       "[unrequested_sections] provider returned section(s) the day did not intend: " \
-      "#{unrequested.join(', ')} (intended: #{@expected_keys.join(', ')})"
+      "#{unrequested.to_json} (intended: #{@expected_keys.to_json})"
     )
   end
 

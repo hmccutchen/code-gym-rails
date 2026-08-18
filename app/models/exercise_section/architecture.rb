@@ -53,12 +53,17 @@ class ExerciseSection::Architecture < ExerciseSection
     SCHEMA
   end
 
+  # The options are what the grading note asks the reviewer to weigh, so they
+  # have to be here — without them "did they consider the alternatives?" is
+  # unanswerable. Omitted when blank, since a provider can return a question
+  # with no option list.
   def self.review_context(section:, answer:, rating:)
-    <<~CONTEXT.chomp
-      Architecture decision (#{section["title"]}): #{section["question"]}
-      Scenario/constraints: #{section["scenario"]}
-      #{answer_lines(answer, rating)}
-    CONTEXT
+    [
+      "Architecture decision (#{section["title"]}): #{section["question"]}",
+      "Scenario/constraints: #{section["scenario"]}",
+      ("Options offered: #{Array(section["options"]).join(' | ')}" if section["options"].present?),
+      answer_lines(answer, rating)
+    ].compact.join("\n")
   end
 
   def self.grading_note(section:, answer:)

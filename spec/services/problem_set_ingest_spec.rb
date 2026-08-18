@@ -577,6 +577,19 @@ RSpec.describe ProblemSetIngest do
       described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
     end
 
+    # Section names are provider-controlled JSON keys, so a newline in one
+    # would forge a second log line if they were interpolated raw.
+    it "escapes a section name rather than letting it forge a log line" do
+      forged = full_set.merge("challenge\nFATAL -- : owned" => { "concept" => "caching" })
+
+      expect(Rails.logger).to receive(:warn) do |message|
+        expect(message.lines.size).to eq(1)
+        expect(message).to include('challenge\\nFATAL')
+      end
+
+      described_class.call(forged, language: "ruby_rails", expected_keys: %w[code_review pattern])
+    end
+
     it "stays quiet when the delivered set is exactly the intended one" do
       expect(Rails.logger).not_to receive(:warn)
 

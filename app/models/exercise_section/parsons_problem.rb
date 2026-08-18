@@ -97,6 +97,15 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       id.is_a?(Integer) && id >= 0 && id < block_count
     end
 
+    # The one way to read a stored answer as an ordering. Parsing alone is not
+    # enough anywhere it matters: "order:0,1,2,3,4,999" parses into a list
+    # whose first block_count entries are the identity permutation, so every
+    # consumer that indexes positionally would call a malformed answer a
+    # perfect one.
+    def submitted_order(answer, block_count)
+      normalize_order(parse_order(answer), block_count)
+    end
+
     # The arrangement to render on the dashboard: the learner's own saved order
     # if it survives normalization, else the generated scramble, else the
     # stored (correct) order.
@@ -108,9 +117,14 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
     # A mismatch count of exactly 1 is impossible for a permutation — the
     # smallest non-zero mismatch is a pair swap — so the table has no `when 1`.
+    #
+    # Normalizes first so nothing short of a complete permutation can score:
+    # padding to block_count silently drops trailing ids, which would grade
+    # a valid prefix plus garbage as an exact match.
     def grade(submitted_ids, block_count)
-      padded     = Array.new(block_count) { |i| submitted_ids[i] }
-      mismatches = padded.each_index.count { |i| padded[i] != i }
+      submitted_ids = normalize_order(submitted_ids, block_count)
+      padded        = Array.new(block_count) { |i| submitted_ids[i] }
+      mismatches    = padded.each_index.count { |i| padded[i] != i }
 
       rating =
         case mismatches
@@ -147,7 +161,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
         UNVERIFIED
       end
 
-      submitted = parse_order(answer)
+      submitted = submitted_order(answer, blocks.size)
 
       <<~PARSONS.chomp
         Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
@@ -160,11 +174,13 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     end
 
     # The ground truth the review prompt hands the model, so it explains a
-    # known result rather than judging one. Padding mirrors .grade so a short
-    # or skipped submission describes rather than raises.
+    # known result rather than judging one. Normalizes and pads the same way
+    # .grade does, so the description can never contradict the score it
+    # accompanies.
     def describe_mismatches(blocks, submitted_ids)
       return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
 
+      submitted_ids = normalize_order(submitted_ids, blocks.size)
       padded = Array.new(blocks.size) { |i| submitted_ids[i] }
       descriptions = padded.each_index.filter_map { |i|
         next if padded[i] == i

@@ -37,19 +37,22 @@ RSpec.describe SectionRotation do
     expect(described_class::OPTIONAL_SLOTS).to eq(ExerciseSection.slots.keys - [ :code_review ])
   end
 
-  # The regime this is designed for: seven kinds competing for one slot, all
-  # of them maximally stale, so the tie-break does the work.
+  # The regime this is designed for: every optional kind competing for one
+  # slot, all of them maximally stale, so the tie-break does the work. The pool
+  # is derived from the roster rather than counted, so adding an eighth kind
+  # lengthens this run instead of leaving the new kind silently uncovered.
   it "drains the whole pool in pool-size days rather than repeating" do
+    pool_size = (ExerciseSection.slots.values.flatten - [ ExerciseSection::CodeReview ]).size
     seen = []
     log  = []
 
-    7.times do
+    pool_size.times do
       chosen = described_class.for(history(*log.reverse), count: 2)
       kind   = chosen.values.compact.first
       seen << kind
       log << ([ "code_review" ] + chosen.values.compact.map(&:to_s))
     end
 
-    expect(seen.uniq.size).to eq(7)
+    expect(seen.uniq.size).to eq(pool_size)
   end
 end
