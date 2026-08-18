@@ -70,7 +70,7 @@ class DailyPlan
   # that (see AiService#log_retention).
   def self.for(user, language:)
     history       = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
-    rotation      = SectionRotation.for(history, count: SectionCount.for(history))
+    rotation      = SectionRotation.for(history, count: SectionCount.for(history, adaptive: user.adaptive_set_size?))
     kinds         = ExerciseSection.for_plan(**rotation)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS)
     # Only the non-fourth kinds present today can ever host a language or

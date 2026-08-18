@@ -17,7 +17,7 @@ RSpec.describe "Profile", type: :request do
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).to eq("name" => "Renamed", "time_zone" => "UTC")
+      expect(JSON.parse(response.body)).to eq("name" => "Renamed", "time_zone" => "UTC", "adaptive_set_size" => true)
       expect(user.reload.name).to eq("Renamed")
     end
 
@@ -70,6 +70,46 @@ RSpec.describe "Profile", type: :request do
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       expect(response).to have_http_status(:unprocessable_entity)
       expect(user.reload.time_zone).to eq("America/Chicago")
+    end
+  end
+
+  describe "PATCH /profile with the adaptive set size preference" do
+    it "saves the preference and echoes it back" do
+      login_as(user)
+
+      patch profile_path,
+            params: { user: { adaptive_set_size: false } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["adaptive_set_size"]).to be(false)
+      expect(user.reload.adaptive_set_size).to be(false)
+    end
+
+    # The column is NOT NULL and Active Record's cast turns "" and null into
+    # nil, so without a boundary check these are a 500 rather than a rejection.
+    it "rejects a value that is not a boolean instead of crashing or guessing" do
+      login_as(user)
+
+      [ nil, "", "banana", 2 ].each do |value|
+        patch profile_path,
+              params: { user: { adaptive_set_size: value } }.to_json,
+              headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+        expect(response).to have_http_status(:unprocessable_entity), "#{value.inspect} was accepted"
+        expect(user.reload.adaptive_set_size).to be(true)
+      end
+    end
+
+    it "still accepts the string forms a form post would send" do
+      login_as(user)
+
+      patch profile_path,
+            params: { user: { adaptive_set_size: "0" } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.adaptive_set_size).to be(false)
     end
   end
 end
