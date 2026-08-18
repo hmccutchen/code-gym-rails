@@ -231,13 +231,20 @@ class AiService
     shallow_module pass_through_method temporal_decomposition
   ].freeze
 
+  # The architecture-level causes of complexity, kept as their own constant
+  # because ANTI_SHAPE_CONCEPTS below has to name them and ARCHITECTURE_CONCEPTS
+  # is defined further down.
+  COMPLEXITY_CAUSE_CONCEPTS = %w[
+    cognitive_load unknown_unknowns
+  ].freeze
+
   # The groups that name something to find rather than something to choose.
   # Every lens written for a remedy is wrong for these — see the senior_lens
   # framing in #build_concept_reference_prompt, whose output is generated once
   # and cached forever, so a wrong framing never self-corrects. Membership
   # rather than "every group with a guidance method": the design principles
   # have one too, and a principle IS something to reach for.
-  ANTI_SHAPE_CONCEPTS = (CODE_SMELL_CONCEPTS + MODULE_DESIGN_CONCEPTS).freeze
+  ANTI_SHAPE_CONCEPTS = (CODE_SMELL_CONCEPTS + MODULE_DESIGN_CONCEPTS + COMPLEXITY_CAUSE_CONCEPTS).freeze
 
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
@@ -281,18 +288,18 @@ class AiService
   # concepts transcend any one stack. Used only by the architecture third
   # section and its concept references (pseudo-language "architecture").
   #
-  # cognitive_load and unknown_unknowns are causes of complexity rather than
-  # decisions, and they sit here rather than in the language vocabularies
+  # COMPLEXITY_CAUSE_CONCEPTS are causes of complexity rather than decisions,
+  # and they sit here rather than in the language vocabularies
   # because what they cost is only visible across a whole design.
   # change_amplification was cut with them: it is coupling_cohesion's symptom
   # at this altitude, and shotgun_surgery already carries the code-level
   # version in both language vocabularies.
-  ARCHITECTURE_CONCEPTS = %w[
+  ARCHITECTURE_CONCEPTS = (%w[
     sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
     caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
     api_versioning event_driven_vs_request_response data_ownership
-    idempotency_at_scale observability_tradeoffs cognitive_load unknown_unknowns
-  ].freeze
+    idempotency_at_scale observability_tradeoffs
+  ] + COMPLEXITY_CAUSE_CONCEPTS).freeze
 
   # Vocabulary for the plan_review fourth-slot kind. Entirely disjoint from
   # RAILS_CONCEPTS/JS_CONCEPTS/ARCHITECTURE_CONCEPTS — a plan_review concept
@@ -1255,8 +1262,9 @@ class AiService
 
     # A shape you find is never a technique to choose, so the remedy lens the
     # other concepts get would have the provider explain when to reach for a
-    # god object or a shallow module. The design principles deliberately stay
-    # on the remedy lens: open_closed IS something to reach for.
+    # god object, a shallow module, or an unknown unknown. The design
+    # principles deliberately stay on the remedy lens: open_closed IS
+    # something to reach for.
     senior_lens_desc =
       if ANTI_SHAPE_CONCEPTS.include?(concept)
         "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"

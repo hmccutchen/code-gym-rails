@@ -513,7 +513,8 @@ RSpec.describe AiService do
     # already carries the code-level version in both language vocabularies —
     # which the disjointness rule above exists to keep from happening.
     it "carries the two complexity causes that duplicate no existing entry" do
-      expect(AiService::ARCHITECTURE_CONCEPTS).to include("cognitive_load", "unknown_unknowns")
+      expect(AiService::COMPLEXITY_CAUSE_CONCEPTS).to contain_exactly("cognitive_load", "unknown_unknowns")
+      expect(AiService::ARCHITECTURE_CONCEPTS).to include(*AiService::COMPLEXITY_CAUSE_CONCEPTS)
       expect(AiService::ARCHITECTURE_CONCEPTS).not_to include("change_amplification")
     end
   end
@@ -582,6 +583,28 @@ RSpec.describe AiService do
     it "keeps the remedy framing for a design principle" do
       config = service.send(:config_for, "ruby_rails")
       prompt = service.send(:build_concept_reference_prompt, "open_closed", config)
+
+      expect(prompt).to include("when to reach for it")
+    end
+
+    # cognitive_load and unknown_unknowns are costs a design imposes, not
+    # techniques — "when to reach for unknown unknowns" is not a sentence. They
+    # reach this method through the architecture pseudo-language, so the lens
+    # has to follow the concept rather than the vocabulary it came from.
+    it "reframes senior_lens for an architecture-level cause of complexity" do
+      config = service.send(:config_for, "architecture")
+
+      AiService::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, config)
+
+        expect(prompt).to include("how to catch it early"), "#{concept} got the remedy lens"
+        expect(prompt).not_to include("when to reach for it")
+      end
+    end
+
+    it "keeps the remedy framing for an architecture concept that names a decision" do
+      config = service.send(:config_for, "architecture")
+      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", config)
 
       expect(prompt).to include("when to reach for it")
     end
