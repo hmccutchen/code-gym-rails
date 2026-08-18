@@ -16,13 +16,13 @@ RSpec.describe ProblemSetIngest do
   # independent — no step undoes another's work — so asserting one field after
   # a full run says the same thing as calling that step alone used to.
   def step(problem_set, language: "ruby_rails")
-    described_class.call(problem_set, language: language).problem_set
+    described_class.call(problem_set, language: language, expected_keys: problem_set.keys).problem_set
   rescue AiService::InvalidResponseError
     raise
   end
 
   def ingest(problem_set, language: "ruby_rails")
-    described_class.call(problem_set, language: language)
+    described_class.call(problem_set, language: language, expected_keys: problem_set.keys)
   end
 
   describe ".call" do
@@ -167,7 +167,8 @@ RSpec.describe ProblemSetIngest do
     it "still accepts a data-modeling concept tagged on parsons_problem" do
       expect(described_class.vocabulary_for("parsons_problem", "ruby_rails")).to include("missing_index")
 
-      result = described_class.call({ "parsons_problem" => { "concept" => "missing_index" } }, language: "ruby_rails")
+      result = described_class.call({ "parsons_problem" => { "concept" => "missing_index" } }, language: "ruby_rails",
+                                     expected_keys: %w[parsons_problem])
 
       expect(result.problem_set["parsons_problem"]["concept"]).to eq("missing_index")
       expect(result.suggested_concepts).to be_empty
@@ -504,4 +505,48 @@ RSpec.describe ProblemSetIngest do
         expect(step(set)).to eq("pattern" => { "question" => "q" })
       end
     end
+
+  describe "the intended set as a contract" do
+    let(:full_set) do
+      {
+        "code_review" => { "concept" => "n_plus_one" },
+        "pattern"     => { "concept" => "memoization" }
+      }
+    end
+
+    it "rejects a set missing an intended section, naming it" do
+      expect {
+        described_class.call(full_set.except("pattern"), language: "ruby_rails",
+                             expected_keys: %w[code_review pattern])
+      }.to raise_error(AiService::InvalidResponseError, /pattern/)
+    end
+
+    it "names every missing section, not just the first" do
+      expect {
+        described_class.call({}, language: "ruby_rails", expected_keys: %w[code_review pattern])
+      }.to raise_error(AiService::InvalidResponseError, /code_review.*pattern/)
+    end
+
+    it "treats a non-Hash value as missing" do
+      expect {
+        described_class.call(full_set.merge("pattern" => "oops"), language: "ruby_rails",
+                             expected_keys: %w[code_review pattern])
+      }.to raise_error(AiService::InvalidResponseError, /pattern/)
+    end
+
+    it "accepts extra sections the day did not intend" do
+      extra = full_set.merge("challenge" => { "concept" => "caching" })
+
+      result = described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
+
+      expect(result.problem_set).to have_key("challenge")
+    end
+
+    it "reports a missing section rather than its unusable answer key" do
+      expect {
+        described_class.call(full_set, language: "ruby_rails",
+                             expected_keys: %w[code_review pattern ambiguity_hunt])
+      }.to raise_error(AiService::InvalidResponseError, /ambiguity_hunt/)
+    end
+  end
 end

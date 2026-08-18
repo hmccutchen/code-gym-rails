@@ -72,6 +72,18 @@ RSpec.describe AiService do
 
   let(:service) { double_class.new }
 
+  # reject_missing_sections! now requires whatever DailyPlan actually rolls for
+  # third/fourth to be present. Most examples below care about one section, not
+  # about the roll, so this pads every third/fourth alternative with an empty
+  # placeholder — satisfying whichever outcome an unstubbed roll picks, without
+  # pinning it. Overrides replace a placeholder with the content a test cares
+  # about; #present? only requires a Hash, so an untouched placeholder is inert.
+  def full_problem_set(overrides = {})
+    base = { "code_review" => {}, "pattern" => {} }
+    (ExerciseSection.thirds + ExerciseSection.fourths).each { |kind| base[kind.key] = {} }
+    base.merge(overrides)
+  end
+
   # A truncated response is still a billed response, so the usage row has to
   # be written before the failure propagates — otherwise cost tracking
   # silently under-counts exactly the calls that burn a full output budget.
@@ -882,10 +894,10 @@ RSpec.describe AiService do
   # and that the suggestions it returns get written.
   describe "generation runs the ingest boundary" do
     it "runs on generation, so a bad diagram never reaches a persisted problem set" do
-      svc = double_class.new(canned_text: {
+      svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
         "pattern"     => { "question" => "q", "concept" => "memoization", "diagram" => "flowchart TD\n  A --> B" }
-      }.to_json)
+      ).to_json)
 
       problem_set = svc.generate_exercise(user)
 
@@ -894,9 +906,9 @@ RSpec.describe AiService do
     end
 
     it "writes the SuggestedConcept rows ingest reports" do
-      svc = double_class.new(canned_text: {
+      svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
-      }.to_json)
+      ).to_json)
 
       expect { svc.generate_exercise(user) }.to change(SuggestedConcept, :count).by(1)
       expect(SuggestedConcept.last.display_name).to eq("Invented Concept!!")
@@ -906,9 +918,9 @@ RSpec.describe AiService do
     # A lost analytics signal is not a reason to fail someone's morning set.
     it "swallows a recording failure and still returns the problem set" do
       allow(SuggestedConcept).to receive(:record!).and_raise(StandardError, "db down")
-      svc = double_class.new(canned_text: {
+      svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
-      }.to_json)
+      ).to_json)
 
       expect(Rails.logger).to receive(:warn).with(/SuggestedConcept recording failed.*db down/)
       expect(svc.generate_exercise(user)["code_review"]["concept"]).to eq("other")
@@ -921,10 +933,10 @@ RSpec.describe AiService do
       allow(SuggestedConcept).to receive(:record!)
         .with(hash_including(name: "First Invention!!")).and_raise(StandardError, "db down")
 
-      svc = double_class.new(canned_text: {
+      svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "First Invention!!" },
         "pattern"     => { "title" => "t", "concept" => "Second Invention!!" }
-      }.to_json)
+      ).to_json)
 
       allow(Rails.logger).to receive(:warn)
 
@@ -1046,7 +1058,7 @@ RSpec.describe AiService do
 
   describe "#generate_exercise" do
     it "shuffles parsons_problem blocks into a non-identity display_order" do
-      set = { "parsons_problem" => { "blocks" => %w[a b c d e] } }
+      set = full_problem_set("parsons_problem" => { "blocks" => %w[a b c d e] })
       svc = double_class.new(canned_text: set.to_json)
 
       result = svc.generate_exercise(user)
@@ -1057,7 +1069,11 @@ RSpec.describe AiService do
     end
 
     it "leaves problem sets without a parsons_problem section untouched" do
-      set = { "code_review" => { "concept" => "n_plus_one" } }
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:plan_review)
+      allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => {},
+              "architecture" => {}, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
 
       result = svc.generate_exercise(user)
@@ -1073,7 +1089,7 @@ RSpec.describe AiService do
     end
 
     it "logs usage and normalizes concepts from the provider's response using the resolved language" do
-      set = { "code_review" => { "concept" => "bogus" } }
+      set = full_problem_set("code_review" => { "concept" => "bogus" })
       svc = double_class.new(canned_text: set.to_json, input_tokens: 5, output_tokens: 7)
 
       result = svc.generate_exercise(user)
@@ -1086,7 +1102,7 @@ RSpec.describe AiService do
     end
 
     it "normalizes against the JS vocabulary when an explicit javascript language is passed" do
-      set = { "code_review" => { "concept" => "closures" } }
+      set = full_problem_set("code_review" => { "concept" => "closures" })
       svc = double_class.new(canned_text: set.to_json)
 
       result = svc.generate_exercise(user, language: "javascript")
@@ -1096,7 +1112,7 @@ RSpec.describe AiService do
 
     it "defaults language to the user's language_for_today when not passed explicitly" do
       user.update!(language: "javascript")
-      set = { "code_review" => { "concept" => "closures" } }
+      set = full_problem_set("code_review" => { "concept" => "closures" })
       svc = double_class.new(canned_text: set.to_json)
 
       result = svc.generate_exercise(user)
@@ -1105,7 +1121,7 @@ RSpec.describe AiService do
     end
 
     it "threads the rolled third-section kind into the exercise prompt" do
-      set = { "code_review" => { "concept" => "n_plus_one" } }
+      set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = double_class.new(canned_text: set.to_json)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:architecture)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
@@ -1149,7 +1165,7 @@ RSpec.describe AiService do
           result
         end
       end
-      set = { "code_review" => { "concept" => "n_plus_one" } }
+      set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = spy_class.new(canned_text: set.to_json)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(:challenge)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
@@ -1191,7 +1207,7 @@ RSpec.describe AiService do
             result
           end
         end
-        svc = spy_class.new(canned_text: { "code_review" => { "concept" => "n_plus_one" } }.to_json)
+        svc = spy_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" }).to_json)
         allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_return(third)
         allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
         allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
@@ -1249,7 +1265,7 @@ RSpec.describe AiService do
 
     it "logs offered and honored when the model used the due concept" do
       due_mastery
-      set = { "code_review" => { "concept" => "memoization" } }
+      set = full_problem_set("code_review" => { "concept" => "memoization" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -1260,7 +1276,7 @@ RSpec.describe AiService do
 
     it "logs an empty honored list when the model ignored the due concept" do
       due_mastery
-      set = { "code_review" => { "concept" => "n_plus_one" } }
+      set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -1270,7 +1286,7 @@ RSpec.describe AiService do
     end
 
     it "logs nothing when no check is due" do
-      set = { "code_review" => { "concept" => "n_plus_one" } }
+      set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -1285,7 +1301,7 @@ RSpec.describe AiService do
       user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 2)
-      set = { "plan_review" => { "concept" => "scope_creep" } }
+      set = full_problem_set("plan_review" => { "concept" => "scope_creep" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::THIRD_SECTION_WEIGHTS).and_call_original
@@ -1305,7 +1321,7 @@ RSpec.describe AiService do
 
   describe "difficulty diagnostics instrumentation" do
     it "logs what was requested and what was delivered on every generation" do
-      set = { "code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" } }
+      set = full_problem_set("code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([ { concept: "n_plus_one", tier: "reduced" } ])
 
@@ -1342,7 +1358,7 @@ RSpec.describe AiService do
       user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
                                      mastered_at: 2.months.ago, retention_interval_days: 14,
                                      next_retention_check_on: Date.current + 5)
-      set = { "code_review" => { "concept" => "memoization" } }
+      set = full_problem_set("code_review" => { "concept" => "memoization" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -1362,12 +1378,12 @@ RSpec.describe AiService do
     # only place the ambiguity hunt's answer key could reach log storage.
     it "redacts the ambiguity hunt's planted answer key from the delivered payload" do
       planted = Array.new(ExerciseSection::AmbiguityHunt::PLANTED_COUNT) { |i| "secret ambiguity #{i}" }
-      set = {
+      set = full_problem_set(
         "code_review"    => { "concept" => "n_plus_one" },
         "ambiguity_hunt" => { "concept" => "missing_success_criteria",
                               "request" => "Build us a leaderboard",
                               "planted_ambiguities" => planted }
-      }
+      )
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -1397,7 +1413,7 @@ RSpec.describe AiService do
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_call_original
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
 
-      set = { "code_review" => { "concept" => "missing_index" } }
+      set = full_problem_set("code_review" => { "concept" => "missing_index" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
@@ -1637,7 +1653,7 @@ RSpec.describe AiService do
     end
 
     it "sends the generation call with the long generation budget" do
-      svc = double_class.new
+      svc = double_class.new(canned_text: full_problem_set.to_json)
       svc.generate_exercise(user)
 
       expect(svc.last_read_timeout).to eq(AiService::GENERATION_READ_TIMEOUT)
@@ -1647,7 +1663,7 @@ RSpec.describe AiService do
     # holds a Puma thread with a user waiting on the response. It needs more
     # room than a section review and much less than the worker's.
     it "tightens the budget when a request thread is blocked on the call" do
-      svc = double_class.new
+      svc = double_class.new(canned_text: full_problem_set.to_json)
       svc.generate_exercise(user, blocking: true)
 
       expect(svc.last_read_timeout).to eq(AiService::SYNC_GENERATION_READ_TIMEOUT)
@@ -2301,7 +2317,7 @@ RSpec.describe AiService do
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::FOURTH_SECTION_WEIGHTS).and_return(:ambiguity_hunt)
       allow(DailyPlan).to receive(:roll_weighted).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
-      svc = double_class.new(canned_text: {
+      svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },
         "pattern"     => { "question" => "q", "concept" => "memoization" },
         "challenge"   => { "question" => "q", "concept" => "idempotency" },
@@ -2310,7 +2326,7 @@ RSpec.describe AiService do
           "planted_ambiguities" => [ "a", "b", "c", "d" ],
           "question" => "q", "concept" => "missing_success_criteria"
         }
-      }.to_json)
+      ).to_json)
 
       problem_set = svc.generate_exercise(user)
       expect(problem_set).to have_key("ambiguity_hunt")

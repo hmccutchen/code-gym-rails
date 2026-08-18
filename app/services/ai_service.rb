@@ -375,7 +375,9 @@ class AiService
     )
 
     ingested = ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "problem set"), language: language
+      parse_json_object(result[:text], subject: "problem set"),
+      language: language,
+      expected_keys: ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth).map(&:key)
     )
     problem_set = ingested.problem_set
     # After ingest, never during: ingest writes nothing and raises on an
