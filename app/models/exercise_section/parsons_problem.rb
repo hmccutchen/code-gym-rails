@@ -34,6 +34,13 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # extension seam, an injected collaborator, and a composed object are
     # structural judgments a permutation score cannot measure at all.
     #
+    # The module-design concepts fail on that same axis. A shallow module, a
+    # pass-through method, and a temporally decomposed flow are all judgments
+    # about what an interface hides, and a permutation score measures where
+    # lines sit rather than what a boundary costs — temporal_decomposition
+    # especially, whose whole point is that a correct execution order is not
+    # evidence of a correct module boundary.
+    #
     # unsafe_migration is the arguable exception: backfill-then-constrain has a
     # genuinely correct step order, which is exactly this format's shape. It is
     # excluded anyway, because the case for it is really evidence that
@@ -42,7 +49,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # grouping it with them, not to special-case one consumer. Revisit here if
     # that regrouping ever happens.
     def excluded_vocabulary_keys
-      [ :data_modeling, :meta_skill, :code_smell, :oo_design ]
+      [ :data_modeling, :meta_skill, :code_smell, :oo_design, :module_design ]
     end
 
     # The answer is an ordering, not prose: a draggable, keyboard-reorderable

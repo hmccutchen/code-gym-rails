@@ -210,13 +210,35 @@ class AiService
     open_closed dependency_inversion composition_over_inheritance
   ].freeze
 
+  # The cost of an interface rather than a defect in what it computes: the code
+  # smells name a shape, the design principles name a rule, and the language
+  # vocabularies name a remedy, but nothing named what a module's interface
+  # charges every caller who uses it. Diagnostic rather than situational —
+  # "does this module hide more than it asks you to learn?" is askable of
+  # almost any snippet, which is the same filter that made the design
+  # principles a better fit here than a pattern catalog.
+  #
+  # Two candidates were cut rather than shipped as twins. information_leakage
+  # is shotgun_surgery named from the cause side and generates the same
+  # section, and coupling_cohesion already carries the architecture-level
+  # version; special_general_mixture's findable violation is the same
+  # conditional an open_closed section shows.
+  #
+  # Shared across both languages because each means the same thing in a Rails
+  # class and a React component, and deliberately outside
+  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code.
+  MODULE_DESIGN_CONCEPTS = %w[
+    shallow_module pass_through_method temporal_decomposition
+  ].freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
+    MODULE_DESIGN_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -225,7 +247,8 @@ class AiService
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
+    MODULE_DESIGN_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -249,11 +272,18 @@ class AiService
   # RAILS_CONCEPTS/JS_CONCEPTS this is NOT tied to the user's language: these
   # concepts transcend any one stack. Used only by the architecture third
   # section and its concept references (pseudo-language "architecture").
+  #
+  # cognitive_load and unknown_unknowns are causes of complexity rather than
+  # decisions, and they sit here rather than in the language vocabularies
+  # because what they cost is only visible across a whole design.
+  # change_amplification was cut with them: it is coupling_cohesion's symptom
+  # at this altitude, and shotgun_surgery already carries the code-level
+  # version in both language vocabularies.
   ARCHITECTURE_CONCEPTS = %w[
     sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
     caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
     api_versioning event_driven_vs_request_response data_ownership
-    idempotency_at_scale observability_tradeoffs
+    idempotency_at_scale observability_tradeoffs cognitive_load unknown_unknowns
   ].freeze
 
   # Vocabulary for the plan_review fourth-slot kind. Entirely disjoint from
@@ -1009,6 +1039,7 @@ class AiService
       #{meta_skill_framing_guidance}
       #{code_smell_naming_guidance}
       #{oo_design_violation_guidance}
+      #{module_design_depth_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1097,6 +1128,27 @@ class AiService
       "starter_code violates the principle — a behavior that cannot be tested without reaching through a " \
       "hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies " \
       "it, so writing the corrected design IS the answer rather than describing it."
+  end
+
+  # Depth is a property of an interface, not a defect in a result, which makes
+  # this the group most able to produce a section with nothing missable in it —
+  # the same failure oo_design_violation_guidance and meta_skill_framing_guidance
+  # each guard against, since code_review and challenge carry no
+  # section_grading_note and the generic rubric has nothing to put in "missed".
+  # Stated once for every section, like the other four group rules, because it
+  # is a rule about the concept and not about any one kind.
+  def module_design_depth_guidance
+    "- The module-design concepts (#{MODULE_DESIGN_CONCEPTS.join(', ')}) name what a module's interface costs " \
+      "every caller, not a bug in what it computes. A section tagged with one must contain exactly one specific, " \
+      "findable instance of that shape and be gradeable against it, and the answer is naming the instance and " \
+      "saying which future change its interface makes expensive, rather than a rewrite of the module. Express it " \
+      "in the host section's own idiom: a code_review tagged pass_through_method shows a method whose entire body " \
+      "forwards its arguments to one collaborator; a pattern, which shows no code, describes a module's interface " \
+      "and asks what it actually hides and what it forces every caller to know anyway. The challenge section is " \
+      "the exception to the answer shape, since its answer is code: there the starter_code exhibits the shape — " \
+      "for temporal_decomposition, a flow split into objects that exist only because they run in that order — and " \
+      "the question asks for the version organized around information instead, so writing the deeper module IS " \
+      "the answer rather than describing it."
   end
 
   # A kind's generation instructions. The vocabulary comes from

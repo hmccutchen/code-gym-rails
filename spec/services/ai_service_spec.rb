@@ -209,8 +209,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 35-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(35)
+    it "is a frozen 38-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(38)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -229,8 +229,8 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 37-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(37)
+    it "is a frozen 40-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(40)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -361,6 +361,78 @@ RSpec.describe AiService do
     end
   end
 
+  describe "MODULE_DESIGN_CONCEPTS" do
+    it "names the three module-design shapes that survived the overlap filter" do
+      expect(AiService::MODULE_DESIGN_CONCEPTS)
+        .to contain_exactly("shallow_module", "pass_through_method", "temporal_decomposition")
+      expect(AiService::MODULE_DESIGN_CONCEPTS).to be_frozen
+    end
+
+    it "is reachable from both language vocabularies" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::MODULE_DESIGN_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::MODULE_DESIGN_CONCEPTS)
+    end
+
+    # information_leakage is shotgun_surgery named from the cause side and
+    # generates the same section; special_general_mixture's findable violation
+    # is the conditional an open_closed section already shows. Both were cut
+    # rather than shipped as twins, on the precedent that cut
+    # single_responsibility from OO_DESIGN_CONCEPTS.
+    it "omits the candidates that duplicated an existing concept" do
+      %w[information_leakage special_general_mixture].each do |cut|
+        expect(AiService::RAILS_CONCEPTS).not_to include(cut)
+        expect(AiService::JS_CONCEPTS).not_to include(cut)
+      end
+    end
+
+    it "stays out of the language-agnostic vocabularies, so its references show real code" do
+      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
+        expect(vocabulary).not_to include(*AiService::MODULE_DESIGN_CONCEPTS)
+      end
+    end
+  end
+
+  describe "#module_design_depth_guidance" do
+    let(:user) { User.create!(email: "modules@example.com", name: "Modules") }
+    let(:service) { FakeService.new("fake-key") }
+
+    it "names the group from the constant" do
+      expect(service.send(:module_design_depth_guidance)).to include(*AiService::MODULE_DESIGN_CONCEPTS)
+    end
+
+    # Depth is a property of an interface rather than a defect in a result, so
+    # this is the group most able to produce a section with nothing missable in
+    # it — and code_review and challenge are graded by the generic rubric,
+    # which then has nothing to put in "missed".
+    it "requires one findable instance the section can be graded against" do
+      guidance = service.send(:module_design_depth_guidance)
+
+      expect(guidance).to match(/exactly one specific, findable/i)
+      expect(guidance).to match(/gradeable/i)
+    end
+
+    it "asks the discussion sections for the shape named rather than rewritten" do
+      expect(service.send(:module_design_depth_guidance)).to match(/rather than a rewrite/i)
+    end
+
+    # challenge draws the full language vocabulary, and its schema asks what to
+    # implement with a code answer. A blanket "never rewrite" would hand the
+    # provider a coding exercise whose answer must not be code.
+    it "gives challenge a deepened-module shape rather than a prose answer" do
+      guidance = service.send(:module_design_depth_guidance)
+
+      expect(guidance).to match(/challenge section is the exception/i)
+      expect(guidance).to match(/writing the deeper module IS the answer/i)
+    end
+
+    it "is stated once in the generation prompt, for every section rather than per kind" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+
+      expect(prompt).to include(service.send(:module_design_depth_guidance))
+      expect(prompt.scan("The module-design concepts").size).to eq(1)
+    end
+  end
+
   describe "TYPESCRIPT_FLAVORED_CONCEPTS" do
     it "is a frozen 4-entry subset of JS_CONCEPTS" do
       expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.size).to eq(4)
@@ -417,8 +489,8 @@ RSpec.describe AiService do
   end
 
   describe "ARCHITECTURE_CONCEPTS" do
-    it "is a frozen 13-entry language-independent vocabulary" do
-      expect(AiService::ARCHITECTURE_CONCEPTS.size).to eq(13)
+    it "is a frozen 15-entry language-independent vocabulary" do
+      expect(AiService::ARCHITECTURE_CONCEPTS.size).to eq(15)
       expect(AiService::ARCHITECTURE_CONCEPTS).to be_frozen
       expect(AiService::ARCHITECTURE_CONCEPTS).to include("service_boundaries", "failure_mode_design", "idempotency_at_scale")
     end
@@ -426,6 +498,16 @@ RSpec.describe AiService do
     it "is not mixed into any per-language generation vocabulary" do
       expect(AiService::RAILS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
       expect(AiService::JS_CONCEPTS & AiService::ARCHITECTURE_CONCEPTS).to be_empty
+    end
+
+    # Chapter 2's causes of complexity, at the level the architecture section
+    # already asks about. change_amplification was cut with them: it is
+    # coupling_cohesion's symptom at the same altitude, and shotgun_surgery
+    # already carries the code-level version in both language vocabularies —
+    # which the disjointness rule above exists to keep from happening.
+    it "carries the two complexity causes that duplicate no existing entry" do
+      expect(AiService::ARCHITECTURE_CONCEPTS).to include("cognitive_load", "unknown_unknowns")
+      expect(AiService::ARCHITECTURE_CONCEPTS).not_to include("change_amplification")
     end
   end
 
