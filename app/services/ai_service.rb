@@ -1139,7 +1139,9 @@ class AiService
       "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
       "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
       "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
-      "costs. The challenge section is the exception to the answer shape, since its answer is code: there the " \
+      "costs; on a test-file code_review, a dependency_inversion violation is a test that can only reach its " \
+      "subject by stubbing one hard-coded collaborator, so the test smell and the broken rule are the same fact. " \
+      "The challenge section is the exception to the answer shape, since its answer is code: there the " \
       "starter_code violates the principle — a behavior that cannot be tested without reaching through a " \
       "hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies " \
       "it, so writing the corrected design IS the answer rather than describing it."

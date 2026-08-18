@@ -353,6 +353,14 @@ RSpec.describe AiService do
       expect(guidance).to match(/writing the corrected design IS the answer/i)
     end
 
+    # A test-file code_review must also exhibit a real test smell, and these
+    # concepts are selectable there, so without this the provider gets two
+    # instructions and no stated way to satisfy both (issue #114). The other
+    # two group rules already carry the clause.
+    it "says what the violation looks like on a test-file code_review" do
+      expect(service.send(:oo_design_violation_guidance)).to match(/test-file code_review/i)
+    end
+
     it "is stated once in the generation prompt, for every section rather than per kind" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
 
