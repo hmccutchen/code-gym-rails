@@ -121,5 +121,57 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
       { mismatches: mismatches, rating: rating }
     end
+
+    # No answer line: the submitted ordering is scored in Ruby against the
+    # stored blocks (see .grade) and handed to the reviewer already graded, so
+    # the raw "order:2,1" string would tell it nothing it can read as prose.
+    def review_context(section:, answer:, rating:)
+      <<~CONTEXT.chomp
+        Parsons Problem (#{section["title"]}): #{section["question"]}
+        Their self-rating: #{rating.presence || '(none given)'}
+      CONTEXT
+    end
+
+    # A provider can return a parsons_problem object with no "blocks" — that
+    # still resolves as the third section (resolution only checks for a Hash),
+    # but there is nothing to score against, so the prompt must not claim a
+    # verified count. Grading is skipped entirely in that case rather than
+    # reporting the grader's degenerate "0 out of place".
+    def grading_note(section:, answer:)
+      blocks = Array(section["blocks"])
+
+      if blocks.empty?
+        return <<~UNVERIFIED.chomp
+          This section's blocks are missing from the stored exercise, so the submitted ordering CANNOT be verified. Do not state or imply how many blocks were misplaced, and do not rate this section's correctness — say only that the exercise data is unavailable.
+          For this section "improved_code" must be an empty string.
+        UNVERIFIED
+      end
+
+      submitted = parse_order(answer)
+
+      <<~PARSONS.chomp
+        Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
+        What they misplaced: #{describe_mismatches(blocks, submitted)}
+        Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{grade(submitted, blocks.size)[:mismatches]} block(s) out of place.
+
+        Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
+        For this section "improved_code" must be an empty string.
+      PARSONS
+    end
+
+    # The ground truth the review prompt hands the model, so it explains a
+    # known result rather than judging one. Padding mirrors .grade so a short
+    # or skipped submission describes rather than raises.
+    def describe_mismatches(blocks, submitted_ids)
+      return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
+
+      padded = Array.new(blocks.size) { |i| submitted_ids[i] }
+      descriptions = padded.each_index.filter_map { |i|
+        next if padded[i] == i
+        got = valid_id?(padded[i], blocks.size) ? "\"#{blocks[padded[i]]}\"" : "(nothing submitted)"
+        "position #{i + 1} has #{got} (correct block there: \"#{blocks[i]}\")"
+      }
+      descriptions.any? ? descriptions.join("; ") : "exact match — no blocks misplaced"
+    end
   end
 end

@@ -153,6 +153,27 @@ class ExerciseSection
       raise NotImplementedError, "#{self} must implement .schema_fragment"
     end
 
+    # This kind's block in the review prompt's day context: what was asked, the
+    # material it was asked about, and what the engineer said. Abstract rather
+    # than defaulted — a kind that returns nothing here produces a review
+    # missing a section's context with no signal that anything went wrong.
+    def review_context(section:, answer:, rating:)
+      raise NotImplementedError, "#{self} must implement .review_context"
+    end
+
+    def answer_lines(answer, rating)
+      "Their answer: #{answer.presence || '(skipped)'}\n" \
+      "Their self-rating: #{rating.presence || '(none given)'}"
+    end
+
+    # What the reviewer needs beyond the generic rubric to grade this kind —
+    # how to weigh the answer, and what its improved_code must hold. Defaulted
+    # rather than abstract: the generic rubric grades most kinds on its own,
+    # and a kind with nothing extra to say should not have to say so.
+    def grading_note(section:, answer:)
+      ""
+    end
+
     # The generation prompt's instruction block for this kind — how to write
     # it, and which vocabulary its concept comes from. Every kind states its
     # own vocabulary and none speaks for another, which is what keeps the

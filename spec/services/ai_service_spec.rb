@@ -1584,21 +1584,60 @@ RSpec.describe AiService do
 
       expect(exercise.fourth_key).to be_nil
       context = service.send(:build_review_day_context, "Rails", exercise, resp)
-      expect(service.send(:fourth_context_summary, exercise, resp.answers, resp.section_ratings)).to eq("")
       expect(context).not_to match(/plan review|ambiguity hunt/i)
     end
   end
 
-  describe "#section_grading_note for the fourth-slot kinds" do
+  describe "#build_review_day_context" do
+    let(:user) { User.create!(email: "review@example.com", name: "Review") }
+    let(:service) { FakeService.new("fake-key") }
+
+    def exercise_with(problem_set)
+      DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails",
+                            generated_at: Time.current, problem_set: problem_set)
+    end
+
+    it "does not raise when the day has no pattern section" do
+      exercise = exercise_with(
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "challenge"   => { "question" => "c" }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                       answers: { "code_review" => "a" })
+
+      expect { service.send(:build_review_day_context, "Rails", exercise, response) }.not_to raise_error
+    end
+
+    it "states the real section count rather than four" do
+      exercise = exercise_with(
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "challenge"   => { "question" => "c" }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      context = service.send(:build_review_day_context, "Rails", exercise, response)
+
+      expect(context).to include("the day's 2 sections")
+      expect(context).not_to include("four sections")
+    end
+  end
+
+  describe "grading notes for the fourth-slot kinds" do
     it "instructs grading against the planted list for ambiguity_hunt" do
-      note = service.send(:section_grading_note, nil, nil, "ambiguity_hunt")
+      note = ExerciseSection::AmbiguityHunt.grading_note(section: {}, answer: nil)
       expect(note).to match(/planted/i)
       expect(note).to match(/empty string/i)
     end
 
     it "instructs evaluating pushback quality and a revised plan for plan_review" do
-      note = service.send(:section_grading_note, nil, nil, "plan_review")
+      note = ExerciseSection::PlanReview.grading_note(section: {}, answer: nil)
       expect(note).to match(/revised/i)
+    end
+
+    # The registry answers every per-kind question; a kind with nothing extra
+    # to say gets the generic rubric rather than a branch at the call site.
+    it "is empty for a kind the generic rubric already grades" do
+      expect(ExerciseSection::Challenge.grading_note(section: {}, answer: nil)).to eq("")
     end
   end
 

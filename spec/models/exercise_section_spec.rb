@@ -818,4 +818,82 @@ RSpec.describe ExerciseSection do
       end
     end
   end
+
+  describe ".review_context" do
+    it "is required of every kind" do
+      expect { ExerciseSection.review_context(section: {}, answer: nil, rating: nil) }
+        .to raise_error(NotImplementedError, /must implement/)
+    end
+  end
+
+  describe ".answer_lines" do
+    it "marks an absent answer and rating rather than rendering blanks" do
+      expect(ExerciseSection.answer_lines(nil, nil))
+        .to eq("Their answer: (skipped)\nTheir self-rating: (none given)")
+    end
+  end
+
+  describe "grading note per kind" do
+    it "answers for every registered kind, so no caller has to branch on section" do
+      ExerciseSection.all.each do |kind|
+        note = kind.grading_note(section: {}, answer: nil)
+        expect(note).to be_a(String), "#{kind}.grading_note did not return a String"
+      end
+    end
+
+    it "grounds parsons in the verified mismatch count rather than the raw answer" do
+      note = ExerciseSection::ParsonsProblem.grading_note(
+        section: { "blocks" => %w[a b c d e] }, answer: "order:0,2,1,3,4"
+      )
+
+      expect(note).to match(/2 block\(s\) out of place/)
+      expect(note).to include("Correct blocks, in order:")
+    end
+
+    it "refuses to claim a verified parsons result with no stored blocks" do
+      note = ExerciseSection::ParsonsProblem.grading_note(section: {}, answer: "order:1,0")
+
+      expect(note).to include("CANNOT be verified")
+      expect(note).not_to match(/block\(s\) out of place/)
+    end
+  end
+
+  describe "review context per kind" do
+    it "is implemented by every registered kind" do
+      ExerciseSection.all.each do |kind|
+        expect { kind.review_context(section: {}, answer: "a", rating: "right_level") }
+          .not_to raise_error, "#{kind} does not implement .review_context"
+      end
+    end
+
+    it "gives parsons no answer line, since the ordering is scored in Ruby rather than read" do
+      context = ExerciseSection::ParsonsProblem.review_context(
+        section: { "title" => "Restock", "question" => "Order these" },
+        answer: "order:2,1", rating: "right_level"
+      )
+
+      expect(context).to include("Restock", "Order these", "right_level")
+      expect(context).not_to include("Their answer:")
+    end
+
+    it "carries the ambiguity hunt's hidden answer key, which is what coverage is graded against" do
+      context = ExerciseSection::AmbiguityHunt.review_context(
+        section: { "title" => "Sharing", "question" => "What's unclear?",
+                   "request" => "Let users share things",
+                   "planted_ambiguities" => [ "which things", "with whom" ] },
+        answer: "who can see it", rating: nil
+      )
+
+      expect(context).to include("which things", "with whom")
+    end
+
+    it "shows the code under review for code_review" do
+      context = ExerciseSection::CodeReview.review_context(
+        section: { "question" => "What's wrong?", "snippet" => "User.all.each" },
+        answer: "n+1", rating: "too_hard"
+      )
+
+      expect(context).to include("What's wrong?", "User.all.each", "n+1", "too_hard")
+    end
+  end
 end

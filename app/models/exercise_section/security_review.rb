@@ -32,4 +32,18 @@ class ExerciseSection::SecurityReview < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Security Review (#{section["title"]}): #{section["question"]}
+      Snippet: #{section["snippet"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
+
+  def self.grading_note(section:, answer:)
+    "Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their " \
+    "proposed mitigation is sound — not against one single expected answer. Give partial credit in " \
+    "\"missed\" for identifying the vulnerability without a complete mitigation, or vice versa."
+  end
 end

@@ -720,51 +720,6 @@ class AiService
     ProblemSetIngest.selectable_vocabulary_for(section_key, cm.language, mode: mode).include?(cm.concept)
   end
 
-  # A provider can return a parsons_problem object with no "blocks" — that
-  # still resolves as the third section (third_key only checks for a Hash), but
-  # there is nothing to score against, so the prompt must not claim a verified
-  # count. Grading is skipped entirely in that case rather than reporting the
-  # grader's degenerate "0 out of place".
-  def parsons_review_block(parsons, answer)
-    blocks = Array(parsons["blocks"])
-    header = "Parsons Problem (#{parsons["title"]}): #{parsons["question"]}"
-
-    if blocks.empty?
-      return <<~UNVERIFIED.chomp
-        #{header}
-        This section's blocks are missing from the stored exercise, so the submitted ordering CANNOT be verified. Do not state or imply how many blocks were misplaced, and do not rate this section's correctness — say only that the exercise data is unavailable.
-        For this section "improved_code" must be an empty string.
-      UNVERIFIED
-    end
-
-    submitted = ExerciseSection::ParsonsProblem.parse_order(answer)
-    graded    = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)
-
-    <<~PARSONS.chomp
-      #{header}
-      Correct blocks, in order: #{blocks.each_with_index.map { |b, i| "#{i + 1}. #{b}" }.join(" / ")}
-      What they misplaced: #{describe_parsons_mismatches(blocks, submitted)}
-      Verified result (already scored in Ruby — do not re-judge correctness or propose a different rating): #{graded[:mismatches]} block(s) out of place.
-
-      Explain WHY the misplaced blocks belong where they do — cite the actual dependency or logical reason (e.g. "this block uses a variable an earlier block declares, so it must come after it"), grounded strictly in the verified result above. Do not output a "rating" judgement of your own for this section; the rating is fixed by the verified result, not by you.
-      For this section "improved_code" must be an empty string.
-    PARSONS
-  end
-
-  # The ground truth the review prompt hands the model, so it explains a known
-  # result rather than judging one. Padding mirrors ParsonsProblem.grade so a
-  # short or skipped submission describes rather than raises.
-  def describe_parsons_mismatches(blocks, submitted_ids)
-    return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
-    padded = Array.new(blocks.size) { |i| submitted_ids[i] }
-    descriptions = padded.each_index.filter_map { |i|
-      next if padded[i] == i
-      got = ExerciseSection::ParsonsProblem.valid_id?(padded[i], blocks.size) ? "\"#{blocks[padded[i]]}\"" : "(nothing submitted)"
-      "position #{i + 1} has #{got} (correct block there: \"#{blocks[i]}\")"
-    }
-    descriptions.any? ? descriptions.join("; ") : "exact match — no blocks misplaced"
-  end
-
   # Delivery is advisory, so the only way to know whether retention checks actually
   # land is to record both halves. Logged after ingest so it reflects
   # the concepts actually persisted, not whatever the provider first returned.
@@ -1148,76 +1103,22 @@ class AiService
     )
   end
 
-  # Mirrors the pattern-section `reference` shape so both render identically.
   def build_review_day_context(coach, exercise, daily_response)
+    keys    = exercise.active_section_keys
     answers = daily_response.answers
     ratings = daily_response.section_ratings
 
+    sections = keys.map do |key|
+      ExerciseSection.for(key).review_context(
+        section: exercise.problem_set[key], answer: answers[key], rating: ratings[key]
+      )
+    end
+
     <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's four sections in a follow-up instruction — the other three are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
+      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — the rest are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
 
-      Code Review question: #{exercise.code_review["question"]}
-      Code snippet: #{exercise.code_review["snippet"]}
-      Their answer: #{answers["code_review"].presence || "(skipped)"}
-      Their self-rating: #{ratings["code_review"] || "(none given)"}
-
-      Pattern question (#{exercise.pattern["title"]}): #{exercise.pattern["question"]}
-      Their answer: #{answers["pattern"].presence || "(skipped)"}
-      Their self-rating: #{ratings["pattern"] || "(none given)"}
-
-      #{third_context_summary(exercise, answers, ratings)}
-
-      #{fourth_context_summary(exercise, answers, ratings)}
+      #{sections.join("\n\n")}
     CONTEXT
-  end
-
-  def third_context_summary(exercise, answers, ratings)
-    case exercise.third_key
-    when "architecture"
-      arch = exercise.architecture
-      "Architecture decision (#{arch["title"]}): #{arch["question"]}\n" \
-      "Scenario/constraints: #{arch["scenario"]}\n" \
-      "Their answer: #{answers["architecture"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["architecture"] || "(none given)"}"
-    when "security_review"
-      sec = exercise.security_review
-      "Security Review (#{sec["title"]}): #{sec["question"]}\n" \
-      "Snippet: #{sec["snippet"]}\n" \
-      "Their answer: #{answers["security_review"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["security_review"] || "(none given)"}"
-    when "parsons_problem"
-      parsons = exercise.parsons_problem
-      "Parsons Problem (#{parsons["title"]}): #{parsons["question"]}\n" \
-      "Their self-rating: #{ratings["parsons_problem"] || "(none given)"}"
-    else
-      "Coding Challenge: #{exercise.challenge["question"]}\n" \
-      "Their answer: #{answers["challenge"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["challenge"] || "(none given)"}"
-    end
-  end
-
-  # Contributes nothing (empty string) for an old exercise with no fourth-slot
-  # key — exercise.fourth_key is nil there, and the CONTEXT heredoc above
-  # simply gets a blank line, matching how every other nil-safe read in this
-  # method already degrades for pre-this-ship rows.
-  def fourth_context_summary(exercise, answers, ratings)
-    case exercise.fourth_key
-    when "ambiguity_hunt"
-      ah = exercise.ambiguity_hunt
-      "Ambiguity Hunt (#{ah["title"]}): #{ah["question"]}\n" \
-      "Request: #{ah["request"]}\n" \
-      "Planted ambiguities (hidden from the engineer, known here for grading): #{Array(ah["planted_ambiguities"]).join('; ')}\n" \
-      "Their answer: #{answers["ambiguity_hunt"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["ambiguity_hunt"] || "(none given)"}"
-    when "plan_review"
-      pr = exercise.plan_review
-      "Plan Review (#{pr["title"]}): #{pr["question"]}\n" \
-      "Plan excerpt: #{pr["plan_excerpt"]}\n" \
-      "Their answer: #{answers["plan_review"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["plan_review"] || "(none given)"}"
-    else
-      ""
-    end
   end
 
   def build_review_section_prompt(exercise, daily_response, section)
@@ -1249,30 +1150,9 @@ class AiService
   end
 
   def section_grading_note(exercise, daily_response, section)
-    case section
-    when "architecture"
-      "Evaluate the architecture answer on the DEPTH of its reasoning, not a single correct answer:\n" \
-      "- Did they weigh real tradeoffs between the options?\n" \
-      "- Did they address the stated constraints (scale, team, reliability, tech debt)?\n" \
-      "- Did they consider alternatives rather than asserting one option?"
-    when "security_review"
-      "Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their " \
-      "proposed mitigation is sound — not against one single expected answer. Give partial credit in " \
-      "\"missed\" for identifying the vulnerability without a complete mitigation, or vice versa."
-    when "parsons_problem"
-      parsons_review_block(exercise.parsons_problem, daily_response.answers["parsons_problem"])
-    when "pattern"
-      "For \"pattern\", improved_code must show the refactored structure that addresses what they missed — " \
-      "the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
-      "structural; show enough of the shape to make the structure obvious."
-    when "ambiguity_hunt"
-      "Grade coverage against the PLANTED ambiguities listed in the context above (the \"Planted ambiguities\" line) — do not invent your own list. In \"missed\", name each planted ambiguity the engineer did not identify. In \"correct\", credit each planted ambiguity they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted.\n" \
-      "For this section \"improved_code\" must be an empty string."
-    when "plan_review"
-      "Evaluate on whether they correctly identified the planted flaws (a technical anti-pattern, a scope-creep item, an unflagged behavior change) and whether their pushback is well-reasoned — not against one exact expected wording. \"improved_code\" for this section is a revised version of the plan that addresses what they missed."
-    else
-      ""
-    end
+    ExerciseSection.for(section).grading_note(
+      section: exercise.problem_set[section] || {}, answer: daily_response.answers[section]
+    )
   end
 
   def build_concept_reference_prompt(concept, config)

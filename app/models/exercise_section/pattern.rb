@@ -42,4 +42,17 @@ class ExerciseSection::Pattern < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Pattern question (#{section["title"]}): #{section["question"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
+
+  def self.grading_note(section:, answer:)
+    "For \"pattern\", improved_code must show the refactored structure that addresses what they missed — " \
+    "the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
+    "structural; show enough of the shape to make the structure obvious."
+  end
 end

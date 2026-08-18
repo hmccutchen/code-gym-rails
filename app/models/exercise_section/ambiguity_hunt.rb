@@ -13,7 +13,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
   # What the planted list is bounded to on ingest, as opposed to what the
   # prompt asks for. PLANTED_COUNT is the generator's target; nothing
   # downstream reads it, since the review prompt lists the ambiguities rather
-  # than counting them (see AiService#fourth_context_summary). So a provider
+  # than counting them (see .review_context below). So a provider
   # that lands on 3 or 5 has still produced a gradable section, and only the
   # runaway case needs bounding — this is provider text going into another
   # prompt.
@@ -52,5 +52,19 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
           "concept": "string — exactly one concept from the provided vocabulary"
         }
     SCHEMA
+  end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Ambiguity Hunt (#{section["title"]}): #{section["question"]}
+      Request: #{section["request"]}
+      Planted ambiguities (hidden from the engineer, known here for grading): #{Array(section["planted_ambiguities"]).join('; ')}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
+
+  def self.grading_note(section:, answer:)
+    "Grade coverage against the PLANTED ambiguities listed in the context above (the \"Planted ambiguities\" line) — do not invent your own list. In \"missed\", name each planted ambiguity the engineer did not identify. In \"correct\", credit each planted ambiguity they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted.\n" \
+    "For this section \"improved_code\" must be an empty string."
   end
 end
