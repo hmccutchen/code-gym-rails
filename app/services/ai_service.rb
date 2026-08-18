@@ -231,6 +231,14 @@ class AiService
     shallow_module pass_through_method temporal_decomposition
   ].freeze
 
+  # The groups that name something to find rather than something to choose.
+  # Every lens written for a remedy is wrong for these — see the senior_lens
+  # framing in #build_concept_reference_prompt, whose output is generated once
+  # and cached forever, so a wrong framing never self-corrects. Membership
+  # rather than "every group with a guidance method": the design principles
+  # have one too, and a principle IS something to reach for.
+  ANTI_SHAPE_CONCEPTS = (CODE_SMELL_CONCEPTS + MODULE_DESIGN_CONCEPTS).freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
@@ -1143,8 +1151,10 @@ class AiService
       "findable instance of that shape and be gradeable against it, and the answer is naming the instance and " \
       "saying which future change its interface makes expensive, rather than a rewrite of the module. Express it " \
       "in the host section's own idiom: a code_review tagged pass_through_method shows a method whose entire body " \
-      "forwards its arguments to one collaborator; a pattern, which shows no code, describes a module's interface " \
-      "and asks what it actually hides and what it forces every caller to know anyway. The challenge section is " \
+      "forwards its arguments to one collaborator; on a test-file code_review, a shallow_module is a test helper " \
+      "whose setup arguments spell out the very state it claims to hide; a pattern, which shows no code, " \
+      "describes a module's interface and asks what it actually hides and what it forces every caller to know " \
+      "anyway. The challenge section is " \
       "the exception to the answer shape, since its answer is code: there the starter_code exhibits the shape — " \
       "for temporal_decomposition, a flow split into objects that exist only because they run in that order — and " \
       "the question asks for the version organized around information instead, so writing the deeper module IS " \
@@ -1243,11 +1253,12 @@ class AiService
         "annotated #{label} code, ~15 lines"
       end
 
-    # A smell is never a technique to choose, so the remedy lens the other
-    # concepts get would have the provider explain when to reach for a god
-    # object. Same membership test the code_example lens above uses.
+    # A shape you find is never a technique to choose, so the remedy lens the
+    # other concepts get would have the provider explain when to reach for a
+    # god object or a shallow module. The design principles deliberately stay
+    # on the remedy lens: open_closed IS something to reach for.
     senior_lens_desc =
-      if CODE_SMELL_CONCEPTS.include?(concept)
+      if ANTI_SHAPE_CONCEPTS.include?(concept)
         "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"
       else
         "when to reach for it / tradeoffs"

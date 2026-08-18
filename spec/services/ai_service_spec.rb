@@ -425,6 +425,13 @@ RSpec.describe AiService do
       expect(guidance).to match(/writing the deeper module IS the answer/i)
     end
 
+    # A test-file code_review must also exhibit a test smell, and these
+    # concepts are selectable there — the same collision #code_smell_naming_guidance
+    # already resolves with one clause.
+    it "says what the shape looks like on a test-file code_review" do
+      expect(service.send(:module_design_depth_guidance)).to match(/test-file code_review/i)
+    end
+
     it "is stated once in the generation prompt, for every section rather than per kind" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
 
@@ -552,6 +559,31 @@ RSpec.describe AiService do
 
       expect(prompt).to include("how to catch it early")
       expect(prompt).not_to include("when to reach for it")
+    end
+
+    # A shallow module is the same kind of thing as a god object: a shape you
+    # find, never one you choose. The reference is generated once and cached
+    # forever (GenerateConceptReferenceJob), so the wrong lens is not
+    # self-correcting.
+    it "reframes senior_lens for a module-design shape, which is never a thing to reach for" do
+      config = service.send(:config_for, "ruby_rails")
+
+      AiService::MODULE_DESIGN_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, config)
+
+        expect(prompt).to include("how to catch it early"), "#{concept} got the remedy lens"
+        expect(prompt).not_to include("when to reach for it")
+      end
+    end
+
+    # The design principles are the counter-case, and why this stays a
+    # membership test rather than "anything in a named group": open_closed IS
+    # something to reach for.
+    it "keeps the remedy framing for a design principle" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "open_closed", config)
+
+      expect(prompt).to include("when to reach for it")
     end
 
     it "keeps the remedy framing for a concept that names a technique" do

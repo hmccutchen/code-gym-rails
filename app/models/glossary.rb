@@ -123,6 +123,7 @@ module Glossary
     "orm" => "Object-Relational Mapping — a library that lets you work with database rows as objects instead of writing raw SQL.",
     "over-mocking" => "Stubbing out so much of the system under test that the test verifies the mocks were called correctly rather than that the real behavior works.",
     "over mocking" => "Stubbing out so much of the system under test that the test verifies the mocks were called correctly rather than that the real behavior works.",
+    "pass-through method" => "A method that does little but forward its arguments to another method with a nearly identical signature, adding an interface to learn without hiding anything.",
     "pass through method" => "A method that does little but forward its arguments to another method with a nearly identical signature, adding an interface to learn without hiding anything.",
     "pessimistic locking" => "Locking a row for the duration of a transaction so no other transaction can touch it, trading concurrency for certainty.",
     "policy object" => "A class that centralizes an authorization decision (can this user do this?) instead of scattering permission checks through controllers.",

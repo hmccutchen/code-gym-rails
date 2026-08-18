@@ -34,6 +34,14 @@ RSpec.describe Glossary do
     expect(Glossary::TERMS.values).to all(be_present)
   end
 
+  # The coverage guard below only tries the underscore_case form, so a term
+  # whose ordinary written spelling is hyphenated needs both keys — TERM_PATTERN
+  # matches literal keys, and generated prose writes "pass-through method".
+  # Same reason "over-mocking"/"over mocking" are both present.
+  it "carries the hyphenated spelling of every term written that way in prose" do
+    expect(Glossary.lookup("pass-through method")).to be_present
+  end
+
   # Regression guard: a user is most likely to search for exactly the words
   # this app already shows them — a concept tag, or its underscore_case form.
   # Catches the class of bug reported in production: "concurrency" (a real
