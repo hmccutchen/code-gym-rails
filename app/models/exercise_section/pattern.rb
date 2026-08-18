@@ -42,4 +42,11 @@ class ExerciseSection::Pattern < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Pattern question (#{section["title"]}): #{section["question"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
 end

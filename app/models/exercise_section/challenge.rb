@@ -32,4 +32,11 @@ class ExerciseSection::Challenge < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Coding Challenge: #{section["question"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
 end

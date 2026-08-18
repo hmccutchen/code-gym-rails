@@ -32,4 +32,12 @@ class ExerciseSection::SecurityReview < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Security Review (#{section["title"]}): #{section["question"]}
+      Snippet: #{section["snippet"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
 end

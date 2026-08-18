@@ -832,4 +832,43 @@ RSpec.describe ExerciseSection do
         .to eq("Their answer: (skipped)\nTheir self-rating: (none given)")
     end
   end
+
+  describe "review context per kind" do
+    it "is implemented by every registered kind" do
+      ExerciseSection.all.each do |kind|
+        expect { kind.review_context(section: {}, answer: "a", rating: "right_level") }
+          .not_to raise_error, "#{kind} does not implement .review_context"
+      end
+    end
+
+    it "gives parsons no answer line, since ordering is graded from display_order" do
+      context = ExerciseSection::ParsonsProblem.review_context(
+        section: { "title" => "Restock", "question" => "Order these" },
+        answer: "order:2,1", rating: "right_level"
+      )
+
+      expect(context).to include("Restock", "Order these", "right_level")
+      expect(context).not_to include("Their answer:")
+    end
+
+    it "carries the ambiguity hunt's hidden answer key, which is what coverage is graded against" do
+      context = ExerciseSection::AmbiguityHunt.review_context(
+        section: { "title" => "Sharing", "question" => "What's unclear?",
+                   "request" => "Let users share things",
+                   "planted_ambiguities" => [ "which things", "with whom" ] },
+        answer: "who can see it", rating: nil
+      )
+
+      expect(context).to include("which things", "with whom")
+    end
+
+    it "shows the code under review for code_review" do
+      context = ExerciseSection::CodeReview.review_context(
+        section: { "question" => "What's wrong?", "snippet" => "User.all.each" },
+        answer: "n+1", rating: "too_hard"
+      )
+
+      expect(context).to include("What's wrong?", "User.all.each", "n+1", "too_hard")
+    end
+  end
 end

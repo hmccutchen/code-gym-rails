@@ -52,4 +52,12 @@ class ExerciseSection::Architecture < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Architecture decision (#{section["title"]}): #{section["question"]}
+      Scenario/constraints: #{section["scenario"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
 end

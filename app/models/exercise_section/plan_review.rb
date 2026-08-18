@@ -50,4 +50,12 @@ class ExerciseSection::PlanReview < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Plan Review (#{section["title"]}): #{section["question"]}
+      Plan excerpt: #{section["plan_excerpt"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
 end

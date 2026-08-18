@@ -47,4 +47,12 @@ class ExerciseSection::CodeReview < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Code Review question: #{section["question"]}
+      Code snippet: #{section["snippet"]}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
 end

@@ -53,4 +53,13 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
         }
     SCHEMA
   end
+
+  def self.review_context(section:, answer:, rating:)
+    <<~CONTEXT.chomp
+      Ambiguity Hunt (#{section["title"]}): #{section["question"]}
+      Request: #{section["request"]}
+      Planted ambiguities (hidden from the engineer, known here for grading): #{Array(section["planted_ambiguities"]).join('; ')}
+      #{answer_lines(answer, rating)}
+    CONTEXT
+  end
 end

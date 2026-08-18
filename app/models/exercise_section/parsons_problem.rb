@@ -121,5 +121,14 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
       { mismatches: mismatches, rating: rating }
     end
+
+    # No answer line: the submitted ordering is graded positionally against
+    # display_order, never read as prose by the reviewer.
+    def review_context(section:, answer:, rating:)
+      <<~CONTEXT.chomp
+        Parsons Problem (#{section["title"]}): #{section["question"]}
+        Their self-rating: #{rating.presence || '(none given)'}
+      CONTEXT
+    end
   end
 end
