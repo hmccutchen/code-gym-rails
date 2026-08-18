@@ -177,6 +177,21 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "section presence" do
+    it "agrees with active_section_keys about what counts as present" do
+      problem_set = {
+        "code_review" => { "question" => "q" },
+        "pattern"     => "not a section",
+        "challenge"   => { "question" => "q" }
+      }
+      exercise = DailyExercise.new(problem_set: problem_set)
+
+      present = problem_set.keys.select { |key| ExerciseSection.present?(problem_set, key) }
+
+      expect(exercise.active_section_keys).to match_array(present)
+    end
+  end
+
   describe "#regenerating?" do
     let(:user) { User.create!(email: "regen-model@example.com", name: "Regen") }
 
