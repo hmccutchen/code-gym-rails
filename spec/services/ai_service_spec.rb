@@ -221,6 +221,25 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#code_smell_naming_guidance" do
+    let(:user) { User.create!(email: "smells@example.com", name: "Smells") }
+    let(:service) { FakeService.new("fake-key") }
+
+    it "names the group from the constant and asks for recognition, not a patch" do
+      guidance = service.send(:code_smell_naming_guidance)
+
+      expect(guidance).to include(*AiService::CODE_SMELL_CONCEPTS)
+      expect(guidance).to match(/naming and locating/i)
+    end
+
+    it "is stated once in the generation prompt" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+
+      expect(prompt.scan("god_object").size).to be >= 1
+      expect(prompt).to include(service.send(:code_smell_naming_guidance))
+    end
+  end
+
   describe "TYPESCRIPT_FLAVORED_CONCEPTS" do
     it "is a frozen 4-entry subset of JS_CONCEPTS" do
       expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.size).to eq(4)

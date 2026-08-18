@@ -1008,6 +1008,7 @@ class AiService
       #{fourth_guidance}
       #{data_modeling_idiom_guidance}
       #{meta_skill_framing_guidance}
+      #{code_smell_naming_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1064,6 +1065,14 @@ class AiService
       "cause; it never asks for an essay about how to debug. Where no code is shown " \
       "(pattern), express the concept against the described design instead: what the " \
       "proposed approach takes for granted, or which layer the real cause sits at."
+  end
+
+  def code_smell_naming_guidance
+    "- The code-smell concepts (#{CODE_SMELL_CONCEPTS.join(', ')}) name a shape to recognize, not a single " \
+      "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
+      "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
+      "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
+      "section's own idiom: on a test-file code_review, a god_object is a bloated test class."
   end
 
   # A kind's generation instructions. The vocabulary comes from
