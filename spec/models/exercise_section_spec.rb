@@ -95,9 +95,9 @@ RSpec.describe ExerciseSection do
     # A sequencing format graded by positional diff can express neither
     # "these columns are modeled wrong" nor "what is this code for" — see the
     # comment on ParsonsProblem.
-    it "withholds both the data-modeling and meta-skill groups from parsons_problem" do
+    it "withholds the data-modeling, meta-skill, and code-smell groups from parsons_problem" do
       expect(ExerciseSection::ParsonsProblem.excluded_vocabulary_keys)
-        .to eq([ :data_modeling, :meta_skill ])
+        .to eq([ :data_modeling, :meta_skill, :code_smell ])
     end
   end
 

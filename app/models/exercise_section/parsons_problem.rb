@@ -31,7 +31,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # grouping it with them, not to special-case one consumer. Revisit here if
     # that regrouping ever happens.
     def excluded_vocabulary_keys
-      [ :data_modeling, :meta_skill ]
+      [ :data_modeling, :meta_skill, :code_smell ]
     end
 
     # The answer is an ordering, not prose: a draggable, keyboard-reorderable
