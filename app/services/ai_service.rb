@@ -188,13 +188,35 @@ class AiService
     god_object primitive_obsession shotgun_surgery feature_envy
   ].freeze
 
+  # The rule underneath the smell: the code smells name a shape to recognize
+  # and the language vocabularies name a remedy, but nothing named the design
+  # principle either one appeals to. Evaluative rather than situational — "does
+  # this violate open/closed?" is askable of almost any snippet, which is what
+  # makes three principles a better fit here than the GoF catalog, whose 22
+  # patterns would nearly double both vocabularies and starve the mastery loop.
+  #
+  # Five candidates were cut rather than shipped as twins. single_responsibility
+  # is god_object named from the rule side and generates the same section;
+  # program_to_interface is dependency_inversion with a less findable violation;
+  # encapsulate_what_varies is open_closed with a blurrier one. Neither
+  # liskov_substitution nor interface_segregation survives the relevance filter
+  # in duck-typed Ruby and hooks-based React, and completing SOLID is not a
+  # reason to carry a concept this app's sections cannot host well.
+  #
+  # Shared across both languages because each means the same thing in a Rails
+  # class and a React component, and deliberately outside
+  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code.
+  OO_DESIGN_CONCEPTS = %w[
+    open_closed dependency_inversion composition_over_inheritance
+  ].freeze
+
   RAILS_CONCEPTS = (%w[
     n_plus_one transaction_safety memoization service_objects scope_chaining
     idempotency authorization background_jobs caching validations
     callbacks_vs_service query_objects policy_objects indexing concurrency
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -203,7 +225,7 @@ class AiService
     controlled_vs_uncontrolled xss_prevention insecure_client_storage
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS).freeze
+  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
