@@ -284,6 +284,37 @@ RSpec.describe AiService do
     end
   end
 
+  describe "#oo_design_violation_guidance" do
+    let(:user) { User.create!(email: "principles@example.com", name: "Principles") }
+    let(:service) { FakeService.new("fake-key") }
+
+    it "names the group from the constant" do
+      expect(service.send(:oo_design_violation_guidance)).to include(*AiService::OO_DESIGN_CONCEPTS)
+    end
+
+    # code_review and challenge have no section_grading_note and are graded by
+    # the generic rubric, which has nothing to put in "missed" unless the
+    # section planted something missable. A principle invites an essay without
+    # this constraint.
+    it "requires one findable violation the section can be graded against" do
+      guidance = service.send(:oo_design_violation_guidance)
+
+      expect(guidance).to match(/exactly one specific, findable violation/i)
+      expect(guidance).to match(/gradeable/i)
+    end
+
+    it "asks for the violation to be named rather than rewritten" do
+      expect(service.send(:oo_design_violation_guidance)).to match(/never (a )?rewrit/i)
+    end
+
+    it "is stated once in the generation prompt, for every section rather than per kind" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+
+      expect(prompt).to include(service.send(:oo_design_violation_guidance))
+      expect(prompt.scan("The OO design-principle concepts").size).to eq(1)
+    end
+  end
+
   describe "TYPESCRIPT_FLAVORED_CONCEPTS" do
     it "is a frozen 4-entry subset of JS_CONCEPTS" do
       expect(AiService::TYPESCRIPT_FLAVORED_CONCEPTS.size).to eq(4)

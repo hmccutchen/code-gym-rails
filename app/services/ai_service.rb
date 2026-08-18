@@ -1031,6 +1031,7 @@ class AiService
       #{data_modeling_idiom_guidance}
       #{meta_skill_framing_guidance}
       #{code_smell_naming_guidance}
+      #{oo_design_violation_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1098,6 +1099,25 @@ class AiService
       "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
       "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
       "restructure it, so writing the better shape IS the answer rather than describing it."
+  end
+
+  # A principle is a rule, not a thing to find, which makes this the group most
+  # likely to produce a section with no wrong answer in it: code_review and
+  # challenge have no section_grading_note and are graded by the generic
+  # rubric, which has nothing to put in "missed" if nothing was missable. So
+  # the requirement here is the same one meta_skill_framing_guidance enforces —
+  # the concept frames the question, it never replaces the findable issue.
+  # Stated once for every section, like the other three group rules, because it
+  # is a rule about the concept and not about any one kind.
+  def oo_design_violation_guidance
+    "- The OO design-principle concepts (#{OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
+      "topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that " \
+      "rule and be gradeable against it, and the answer is naming the violation and saying which future change it " \
+      "makes hard — never a rewrite of the class. Express it in the host section's own idiom: a code_review " \
+      "tagged open_closed shows a conditional that must be edited every time a variant is added; a challenge " \
+      "tagged dependency_inversion states a behavior that cannot be tested without reaching through a " \
+      "hard-coded collaborator; a pattern, which shows no code, describes a hierarchy built for reuse and asks " \
+      "what the composed shape would be and what it costs."
   end
 
   # A kind's generation instructions. The vocabulary comes from
