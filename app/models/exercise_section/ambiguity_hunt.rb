@@ -13,7 +13,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
   # What the planted list is bounded to on ingest, as opposed to what the
   # prompt asks for. PLANTED_COUNT is the generator's target; nothing
   # downstream reads it, since the review prompt lists the ambiguities rather
-  # than counting them (see AiService#fourth_context_summary). So a provider
+  # than counting them (see .review_context below). So a provider
   # that lands on 3 or 5 has still produced a gradable section, and only the
   # runaway case needs bounding — this is provider text going into another
   # prompt.

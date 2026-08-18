@@ -1584,8 +1584,41 @@ RSpec.describe AiService do
 
       expect(exercise.fourth_key).to be_nil
       context = service.send(:build_review_day_context, "Rails", exercise, resp)
-      expect(service.send(:fourth_context_summary, exercise, resp.answers, resp.section_ratings)).to eq("")
       expect(context).not_to match(/plan review|ambiguity hunt/i)
+    end
+  end
+
+  describe "#build_review_day_context" do
+    let(:user) { User.create!(email: "review@example.com", name: "Review") }
+    let(:service) { FakeService.new("fake-key") }
+
+    def exercise_with(problem_set)
+      DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails",
+                            generated_at: Time.current, problem_set: problem_set)
+    end
+
+    it "does not raise when the day has no pattern section" do
+      exercise = exercise_with(
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "challenge"   => { "question" => "c" }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                       answers: { "code_review" => "a" })
+
+      expect { service.send(:build_review_day_context, "Rails", exercise, response) }.not_to raise_error
+    end
+
+    it "states the real section count rather than four" do
+      exercise = exercise_with(
+        "code_review" => { "question" => "q", "snippet" => "s" },
+        "challenge"   => { "question" => "c" }
+      )
+      response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
+
+      context = service.send(:build_review_day_context, "Rails", exercise, response)
+
+      expect(context).to include("the day's 2 sections")
+      expect(context).not_to include("four sections")
     end
   end
 

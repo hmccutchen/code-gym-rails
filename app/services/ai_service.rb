@@ -1148,76 +1148,22 @@ class AiService
     )
   end
 
-  # Mirrors the pattern-section `reference` shape so both render identically.
   def build_review_day_context(coach, exercise, daily_response)
+    keys    = exercise.active_section_keys
     answers = daily_response.answers
     ratings = daily_response.section_ratings
 
+    sections = keys.map do |key|
+      ExerciseSection.for(key).review_context(
+        section: exercise.problem_set[key], answer: answers[key], rating: ratings[key]
+      )
+    end
+
     <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's four sections in a follow-up instruction — the other three are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
+      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — the #{keys.size - 1} others are given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
 
-      Code Review question: #{exercise.code_review["question"]}
-      Code snippet: #{exercise.code_review["snippet"]}
-      Their answer: #{answers["code_review"].presence || "(skipped)"}
-      Their self-rating: #{ratings["code_review"] || "(none given)"}
-
-      Pattern question (#{exercise.pattern["title"]}): #{exercise.pattern["question"]}
-      Their answer: #{answers["pattern"].presence || "(skipped)"}
-      Their self-rating: #{ratings["pattern"] || "(none given)"}
-
-      #{third_context_summary(exercise, answers, ratings)}
-
-      #{fourth_context_summary(exercise, answers, ratings)}
+      #{sections.join("\n\n")}
     CONTEXT
-  end
-
-  def third_context_summary(exercise, answers, ratings)
-    case exercise.third_key
-    when "architecture"
-      arch = exercise.architecture
-      "Architecture decision (#{arch["title"]}): #{arch["question"]}\n" \
-      "Scenario/constraints: #{arch["scenario"]}\n" \
-      "Their answer: #{answers["architecture"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["architecture"] || "(none given)"}"
-    when "security_review"
-      sec = exercise.security_review
-      "Security Review (#{sec["title"]}): #{sec["question"]}\n" \
-      "Snippet: #{sec["snippet"]}\n" \
-      "Their answer: #{answers["security_review"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["security_review"] || "(none given)"}"
-    when "parsons_problem"
-      parsons = exercise.parsons_problem
-      "Parsons Problem (#{parsons["title"]}): #{parsons["question"]}\n" \
-      "Their self-rating: #{ratings["parsons_problem"] || "(none given)"}"
-    else
-      "Coding Challenge: #{exercise.challenge["question"]}\n" \
-      "Their answer: #{answers["challenge"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["challenge"] || "(none given)"}"
-    end
-  end
-
-  # Contributes nothing (empty string) for an old exercise with no fourth-slot
-  # key — exercise.fourth_key is nil there, and the CONTEXT heredoc above
-  # simply gets a blank line, matching how every other nil-safe read in this
-  # method already degrades for pre-this-ship rows.
-  def fourth_context_summary(exercise, answers, ratings)
-    case exercise.fourth_key
-    when "ambiguity_hunt"
-      ah = exercise.ambiguity_hunt
-      "Ambiguity Hunt (#{ah["title"]}): #{ah["question"]}\n" \
-      "Request: #{ah["request"]}\n" \
-      "Planted ambiguities (hidden from the engineer, known here for grading): #{Array(ah["planted_ambiguities"]).join('; ')}\n" \
-      "Their answer: #{answers["ambiguity_hunt"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["ambiguity_hunt"] || "(none given)"}"
-    when "plan_review"
-      pr = exercise.plan_review
-      "Plan Review (#{pr["title"]}): #{pr["question"]}\n" \
-      "Plan excerpt: #{pr["plan_excerpt"]}\n" \
-      "Their answer: #{answers["plan_review"].presence || "(skipped)"}\n" \
-      "Their self-rating: #{ratings["plan_review"] || "(none given)"}"
-    else
-      ""
-    end
   end
 
   def build_review_section_prompt(exercise, daily_response, section)

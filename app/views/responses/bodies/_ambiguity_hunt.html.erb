@@ -1,6 +1,6 @@
 <%# Deliberately never references data["planted_ambiguities"] — that field is
     hidden test data for the review prompt only (see
-    AiService#fourth_context_summary). Every field rendered here is named
+    ExerciseSection::AmbiguityHunt.review_context). Every field rendered here is named
     explicitly, matching the closed-enumeration discipline every body partial
     uses; there is no generic problem_set dump anywhere in this app to leak it
     through. Locals: data, exercise, response, submitted. %>
