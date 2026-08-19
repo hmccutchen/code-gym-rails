@@ -23,7 +23,7 @@ module PreviewAutoLogin
     private
 
     def preview_auto_login
-      return if session[:user_id].present?
+      return if current_user
       return if cookies[SIGNED_OUT_COOKIE].present?
       # Magic-link login must behave exactly as it does everywhere else, and
       # staying out of this controller is what keeps that flow exercisable here.

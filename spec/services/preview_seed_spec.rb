@@ -71,8 +71,8 @@ RSpec.describe PreviewSeed do
       expect(PreviewSeed.run!.id).to eq(first.id)
     end
 
-    # Safety rule 3. This is the test that protects a real account if
-    # PREVIEW_SEED_EMAIL is ever set in production.
+    # Safety rule 3. This is the test that protects a real account that
+    # happens to share the configured preview address.
     it "never overwrites an existing API key" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
       real.update!(api_key: "sk-ant-a-real-key", provider: "anthropic")

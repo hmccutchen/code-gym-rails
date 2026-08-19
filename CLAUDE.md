@@ -248,13 +248,15 @@ User interacts:
   `PreviewAutoLogin` (an unauthenticated request is signed in as the seeded
   user). `PREVIEW_SEED_EMAIL` is now only an optional override of *which*
   account — `PreviewSeed::DEFAULT_EMAIL` covers the normal case — so setting it
-  at the wrong Railway scope no longer does anything on its own. Auto-login is
-  unreachable outside a PR deployment by construction: `pr` is a hardcoded key
-  Railway resolves itself, production's deploy config comes from `[deploy]`
-  which exports nothing, and `PreviewAutoLogin` registers its callback only
-  when the gate is true — so in production the callback is not in the chain at
-  all. It skips `SessionsController`, so real magic-link login is unchanged and
-  still testable, and a deliberate logout sets a cookie that keeps the reviewer
+  at the wrong Railway scope no longer does anything on its own. No accidental
+  scoping mistake in the Railway dashboard turns auto-login on outside a PR
+  deployment: `pr` is a hardcoded key Railway resolves itself, production's
+  deploy config comes from `[deploy]` which exports nothing, and the app's own
+  config never sets `PREVIEW_APP` outside a PR deployment, so `PreviewAutoLogin`
+  registers its callback — gated on the same `PreviewEnvironment.active?` — only
+  there; in production the callback is not in the chain at all. It skips
+  `SessionsController`, so real magic-link login is unchanged and still
+  testable, and a deliberate logout sets a cookie that keeps the reviewer
   signed out.
 - **Host resolution**: `AppHost.resolve` (`lib/boot/app_host.rb`, deliberately
   outside the autoload path because environment files cannot autoload) takes

@@ -17,9 +17,9 @@ startCommand = "bundle exec puma -C config/puma.rb"
 # in Railway's schema and would be silently ignored.
 #
 # preview:seed runs here in EVERY environment, production included, because this
-# file is shared. It no-ops unless PREVIEW_SEED_EMAIL is set, which must be
-# configured on the PR-environment template only -- never at the shared or base
-# project level, where Railway would propagate it into production.
+# file is shared. It no-ops outside a pull-request deployment: it's gated on
+# PreviewEnvironment.active?, which reads PREVIEW_APP -- exported only by the
+# [environments.pr.deploy] block below.
 preDeployCommand = ["bundle exec rails db:migrate preview:seed"]
 healthcheckPath = "/up"
 healthcheckTimeout = 30

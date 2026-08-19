@@ -92,11 +92,25 @@ RSpec.describe "Preview auto-login", type: :request do
 
     it "already logged in is left alone" do
       User.create!(email: PreviewSeed::DEFAULT_EMAIL, name: "Preview Reviewer")
-      session[:user_id] = 12_345
+      real_user = User.create!(email: "already-logged-in@example.com", name: "Real")
+      session[:user_id] = real_user.id
 
       controller.send(:preview_auto_login)
 
-      expect(session[:user_id]).to eq(12_345)
+      expect(session[:user_id]).to eq(real_user.id)
+    end
+
+    # session[:user_id] can outlive the row it points at (account deletion,
+    # a stale cookie from a reseeded database). current_user's ||= does not
+    # memoize nil, so the same query a later require_login runs sees the
+    # seeded user's id this callback sets rather than getting stuck behind it.
+    it "does not block auto-login when the session id points at no user" do
+      user = User.create!(email: PreviewSeed::DEFAULT_EMAIL, name: "Preview Reviewer")
+      session[:user_id] = user.id + 1_000_000
+
+      controller.send(:preview_auto_login)
+
+      expect(session[:user_id]).to eq(user.id)
     end
   end
 
