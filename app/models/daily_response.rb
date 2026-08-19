@@ -102,6 +102,22 @@ class DailyResponse < ApplicationRecord
     (newer / HISTORY_PAGE_SIZE) + 1
   end
 
+  def pseudocode_round(section)
+    pseudocode_rounds[section.to_s] || {}
+  end
+
+  # Keyed on the timestamp rather than on the critique list, because `[].present?`
+  # is false: a critique that legitimately found no gaps stores an empty list, and
+  # a list-based check would let that engineer request an unlimited number of
+  # further critiques — each one a provider call they pay for with their own key.
+  def critiqued?(section)
+    pseudocode_round(section)["critiqued_at"].present?
+  end
+
+  def translated?(section)
+    pseudocode_round(section)["translated_at"].present?
+  end
+
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
   def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"
