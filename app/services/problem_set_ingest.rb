@@ -143,6 +143,7 @@ class ProblemSetIngest
     reject_missing_sections!
     warn_unrequested_sections!
     reject_unusable_answer_key!
+    reject_unusable_problem_statement!
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
@@ -222,6 +223,26 @@ class ProblemSetIngest
     end
 
     section[ANSWER_KEY_FIELD] = planted.first(ExerciseSection::AmbiguityHunt::MAX_PLANTED)
+  end
+
+  # problem_statement is the entire task for a pseudocode_to_code day: it is the
+  # only thing telling the engineer what to plan, it is interpolated into both
+  # round prompts, and it reaches glossary_wrap in the view — where a non-string
+  # raises. A section with nothing to plan is not a section, so this rejects
+  # rather than repairs, the same call reject_unusable_answer_key! makes and for
+  # the same reason. Bounded too, since it is provider text going into a prompt.
+  def reject_unusable_problem_statement!
+    kind = ExerciseSection::PseudocodeToCode
+    return unless ExerciseSection.resolved_fourth_key(@problem_set) == kind.key
+
+    section   = @problem_set[kind.key]
+    statement = section["problem_statement"].is_a?(String) ? section["problem_statement"].strip : ""
+    if statement.empty?
+      raise AiService::InvalidResponseError,
+            "Pseudocode section returned no usable problem_statement to plan against"
+    end
+
+    section["problem_statement"] = statement.truncate(kind::MAX_PROBLEM_STATEMENT_LENGTH)
   end
 
   # A provider occasionally invents tags; keep the vocabulary closed so

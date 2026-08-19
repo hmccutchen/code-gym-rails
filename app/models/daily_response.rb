@@ -118,6 +118,17 @@ class DailyResponse < ApplicationRecord
     pseudocode_round(section)["translated_at"].present?
   end
 
+  # A round whose provider call was claimed and has not come back. Mirrors
+  # #reviewing? and deliberately reuses REVIEW_CLAIM_STALE_AFTER: both answer
+  # "a paid call was started and may still be running", and two windows that
+  # could disagree is one window too many.
+  def pseudocode_claimed?(section, phase)
+    claimed_at = pseudocode_round(section)["#{phase}_claimed_at"]
+    return false if claimed_at.blank?
+
+    Time.zone.parse(claimed_at) > REVIEW_CLAIM_STALE_AFTER.ago
+  end
+
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
   def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"

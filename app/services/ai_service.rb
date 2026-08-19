@@ -738,7 +738,17 @@ class AiService
       prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
     )
 
-    text_or_raise(result, subject: "pseudocode translation").truncate(MAX_GENERATED_CODE_LENGTH)
+    code = text_or_raise(result, subject: "pseudocode translation")
+    # Rejected, never truncated. Cutting source mid-token or mid-delimiter
+    # produces code that is no longer what their plan says — which the page
+    # then captions as "your plan implemented literally" and the review grades
+    # them on. Raising keeps the round unspent and retryable instead.
+    if code.length > MAX_GENERATED_CODE_LENGTH
+      raise InvalidResponseError,
+            "Pseudocode translation came back too long to be usable (#{code.length} characters)"
+    end
+
+    code
   end
 
   private

@@ -13,8 +13,11 @@ require "rails_helper"
 # exact field reached that exact render.
 #
 # All nine kinds are covered across all three renders, enumerated from
-# DailyPlan's weight tables rather than sampled — a kind quietly dropping out of
-# one of the three renders is the specific failure this exists to catch.
+# ExerciseSection.thirds/.fourths rather than sampled — a kind quietly dropping
+# out of one of the three renders is the specific failure this exists to catch.
+# (This read DailyPlan's third/fourth weight tables when it was written; those
+# were replaced by SectionRotation's staleness weighting, and the registry is
+# now the authority.)
 #
 # Recorded against unmodified views. Anything asserted here is current
 # behaviour, not desired behaviour: the numbering in SLOT_LABELS is hardcoded

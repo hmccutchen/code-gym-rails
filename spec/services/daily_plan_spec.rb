@@ -8,6 +8,10 @@ RSpec.describe DailyPlan do
       expect(DailyPlan::FOURTH_BUCKET_FOR.keys.map(&:to_s))
         .to match_array(ExerciseSection.fourths.map(&:key))
       expect(DailyPlan::FOURTH_BUCKET_FOR[:pseudocode_to_code]).to eq(ConceptBucket::PSEUDOCODE_TO_CODE)
+      # Derived from ConceptBucket, so no fourth kind can resolve to nil — which
+      # would mean it was bucketing by the day's language and mixing its history
+      # into the three-slot track.
+      expect(DailyPlan::FOURTH_BUCKET_FOR.values).to all(be_present)
       expect(DailyPlan::FOURTH_BUCKET_FOR.values.uniq.size).to eq(DailyPlan::FOURTH_BUCKET_FOR.size)
     end
   end

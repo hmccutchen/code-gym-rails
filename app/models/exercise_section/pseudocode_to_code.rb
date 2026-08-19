@@ -10,6 +10,11 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
 
   MAX_CRITIQUE_POINT_LENGTH = 300
 
+  # problem_statement is the whole task: rendered, persisted, and interpolated
+  # into both round prompts. Bounded here, enforced by ProblemSetIngest, the
+  # same split AmbiguityHunt::MAX_PLANTED uses.
+  MAX_PROBLEM_STATEMENT_LENGTH = 2_000
+
   def self.vocabulary_key
     :pseudocode_to_code
   end
@@ -137,7 +142,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   private_class_method :translation_lines
 
   def self.grading_note(section:, answer:)
-    "Grade the REASONING in their pseudocode, not the polish of the code it produced. The code was translated literally and faithfully from their plan — it was never corrected — so any flaw in it is a flaw in the plan and must be attributed to the plan, and missing syntax or idiom in it is an artifact of translation and is never a fault.\n" \
+    "Grade the REASONING in their pseudocode, not the polish of the code it produced. The code was translated literally and faithfully from the pseudocode it was given — it was never corrected — so a flaw in it is a flaw in THAT version of the plan, and missing syntax or idiom in it is an artifact of translation and is never a fault. Attribute a flaw to their final answer only when the context above says the code was translated from that same text; if it says the plan was revised afterwards, check whether the final version still has the flaw before counting it.\n" \
     "#{gap_standard}\n" \
     "If the context above shows a critique was requested, credit any revision that addressed a point it raised. NEVER treat an unaddressed critique point as a miss on its own: the critique is advisory, the engineer may have judged it wrong, and it is permitted to find nothing at all.\n" \
     "\"improved_code\" for this section is their corrected plan implemented — the smallest change to their approach that fixes what they missed, not a from-scratch ideal solution."

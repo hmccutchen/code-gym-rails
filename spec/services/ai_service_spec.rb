@@ -2401,8 +2401,19 @@ RSpec.describe AiService do
         expect { translate_with("   ") }.to raise_error(AiService::InvalidResponseError)
       end
 
-      it "truncates a runaway translation" do
-        expect(translate_with("x" * 20_000).length).to be <= AiService::MAX_GENERATED_CODE_LENGTH
+      # Rejected, not truncated: cutting source mid-token yields code that is no
+      # longer what the plan said, which the page then captions as "your plan
+      # implemented literally" and the review grades them on. Raising also keeps
+      # the round unspent, so the engineer can retry.
+      it "rejects a runaway translation rather than cutting it into something else" do
+        expect { translate_with("x" * 20_000) }
+          .to raise_error(AiService::InvalidResponseError, /too long/i)
+      end
+
+      it "accepts a translation right at the limit" do
+        code = translate_with("x" * AiService::MAX_GENERATED_CODE_LENGTH)
+
+        expect(code.length).to eq(AiService::MAX_GENERATED_CODE_LENGTH)
       end
 
       it "sends the pseudocode and the day's language, never a request to improve it" do
