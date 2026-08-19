@@ -1,9 +1,10 @@
 # Demo content for a Railway PR app, whose database starts empty.
 #
-# railway.toml's preDeployCommand is shared with production, so this runs there
-# too. Three rules make that safe: no variable means no action; rows are created
-# only when absent and never updated or deleted; and nothing outside the single
-# named account is touched.
+# railway.toml's preDeployCommand is shared with production, so this task runs
+# there too. Three rules make that safe: it does nothing unless
+# PreviewEnvironment.active? — which only a pull-request deployment can make
+# true — rows are created only when absent and never updated or deleted, and
+# nothing outside the single named account is touched.
 #
 # preDeployCommand fires on every deploy, so a preview app open across a date
 # boundary accumulates rows as the seeded dates roll forward — harmless in a
@@ -14,10 +15,15 @@ class PreviewSeed
   EMAIL_VAR     = "PREVIEW_SEED_EMAIL"
   DUMMY_API_KEY = "sk-ant-preview-not-a-real-key"
 
+  # A PR app needs no configuration at all, so the address has a default.
+  # `.invalid` is reserved by RFC 2606, so this can never collide with a real
+  # deliverable mailbox.
+  DEFAULT_EMAIL = "preview-reviewer@code-gym.invalid".freeze
+
   def self.run! = new.run!
 
   def run!
-    return nil if target_email.blank?
+    return nil unless PreviewEnvironment.active?
 
     user = find_or_create_user
     Time.use_zone(user.effective_time_zone) { seed_days(user) }
@@ -27,8 +33,11 @@ class PreviewSeed
 
   private
 
+  # EMAIL_VAR is an override, not a gate: PreviewEnvironment decides whether
+  # seeding runs at all, and this only decides which account it runs against.
+  # That split is what makes a leaked EMAIL_VAR harmless in production.
   def target_email
-    @target_email ||= ENV[EMAIL_VAR].to_s.strip.downcase
+    @target_email ||= ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
   end
 
   # create_with applies the demo defaults on the create path only. An existing

@@ -2,22 +2,46 @@ require "rails_helper"
 
 RSpec.describe PreviewSeed do
   after { ENV.delete("PREVIEW_SEED_EMAIL") }
+  after { ENV.delete(PreviewEnvironment::VAR) }
+
+  def in_preview
+    ENV[PreviewEnvironment::VAR] = "1"
+  end
 
   def set_target(email = "reviewer@example.com")
+    ENV[PreviewEnvironment::VAR] = "1"
     ENV["PREVIEW_SEED_EMAIL"] = email
   end
 
   describe "the gate" do
-    it "does nothing and returns nil when PREVIEW_SEED_EMAIL is unset" do
+    it "does nothing and returns nil outside a preview app" do
       expect { PreviewSeed.run! }.not_to change(User, :count)
       expect(PreviewSeed.run!).to be_nil
     end
 
-    it "does nothing when PREVIEW_SEED_EMAIL is blank" do
-      set_target("   ")
+    # The property that makes this strictly safer than the old gate: the email
+    # variable alone is no longer sufficient to seed. Before this change,
+    # PREVIEW_SEED_EMAIL set at the wrong Railway scope would seed production.
+    it "does nothing even when PREVIEW_SEED_EMAIL is set, if this is not a preview app" do
+      ENV["PREVIEW_SEED_EMAIL"] = "reviewer@example.com"
 
       expect { PreviewSeed.run! }.not_to change(User, :count)
       expect(PreviewSeed.run!).to be_nil
+    end
+
+    it "seeds with no email configured at all, using the default address" do
+      in_preview
+
+      user = PreviewSeed.run!
+
+      expect(user.email).to eq(PreviewSeed::DEFAULT_EMAIL)
+    end
+
+    it "prefers PREVIEW_SEED_EMAIL over the default when both are available" do
+      in_preview
+      set_target("reviewer@example.com")
+
+      expect(PreviewSeed.run!.email).to eq("reviewer@example.com")
     end
   end
 

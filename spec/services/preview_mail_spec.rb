@@ -10,31 +10,32 @@ RSpec.describe PreviewMail do
   end
 
   after { ENV.delete("PREVIEW_SEED_EMAIL") }
+  after { ENV.delete(PreviewEnvironment::VAR) }
 
-  it "does nothing when PREVIEW_SEED_EMAIL is unset" do
+  it "does nothing outside a preview app" do
     before_adapter = ActionMailer::MailDeliveryJob.queue_adapter
 
     expect(PreviewMail.apply!).to be(false)
     expect(ActionMailer::MailDeliveryJob.queue_adapter).to eq(before_adapter)
   end
 
-  it "does nothing when PREVIEW_SEED_EMAIL is blank" do
-    ENV["PREVIEW_SEED_EMAIL"] = "   "
+  it "does nothing when the preview flag is blank" do
+    ENV[PreviewEnvironment::VAR] = "   "
     before_adapter = ActionMailer::MailDeliveryJob.queue_adapter
 
     expect(PreviewMail.apply!).to be(false)
     expect(ActionMailer::MailDeliveryJob.queue_adapter).to eq(before_adapter)
   end
 
-  it "sends mail inline when PREVIEW_SEED_EMAIL is set" do
-    ENV["PREVIEW_SEED_EMAIL"] = "reviewer@example.com"
+  it "sends mail inline in a preview app" do
+    ENV[PreviewEnvironment::VAR] = "1"
 
     expect(PreviewMail.apply!).to be(true)
-    expect(ActionMailer::MailDeliveryJob.queue_adapter.class.name).to match(/Inline/)
+    expect(ActionMailer::MailDeliveryJob.queue_adapter).to be_a(ActiveJob::QueueAdapters::InlineAdapter)
   end
 
   it "leaves every other job class on the configured adapter" do
-    ENV["PREVIEW_SEED_EMAIL"] = "reviewer@example.com"
+    ENV[PreviewEnvironment::VAR] = "1"
     other_before = GenerateDailyExercisesJob.queue_adapter
 
     PreviewMail.apply!

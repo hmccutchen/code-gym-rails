@@ -4,7 +4,7 @@
 # under review behaves like production everywhere the reviewer is looking.
 class PreviewMail
   def self.apply!
-    return false if ENV["PREVIEW_SEED_EMAIL"].to_s.strip.blank?
+    return false unless PreviewEnvironment.active?
 
     ActionMailer::MailDeliveryJob.queue_adapter = :inline
     true
