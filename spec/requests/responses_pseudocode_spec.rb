@@ -125,6 +125,69 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
+  # The measurement half of the design: a critique that found nothing followed
+  # by a review that found plenty is the incoherence this feature is most
+  # exposed to, so it is logged as a boolean rather than left to be
+  # reconstructed from user reports later.
+  describe "review diagnostics" do
+    def submitted_response(rounds:, review:)
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        answers: { "pseudocode_to_code" => "sort then walk the ranges" },
+        pseudocode_rounds: { "pseudocode_to_code" => rounds }, ai_review: review
+      )
+    end
+
+    def logged_pseudocode_lines
+      lines = []
+      allow(Rails.logger).to receive(:info) { |msg| lines << msg.to_s if msg.to_s.start_with?("[pseudocode]") }
+      yield
+      lines
+    end
+
+    it "flags the disagreement when a clean critique precedes a critical review" do
+      response_row = submitted_response(
+        rounds: { "gaps_found" => false, "critique" => [], "critiqued_at" => Time.current.iso8601,
+                  "generated_code" => "def f; end", "translated_at" => Time.current.iso8601 },
+        review: nil
+      )
+
+      lines = logged_pseudocode_lines do
+        allow_any_instance_of(FakeService).to receive(:review_sections).and_return(
+          "pseudocode_to_code" => { ok: true, review: { "rating" => "developing", "missed" => %w[a b c],
+                                                        "correct" => [], "better_questions" => [],
+                                                        "next_step" => "x", "improved_code" => "" } }
+        )
+        post review_response_path(response_row)
+      end
+
+      line = lines.find { |l| l.include?("phase=review") }
+      expect(line).to include("user=#{user.id}", "critiqued=true", "gaps=0", "missed=3", "disagreement=true")
+      expect(line).not_to include("sort then walk the ranges")
+    end
+
+    it "does not flag a disagreement when the critique itself raised points" do
+      response_row = submitted_response(
+        rounds: { "gaps_found" => true, "critique" => [ "No empty-input case." ],
+                  "critiqued_at" => Time.current.iso8601,
+                  "generated_code" => "def f; end", "translated_at" => Time.current.iso8601 },
+        review: nil
+      )
+
+      lines = logged_pseudocode_lines do
+        allow_any_instance_of(FakeService).to receive(:review_sections).and_return(
+          "pseudocode_to_code" => { ok: true, review: { "rating" => "developing", "missed" => %w[a b],
+                                                        "correct" => [], "better_questions" => [],
+                                                        "next_step" => "x", "improved_code" => "" } }
+        )
+        post review_response_path(response_row)
+      end
+
+      line = lines.find { |l| l.include?("phase=review") }
+      expect(line).to include("critiqued=true", "gaps=1", "missed=2", "disagreement=false")
+    end
+  end
+
   describe "POST pseudocode_translate" do
     it "stores the generated code and the plan that produced it" do
       translate

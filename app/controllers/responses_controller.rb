@@ -561,6 +561,32 @@ class ResponsesController < ApplicationController
     }
 
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
+    log_pseudocode_review_diagnostics(response, sections)
+  end
+
+  # The counterpart to AiService#log_pseudocode_critique, correlated by user id +
+  # date the way log_difficulty_diagnostics and this method already correlate.
+  #
+  # `disagreement` is computed here rather than left to be reconstructed later:
+  # the question this instrumentation exists to answer is "how often does a
+  # critique that found nothing precede a review that found plenty", and a
+  # derived boolean makes that a grep instead of an analysis. Counts and flags
+  # only — no pseudocode, no critique text, no "missed" text. The join key
+  # locates the row for anyone who needs the content, and application logs are a
+  # different store from the database.
+  def log_pseudocode_review_diagnostics(response, sections)
+    section = ExerciseSection::PseudocodeToCode.key
+    return unless sections.include?(section)
+
+    critiqued = response.critiqued?(section)
+    gaps      = ExerciseSection::PseudocodeToCode.normalize_critique(response.pseudocode_round(section)["critique"]).size
+    missed    = DailyResponse.review_points(response.ai_review&.dig(section, "missed")).size
+
+    Rails.logger.info(
+      "[pseudocode] user=#{response.user_id} date=#{response.daily_exercise.date} phase=review " \
+      "critiqued=#{critiqued} gaps=#{gaps} missed=#{missed} " \
+      "disagreement=#{critiqued && gaps.zero? && missed.positive?}"
+    )
   end
 
   def zero_success_alert(failures)
