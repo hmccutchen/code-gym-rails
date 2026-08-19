@@ -1,9 +1,10 @@
 # Demo content for a Railway PR app, whose database starts empty.
 #
-# railway.toml's preDeployCommand is shared with production, so this runs there
-# too. Three rules make that safe: no variable means no action; rows are created
-# only when absent and never updated or deleted; and nothing outside the single
-# named account is touched.
+# railway.toml's preDeployCommand is shared with production, so this task runs
+# there too. Three rules make that safe: it does nothing unless
+# PreviewEnvironment.active? — which only a pull-request deployment can make
+# true — rows are created only when absent and never updated or deleted, and
+# nothing outside the single named account is touched.
 #
 # preDeployCommand fires on every deploy, so a preview app open across a date
 # boundary accumulates rows as the seeded dates roll forward — harmless in a
@@ -14,10 +15,42 @@ class PreviewSeed
   EMAIL_VAR     = "PREVIEW_SEED_EMAIL"
   DUMMY_API_KEY = "sk-ant-preview-not-a-real-key"
 
+  # A PR app needs no configuration at all, so the address has a default.
+  # `.invalid` is reserved by RFC 2606, so this can never collide with a real
+  # deliverable mailbox.
+  DEFAULT_EMAIL = "preview-reviewer@code-gym.invalid".freeze
+
   def self.run! = new.run!
 
+  # EMAIL_VAR is an override, not a gate: PreviewEnvironment decides whether
+  # seeding runs at all, and this only decides which account it runs against.
+  # That split is what makes a leaked EMAIL_VAR harmless in production.
+  #
+  # The single authority for "which account is the preview account" — also
+  # called by PreviewAutoLogin, so the two can never disagree about which row
+  # a preview deployment treats as its demo user.
+  def self.target_email
+    ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
+  end
+
+  # Whether a row is one this seeder created, rather than a real account that
+  # happens to sit at the configured address — find_or_create_user deliberately
+  # leaves such a row untouched, so an address match alone does not mean the
+  # account is ours. PreviewAutoLogin signs in only an account that passes here,
+  # so a miswired database (a PR environment resolving to production's
+  # DATABASE_URL, an EMAIL_VAR naming a real teammate) cannot hand an anonymous
+  # visitor someone's real account.
+  #
+  # The dummy key is the marker because it is the one attribute only the create
+  # path sets. Replacing it with a real key on a preview app therefore turns
+  # auto-login off — the right direction to fail, since a real key does not
+  # belong on an unauthenticated public URL.
+  def self.seeded?(user)
+    user.present? && user.api_key == DUMMY_API_KEY
+  end
+
   def run!
-    return nil if target_email.blank?
+    return nil unless PreviewEnvironment.active?
 
     user = find_or_create_user
     Time.use_zone(user.effective_time_zone) { seed_days(user) }
@@ -28,7 +61,7 @@ class PreviewSeed
   private
 
   def target_email
-    @target_email ||= ENV[EMAIL_VAR].to_s.strip.downcase
+    @target_email ||= self.class.target_email
   end
 
   # create_with applies the demo defaults on the create path only. An existing

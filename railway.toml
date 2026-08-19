@@ -17,9 +17,36 @@ startCommand = "bundle exec puma -C config/puma.rb"
 # in Railway's schema and would be silently ignored.
 #
 # preview:seed runs here in EVERY environment, production included, because this
-# file is shared. It no-ops unless PREVIEW_SEED_EMAIL is set, which must be
-# configured on the PR-environment template only -- never at the shared or base
-# project level, where Railway would propagate it into production.
+# file is shared. It no-ops outside a pull-request deployment: it's gated on
+# PreviewEnvironment.active?, which reads PREVIEW_APP -- exported only by the
+# [environments.pr.deploy] block below.
 preDeployCommand = ["bundle exec rails db:migrate preview:seed"]
 healthcheckPath = "/up"
 healthcheckTimeout = 30
+
+# Pull-request deployments only. `pr` is a hardcoded key in Railway's config
+# resolution order (ephemeral environment name -> pr -> base environment ->
+# base config -> service settings), so Railway decides when this applies --
+# it is never matched against an operator-typed environment name, and
+# production resolves its deploy config from [deploy] above.
+#
+# These sections can override build/deploy fields but cannot set environment
+# variables, so the commands export PREVIEW_APP themselves. Railway runs
+# commands in exec form with no shell (the same reason `rails server -p $PORT`
+# fails above), so a /bin/bash -c wrapper is required to get one.
+#
+# BOTH commands, not just the start command: preDeployCommand runs in a
+# separate container that does not inherit the server process's environment,
+# and that is where preview:seed runs. Overriding only startCommand would give
+# a preview app an empty database and no demo account to sign in to.
+#
+# `exec` in the start command keeps Puma as PID 1 so Railway's stop signals
+# reach it rather than the wrapping shell.
+# UNVERIFIED until the first PR deploy: whether Railway splits these strings
+# with shell lexing (so the quoted /bin/bash -c payload survives) or naive
+# whitespace splitting (so bash receives a broken argv). preDeployCommand fails
+# loudly if it is wrong; startCommand fails as a boot loop, which is quieter --
+# check the deploy logs on the first PR before trusting either.
+[environments.pr.deploy]
+preDeployCommand = ["/bin/bash -c 'PREVIEW_APP=1 bundle exec rails db:migrate preview:seed'"]
+startCommand = "/bin/bash -c 'PREVIEW_APP=1 exec bundle exec puma -C config/puma.rb'"

@@ -26,7 +26,10 @@ module CodeGymRails
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks])
+    # `boot` holds code that config/environments/*.rb requires directly.
+    # Autoloading during Rails.application.configure raises, so that directory
+    # must not be managed by Zeitwerk.
+    config.autoload_lib(ignore: %w[assets tasks boot])
 
     # Configuration for the application, engines, and railties goes here.
     #

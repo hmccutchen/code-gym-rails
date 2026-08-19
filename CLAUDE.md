@@ -239,7 +239,58 @@ User interacts:
   does not.
 
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
-- **Preview apps**: a Railway PR environment starts with an empty database, so `PreviewSeed` (`app/services/preview_seed.rb`) seeds three days of demo content for the single account named by `PREVIEW_SEED_EMAIL`. It runs from `preDeployCommand` in every environment including production, and is safe there because it no-ops without that variable, only ever creates rows (never updates or deletes), and never reassigns a non-blank attribute. `PreviewMail` additionally sends mail inline when the variable is set, so magic-link login does not depend on the worker service. **`PREVIEW_SEED_EMAIL` must be set on the PR-environment template only** — set at the shared or base level, Railway propagates it into production. There is no login bypass: PR apps authenticate with real magic links.
+- **Preview apps**: a Railway PR environment starts with an empty database and
+  needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block
+  exports `PREVIEW_APP=1` into both the pre-deploy and server processes, and
+  `PreviewEnvironment.active?` is the single authority every preview behavior
+  derives from: `PreviewSeed` (three days of demo content for one account),
+  `PreviewMail` (inline delivery, so login never waits on a worker), and
+  `PreviewAutoLogin` (an unauthenticated request is signed in as the seeded
+  user — and only as an account `PreviewSeed.seeded?` recognizes as its own,
+  so a real account sitting at that address, which the seeder deliberately
+  leaves untouched, is never signed into). `PREVIEW_SEED_EMAIL` is now only an
+  optional override of *which*
+  account — `PreviewSeed::DEFAULT_EMAIL` covers the normal case — so setting it
+  at the wrong Railway scope no longer does anything on its own. Nothing in the
+  repo turns auto-login on outside a PR deployment: `pr` is a hardcoded key
+  Railway resolves itself, production's
+  deploy config comes from `[deploy]` which exports nothing, and the app's own
+  config never sets `PREVIEW_APP`, so `PreviewAutoLogin`
+  registers its callback — gated on the same `PreviewEnvironment.active?` — only
+  there; in production the callback is not in the chain at all. `PREVIEW_APP`
+  is still an ordinary environment variable, though: typing it into a
+  production or shared-scope Railway variable would enable this, which is why
+  the name is reserved for PR deployments and set from committed config only.
+  It skips
+  `SessionsController`, so real magic-link login is unchanged and still
+  testable, and a deliberate logout sets a cookie that keeps the reviewer
+  signed out.
+
+  **Accepted tradeoff:** a PR app's URL is internet-reachable, so this replaces
+  "public URL, login wall" with "public URL, no wall" for anyone holding the
+  link. The seeded account carries `PreviewSeed::DUMMY_API_KEY` and fabricated
+  history in a throwaway database, so the blast radius is bounded — but the
+  change is deliberate, not an oversight.
+
+  **`DEFAULT_EMAIL` is undeliverable on purpose** (`.invalid`, RFC 2606), so it
+  can never collide with a real mailbox. The cost is that a preview app's
+  mail-sending actions (the "Email me this review" button, a magic link
+  requested for that address) fail loudly rather than silently: `PreviewMail`
+  delivers inline and production config sets `raise_delivery_errors`. Set
+  `PREVIEW_SEED_EMAIL` to a real address on the PR environment when a reviewer
+  needs those paths to work.
+- **Host resolution**: `AppHost.resolve` (`lib/boot/app_host.rb`, deliberately
+  outside the autoload path because environment files cannot autoload) reads
+  `APP_HOST` and Railway's injected `RAILWAY_PUBLIC_DOMAIN`, tolerating either
+  with or without a scheme, and **which one wins depends on the environment**.
+  Normally `APP_HOST` does, so production's deliberate custom domain always
+  beats an injected value. On a preview app (`PREVIEW_APP` set) the order
+  inverts, because a PR environment inherits its base environment's variables
+  and therefore arrives carrying production's `APP_HOST` — honoring it there
+  would put production's domain in the preview app's magic links, where the
+  token does not exist. `AppHost` reads that variable directly rather than
+  through `PreviewEnvironment`, which is not loadable during
+  `Rails.application.configure`; a spec asserts the two names agree.
 - **Paginated history**: `/history` renders 10 submitted sessions per page via
   Pagy's offset paginator (`DailyResponse::HISTORY_PAGE_SIZE`). Pagy 43's API
   is a full rewrite — `Pagy::Method`, `pagy(:offset, …)`, and helper methods on
@@ -326,8 +377,11 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/controllers/sessions_controller.rb` — magic link create + verify
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
-- `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PREVIEW_SEED_EMAIL`
-- `app/services/preview_mail.rb` — inline mail delivery in preview apps, so login never needs a worker
+- `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
+- `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
+- `app/services/preview_mail.rb` — inline mail delivery in preview apps, gated on `PreviewEnvironment.active?`, so login never needs a worker
+- `app/controllers/concerns/preview_auto_login.rb` — preview-only auto-login callback, registered only when `PreviewEnvironment.active?`
+- `lib/boot/app_host.rb` — `AppHost.resolve`: `APP_HOST` then `RAILWAY_PUBLIC_DOMAIN`, with that order inverted on a preview app (see "Host resolution" above); outside the autoload path
 - `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)

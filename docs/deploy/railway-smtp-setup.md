@@ -19,6 +19,10 @@ still reads `APP_HOST` at boot for mailer link URLs. Set all three vars on
 | `MAIL_FROM` | a sender address on a domain you've verified in Resend — or `onboarding@resend.dev`, which delivers **only to your own Resend account email** (fine for smoke tests, useless for teammates) |
 | `APP_HOST` | `https://web-production-246e40.up.railway.app` |
 
+`APP_HOST` is required on production only. A PR environment needs none of these
+set by hand: `AppHost.resolve` falls back to Railway's injected
+`RAILWAY_PUBLIC_DOMAIN`, and mail is delivered inline by `PreviewMail`.
+
 The legacy `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` vars
 are no longer read and can be deleted.
 

@@ -2,22 +2,46 @@ require "rails_helper"
 
 RSpec.describe PreviewSeed do
   after { ENV.delete("PREVIEW_SEED_EMAIL") }
+  after { ENV.delete(PreviewEnvironment::VAR) }
+
+  def in_preview
+    ENV[PreviewEnvironment::VAR] = "1"
+  end
 
   def set_target(email = "reviewer@example.com")
+    ENV[PreviewEnvironment::VAR] = "1"
     ENV["PREVIEW_SEED_EMAIL"] = email
   end
 
   describe "the gate" do
-    it "does nothing and returns nil when PREVIEW_SEED_EMAIL is unset" do
+    it "does nothing and returns nil outside a preview app" do
       expect { PreviewSeed.run! }.not_to change(User, :count)
       expect(PreviewSeed.run!).to be_nil
     end
 
-    it "does nothing when PREVIEW_SEED_EMAIL is blank" do
-      set_target("   ")
+    # The property that makes this strictly safer than the old gate: the email
+    # variable alone is no longer sufficient to seed. Before this change,
+    # PREVIEW_SEED_EMAIL set at the wrong Railway scope would seed production.
+    it "does nothing even when PREVIEW_SEED_EMAIL is set, if this is not a preview app" do
+      ENV["PREVIEW_SEED_EMAIL"] = "reviewer@example.com"
 
       expect { PreviewSeed.run! }.not_to change(User, :count)
       expect(PreviewSeed.run!).to be_nil
+    end
+
+    it "seeds with no email configured at all, using the default address" do
+      in_preview
+
+      user = PreviewSeed.run!
+
+      expect(user.email).to eq(PreviewSeed::DEFAULT_EMAIL)
+    end
+
+    it "prefers PREVIEW_SEED_EMAIL over the default when both are available" do
+      in_preview
+      set_target("reviewer@example.com")
+
+      expect(PreviewSeed.run!.email).to eq("reviewer@example.com")
     end
   end
 
@@ -47,8 +71,8 @@ RSpec.describe PreviewSeed do
       expect(PreviewSeed.run!.id).to eq(first.id)
     end
 
-    # Safety rule 3. This is the test that protects a real account if
-    # PREVIEW_SEED_EMAIL is ever set in production.
+    # Safety rule 3. This is the test that protects a real account that
+    # happens to share the configured preview address.
     it "never overwrites an existing API key" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
       real.update!(api_key: "sk-ant-a-real-key", provider: "anthropic")
@@ -101,6 +125,31 @@ RSpec.describe PreviewSeed do
       real.reload
       expect(real.api_key).to be_blank
       expect(real.provider).to be_nil
+    end
+  end
+
+  # PreviewAutoLogin signs in only a row that passes this, so it is what keeps
+  # an address collision from becoming an account takeover.
+  describe ".seeded?" do
+    it "is true for an account this seeder created" do
+      set_target
+
+      expect(described_class.seeded?(PreviewSeed.run!)).to be(true)
+    end
+
+    it "is false for a real account at the same address, which seeding leaves alone" do
+      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      real.update!(api_key: "sk-ant-a-real-key", provider: "anthropic")
+      set_target
+
+      PreviewSeed.run!
+
+      expect(described_class.seeded?(real.reload)).to be(false)
+    end
+
+    it "is false for an account with no API key, and for no account at all" do
+      expect(described_class.seeded?(User.create!(email: "no-key@example.com", name: "No Key"))).to be(false)
+      expect(described_class.seeded?(nil)).to be(false)
     end
   end
 
