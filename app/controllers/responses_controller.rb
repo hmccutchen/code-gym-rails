@@ -2,11 +2,6 @@ class ResponsesController < ApplicationController
   before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently, :follow_ups, :start_over ]
   before_action :require_reviewed_section!, only: [ :self_explanation, :explain_differently, :follow_ups ]
 
-  # How long a claimed-but-unfinished review blocks a retry. The provider call
-  # has no configured timeout, so a crash or hang mid-review must not lock the
-  # user out forever — after this window a new request may reclaim the row.
-  REVIEW_CLAIM_STALE_AFTER = 3.minutes
-
   # Double MAX_FOLLOW_UPS_PER_SECTION (3): a follow-up is one clarifying
   # question about an already-finished review, while a duck thread supports
   # an actual back-and-forth while someone is actively stuck. Lives here
@@ -128,7 +123,8 @@ class ResponsesController < ApplicationController
       # response while the provider call above is running (its stale-claim
       # window is shorter than an untimed request can take), and an UPDATE
       # against a deleted row reports success — without this, ConceptMastery
-      # writes would commit for a review no row will ever hold.
+      # writes would commit for a review no row will ever hold. RegenerateExerciseJob
+      # destroys it too, and takes this same lock before deciding to.
       @response.lock!
 
       if successes.any?
@@ -177,9 +173,7 @@ class ResponsesController < ApplicationController
   def start_over
     return redirect_to root_path, alert: "This set has already been reviewed — nothing to start over." if @response.reviewed?
     return redirect_to root_path, alert: "You can only start over on today's set." unless @response.date == Date.current
-    if @response.reviewing_since.present? && @response.reviewing_since > REVIEW_CLAIM_STALE_AFTER.ago
-      return redirect_to root_path, alert: "A review is being generated for this — try again in a moment."
-    end
+    return redirect_to root_path, alert: "A review is being generated for this — try again in a moment." if @response.reviewing?
 
     @response.destroy
     redirect_to root_path, notice: "Today's answers have been cleared — start fresh whenever you're ready."
@@ -426,7 +420,7 @@ class ResponsesController < ApplicationController
   # instead of racing into a second provider call and ConceptMastery write.
   def claim_review!
     claimed = DailyResponse.where(id: @response.id)
-                           .where("reviewing_since IS NULL OR reviewing_since < ?", REVIEW_CLAIM_STALE_AFTER.ago)
+                           .where("reviewing_since IS NULL OR reviewing_since < ?", DailyResponse::REVIEW_CLAIM_STALE_AFTER.ago)
                            .update_all(reviewing_since: Time.current) == 1
     @response.reload if claimed
     claimed

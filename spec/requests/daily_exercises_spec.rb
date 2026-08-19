@@ -29,6 +29,63 @@ RSpec.describe "DailyExercises", type: :request do
       expect(flash[:alert]).to eq("You've already generated a new set today.")
     end
 
+    # The bug this guards: regeneration destroys today's response, and
+    # ConceptMastery.record_review! has already moved tier/streak/retention state
+    # off a review by the time one exists. Destroying the row leaves that state
+    # standing with no evidence behind it — the same invariant #start_over is
+    # blocked on, which this action predates.
+    it "refuses once today's set has been reviewed" do
+      exercise = create_exercise
+      reviewed = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                       submitted_at: Time.current,
+                                       answers: { "code_review" => "a" * 20 },
+                                       ai_review: { "code_review" => { "rating" => "developing" } })
+
+      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to include("already been reviewed")
+      expect(DailyResponse.exists?(reviewed.id)).to be true
+      expect(exercise.reload.regenerating_since).to be_nil
+      expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
+    end
+
+    it "refuses while a review is actively being generated" do
+      exercise = create_exercise
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            submitted_at: Time.current, reviewing_since: 10.seconds.ago,
+                            answers: { "code_review" => "a" * 20 })
+
+      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("A review is being generated for today's set — try again in a moment.")
+      expect(exercise.reload.regenerating_since).to be_nil
+    end
+
+    # An abandoned claim must not cost the user the day's regeneration, exactly
+    # as it doesn't cost them #start_over.
+    it "proceeds when an unreviewed response's review claim has gone stale" do
+      exercise = create_exercise
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                            reviewing_since: (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago)
+
+      expect { post regenerate_path }.to have_enqueued_job(RegenerateExerciseJob)
+    end
+
+    it "offers no regenerate button on a reviewed day" do
+      exercise = create_exercise
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                            ai_review: { "code_review" => { "rating" => "developing" } })
+
+      get root_path
+
+      expect(response.body).not_to include("Generate new set")
+      expect(response.body).to include("Today's set has been reviewed")
+    end
+
     it "enqueues the job without calling the provider inline" do
       create_exercise
       allow(AiService).to receive(:for)

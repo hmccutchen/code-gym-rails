@@ -1314,7 +1314,7 @@ RSpec.describe "Responses", type: :request do
     it "destroys when an abandoned review claim has gone stale" do
       daily_response = create_response_for(
         user, submitted: true,
-        reviewing_since: (ResponsesController::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago
+        reviewing_since: (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago
       )
 
       delete start_over_response_path(daily_response)

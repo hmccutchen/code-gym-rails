@@ -46,6 +46,69 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.reload.daily_response).to be_nil
   end
 
+  # DailyExercisesController#regenerate refuses a reviewed set, but that check
+  # runs a worker hop and a provider call before this destroy — a review started
+  # in another tab can land inside that window. Here the whole regeneration is
+  # abandoned instead, since the alternative destroys a review ConceptMastery has
+  # already recorded tier/streak/retention movement from.
+  it "keeps a response reviewed after the click, and the set that review describes" do
+    exercise = claimed_exercise
+    reviewed = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                     submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                                     ai_review: { "code_review" => { "rating" => "developing" } })
+    stub_provider({ "code_review" => { "question" => "new" } })
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(DailyResponse.exists?(reviewed.id)).to be true
+    expect(reviewed.reload.ai_review).to eq("code_review" => { "rating" => "developing" })
+    expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "old" })
+  end
+
+  it "leaves the day's regeneration available after keeping a reviewed set" do
+    exercise = claimed_exercise
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                          ai_review: { "code_review" => { "rating" => "developing" } })
+    stub_provider({ "code_review" => { "question" => "new" } })
+
+    described_class.new.perform(user_id: user.id)
+
+    exercise.reload
+    expect(exercise.regenerated_at).to be_nil
+    expect(exercise.regenerating_since).to be_nil
+    expect(user.reload.last_generation_error).to include("today's reviewed set was kept")
+    expect(user.last_generation_error_date).to eq(Date.current)
+  end
+
+  # The review's own writes commit after its provider call returns, so a claimed
+  # row is a review in flight — destroying it discards work the user has paid for.
+  it "keeps a response whose review is still in flight" do
+    exercise = claimed_exercise
+    in_flight = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                      submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                                      reviewing_since: 10.seconds.ago)
+    stub_provider({ "code_review" => { "question" => "new" } })
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(DailyResponse.exists?(in_flight.id)).to be true
+    expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "old" })
+  end
+
+  it "regenerates past an abandoned review claim" do
+    exercise = claimed_exercise
+    abandoned = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                      submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                                      reviewing_since: (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago)
+    stub_provider({ "code_review" => { "question" => "new" } })
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(DailyResponse.exists?(abandoned.id)).to be false
+    expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "new" })
+  end
+
   it "regenerates in the exercise's own stored language" do
     exercise = claimed_exercise
     exercise.update!(language: "javascript")
