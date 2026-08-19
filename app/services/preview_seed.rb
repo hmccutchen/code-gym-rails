@@ -33,6 +33,22 @@ class PreviewSeed
     ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
   end
 
+  # Whether a row is one this seeder created, rather than a real account that
+  # happens to sit at the configured address — find_or_create_user deliberately
+  # leaves such a row untouched, so an address match alone does not mean the
+  # account is ours. PreviewAutoLogin signs in only an account that passes here,
+  # so a miswired database (a PR environment resolving to production's
+  # DATABASE_URL, an EMAIL_VAR naming a real teammate) cannot hand an anonymous
+  # visitor someone's real account.
+  #
+  # The dummy key is the marker because it is the one attribute only the create
+  # path sets. Replacing it with a real key on a preview app therefore turns
+  # auto-login off — the right direction to fail, since a real key does not
+  # belong on an unauthenticated public URL.
+  def self.seeded?(user)
+    user.present? && user.api_key == DUMMY_API_KEY
+  end
+
   def run!
     return nil unless PreviewEnvironment.active?
 

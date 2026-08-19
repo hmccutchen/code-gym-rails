@@ -65,10 +65,13 @@ Rails.application.configure do
   app_host = AppHost.resolve
   config.action_mailer.default_url_options = { host: app_host, protocol: "https" }
 
-  # Allow the app's own origin to open ActionCable WebSocket connections
-  # (Turbo Stream broadcasts for exercise-generation live updates). Derived from
-  # the same resolved host as the mailer config above. Browser Origin headers
-  # always include the scheme, so only the full "https://host" form is ever matched.
+  # Allow the app's own origin to open ActionCable WebSocket connections.
+  # Nothing subscribes today -- this layout loads no Turbo or Stimulus, and the
+  # dashboard learns a generation finished by polling /dashboard/status -- so
+  # this is the standing allowance for the mounted cable, not the transport any
+  # current feature runs on. Derived from the same resolved host as the mailer
+  # config above. Browser Origin headers always include the scheme, so only the
+  # full "https://host" form is ever matched.
   config.action_cable.allowed_request_origins = [ "https://#{app_host}" ]
 
   # Deliver via Resend's HTTP API (see docs/deploy/railway-smtp-setup.md).

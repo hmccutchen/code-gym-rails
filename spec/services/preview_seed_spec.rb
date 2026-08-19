@@ -128,6 +128,31 @@ RSpec.describe PreviewSeed do
     end
   end
 
+  # PreviewAutoLogin signs in only a row that passes this, so it is what keeps
+  # an address collision from becoming an account takeover.
+  describe ".seeded?" do
+    it "is true for an account this seeder created" do
+      set_target
+
+      expect(described_class.seeded?(PreviewSeed.run!)).to be(true)
+    end
+
+    it "is false for a real account at the same address, which seeding leaves alone" do
+      real = User.create!(email: "reviewer@example.com", name: "Real Person")
+      real.update!(api_key: "sk-ant-a-real-key", provider: "anthropic")
+      set_target
+
+      PreviewSeed.run!
+
+      expect(described_class.seeded?(real.reload)).to be(false)
+    end
+
+    it "is false for an account with no API key, and for no account at all" do
+      expect(described_class.seeded?(User.create!(email: "no-key@example.com", name: "No Key"))).to be(false)
+      expect(described_class.seeded?(nil)).to be(false)
+    end
+  end
+
   describe "the seeded content" do
     before { set_target }
 

@@ -1,6 +1,7 @@
 class ApplicationController < ActionController::Base
-  # Registers a prepend_before_action ONLY on a Railway pull-request
-  # deployment; in every other environment this include adds no callback.
+  # Registers a prepend_before_action only when PREVIEW_APP is set at boot,
+  # which committed config does only for a Railway pull-request deployment;
+  # everywhere else this include adds no callback at all.
   include PreviewAutoLogin
 
   before_action :require_login

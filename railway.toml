@@ -38,7 +38,7 @@ healthcheckTimeout = 30
 # BOTH commands, not just the start command: preDeployCommand runs in a
 # separate container that does not inherit the server process's environment,
 # and that is where preview:seed runs. Overriding only startCommand would give
-# a preview app auto-login to a user that was never seeded.
+# a preview app an empty database and no demo account to sign in to.
 #
 # `exec` in the start command keeps Puma as PID 1 so Railway's stop signals
 # reach it rather than the wrapping shell.

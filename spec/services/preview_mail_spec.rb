@@ -9,7 +9,6 @@ RSpec.describe PreviewMail do
     ActionMailer::MailDeliveryJob.queue_adapter = original
   end
 
-  after { ENV.delete("PREVIEW_SEED_EMAIL") }
   after { ENV.delete(PreviewEnvironment::VAR) }
 
   it "does nothing outside a preview app" do

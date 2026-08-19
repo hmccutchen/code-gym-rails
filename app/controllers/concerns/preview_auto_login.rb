@@ -1,11 +1,15 @@
 # Transparent login for a Railway PR app: opening the deployment URL lands the
 # reviewer on the dashboard rather than a login form they have no mailbox for.
 #
-# The gate is checked at class-definition time, not per request. In any
-# environment that is not a pull-request deployment the callback is never added
-# to the chain at all — there is nothing to misconfigure into running, because
-# there is no code path. That is the same bar the removed /test_login endpoint
-# was held to, and the reason this is safe to ship in a shared codebase.
+# The gate is checked at class-definition time, not per request: unless
+# PREVIEW_APP is set at boot, the callback is never added to the chain, so a
+# non-preview deployment has no path that could run this — not one that declines
+# at request time. What that safety rests on is PREVIEW_APP being reserved for
+# pull-request deployments: railway.toml exports it only from
+# [environments.pr.deploy], and nothing in the app sets it. It is still an
+# ordinary environment variable, so setting it by hand on a production service
+# would enable this — that variable is the thing to keep un-set, and the reason
+# PreviewEnvironment documents it as such.
 module PreviewAutoLogin
   extend ActiveSupport::Concern
 
@@ -30,9 +34,11 @@ module PreviewAutoLogin
       return if controller_name == "sessions"
 
       user = User.active.find_by(email: PreviewSeed.target_email)
-      # Seeding may have failed, or the account may have been deleted through
-      # the Account page. A convenience must not become a 500.
-      return if user.nil?
+      # Seeding may have failed, the account may have been deleted through the
+      # Account page, or the row may be a real user PreviewSeed refused to touch.
+      # A convenience must neither become a 500 nor sign anyone into an account
+      # this seeder did not create.
+      return unless PreviewSeed.seeded?(user)
 
       session[:user_id] = user.id
     end
