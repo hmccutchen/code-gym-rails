@@ -125,6 +125,29 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
+  # Generated code and critique points are provider output rendered into the
+  # page. The client path uses textContent; this covers the server-rendered
+  # half, which is what a reload shows.
+  describe "rendering stored round output" do
+    it "escapes generated code and critique text rather than emitting markup" do
+      DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "pseudocode_to_code" => "sort then walk" },
+        pseudocode_rounds: { "pseudocode_to_code" => {
+          "gaps_found" => true, "critique" => [ "<img src=x onerror=alert(1)>" ],
+          "critiqued_at" => Time.current.iso8601,
+          "generated_code" => "<script>alert(1)</script>", "translated_at" => Time.current.iso8601
+        } }
+      )
+
+      get root_path
+
+      expect(response.body).to include("&lt;script&gt;alert(1)&lt;/script&gt;")
+      expect(response.body).to include("&lt;img src=x onerror=alert(1)&gt;")
+      expect(response.body).not_to include("<script>alert(1)</script>")
+    end
+  end
+
   # The measurement half of the design: a critique that found nothing followed
   # by a review that found plenty is the incoherence this feature is most
   # exposed to, so it is logged as a boolean rather than left to be
