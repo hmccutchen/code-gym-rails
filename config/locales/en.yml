@@ -73,6 +73,7 @@ en:
     caption: "This is your plan implemented literally — gaps and all. It was not corrected."
     nudge: "Translate your pseudocode to code before submitting."
     working: "Working…"
+    translate_failed: "You can still submit without translating."
   review:
     get_button: "Get %{provider} review →"
     finish_button: "Finish review →"

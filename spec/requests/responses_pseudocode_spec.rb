@@ -92,6 +92,63 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(round["critiqued_at"]).to be_present
     end
 
+    # The section guard has to check the KIND, not just that the day presents the
+    # section: without it a crafted request translates arbitrary text into
+    # working code for code_review or challenge — the "free help" outcome the
+    # faithfulness constraint exists to prevent — and gets one extra cap per
+    # section, since the cap is keyed per section.
+    it "refuses a section that is active but not this kind, without calling the provider" do
+      expect_any_instance_of(FakeService).not_to receive(:critique_pseudocode)
+      expect_any_instance_of(FakeService).not_to receive(:translate_pseudocode)
+
+      %w[code_review pattern challenge].each do |other|
+        critique(section: other)
+        expect(response).to have_http_status(:unprocessable_entity)
+
+        translate(section: other)
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      expect(user.daily_responses.find_by(date: Date.current)&.pseudocode_rounds).to be_blank
+    end
+
+    # The response row is unpersisted until something saves it, and the
+    # dashboard's debounced autosave commonly INSERTs it while the provider call
+    # is still in flight. A bare save! then fails the user_id/date uniqueness
+    # validation and escapes `rescue AiService::Error` as a 500 — on a call the
+    # user has already paid for.
+    it "survives the autosave inserting today's response mid-call" do
+      allow_any_instance_of(FakeService).to receive(:critique_pseudocode) do
+        DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                              answers: { "pseudocode_to_code" => "sort then walk" })
+        { gaps_found: true, gaps: [ "No empty-input case." ] }
+      end
+
+      critique
+
+      expect(response).to have_http_status(:ok)
+      expect(round["critiqued_at"]).to be_present
+      expect(user.daily_responses.where(date: Date.current).count).to eq(1)
+    end
+
+    # The pre-call check is advisory — the provider call sits between it and the
+    # write, so two requests can both pass it. The row lock is the real cap.
+    it "does not let a second request overwrite a critique claimed while it waited" do
+      allow_any_instance_of(FakeService).to receive(:critique_pseudocode) do
+        row = DailyResponse.find_or_create_by!(user: user, daily_exercise: exercise, date: Date.current)
+        row.update!(pseudocode_rounds: { "pseudocode_to_code" => {
+          "gaps_found" => true, "critique" => [ "Claimed by the other request." ],
+          "critiqued_at" => Time.current.iso8601
+        } })
+        { gaps_found: true, gaps: [ "This one lost the race." ] }
+      end
+
+      critique
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(round["critique"]).to eq([ "Claimed by the other request." ])
+    end
+
     it "rejects a section this exercise does not present" do
       allow_any_instance_of(DailyExercise).to receive(:active_section_keys).and_return(%w[code_review pattern])
 

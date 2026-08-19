@@ -2427,6 +2427,26 @@ RSpec.describe AiService do
       end
     end
 
+    # CLAUDE.md forbids a constant justified by a vocabulary's or schema's size
+    # unless it derives from that size or a spec asserts the assumption. This is
+    # the spec: a flat 300 sat below the largest VALID critique, so a maximal
+    # three-point response truncated mid-JSON and surfaced as a parse failure.
+    it "budgets enough tokens for the largest critique its own schema permits" do
+      kind  = ExerciseSection::PseudocodeToCode
+      chars = kind::MAX_CRITIQUE_POINTS * kind::MAX_CRITIQUE_POINT_LENGTH
+
+      expect(AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be > chars / 3
+      # Still a cheap round-1 call, not a generation-sized one.
+      expect(AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+    end
+
+    it "gives the thinking partner the problem statement, which is the whole task" do
+      svc = spy_class.new(canned_text: "A guiding question.")
+      svc.duck_response(user, exercise, section: "pseudocode_to_code", message: "stuck", thread: [])
+
+      expect(svc.last_prompt).to include("Merge overlapping ranges. The list may be empty.")
+    end
+
     # The design constraint made mechanical: one source, two consumers. Two
     # independently-worded copies fail here, and so does a future edit that
     # inlines either one.

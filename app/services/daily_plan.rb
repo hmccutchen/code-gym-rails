@@ -166,7 +166,7 @@ class DailyPlan
   private_class_method :established_concepts_for_bucket
 
   # Single-bucket analog of overdue_retention_check_pending? — required, not
-  # optional: each fourth-slot vocabulary is only 4-5 concepts, so it will
+  # optional: every fourth-slot vocabulary is small, so it will
   # commonly have at least one concept needing reinforcement, which would
   # otherwise claim the slot every day and starve fourth_due_checks
   # permanently (the fourth slot has exactly one slot total, unlike the

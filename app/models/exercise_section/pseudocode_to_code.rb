@@ -28,9 +28,12 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     "responses/answers/pseudocode_to_code"
   end
 
-  # Pseudocode is written as code-shaped text, so it reads wrong in the prose face.
+  # Pseudocode is written as code-shaped text, so it reads wrong in the prose
+  # face. "answer code-answer" is what actually applies the monospace treatment
+  # (see Challenge) — returning the bare "answer" here duplicated the base
+  # default and did nothing.
   def self.answer_class
-    "answer"
+    "answer code-answer"
   end
 
   # The one statement of what counts as a genuine gap. Two consumers read this
@@ -92,7 +95,8 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
       Pseudocode to Code (#{section["title"]}): #{section["question"]}
       Problem statement: #{section["problem_statement"]}
       #{critique_lines(rounds)}
-      The code their pseudocode produced, translated literally: #{rounds["generated_code"].presence || "(never translated)"}
+      Their final pseudocode: #{answer.presence || "(skipped)"}
+      #{translation_lines(rounds, answer)}
       #{answer_lines(answer, rating)}
     CONTEXT
   end
@@ -110,6 +114,27 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     "The critique they were shown raised: #{raised}"
   end
   private_class_method :critique_lines
+
+  # The stored code was translated from whatever the plan said at the moment the
+  # engineer pressed translate, and they can keep editing afterwards. Saying so
+  # is what keeps .grading_note's "any flaw in the code is a flaw in the plan"
+  # rule honest: without it, a draft's flaws get attributed to a plan that no
+  # longer contains them, and improved_code gets written against the wrong
+  # approach. This is the only reader of translated_from, which is why it is
+  # stored separately from the answer at all.
+  def self.translation_lines(rounds, answer)
+    code = rounds["generated_code"].presence
+    return "They never translated their plan into code." if code.nil?
+
+    if rounds["translated_from"].to_s.strip == answer.to_s.strip
+      "The code their pseudocode produced, translated literally:\n#{code}"
+    else
+      "They revised their plan AFTER translating, so the code below came from an earlier draft. " \
+      "Grade the final pseudocode above; treat this code as evidence about the draft only, and do " \
+      "not attribute its flaws to the final plan unless the final plan still has them:\n#{code}"
+    end
+  end
+  private_class_method :translation_lines
 
   def self.grading_note(section:, answer:)
     "Grade the REASONING in their pseudocode, not the polish of the code it produced. The code was translated literally and faithfully from their plan — it was never corrected — so any flaw in it is a flaw in the plan and must be attributed to the plan, and missing syntax or idiom in it is an artifact of translation and is never a fault.\n" \

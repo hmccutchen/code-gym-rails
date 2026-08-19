@@ -83,4 +83,26 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
       expect(page).to have_button("Submit answers →", disabled: false)
     end
   end
+
+  # The gate must never trap someone behind an outage they cannot fix from this
+  # page. Every other gate in this app is satisfiable without a provider.
+  it "releases the gate when the provider refuses the translation" do
+    user = create_fake_provider_user
+    allow_any_instance_of(FakeService).to receive(:translate_pseudocode)
+      .and_raise(AiService::Error, "The AI provider is unavailable.")
+
+    travel_to(a_weekday) do
+      open_dashboard(user)
+      all("button.rating-btn[data-rating='right_level']").each(&:click)
+      write_plan(PLAN)
+
+      expect(page).to have_button("Submit answers →", disabled: true)
+
+      click_button "Translate to code"
+
+      expect(page).to have_content(/still submit without translating/i, wait: 10)
+      expect(page).to have_button("Submit answers →", disabled: false)
+      expect(page).not_to have_css("[data-pseudocode-code] pre")
+    end
+  end
 end

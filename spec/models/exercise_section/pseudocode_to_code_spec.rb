@@ -45,4 +45,42 @@ RSpec.describe ExerciseSection::PseudocodeToCode do
       expect(described_class.normalize_critique("nope")).to eq([])
     end
   end
+
+  describe ".answer_class" do
+    # An override returning the base default is dead code, and this one carried a
+    # comment claiming it applied the monospace face.
+    it "actually differs from the prose default" do
+      expect(described_class.answer_class).not_to eq(ExerciseSection.answer_class)
+      expect(described_class.answer_class).to eq(ExerciseSection::Challenge.answer_class)
+    end
+  end
+
+  describe ".review_context translation provenance" do
+    def context_for(rounds, answer)
+      described_class.review_context(
+        section: { "title" => "T", "question" => "Q", "problem_statement" => "P", "rounds" => rounds },
+        answer: answer, rating: nil
+      )
+    end
+
+    it "presents the code as theirs when the plan is unchanged since translating" do
+      context = context_for({ "generated_code" => "def f; end", "translated_from" => "sort then walk" }, "sort then walk")
+
+      expect(context).to include("translated literally")
+      expect(context).not_to include("earlier draft")
+    end
+
+    # grading_note tells the reviewer that any flaw in the code is a flaw in the
+    # plan. That is only true while the two still correspond.
+    it "warns the reviewer when the plan was revised after translating" do
+      context = context_for({ "generated_code" => "def f; end", "translated_from" => "first draft" }, "a rewritten plan")
+
+      expect(context).to include("earlier draft")
+      expect(context).to include("do not attribute its flaws to the final plan")
+    end
+
+    it "says so plainly when nothing was translated" do
+      expect(context_for({}, "sort then walk")).to include("never translated their plan")
+    end
+  end
 end

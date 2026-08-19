@@ -99,10 +99,19 @@ class AiService
   # against the same turn cap as one.
   DUCK_EXPLAIN_REQUEST = "Explain what this exercise is asking, in plain language."
 
-  # Three short prose points at most (ExerciseSection::PseudocodeToCode::
-  # MAX_CRITIQUE_POINTS), so this is sized like the duck's ceiling rather than
-  # like full generation. Round 1 returns no code, which is what keeps it cheap.
-  PSEUDOCODE_CRITIQUE_MAX_TOKENS = 300
+  # Derived from what the critique schema actually permits rather than guessed:
+  # MAX_CRITIQUE_POINTS points of up to MAX_CRITIQUE_POINT_LENGTH characters is
+  # the largest VALID response, and a flat 300 sat below it — so a maximal
+  # three-point critique truncated mid-JSON and surfaced as a parse failure on a
+  # response the provider had produced correctly. Three characters per token is
+  # deliberately conservative for prose, and the constant covers the JSON
+  # envelope on top. Still far below full generation; round 1 returns no code,
+  # which is what keeps it cheap.
+  PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS = 100
+  PSEUDOCODE_CRITIQUE_MAX_TOKENS =
+    (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
+      ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
+    PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
 
   # Provider output rendered into the page, so bounded at the boundary like
   # every other such field.
@@ -746,7 +755,8 @@ class AiService
 
   # Plain-text summary of whichever fields a given section actually has
   # (code_review/pattern/challenge/architecture/security_review/
-  # parsons_problem/plan_review/ambiguity_hunt all carry a different subset)
+  # parsons_problem/plan_review/ambiguity_hunt/pseudocode_to_code all carry a
+  # different subset)
   # — enough context for a Socratic prompt without needing per-section-kind
   # branching. `planted_ambiguities` is deliberately excluded: it's the
   # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
@@ -762,6 +772,7 @@ class AiService
       ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
       ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
       ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
+      ("The problem to plan:\n#{data["problem_statement"]}" if data["problem_statement"].present?),
       ("Feature request:\n#{data["request"]}" if data["request"].present?),
       duck_parsons_blocks(data)
     ].compact.join("\n")

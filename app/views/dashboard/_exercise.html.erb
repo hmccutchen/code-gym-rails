@@ -107,6 +107,11 @@
       if (!pseudoBox) return true;
       const ta = form.querySelector(`textarea[data-field="${pseudoBox.dataset.pseudocodeSection}"]`);
       if (!ta || !answered(ta)) return true;
+      // A translation the provider refused releases the gate. The engineer
+      // cannot fix a rejected key or an outage from this page, and blocking the
+      // whole day's submit on one optional round would trap them there — every
+      // other gate in this app is satisfiable without a provider.
+      if (pseudoBox.dataset.translateFailed) return true;
       return !!pseudoBox.querySelector("[data-pseudocode-code] pre");
     }
 

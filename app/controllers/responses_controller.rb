@@ -379,11 +379,12 @@ class ResponsesController < ApplicationController
 
     # Written only after the provider call succeeds: a malformed response must
     # not spend the engineer's one critique.
-    write_pseudocode_round!(daily, section,
+    written = write_pseudocode_round!(daily, section, :critiqued?,
       "initial_pseudocode" => pseudocode,
       "gaps_found"         => result[:gaps_found],
       "critique"           => result[:gaps],
       "critiqued_at"       => Time.current.iso8601)
+    return render_section_error("You've already had this plan checked.") unless written
 
     render json: { status: "ok", gaps_found: result[:gaps_found], gaps: result[:gaps] }
   rescue AiService::Error => e
@@ -402,10 +403,11 @@ class ResponsesController < ApplicationController
       current_user, daily.daily_exercise, section: section, pseudocode: pseudocode
     )
 
-    write_pseudocode_round!(daily, section,
+    written = write_pseudocode_round!(daily, section, :translated?,
       "generated_code"  => code,
       "translated_from" => pseudocode,
       "translated_at"   => Time.current.iso8601)
+    return render_section_error("This plan has already been translated.") unless written
 
     render json: { status: "ok", code: code }
   rescue AiService::Error => e
@@ -451,6 +453,13 @@ class ResponsesController < ApplicationController
     # fourth-shaped key the page never rendered, and a section the engineer
     # cannot see is not one they can plan against.
     return pseudocode_error("That section isn't part of this exercise.") unless exercise.active_section_keys.include?(section)
+    # And it must be THIS kind. active_section_keys alone would accept any
+    # section the day presents, which would translate arbitrary text into
+    # working code for code_review or challenge — the "free help" outcome the
+    # faithfulness prompt exists to prevent — and would multiply the per-day cap
+    # by the number of sections, since the cap is keyed per section.
+    # #duck_thread needs no equivalent guard because it has no per-kind behavior.
+    return pseudocode_error("These rounds only apply to the pseudocode section.") unless section == ExerciseSection::PseudocodeToCode.key
 
     daily = current_user.daily_responses.find_or_initialize_by(daily_exercise: exercise, date: Date.current)
     return pseudocode_error("The rounds are only available before you submit.") if daily.submitted?
@@ -471,11 +480,53 @@ class ResponsesController < ApplicationController
     nil
   end
 
-  def write_pseudocode_round!(daily, section, attrs)
-    rounds          = daily.pseudocode_rounds.deep_dup
-    rounds[section] = (rounds[section] || {}).merge(attrs)
-    daily.pseudocode_rounds = rounds
-    daily.save!
+  # Writes one round and returns false if the cap was claimed while this request
+  # was waiting on the provider.
+  #
+  # Two problems this solves, both created by the provider call sitting between
+  # the guard and the write. First, the row `load_pseudocode_context` handed back
+  # may be unpersisted, and the dashboard's debounced autosave commonly INSERTs
+  # it during that call — a bare `save!` then violates the user_id/date
+  # uniqueness validation and escapes `rescue AiService::Error` as a 500, on a
+  # call the user has already paid for. Second, the pre-call `critiqued?` check
+  # is advisory: two concurrent requests both pass it, both spend a call, and the
+  # second overwrites the first. Re-checking under the row lock is the actual
+  # cap — the same reasoning, and the same shape, as #follow_ups above.
+  def write_pseudocode_round!(daily, section, guard, attrs)
+    row     = persisted_response_for(daily)
+    written = false
+
+    row.with_lock do
+      next if row.public_send(guard, section)
+
+      rounds          = row.pseudocode_rounds.deep_dup
+      rounds[section] = (rounds[section] || {}).merge(attrs)
+      row.update!(pseudocode_rounds: rounds)
+      written = true
+    end
+
+    written
+  end
+
+  # with_lock needs a persisted row. The rescue is the same autosave race: a
+  # concurrent #create can win between the SELECT and the INSERT.
+  #
+  # Both error classes, because the row is guarded twice and which one fires
+  # depends on the timing: DailyResponse validates date uniqueness scoped to
+  # user_id, so a row that already exists at validation time raises
+  # RecordInvalid, while one inserted after that check raises RecordNotUnique
+  # from the index. Rescuing only the latter left the common case — the
+  # dashboard's debounced autosave — surfacing as a 422 HTML error page.
+  #
+  # Re-found by date alone, which is the uniqueness scope; a regenerated day
+  # swaps daily_exercise_id, so keying the lookup on it could miss the very row
+  # that just caused the conflict.
+  def persisted_response_for(daily)
+    return daily if daily.persisted?
+
+    current_user.daily_responses.create!(daily_exercise: daily.daily_exercise, date: daily.date)
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+    current_user.daily_responses.find_by!(date: daily.date)
   end
 
   # Errors send the user back to the dashboard, where the retry button lives.

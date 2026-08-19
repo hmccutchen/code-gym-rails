@@ -67,6 +67,7 @@
       const NO_GAPS  = <%= t("pseudocode.no_gaps").to_json.html_safe %>;
       const CAPTION  = <%= t("pseudocode.caption").to_json.html_safe %>;
       const WORKING  = <%= t("pseudocode.working").to_json.html_safe %>;
+      const TRANSLATE_FAILED = <%= t("pseudocode.translate_failed").to_json.html_safe %>;
 
       const post = async (url) => {
         const res = await fetch(url, {
@@ -100,6 +101,14 @@
           status.textContent = e.message;
           button.disabled = false;
           others.forEach(b => b.disabled = wasDisabled.get(b));
+          // A translation the provider refused must not hold the whole day
+          // hostage: the engineer cannot fix a rejected key or an outage from
+          // here, and every other section is ready to submit. Recording the
+          // attempt releases the gate (see pseudocodeReady in dashboard/_exercise).
+          if (button === translateBtn) {
+            box.dataset.translateFailed = "1";
+            status.textContent = e.message + " " + TRANSLATE_FAILED;
+          }
         }
         form.dispatchEvent(new Event("pseudocode:changed", { bubbles: true }));
       };
