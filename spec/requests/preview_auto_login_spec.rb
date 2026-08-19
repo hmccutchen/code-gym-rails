@@ -10,6 +10,7 @@ RSpec.describe "Preview auto-login", type: :request do
       names = ApplicationController._process_action_callbacks.map(&:filter)
 
       expect(names).not_to include(:preview_auto_login)
+      expect(names).not_to include(:remember_preview_sign_out)
     end
 
     it "leaves an unauthenticated request at the login page" do
@@ -96,6 +97,61 @@ RSpec.describe "Preview auto-login", type: :request do
       controller.send(:preview_auto_login)
 
       expect(session[:user_id]).to eq(12_345)
+    end
+  end
+
+  describe "remembering a deliberate sign-out" do
+    let(:controller) { ApplicationController.new }
+    let(:session)    { {} }
+    let(:cookies)    { {} }
+
+    before do
+      allow(controller).to receive(:session).and_return(session)
+      allow(controller).to receive(:cookies).and_return(cookies)
+      controller.extend(PreviewAutoLogin::Behavior)
+    end
+
+    it "sets the signed-out cookie on sessions#destroy" do
+      allow(controller).to receive_messages(controller_name: "sessions", action_name: "destroy")
+
+      controller.send(:remember_preview_sign_out)
+
+      expect(cookies[PreviewAutoLogin::SIGNED_OUT_COOKIE][:value]).to eq("1")
+    end
+
+    it "sets the signed-out cookie on accounts#destroy" do
+      allow(controller).to receive_messages(controller_name: "accounts", action_name: "destroy")
+
+      controller.send(:remember_preview_sign_out)
+
+      expect(cookies[PreviewAutoLogin::SIGNED_OUT_COOKIE][:value]).to eq("1")
+    end
+
+    it "does not set the cookie for a non-destroy action" do
+      allow(controller).to receive_messages(controller_name: "sessions", action_name: "create")
+
+      controller.send(:remember_preview_sign_out)
+
+      expect(cookies[PreviewAutoLogin::SIGNED_OUT_COOKIE]).to be_nil
+    end
+
+    it "does not set the cookie for destroy on an unrelated controller" do
+      allow(controller).to receive_messages(controller_name: "dashboard", action_name: "destroy")
+
+      controller.send(:remember_preview_sign_out)
+
+      expect(cookies[PreviewAutoLogin::SIGNED_OUT_COOKIE]).to be_nil
+    end
+
+    it "closes the loop: the cookie it writes is one preview_auto_login declines on" do
+      User.create!(email: PreviewSeed::DEFAULT_EMAIL, name: "Preview Reviewer")
+      allow(controller).to receive_messages(controller_name: "sessions", action_name: "destroy")
+      controller.send(:remember_preview_sign_out)
+
+      allow(controller).to receive(:controller_name).and_return("dashboard")
+      controller.send(:preview_auto_login)
+
+      expect(session[:user_id]).to be_nil
     end
   end
 end

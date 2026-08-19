@@ -22,6 +22,17 @@ class PreviewSeed
 
   def self.run! = new.run!
 
+  # EMAIL_VAR is an override, not a gate: PreviewEnvironment decides whether
+  # seeding runs at all, and this only decides which account it runs against.
+  # That split is what makes a leaked EMAIL_VAR harmless in production.
+  #
+  # The single authority for "which account is the preview account" — also
+  # called by PreviewAutoLogin, so the two can never disagree about which row
+  # a preview deployment treats as its demo user.
+  def self.target_email
+    ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
+  end
+
   def run!
     return nil unless PreviewEnvironment.active?
 
@@ -33,11 +44,8 @@ class PreviewSeed
 
   private
 
-  # EMAIL_VAR is an override, not a gate: PreviewEnvironment decides whether
-  # seeding runs at all, and this only decides which account it runs against.
-  # That split is what makes a leaked EMAIL_VAR harmless in production.
   def target_email
-    @target_email ||= ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
+    @target_email ||= self.class.target_email
   end
 
   # create_with applies the demo defaults on the create path only. An existing

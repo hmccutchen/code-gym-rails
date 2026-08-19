@@ -29,7 +29,7 @@ module PreviewAutoLogin
       # staying out of this controller is what keeps that flow exercisable here.
       return if controller_name == "sessions"
 
-      user = User.active.find_by(email: preview_email)
+      user = User.active.find_by(email: PreviewSeed.target_email)
       # Seeding may have failed, or the account may have been deleted through
       # the Account page. A convenience must not become a 500.
       return if user.nil?
@@ -42,11 +42,11 @@ module PreviewAutoLogin
                             (controller_name == "sessions" || controller_name == "accounts")
       return unless destroying_session
 
+      # No expires: a browser-session cookie. Quitting the browser (not just
+      # closing the tab) drops it, so auto-login comes back on the next visit
+      # — acceptable in a throwaway preview app, not something to carry into
+      # a real deployment.
       cookies[SIGNED_OUT_COOKIE] = { value: "1", httponly: true }
-    end
-
-    def preview_email
-      ENV[PreviewSeed::EMAIL_VAR].to_s.strip.downcase.presence || PreviewSeed::DEFAULT_EMAIL
     end
   end
 
