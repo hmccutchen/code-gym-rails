@@ -1347,9 +1347,14 @@ class AiService
     answers = daily_response.answers
     ratings = daily_response.section_ratings
 
+    # "rounds" is merged in for every key, not just the one kind that reads it:
+    # handing each kind a uniform context and letting it read only its own part
+    # is the same contract .generation_guidance uses, and it keeps the branch on
+    # which kind this is out of the shared assembler.
     sections = keys.map do |key|
       ExerciseSection.for(key).review_context(
-        section: exercise.problem_set[key], answer: answers[key], rating: ratings[key]
+        section: (exercise.problem_set[key] || {}).merge("rounds" => daily_response.pseudocode_round(key)),
+        answer: answers[key], rating: ratings[key]
       )
     end
 

@@ -70,6 +70,18 @@
        instead of the monospace snippet treatment, so multi-paragraph text
        reads as an excerpt from a doc rather than malformed code. */
     .plan-excerpt { background: #0d0d1a; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    /* The pseudocode_to_code rounds. Here rather than in a per-page block for
+       the same reason .answer-display is: _answered_sections renders these on
+       the dashboard's submitted state AND on every history entry. */
+    .problem-statement { background: #0d0d1a; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    .pseudocode-rounds { margin-top: .75rem; }
+    .pseudocode-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .pseudocode-status { font-size: .8rem; color: var(--muted); }
+    .pseudocode-critique-label { font-size: .85rem; color: var(--muted); margin: .6rem 0 .2rem; }
+    .pseudocode-critique ul { margin: 0 0 .4rem 1.1rem; font-size: .9rem; }
+    .pseudocode-critique li { margin-bottom: .25rem; }
+    .pseudocode-code pre { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .85rem; overflow-x: auto; white-space: pre; margin: .6rem 0 .2rem; }
+    .pseudocode-caption { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
     .hljs { color: var(--text); }
     .hljs-keyword, .hljs-title.function_, .hljs-title.class_ { color: var(--accent); }
     .hljs-string, .hljs-regexp { color: var(--green); }

@@ -65,6 +65,14 @@ en:
     pseudocode_to_code:
       name: "Pseudocode to Code"
       placeholder: "Write your plan in pseudocode — steps, not syntax…"
+  pseudocode:
+    critique_button: "Check my plan"
+    translate_button: "Translate to code"
+    critique_heading: "Worth reconsidering before you translate:"
+    no_gaps: "Your plan holds up — nothing worth flagging before you translate it."
+    caption: "This is your plan implemented literally — gaps and all. It was not corrected."
+    nudge: "Translate your pseudocode to code before submitting."
+    working: "Working…"
   review:
     get_button: "Get %{provider} review →"
     finish_button: "Finish review →"

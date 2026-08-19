@@ -70,6 +70,7 @@
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
     <p class="progress-label" id="rating-nudge"<%= " hidden".html_safe if all_rated %>>Rate every section's difficulty to finish up.</p>
+    <p class="progress-label" id="pseudocode-nudge" hidden><%= t("pseudocode.nudge") %></p>
   <% end %>
 
   <script>
@@ -94,10 +95,27 @@
       return sectionFields.every(section => ratings[section]);
     }
 
+    // The pseudocode_to_code section, on the days that have one. Null otherwise,
+    // and every helper below no-ops on null.
+    const pseudoBox   = form.querySelector("[data-pseudocode-section]");
+    const pseudoNudge = document.getElementById("pseudocode-nudge");
+
+    // Gated on the SAME rule as DailyResponse.answered? by calling answered()
+    // below rather than restating a threshold. An untouched section stays
+    // skippable exactly like every other kind, so nobody is ever trapped.
+    function pseudocodeReady() {
+      if (!pseudoBox) return true;
+      const ta = form.querySelector(`textarea[data-field="${pseudoBox.dataset.pseudocodeSection}"]`);
+      if (!ta || !answered(ta)) return true;
+      return !!pseudoBox.querySelector("[data-pseudocode-code] pre");
+    }
+
     function refreshSubmit() {
-      const ready = allRated();
-      submitButton.disabled = !ready;
-      ratingNudge.hidden = ready;
+      const rated = allRated();
+      const translated = pseudocodeReady();
+      submitButton.disabled = !(rated && translated);
+      ratingNudge.hidden = rated;
+      if (pseudoNudge) pseudoNudge.hidden = translated;
     }
 
     // The client-side half of DailyResponse.answered? — same rule, same
@@ -150,7 +168,10 @@
     }
 
     textareas.forEach(t => {
-      t.addEventListener("input", () => { updateProgress(); autoSave(); });
+      // refreshSubmit too: typing into the pseudocode section is what makes the
+      // translate gate start applying, so the button state has to follow the
+      // text, not only the ratings.
+      t.addEventListener("input", () => { updateProgress(); refreshSubmit(); autoSave(); });
     });
 
     ratingButtons.forEach(btn => {
@@ -204,6 +225,10 @@
         alert("Couldn't submit your answers — please try again.");
       }
     });
+
+    // Dispatched by the pseudocode round controls after a critique or a
+    // translation lands, so the gate re-reads the page it just changed.
+    form.addEventListener("pseudocode:changed", refreshSubmit);
 
     updateProgress();
     refreshSubmit();
