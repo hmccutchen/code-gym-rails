@@ -109,6 +109,28 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "new" })
   end
 
+  # #start_over can delete the row while this job is mid-flight. The locked read
+  # returns nil for a row already gone rather than raising the way a load
+  # followed by #lock! does — a raise here escapes every rescue below and
+  # strands the claim until it goes stale.
+  it "completes cleanly when the response is deleted while the provider call runs" do
+    exercise = claimed_exercise
+    daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                           answers: { "code_review" => "a" * 20 })
+    fake_service = stub_provider({ "code_review" => { "question" => "new" } })
+    allow(fake_service).to receive(:generate_exercise) do
+      daily_response.destroy
+      { "code_review" => { "question" => "new" } }
+    end
+
+    expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
+
+    exercise.reload
+    expect(exercise.problem_set).to eq("code_review" => { "question" => "new" })
+    expect(exercise.regenerating_since).to be_nil
+    expect(exercise.regenerated_at).to be_present
+  end
+
   it "regenerates in the exercise's own stored language" do
     exercise = claimed_exercise
     exercise.update!(language: "javascript")

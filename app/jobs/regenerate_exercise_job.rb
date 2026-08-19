@@ -27,8 +27,13 @@ class RegenerateExerciseJob < ApplicationJob
       # The whole regeneration is abandoned rather than the destroy alone —
       # replacing the problem_set under a review would leave that review
       # describing code the day no longer shows.
-      existing = exercise.reload_daily_response
-      existing&.lock!
+      #
+      # One locked SELECT rather than a load followed by #lock!: a concurrent
+      # #start_over can delete the row between those two statements, and #lock!
+      # raises RecordNotFound on a row that has gone — which no rescue below
+      # catches, so the claim would be stranded until it goes stale. A row
+      # already gone is simply nil here, which is the no-response case.
+      existing = DailyResponse.lock.find_by(daily_exercise_id: exercise.id)
       if existing&.reviewed? || existing&.reviewing?
         kept_review = true
         raise ActiveRecord::Rollback
