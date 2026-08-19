@@ -10,6 +10,10 @@ class ResponsesController < ApplicationController
   # straight off this controller.
   MAX_DUCK_TURNS_PER_SECTION = 6
 
+  # A pseudocode plan for a 15-25 line problem. Generous enough not to clip a
+  # verbose planner, bounded because it is user text going into a prompt.
+  MAX_PSEUDOCODE_LENGTH = 6_000
+
   # The thread is client-held, so its size is attacker-controlled: the turn cap
   # above counts only "user" roles and so bounds nothing on its own (a crafted
   # request can carry unlimited "assistant" entries). These bound what gets
@@ -360,6 +364,54 @@ class ResponsesController < ApplicationController
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end
 
+  # POST /responses/pseudocode_critique — round 1: one text-only critique of the
+  # engineer's plan. Capped server-side at one per section per day, unlike the
+  # duck's soft cap, because this state is persisted and therefore countable.
+  def pseudocode_critique
+    return unless (context = load_pseudocode_context)
+
+    daily, section, pseudocode = context
+    return render_section_error("You've already had this plan checked.") if daily.critiqued?(section)
+
+    result = AiService.for(current_user).critique_pseudocode(
+      current_user, daily.daily_exercise, section: section, pseudocode: pseudocode
+    )
+
+    # Written only after the provider call succeeds: a malformed response must
+    # not spend the engineer's one critique.
+    write_pseudocode_round!(daily, section,
+      "initial_pseudocode" => pseudocode,
+      "gaps_found"         => result[:gaps_found],
+      "critique"           => result[:gaps],
+      "critiqued_at"       => Time.current.iso8601)
+
+    render json: { status: "ok", gaps_found: result[:gaps_found], gaps: result[:gaps] }
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
+  # POST /responses/pseudocode_translate — round 2. Never gated on round 1:
+  # whatever plan exists is translated, so there is no way to get stuck.
+  def pseudocode_translate
+    return unless (context = load_pseudocode_context)
+
+    daily, section, pseudocode = context
+    return render_section_error("This plan has already been translated.") if daily.translated?(section)
+
+    code = AiService.for(current_user).translate_pseudocode(
+      current_user, daily.daily_exercise, section: section, pseudocode: pseudocode
+    )
+
+    write_pseudocode_round!(daily, section,
+      "generated_code"  => code,
+      "translated_from" => pseudocode,
+      "translated_at"   => Time.current.iso8601)
+
+    render json: { status: "ok", code: code }
+  rescue AiService::Error => e
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
   private
 
   # A non-Hash-like element (e.g. thread: ["oops"] or thread: "not-an-array",
@@ -382,6 +434,48 @@ class ResponsesController < ApplicationController
 
       { role: role, content: turn[:content].to_s }
     }
+  end
+
+  # The guard sequence both pseudocode rounds share, in the same order
+  # #duck_thread uses. Renders the error itself and returns nil, so both callers
+  # guard on the return value rather than restating six checks each.
+  def load_pseudocode_context
+    exercise = current_user.daily_exercises.for_date.first
+    unless exercise
+      render json: { status: "error", error: "No exercise set for today." }, status: :not_found
+      return
+    end
+
+    section = params[:section].to_s
+    # active_section_keys, never the raw payload keys: a payload can hold a
+    # fourth-shaped key the page never rendered, and a section the engineer
+    # cannot see is not one they can plan against.
+    return pseudocode_error("That section isn't part of this exercise.") unless exercise.active_section_keys.include?(section)
+
+    daily = current_user.daily_responses.find_or_initialize_by(daily_exercise: exercise, date: Date.current)
+    return pseudocode_error("The rounds are only available before you submit.") if daily.submitted?
+
+    pseudocode = params[:pseudocode].to_s.strip
+    return pseudocode_error("Write your pseudocode first.") if pseudocode.blank?
+    if pseudocode.length > MAX_PSEUDOCODE_LENGTH
+      return pseudocode_error("That's too long — keep it under #{MAX_PSEUDOCODE_LENGTH} characters.")
+    end
+
+    [ daily, section, pseudocode ]
+  end
+
+  # render_section_error returns the rendered response, which is truthy; the
+  # callers above need a falsy value to mean "already handled".
+  def pseudocode_error(message)
+    render_section_error(message)
+    nil
+  end
+
+  def write_pseudocode_round!(daily, section, attrs)
+    rounds          = daily.pseudocode_rounds.deep_dup
+    rounds[section] = (rounds[section] || {}).merge(attrs)
+    daily.pseudocode_rounds = rounds
+    daily.save!
   end
 
   # Errors send the user back to the dashboard, where the retry button lives.
