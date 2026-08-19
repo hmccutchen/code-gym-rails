@@ -1,6 +1,17 @@
 require "rails_helper"
 
 RSpec.describe DailyPlan do
+
+  describe "FOURTH_BUCKET_FOR" do
+    # DailyPlan.fourth_track fetches this, so a fourth kind missing an entry
+    # raises at generation rather than silently sharing another kind's history.
+    it "gives every fourth-slot kind its own bucket" do
+      expect(DailyPlan::FOURTH_BUCKET_FOR.keys.map(&:to_s))
+        .to match_array(ExerciseSection.fourths.map(&:key))
+      expect(DailyPlan::FOURTH_BUCKET_FOR[:pseudocode_to_code]).to eq(ConceptBucket::PSEUDOCODE_TO_CODE)
+      expect(DailyPlan::FOURTH_BUCKET_FOR.values.uniq.size).to eq(DailyPlan::FOURTH_BUCKET_FOR.size)
+    end
+  end
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
   describe "RETENTION_BUCKET_FETCH_CAP" do

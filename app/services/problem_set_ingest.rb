@@ -60,6 +60,7 @@ class ProblemSetIngest
     when :security_concepts then language_config(language)[:security_concepts]
     when :plan_review       then AiService::PLAN_REVIEW_CONCEPTS
     when :ambiguity_hunt    then AiService::AMBIGUITY_HUNT_CONCEPTS
+    when :pseudocode_to_code then AiService::PSEUDOCODE_TO_CODE_CONCEPTS
     else                         language_config(language)[:concepts]
     end
   end

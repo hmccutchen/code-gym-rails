@@ -317,6 +317,16 @@ class AiService
     unstated_data_implications undefined_permissions_model
   ].freeze
 
+  # What a plan can get wrong before any syntax exists: these name defects in a
+  # decomposition, not in a language. Deliberately disjoint from every language
+  # vocabulary and from the other two fourth-slot ones, which is what lets this
+  # kind carry a ConceptBucket of its own (see DailyPlan::FOURTH_BUCKET_FOR).
+  PSEUDOCODE_TO_CODE_CONCEPTS = %w[
+    missing_base_case unhandled_empty_input off_by_one_boundary ambiguous_ordering
+    unstated_mutation conflated_responsibilities missing_termination_condition
+    undefined_failure_path
+  ].freeze
+
   # Curated, real, job-adjacent scenario flavors for the "scenario" field's
   # business-domain framing — prompt-level grounding only, to keep generated
   # scenarios feeling like real engineering work rather than generic SaaS
@@ -373,13 +383,20 @@ class AiService
       concepts: AMBIGUITY_HUNT_CONCEPTS,
       coach:    "requirements analysis",
       focus:    "interrogating an underspecified feature request: missing scope boundaries, unhandled edge cases, and unstated success criteria."
+    },
+    "pseudocode_to_code" => {
+      label:    "language-agnostic",
+      concepts: PSEUDOCODE_TO_CODE_CONCEPTS,
+      coach:    "algorithm design",
+      focus:    "turning an informal plan into something that actually works: base cases, empty input, boundaries, ordering, and the failure paths a plan leaves undefined."
     }
   }.freeze
 
   # Vocabularies with no code of their own to reference — a concept from any
   # of these has nothing language-specific to show, so their concept
   # reference asks for illustrative pseudocode instead of real source.
-  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS, AMBIGUITY_HUNT_CONCEPTS ].freeze
+  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS,
+                                     AMBIGUITY_HUNT_CONCEPTS, PSEUDOCODE_TO_CODE_CONCEPTS ].freeze
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 

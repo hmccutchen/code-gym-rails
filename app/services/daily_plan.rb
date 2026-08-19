@@ -30,7 +30,11 @@ class DailyPlan
   # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket
   # per kind (not a single shared bucket), matching how ARCHITECTURE already
   # gets its own bucket rather than folding into a language bucket.
-  FOURTH_BUCKET_FOR = { plan_review: ConceptBucket::PLAN_REVIEW, ambiguity_hunt: ConceptBucket::AMBIGUITY_HUNT }.freeze
+  FOURTH_BUCKET_FOR = {
+    plan_review:        ConceptBucket::PLAN_REVIEW,
+    ambiguity_hunt:     ConceptBucket::AMBIGUITY_HUNT,
+    pseudocode_to_code: ConceptBucket::PSEUDOCODE_TO_CODE
+  }.freeze
 
   # Always excluded from the non-fourth reinforcement pool, regardless of which
   # fourth kind rolls today — neither bucket is ever hostable in

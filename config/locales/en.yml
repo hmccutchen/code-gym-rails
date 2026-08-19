@@ -62,6 +62,9 @@ en:
     ambiguity_hunt:
       name: "Ambiguity Hunt"
       placeholder: "What would you need clarified?"
+    pseudocode_to_code:
+      name: "Pseudocode to Code"
+      placeholder: "Write your plan in pseudocode — steps, not syntax…"
   review:
     get_button: "Get %{provider} review →"
     finish_button: "Finish review →"
