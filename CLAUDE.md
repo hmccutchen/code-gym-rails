@@ -239,7 +239,29 @@ User interacts:
   does not.
 
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
-- **Preview apps**: a Railway PR environment starts with an empty database, so `PreviewSeed` (`app/services/preview_seed.rb`) seeds three days of demo content for the single account named by `PREVIEW_SEED_EMAIL`. It runs from `preDeployCommand` in every environment including production, and is safe there because it no-ops without that variable, only ever creates rows (never updates or deletes), and never reassigns a non-blank attribute. `PreviewMail` additionally sends mail inline when the variable is set, so magic-link login does not depend on the worker service. **`PREVIEW_SEED_EMAIL` must be set on the PR-environment template only** — set at the shared or base level, Railway propagates it into production. There is no login bypass: PR apps authenticate with real magic links.
+- **Preview apps**: a Railway PR environment starts with an empty database and
+  needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block
+  exports `PREVIEW_APP=1` into both the pre-deploy and server processes, and
+  `PreviewEnvironment.active?` is the single authority every preview behavior
+  derives from: `PreviewSeed` (three days of demo content for one account),
+  `PreviewMail` (inline delivery, so login never waits on a worker), and
+  `PreviewAutoLogin` (an unauthenticated request is signed in as the seeded
+  user). `PREVIEW_SEED_EMAIL` is now only an optional override of *which*
+  account — `PreviewSeed::DEFAULT_EMAIL` covers the normal case — so setting it
+  at the wrong Railway scope no longer does anything on its own. Auto-login is
+  unreachable outside a PR deployment by construction: `pr` is a hardcoded key
+  Railway resolves itself, production's deploy config comes from `[deploy]`
+  which exports nothing, and `PreviewAutoLogin` registers its callback only
+  when the gate is true — so in production the callback is not in the chain at
+  all. It skips `SessionsController`, so real magic-link login is unchanged and
+  still testable, and a deliberate logout sets a cookie that keeps the reviewer
+  signed out.
+- **Host resolution**: `AppHost.resolve` (`lib/boot/app_host.rb`, deliberately
+  outside the autoload path because environment files cannot autoload) takes
+  `APP_HOST` when set and Railway's injected `RAILWAY_PUBLIC_DOMAIN` otherwise,
+  and tolerates either with or without a scheme. `APP_HOST` keeps precedence so
+  production's custom domain always wins; the fallback is what makes a PR app's
+  magic links work with no configuration.
 - **Paginated history**: `/history` renders 10 submitted sessions per page via
   Pagy's offset paginator (`DailyResponse::HISTORY_PAGE_SIZE`). Pagy 43's API
   is a full rewrite — `Pagy::Method`, `pagy(:offset, …)`, and helper methods on

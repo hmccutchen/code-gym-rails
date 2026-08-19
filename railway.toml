@@ -23,3 +23,25 @@ startCommand = "bundle exec puma -C config/puma.rb"
 preDeployCommand = ["bundle exec rails db:migrate preview:seed"]
 healthcheckPath = "/up"
 healthcheckTimeout = 30
+
+# Pull-request deployments only. `pr` is a hardcoded key in Railway's config
+# resolution order (ephemeral environment name -> pr -> base environment ->
+# base config -> service settings), so Railway decides when this applies --
+# it is never matched against an operator-typed environment name, and
+# production resolves its deploy config from [deploy] above.
+#
+# These sections can override build/deploy fields but cannot set environment
+# variables, so the commands export PREVIEW_APP themselves. Railway runs
+# commands in exec form with no shell (the same reason `rails server -p $PORT`
+# fails above), so a /bin/bash -c wrapper is required to get one.
+#
+# BOTH commands, not just the start command: preDeployCommand runs in a
+# separate container that does not inherit the server process's environment,
+# and that is where preview:seed runs. Overriding only startCommand would give
+# a preview app auto-login to a user that was never seeded.
+#
+# `exec` in the start command keeps Puma as PID 1 so Railway's stop signals
+# reach it rather than the wrapping shell.
+[environments.pr.deploy]
+preDeployCommand = ["/bin/bash -c 'PREVIEW_APP=1 bundle exec rails db:migrate preview:seed'"]
+startCommand = "/bin/bash -c 'PREVIEW_APP=1 exec bundle exec puma -C config/puma.rb'"
