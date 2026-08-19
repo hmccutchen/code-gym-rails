@@ -258,12 +258,32 @@ User interacts:
   `SessionsController`, so real magic-link login is unchanged and still
   testable, and a deliberate logout sets a cookie that keeps the reviewer
   signed out.
+
+  **Accepted tradeoff:** a PR app's URL is internet-reachable, so this replaces
+  "public URL, login wall" with "public URL, no wall" for anyone holding the
+  link. The seeded account carries `PreviewSeed::DUMMY_API_KEY` and fabricated
+  history in a throwaway database, so the blast radius is bounded — but the
+  change is deliberate, not an oversight.
+
+  **`DEFAULT_EMAIL` is undeliverable on purpose** (`.invalid`, RFC 2606), so it
+  can never collide with a real mailbox. The cost is that a preview app's
+  mail-sending actions (the "Email me this review" button, a magic link
+  requested for that address) fail loudly rather than silently: `PreviewMail`
+  delivers inline and production config sets `raise_delivery_errors`. Set
+  `PREVIEW_SEED_EMAIL` to a real address on the PR environment when a reviewer
+  needs those paths to work.
 - **Host resolution**: `AppHost.resolve` (`lib/boot/app_host.rb`, deliberately
-  outside the autoload path because environment files cannot autoload) takes
-  `APP_HOST` when set and Railway's injected `RAILWAY_PUBLIC_DOMAIN` otherwise,
-  and tolerates either with or without a scheme. `APP_HOST` keeps precedence so
-  production's custom domain always wins; the fallback is what makes a PR app's
-  magic links work with no configuration.
+  outside the autoload path because environment files cannot autoload) reads
+  `APP_HOST` and Railway's injected `RAILWAY_PUBLIC_DOMAIN`, tolerating either
+  with or without a scheme, and **which one wins depends on the environment**.
+  Normally `APP_HOST` does, so production's deliberate custom domain always
+  beats an injected value. On a preview app (`PREVIEW_APP` set) the order
+  inverts, because a PR environment inherits its base environment's variables
+  and therefore arrives carrying production's `APP_HOST` — honoring it there
+  would put production's domain in the preview app's magic links, where the
+  token does not exist. `AppHost` reads that variable directly rather than
+  through `PreviewEnvironment`, which is not loadable during
+  `Rails.application.configure`; a spec asserts the two names agree.
 - **Paginated history**: `/history` renders 10 submitted sessions per page via
   Pagy's offset paginator (`DailyResponse::HISTORY_PAGE_SIZE`). Pagy 43's API
   is a full rewrite — `Pagy::Method`, `pagy(:offset, …)`, and helper methods on

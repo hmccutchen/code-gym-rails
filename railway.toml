@@ -42,6 +42,11 @@ healthcheckTimeout = 30
 #
 # `exec` in the start command keeps Puma as PID 1 so Railway's stop signals
 # reach it rather than the wrapping shell.
+# UNVERIFIED until the first PR deploy: whether Railway splits these strings
+# with shell lexing (so the quoted /bin/bash -c payload survives) or naive
+# whitespace splitting (so bash receives a broken argv). preDeployCommand fails
+# loudly if it is wrong; startCommand fails as a boot loop, which is quieter --
+# check the deploy logs on the first PR before trusting either.
 [environments.pr.deploy]
 preDeployCommand = ["/bin/bash -c 'PREVIEW_APP=1 bundle exec rails db:migrate preview:seed'"]
 startCommand = "/bin/bash -c 'PREVIEW_APP=1 exec bundle exec puma -C config/puma.rb'"

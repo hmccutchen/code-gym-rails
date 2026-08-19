@@ -42,4 +42,58 @@ RSpec.describe AppHost do
       expect(described_class.resolve("APP_HOST" => "https://coding-gym.pro:443/app")).to eq("coding-gym.pro")
     end
   end
+
+  describe "on a preview deployment" do
+    # A PR environment inherits its base environment's variables, so it arrives
+    # carrying production's APP_HOST. Verified live on PR #118's environment:
+    # APP_HOST=https://coding-gym.pro alongside
+    # RAILWAY_PUBLIC_DOMAIN=web-code-gym-rails-pr-118.up.railway.app. Honoring
+    # APP_HOST there puts production's domain in the preview app's magic links,
+    # where the token does not exist.
+    it "prefers the injected Railway domain over an inherited APP_HOST" do
+      host = described_class.resolve(
+        "PREVIEW_APP" => "1",
+        "APP_HOST" => "https://coding-gym.pro",
+        "RAILWAY_PUBLIC_DOMAIN" => "web-code-gym-rails-pr-118.up.railway.app"
+      )
+
+      expect(host).to eq("web-code-gym-rails-pr-118.up.railway.app")
+    end
+
+    it "still falls back to APP_HOST when no Railway domain is injected" do
+      expect(described_class.resolve("PREVIEW_APP" => "1", "APP_HOST" => "https://coding-gym.pro"))
+        .to eq("coding-gym.pro")
+    end
+
+    it "treats a blank preview flag as not-preview, so APP_HOST keeps precedence" do
+      host = described_class.resolve(
+        "PREVIEW_APP" => "   ",
+        "APP_HOST" => "https://coding-gym.pro",
+        "RAILWAY_PUBLIC_DOMAIN" => "pr.up.railway.app"
+      )
+
+      expect(host).to eq("coding-gym.pro")
+    end
+
+    # The variable name is owned by PreviewEnvironment; AppHost reads ENV
+    # directly only because it runs before autoloading is available.
+    it "reads the same variable PreviewEnvironment gates on" do
+      expect(described_class::PREVIEW_VAR).to eq(PreviewEnvironment::VAR)
+    end
+  end
+
+  describe "a value that parses to an empty host" do
+    # URI.parse("https://").host is "" rather than nil, so without an explicit
+    # blank check this would be treated as resolved — skipping the next source
+    # AND the fallback, and yielding the blank host this class rules out.
+    it "falls through to the next source rather than resolving blank" do
+      expect(described_class.resolve("APP_HOST" => "https://", "RAILWAY_PUBLIC_DOMAIN" => "pr.up.railway.app"))
+        .to eq("pr.up.railway.app")
+    end
+
+    it "falls through to FALLBACK when it is the only source" do
+      expect(described_class.resolve("APP_HOST" => "https://")).to eq(described_class::FALLBACK)
+      expect(described_class.resolve("APP_HOST" => "https:///")).to eq(described_class::FALLBACK)
+    end
+  end
 end
