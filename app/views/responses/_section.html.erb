@@ -19,8 +19,9 @@
   <%= render "shared/mermaid_diagram", source: data["diagram"] %>
 
   <%# The bucket a concept's history records under is ConceptBucket's rule, not
-      a literal repeated per kind — architecture, plan_review, and ambiguity_hunt
-      are language-independent, everything else buckets by the day's language. %>
+      a literal repeated per kind — architecture, plan_review, ambiguity_hunt and
+      pseudocode_to_code are language-independent, everything else buckets by the
+      day's language. %>
   <% if (ref = concept_reference_for(data["concept"], bucket)) %>
     <%= render "shared/concept_reference", reference: ref,
           open: !submitted && first_exposure?(data["concept"], bucket, exercise.date) %>

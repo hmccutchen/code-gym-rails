@@ -5,7 +5,7 @@ RSpec.describe ExerciseSection do
     it "lists every section kind in the order the app has always enumerated them" do
       expect(described_class.keys).to eq(%w[
         code_review pattern challenge architecture security_review parsons_problem
-        plan_review ambiguity_hunt
+        plan_review ambiguity_hunt pseudocode_to_code
       ])
     end
   end
@@ -41,8 +41,10 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".fourths" do
-    it "lists the fourth-slot kinds" do
-      expect(described_class.fourths).to eq([ ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt ])
+    it "lists the fourth-slot kinds in resolution precedence order" do
+      expect(described_class.fourths).to eq([
+        ExerciseSection::PlanReview, ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode
+      ])
     end
 
     it "marks only the fourth-slot kinds as fourth?" do
@@ -50,6 +52,14 @@ RSpec.describe ExerciseSection do
       expect(described_class.find("challenge").fourth?).to be(false)
       expect(described_class.find("plan_review").fourth?).to be(true)
       expect(described_class.find("ambiguity_hunt").fourth?).to be(true)
+      expect(described_class.find("pseudocode_to_code").fourth?).to be(true)
+    end
+
+    it "keeps plan_review winning a payload that holds more than one fourth key" do
+      set = { "ambiguity_hunt" => { "q" => "?" }, "pseudocode_to_code" => { "q" => "?" },
+              "plan_review" => { "q" => "?" } }
+
+      expect(described_class.resolved_fourth_key(set)).to eq("plan_review")
     end
   end
 

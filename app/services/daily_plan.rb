@@ -30,7 +30,17 @@ class DailyPlan
   # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket
   # per kind (not a single shared bucket), matching how ARCHITECTURE already
   # gets its own bucket rather than folding into a language bucket.
-  FOURTH_BUCKET_FOR = { plan_review: ConceptBucket::PLAN_REVIEW, ambiguity_hunt: ConceptBucket::AMBIGUITY_HUNT }.freeze
+  # Derived from the registry and ConceptBucket rather than restated. The
+  # section-to-bucket rule already has exactly one home
+  # (ConceptBucket::SPECIAL_BUCKETS); a second copy here could disagree with it,
+  # and would make every new fourth kind edit this file as well as its own class.
+  # The nil language is safe and load-bearing: every fourth kind's bucket is
+  # language-independent, which is precisely why the fourth track can run on a
+  # track of its own. A fourth kind that was not special would resolve to nil
+  # here and fail the fetch below rather than silently sharing a language bucket.
+  FOURTH_BUCKET_FOR = ExerciseSection.fourths
+    .to_h { |kind| [ kind.key.to_sym, ConceptBucket.for(kind.key, nil) ] }
+    .freeze
 
   # Always excluded from the non-fourth reinforcement pool, regardless of which
   # fourth kind rolls today — neither bucket is ever hostable in
@@ -162,7 +172,7 @@ class DailyPlan
   private_class_method :established_concepts_for_bucket
 
   # Single-bucket analog of overdue_retention_check_pending? — required, not
-  # optional: each fourth-slot vocabulary is only 4-5 concepts, so it will
+  # optional: every fourth-slot vocabulary is small, so it will
   # commonly have at least one concept needing reinforcement, which would
   # otherwise claim the slot every day and starve fourth_due_checks
   # permanently (the fourth slot has exactly one slot total, unlike the

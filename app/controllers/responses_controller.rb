@@ -10,6 +10,10 @@ class ResponsesController < ApplicationController
   # straight off this controller.
   MAX_DUCK_TURNS_PER_SECTION = 6
 
+  # A pseudocode plan for a 15-25 line problem. Generous enough not to clip a
+  # verbose planner, bounded because it is user text going into a prompt.
+  MAX_PSEUDOCODE_LENGTH = 6_000
+
   # The thread is client-held, so its size is attacker-controlled: the turn cap
   # above counts only "user" roles and so bounds nothing on its own (a crafted
   # request can carry unlimited "assistant" entries). These bound what gets
@@ -360,6 +364,53 @@ class ResponsesController < ApplicationController
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end
 
+  # POST /responses/pseudocode_critique — round 1: one text-only critique of the
+  # engineer's plan.
+  def pseudocode_critique
+    return unless (context = load_pseudocode_context)
+
+    row, section, pseudocode = context
+    return render_section_error(critique_busy_message(row, section)) unless claim_pseudocode_round!(row, section, "critique", :critiqued?)
+
+    result = AiService.for(current_user).critique_pseudocode(
+      current_user, row.daily_exercise, section: section, pseudocode: pseudocode
+    )
+
+    write_pseudocode_round!(row, section, "critique",
+      "initial_pseudocode" => pseudocode,
+      "gaps_found"         => result[:gaps_found],
+      "critique"           => result[:gaps],
+      "critiqued_at"       => Time.current.iso8601)
+
+    render json: { status: "ok", gaps_found: result[:gaps_found], gaps: result[:gaps] }
+  rescue AiService::Error => e
+    release_pseudocode_claim!(row, section, "critique")
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
+  # POST /responses/pseudocode_translate — round 2. Never gated on round 1:
+  # whatever plan exists is translated, so there is no way to get stuck.
+  def pseudocode_translate
+    return unless (context = load_pseudocode_context)
+
+    row, section, pseudocode = context
+    return render_section_error(translate_busy_message(row, section)) unless claim_pseudocode_round!(row, section, "translate", :translated?)
+
+    code = AiService.for(current_user).translate_pseudocode(
+      current_user, row.daily_exercise, section: section, pseudocode: pseudocode
+    )
+
+    write_pseudocode_round!(row, section, "translate",
+      "generated_code"  => code,
+      "translated_from" => pseudocode,
+      "translated_at"   => Time.current.iso8601)
+
+    render json: { status: "ok", code: code }
+  rescue AiService::Error => e
+    release_pseudocode_claim!(row, section, "translate")
+    render json: { status: "error", error: e.message }, status: :service_unavailable
+  end
+
   private
 
   # A non-Hash-like element (e.g. thread: ["oops"] or thread: "not-an-array",
@@ -382,6 +433,113 @@ class ResponsesController < ApplicationController
 
       { role: role, content: turn[:content].to_s }
     }
+  end
+
+  # The section is taken from the registry, never from params: these endpoints
+  # exist for exactly one kind, so deriving it means no crafted request can aim
+  # them at another section and no per-kind comparison has to live in this
+  # shared controller. Renders its own error and returns nil, so callers guard
+  # on the return value.
+  def load_pseudocode_context
+    exercise = current_user.daily_exercises.for_date.first
+    unless exercise
+      render json: { status: "error", error: "No exercise set for today." }, status: :not_found
+      return
+    end
+
+    section = ExerciseSection::PseudocodeToCode.key
+    return pseudocode_error("Today's set has no pseudocode section.") unless exercise.active_section_keys.include?(section)
+
+    pseudocode = validated_pseudocode or return
+    row        = open_response_for(exercise) or return
+
+    [ row, section, pseudocode ]
+  end
+
+  def validated_pseudocode
+    value = params[:pseudocode].to_s.strip
+    return pseudocode_error("Write your pseudocode first.") if value.blank?
+    return pseudocode_error("That's too long — keep it under #{MAX_PSEUDOCODE_LENGTH} characters.") if value.length > MAX_PSEUDOCODE_LENGTH
+
+    value
+  end
+
+  # Persisted, because the row lock the rounds claim under needs a real row.
+  # Reached only after the request has otherwise validated, so a malformed
+  # request never creates one.
+  def open_response_for(exercise)
+    row = persisted_response_for(exercise)
+    return pseudocode_error("The rounds are only available before you submit.") if row.submitted?
+
+    row
+  end
+
+  # Both error classes, because the row is guarded twice and which one fires
+  # depends on timing: DailyResponse validates date uniqueness scoped to
+  # user_id, so a row already there at validation time raises RecordInvalid,
+  # while one inserted after that check raises RecordNotUnique from the index.
+  # The dashboard's debounced autosave makes this race the common case, not the
+  # exotic one. Re-found by date alone, which is the uniqueness scope — a
+  # regenerated day swaps daily_exercise_id.
+  def persisted_response_for(exercise)
+    current_user.daily_responses.find_or_create_by!(daily_exercise: exercise, date: Date.current)
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+    current_user.daily_responses.find_by!(date: Date.current)
+  end
+
+  # Claims the round under the row lock BEFORE the provider call. Claiming
+  # afterwards would still bill both of two concurrent requests and only stop
+  # the second from storing its result — a cap on a paid call has to bound the
+  # spend, not just the write. The claim expires after
+  # DailyResponse::REVIEW_CLAIM_STALE_AFTER, the same window #review uses and
+  # for the same reason: a crashed or hung request must not lock the round
+  # forever. Same shape as #follow_ups' with_lock re-check.
+  def claim_pseudocode_round!(row, section, phase, done)
+    claimed = false
+
+    row.with_lock do
+      next if row.public_send(done, section) || row.pseudocode_claimed?(section, phase)
+
+      merge_pseudocode_round!(row, section, "#{phase}_claimed_at" => Time.current.iso8601)
+      claimed = true
+    end
+
+    claimed
+  end
+
+  # Writing the result also releases the claim, so the two can never disagree.
+  def write_pseudocode_round!(row, section, phase, attrs)
+    row.with_lock { merge_pseudocode_round!(row, section, attrs.merge("#{phase}_claimed_at" => nil)) }
+  end
+
+  # A handled provider failure hands the round back rather than burning it: the
+  # engineer paid for nothing, so they should be able to retry immediately
+  # instead of waiting out the stale window.
+  def release_pseudocode_claim!(row, section, phase)
+    return if row.nil?
+
+    row.with_lock { merge_pseudocode_round!(row, section, "#{phase}_claimed_at" => nil) }
+  end
+
+  def merge_pseudocode_round!(row, section, attrs)
+    rounds          = row.pseudocode_rounds.deep_dup
+    rounds[section] = (rounds[section] || {}).merge(attrs).compact
+    row.update!(pseudocode_rounds: rounds)
+  end
+
+  def critique_busy_message(row, section)
+    row.critiqued?(section) ? "You've already had this plan checked." : "A check of this plan is already running."
+  end
+
+  def translate_busy_message(row, section)
+    row.translated?(section) ? "This plan has already been translated." : "A translation of this plan is already running."
+  end
+
+  # render_section_error returns the rendered response, which is truthy; the
+  # callers above need a falsy value to mean "already handled".
+  def pseudocode_error(message)
+    render_section_error(message)
+    nil
   end
 
   # Errors send the user back to the dashboard, where the retry button lives.
@@ -467,6 +625,32 @@ class ResponsesController < ApplicationController
     }
 
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
+    log_pseudocode_review_diagnostics(response, sections)
+  end
+
+  # The counterpart to AiService#log_pseudocode_critique, correlated by user id +
+  # date the way log_difficulty_diagnostics and this method already correlate.
+  #
+  # `disagreement` is computed here rather than left to be reconstructed later:
+  # the question this instrumentation exists to answer is "how often does a
+  # critique that found nothing precede a review that found plenty", and a
+  # derived boolean makes that a grep instead of an analysis. Counts and flags
+  # only — no pseudocode, no critique text, no "missed" text. The join key
+  # locates the row for anyone who needs the content, and application logs are a
+  # different store from the database.
+  def log_pseudocode_review_diagnostics(response, sections)
+    section = ExerciseSection::PseudocodeToCode.key
+    return unless sections.include?(section)
+
+    critiqued = response.critiqued?(section)
+    gaps      = ExerciseSection::PseudocodeToCode.normalize_critique(response.pseudocode_round(section)["critique"]).size
+    missed    = DailyResponse.review_points(response.ai_review&.dig(section, "missed")).size
+
+    Rails.logger.info(
+      "[pseudocode] user=#{response.user_id} date=#{response.daily_exercise.date} phase=review " \
+      "critiqued=#{critiqued} gaps=#{gaps} missed=#{missed} " \
+      "disagreement=#{critiqued && gaps.zero? && missed.positive?}"
+    )
   end
 
   def zero_success_alert(failures)

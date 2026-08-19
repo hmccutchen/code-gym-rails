@@ -1,12 +1,13 @@
 # The vocabulary bucket a concept's history is recorded under. Architecture,
-# plan_review, and ambiguity_hunt concepts are each language-independent —
-# they transcend any one stack, so they're tracked in their own bucket rather
-# than under the day's generation language; every other section buckets
-# under that language. Each of the three special buckets is entirely
-# disjoint vocabulary (see AiService::ARCHITECTURE_CONCEPTS/
-# PLAN_REVIEW_CONCEPTS/AMBIGUITY_HUNT_CONCEPTS), so each gets its own bucket
-# rather than being merged into one shared "meta-skills" bucket — the same
-# granularity ConceptMastery already uses everywhere else.
+# plan_review, ambiguity_hunt, and pseudocode_to_code concepts are each
+# language-independent — they transcend any one stack, so they're tracked in
+# their own bucket rather than under the day's generation language; every other
+# section buckets under that language. Each of the four special buckets is
+# entirely disjoint vocabulary (see AiService::ARCHITECTURE_CONCEPTS/
+# PLAN_REVIEW_CONCEPTS/AMBIGUITY_HUNT_CONCEPTS/PSEUDOCODE_TO_CODE_CONCEPTS), so
+# each gets its own bucket rather than being merged into one shared
+# "meta-skills" bucket — the same granularity ConceptMastery already uses
+# everywhere else.
 #
 # Accepts one section or several: a concept tagged on multiple sections the
 # same day belongs to a special bucket if any of them is that special
@@ -18,14 +19,16 @@
 # A nil language passes through as a nil bucket — callers reading history for
 # a response whose exercise is missing get no bucket rather than an exception.
 class ConceptBucket
-  ARCHITECTURE   = "architecture".freeze
-  PLAN_REVIEW    = "plan_review".freeze
-  AMBIGUITY_HUNT = "ambiguity_hunt".freeze
+  ARCHITECTURE       = "architecture".freeze
+  PLAN_REVIEW        = "plan_review".freeze
+  AMBIGUITY_HUNT     = "ambiguity_hunt".freeze
+  PSEUDOCODE_TO_CODE = "pseudocode_to_code".freeze
 
   SPECIAL_BUCKETS = {
-    ARCHITECTURE   => ARCHITECTURE,
-    PLAN_REVIEW    => PLAN_REVIEW,
-    AMBIGUITY_HUNT => AMBIGUITY_HUNT
+    ARCHITECTURE       => ARCHITECTURE,
+    PLAN_REVIEW        => PLAN_REVIEW,
+    AMBIGUITY_HUNT     => AMBIGUITY_HUNT,
+    PSEUDOCODE_TO_CODE => PSEUDOCODE_TO_CODE
   }.freeze
 
   def self.for(sections, language)

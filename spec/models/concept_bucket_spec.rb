@@ -7,6 +7,11 @@ RSpec.describe ConceptBucket do
       expect(described_class.for("architecture", "javascript")).to eq("architecture")
     end
 
+    it "buckets pseudocode_to_code independently of the day's language" do
+      expect(described_class.for("pseudocode_to_code", "ruby_rails")).to eq("pseudocode_to_code")
+      expect(described_class.for("pseudocode_to_code", "javascript")).to eq("pseudocode_to_code")
+    end
+
     it "buckets every other section under the day's language" do
       expect(described_class.for("code_review", "ruby_rails")).to eq("ruby_rails")
       expect(described_class.for("pattern", "javascript")).to eq("javascript")
@@ -73,6 +78,7 @@ RSpec.describe ConceptBucket do
       expect(described_class.vocabulary_for("architecture")).to eq(AiService::ARCHITECTURE_CONCEPTS)
       expect(described_class.vocabulary_for("plan_review")).to eq(AiService::PLAN_REVIEW_CONCEPTS)
       expect(described_class.vocabulary_for("ambiguity_hunt")).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
+      expect(described_class.vocabulary_for("pseudocode_to_code")).to eq(AiService::PSEUDOCODE_TO_CODE_CONCEPTS)
     end
 
     # Every bucket .for can return is a LANGUAGE_CONFIG key, so a miss here is a

@@ -102,6 +102,33 @@ class DailyResponse < ApplicationRecord
     (newer / HISTORY_PAGE_SIZE) + 1
   end
 
+  def pseudocode_round(section)
+    pseudocode_rounds[section.to_s] || {}
+  end
+
+  # Keyed on the timestamp rather than on the critique list, because `[].present?`
+  # is false: a critique that legitimately found no gaps stores an empty list, and
+  # a list-based check would let that engineer request an unlimited number of
+  # further critiques — each one a provider call they pay for with their own key.
+  def critiqued?(section)
+    pseudocode_round(section)["critiqued_at"].present?
+  end
+
+  def translated?(section)
+    pseudocode_round(section)["translated_at"].present?
+  end
+
+  # A round whose provider call was claimed and has not come back. Mirrors
+  # #reviewing? and deliberately reuses REVIEW_CLAIM_STALE_AFTER: both answer
+  # "a paid call was started and may still be running", and two windows that
+  # could disagree is one window too many.
+  def pseudocode_claimed?(section, phase)
+    claimed_at = pseudocode_round(section)["#{phase}_claimed_at"]
+    return false if claimed_at.blank?
+
+    Time.zone.parse(claimed_at) > REVIEW_CLAIM_STALE_AFTER.ago
+  end
+
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
   def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"

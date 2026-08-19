@@ -12,9 +12,12 @@ require "rails_helper"
 # by a marker string distinctive enough that the assertion can only pass if that
 # exact field reached that exact render.
 #
-# All eight kinds are covered across all three renders, enumerated from
-# DailyPlan's weight tables rather than sampled — a kind quietly dropping out of
-# one of the three renders is the specific failure this exists to catch.
+# All nine kinds are covered across all three renders, enumerated from
+# ExerciseSection.thirds/.fourths rather than sampled — a kind quietly dropping
+# out of one of the three renders is the specific failure this exists to catch.
+# (This read DailyPlan's third/fourth weight tables when it was written; those
+# were replaced by SectionRotation's staleness weighting, and the registry is
+# now the authority.)
 #
 # Recorded against unmodified views. Anything asserted here is current
 # behaviour, not desired behaviour: the numbering in SLOT_LABELS is hardcoded
@@ -65,6 +68,11 @@ RSpec.describe "section rendering", type: :request do
       "request" => "AH-REQUEST",
       "planted_ambiguities" => [ "AH-SECRET-ONE", "AH-SECRET-TWO" ],
       "teaching_note" => "AH-HINT", "concept" => "unspecified_edge_cases"
+    },
+    "pseudocode_to_code" => {
+      "title" => "P2C-TITLE", "question" => "P2C-QUESTION", "scenario" => "P2C-SCENARIO",
+      "problem_statement" => "P2C-PROBLEM",
+      "teaching_note" => "P2C-HINT", "concept" => "unhandled_empty_input"
     }
   }.freeze
 
@@ -78,7 +86,8 @@ RSpec.describe "section rendering", type: :request do
     "security_review" => "3 — Security Review: SEC-TITLE",
     "parsons_problem" => "3 — Parsons Problem: PB-TITLE",
     "plan_review"     => "4 — Plan Review: PR-TITLE",
-    "ambiguity_hunt"  => "4 — Ambiguity Hunt: AH-TITLE"
+    "ambiguity_hunt"  => "4 — Ambiguity Hunt: AH-TITLE",
+    "pseudocode_to_code" => "4 — Pseudocode to Code: P2C-TITLE"
   }.freeze
 
   # Body content unique to each kind — the part no shared wrapper can render.
@@ -90,7 +99,8 @@ RSpec.describe "section rendering", type: :request do
     "security_review" => [ "SEC-SNIPPET" ],
     "parsons_problem" => [ "PB-BLOCK-ONE", "PB-BLOCK-TWO", "PB-BLOCK-THREE" ],
     "plan_review"     => [ "PR-EXCERPT" ],
-    "ambiguity_hunt"  => [ "AH-REQUEST" ]
+    "ambiguity_hunt"  => [ "AH-REQUEST" ],
+    "pseudocode_to_code" => [ "P2C-PROBLEM" ]
   }.freeze
 
   ANSWER_KEY_MARKERS = %w[AH-SECRET-ONE AH-SECRET-TWO].freeze

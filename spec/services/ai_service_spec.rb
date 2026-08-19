@@ -2289,6 +2289,191 @@ RSpec.describe AiService do
     end
   end
 
+  describe "the pseudocode_to_code rounds" do
+    let(:user) { User.create!(email: "pseudo-#{SecureRandom.hex(4)}@example.com", name: "P") }
+
+    let(:exercise) do
+      DailyExercise.new(language: "ruby_rails", problem_set: {
+        "pseudocode_to_code" => {
+          "title" => "Merge ranges",
+          "problem_statement" => "Merge overlapping ranges. The list may be empty.",
+          "question" => "Write pseudocode for this."
+        }
+      })
+    end
+
+    # Captures `system:` as well as `prompt:`, which the shared double_class
+    # does not expose — both round prompts are asserted against below.
+    let(:spy_class) do
+      Class.new(double_class) do
+        attr_reader :last_prompt, :last_system
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+          @last_system = system
+          @last_prompt = prompt
+          super
+        end
+      end
+    end
+
+    def critique_with(text)
+      spy_class.new(canned_text: text)
+        .critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
+    end
+
+    describe "#critique_pseudocode" do
+      it "returns the typed flag and the bounded points" do
+        result = critique_with({ gaps_found: true, gaps: [ "No empty-input case." ] }.to_json)
+
+        expect(result[:gaps_found]).to be(true)
+        expect(result[:gaps]).to eq([ "No empty-input case." ])
+      end
+
+      it "distinguishes 'found nothing' from 'came back malformed'" do
+        result = critique_with({ gaps_found: false, gaps: [] }.to_json)
+
+        expect(result[:gaps_found]).to be(false)
+        expect(result[:gaps]).to be_empty
+      end
+
+      # The whole reason gaps_found is a typed field: an empty list is ALSO what
+      # a garbage response normalizes to, so the list can never be the signal.
+      it "raises when it claims gaps and delivers none usable" do
+        expect { critique_with({ gaps_found: true, gaps: [ "", "   ", 7 ] }.to_json) }
+          .to raise_error(AiService::InvalidResponseError, /claimed gaps/i)
+      end
+
+      it "raises when gaps_found is missing or not a boolean" do
+        expect { critique_with({ gaps: [ "something" ] }.to_json) }
+          .to raise_error(AiService::InvalidResponseError, /gaps_found/)
+        expect { critique_with({ gaps_found: "yes", gaps: [ "something" ] }.to_json) }
+          .to raise_error(AiService::InvalidResponseError, /gaps_found/)
+      end
+
+      it "caps the points at the kind's bound" do
+        result = critique_with({ gaps_found: true, gaps: %w[a b c d].map { |c| c * 40 } }.to_json)
+
+        expect(result[:gaps].size).to eq(ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS)
+      end
+
+      it "drops the list entirely when the flag says nothing was found" do
+        result = critique_with({ gaps_found: false, gaps: [ "leaked point" ] }.to_json)
+
+        expect(result[:gaps]).to eq([])
+      end
+
+      it "logs its own usage purpose" do
+        svc = spy_class.new(canned_text: { gaps_found: false, gaps: [] }.to_json)
+
+        expect { svc.critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "x") }
+          .to change { ApiUsage.where(purpose: "pseudocode_critique").count }.by(1)
+      end
+
+      it "logs counts only, never the plan or the critique text" do
+        logged = []
+        allow(Rails.logger).to receive(:info) { |msg| logged << msg.to_s if msg.to_s.start_with?("[pseudocode]") }
+
+        spy_class.new(canned_text: { gaps_found: false, gaps: [] }.to_json)
+          .critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "my secret plan text")
+
+        expect(logged.size).to eq(1)
+        expect(logged.first).to include("phase=critique", "gaps_found=false", "gaps=0", "user=#{user.id}")
+        expect(logged.first).not_to include("my secret plan text")
+      end
+    end
+
+    describe "#translate_pseudocode" do
+      def translate_with(text, pseudocode: "sort then walk")
+        spy_class.new(canned_text: text)
+          .translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: pseudocode)
+      end
+
+      it "returns the generated code and logs its own purpose" do
+        svc = spy_class.new(canned_text: "def merge(r)\nend")
+
+        expect {
+          code = svc.translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
+          expect(code).to include("def merge")
+        }.to change { ApiUsage.where(purpose: "pseudocode_translate").count }.by(1)
+      end
+
+      it "rejects a blank translation rather than storing it" do
+        expect { translate_with("   ") }.to raise_error(AiService::InvalidResponseError)
+      end
+
+      # Rejected, not truncated: cutting source mid-token yields code that is no
+      # longer what the plan said, which the page then captions as "your plan
+      # implemented literally" and the review grades them on. Raising also keeps
+      # the round unspent, so the engineer can retry.
+      it "rejects a runaway translation rather than cutting it into something else" do
+        expect { translate_with("x" * 20_000) }
+          .to raise_error(AiService::InvalidResponseError, /too long/i)
+      end
+
+      it "accepts a translation right at the limit" do
+        code = translate_with("x" * AiService::MAX_GENERATED_CODE_LENGTH)
+
+        expect(code.length).to eq(AiService::MAX_GENERATED_CODE_LENGTH)
+      end
+
+      it "sends the pseudocode and the day's language, never a request to improve it" do
+        svc = spy_class.new(canned_text: "def f; end")
+        svc.translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
+
+        expect(svc.last_prompt).to include("sort then walk", "Ruby/Rails")
+        expect(svc.last_prompt).to include("never for filling gaps")
+      end
+
+      # Faithfulness cannot be asserted against a live model, so what IS asserted
+      # is that every prohibition reaches the prompt. The behavioural half is
+      # FakeService::PSEUDOCODE_TRANSLATION plus the system spec.
+      it "forbids every form of silent correction in its system prompt" do
+        system_prompt = AiService::PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT
+
+        expect(system_prompt).to match(/omits an edge case, the code omits it too/i)
+        expect(system_prompt).to match(/implement the wrong thing/i)
+        expect(system_prompt).to match(/do not add error handling/i)
+        expect(system_prompt).to match(/do not add comments/i)
+        expect(system_prompt).to match(/syntactically valid/i)
+      end
+    end
+
+    # CLAUDE.md forbids a constant justified by a vocabulary's or schema's size
+    # unless it derives from that size or a spec asserts the assumption. This is
+    # the spec: a flat 300 sat below the largest VALID critique, so a maximal
+    # three-point response truncated mid-JSON and surfaced as a parse failure.
+    it "budgets enough tokens for the largest critique its own schema permits" do
+      kind  = ExerciseSection::PseudocodeToCode
+      chars = kind::MAX_CRITIQUE_POINTS * kind::MAX_CRITIQUE_POINT_LENGTH
+
+      expect(AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be > chars / 3
+      # Still a cheap round-1 call, not a generation-sized one.
+      expect(AiService::PSEUDOCODE_CRITIQUE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+    end
+
+    it "gives the thinking partner the problem statement, which is the whole task" do
+      svc = spy_class.new(canned_text: "A guiding question.")
+      svc.duck_response(user, exercise, section: "pseudocode_to_code", message: "stuck", thread: [])
+
+      expect(svc.last_prompt).to include("Merge overlapping ranges. The list may be empty.")
+    end
+
+    # The design constraint made mechanical: one source, two consumers. Two
+    # independently-worded copies fail here, and so does a future edit that
+    # inlines either one.
+    describe "the shared essential-vs-abstraction standard" do
+      it "reaches both consumers from one source" do
+        standard = ExerciseSection::PseudocodeToCode.gap_standard
+        svc      = spy_class.new(canned_text: { gaps_found: false, gaps: [] }.to_json)
+        svc.critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "x")
+
+        expect(svc.last_system).to include(standard)
+        expect(svc.last_prompt).to include(standard)
+        expect(ExerciseSection::PseudocodeToCode.grading_note(section: {}, answer: "x")).to include(standard)
+      end
+    end
+  end
+
   describe "#duck_response" do
     let(:exercise) do
       DailyExercise.new(language: "ruby_rails", problem_set: {

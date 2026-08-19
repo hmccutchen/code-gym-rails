@@ -1,6 +1,47 @@
 require "rails_helper"
 
 RSpec.describe DailyResponse, type: :model do
+  describe "pseudocode rounds" do
+    def response_for(rounds)
+      user     = User.create!(email: "pseudo-#{SecureRandom.hex(4)}@example.com", name: "P")
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                       language: "ruby_rails",
+                                       problem_set: { "pseudocode_to_code" => { "question" => "Plan it" } })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            pseudocode_rounds: rounds)
+    end
+
+    it "defaults to an empty hash and reads a missing section as empty" do
+      response = response_for({})
+
+      expect(response.pseudocode_rounds).to eq({})
+      expect(response.pseudocode_round("pseudocode_to_code")).to eq({})
+      expect(response.critiqued?("pseudocode_to_code")).to be(false)
+      expect(response.translated?("pseudocode_to_code")).to be(false)
+    end
+
+    # critiqued? keys on the timestamp, never on the list: [].present? is false
+    # in Ruby, so a list-based guard would stop capping exactly the "no gaps
+    # found" case — the most common good outcome.
+    it "counts a critique that found nothing as spent" do
+      response = response_for("pseudocode_to_code" => {
+        "gaps_found" => false, "critique" => [], "critiqued_at" => Time.current.iso8601
+      })
+
+      expect(response.critiqued?("pseudocode_to_code")).to be(true)
+      expect(response.translated?("pseudocode_to_code")).to be(false)
+    end
+
+    it "reports a translation once code has been stored" do
+      response = response_for("pseudocode_to_code" => {
+        "generated_code" => "def f; end", "translated_at" => Time.current.iso8601
+      })
+
+      expect(response.translated?("pseudocode_to_code")).to be(true)
+      expect(response.critiqued?("pseudocode_to_code")).to be(false)
+    end
+  end
+
   describe ".review_points" do
     it "strips entries and drops blanks from an array" do
       expect(DailyResponse.review_points([ "  Spotted the N+1  ", "", "Missed the index", nil ]))

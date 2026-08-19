@@ -19,7 +19,7 @@ class ExerciseSection
   # Hash or Array from it keeps the ordering it already had.
   def self.all
     [ CodeReview, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem,
-      PlanReview, AmbiguityHunt ]
+      PlanReview, AmbiguityHunt, PseudocodeToCode ]
   end
 
   def self.keys
@@ -35,9 +35,10 @@ class ExerciseSection
   end
 
   # Precedence order for the fourth slot, mirroring .thirds: if a provider
-  # somehow returned both fourth-shaped keys, plan_review wins.
+  # somehow returned more than one fourth-shaped key, plan_review wins, then
+  # ambiguity_hunt.
   def self.fourths
-    [ PlanReview, AmbiguityHunt ]
+    [ PlanReview, AmbiguityHunt, PseudocodeToCode ]
   end
 
   # Which fourth-slot key a raw problem_set resolves to, by .fourths

@@ -63,6 +63,12 @@ Rails.application.routes.draw do
       # Pre-submission Socratic thinking partner. No :id — fully unpersisted,
       # nothing to look up by id.
       post :duck_thread
+
+      # The two pseudocode_to_code rounds. No :id for the same reason
+      # duck_thread has none: both run before submission, against today's
+      # response, which may not exist yet on the first call.
+      post :pseudocode_critique
+      post :pseudocode_translate
     end
   end
 

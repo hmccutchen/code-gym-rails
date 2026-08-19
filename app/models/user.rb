@@ -181,7 +181,7 @@ class User < ApplicationRecord
   # caller as of this comment) sees identical behavior to before either
   # keyword existed. Marking a concept resolved happens before either filter
   # runs; that's safe for the special ConceptBucket vocabularies (architecture,
-  # plan_review, ambiguity_hunt) because each is disjoint from every other
+  # plan_review, ambiguity_hunt, pseudocode_to_code) because each is disjoint from every other
   # vocabulary, including both language vocabularies — a filtered-out
   # most-recent occurrence implies every older occurrence of that same concept
   # would be filtered too, so dedup and filter order can never disagree. It is

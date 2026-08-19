@@ -99,6 +99,70 @@ class AiService
   # against the same turn cap as one.
   DUCK_EXPLAIN_REQUEST = "Explain what this exercise is asking, in plain language."
 
+  # Derived from what the critique schema actually permits rather than guessed:
+  # MAX_CRITIQUE_POINTS points of up to MAX_CRITIQUE_POINT_LENGTH characters is
+  # the largest VALID response, and a flat 300 sat below it — so a maximal
+  # three-point critique truncated mid-JSON and surfaced as a parse failure on a
+  # response the provider had produced correctly. Three characters per token is
+  # deliberately conservative for prose, and the constant covers the JSON
+  # envelope on top. Still far below full generation; round 1 returns no code,
+  # which is what keeps it cheap.
+  PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS = 100
+  PSEUDOCODE_CRITIQUE_MAX_TOKENS =
+    (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
+      ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
+    PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
+
+  # Provider output rendered into the page, so bounded at the boundary like
+  # every other such field.
+  MAX_GENERATED_CODE_LENGTH = 8_000
+
+  PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT = <<~PROMPT.chomp
+    You are reviewing an engineer's PSEUDOCODE plan before any code exists. They
+    have not submitted or been graded. Your job is to point out genuine gaps in
+    the plan's reasoning, and nothing else.
+
+    #{ExerciseSection::PseudocodeToCode.gap_standard}
+
+    Never write code, never show a corrected plan, and never restate their plan
+    back to them. Name what breaks and why, in one or two sentences per point.
+
+    If the plan holds up, say so by returning "gaps_found": false with an empty
+    "gaps" array. Do NOT invent a point to seem useful — an empty result is a
+    valid and expected outcome.
+
+    Return a single JSON object:
+    {"gaps_found": true|false, "gaps": ["string", "..."]}
+    At most #{ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS} entries in "gaps".
+    "gaps" must be empty when "gaps_found" is false, and non-empty when it is true.
+  PROMPT
+
+  # The single most important constraint in this feature. If the translation
+  # drifts into helpfulness the exercise silently becomes free help, which is
+  # the same failure teaching_note and improved_code gating exist to prevent.
+  # Stated as a list of prohibitions rather than as the adjective "faithful",
+  # because the adjective is exactly what a model interprets generously.
+  PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT = <<~PROMPT.chomp
+    You translate an engineer's pseudocode into real code. You are a
+    TRANSCRIBER, not a reviewer and not an assistant. You do not improve
+    anything.
+
+    - If the pseudocode omits an edge case, the code omits it too. Do not add a
+      guard, a nil check, a bounds check, or a default the pseudocode did not state.
+    - If the pseudocode is ambiguous, pick the MOST LITERAL reading and implement
+      that. Do not pick the reading that would work better.
+    - If the pseudocode is wrong, implement the wrong thing. Do not fix it.
+    - Do not add error handling, logging, validation, or defensive checks.
+    - Do not add comments. In particular, never add a comment pointing out a
+      problem ("# note: this will fail on empty input"). Naming the flaw is
+      someone else's job, not yours.
+    - Do not rename, reorder, or restructure for clarity.
+    - Add ONLY what is required to make the result syntactically valid:
+      declarations, signatures, brackets, imports.
+
+    Return the code and nothing else — no prose, no explanation, no fences.
+  PROMPT
+
   DUCK_SYSTEM_PROMPT = <<~PROMPT.chomp
     You are a Socratic thinking partner helping an engineer work through a
     problem they have NOT yet submitted or been graded on.
@@ -317,6 +381,16 @@ class AiService
     unstated_data_implications undefined_permissions_model
   ].freeze
 
+  # What a plan can get wrong before any syntax exists: these name defects in a
+  # decomposition, not in a language. Deliberately disjoint from every language
+  # vocabulary and from the other two fourth-slot ones, which is what lets this
+  # kind carry a ConceptBucket of its own (see DailyPlan::FOURTH_BUCKET_FOR).
+  PSEUDOCODE_TO_CODE_CONCEPTS = %w[
+    missing_base_case unhandled_empty_input off_by_one_boundary ambiguous_ordering
+    unstated_mutation conflated_responsibilities missing_termination_condition
+    undefined_failure_path
+  ].freeze
+
   # Curated, real, job-adjacent scenario flavors for the "scenario" field's
   # business-domain framing — prompt-level grounding only, to keep generated
   # scenarios feeling like real engineering work rather than generic SaaS
@@ -373,13 +447,20 @@ class AiService
       concepts: AMBIGUITY_HUNT_CONCEPTS,
       coach:    "requirements analysis",
       focus:    "interrogating an underspecified feature request: missing scope boundaries, unhandled edge cases, and unstated success criteria."
+    },
+    "pseudocode_to_code" => {
+      label:    "language-agnostic",
+      concepts: PSEUDOCODE_TO_CODE_CONCEPTS,
+      coach:    "algorithm design",
+      focus:    "turning an informal plan into something that actually works: base cases, empty input, boundaries, ordering, and the failure paths a plan leaves undefined."
     }
   }.freeze
 
   # Vocabularies with no code of their own to reference — a concept from any
   # of these has nothing language-specific to show, so their concept
   # reference asks for illustrative pseudocode instead of real source.
-  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS, AMBIGUITY_HUNT_CONCEPTS ].freeze
+  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS,
+                                     AMBIGUITY_HUNT_CONCEPTS, PSEUDOCODE_TO_CODE_CONCEPTS ].freeze
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
@@ -625,6 +706,51 @@ class AiService
     text_or_raise(result, subject: "duck response")
   end
 
+  # ── The pseudocode_to_code rounds, pre-submission only ───────────────────
+  # Round 1: one text-only critique. `gaps_found` is returned as a typed boolean
+  # rather than letting an empty list carry the meaning — an empty list is also
+  # what a malformed response normalizes to, so the list can never be the signal.
+  def critique_pseudocode(user, exercise, section:, pseudocode:)
+    result = call_and_log(
+      user, purpose: "pseudocode_critique", max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS,
+      system: PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT,
+      prompt: build_pseudocode_critique_prompt(exercise, section, pseudocode)
+    )
+
+    parsed     = parse_json_object(result[:text], subject: "pseudocode critique")
+    gaps_found = parsed["gaps_found"]
+    unless [ true, false ].include?(gaps_found)
+      raise InvalidResponseError, "Pseudocode critique returned no usable \"gaps_found\" flag"
+    end
+
+    gaps = ExerciseSection::PseudocodeToCode.normalize_critique(parsed["gaps"])
+    raise InvalidResponseError, "Pseudocode critique claimed gaps but returned none usable" if gaps_found && gaps.empty?
+
+    log_pseudocode_critique(user, gaps_found, gaps)
+    { gaps_found: gaps_found, gaps: gaps_found ? gaps : [] }
+  end
+
+  # Round 2: one call, always available, never gated on round 1's outcome.
+  def translate_pseudocode(user, exercise, section:, pseudocode:)
+    result = call_and_log(
+      user, purpose: "pseudocode_translate",
+      system: PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT,
+      prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
+    )
+
+    code = text_or_raise(result, subject: "pseudocode translation")
+    # Rejected, never truncated. Cutting source mid-token or mid-delimiter
+    # produces code that is no longer what their plan says — which the page
+    # then captions as "your plan implemented literally" and the review grades
+    # them on. Raising keeps the round unspent and retryable instead.
+    if code.length > MAX_GENERATED_CODE_LENGTH
+      raise InvalidResponseError,
+            "Pseudocode translation came back too long to be usable (#{code.length} characters)"
+    end
+
+    code
+  end
+
   private
 
   # Shared by #answer_follow_up and #duck_response — both render a prior
@@ -639,7 +765,8 @@ class AiService
 
   # Plain-text summary of whichever fields a given section actually has
   # (code_review/pattern/challenge/architecture/security_review/
-  # parsons_problem/plan_review/ambiguity_hunt all carry a different subset)
+  # parsons_problem/plan_review/ambiguity_hunt/pseudocode_to_code all carry a
+  # different subset)
   # — enough context for a Socratic prompt without needing per-section-kind
   # branching. `planted_ambiguities` is deliberately excluded: it's the
   # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
@@ -655,6 +782,7 @@ class AiService
       ("Code snippet:\n#{data["snippet"]}" if data["snippet"].present?),
       ("Starter code:\n#{data["starter_code"]}" if data["starter_code"].present?),
       ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
+      ("The problem to plan:\n#{data["problem_statement"]}" if data["problem_statement"].present?),
       ("Feature request:\n#{data["request"]}" if data["request"].present?),
       duck_parsons_blocks(data)
     ].compact.join("\n")
@@ -689,6 +817,45 @@ class AiService
     return if order.empty? || order == (0...block_count).to_a
 
     order
+  end
+
+  def build_pseudocode_critique_prompt(exercise, section, pseudocode)
+    data = exercise.problem_set[section.to_s] || {}
+
+    <<~PROMPT
+      The problem they are planning:
+      #{data["problem_statement"]}
+
+      Their pseudocode:
+      #{pseudocode}
+
+      Apply your standard exactly as stated in your system instructions:
+      #{ExerciseSection::PseudocodeToCode.gap_standard}
+    PROMPT
+  end
+
+  def build_pseudocode_translate_prompt(exercise, section, pseudocode)
+    data = exercise.problem_set[section.to_s] || {}
+
+    <<~PROMPT
+      Target language: #{config_for(exercise.language)[:label]}.
+
+      The problem they were planning, for naming only — never for filling gaps:
+      #{data["problem_statement"]}
+
+      Their pseudocode, to transcribe literally:
+      #{pseudocode}
+    PROMPT
+  end
+
+  # Counts and flags only: no pseudocode, no critique text. The counterpart line
+  # is ResponsesController#log_pseudocode_review_diagnostics, correlated by
+  # user id + date the way the difficulty diagnostics pair already correlates.
+  def log_pseudocode_critique(user, gaps_found, gaps)
+    Rails.logger.info(
+      "[pseudocode] user=#{user.id} date=#{Date.current} phase=critique " \
+      "gaps_found=#{gaps_found} gaps=#{gaps.size}"
+    )
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting
@@ -1201,9 +1368,14 @@ class AiService
     answers = daily_response.answers
     ratings = daily_response.section_ratings
 
+    # "rounds" is merged in for every key, not just the one kind that reads it:
+    # handing each kind a uniform context and letting it read only its own part
+    # is the same contract .generation_guidance uses, and it keeps the branch on
+    # which kind this is out of the shared assembler.
     sections = keys.map do |key|
       ExerciseSection.for(key).review_context(
-        section: exercise.problem_set[key], answer: answers[key], rating: ratings[key]
+        section: (exercise.problem_set[key] || {}).merge("rounds" => daily_response.pseudocode_round(key)),
+        answer: answers[key], rating: ratings[key]
       )
     end
 

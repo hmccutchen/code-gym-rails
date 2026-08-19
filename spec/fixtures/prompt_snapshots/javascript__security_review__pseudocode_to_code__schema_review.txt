@@ -1,0 +1,96 @@
+Generate a daily Code Gym exercise set for this engineer.
+
+Engineer profile:
+- Name: Snapshot
+- Skill level: developing (beginner → developing → solid → strong)
+- Priority focus areas: general JavaScript/React patterns
+
+Recent performance (last 10 sessions):
+No history yet — this is their first exercise set.
+
+Concepts needing reinforcement right now: none
+Fourth-section (pseudocode_to_code) concept needing reinforcement: none
+
+Instructions:
+- If they've been rating exercises "too easy", increase difficulty and reduce explanation in the reference.
+- If they've been rating "too hard" or skipping sections, simplify and add more scaffolding.
+- Prioritize focus areas they've missed or rated hard recently.
+- Rotate between topics across sessions — avoid the same pattern two days in a row.
+- Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
+- If a section's tagged concept is one of generics, type_guards_narrowing, union_intersection_types, mapped_conditional_types, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.
+
+- Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: background job processing, api versioning and deprecation, activerecord query construction, component state management, data export and reporting, webhook delivery, rate limiting, multi tenant data isolation (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
+- Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
+- answer_scaffold (pattern and architecture only): 4 labels at most, 80 characters at most each, ending in a colon. These pre-fill the answer box, so write them for THIS question specifically — name the parts a complete answer to it must cover, in the order someone should think them through (e.g. for a caching decision: "Which option, and why:", "How you'd handle a stale entry:"). Generic prompts that would fit any question of this kind are a wasted scaffold. Each is a heading the engineer writes UNDER, so it must ask for something, never state or hint at the answer — the teaching_note rules apply here too.
+- Every "diagram" field is Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not. Node labels must be short (a few words); use quoted labels like A["Order service"] when a label contains spaces or punctuation.
+- A section's "diagram" depicts ONLY the structure its scenario or snippet already describes — the components, calls, state, and consumers as written, in the order they happen. Never diagram the fix, the corrected structure, or the answer, and never annotate a node as the problem, the bug, or the bottleneck. The engineer sees this BEFORE answering, so showing the shape of a problem must never reveal its solution.
+- When the snippet or scenario contains a loop, iteration, or repeated invocation that wraps the flow being diagrammed (e.g. a method called inside `each`/`for`/`while`), the diagram must make that repetition visible — either an explicit loop/iteration node in the call's path, or a labeled edge stating the per-item cardinality (e.g. "once per customer", "for each order"). A flat one-time call chain is not accurate for code that actually repeats. Do not manufacture a loop or cardinality label when the snippet has none.
+- Return an empty string for any "diagram" when a picture would not add anything beyond the text. An empty string is a perfectly good answer and is preferred over a forced or trivial diagram.
+- The code_review snippet must be a Prisma schema change, with the migration it generates, ~10-15 lines, containing one planted data-modeling flaw. Same question shape as any other code_review ("what's the issue here, and how would you fix it") — the engineer reviews the proposed change, not prose about it.
+- Choose the code_review concept from this vocabulary, exactly one: missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration
+- Choose the pattern concept from this vocabulary, exactly one: callback_hell, promise_chaining, closures, prototype_chain, event_loop_blocking, this_binding, array_mutation_pitfalls, debouncing_throttling, closures_in_loops, memory_leaks_listeners, hooks_dependencies, component_re_renders, state_lifting, controlled_vs_uncontrolled, xss_prevention, insecure_client_storage, generics, type_guards_narrowing, union_intersection_types, mapped_conditional_types, over_mocking, testing_implementation_not_behavior, missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration, reading_for_intent, spotting_unstated_assumptions, separating_symptom_from_cause, god_object, primitive_obsession, shotgun_surgery, feature_envy, open_closed, dependency_inversion, composition_over_inheritance, shallow_module, pass_through_method, temporal_decomposition
+- The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to JavaScript/React. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."
+- Choose the security_review concept from this vocabulary, exactly one — these are the ONLY concepts security_review may use, never one from code_review/pattern's broader vocabulary: xss_prevention, insecure_client_storage
+- The security_review snippet should be realistic JavaScript/React code, not a contrived toy example — the same bar as code_review's snippet.
+- The fourth section is PSEUDOCODE TO CODE: "problem_statement" is a self-contained problem the engineer will plan in pseudocode before any code exists. It must be solvable in roughly 15-25 lines of pseudocode — small enough to plan in one sitting, large enough to need real decomposition — and must state at least one requirement an under-specified plan would quietly miss (an empty input, a boundary, an ordering guarantee, a failure path), so there is something missable to grade.
+- State the problem in terms of behavior and inputs, never in terms of JavaScript/React APIs: the engineer answers in pseudocode, and naming a framework method would hand them the decomposition.
+- Do NOT include starter code, a function signature, or a worked example. Choosing the decomposition is the whole exercise.
+- Choose the pseudocode_to_code concept from this vocabulary, exactly one: missing_base_case, unhandled_empty_input, off_by_one_boundary, ambiguous_ordering, unstated_mutation, conflated_responsibilities, missing_termination_condition, undefined_failure_path
+- The data-modeling concepts (missing_index, wrong_cardinality, missing_constraint, denormalization_tradeoffs, unsafe_migration) may be tagged on any section whose own vocabulary list above includes them. Only a schema-review code_review presents a schema artifact to review — anywhere else, express the concept in that section's own idiom: a pattern question about wrong_cardinality asks how the relationship should be modeled and what the wrong shape costs the code that uses it, not for a migration to review.
+- The meta-skill concepts (reading_for_intent, spotting_unstated_assumptions, separating_symptom_from_cause) name HOW to reason about a problem, not a topic to write about. A section tagged with one must still contain exactly one specific, findable issue and be gradeable against it — the concept shapes only how the question is framed, never whether there is a right answer. A code_review tagged reading_for_intent plants one real divergence between what the code is evidently for and what it does, and asks the engineer to name both; it never asks an open question about the code's purpose. A challenge tagged separating_symptom_from_cause states a failing behavior whose obvious fix treats the symptom, and is graded on whether the submitted implementation addresses the cause; it never asks for an essay about how to debug. Where no code is shown (pattern), express the concept against the described design instead: what the proposed approach takes for granted, or which layer the real cause sits at.
+- The code-smell concepts (god_object, primitive_obsession, shotgun_surgery, feature_envy) name a shape to recognize, not a single broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming and locating the smell and saying what it costs, never patching one line. Express it in the host section's own idiom: on a test-file code_review, a god_object is a bloated test class. The challenge section is the exception to the answer shape, since its answer is code: there the exercise is a refactor — starter_code exhibits the smell at that scale and the question asks the engineer to restructure it, so writing the better shape IS the answer rather than describing it.
+- The OO design-principle concepts (open_closed, dependency_inversion, composition_over_inheritance) name a rule the code breaks, not a topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that rule and be gradeable against it, and the answer is naming the violation and saying which future change it makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it costs; on a test-file code_review the planted test smell must BE the violation rather than sit beside it, which every principle in the group can express — a dependency_inversion violation is a test that can only reach its subject by stubbing one hard-coded collaborator, an open_closed violation is a conditional inside the test that gains a branch for every case added, and a composition_over_inheritance violation is a test-case base class whose subclasses inherit setup they do not use. The challenge section is the exception to the answer shape, since its answer is code: there the starter_code violates the principle — a behavior that cannot be tested without reaching through a hard-coded collaborator, for dependency_inversion — and the question asks for the version that satisfies it, so writing the corrected design IS the answer rather than describing it.
+- The module-design concepts (shallow_module, pass_through_method, temporal_decomposition) name what a module's interface costs every caller, not a bug in what it computes. A section tagged with one must contain exactly one specific, findable instance of that shape and be gradeable against it, and the answer is naming the instance and saying which future change its interface makes expensive, rather than a rewrite of the module. Express it in the host section's own idiom: a code_review tagged pass_through_method shows a method whose entire body forwards its arguments to one collaborator; on a test-file code_review, a shallow_module is a test helper whose setup arguments spell out the very state it claims to hide; a pattern, which shows no code, describes a module's interface and asks what it actually hides and what it forces every caller to know anyway. The challenge section is the exception to the answer shape, since its answer is code: there the starter_code exhibits the shape — for temporal_decomposition, a flow split into objects that exist only because they run in that order — and the question asks for the version organized around information instead, so writing the deeper module IS the answer rather than describing it.
+- Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
+- Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
+
+
+
+
+- Concepts most recently rated "too easy" must not repeat within the same week.
+- Concepts most recently rated "right level" have no special weighting.
+
+Return JSON matching this schema exactly:
+{
+  "code_review": {
+    "question": "string — what to find/fix",
+    "snippet":  "string — ~10-15 lines, matching the code_review snippet instruction above",
+    "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+    "concept": "string — exactly one concept from the provided vocabulary",
+    "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+    "diagram":  "string — Mermaid source showing the structure this snippet describes, or an empty string if no diagram would help"
+  },
+  "pattern": {
+    "title":    "string — pattern name",
+    "why":      "string — one sentence on why the pattern exists",
+    "question": "string — conceptual question to answer. Must be fully self-contained: never reference a code snippet, example, or \"the code below\" — none is shown for this section.",
+    "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+    "answer_scaffold": ["string — a labelled part of a complete answer to THIS question", "string — another part"],
+    "teaching_note": "string — 1-2 sentence hint toward the key insight, never the answer",
+    "concept": "string — exactly one concept from the provided vocabulary",
+    "diagram": "string — Mermaid source showing the structure this scenario describes, or an empty string if no diagram would help"
+  },
+  "security_review": {
+    "title":        "string",
+    "question":     "string — what security vulnerability exists here, and how would you mitigate it",
+    "snippet":      "string — JavaScript/React code, ~10-15 lines, containing one real, exploitable vulnerability",
+    "scenario": "string — the concrete business-domain framing, e.g. 'inventory restocking service'",
+    "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+    "concept": "string — exactly one concept from the provided vocabulary",
+    "reference": {
+      "tagline":      "string — bold one-liner",
+      "explanation":  "string — 2-3 sentences",
+      "code_example": "string — annotated JavaScript/React code, ~15 lines",
+      "senior_lens":  "string — when to reach for it / tradeoffs"
+    }
+  },
+  "pseudocode_to_code": {
+    "title":    "string — short name for the problem",
+    "scenario": "string — the concrete business-domain framing, e.g. 'deduplicating a nightly import feed'",
+    "problem_statement": "string — a self-contained problem solvable in roughly 15-25 lines of pseudocode, stating at least one requirement an under-specified plan would miss. No starter code, no signature, no worked example.",
+    "question": "string — e.g. 'Write pseudocode for this, then translate it.'",
+    "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
+    "concept": "string — exactly one concept from the provided vocabulary"
+  }
+}
+
