@@ -585,6 +585,54 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  # A review closes the day to regeneration, and every path that clears this
+  # message runs through regeneration — so a message left standing would tell
+  # the user to retry something the reviewed-set guard now refuses.
+  describe "POST /responses/:id/review and a stale generation failure" do
+    def submitted_response
+      exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+    end
+
+    def stub_review(result)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => result)
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    end
+
+    it "clears today's regeneration failure once a section is reviewed" do
+      resp = submitted_response
+      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+      stub_review({ ok: true, review: { "rating" => "solid" } })
+
+      post review_response_path(resp)
+
+      expect(user.reload.last_generation_error).to be_nil
+      expect(user.last_generation_error_date).to be_nil
+    end
+
+    it "leaves it standing when no section could be reviewed" do
+      resp = submitted_response
+      user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
+      stub_review({ ok: false, error_code: "other", message: "provider down" })
+
+      post review_response_path(resp)
+
+      expect(user.reload.last_generation_error).to eq("boom")
+    end
+
+    it "leaves an earlier day's failure alone" do
+      resp = submitted_response
+      user.update!(last_generation_error_date: Date.current - 1, last_generation_error: "yesterday")
+      stub_review({ ok: true, review: { "rating" => "solid" } })
+
+      post review_response_path(resp)
+
+      expect(user.reload.last_generation_error).to eq("yesterday")
+    end
+  end
+
   describe "POST /responses/:id/review partial success and retry" do
     def submitted_response
       exercise = DailyExercise.create!(
@@ -1314,7 +1362,7 @@ RSpec.describe "Responses", type: :request do
     it "destroys when an abandoned review claim has gone stale" do
       daily_response = create_response_for(
         user, submitted: true,
-        reviewing_since: (ResponsesController::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago
+        reviewing_since: (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago
       )
 
       delete start_over_response_path(daily_response)

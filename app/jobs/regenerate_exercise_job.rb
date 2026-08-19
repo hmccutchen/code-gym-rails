@@ -16,8 +16,34 @@ class RegenerateExerciseJob < ApplicationJob
 
     problem_set = AiService.for(user).generate_exercise(user, language: exercise.language)
 
+    kept_for = nil
     ActiveRecord::Base.transaction do
-      exercise.daily_response&.destroy
+      # The reviewed-state guard in DailyExercisesController#regenerate runs a
+      # worker hop and a 10-30s provider call earlier than this destroy, so a
+      # review started in another tab can land inside that window. Both halves of
+      # the re-check are load-bearing, and they cover different windows: #review
+      # claims the row with a bare UPDATE and takes the row lock only inside the
+      # transaction that writes its result, so during its provider call nothing
+      # is locked and this SELECT would win uncontended — #reviewing? is what
+      # sees that in-flight review, and the lock is what serializes this destroy
+      # against the write that finishes one. Dropping either lets a review the
+      # user has already paid for be destroyed.
+      #
+      # The whole regeneration is abandoned rather than the destroy alone —
+      # replacing the problem_set under a review would leave that review
+      # describing code the day no longer shows.
+      #
+      # One locked SELECT rather than a load followed by #lock!: a concurrent
+      # #start_over can delete the row between those two statements, and #lock!
+      # raises RecordNotFound on a row that has gone — which no rescue below
+      # catches, so the claim would be stranded until it goes stale. A row
+      # already gone is simply nil here, which is the no-response case.
+      existing = DailyResponse.lock.find_by(daily_exercise_id: exercise.id)
+      kept_for = :reviewed if existing&.reviewed?
+      kept_for = :reviewing if kept_for.nil? && existing&.reviewing?
+      raise ActiveRecord::Rollback if kept_for
+
+      existing&.destroy
       exercise.update!(
         problem_set:        problem_set,
         generated_at:       Time.current,
@@ -25,6 +51,8 @@ class RegenerateExerciseJob < ApplicationJob
         regenerating_since: nil
       )
     end
+
+    return keep_reviewed_set(user, exercise, kept_for) if kept_for
 
     user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
     Rails.logger.info("Regenerated exercise for #{user.email} on #{Date.current}")
@@ -38,6 +66,25 @@ class RegenerateExerciseJob < ApplicationJob
     release(user, exercise, e.message, e)
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
     release(user, exercise, "Generation returned an unusable set — try again.", e)
+  end
+
+  # Rendered after the dashboard's "Couldn't generate a new set: " prefix. A
+  # finished review and a running one are told apart because a running one can
+  # still fail, and a message asserting a review that never landed would be a
+  # false explanation for why the set is unchanged.
+  KEPT_SET_MESSAGES = {
+    reviewed:  "your review landed first, and replacing a reviewed set would discard it — today's reviewed set was kept.",
+    reviewing: "a review was running for today's set, so it was kept rather than replaced mid-review."
+  }.freeze
+
+  # Same shape as a failed attempt — the claim is released and regenerated_at
+  # stays nil, so the day's one regeneration is still available once the review
+  # is no longer the reason to refuse. The generated set is discarded: it was
+  # built for a day whose sections must not change.
+  def keep_reviewed_set(user, exercise, kept_for)
+    Rails.logger.info("Kept today's set (#{kept_for}) for #{user.email} on #{Date.current}; discarded the regenerated one")
+    exercise.update_columns(regenerating_since: nil)
+    user.update!(last_generation_error_date: Date.current, last_generation_error: KEPT_SET_MESSAGES.fetch(kept_for))
   end
 
   # regenerated_at is deliberately left untouched: a failed attempt must not

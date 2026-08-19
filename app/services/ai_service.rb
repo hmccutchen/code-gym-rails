@@ -36,7 +36,7 @@ class AiService
   # sets no timeout by default. The read budget is generous because a full
   # section review legitimately takes tens of seconds; the ceiling that matters
   # is (attempts × (open + read)) + retry backoff staying under
-  # ResponsesController::REVIEW_CLAIM_STALE_AFTER, which ai_service_spec
+  # DailyResponse::REVIEW_CLAIM_STALE_AFTER, which ai_service_spec
   # asserts so the two cannot drift apart.
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45

@@ -16,7 +16,7 @@ RSpec.describe AiService do
       backoff *= (1 + ClaudeService::RETRY_OPTIONS[:interval_randomness])
       worst_case = (retries + 1) * (AiService::OPEN_TIMEOUT + AiService::READ_TIMEOUT) + backoff
 
-      expect(worst_case).to be < ResponsesController::REVIEW_CLAIM_STALE_AFTER.to_i
+      expect(worst_case).to be < DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i
     end
 
     # The review budget above is driven by #review holding a request thread and

@@ -7,7 +7,11 @@
 
 <div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
   <div>
-    <% if exercise.regenerated_at.present? %>
+    <% if response.persisted? && response.reviewed? %>
+      <%# Mirrors the controller guard, which is the one that holds — the review
+          is already part of concept tracking and a new set would discard it. %>
+      <p class="hint">Today's set has been reviewed, so it can't be replaced — tomorrow's set builds on it.</p>
+    <% elsif exercise.regenerated_at.present? %>
       <p class="hint">You've already generated a new set today.</p>
     <% else %>
       <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>

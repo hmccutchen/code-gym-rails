@@ -68,8 +68,24 @@ class DailyResponse < ApplicationRecord
     end.then { |text| text.blank? ? nil : text }
   end
 
+  # How long a claimed-but-unfinished review blocks a retry. The provider call
+  # has no configured timeout, so a crash or hang mid-review must not lock the
+  # user out forever — after this window a new request may reclaim the row.
+  # Lives here rather than on ResponsesController because regeneration asks the
+  # same question from a controller and a job, and a second statement of the
+  # window could disagree with this one.
+  REVIEW_CLAIM_STALE_AFTER = 3.minutes
+
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
+
+  # A review is claimed and still plausibly running — mirrors
+  # DailyExercise#regenerating?. Anything that would destroy this row has to
+  # ask: #review's provider call runs outside a transaction, so a destroy
+  # mid-flight discards a review the user has already paid for.
+  def reviewing?
+    reviewing_since.present? && reviewing_since > REVIEW_CLAIM_STALE_AFTER.ago
+  end
 
   def fully_reviewed?
     section_keys.all? { |key| section_reviewed?(key) }

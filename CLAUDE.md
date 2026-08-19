@@ -187,7 +187,10 @@ User interacts:
        disables and relabels while it runs. Still manual/on-demand.
   └→ ResponsesController#email_review→ mails the completed review to the user,
        then returns to the dashboard (where the button lives)
-  └→ DailyExercisesController#regenerate → replaces today's set in place (once/day)
+  └→ DailyExercisesController#regenerate → replaces today's set in place (once/day),
+       destroying today's response — so it is blocked once that response has been
+       reviewed, the same invariant ResponsesController#start_over is blocked on
+       (see "One reviewed-response invariant" below)
   └→ HistoryController#index         → every submitted session, newest first,
        paginated 10 per page (pagy, offset) —
        the single destination for viewing any day's problems, answers, and
@@ -222,6 +225,19 @@ User interacts:
 - **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule).
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so every `answers[section].presence` reader — review prompt, history, `recent_performance` — sees what it saw before scaffolds existed.
 - **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call. The AI review stays a separate, manual step afterward — cost-conscious by design. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
+- **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
+  `ConceptMastery.record_review!` has already moved tier, streak and retention
+  state off that review, and nothing can undo it. So no action destroys a
+  reviewed response: `ResponsesController#start_over` and
+  `DailyExercisesController#regenerate` both refuse, and `RegenerateExerciseJob`
+  re-asks under the row lock `#review` takes, because the controller's answer is
+  a worker hop and a provider call old by the time the destroy runs — abandoning
+  the whole regeneration (claim released, the day's one regeneration preserved)
+  rather than replacing a problem_set the standing review describes. A review
+  merely in flight (`DailyResponse#reviewing?`, the same stale-claim window
+  `#review` claims with) blocks the same way; an abandoned claim past that window
+  does not.
+
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database, so `PreviewSeed` (`app/services/preview_seed.rb`) seeds three days of demo content for the single account named by `PREVIEW_SEED_EMAIL`. It runs from `preDeployCommand` in every environment including production, and is safe there because it no-ops without that variable, only ever creates rows (never updates or deletes), and never reassigns a non-blank attribute. `PreviewMail` additionally sends mail inline when the variable is set, so magic-link login does not depend on the worker service. **`PREVIEW_SEED_EMAIL` must be set on the PR-environment template only** — set at the shared or base level, Railway propagates it into production. There is no login bypass: PR apps authenticate with real magic links.
 - **Paginated history**: `/history` renders 10 submitted sessions per page via

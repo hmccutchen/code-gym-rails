@@ -475,6 +475,32 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#reviewing?" do
+    def response_claimed_at(reviewing_since)
+      user = User.create!(email: "reviewing-#{SecureRandom.hex(3)}@example.com", name: "R")
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
+      )
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: {}, reviewing_since: reviewing_since)
+    end
+
+    it "is false with no claim" do
+      expect(response_claimed_at(nil)).not_to be_reviewing
+    end
+
+    it "is true while a fresh claim is held" do
+      expect(response_claimed_at(10.seconds.ago)).to be_reviewing
+    end
+
+    # A crashed or hung review must not block regeneration (or start-over) for
+    # the rest of the day.
+    it "is false once the claim has gone stale" do
+      expect(response_claimed_at((DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago)).not_to be_reviewing
+    end
+  end
+
   describe "#section_reviewed?" do
     it "is true only for a section with a Hash entry in ai_review" do
       user = User.create!(email: "sr_test@example.com", name: "SR")

@@ -18,9 +18,26 @@ class DailyExercisesController < ApplicationController
   # once per day via regenerated_at. Replaces the existing DailyExercise row's
   # contents in place; never creates a second row for the same day. The provider
   # call runs on the worker, so this action never blocks on it.
+  #
+  # Regeneration destroys today's response (RegenerateExerciseJob), so it carries
+  # the same reviewed-state guard as ResponsesController#start_over: once a
+  # review exists, ConceptMastery.record_review! has already moved tier, streak
+  # and retention state off it, and destroying the row would leave that state
+  # standing with no evidence behind it. Guarded here rather than only in the
+  # view, since the view's button is not what makes the destroy unsafe.
   def regenerate
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: "No exercise set to regenerate yet." unless exercise
+
+    # Named daily_response, not response: a local named `response` shadows the
+    # controller's own response object for the rest of the action.
+    daily_response = exercise.daily_response
+    if daily_response&.reviewed?
+      return redirect_to root_path, alert: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
+    end
+    if daily_response&.reviewing?
+      return redirect_to root_path, alert: "A review is being generated for today's set — try again in a moment."
+    end
 
     unless claim_regeneration!(exercise)
       return redirect_to root_path, alert: "You've already generated a new set today."
