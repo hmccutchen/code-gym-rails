@@ -1,4 +1,5 @@
 require "active_support/core_ext/integer/time"
+require_relative "../../lib/boot/app_host"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
@@ -61,15 +62,14 @@ Rails.application.configure do
   # Set host to be used by links generated in mailer templates (e.g. the magic link
   # verify_auth_url). Mailer views render outside the request cycle, so config.force_ssl
   # has no effect here -- protocol is forced to https explicitly.
-  app_host = URI.parse(ENV.fetch("APP_HOST", "https://example.com"))
-  config.action_mailer.default_url_options = { host: app_host.host, protocol: "https" }
+  app_host = AppHost.resolve
+  config.action_mailer.default_url_options = { host: app_host, protocol: "https" }
 
   # Allow the app's own origin to open ActionCable WebSocket connections
-  # (Turbo Stream broadcasts for exercise-generation live updates). Reuses
-  # the same APP_HOST env var as the mailer config above. Browser Origin
-  # headers always include the scheme, so only the full "https://host" form
-  # is ever matched.
-  config.action_cable.allowed_request_origins = [ "https://#{app_host.host}" ]
+  # (Turbo Stream broadcasts for exercise-generation live updates). Derived from
+  # the same resolved host as the mailer config above. Browser Origin headers
+  # always include the scheme, so only the full "https://host" form is ever matched.
+  config.action_cable.allowed_request_origins = [ "https://#{app_host}" ]
 
   # Deliver via Resend's HTTP API (see docs/deploy/railway-smtp-setup.md).
   # Railway blocks outbound SMTP on plans below Pro, so smtp_settings would
