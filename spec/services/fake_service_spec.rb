@@ -23,13 +23,23 @@ RSpec.describe FakeService do
     it "returns a problem set covering every ExerciseSection kind with valid, non-'other' concepts" do
       problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
 
-      expect(problem_set.keys).to match_array(
-        %w[code_review pattern challenge architecture security_review parsons_problem plan_review ambiguity_hunt]
-      )
+      # Derived from the registry rather than restated: this example's whole
+      # claim is "every kind", and a hardcoded list quietly stops meaning that
+      # the moment a kind is added.
+      expect(problem_set.keys).to match_array(ExerciseSection.keys)
       problem_set.each_value do |section|
         expect(section["concept"]).to be_present
         expect(section["concept"]).not_to eq("other")
       end
+    end
+
+    # The behavioural half of the faithfulness check: the canned plan omits the
+    # empty-input case, and the canned translation omits it too. A fixture that
+    # "helpfully" added a guard would let the faithfulness specs pass while
+    # proving nothing.
+    it "returns a translation that preserves the gap its own critique names" do
+      expect(described_class::PSEUDOCODE_CRITIQUE["gaps"].join).to match(/empty/i)
+      expect(described_class::PSEUDOCODE_TRANSLATION).not_to match(/empty\?|nil\?|blank\?|\.any\?/)
     end
 
     it "resolves to the architecture third when persisted, since architecture has top precedence" do

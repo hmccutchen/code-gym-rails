@@ -1,7 +1,6 @@
 require "rails_helper"
 
 RSpec.describe DailyPlan do
-
   describe "FOURTH_BUCKET_FOR" do
     # DailyPlan.fourth_track fetches this, so a fourth kind missing an entry
     # raises at generation rather than silently sharing another kind's history.

@@ -99,6 +99,61 @@ class AiService
   # against the same turn cap as one.
   DUCK_EXPLAIN_REQUEST = "Explain what this exercise is asking, in plain language."
 
+  # Three short prose points at most (ExerciseSection::PseudocodeToCode::
+  # MAX_CRITIQUE_POINTS), so this is sized like the duck's ceiling rather than
+  # like full generation. Round 1 returns no code, which is what keeps it cheap.
+  PSEUDOCODE_CRITIQUE_MAX_TOKENS = 300
+
+  # Provider output rendered into the page, so bounded at the boundary like
+  # every other such field.
+  MAX_GENERATED_CODE_LENGTH = 8_000
+
+  PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT = <<~PROMPT.chomp
+    You are reviewing an engineer's PSEUDOCODE plan before any code exists. They
+    have not submitted or been graded. Your job is to point out genuine gaps in
+    the plan's reasoning, and nothing else.
+
+    #{ExerciseSection::PseudocodeToCode.gap_standard}
+
+    Never write code, never show a corrected plan, and never restate their plan
+    back to them. Name what breaks and why, in one or two sentences per point.
+
+    If the plan holds up, say so by returning "gaps_found": false with an empty
+    "gaps" array. Do NOT invent a point to seem useful — an empty result is a
+    valid and expected outcome.
+
+    Return a single JSON object:
+    {"gaps_found": true|false, "gaps": ["string", "..."]}
+    At most #{ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS} entries in "gaps".
+    "gaps" must be empty when "gaps_found" is false, and non-empty when it is true.
+  PROMPT
+
+  # The single most important constraint in this feature. If the translation
+  # drifts into helpfulness the exercise silently becomes free help, which is
+  # the same failure teaching_note and improved_code gating exist to prevent.
+  # Stated as a list of prohibitions rather than as the adjective "faithful",
+  # because the adjective is exactly what a model interprets generously.
+  PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT = <<~PROMPT.chomp
+    You translate an engineer's pseudocode into real code. You are a
+    TRANSCRIBER, not a reviewer and not an assistant. You do not improve
+    anything.
+
+    - If the pseudocode omits an edge case, the code omits it too. Do not add a
+      guard, a nil check, a bounds check, or a default the pseudocode did not state.
+    - If the pseudocode is ambiguous, pick the MOST LITERAL reading and implement
+      that. Do not pick the reading that would work better.
+    - If the pseudocode is wrong, implement the wrong thing. Do not fix it.
+    - Do not add error handling, logging, validation, or defensive checks.
+    - Do not add comments. In particular, never add a comment pointing out a
+      problem ("# note: this will fail on empty input"). Naming the flaw is
+      someone else's job, not yours.
+    - Do not rename, reorder, or restructure for clarity.
+    - Add ONLY what is required to make the result syntactically valid:
+      declarations, signatures, brackets, imports.
+
+    Return the code and nothing else — no prose, no explanation, no fences.
+  PROMPT
+
   DUCK_SYSTEM_PROMPT = <<~PROMPT.chomp
     You are a Socratic thinking partner helping an engineer work through a
     problem they have NOT yet submitted or been graded on.
@@ -642,6 +697,41 @@ class AiService
     text_or_raise(result, subject: "duck response")
   end
 
+  # ── The pseudocode_to_code rounds, pre-submission only ───────────────────
+  # Round 1: one text-only critique. `gaps_found` is returned as a typed boolean
+  # rather than letting an empty list carry the meaning — an empty list is also
+  # what a malformed response normalizes to, so the list can never be the signal.
+  def critique_pseudocode(user, exercise, section:, pseudocode:)
+    result = call_and_log(
+      user, purpose: "pseudocode_critique", max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS,
+      system: PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT,
+      prompt: build_pseudocode_critique_prompt(exercise, section, pseudocode)
+    )
+
+    parsed     = parse_json_object(result[:text], subject: "pseudocode critique")
+    gaps_found = parsed["gaps_found"]
+    unless [ true, false ].include?(gaps_found)
+      raise InvalidResponseError, "Pseudocode critique returned no usable \"gaps_found\" flag"
+    end
+
+    gaps = ExerciseSection::PseudocodeToCode.normalize_critique(parsed["gaps"])
+    raise InvalidResponseError, "Pseudocode critique claimed gaps but returned none usable" if gaps_found && gaps.empty?
+
+    log_pseudocode_critique(user, gaps_found, gaps)
+    { gaps_found: gaps_found, gaps: gaps_found ? gaps : [] }
+  end
+
+  # Round 2: one call, always available, never gated on round 1's outcome.
+  def translate_pseudocode(user, exercise, section:, pseudocode:)
+    result = call_and_log(
+      user, purpose: "pseudocode_translate",
+      system: PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT,
+      prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
+    )
+
+    text_or_raise(result, subject: "pseudocode translation").truncate(MAX_GENERATED_CODE_LENGTH)
+  end
+
   private
 
   # Shared by #answer_follow_up and #duck_response — both render a prior
@@ -706,6 +796,45 @@ class AiService
     return if order.empty? || order == (0...block_count).to_a
 
     order
+  end
+
+  def build_pseudocode_critique_prompt(exercise, section, pseudocode)
+    data = exercise.problem_set[section.to_s] || {}
+
+    <<~PROMPT
+      The problem they are planning:
+      #{data["problem_statement"]}
+
+      Their pseudocode:
+      #{pseudocode}
+
+      Apply your standard exactly as stated in your system instructions:
+      #{ExerciseSection::PseudocodeToCode.gap_standard}
+    PROMPT
+  end
+
+  def build_pseudocode_translate_prompt(exercise, section, pseudocode)
+    data = exercise.problem_set[section.to_s] || {}
+
+    <<~PROMPT
+      Target language: #{config_for(exercise.language)[:label]}.
+
+      The problem they were planning, for naming only — never for filling gaps:
+      #{data["problem_statement"]}
+
+      Their pseudocode, to transcribe literally:
+      #{pseudocode}
+    PROMPT
+  end
+
+  # Counts and flags only: no pseudocode, no critique text. The counterpart line
+  # is ResponsesController#log_pseudocode_review_diagnostics, correlated by
+  # user id + date the way the difficulty diagnostics pair already correlates.
+  def log_pseudocode_critique(user, gaps_found, gaps)
+    Rails.logger.info(
+      "[pseudocode] user=#{user.id} date=#{Date.current} phase=critique " \
+      "gaps_found=#{gaps_found} gaps=#{gaps.size}"
+    )
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting

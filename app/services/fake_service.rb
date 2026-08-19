@@ -8,14 +8,15 @@
 # reads which section to grade out of `prompt:`, since #review_sections
 # sends the same shared system context to every section's call.
 class FakeService < AiService
-  # All eight ExerciseSection kinds populated at once. DailyExercise#third_key
+  # All nine ExerciseSection kinds populated at once. DailyExercise#third_key
   # resolves by precedence over whichever keys are present hashes
   # (ExerciseSection.thirds: architecture, security_review, challenge,
   # parsons_problem) — architecture wins here every time, regardless of
   # which third DailyPlan actually asked for, since normalize_concepts and
   # shuffle_parsons_blocks! only ever touch keys that exist. Same precedence
-  # story for the fourth slot (ExerciseSection.fourths): plan_review wins
-  # over ambiguity_hunt whenever both are present, via DailyExercise#fourth_key.
+  # story for the fourth slot (ExerciseSection.fourths): plan_review wins over
+  # ambiguity_hunt and pseudocode_to_code whenever more than one is present,
+  # via DailyExercise#fourth_key.
   EXERCISE_PROBLEM_SET = {
     "code_review" => {
       "question" => "This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?",
@@ -151,6 +152,14 @@ class FakeService < AiService
       "question" => "What would you need clarified before writing a spec for this?",
       "teaching_note" => "Read the request as if you had to start writing code from it right now — where would you have to just guess?",
       "concept" => "missing_success_criteria"
+    },
+    "pseudocode_to_code" => {
+      "title" => "Merge overlapping ranges",
+      "scenario" => "collapsing overlapping maintenance windows before they go on a status page",
+      "problem_statement" => "Given a list of [start, end] ranges in no particular order, return the smallest list of ranges covering exactly the same span, merging any that overlap or touch. The list may be empty.",
+      "question" => "Write pseudocode for this, then translate it.",
+      "teaching_note" => "Think about what has to be true about the order of the ranges before any merging step can work.",
+      "concept" => "unhandled_empty_input"
     }
   }.freeze
 
@@ -184,6 +193,31 @@ class FakeService < AiService
     "Focus on the boundary of the operation: what MUST happen before returning success, and what could safely " \
     "happen after. That's what separates a synchronous responsibility from something a background job can own."
 
+  PSEUDOCODE_CRITIQUE = {
+    "gaps_found" => true,
+    "gaps" => [ "Your plan never says what happens when the input list is empty — the first step reads a first element that will not be there." ]
+  }.freeze
+
+  # Deliberately preserves the gap the canned critique names: it indexes the
+  # first element with no empty-list check, exactly as the canned plan does. A
+  # fixture that "helpfully" added a guard would let the faithfulness specs pass
+  # while testing nothing.
+  PSEUDOCODE_TRANSLATION = <<~RUBY.strip
+    def merge_ranges(ranges)
+      sorted = ranges.sort_by(&:first)
+      merged = [ sorted.first ]
+      sorted.drop(1).each do |range|
+        last = merged.last
+        if range.first <= last.last
+          merged[-1] = [ last.first, [ last.last, range.last ].max ]
+        else
+          merged << range
+        end
+      end
+      merged
+    end
+  RUBY
+
   DUCK_RESPONSE_TEXT =
     "What would happen to that method if it ran a hundred times in one request — where would the slowdown show up?"
 
@@ -211,6 +245,10 @@ class FakeService < AiService
         FOLLOW_UP_ANSWER_TEXT
       when /Socratic thinking partner/
         DUCK_RESPONSE_TEXT
+      when /reviewing an engineer's PSEUDOCODE plan/
+        PSEUDOCODE_CRITIQUE.to_json
+      when /TRANSCRIBER, not a reviewer/
+        PSEUDOCODE_TRANSLATION
       else
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end
