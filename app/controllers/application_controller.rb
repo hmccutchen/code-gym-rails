@@ -1,4 +1,8 @@
 class ApplicationController < ActionController::Base
+  # Registers a prepend_before_action ONLY on a Railway pull-request
+  # deployment; in every other environment this include adds no callback.
+  include PreviewAutoLogin
+
   before_action :require_login
   before_action :require_api_key
   around_action :use_time_zone
