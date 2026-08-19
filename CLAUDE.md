@@ -348,8 +348,11 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/controllers/sessions_controller.rb` — magic link create + verify
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
-- `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PREVIEW_SEED_EMAIL`
-- `app/services/preview_mail.rb` — inline mail delivery in preview apps, so login never needs a worker
+- `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
+- `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
+- `app/services/preview_mail.rb` — inline mail delivery in preview apps, gated on `PreviewEnvironment.active?`, so login never needs a worker
+- `app/controllers/concerns/preview_auto_login.rb` — preview-only auto-login callback, registered only when `PreviewEnvironment.active?`
+- `lib/boot/app_host.rb` — `AppHost.resolve`: `APP_HOST` then `RAILWAY_PUBLIC_DOMAIN`, outside the autoload path
 - `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
