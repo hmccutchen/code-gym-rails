@@ -137,6 +137,7 @@ class ResponsesController < ApplicationController
       @response.save!
     end
     release_review_claim!
+    clear_stale_generation_error! if successes.any?
     log_review_diagnostics(@response, successes.keys) if successes.any?
 
     if failures.empty?
@@ -428,6 +429,19 @@ class ResponsesController < ApplicationController
 
   def release_review_claim!
     @response.update_column(:reviewing_since, nil)
+  end
+
+  # A review closes the day to regeneration (DailyExercisesController#regenerate
+  # refuses a reviewed response), and with it every path that clears this
+  # message — #generate early-returns once the day has an exercise. So a
+  # regeneration failure recorded earlier today would otherwise sit on the
+  # dashboard until midnight telling the user to retry something they can no
+  # longer do. RegenerateExerciseJob#keep_reviewed_set writes its own message
+  # after this point, so the one explanation that is still true survives.
+  def clear_stale_generation_error!
+    return unless current_user.last_generation_error_date == Date.current
+
+    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
   end
 
   # Nearly all difficulty adaptation in this app is advisory; nothing

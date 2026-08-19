@@ -29,11 +29,13 @@ class DailyExercisesController < ApplicationController
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: "No exercise set to regenerate yet." unless exercise
 
-    response = exercise.daily_response
-    if response&.reviewed?
+    # Named daily_response, not response: a local named `response` shadows the
+    # controller's own response object for the rest of the action.
+    daily_response = exercise.daily_response
+    if daily_response&.reviewed?
       return redirect_to root_path, alert: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
     end
-    if response&.reviewing?
+    if daily_response&.reviewing?
       return redirect_to root_path, alert: "A review is being generated for today's set — try again in a moment."
     end
 

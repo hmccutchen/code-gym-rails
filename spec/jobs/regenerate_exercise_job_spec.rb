@@ -81,6 +81,21 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.last_generation_error_date).to eq(Date.current)
   end
 
+  # A running review can still fail, so the kept-set explanation must not assert
+  # that one landed.
+  it "distinguishes a review still running from one that landed" do
+    exercise = claimed_exercise
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                          reviewing_since: 10.seconds.ago)
+    stub_provider({ "code_review" => { "question" => "new" } })
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(user.reload.last_generation_error).to eq(described_class::KEPT_SET_MESSAGES.fetch(:reviewing))
+    expect(user.last_generation_error).not_to include("landed")
+  end
+
   # The review's own writes commit after its provider call returns, so a claimed
   # row is a review in flight — destroying it discards work the user has paid for.
   it "keeps a response whose review is still in flight" do
