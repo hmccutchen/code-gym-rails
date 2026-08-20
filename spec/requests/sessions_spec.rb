@@ -266,6 +266,28 @@ RSpec.describe "Sessions", type: :request do
       expect(response.body).not_to include("/login/code")
       expect(response.body).to include("Check your email")
     end
+
+    # Asserted on the script text because the branch is client-side and its
+    # inputs are the platform's, not the server's. The hazard it answers —
+    # a link clicked in the browser landing in a session the app window
+    # cannot see — is iOS's alone, since a home-screen app there gets its own
+    # cookie jar from 16.4. An installed app anywhere else shares the
+    # browser's cookies, so widening this to (display-mode: standalone) would
+    # switch polling off for users whose magic link would have resolved it,
+    # leaving them to retype a code for a problem they do not have. Nothing
+    # renders differently when that regresses, so this is the only thing that
+    # would say so. Matching on matchMedia rather than the query string:
+    # the layout carries an @media (display-mode: standalone) block of its
+    # own, and only a script can consult the query from here.
+    it "gates the code-only pending state on iOS standalone alone" do
+      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+
+      get login_path
+
+      expect(response.body).to include("window.navigator.standalone === true")
+      expect(response.body).not_to include("matchMedia")
+      expect(response.body).to include(login_status_path)
+    end
   end
 
   describe "GET /login/status" do

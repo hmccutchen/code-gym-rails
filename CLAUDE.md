@@ -304,6 +304,21 @@ User interacts:
   reorderable with Ctrl+↑/↓ (bare ↑/↓ moves focus), with an `aria-live` status
   line announcing each move — that keyboard path, not the arrows, is what keeps
   the section answerable without a mouse.
+- **Home-screen app**: `GET /manifest.json` (Rails' own `PwaController`, so it
+  needs no session) plus the `apple-mobile-web-app-*` meta tags in the layout
+  make an iOS home-screen launch open standalone instead of inside Safari's
+  chrome. The `apple-` meta tags are not redundant with the manifest — iOS reads
+  `display: standalone` only from 17.4. `status-bar-style` is `black`, so
+  content stays below the status bar and nothing needs `viewport-fit=cover` or
+  safe-area insets. `public/icon.svg` is the committed source of the icon;
+  `icon.png`, `icon-192.png` and `apple-touch-icon.png` are rasterized from it.
+  No service worker: nothing registers one, and iOS does not need one for
+  standalone mode. A home-screen app gets its own cookie jar on iOS 16.4+, so a
+  magic link opened in Safari cannot log it in — `sessions/_pending` switches to
+  the 6-digit code there, keying on `navigator.standalone` rather than
+  `display-mode: standalone` precisely because that hazard is iOS's alone: an
+  installed app elsewhere shares the browser's cookies, so the link still
+  resolves its poll.
 
 ## Railway Deployment
 

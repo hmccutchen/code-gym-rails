@@ -8,6 +8,21 @@
       That's --input-font-size below, on every focusable control's rule. %>
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>Code Gym</title>
+  <link rel="manifest" href="<%= pwa_manifest_path %>">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icon-192.png" type="image/png">
+  <%# iOS reads the manifest's display:standalone only from 17.4, so
+      apple-mobile-web-app-capable is what actually drops Safari's address bar,
+      reload and "aA" buttons on a home-screen launch; mobile-web-app-capable is
+      the standardised spelling of the same declaration. status-bar-style "black"
+      keeps the app's content below the status bar, so nothing here needs
+      viewport-fit=cover or safe-area insets. %>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Code Gym">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#1a1a2e">
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
   <style>
@@ -22,6 +37,15 @@
       --input-font-size: max(1rem, 16px);
     }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
+    /* Browser behaviours that read as "web page" rather than "app" once the
+       chrome around them is gone: the rubber-band bounce past the end of a
+       page, and the grey flash on tap. Scoped to the installed app rather than
+       applied everywhere, so a Safari tab keeps its pull-to-refresh and its
+       tap feedback. */
+    @media (display-mode: standalone) {
+      html, body { overscroll-behavior-y: none; }
+      body { -webkit-tap-highlight-color: transparent; }
+    }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
@@ -29,8 +53,21 @@
 
     nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
     nav .inner { display: flex; justify-content: space-between; align-items: center; }
-    nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
-    nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; }
+    /* The brand refuses to shrink or wrap: squeezed between the name editor and
+       the links on a phone, it otherwise broke into three lines (the bolt, then
+       "Code", then "Gym"), which is most visible in the installed app where
+       there is no browser chrome above it to distract from it. The name editor
+       absorbs the squeeze instead — a truncated name still reads and still
+       edits, a stacked wordmark reads as broken. min-width: 0 all the way down
+       is what lets it: a flex item will not shrink below its content otherwise. */
+    nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+    nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
+    nav .name-editor { display: flex; align-items: center; min-width: 0; }
+    /* Below this the row is too tight for the bolt and the wordmark both, and
+       the wordmark is the half that names the app. */
+    @media (max-width: 600px) {
+      nav .brand-mark { display: none; }
+    }
 
     .flash { padding: .75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: .9rem; }
     .flash.notice { background: rgba(74, 222, 128, .1); border: 1px solid var(--green); color: var(--green); }
@@ -226,6 +263,7 @@
       font-family: inherit;
       padding: .15rem .3rem;
       width: 9rem;
+      min-width: 0;
       border-radius: 6px;
     }
     .name-editor-input:focus {
@@ -246,9 +284,9 @@
   <nav>
     <div class="container inner">
       <% if logged_in? %>
-        <%= link_to "⚡ Code Gym", root_path, class: "brand" %>
+        <%= link_to root_path, class: "brand" do %><span class="brand-mark">⚡</span> Code Gym<% end %>
       <% else %>
-        <span class="brand">⚡ Code Gym</span>
+        <span class="brand"><span class="brand-mark">⚡</span> Code Gym</span>
       <% end %>
       <% if logged_in? %>
         <div class="nav-links">
