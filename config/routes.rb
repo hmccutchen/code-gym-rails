@@ -3,6 +3,13 @@ Rails.application.routes.draw do
   # app has booted; served by Rails' built-in health controller, no auth required.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Web app manifest. Linked from the layout, this is what lets an iOS
+  # home-screen launch open standalone instead of inside Safari's chrome.
+  # Rails' own PwaController does not inherit ApplicationController, so it is
+  # reachable logged out — which it must be, since the manifest is fetched
+  # before any session exists.
+  get "manifest.json" => "rails/pwa#manifest", as: :pwa_manifest, defaults: { format: :json }
+
   # Not used by anything live today — the dashboard's generation-completion
   # signal is a polled JSON endpoint instead (this app loads no Turbo/
   # Stimulus JS, so a broadcast here would have no subscriber). Left mounted

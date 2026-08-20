@@ -1,3 +1,8 @@
-<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="256" cy="256" r="256" fill="red"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Code Gym</title>
+  <!-- Full-bleed square with no rounded corners of its own: iOS and Android
+       each apply their own mask, and the bolt is kept inside the centre 80%
+       so the maskable manifest entry can reuse this same artwork. -->
+  <rect width="512" height="512" fill="#0f0f1a"/>
+  <path d="M278.5 106 L128.5 286 L233.5 286 L218.5 406 L383.5 226 L278.5 226 L293.5 106 Z" fill="#7c6af7"/>
 </svg>

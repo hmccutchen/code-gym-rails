@@ -8,6 +8,20 @@
       That's --input-font-size below, on every focusable control's rule. %>
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>Code Gym</title>
+  <link rel="manifest" href="<%= pwa_manifest_path %>">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <%# iOS reads the manifest's display:standalone only from 17.4, so
+      apple-mobile-web-app-capable is what actually drops Safari's address bar,
+      reload and "aA" buttons on a home-screen launch; mobile-web-app-capable is
+      the standardised spelling of the same declaration. status-bar-style "black"
+      keeps the app's content below the status bar, so nothing here needs
+      viewport-fit=cover or safe-area insets. %>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Code Gym">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#1a1a2e">
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
   <style>
@@ -22,6 +36,14 @@
       --input-font-size: max(1rem, 16px);
     }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
+    /* Browser behaviours that read as "web page" rather than "app" once the
+       chrome around them is gone: the rubber-band bounce past the end of a
+       page, and the grey flash on tap. Scoped to the installed app rather than
+       applied everywhere, so a Safari tab keeps its pull-to-refresh and its
+       tap feedback. */
+    @media (display-mode: standalone) {
+      body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+    }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
