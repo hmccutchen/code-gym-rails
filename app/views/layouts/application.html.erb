@@ -10,6 +10,7 @@
   <title>Code Gym</title>
   <link rel="manifest" href="<%= pwa_manifest_path %>">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icon-192.png" type="image/png">
   <%# iOS reads the manifest's display:standalone only from 17.4, so
       apple-mobile-web-app-capable is what actually drops Safari's address bar,
       reload and "aA" buttons on a home-screen launch; mobile-web-app-capable is
@@ -42,7 +43,8 @@
        applied everywhere, so a Safari tab keeps its pull-to-refresh and its
        tap feedback. */
     @media (display-mode: standalone) {
-      body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+      html, body { overscroll-behavior-y: none; }
+      body { -webkit-tap-highlight-color: transparent; }
     }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -65,7 +67,6 @@
        the wordmark is the half that names the app. */
     @media (max-width: 600px) {
       nav .brand-mark { display: none; }
-      .name-editor-input { width: 100%; max-width: 9rem; }
     }
 
     .flash { padding: .75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: .9rem; }

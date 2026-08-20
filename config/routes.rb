@@ -8,7 +8,11 @@ Rails.application.routes.draw do
   # Rails' own PwaController does not inherit ApplicationController, so it is
   # reachable logged out — which it must be, since the manifest is fetched
   # before any session exists.
-  get "manifest.json" => "rails/pwa#manifest", as: :pwa_manifest, defaults: { format: :json }
+  # format: false, not just a default: the route would otherwise compile to
+  # /manifest.json(.:format), and a request-supplied format beats the default —
+  # /manifest.json.html then reaches the controller as HTML and raises
+  # MissingTemplate, a 500 on an unauthenticated path any crawler can hit.
+  get "manifest.json" => "rails/pwa#manifest", as: :pwa_manifest, defaults: { format: :json }, format: false
 
   # Not used by anything live today — the dashboard's generation-completion
   # signal is a polled JSON endpoint instead (this app loads no Turbo/

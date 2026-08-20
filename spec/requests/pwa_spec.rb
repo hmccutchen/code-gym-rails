@@ -39,6 +39,16 @@ RSpec.describe "PWA", type: :request do
       expect(manifest["theme_color"]).to eq(layout_color("surface"))
     end
 
+    # The route pins format: false. Without it the pattern carries an optional
+    # (.:format) that a request can override, and the JSON template is then
+    # asked for as HTML — MissingTemplate, i.e. a 500 on a path that needs no
+    # session and that any crawler appending an extension will find.
+    it "serves no format but JSON" do
+      get "/manifest.json.html"
+
+      expect(response).to have_http_status(:not_found)
+    end
+
     it "points every icon at artwork that exists" do
       sources = manifest["icons"].map { |icon| icon["src"] }
 
@@ -63,6 +73,13 @@ RSpec.describe "PWA", type: :request do
       expect(response.body).to include(%(<meta name="apple-mobile-web-app-capable" content="yes">))
       expect(response.body).to include(%(<meta name="mobile-web-app-capable" content="yes">))
       expect(response.body).to include(%(<meta name="apple-mobile-web-app-status-bar-style" content="black">))
+    end
+
+    # The third copy of --surface, after the custom property and the manifest.
+    # Without this the manifest assertion above can be brought back into line
+    # on its own and leave the browser-chrome tint on the old value.
+    it "tints the browser chrome from the same palette as the manifest" do
+      expect(response.body).to include(%(<meta name="theme-color" content="#{layout_color("surface")}">))
     end
 
     it "names and illustrates the home screen entry" do

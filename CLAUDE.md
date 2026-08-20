@@ -314,8 +314,11 @@ User interacts:
   `icon.png`, `icon-192.png` and `apple-touch-icon.png` are rasterized from it.
   No service worker: nothing registers one, and iOS does not need one for
   standalone mode. A home-screen app gets its own cookie jar on iOS 16.4+, so a
-  magic link opened in Safari cannot log it in — `sessions/_pending` detects
-  standalone and switches to the 6-digit code, which is the login path there.
+  magic link opened in Safari cannot log it in — `sessions/_pending` switches to
+  the 6-digit code there, keying on `navigator.standalone` rather than
+  `display-mode: standalone` precisely because that hazard is iOS's alone: an
+  installed app elsewhere shares the browser's cookies, so the link still
+  resolves its poll.
 
 ## Railway Deployment
 

@@ -21,8 +21,13 @@
     dashboard/_generating.html.erb's polling script. %>
 <script>
 (() => {
-  const isStandalone = window.navigator.standalone === true ||
-    (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  // iOS only, deliberately. A home-screen app there gets its own cookie jar
+  // (16.4+), so a link clicked in Safari lands in a session this window cannot
+  // see. An installed app on Android or desktop shares the browser's cookies,
+  // so the link still resolves the poll below — matching (display-mode:
+  // standalone) too would strand those users on the code form with polling
+  // switched off, for a hazard they do not have.
+  const isIosStandalone = window.navigator.standalone === true;
   const message = document.getElementById("pending-message");
   const details = document.getElementById("code-details");
 
@@ -30,11 +35,11 @@
   // entirely. Requiring it here means a standalone app that somehow has no
   // code form still falls through to polling rather than stranding the user
   // on a message about a field that isn't there.
-  if (isStandalone && details) {
+  if (isIosStandalone && details) {
     message.textContent = "Check your email for a 6-digit code and enter it below.";
     details.open = true;
     details.querySelector("summary").style.display = "none";
-    return; // no shared storage for a same-browser link click to land in, so polling could never resolve
+    return; // polling could never resolve here — the code is the only way through
   }
 
   const statusUrl = "<%= login_status_path %>";
