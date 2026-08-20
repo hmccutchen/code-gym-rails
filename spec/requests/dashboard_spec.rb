@@ -353,7 +353,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to match(%r{<a class="brand" href="/">⚡ Code Gym</a>})
+      expect(response.body).to match(%r{<a class="brand" href="/"><span class="brand-mark">⚡</span> Code Gym</a>})
     end
   end
 

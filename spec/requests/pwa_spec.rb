@@ -70,5 +70,14 @@ RSpec.describe "PWA", type: :request do
       expect(response.body).to include(%(<link rel="apple-touch-icon" href="/apple-touch-icon.png">))
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
+
+    # The nav row is tight enough on a phone that the bolt has to go, and the
+    # stylesheet can only hide it while it is an element of its own. Inline it
+    # back into the brand text and the wordmark starts wrapping again with
+    # nothing failing to say so. This is the logged-out brand; dashboard_spec's
+    # "brand title link" covers the linked one.
+    it "keeps the brand's bolt separately addressable from the wordmark" do
+      expect(response.body).to include(%(<span class="brand"><span class="brand-mark">⚡</span> Code Gym</span>))
+    end
   end
 end

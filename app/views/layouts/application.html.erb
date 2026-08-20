@@ -51,8 +51,22 @@
 
     nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
     nav .inner { display: flex; justify-content: space-between; align-items: center; }
-    nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
-    nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; }
+    /* The brand refuses to shrink or wrap: squeezed between the name editor and
+       the links on a phone, it otherwise broke into three lines (the bolt, then
+       "Code", then "Gym"), which is most visible in the installed app where
+       there is no browser chrome above it to distract from it. The name editor
+       absorbs the squeeze instead — a truncated name still reads and still
+       edits, a stacked wordmark reads as broken. min-width: 0 all the way down
+       is what lets it: a flex item will not shrink below its content otherwise. */
+    nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+    nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
+    nav .name-editor { display: flex; align-items: center; min-width: 0; }
+    /* Below this the row is too tight for the bolt and the wordmark both, and
+       the wordmark is the half that names the app. */
+    @media (max-width: 600px) {
+      nav .brand-mark { display: none; }
+      .name-editor-input { width: 100%; max-width: 9rem; }
+    }
 
     .flash { padding: .75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: .9rem; }
     .flash.notice { background: rgba(74, 222, 128, .1); border: 1px solid var(--green); color: var(--green); }
@@ -248,6 +262,7 @@
       font-family: inherit;
       padding: .15rem .3rem;
       width: 9rem;
+      min-width: 0;
       border-radius: 6px;
     }
     .name-editor-input:focus {
@@ -268,9 +283,9 @@
   <nav>
     <div class="container inner">
       <% if logged_in? %>
-        <%= link_to "⚡ Code Gym", root_path, class: "brand" %>
+        <%= link_to root_path, class: "brand" do %><span class="brand-mark">⚡</span> Code Gym<% end %>
       <% else %>
-        <span class="brand">⚡ Code Gym</span>
+        <span class="brand"><span class="brand-mark">⚡</span> Code Gym</span>
       <% end %>
       <% if logged_in? %>
         <div class="nav-links">
