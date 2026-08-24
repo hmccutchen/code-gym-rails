@@ -20,17 +20,26 @@ module AuthHelpers
 
   # `get`/request-spec style — used by request/channel/helper specs, which
   # don't drive a real browser.
+  #
+  # The POST establishes this session's pending-login state; the code is
+  # minted afterwards because #authenticate_login_code reads whatever digest
+  # is current, which keeps the helper off the mail queue entirely.
   def login_as(user)
-    get verify_auth_path(token: user.generate_login_token!)
+    post login_path, params: { email: user.email }
+    user.generate_login_token!
+    post verify_login_code_path, params: { code: user.raw_login_code }
   end
 
-  # System specs drive a real browser via Capybara, so login must be a real
-  # page load rather than a bare `get`. Verify is a terminal confirmation
-  # page, so getting into the app means following its continue link the way a
-  # user with no polling tab would.
+  # System specs drive a real browser via Capybara, so login must be real page
+  # loads rather than bare requests.
   def visit_as(user)
-    visit verify_auth_path(token: user.generate_login_token!)
-    click_link "Continue to Code Gym →"
+    visit login_path
+    fill_in "Work email *", with: user.email
+    click_button "Send code →"
+
+    user.generate_login_token!
+    fill_in "6-digit code from the email", with: user.raw_login_code
+    click_button "Verify code →"
   end
 end
 

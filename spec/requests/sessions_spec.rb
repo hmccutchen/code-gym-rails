@@ -342,7 +342,19 @@ RSpec.describe "Sessions", type: :request do
     # about — and leave them still logged in with nothing said.
     it "still warns on a stale logout instead of silently returning to the dashboard" do
       user = create_user_with_key(email: "out@example.com")
-      login_as(user)
+
+      # login_as posts with no authenticity_token at all, which real forgery
+      # protection (on for this describe block) rejects outright — so getting
+      # logged in here has to go through the same token-carrying flow as the
+      # test above rather than the shared helper.
+      get login_path
+      perform_enqueued_jobs do
+        post login_path, params: { email: user.email, authenticity_token: authenticity_token }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
+
+      get login_path
+      post verify_login_code_path, params: { code: raw_code, authenticity_token: authenticity_token }
 
       delete logout_path, params: { authenticity_token: "stale-bogus-token" }
 
