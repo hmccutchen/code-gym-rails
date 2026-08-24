@@ -12,7 +12,7 @@ class ProfileController < ApplicationController
                      adaptive_set_size: current_user.adaptive_set_size }
     else
       render json: { errors: current_user.errors.full_messages },
-             status: :unprocessable_entity
+             status: :unprocessable_content
     end
   end
 
@@ -34,7 +34,7 @@ class ProfileController < ApplicationController
 
   def render_invalid_boolean
     render json: { errors: [ "Adaptive set size must be true or false" ] },
-           status: :unprocessable_entity
+           status: :unprocessable_content
   end
 
   def profile_params

@@ -24,59 +24,64 @@ class User < ApplicationRecord
 
   scope :active, -> { where(anonymized_at: nil) }
 
-  TOKEN_EXPIRY = 15.minutes
+  LOGIN_CODE_EXPIRY = 15.minutes
   LOGIN_CODE_MAX_ATTEMPTS = 5
 
-  attr_reader :raw_login_code
+  # The one phrasing of the window, so the flash and the email cannot drift
+  # from the constant they describe. ActiveSupport::Duration#inspect is the
+  # humanized form ("15 minutes"), not a debug dump.
+  def self.login_code_expiry_in_words
+    LOGIN_CODE_EXPIRY.inspect
+  end
 
-  # ── Magic link ────────────────────────────────────────────────────────────
-  def generate_login_token!
-    raw_token = SecureRandom.urlsafe_base64(32)
-    @raw_login_code = format("%06d", SecureRandom.random_number(1_000_000))
+  # ── Login code ────────────────────────────────────────────────────────────
+  def generate_login_code!
+    raw_code = format("%06d", SecureRandom.random_number(1_000_000))
     update!(
-      login_token_digest:   BCrypt::Password.create(raw_token),
-      login_token_sent_at:  Time.current,
-      login_code_digest:    BCrypt::Password.create(@raw_login_code),
-      login_code_attempts:  0
+      login_code_sent_at:  Time.current,
+      login_code_digest:   BCrypt::Password.create(raw_code),
+      login_code_attempts: 0
     )
-    raw_token
+    raw_code
   end
 
-  def self.find_by_login_token(raw_token)
-    # We can't query by the digest directly since each BCrypt hash is salted,
-    # so we do a two-step lookup: find candidates sent within the expiry window,
-    # then verify the digest in Ruby.
-    candidates = active.where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
-                       .where.not(login_token_digest: nil)
-    candidates.find { |u| BCrypt::Password.new(u.login_token_digest) == raw_token }
-  end
-
-  # Same underlying token record as the link — a different presentation, not a
-  # separate or weaker mechanism. Wrong guesses count against
-  # LOGIN_CODE_MAX_ATTEMPTS; hitting it invalidates the code AND the link,
-  # forcing a fresh request rather than leaving a guessable code live.
+  # Wrong guesses count against LOGIN_CODE_MAX_ATTEMPTS; hitting it
+  # invalidates the code, forcing a fresh request rather than leaving a
+  # guessable one live.
+  #
+  # Serialized under a row lock, the same way #anonymize! is. Read, compare and
+  # invalidate are one decision, and unserialized they are three statements a
+  # second request can interleave with: every request that reads the digest
+  # before the first invalidation commits redeems the same code. Measured, not
+  # reasoned — with the lock removed, eight parallel posts of one correct code
+  # authenticate five times (see spec/models/login_code_concurrency_spec.rb).
+  # Those same interleaved reads each spend a guess against a live digest,
+  # which is why the lock matters more here than it would for a 256-bit token.
+  # It spans one BCrypt compare, which a login endpoint can afford.
   def self.authenticate_login_code(email:, code:)
-    candidates = active.where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
-                       .where.not(login_code_digest: nil)
-    user = candidates.find_by(email: email.to_s.strip.downcase)
+    user = active.find_by(email: email.to_s.strip.downcase)
     return nil unless user
 
-    if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip
-      user.clear_login_token!
-      return user
-    end
+    user.with_lock do
+      return nil if user.login_code_digest.nil?
+      return nil if user.login_code_sent_at.nil? || user.login_code_sent_at < LOGIN_CODE_EXPIRY.ago
 
-    user.increment!(:login_code_attempts)
-    user.clear_login_token! if user.login_code_attempts >= LOGIN_CODE_MAX_ATTEMPTS
-    nil
+      if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip
+        user.clear_login_code!
+        return user
+      end
+
+      user.increment!(:login_code_attempts)
+      user.clear_login_code! if user.login_code_attempts >= LOGIN_CODE_MAX_ATTEMPTS
+      nil
+    end
   end
 
-  def clear_login_token!
+  def clear_login_code!
     update!(
-      login_token_digest:   nil,
-      login_token_sent_at:  nil,
-      login_code_digest:    nil,
-      login_code_attempts:  0
+      login_code_sent_at:  nil,
+      login_code_digest:   nil,
+      login_code_attempts: 0
     )
   end
 
@@ -110,8 +115,7 @@ class User < ApplicationRecord
         email:               "deleted-user-#{id}@anonymized.local",
         name:                "Deleted user",
         api_key:             nil,
-        login_token_digest:  nil,
-        login_token_sent_at: nil,
+        login_code_sent_at:  nil,
         login_code_digest:   nil,
         login_code_attempts: 0,
         anonymized_at:       Time.current

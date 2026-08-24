@@ -21,7 +21,7 @@ class ApiKeysController < ApplicationController
 
     unless provider
       flash.now[:alert] = "We don't recognize this key format — currently supporting Anthropic and Gemini keys."
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
       return
     end
 
@@ -40,7 +40,7 @@ class ApiKeysController < ApplicationController
   def language_only_update
     unless current_user.api_key_present?
       flash.now[:alert] = "Add your API key to get started."
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
       return
     end
 

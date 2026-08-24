@@ -1,6 +1,6 @@
 require "uri"
 
-# The host this app's generated URLs point at — the mailer's magic links and
+# The host this app's generated URLs point at — default_url_options and
 # ActionCable's allowed origin.
 #
 # Two sources, and which one wins depends on the environment, because they mean
@@ -12,11 +12,10 @@ require "uri"
 #
 # A pull-request deployment inverts that, and not hypothetically: a PR
 # environment inherits its base environment's service variables, so it arrives
-# carrying production's APP_HOST. Honoring it there would put production's
-# domain in a preview app's magic links, where the token does not exist — the
-# preview login stays broken, which is the whole thing this class was written to
-# fix. On a preview app the injected domain is the only value that describes the
-# app actually serving the request, so it wins.
+# carrying production's APP_HOST. Honoring it there would point a preview app's
+# default_url_options and ActionCable origin check at production's host instead
+# of its own. On a preview app the injected domain is the only value that
+# describes the app actually serving the request, so it wins.
 #
 # ENV is read directly rather than through PreviewEnvironment: this runs during
 # Rails.application.configure, where autoloading raises, and one duplicated
@@ -25,8 +24,8 @@ require "uri"
 #
 # Neither value is assumed to carry a scheme. Railway injects a bare host
 # ("web-….up.railway.app"), and URI.parse returns a nil #host for one — which
-# is what left every preview app with default_url_options[:host] = nil and no
-# working magic link.
+# is what left every preview app with default_url_options[:host] = nil and a
+# broken ActionCable origin check.
 #
 # Lives outside the autoload path on purpose: config/environments/production.rb
 # runs during Rails.application.configure, and autoloading there raises. See

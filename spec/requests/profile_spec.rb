@@ -29,7 +29,7 @@ RSpec.describe "Profile", type: :request do
             params: { user: { name: "   " } }.to_json,
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["errors"]).to be_present
       expect(user.reload.name).to eq(original)
     end
@@ -68,7 +68,7 @@ RSpec.describe "Profile", type: :request do
       patch profile_path,
             params: { user: { time_zone: "Mars/Phobos" } }.to_json,
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(user.reload.time_zone).to eq("America/Chicago")
     end
   end
@@ -96,7 +96,7 @@ RSpec.describe "Profile", type: :request do
               params: { user: { adaptive_set_size: value } }.to_json,
               headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-        expect(response).to have_http_status(:unprocessable_entity), "#{value.inspect} was accepted"
+        expect(response).to have_http_status(:unprocessable_content), "#{value.inspect} was accepted"
         expect(user.reload.adaptive_set_size).to be(true)
       end
     end

@@ -6,10 +6,10 @@
 > connect. Delivery now goes through Resend's HTTPS API instead
 > (`config.action_mailer.delivery_method = :resend`), which works on every plan.
 
-Magic-link emails (`UserMailer.magic_link`) are sent via `deliver_later`, so
+Login code emails (`UserMailer.login_code`) are sent via `deliver_later`, so
 delivery happens inside the **worker** service (Solid Queue), not `web`. `web`
-still reads `APP_HOST` at boot for mailer link URLs. Set all three vars on
-**both** services.
+still reads `APP_HOST` at boot for `default_url_options` and the ActionCable
+origin check. Set all three vars on **both** services.
 
 ## Vars to set
 
@@ -58,7 +58,7 @@ Each `railway variable set` triggers a redeploy of that service by default.
 
 ## Verifying it worked
 
-After both services redeploy, request a magic link from the login page and
+After both services redeploy, request a login code from the login page and
 check the worker logs (`railway logs -s worker`). A bad API key or an
 unverified `MAIL_FROM` domain surfaces as a failed Solid Queue job
 (`raise_delivery_errors = true`), not silence. Remember that with

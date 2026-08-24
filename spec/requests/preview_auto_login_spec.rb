@@ -158,10 +158,10 @@ RSpec.describe "Preview auto-login", type: :request do
       expect(session[:user_id]).to be_nil
     end
 
-    # Auto-authenticating someone as they hit the verify URL would change real
-    # magic-link behavior, which the constraints forbid — and would make the
-    # flow untestable on the one deployment where it is easiest to test.
-    it "declines inside SessionsController so magic-link login still works" do
+    # Auto-authenticating someone mid-login would change real code-login
+    # behavior, which the constraints forbid — and would make the flow
+    # untestable on the one deployment where it is easiest to test.
+    it "declines inside SessionsController so code login still works" do
       seeded_user
       allow(controller).to receive(:controller_name).and_return("sessions")
 
