@@ -5,7 +5,7 @@ Your Code Gym login code is:
 <%= @raw_code %>
 
 Enter it in the browser where you requested it — the code will not work
-anywhere else. It expires in 15 minutes. If you didn't request this, you can
-ignore it.
+anywhere else. It expires in <%= User.login_code_expiry_in_words %>. If you
+didn't request this, you can ignore it.
 
 — Code Gym

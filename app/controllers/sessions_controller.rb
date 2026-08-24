@@ -70,7 +70,8 @@ class SessionsController < ApplicationController
     session[:pending_login_email] = email
     session[:pending_login_at]    = Time.current.iso8601
 
-    redirect_to login_path, notice: "Check your email for a 6-digit login code. It expires in 15 minutes."
+    redirect_to login_path,
+                notice: "Check your email for a 6-digit login code. It expires in #{User.login_code_expiry_in_words}."
   rescue ActiveRecord::RecordInvalid => e
     flash.now[:alert] = e.message
     render :new, status: :unprocessable_content

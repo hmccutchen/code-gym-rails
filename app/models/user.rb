@@ -27,6 +27,13 @@ class User < ApplicationRecord
   LOGIN_CODE_EXPIRY = 15.minutes
   LOGIN_CODE_MAX_ATTEMPTS = 5
 
+  # The one phrasing of the window, so the flash and the email cannot drift
+  # from the constant they describe. ActiveSupport::Duration#inspect is the
+  # humanized form ("15 minutes"), not a debug dump.
+  def self.login_code_expiry_in_words
+    LOGIN_CODE_EXPIRY.inspect
+  end
+
   # ── Login code ────────────────────────────────────────────────────────────
   def generate_login_code!
     raw_code = format("%06d", SecureRandom.random_number(1_000_000))
@@ -41,20 +48,33 @@ class User < ApplicationRecord
   # Wrong guesses count against LOGIN_CODE_MAX_ATTEMPTS; hitting it
   # invalidates the code, forcing a fresh request rather than leaving a
   # guessable one live.
+  #
+  # Serialized under a row lock, the same way #anonymize! is. Read, compare and
+  # invalidate are one decision, and unserialized they are three statements a
+  # second request can interleave with: every request that reads the digest
+  # before the first invalidation commits redeems the same code. Measured, not
+  # reasoned — with the lock removed, eight parallel posts of one correct code
+  # authenticate five times (see spec/models/login_code_concurrency_spec.rb).
+  # Those same interleaved reads each spend a guess against a live digest,
+  # which is why the lock matters more here than it would for a 256-bit token.
+  # It spans one BCrypt compare, which a login endpoint can afford.
   def self.authenticate_login_code(email:, code:)
-    candidates = active.where("login_code_sent_at > ?", LOGIN_CODE_EXPIRY.ago)
-                       .where.not(login_code_digest: nil)
-    user = candidates.find_by(email: email.to_s.strip.downcase)
+    user = active.find_by(email: email.to_s.strip.downcase)
     return nil unless user
 
-    if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip
-      user.clear_login_code!
-      return user
-    end
+    user.with_lock do
+      return nil if user.login_code_digest.nil?
+      return nil if user.login_code_sent_at.nil? || user.login_code_sent_at < LOGIN_CODE_EXPIRY.ago
 
-    user.increment!(:login_code_attempts)
-    user.clear_login_code! if user.login_code_attempts >= LOGIN_CODE_MAX_ATTEMPTS
-    nil
+      if BCrypt::Password.new(user.login_code_digest) == code.to_s.strip
+        user.clear_login_code!
+        return user
+      end
+
+      user.increment!(:login_code_attempts)
+      user.clear_login_code! if user.login_code_attempts >= LOGIN_CODE_MAX_ATTEMPTS
+      nil
+    end
   end
 
   def clear_login_code!
