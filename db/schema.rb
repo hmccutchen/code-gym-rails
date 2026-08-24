@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_19_153107) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_200702) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -274,8 +274,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_153107) do
     t.date "last_generation_error_date"
     t.integer "login_code_attempts", default: 0, null: false
     t.string "login_code_digest"
-    t.string "login_token_digest"
-    t.datetime "login_token_sent_at"
+    t.datetime "login_code_sent_at"
     t.string "name", null: false
     t.datetime "paused_generation_at"
     t.string "provider"
@@ -283,7 +282,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_153107) do
     t.string "time_zone"
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
-    t.index ["login_token_digest"], name: "index_users_on_login_token_digest"
   end
 
   add_foreign_key "api_usages", "users"

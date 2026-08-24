@@ -26,8 +26,7 @@ module AuthHelpers
   # is current, which keeps the helper off the mail queue entirely.
   def login_as(user)
     post login_path, params: { email: user.email }
-    user.generate_login_token!
-    post verify_login_code_path, params: { code: user.raw_login_code }
+    post verify_login_code_path, params: { code: user.generate_login_code! }
   end
 
   # System specs drive a real browser via Capybara, so login must be real page
@@ -37,8 +36,7 @@ module AuthHelpers
     fill_in "Work email *", with: user.email
     click_button "Send code →"
 
-    user.generate_login_token!
-    fill_in "6-digit code from the email", with: user.raw_login_code
+    fill_in "6-digit code from the email", with: user.generate_login_code!
     click_button "Verify code →"
   end
 end

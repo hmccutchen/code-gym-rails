@@ -82,126 +82,80 @@ RSpec.describe User, type: :model do
     end
   end
 
-  describe "magic link tokens" do
-    it "generates a token that can be looked up" do
-      user = create_user
-      raw_token = user.generate_login_token!
-
-      expect(raw_token).to be_present
-      expect(User.find_by_login_token(raw_token)).to eq(user)
-    end
-
-    it "returns nil for a token that was never issued" do
-      create_user.generate_login_token!
-      expect(User.find_by_login_token("wrong-token")).to be_nil
-    end
-
-    it "returns nil once the token has expired" do
-      user = create_user
-      raw_token = user.generate_login_token!
-
-      travel(User::TOKEN_EXPIRY + 1.minute) do
-        expect(User.find_by_login_token(raw_token)).to be_nil
-      end
-    end
-
-    it "returns nil after the token is cleared" do
-      user = create_user
-      raw_token = user.generate_login_token!
-      user.clear_login_token!
-
-      expect(User.find_by_login_token(raw_token)).to be_nil
-    end
-
-    it "stores only a digest, never the raw token" do
-      user = create_user
-      raw_token = user.generate_login_token!
-
-      expect(user.reload.login_token_digest).not_to include(raw_token)
-    end
-  end
-
-  describe "login code" do
+  describe "login codes" do
     # The generator emits a random 6-digit string, so a hardcoded "wrong" code
     # can occasionally *be* the real one. Derive one that never collides.
-    def wrong_code_for(user)
-      format("%06d", (user.raw_login_code.to_i + 1) % 1_000_000)
+    def wrong_code_for(raw_code)
+      format("%06d", (raw_code.to_i + 1) % 1_000_000)
     end
 
-    it "generates a code digest alongside the token, with attempts reset to zero" do
+    it "generates a code digest, with attempts reset to zero" do
       user = create_user
-      user.generate_login_token!
+      user.generate_login_code!
 
       expect(user.reload.login_code_digest).to be_present
       expect(user.login_code_attempts).to eq(0)
     end
 
-    it "exposes the raw code only in-memory on the instance that generated it" do
+    it "returns the raw code, which is not persisted" do
       user = create_user
-      user.generate_login_token!
+      raw_code = user.generate_login_code!
 
-      expect(user.raw_login_code).to match(/\A\d{6}\z/)
-      expect(User.find(user.id).raw_login_code).to be_nil
+      expect(raw_code).to match(/\A\d{6}\z/)
     end
 
     it "stores only a digest, never the raw code" do
       user = create_user
-      user.generate_login_token!
+      raw_code = user.generate_login_code!
 
       digest = user.reload.login_code_digest
-      expect(digest).not_to eq(user.raw_login_code)
-      expect(BCrypt::Password.new(digest)).to eq(user.raw_login_code)
+      expect(digest).not_to eq(raw_code)
+      expect(BCrypt::Password.new(digest)).to eq(raw_code)
     end
 
-    it "authenticates with the correct code and invalidates both the code and the link" do
+    it "authenticates with the correct code and invalidates it" do
       user = create_user
-      raw_token = user.generate_login_token!
-      raw_code = user.raw_login_code
+      raw_code = user.generate_login_code!
 
       expect(User.authenticate_login_code(email: user.email, code: raw_code)).to eq(user)
       expect(user.reload.login_code_digest).to be_nil
-      expect(user.login_token_digest).to be_nil
-      expect(User.find_by_login_token(raw_token)).to be_nil
     end
 
     it "returns nil and increments attempts for a wrong code" do
       user = create_user
-      user.generate_login_token!
+      raw_code = user.generate_login_code!
 
-      expect(User.authenticate_login_code(email: user.email, code: wrong_code_for(user))).to be_nil
+      expect(User.authenticate_login_code(email: user.email, code: wrong_code_for(raw_code))).to be_nil
       expect(user.reload.login_code_attempts).to eq(1)
       expect(user.login_code_digest).to be_present
     end
 
-    it "locks out and invalidates both the code and the token after 5 wrong attempts" do
+    it "locks out and invalidates the code after 5 wrong attempts" do
       user = create_user
-      user.generate_login_token!
-      wrong = wrong_code_for(user)
+      raw_code = user.generate_login_code!
+      wrong = wrong_code_for(raw_code)
 
       4.times { User.authenticate_login_code(email: user.email, code: wrong) }
       expect(user.reload.login_code_digest).to be_present
 
       User.authenticate_login_code(email: user.email, code: wrong)
       expect(user.reload.login_code_digest).to be_nil
-      expect(user.login_token_digest).to be_nil
     end
 
-    it "invalidates the code once the link has already been used" do
+    it "invalidates the code once it has already been used" do
       user = create_user
-      user.generate_login_token!
-      raw_code = user.raw_login_code
+      raw_code = user.generate_login_code!
 
-      user.clear_login_token!
+      user.clear_login_code!
 
       expect(User.authenticate_login_code(email: user.email, code: raw_code)).to be_nil
     end
 
-    it "expires the code on the same window as the token" do
+    it "expires the code after LOGIN_CODE_EXPIRY" do
       user = create_user
-      user.generate_login_token!
-      raw_code = user.raw_login_code
+      raw_code = user.generate_login_code!
 
-      travel(User::TOKEN_EXPIRY + 1.minute) do
+      travel(User::LOGIN_CODE_EXPIRY + 1.minute) do
         expect(User.authenticate_login_code(email: user.email, code: raw_code)).to be_nil
       end
     end
@@ -213,7 +167,7 @@ RSpec.describe User, type: :model do
 
     it "clears the code when the account is anonymized" do
       user = create_user
-      user.generate_login_token!
+      user.generate_login_code!
 
       user.anonymize!
 
@@ -833,7 +787,7 @@ RSpec.describe User, type: :model do
     it "replaces or clears every identifying field" do
       user = create_user(email: "real@example.com", name: "Real Person")
       user.update!(api_key: "sk-ant-secret", provider: "anthropic")
-      user.generate_login_token!
+      user.generate_login_code!
 
       expect(user.anonymize!).to be true
 
@@ -841,8 +795,8 @@ RSpec.describe User, type: :model do
       expect(user.email).to eq("deleted-user-#{user.id}@anonymized.local")
       expect(user.name).to eq("Deleted user")
       expect(user.api_key).to be_nil
-      expect(user.login_token_digest).to be_nil
-      expect(user.login_token_sent_at).to be_nil
+      expect(user.login_code_digest).to be_nil
+      expect(user.login_code_sent_at).to be_nil
       expect(user.anonymized_at).to be_present
       expect(user).to be_anonymized
     end

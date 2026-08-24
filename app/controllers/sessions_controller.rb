@@ -24,8 +24,7 @@ class SessionsController < ApplicationController
       user = User.create!(email: email, name: name.presence || email.split("@").first)
     end
 
-    user.generate_login_token!
-    UserMailer.login_code(user, user.raw_login_code).deliver_later
+    UserMailer.login_code(user, user.generate_login_code!).deliver_later
 
     # Drives the code form on the login page across reloads in this same
     # browser. Stamped so the state can age out with the code it describes —
@@ -96,7 +95,7 @@ class SessionsController < ApplicationController
     stamped_at = session[:pending_login_at]
     return false if stamped_at.blank?
 
-    Time.iso8601(stamped_at.to_s) < User::TOKEN_EXPIRY.ago
+    Time.iso8601(stamped_at.to_s) < User::LOGIN_CODE_EXPIRY.ago
   rescue ArgumentError
     false
   end

@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Sessions", type: :request do
   describe "POST /login" do
-    # Regression guard: this drives User#generate_login_token! (BCrypt) under
+    # Regression guard: this drives User#generate_login_code! (BCrypt) under
     # bundler, which 500'd in production when the bcrypt gem was missing from
     # the Gemfile.
     it "creates a first-time user and enqueues the login code email" do
@@ -38,7 +38,7 @@ RSpec.describe "Sessions", type: :request do
         post login_path, params: { email: "KNOWN@example.com" }
       }.not_to change(User, :count)
 
-      expect(user.reload.login_token_digest).to be_present
+      expect(user.reload.login_code_digest).to be_present
     end
 
     it "rejects an invalid email without creating a user" do
@@ -125,11 +125,7 @@ RSpec.describe "Sessions", type: :request do
       expect(session[:user_id]).to be_nil
     end
 
-    # generate_login_token! writes the code's digest and the token's digest
-    # together, so locking out the code has to invalidate the token row too —
-    # asserted on the row directly, since the code's email carries no link to
-    # exercise verify through.
-    it "locks out after 5 wrong attempts, invalidating the underlying token too" do
+    it "locks out after 5 wrong attempts, invalidating the code" do
       user = User.create!(email: "dev@example.com", name: "Dev")
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev" }
@@ -140,7 +136,7 @@ RSpec.describe "Sessions", type: :request do
 
       5.times { post verify_login_code_path, params: { code: wrong } }
 
-      expect(user.reload.login_token_digest).to be_nil
+      expect(user.reload.login_code_digest).to be_nil
     end
 
     it "returns nil-equivalent (no session) when there is no pending login in this browser" do
@@ -188,8 +184,7 @@ RSpec.describe "Sessions", type: :request do
       expect(response).to redirect_to(login_path)
 
       post login_path, params: { email: user.email }
-      user.generate_login_token!
-      post verify_login_code_path, params: { code: user.raw_login_code }
+      post verify_login_code_path, params: { code: user.generate_login_code! }
 
       expect(response).to redirect_to(history_path)
     end
@@ -312,10 +307,10 @@ RSpec.describe "Sessions", type: :request do
     it "refuses a code issued before deletion" do
       user = create_user_with_key(email: "gone@example.com")
       post login_path, params: { email: user.email }
-      user.generate_login_token!
+      code = user.generate_login_code!
       user.anonymize!
 
-      post verify_login_code_path, params: { code: user.raw_login_code }
+      post verify_login_code_path, params: { code: code }
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(flash[:alert]).to match(/incorrect or expired/i)
@@ -348,10 +343,10 @@ RSpec.describe "Sessions", type: :request do
     it "keeps the form reachable in a browser that did not request the code" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       user = User.find_by(email: "dev@example.com")
-      user.generate_login_token!
+      code = user.generate_login_code!
 
       other_jar = open_session
-      other_jar.post verify_login_code_path, params: { code: user.raw_login_code }
+      other_jar.post verify_login_code_path, params: { code: code }
 
       expect(other_jar.session[:user_id]).to be_nil
       expect(other_jar.response.body).to include('name="email"')
@@ -369,7 +364,7 @@ RSpec.describe "Sessions", type: :request do
     it "drops the pending state once the link it describes has expired" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
 
-      travel(User::TOKEN_EXPIRY + 1.minute) do
+      travel(User::LOGIN_CODE_EXPIRY + 1.minute) do
         get login_path
 
         expect(response.body).not_to include("pending-message")
@@ -378,8 +373,8 @@ RSpec.describe "Sessions", type: :request do
     end
 
     # The database is the enforcer here, not the session stamp:
-    # User.authenticate_login_code already filters on login_token_sent_at
-    # within TOKEN_EXPIRY, and both clocks start from the same #create. So
+    # User.authenticate_login_code already filters on login_code_sent_at
+    # within LOGIN_CODE_EXPIRY, and both clocks start from the same #create. So
     # this guards the outcome rather than the mechanism — it would still pass
     # with pending_login_email's expiry removed from #verify_code, where that
     # check is redundancy behind one authority rather than the thing keeping
@@ -390,7 +385,7 @@ RSpec.describe "Sessions", type: :request do
       end
       raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 
-      travel(User::TOKEN_EXPIRY + 1.minute) do
+      travel(User::LOGIN_CODE_EXPIRY + 1.minute) do
         post verify_login_code_path, params: { code: raw_code }
       end
 

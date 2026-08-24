@@ -14,7 +14,7 @@ RSpec.describe "Logging in with an emailed code", type: :system do
 
     expect(page).to have_content("Enter the 6-digit code")
 
-    fill_in "6-digit code from the email", with: user.generate_login_token! && user.raw_login_code
+    fill_in "6-digit code from the email", with: user.generate_login_code!
     click_button "Verify code →"
 
     expect(page).to have_current_path(root_path)
