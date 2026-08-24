@@ -267,6 +267,14 @@ RSpec.describe "Sessions", type: :request do
       expect(response.body).to include("Check your email")
     end
 
+    # Scoped to the pending partial's own script: the email form renders
+    # alongside it now and does its own touch detection with matchMedia,
+    # legitimately, so a page-wide check would read that as a regression here.
+    def pending_script
+      response.body.split("<script>").find { |b| b.include?("isIosStandalone") }
+              &.split("</script>")&.first
+    end
+
     # Asserted on the script text because the branch is client-side and its
     # inputs are the platform's, not the server's. The hazard it answers —
     # a link clicked in the browser landing in a session the app window
@@ -284,8 +292,8 @@ RSpec.describe "Sessions", type: :request do
 
       get login_path
 
-      expect(response.body).to include("window.navigator.standalone === true")
-      expect(response.body).not_to include("matchMedia")
+      expect(pending_script).to include("window.navigator.standalone === true")
+      expect(pending_script).not_to include("matchMedia")
       expect(response.body).to include(login_status_path)
     end
   end
@@ -478,6 +486,78 @@ RSpec.describe "Sessions", type: :request do
 
       expect(response).to redirect_to(login_path)
       expect(flash[:alert]).to match(/invalid or expired/i)
+    end
+  end
+
+  # A production lockout: the pending-login state used to replace the email
+  # form rather than sit above it, so any way of reaching verify outside this
+  # browser's cookie jar — a mail client's in-app browser, an expired or
+  # already-consumed link — left the login page with no way to request a new
+  # one. Clearing cookies was the only recovery.
+  describe "recovering from a pending login that never completes" do
+    include ActiveJob::TestHelper
+
+    def email_form_present?
+      response.body.include?('name="email"')
+    end
+
+    it "still offers the email form while a login is pending" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+
+      get login_path
+
+      expect(email_form_present?).to be(true)
+    end
+
+    it "keeps the form reachable when the link is verified in another cookie jar" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+      end
+      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+
+      # A second session stands in for the tab that clicked the link — the mail
+      # client's own browser, which never shares this session's cookie.
+      other_jar = open_session
+      other_jar.get verify_auth_path(token: raw_token)
+      expect(other_jar.session[:user_id]).to be_present
+
+      get login_path
+
+      expect(session[:user_id]).to be_nil
+      expect(email_form_present?).to be(true)
+    end
+
+    it "lets a new link be requested from the pending page" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      get login_path
+
+      expect {
+        post login_path, params: { email: "dev@example.com" }
+      }.to have_enqueued_mail(UserMailer, :magic_link)
+    end
+
+    it "drops the pending state once the link it describes has expired" do
+      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+
+      travel(User::TOKEN_EXPIRY + 1.minute) do
+        get login_path
+
+        expect(response.body).not_to include("pending-message")
+        expect(email_form_present?).to be(true)
+      end
+    end
+
+    it "refuses a login code once the pending state has expired" do
+      perform_enqueued_jobs do
+        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      end
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+
+      travel(User::TOKEN_EXPIRY + 1.minute) do
+        post verify_login_code_path, params: { code: raw_code }
+      end
+
+      expect(session[:user_id]).to be_nil
     end
   end
 end

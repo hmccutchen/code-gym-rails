@@ -2,6 +2,8 @@ class SessionsController < ApplicationController
   skip_before_action :require_login
   skip_before_action :require_api_key
 
+  helper_method :pending_login_email, :pending_login_touch?
+
   # GET /login
   def new
     redirect_to root_path if logged_in?
@@ -29,9 +31,11 @@ class SessionsController < ApplicationController
     UserMailer.magic_link(user, raw_token, touch_device ? user.raw_login_code : nil).deliver_later
 
     # Drives the "check your email" pending state on the login page (the code
-    # field, the polling) across reloads in this same browser.
+    # field, the polling) across reloads in this same browser. Stamped so the
+    # state can age out with the link it describes — see #pending_login_email.
     session[:pending_login_email] = email
     session[:pending_login_touch] = touch_device
+    session[:pending_login_at]    = Time.current.iso8601
 
     redirect_to login_path, notice: "Check your email for a login link. It expires in 15 minutes."
   rescue ActiveRecord::RecordInvalid => e
@@ -66,7 +70,7 @@ class SessionsController < ApplicationController
   # from a client-supplied field, so the code can't be used to target a
   # different account than the one that requested it here.
   def verify_code
-    email = session[:pending_login_email]
+    email = pending_login_email
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
 
     if user
@@ -93,6 +97,28 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # The single authority for "is a login pending in this browser," read by
+  # both #verify_code and the login page. Expires with the link it describes:
+  # the pending state is only ever a claim that a live token is in someone's
+  # inbox, and a stale claim used to leave the login page insisting on an
+  # email that could no longer log anyone in.
+  def pending_login_email
+    stamped_at = session[:pending_login_at]
+    return nil if stamped_at.blank?
+    return nil if Time.iso8601(stamped_at) < User::TOKEN_EXPIRY.ago
+
+    session[:pending_login_email].presence
+  rescue ArgumentError
+    # An unparseable stamp means a tampered or hand-rolled cookie. Treating it
+    # as "nothing pending" degrades to the plain login form, which is the one
+    # state this page must always be able to reach.
+    nil
+  end
+
+  def pending_login_touch?
+    pending_login_email.present? && session[:pending_login_touch].present?
+  end
 
   # Rotate the session on login so nothing written before authentication —
   # return_to, the pending-login state — survives into the authenticated

@@ -2,7 +2,7 @@
   Check your email for a login link — this page will update automatically once you click it.
 </p>
 
-<% if session[:pending_login_touch] %>
+<% if pending_login_touch? %>
   <details id="code-details">
     <summary>Or enter the code instead</summary>
     <%= form_with url: verify_login_code_path, method: :post do |f| %>
@@ -60,7 +60,13 @@
       // Transient network hiccup — keep polling rather than giving up early.
     }
 
-    if (attempts >= MAX_ATTEMPTS) return;
+    // Giving up silently would leave the message above still promising this
+    // page updates itself, with nothing left running to make that true.
+    if (attempts >= MAX_ATTEMPTS) {
+      message.textContent = "Still not logged in — we stopped checking. Request a new link below.";
+      return;
+    }
+
     setTimeout(poll, 3000);
   }
 
