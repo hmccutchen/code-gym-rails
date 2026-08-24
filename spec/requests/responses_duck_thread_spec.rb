@@ -60,7 +60,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
     post duck_thread_responses_path, params: { section: "code_review", message: "too late?", thread: [] }, as: :json
 
-    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response).to have_http_status(:unprocessable_content)
     expect(fake).not_to have_received(:duck_response)
   end
 
@@ -88,7 +88,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
                      message: "x" * (ResponsesController::MAX_DUCK_MESSAGE_LENGTH + 1), thread: [] },
            as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:duck_response)
     end
 
@@ -119,7 +119,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       post duck_thread_responses_path,
            params: { section: "code_review", message: "hi", thread: padded }, as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:duck_response)
     end
 
@@ -135,7 +135,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       post duck_thread_responses_path,
            params: { section: "code_review", message: "hi", thread: oversized }, as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:duck_response)
     end
 
@@ -150,7 +150,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       post duck_thread_responses_path,
            params: { section: "code_review", message: "hi", thread: multibyte }, as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:duck_response)
     end
 
@@ -187,7 +187,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
     post duck_thread_responses_path, params: { section: "architecture", message: "hi", thread: [] }, as: :json
 
-    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response).to have_http_status(:unprocessable_content)
     expect(fake).not_to have_received(:duck_response)
   end
 
@@ -208,7 +208,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
     post duck_thread_responses_path, params: { section: "ambiguity_hunt", message: "hi", thread: [] }, as: :json
 
-    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response).to have_http_status(:unprocessable_content)
     expect(fake).not_to have_received(:duck_response)
   end
 
@@ -228,7 +228,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
     post duck_thread_responses_path, params: { section: "code_review", message: "   ", thread: [] }, as: :json
 
-    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response).to have_http_status(:unprocessable_content)
     expect(fake).not_to have_received(:duck_response)
   end
 
@@ -290,7 +290,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       params: { section: "code_review", message: "one more", thread: mixed_case_capped_thread },
       as: :json
 
-    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response).to have_http_status(:unprocessable_content)
     expect(fake).not_to have_received(:duck_response)
   end
 
@@ -306,7 +306,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
       post duck_thread_responses_path, params: { section: "code_review", message: "one more", thread: capped_thread }, as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:duck_response)
     end
 
@@ -367,7 +367,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       post duck_thread_responses_path,
            params: { section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST, thread: thread }, as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["error"]).to match(/used all/i)
     end
 
@@ -381,7 +381,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       post duck_thread_responses_path,
            params: { section: "code_review", message: AiService::DUCK_EXPLAIN_REQUEST, thread: [] }, as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["error"]).to match(/before you submit/i)
     end
   end

@@ -58,7 +58,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       critique
       critique
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["error"]).to match(/already/i)
     end
 
@@ -74,7 +74,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(round["gaps_found"]).to be(false)
 
       critique
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     # A provider hiccup must not silently spend the engineer's one critique.
@@ -147,7 +147,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
                             } })
 
       critique
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["error"]).to match(/already running/i)
     end
 
@@ -185,17 +185,17 @@ RSpec.describe "Pseudocode rounds", type: :request do
       allow_any_instance_of(DailyExercise).to receive(:active_section_keys).and_return(%w[code_review pattern])
 
       critique
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "rejects blank and over-length pseudocode without calling the provider" do
       expect_any_instance_of(FakeService).not_to receive(:critique_pseudocode)
 
       critique(pseudocode: "   ")
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
 
       critique(pseudocode: "x" * (ResponsesController::MAX_PSEUDOCODE_LENGTH + 1))
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "refuses once today's response has been submitted" do
@@ -203,7 +203,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
 
       critique
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "404s when there is no exercise for today" do
@@ -325,7 +325,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       translate
       translate
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     # Round 2 is never gated on round 1 — there is no way to get stuck.

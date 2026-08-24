@@ -83,7 +83,7 @@ class ResponsesController < ApplicationController
           payload[:redirect] = root_path if response_params[:submit] == "1"
           render json: payload
         else
-          render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_entity
+          render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_content
         end
       end
       format.html do
@@ -569,7 +569,7 @@ class ResponsesController < ApplicationController
   end
 
   def render_section_error(message)
-    render json: { status: "error", error: message }, status: :unprocessable_entity
+    render json: { status: "error", error: message }, status: :unprocessable_content
   end
 
   # Atomic claim against a concurrent double-review (e.g. an impatient second

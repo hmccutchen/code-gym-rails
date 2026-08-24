@@ -73,7 +73,7 @@ class SessionsController < ApplicationController
     redirect_to login_path, notice: "Check your email for a 6-digit login code. It expires in 15 minutes."
   rescue ActiveRecord::RecordInvalid => e
     flash.now[:alert] = e.message
-    render :new, status: :unprocessable_entity
+    render :new, status: :unprocessable_content
   end
 
   # POST /login/code — the only way in. Email comes from this browser's own
@@ -97,7 +97,7 @@ class SessionsController < ApplicationController
         else
           "Incorrect or expired code. Request a new one below."
         end
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
   end
 

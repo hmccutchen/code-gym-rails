@@ -931,7 +931,7 @@ RSpec.describe "Responses", type: :request do
       login_as(user)
 
       patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(r.reload.self_explanations).to eq({})
     end
 
@@ -940,7 +940,7 @@ RSpec.describe "Responses", type: :request do
       login_as(user)
 
       patch self_explanation_response_path(r), params: { section: "architecture", text: "x" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(r.reload.self_explanations).to eq({})
     end
 
@@ -951,7 +951,7 @@ RSpec.describe "Responses", type: :request do
       login_as(user)
 
       patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)).to eq("status" => "error", "error" => "Answers is invalid")
     end
 
@@ -1029,7 +1029,7 @@ RSpec.describe "Responses", type: :request do
       login_as(user)
 
       post explain_differently_response_path(r), params: { section: "code_review" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:explain_differently)
       expect(r.reload.review_alternates["code_review"]).to eq([ "one", "two" ])
       # Same error-body shape as follow_ups' cap and every other section error —
@@ -1052,7 +1052,7 @@ RSpec.describe "Responses", type: :request do
       login_as(user)
 
       post explain_differently_response_path(r), params: { section: "challenge" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "leaves the stored array untouched when the provider fails" do
@@ -1085,7 +1085,7 @@ RSpec.describe "Responses", type: :request do
 
       post explain_differently_response_path(r), params: { section: "code_review" }
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(r.reload.review_alternates["code_review"]).to eq([ "one", "concurrent" ])
     end
   end
@@ -1154,7 +1154,7 @@ RSpec.describe "Responses", type: :request do
       login_as(user)
 
       post follow_ups_response_path(r), params: { section: "code_review", question: "One more?" }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:answer_follow_up)
       expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
     end
@@ -1186,7 +1186,7 @@ RSpec.describe "Responses", type: :request do
       login_as(user)
 
       post follow_ups_response_path(r), params: { section: "code_review", question: "   " }
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(r.reload.review_follow_ups.count).to eq(0)
     end
 
@@ -1208,7 +1208,7 @@ RSpec.describe "Responses", type: :request do
 
       post follow_ups_response_path(r), params: { section: "code_review", question: "One more?" }
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(r.reload.review_follow_ups.where(role: :user).count).to eq(3)
     end
   end
