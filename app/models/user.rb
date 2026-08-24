@@ -29,7 +29,7 @@ class User < ApplicationRecord
 
   attr_reader :raw_login_code
 
-  # ── Magic link ────────────────────────────────────────────────────────────
+  # ── Login code ────────────────────────────────────────────────────────────
   def generate_login_token!
     raw_token = SecureRandom.urlsafe_base64(32)
     @raw_login_code = format("%06d", SecureRandom.random_number(1_000_000))
@@ -51,10 +51,8 @@ class User < ApplicationRecord
     candidates.find { |u| BCrypt::Password.new(u.login_token_digest) == raw_token }
   end
 
-  # Same underlying token record as the link — a different presentation, not a
-  # separate or weaker mechanism. Wrong guesses count against
-  # LOGIN_CODE_MAX_ATTEMPTS; hitting it invalidates the code AND the link,
-  # forcing a fresh request rather than leaving a guessable code live.
+  # Wrong guesses count against LOGIN_CODE_MAX_ATTEMPTS; hitting it invalidates
+  # the code, forcing a fresh request rather than leaving a guessable code live.
   def self.authenticate_login_code(email:, code:)
     candidates = active.where("login_token_sent_at > ?", TOKEN_EXPIRY.ago)
                        .where.not(login_code_digest: nil)

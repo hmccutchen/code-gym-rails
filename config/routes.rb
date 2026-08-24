@@ -20,10 +20,9 @@ Rails.application.routes.draw do
   # rather than removed, as that's a separate, unrelated cleanup.
   mount ActionCable.server => "/cable"
 
-  # Auth (magic link)
+  # Auth (emailed 6-digit code)
   get    "login",        to: "sessions#new"
   post   "login",        to: "sessions#create"
-  get    "auth/verify",  to: "sessions#verify", as: :verify_auth
   post   "login/code",   to: "sessions#verify_code", as: :verify_login_code
   delete "logout",       to: "sessions#destroy", as: :logout
 

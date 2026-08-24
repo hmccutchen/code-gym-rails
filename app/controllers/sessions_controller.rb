@@ -39,26 +39,6 @@ class SessionsController < ApplicationController
     render :new, status: :unprocessable_entity
   end
 
-  # GET /auth/verify?token=...
-  #
-  # Renders a terminal confirmation rather than redirecting into the app,
-  # since a tab that opened this link has no reason to land back in the app
-  # it never left — the continue link is what takes it there, on request
-  # rather than automatically. It carries no flash for the same reason: flash
-  # rides the shared cookie and would surface in whatever tab reads it next.
-  def verify
-    user = User.find_by_login_token(params[:token].to_s)
-
-    if user.nil?
-      redirect_to login_path, alert: "That link is invalid or expired. Try again."
-      return
-    end
-
-    user.clear_login_token!
-    @user = user
-    @continue_path = start_new_session_for(user) || root_path
-  end
-
   # POST /login/code — the only way in. Email comes from this browser's own
   # pending-login session state, never from a client-supplied field, so the
   # code can't be used to target a different account than the one that

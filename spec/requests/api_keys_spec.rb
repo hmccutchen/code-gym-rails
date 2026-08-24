@@ -4,7 +4,7 @@ RSpec.describe "ApiKeys", type: :request do
   let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
 
   def login(user)
-    get verify_auth_path(token: user.generate_login_token!)
+    login_as(user)
   end
 
   describe "PATCH /setup" do

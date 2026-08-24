@@ -59,9 +59,9 @@ Rails.application.configure do
   # (UserMailer.login_code is sent via deliver_later) instead of failing silently.
   config.action_mailer.raise_delivery_errors = true
 
-  # Set host to be used by links generated in mailer templates (e.g. the magic link
-  # verify_auth_url). Mailer views render outside the request cycle, so config.force_ssl
-  # has no effect here -- protocol is forced to https explicitly.
+  # Set host to be used by links generated in mailer templates. Mailer views
+  # render outside the request cycle, so config.force_ssl has no effect here
+  # -- protocol is forced to https explicitly.
   app_host = AppHost.resolve
   config.action_mailer.default_url_options = { host: app_host, protocol: "https" }
 

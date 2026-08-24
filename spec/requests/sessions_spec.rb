@@ -80,87 +80,6 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
-  describe "GET /auth/verify" do
-    let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
-
-    it "logs the user in with a valid token and consumes it" do
-      raw_token = user.generate_login_token!
-
-      get verify_auth_path(token: raw_token)
-      expect(response).to have_http_status(:ok)
-      expect(session[:user_id]).to eq(user.id)
-
-      # Token is single-use: a second visit must fail.
-      get verify_auth_path(token: raw_token)
-      expect(response).to redirect_to(login_path)
-      expect(flash[:alert]).to match(/invalid or expired/i)
-    end
-
-    # Terminal by design: the tab that requested the link is polling and will
-    # move itself to the dashboard, so redirecting here would run the app in
-    # two tabs at once.
-    it "renders a confirmation instead of redirecting into the app" do
-      get verify_auth_path(token: user.generate_login_token!)
-
-      expect(response).not_to have_http_status(:redirect)
-      expect(response.body).to include("close this tab")
-      expect(response.body).not_to include("<nav>")
-    end
-
-    # The only way forward for someone with no polling tab — a link opened on
-    # a different device, or from a phone's mail app.
-    it "offers a continue link for anyone with no tab to return to" do
-      get verify_auth_path(token: user.generate_login_token!)
-
-      assert_select "a[href=?]", root_path, count: 1
-    end
-
-    it "sends the continue link to the pre-login destination when there is one" do
-      get history_path
-      expect(session[:return_to]).to eq(history_path)
-
-      get verify_auth_path(token: user.generate_login_token!)
-
-      assert_select "a[href=?]", history_path, count: 1
-    end
-
-    # The label is the link's accessible name, and the destination varies with
-    # return_to — so naming a specific page would misdescribe where it goes for
-    # anyone bounced here from somewhere other than the dashboard.
-    it "labels the continue link without promising a specific destination" do
-      get history_path
-
-      get verify_auth_path(token: user.generate_login_token!)
-
-      assert_select "a[href=?]", history_path do |links|
-        expect(links.first.text).not_to match(/today's set/i)
-      end
-    end
-
-    # Flash rides the same cookie every tab shares, so a notice set here would
-    # surface in the polling tab when it lands on the dashboard.
-    it "sets no flash that could leak into the polling tab" do
-      get verify_auth_path(token: user.generate_login_token!)
-
-      expect(flash[:notice]).to be_nil
-    end
-
-    it "rejects an expired token" do
-      raw_token = user.generate_login_token!
-
-      travel(User::TOKEN_EXPIRY + 1.minute) do
-        get verify_auth_path(token: raw_token)
-        expect(response).to redirect_to(login_path)
-        expect(flash[:alert]).to match(/invalid or expired/i)
-      end
-    end
-
-    it "rejects a garbage token" do
-      get verify_auth_path(token: "garbage")
-      expect(response).to redirect_to(login_path)
-    end
-  end
-
   describe "stale CSRF token (e.g. after a deploy restart)", :with_csrf do
     it "redirects to login with a friendly flash instead of a raw 422" do
       post login_path, params: { email: "x@example.com", authenticity_token: "stale-bogus-token" }
@@ -235,18 +154,6 @@ RSpec.describe "Sessions", type: :request do
   describe "session rotation on login" do
     include ActiveJob::TestHelper
 
-    it "issues a new session on link login so nothing written before auth survives" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
-      user = User.find_by(email: "dev@example.com")
-      raw_token = user.generate_login_token!
-      pre_login_session_id = session.id.public_id
-
-      get verify_auth_path(token: raw_token)
-
-      expect(session[:user_id]).to be_present
-      expect(session.id.public_id).not_to eq(pre_login_session_id)
-    end
-
     it "issues a new session on code login" do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev" }
@@ -273,17 +180,18 @@ RSpec.describe "Sessions", type: :request do
     end
 
     # The rotation discards the whole session, so return_to has to be read out
-    # before reset_session or the verify page's continue link silently loses it.
+    # before reset_session or a successful login silently loses it.
     it "still points the user at the page they were bounced from" do
       user = User.create!(email: "dev@example.com", name: "Dev")
-      raw_token = user.generate_login_token!
 
       get history_path
       expect(response).to redirect_to(login_path)
 
-      get verify_auth_path(token: raw_token)
+      post login_path, params: { email: user.email }
+      user.generate_login_token!
+      post verify_login_code_path, params: { code: user.raw_login_code }
 
-      expect(response.body).to include(%(href="#{history_path}"))
+      expect(response).to redirect_to(history_path)
     end
 
     it "clears the pending-login state after a code login" do
@@ -401,15 +309,16 @@ RSpec.describe "Sessions", type: :request do
       expect(new_user.api_key).to be_nil
     end
 
-    it "refuses a magic-link token issued before deletion" do
+    it "refuses a code issued before deletion" do
       user = create_user_with_key(email: "gone@example.com")
-      raw_token = user.generate_login_token!
+      post login_path, params: { email: user.email }
+      user.generate_login_token!
       user.anonymize!
 
-      get verify_auth_path(token: raw_token)
+      post verify_login_code_path, params: { code: user.raw_login_code }
 
-      expect(response).to redirect_to(login_path)
-      expect(flash[:alert]).to match(/invalid or expired/i)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(flash[:alert]).to match(/incorrect or expired/i)
     end
   end
 
@@ -433,22 +342,19 @@ RSpec.describe "Sessions", type: :request do
       expect(email_form_present?).to be(true)
     end
 
-    it "keeps the form reachable when the link is verified in another cookie jar" do
+    # The code is bound to the session that requested it, so a second browser
+    # holding the same address gets nowhere — and must still be able to ask
+    # for its own code rather than being stranded.
+    it "keeps the form reachable in a browser that did not request the code" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       user = User.find_by(email: "dev@example.com")
-      raw_token = user.generate_login_token!
+      user.generate_login_token!
 
-      # A second session stands in for a browser reaching verify outside this
-      # one's cookie jar — verify itself stays reachable even though nothing
-      # in the email links to it anymore.
       other_jar = open_session
-      other_jar.get verify_auth_path(token: raw_token)
-      expect(other_jar.session[:user_id]).to be_present
+      other_jar.post verify_login_code_path, params: { code: user.raw_login_code }
 
-      get login_path
-
-      expect(session[:user_id]).to be_nil
-      expect(email_form_present?).to be(true)
+      expect(other_jar.session[:user_id]).to be_nil
+      expect(other_jar.response.body).to include('name="email"')
     end
 
     it "lets a new code be requested from the pending page" do
