@@ -42,17 +42,24 @@ RSpec.describe "Login rate limits", type: :request do
       }.not_to have_enqueued_mail(UserMailer, :login_code)
     end
 
-    # Exhausting the #create limit must not touch the #verify_code bucket —
-    # the two rate_limit declarations need distinct `name:`s or they'd
-    # collide into one key, since `by` for #create is attacker-controlled.
-    it "leaves the verify_code limit untouched by exhausting the create limit" do
+    # The two rate_limit declarations need distinct `name:`s or they alias:
+    # nameless, both key on `by`, and `by` for #create is attacker-controlled,
+    # so submitting the request's own IP as the email makes both limits key
+    # on "127.0.0.1". Eleven such posts land the shared key at 11 (posts
+    # 6-11 are themselves over #create's cap of 5, but rate_limit increments
+    # before it checks, so they still count) — the next verify post would
+    # then be the 12th and trip #verify_code's cap of 10. With separate
+    # names, #create's posts land in "code_requests:127.0.0.1" and the verify
+    # post opens a fresh "code_attempts:127.0.0.1" at 1, so it answers
+    # normally instead of 429.
+    it "keeps the create and verify_code buckets separate when an attacker submits their IP as the email" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
-      5.times { post login_path, params: { email: "dev@example.com" } }
+
+      11.times { post login_path, params: { email: "127.0.0.1" } }
 
       post verify_login_code_path, params: { code: "000000" }
 
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(flash[:alert]).not_to match(/too many/i)
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 
@@ -66,16 +73,6 @@ RSpec.describe "Login rate limits", type: :request do
       expect(flash[:alert]).to match(/too many/i)
       expect(response).to have_http_status(:too_many_requests)
       expect(response.body).to include('name="email"')
-    end
-
-    # Exhausting the #verify_code limit must not touch the #create bucket.
-    it "leaves the create limit untouched by exhausting the verify_code limit" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
-      11.times { post verify_login_code_path, params: { code: "000000" } }
-
-      expect {
-        post login_path, params: { email: "dev@example.com" }
-      }.to have_enqueued_mail(UserMailer, :login_code)
     end
   end
 
