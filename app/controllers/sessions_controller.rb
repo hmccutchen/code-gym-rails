@@ -12,12 +12,12 @@ class SessionsController < ApplicationController
   # rather than the IP because the address is what an attacker targets and
   # the IP is what they can change.
   #
-  # Both limits need distinct `name:`s: Rails keys a limit on
+  # All three limits need distinct `name:`s: Rails keys a limit on
   # ["rate-limit", scope, name, by].compact.join(":"), scope defaults to the
   # controller, and `by` for #create is attacker-controlled (any email an
-  # attacker submits) — without a name the two limits would collide into one
-  # bucket, letting a `POST /login` with a chosen IP as the email lock that
-  # IP out of #verify_code.
+  # attacker submits) — unnamed, they would collide into one bucket, letting a
+  # `POST /login` with a chosen IP as the email lock that IP out of
+  # #verify_code.
   rate_limit to: 5, within: User::LOGIN_CODE_EXPIRY,
              by:    -> { normalized_email },
              with:  -> { rate_limited("Too many code requests for that address. Try again in a few minutes.") },

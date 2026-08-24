@@ -42,18 +42,8 @@ RSpec.describe "Login rate limits", type: :request do
       }.not_to have_enqueued_mail(UserMailer, :login_code)
     end
 
-    # The two rate_limit declarations need distinct `name:`s or they alias:
-    # nameless, both key on `by`, and `by` for #create is attacker-controlled,
-    # so submitting the request's own IP as the email makes both limits key
-    # on "127.0.0.1". Eleven such posts land the shared key at 11 (posts
-    # 6-11 are themselves over #create's cap of 5, but rate_limit increments
-    # before it checks, so they still count) — the next verify post would
-    # then be the 12th and trip #verify_code's cap of 10. With separate
-    # names, #create's posts land in "code_requests:127.0.0.1" and the verify
-    # post opens a fresh "code_attempts:127.0.0.1" at 1, so it answers
-    # normally instead of 429.
     # Bounds an attacker who varies the address instead of hammering one —
-    # the address-keyed limit above can't see that pattern at all, since each
+    # the address-keyed limit above cannot see that pattern at all, since each
     # address gets its own fresh bucket.
     it "stops a 21st request from one IP across 21 different addresses" do
       20.times { |n| post login_path, params: { email: "dev#{n}@example.com", name: "Dev" } }
@@ -67,6 +57,16 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
+    # The three rate_limit declarations need distinct `name:`s or they alias:
+    # nameless, both key on `by`, and `by` for #create is attacker-controlled,
+    # so submitting the request's own IP as the email makes both limits key
+    # on "127.0.0.1". Eleven such posts land the shared key at 11 (posts
+    # 6-11 are themselves over #create's cap of 5, but rate_limit increments
+    # before it checks, so they still count) — the next verify post would
+    # then be the 12th and trip #verify_code's cap of 10. With separate
+    # names, #create's posts land in "code_requests:127.0.0.1" and the verify
+    # post opens a fresh "code_attempts:127.0.0.1" at 1, so it answers
+    # normally instead of 429.
     it "keeps the create and verify_code buckets separate when an attacker submits their IP as the email" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       user = User.find_by(email: "dev@example.com")
