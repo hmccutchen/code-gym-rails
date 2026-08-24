@@ -99,10 +99,13 @@ class SessionsController < ApplicationController
   private
 
   # The single authority for "is a login pending in this browser," read by
-  # both #verify_code and the login page. Expires with the link it describes:
-  # the pending state is only ever a claim that a live token is in someone's
-  # inbox, and a stale claim used to leave the login page insisting on an
-  # email that could no longer log anyone in.
+  # both #verify_code and the login page. A stamped state expires with the
+  # link it describes — the pending state is only ever a claim that a live
+  # token is in someone's inbox, and a stale claim used to leave the login
+  # page insisting on an email that could no longer log anyone in. A state
+  # carrying no readable stamp is the one exception, and stays pending for the
+  # life of the cookie; see #pending_login_expired? for why that is the safer
+  # side to err on.
   def pending_login_email
     return nil if pending_login_expired?
 
@@ -112,10 +115,18 @@ class SessionsController < ApplicationController
   # A stamp this can't read is one a different version of this app wrote — the
   # session cookie is signed and encrypted, so a hand-edited value never gets
   # this far. Both unreadable cases resolve toward still-pending rather than
-  # expired: a session that predates the stamp holds a link that may well
-  # still be live, and rejecting its code would strand an in-flight login for
-  # the 15 minutes after a deploy. Nothing is trapped by being generous here,
-  # since the login form now renders either way.
+  # expired, which is deliberate but asymmetric, so the two costs:
+  #
+  #   pending  — a session that predates the stamp shows a stale banner until
+  #              its cookie lapses, up to two days. Cosmetic: the email form
+  #              renders alongside it, so nothing is trapped.
+  #   expired  — an in-flight login started before this shipped has its still
+  #              live code rejected as "incorrect or expired" for the 15
+  #              minutes after a deploy. A real failure, not a cosmetic one.
+  #
+  # Both land on the same population — sessions created before this shipped —
+  # so the choice is only which way they fail, and a stale banner beats a
+  # rejected working code.
   def pending_login_expired?
     stamped_at = session[:pending_login_at]
     return false if stamped_at.blank?
