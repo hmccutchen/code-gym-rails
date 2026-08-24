@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in (magic link, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline AI review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline AI review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
 
 ## Git Workflow
 
@@ -143,7 +143,7 @@ advisory signal; it is not evidence that anything was verified.
 - **Solid Queue** — background jobs + recurring 8am weekday cron (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
-- **BCrypt** — magic link token digests
+- **BCrypt** — login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
 - **Railway** — hosting (web + worker services, postgres service)
 - **Nixpacks** — auto-detected build from `railway.toml`
@@ -151,7 +151,7 @@ advisory signal; it is not evidence that anything was verified.
 ## Architecture
 
 ```
-User logs in (magic link email)
+User logs in (emailed 6-digit code)
   └→ enters their own Anthropic or Gemini API key (stored encrypted per-user;
      the key's prefix determines user.provider)
 
@@ -213,7 +213,23 @@ User interacts:
 
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement only `#call` and `#build_connection`. Adding a provider means adding a subclass, not editing the base.
-- **Magic link auth**: No passwords. `User#generate_login_token!` creates a BCrypt digest, emails a token, `User#find_by_login_token` does constant-time compare. Tokens expire in 15 minutes.
+- **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
+  mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
+  the mailer; `User.authenticate_login_code` verifies it in constant time.
+  Codes expire in 15 minutes (`User::LOGIN_CODE_EXPIRY`) and die after five
+  wrong guesses (`LOGIN_CODE_MAX_ATTEMPTS`). A code is redeemable **only in
+  the browser that requested it** — `SessionsController#verify_code` reads the
+  address from `session[:pending_login_email]`, never from a form field, so a
+  code cannot be pointed at an account this browser did not ask about. That
+  binding is why cross-device login is not possible, which is a deliberate
+  cost of having one credential instead of two.
+- **Login rate limits**: A 6-digit code is a weak enough secret that the
+  guessing bound is part of the design, not an optimization. `SessionsController`
+  caps code requests at 5 per address and submissions at 10 per IP per
+  `LOGIN_CODE_EXPIRY`, via Rails' `rate_limit`. `LazyCacheStore` exists solely
+  because `rate_limit` binds its `store:` at class-load time; resolving
+  `Rails.cache` per call keeps production on Solid Cache and keeps the limits
+  testable against the test env's `:null_store`.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**: `code_review` rolls one of three content modes per day (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`, roughly even) — `application_code` (realistic snippet, unchanged from before modes existed), `test_file` (a realistic test file exhibiting one test smell, in the day's `test_framework`), or `schema_review` (the day's `schema_artifact` — a Rails migration or a Prisma schema change with its migration — carrying one planted data-modeling flaw). Only `schema_review` narrows the vocabulary, to `AiService::DATA_MODELING_CONCEPTS` (`ProblemSetIngest.code_review_vocabulary`); the other two modes get the full list minus those concepts, unchanged from before modes existed. `pattern` and the rotating third deliberately keep the full vocabulary regardless of the day's `code_review` mode, so a due data-modeling retention check has somewhere to land on a non-schema-review day that includes either of them — a short day may include neither, and `DailyPlan` only offers a check a chosen kind can host. Because that lets a data-modeling concept surface where no schema artifact is shown, `AiService#data_modeling_idiom_guidance` adds one prompt line — stated once for all sections, named from the constant — telling the model to express such a concept in the host section's own idiom (a `pattern` question about `wrong_cardinality` asks how the relationship should be modeled, not for a migration to review). Advisory prompt text, no new machinery; `[retention]` logs are the check on whether it lands.
@@ -274,7 +290,7 @@ User interacts:
 
   **`DEFAULT_EMAIL` is undeliverable on purpose** (`.invalid`, RFC 2606), so it
   can never collide with a real mailbox. The cost is that a preview app's
-  mail-sending actions (the "Email me this review" button, a magic link
+  mail-sending actions (the "Email me this review" button, a login code
   requested for that address) fail loudly rather than silently: `PreviewMail`
   delivers inline and production config sets `raise_delivery_errors`. Set
   `PREVIEW_SEED_EMAIL` to a real address on the PR environment when a reviewer
@@ -287,10 +303,11 @@ User interacts:
   beats an injected value. On a preview app (`PREVIEW_APP` set) the order
   inverts, because a PR environment inherits its base environment's variables
   and therefore arrives carrying production's `APP_HOST` — honoring it there
-  would put production's domain in the preview app's magic links, where the
-  token does not exist. `AppHost` reads that variable directly rather than
-  through `PreviewEnvironment`, which is not loadable during
-  `Rails.application.configure`; a spec asserts the two names agree.
+  would give the preview app `default_url_options` and an ActionCable origin
+  check pointed at production's host instead of its own. `AppHost` reads that
+  variable directly rather than through `PreviewEnvironment`, which is not
+  loadable during `Rails.application.configure`; a spec asserts the two names
+  agree.
 - **Paginated history**: `/history` renders 10 submitted sessions per page via
   Pagy's offset paginator (`DailyResponse::HISTORY_PAGE_SIZE`). Pagy 43's API
   is a full rewrite — `Pagy::Method`, `pagy(:offset, …)`, and helper methods on
@@ -313,12 +330,7 @@ User interacts:
   safe-area insets. `public/icon.svg` is the committed source of the icon;
   `icon.png`, `icon-192.png` and `apple-touch-icon.png` are rasterized from it.
   No service worker: nothing registers one, and iOS does not need one for
-  standalone mode. A home-screen app gets its own cookie jar on iOS 16.4+, so a
-  magic link opened in Safari cannot log it in — `sessions/_pending` switches to
-  the 6-digit code there, keying on `navigator.standalone` rather than
-  `display-mode: standalone` precisely because that hazard is iOS's alone: an
-  installed app elsewhere shares the browser's cookies, so the link still
-  resolves its poll.
+  standalone mode.
 
 ## Railway Deployment
 
@@ -330,7 +342,7 @@ User interacts:
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
 ## What Still Needs Work
-1. ~~Email (magic links won't work yet)~~ — production delivers via Resend's HTTP API (`delivery_method = :resend`; Railway blocks SMTP below Pro). Needs `RESEND_API_KEY`, `MAIL_FROM`, `APP_HOST` on both Railway services: see `docs/deploy/railway-smtp-setup.md`. Sending to teammates requires a verified domain in Resend.
+1. ~~Email (login code emails won't work yet)~~ — production delivers via Resend's HTTP API (`delivery_method = :resend`; Railway blocks SMTP below Pro). Needs `RESEND_API_KEY`, `MAIL_FROM`, `APP_HOST` on both Railway services: see `docs/deploy/railway-smtp-setup.md`. Sending to teammates requires a verified domain in Resend.
 2. ~~`config/environments/production.rb`~~ — done. Resend delivery, `default_url_options`, and `raise_delivery_errors` are wired up from `ENV`.
 3. ~~`db:migrate` on Railway~~ — done. `railway.toml` now runs `bundle exec rails db:migrate` via `preDeployCommand` on every deploy, before the new version takes traffic.
 4. **Seed a first user**: After deploy, run `rails console` on Railway and create the first user manually, then invite teammates.
@@ -346,7 +358,7 @@ rails db:create db:migrate
 bin/dev  # starts web + solid_queue worker
 ```
 
-In development, magic link emails open in the browser via `letter_opener` gem (no SMTP needed).
+In development, login code emails open in the browser via `letter_opener` gem (no SMTP needed).
 
 ## Tests
 
@@ -389,7 +401,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/views/responses/_answered_sections.html.erb` — read-only render of a submitted day; shared by the dashboard's submitted state and every history entry. Its styles live in the layout's `<style>`, not a per-page block, precisely because it renders on both.
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions
-- `app/controllers/sessions_controller.rb` — magic link create + verify
+- `app/controllers/sessions_controller.rb` — code request + verification, with rate limits
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`

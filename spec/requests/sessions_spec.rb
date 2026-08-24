@@ -361,7 +361,7 @@ RSpec.describe "Sessions", type: :request do
       }.to have_enqueued_mail(UserMailer, :login_code)
     end
 
-    it "drops the pending state once the link it describes has expired" do
+    it "drops the pending state once the code it describes has expired" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
 
       travel(User::LOGIN_CODE_EXPIRY + 1.minute) do
@@ -379,7 +379,7 @@ RSpec.describe "Sessions", type: :request do
     # with pending_login_email's expiry removed from #verify_code, where that
     # check is redundancy behind one authority rather than the thing keeping
     # an expired code out.
-    it "refuses a login code once the link's window has passed" do
+    it "refuses a login code once the code's window has passed" do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev" }
       end

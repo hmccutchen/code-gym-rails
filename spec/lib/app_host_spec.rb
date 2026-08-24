@@ -16,7 +16,8 @@ RSpec.describe AppHost do
 
     # The bug this exists to fix: Railway injects a bare host, and
     # URI.parse("web-….up.railway.app").host is nil, which left every preview
-    # app with default_url_options[:host] = nil and a broken magic link.
+    # app with default_url_options[:host] = nil and a broken ActionCable
+    # origin check.
     it "resolves a bare host that carries no scheme" do
       expect(described_class.resolve("RAILWAY_PUBLIC_DOMAIN" => "web-code-gym-rails-pr-117.up.railway.app"))
         .to eq("web-code-gym-rails-pr-117.up.railway.app")
@@ -48,8 +49,8 @@ RSpec.describe AppHost do
     # carrying production's APP_HOST. Verified live on PR #118's environment:
     # APP_HOST=https://coding-gym.pro alongside
     # RAILWAY_PUBLIC_DOMAIN=web-code-gym-rails-pr-118.up.railway.app. Honoring
-    # APP_HOST there puts production's domain in the preview app's magic links,
-    # where the token does not exist.
+    # APP_HOST there would point the preview app's default_url_options and
+    # ActionCable origin check at production's host instead of its own.
     it "prefers the injected Railway domain over an inherited APP_HOST" do
       host = described_class.resolve(
         "PREVIEW_APP" => "1",
