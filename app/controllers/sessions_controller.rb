@@ -4,6 +4,24 @@ class SessionsController < ApplicationController
 
   helper_method :pending_login_email
 
+  RATE_LIMIT_STORE = LazyCacheStore.new
+
+  # Capping requests per address is the one that matters: a fresh code resets
+  # login_code_attempts, so uncapped re-requests would turn the five-guess
+  # ceiling into five guesses per request, forever. Keyed on the address
+  # rather than the IP because the address is what an attacker targets and
+  # the IP is what they can change.
+  rate_limit to: 5, within: User::LOGIN_CODE_EXPIRY,
+             by:    -> { params[:email].to_s.strip.downcase },
+             with:  -> { rate_limited("Too many code requests for that address. Try again in a few minutes.") },
+             store: RATE_LIMIT_STORE,
+             only:  :create
+
+  rate_limit to: 10, within: User::LOGIN_CODE_EXPIRY,
+             with:  -> { rate_limited("Too many attempts. Try again in a few minutes.") },
+             store: RATE_LIMIT_STORE,
+             only:  :verify_code
+
   # GET /login
   def new
     redirect_to root_path if logged_in?
@@ -61,6 +79,13 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # A bare 429 would drop someone out of the flow with no way back; this keeps
+  # them on the page that can request a new code.
+  def rate_limited(message)
+    flash.now[:alert] = message
+    render :new, status: :too_many_requests
+  end
 
   # The single authority for "is a login pending in this browser," read by
   # both #verify_code and the login page. A stamped state expires with the
