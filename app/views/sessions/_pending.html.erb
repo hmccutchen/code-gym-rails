@@ -2,7 +2,7 @@
   Check your email for a login link — this page will update automatically once you click it.
 </p>
 
-<% if session[:pending_login_touch] %>
+<% if pending_login_touch? %>
   <details id="code-details">
     <summary>Or enter the code instead</summary>
     <%= form_with url: verify_login_code_path, method: :post do |f| %>
@@ -43,8 +43,14 @@
   }
 
   const statusUrl = "<%= login_status_path %>";
+  const POLL_INTERVAL_MS = 3000;
   let attempts = 0;
-  const MAX_ATTEMPTS = 200; // ~10 minutes at 3s intervals
+
+  // Derived from the link's own lifetime rather than picked: polling that
+  // stopped first would tell someone their link was dead while it still had
+  // minutes left, and polling past expiry would wait on a link that can no
+  // longer resolve.
+  const MAX_ATTEMPTS = <%= (User::TOKEN_EXPIRY.to_i * 1000) %> / POLL_INTERVAL_MS;
 
   async function poll() {
     attempts += 1;
@@ -60,10 +66,18 @@
       // Transient network hiccup — keep polling rather than giving up early.
     }
 
-    if (attempts >= MAX_ATTEMPTS) return;
-    setTimeout(poll, 3000);
+    // Giving up silently would leave the message above still promising this
+    // page updates itself, with nothing left running to make that true. The
+    // link has expired by now too, so sending them back to the form is not
+    // asking them to abandon a working one.
+    if (attempts >= MAX_ATTEMPTS) {
+      message.textContent = "That link has expired — request a new one below.";
+      return;
+    }
+
+    setTimeout(poll, POLL_INTERVAL_MS);
   }
 
-  setTimeout(poll, 3000);
+  setTimeout(poll, POLL_INTERVAL_MS);
 })();
 </script>
