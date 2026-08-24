@@ -56,7 +56,7 @@ Rails.application.configure do
   config.active_job.queue_adapter = :solid_queue
 
   # Raise delivery errors so failed sends surface as failed/retried Solid Queue jobs
-  # (UserMailer.magic_link is sent via deliver_later) instead of failing silently.
+  # (UserMailer.login_code is sent via deliver_later) instead of failing silently.
   config.action_mailer.raise_delivery_errors = true
 
   # Set host to be used by links generated in mailer templates (e.g. the magic link

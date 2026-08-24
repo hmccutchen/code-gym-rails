@@ -6,8 +6,6 @@
   .form-field label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
   .form-field input { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
   .form-field input:focus { outline: none; border-color: var(--accent); }
-  .login-wrap details { text-align: left; }
-  .login-wrap summary { cursor: pointer; color: var(--muted); margin-bottom: .5rem; }
   .pending-divider { border-top: 1px solid var(--border); padding-top: 1.25rem; font-size: .85rem; }
 </style>
 
@@ -21,43 +19,20 @@
         browser — the link opened in a mail client's own cookie jar, a token
         already consumed — used to leave this page with no way to request a
         new one, recoverable only by clearing cookies. %>
-    <p class="pending-divider">Didn't get the email? Request a new link below, or use a different address.</p>
+    <p class="pending-divider">Didn't get the email? Request a new code below, or use a different address.</p>
   <% else %>
-    <p>Daily dev exercises.<br>Enter your email to get a magic link.</p>
+    <p>Daily dev exercises.<br>Enter your email to get a login code.</p>
   <% end %>
 
   <%= form_with url: login_path, method: :post do |f| %>
-    <%= f.hidden_field :touch_device, value: "", id: "touch-device" %>
     <div class="form-field">
       <%= f.label :name, "Name (first time only)" %>
       <%= f.text_field :name, placeholder: "Your name", autocomplete: "name" %>
     </div>
     <div class="form-field">
-      <%= f.label :email, "Work email" %>
+      <%= f.label :email, "Work email *" %>
       <%= f.email_field :email, placeholder: "you@company.com", required: true, autocomplete: "email" %>
     </div>
-    <%= f.submit "Send magic link →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+    <%= f.submit "Send code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
   <% end %>
-
-  <%# Tells the server whether to bother sending a login code at all. The
-      code is only redeemable in the browser that requested it, so it is
-      noise on desktop. Unset means desktop — the safe default, since a
-      touch user with JS off still gets a working magic link. %>
-  <script>
-  (() => {
-    const field = document.getElementById("touch-device");
-    if (!field) return;
-
-    // matchMedia is optional here: navigator.standalone alone is enough to
-    // identify an installed iOS PWA, so bailing out on its absence would
-    // drop that signal.
-    const matches = (query) => window.matchMedia ? window.matchMedia(query).matches : false;
-
-    const isTouch = window.navigator.standalone === true ||
-      matches("(display-mode: standalone)") ||
-      matches("(pointer: coarse)");
-
-    if (isTouch) field.value = "1";
-  })();
-  </script>
 </div>

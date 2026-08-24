@@ -1,83 +1,13 @@
 <p id="pending-message" style="color:var(--muted);margin-bottom:1.5rem;">
-  Check your email for a login link — this page will update automatically once you click it.
+  Enter the 6-digit code we emailed you.
 </p>
 
-<% if pending_login_touch? %>
-  <details id="code-details">
-    <summary>Or enter the code instead</summary>
-    <%= form_with url: verify_login_code_path, method: :post do |f| %>
-      <div class="form-field" style="margin-top:.75rem;">
-        <%= f.label :code, "6-digit code from the email" %>
-        <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6, autocomplete: "one-time-code", placeholder: "123456", required: true %>
-      </div>
-      <%= f.submit "Verify code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
-    <% end %>
-  </details>
+<%= form_with url: verify_login_code_path, method: :post do |f| %>
+  <div class="form-field">
+    <%= f.label :code, "6-digit code from the email" %>
+    <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6,
+                     autocomplete: "one-time-code", placeholder: "123456",
+                     required: true, autofocus: true %>
+  </div>
+  <%= f.submit "Verify code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
 <% end %>
-
-<%# Wrapped in an IIFE: this partial can render again after a failed code
-    submit re-renders sessions/new, and top-level const/let would redeclare
-    on that second execution — same hazard documented in
-    dashboard/_generating.html.erb's polling script. %>
-<script>
-(() => {
-  // iOS only, deliberately. A home-screen app there gets its own cookie jar
-  // (16.4+), so a link clicked in Safari lands in a session this window cannot
-  // see. An installed app on Android or desktop shares the browser's cookies,
-  // so the link still resolves the poll below — matching (display-mode:
-  // standalone) too would strand those users on the code form with polling
-  // switched off, for a hazard they do not have.
-  const isIosStandalone = window.navigator.standalone === true;
-  const message = document.getElementById("pending-message");
-  const details = document.getElementById("code-details");
-
-  // `details` is absent on desktop, where the server omits the code form
-  // entirely. Requiring it here means a standalone app that somehow has no
-  // code form still falls through to polling rather than stranding the user
-  // on a message about a field that isn't there.
-  if (isIosStandalone && details) {
-    message.textContent = "Check your email for a 6-digit code and enter it below.";
-    details.open = true;
-    details.querySelector("summary").style.display = "none";
-    return; // polling could never resolve here — the code is the only way through
-  }
-
-  const statusUrl = "<%= login_status_path %>";
-  const POLL_INTERVAL_MS = 3000;
-  let attempts = 0;
-
-  // Derived from the link's own lifetime rather than picked: polling that
-  // stopped first would tell someone their link was dead while it still had
-  // minutes left, and polling past expiry would wait on a link that can no
-  // longer resolve.
-  const MAX_ATTEMPTS = <%= (User::TOKEN_EXPIRY.to_i * 1000) %> / POLL_INTERVAL_MS;
-
-  async function poll() {
-    attempts += 1;
-
-    try {
-      const res = await fetch(statusUrl, { headers: { "Accept": "application/json" } });
-      const data = await res.json();
-      if (data.authenticated) {
-        window.location.href = "/";
-        return;
-      }
-    } catch {
-      // Transient network hiccup — keep polling rather than giving up early.
-    }
-
-    // Giving up silently would leave the message above still promising this
-    // page updates itself, with nothing left running to make that true. The
-    // link has expired by now too, so sending them back to the form is not
-    // asking them to abandon a working one.
-    if (attempts >= MAX_ATTEMPTS) {
-      message.textContent = "That link has expired — request a new one below.";
-      return;
-    }
-
-    setTimeout(poll, POLL_INTERVAL_MS);
-  }
-
-  setTimeout(poll, POLL_INTERVAL_MS);
-})();
-</script>

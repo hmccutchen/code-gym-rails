@@ -5,14 +5,30 @@ RSpec.describe "Sessions", type: :request do
     # Regression guard: this drives User#generate_login_token! (BCrypt) under
     # bundler, which 500'd in production when the bcrypt gem was missing from
     # the Gemfile.
-    it "creates a first-time user and enqueues the magic link email" do
+    it "creates a first-time user and enqueues the login code email" do
       expect {
         post login_path, params: { email: "new@example.com", name: "New Dev" }
       }.to change(User, :count).by(1)
-        .and have_enqueued_mail(UserMailer, :magic_link)
+        .and have_enqueued_mail(UserMailer, :login_code)
 
       expect(response).to redirect_to(login_path)
       expect(flash[:notice]).to match(/check your email/i)
+    end
+
+    # Every requester gets a code now, with no client-supplied hint deciding
+    # who is worth mailing one to.
+    it "mails a code regardless of any touch_device hint in the params" do
+      expect {
+        post login_path, params: { email: "new@example.com", touch_device: "" }
+      }.to have_enqueued_mail(UserMailer, :login_code)
+    end
+
+    it "records the pending state without a device flag" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+
+      expect(session[:pending_login_email]).to eq("dev@example.com")
+      expect(session[:pending_login_at]).to be_present
+      expect(session[:pending_login_touch]).to be_nil
     end
 
     it "reuses the existing user for a known email" do
@@ -31,6 +47,36 @@ RSpec.describe "Sessions", type: :request do
       }.not_to change(User, :count)
 
       expect(response).to have_http_status(:unprocessable_content)
+    end
+  end
+
+  describe "the login page" do
+    it "marks the email field as required and the name field as not" do
+      get login_path
+
+      expect(response.body).to include("Work email *")
+      expect(response.body).not_to include("Name *")
+    end
+
+    it "offers the code form as soon as a login is pending" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+
+      get login_path
+
+      expect(response.body).to include("/login/code")
+      expect(response.body).to include("6-digit code")
+    end
+
+    # The page carries no JavaScript at all now: polling is gone with the
+    # link it waited on, and the device sniffing went with the gating.
+    it "carries no polling or device-detection script" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+
+      get login_path
+
+      expect(response.body).not_to include("matchMedia")
+      expect(response.body).not_to include("navigator.standalone")
+      expect(response.body).not_to include("login/status")
     end
   end
 
@@ -135,10 +181,10 @@ RSpec.describe "Sessions", type: :request do
 
     it "logs the user in with the code emailed after POST /login" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
       end
 
-      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
       expect(raw_code).to be_present
 
       post verify_login_code_path, params: { code: raw_code }
@@ -149,9 +195,9 @@ RSpec.describe "Sessions", type: :request do
 
     it "rejects an incorrect code without logging in" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
       end
-      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
       expect(raw_code).to be_present
 
       post verify_login_code_path, params: { code: wrong_code_for(raw_code) }
@@ -160,22 +206,22 @@ RSpec.describe "Sessions", type: :request do
       expect(session[:user_id]).to be_nil
     end
 
-    it "locks out after 5 wrong attempts, invalidating the emailed link too" do
+    # generate_login_token! writes the code's digest and the token's digest
+    # together, so locking out the code has to invalidate the token row too —
+    # asserted on the row directly, since the code's email carries no link to
+    # exercise verify through.
+    it "locks out after 5 wrong attempts, invalidating the underlying token too" do
+      user = User.create!(email: "dev@example.com", name: "Dev")
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
       end
-      body = ActionMailer::Base.deliveries.last.body.encoded
-      raw_token = body[/token=([\w-]+)/, 1]
-      raw_code  = body[/enter this code: (\d{6})/, 1]
-      expect(raw_token).to be_present
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
       expect(raw_code).to be_present
       wrong = wrong_code_for(raw_code)
 
       5.times { post verify_login_code_path, params: { code: wrong } }
 
-      get verify_auth_path(token: raw_token)
-      expect(response).to redirect_to(login_path)
-      expect(flash[:alert]).to match(/invalid or expired/i)
+      expect(user.reload.login_token_digest).to be_nil
     end
 
     it "returns nil-equivalent (no session) when there is no pending login in this browser" do
@@ -186,146 +232,13 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
-  describe "login code gating by device" do
-    include ActiveJob::TestHelper
-
-    it "emails a login code when the request came from a touch device" do
-      perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
-      end
-
-      expect(ActionMailer::Base.deliveries.last.body.encoded).to match(/enter this code: \d{6}/)
-    end
-
-    it "omits the login code when the request came from a desktop browser" do
-      perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
-      end
-
-      expect(ActionMailer::Base.deliveries.last.body.encoded).not_to include("enter this code")
-    end
-
-    it "still emails a working magic link to a desktop browser" do
-      perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
-      end
-      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
-
-      get verify_auth_path(token: raw_token)
-
-      expect(response).to have_http_status(:ok)
-      expect(session[:user_id]).to be_present
-    end
-
-    it "clears the pending-login device flag after a link login" do
-      perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
-      end
-      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
-
-      get verify_auth_path(token: raw_token)
-
-      expect(session[:pending_login_email]).to be_nil
-      expect(session[:pending_login_touch]).to be_nil
-    end
-
-    it "clears the pending-login device flag after a code login" do
-      perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
-      end
-      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
-
-      post verify_login_code_path, params: { code: raw_code }
-
-      expect(session[:pending_login_email]).to be_nil
-      expect(session[:pending_login_touch]).to be_nil
-    end
-  end
-
-  describe "the login page's device-gated code UI" do
-    it "carries a touch_device field for the client script to set" do
-      get login_path
-
-      expect(response.body).to include('name="touch_device"')
-    end
-
-    it "offers the code form on the pending page after a touch-device request" do
-      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
-
-      get login_path
-
-      expect(response.body).to include("/login/code")
-      expect(response.body).to include("6-digit code")
-    end
-
-    it "hides the code form on the pending page after a desktop request" do
-      post login_path, params: { email: "dev@example.com", name: "Dev" }
-
-      get login_path
-
-      expect(response.body).not_to include("/login/code")
-      expect(response.body).to include("Check your email")
-    end
-
-    # Scoped to the pending partial's own script: the email form renders
-    # alongside it now and does its own touch detection with matchMedia,
-    # legitimately, so a page-wide check would read that as a regression here.
-    def pending_script
-      response.body.split("<script>").find { |b| b.include?("isIosStandalone") }
-              &.split("</script>")&.first
-    end
-
-    # Asserted on the script text because the branch is client-side and its
-    # inputs are the platform's, not the server's. The hazard it answers —
-    # a link clicked in the browser landing in a session the app window
-    # cannot see — is iOS's alone, since a home-screen app there gets its own
-    # cookie jar from 16.4. An installed app anywhere else shares the
-    # browser's cookies, so widening this to (display-mode: standalone) would
-    # switch polling off for users whose magic link would have resolved it,
-    # leaving them to retype a code for a problem they do not have. Nothing
-    # renders differently when that regresses, so this is the only thing that
-    # would say so. Matching on matchMedia rather than the query string:
-    # the layout carries an @media (display-mode: standalone) block of its
-    # own, and only a script can consult the query from here.
-    it "gates the code-only pending state on iOS standalone alone" do
-      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
-
-      get login_path
-
-      expect(pending_script).to include("window.navigator.standalone === true")
-      expect(pending_script).not_to include("matchMedia")
-      expect(response.body).to include(login_status_path)
-    end
-  end
-
-  describe "GET /login/status" do
-    it "reports unauthenticated before verification" do
-      get login_status_path
-      expect(JSON.parse(response.body)).to eq("authenticated" => false)
-    end
-
-    it "reports authenticated once verify has completed in this session" do
-      user = User.create!(email: "dev@example.com", name: "Dev")
-      raw_token = user.generate_login_token!
-
-      get login_status_path
-      expect(JSON.parse(response.body)["authenticated"]).to eq(false)
-
-      get verify_auth_path(token: raw_token)
-
-      get login_status_path
-      expect(JSON.parse(response.body)["authenticated"]).to eq(true)
-    end
-  end
-
   describe "session rotation on login" do
     include ActiveJob::TestHelper
 
     it "issues a new session on link login so nothing written before auth survives" do
-      perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
-      end
-      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      user = User.find_by(email: "dev@example.com")
+      raw_token = user.generate_login_token!
       pre_login_session_id = session.id.public_id
 
       get verify_auth_path(token: raw_token)
@@ -336,9 +249,9 @@ RSpec.describe "Sessions", type: :request do
 
     it "issues a new session on code login" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
       end
-      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
       pre_login_session_id = session.id.public_id
 
       post verify_login_code_path, params: { code: raw_code }
@@ -373,16 +286,15 @@ RSpec.describe "Sessions", type: :request do
       expect(response.body).to include(%(href="#{history_path}"))
     end
 
-    it "clears the pending-login state on code login" do
+    it "clears the pending-login state after a code login" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
       end
-      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 
       post verify_login_code_path, params: { code: raw_code }
 
       expect(session[:pending_login_email]).to be_nil
-      expect(session[:pending_login_touch]).to be_nil
     end
   end
 
@@ -400,10 +312,10 @@ RSpec.describe "Sessions", type: :request do
     it "sends an already-logged-in user home instead of claiming the session expired" do
       get login_path
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1",
+        post login_path, params: { email: "dev@example.com", name: "Dev",
                                    authenticity_token: authenticity_token }
       end
-      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 
       get login_path
       code_form_token = authenticity_token
@@ -510,13 +422,13 @@ RSpec.describe "Sessions", type: :request do
     end
 
     it "keeps the form reachable when the link is verified in another cookie jar" do
-      perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev" }
-      end
-      raw_token = ActionMailer::Base.deliveries.last.body.encoded[/token=([\w-]+)/, 1]
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      user = User.find_by(email: "dev@example.com")
+      raw_token = user.generate_login_token!
 
-      # A second session stands in for the tab that clicked the link — the mail
-      # client's own browser, which never shares this session's cookie.
+      # A second session stands in for a browser reaching verify outside this
+      # one's cookie jar — verify itself stays reachable even though nothing
+      # in the email links to it anymore.
       other_jar = open_session
       other_jar.get verify_auth_path(token: raw_token)
       expect(other_jar.session[:user_id]).to be_present
@@ -527,17 +439,17 @@ RSpec.describe "Sessions", type: :request do
       expect(email_form_present?).to be(true)
     end
 
-    it "lets a new link be requested from the pending page" do
+    it "lets a new code be requested from the pending page" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       get login_path
 
       expect {
         post login_path, params: { email: "dev@example.com" }
-      }.to have_enqueued_mail(UserMailer, :magic_link)
+      }.to have_enqueued_mail(UserMailer, :login_code)
     end
 
     it "drops the pending state once the link it describes has expired" do
-      post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
 
       travel(User::TOKEN_EXPIRY + 1.minute) do
         get login_path
@@ -556,9 +468,9 @@ RSpec.describe "Sessions", type: :request do
     # an expired code out.
     it "refuses a login code once the link's window has passed" do
       perform_enqueued_jobs do
-        post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
       end
-      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/enter this code: (\d{6})/, 1]
+      raw_code = ActionMailer::Base.deliveries.last.body.encoded[/is:\s*(\d{6})/m, 1]
 
       travel(User::TOKEN_EXPIRY + 1.minute) do
         post verify_login_code_path, params: { code: raw_code }

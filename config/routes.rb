@@ -25,7 +25,6 @@ Rails.application.routes.draw do
   post   "login",        to: "sessions#create"
   get    "auth/verify",  to: "sessions#verify", as: :verify_auth
   post   "login/code",   to: "sessions#verify_code", as: :verify_login_code
-  get    "login/status", to: "sessions#status", as: :login_status
   delete "logout",       to: "sessions#destroy", as: :logout
 
   # First-time setup: enter an Anthropic or Gemini API key
