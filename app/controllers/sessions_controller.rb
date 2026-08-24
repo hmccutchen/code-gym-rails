@@ -11,15 +11,24 @@ class SessionsController < ApplicationController
   # ceiling into five guesses per request, forever. Keyed on the address
   # rather than the IP because the address is what an attacker targets and
   # the IP is what they can change.
+  #
+  # Both limits need distinct `name:`s: Rails keys a limit on
+  # ["rate-limit", scope, name, by].compact.join(":"), scope defaults to the
+  # controller, and `by` for #create is attacker-controlled (any email an
+  # attacker submits) — without a name the two limits would collide into one
+  # bucket, letting a `POST /login` with a chosen IP as the email lock that
+  # IP out of #verify_code.
   rate_limit to: 5, within: User::LOGIN_CODE_EXPIRY,
-             by:    -> { params[:email].to_s.strip.downcase },
+             by:    -> { normalized_email },
              with:  -> { rate_limited("Too many code requests for that address. Try again in a few minutes.") },
              store: RATE_LIMIT_STORE,
+             name:  "code_requests",
              only:  :create
 
   rate_limit to: 10, within: User::LOGIN_CODE_EXPIRY,
              with:  -> { rate_limited("Too many attempts. Try again in a few minutes.") },
              store: RATE_LIMIT_STORE,
+             name:  "code_attempts",
              only:  :verify_code
 
   # GET /login
@@ -31,7 +40,7 @@ class SessionsController < ApplicationController
   # that requested it (see #verify_code), so the pending state written here is
   # what makes the code usable at all, not merely a UI convenience.
   def create
-    email = params[:email].to_s.strip.downcase
+    email = normalized_email
     name  = params[:name].to_s.strip
 
     # `active` only: an anonymized row's email was rewritten anyway, so this
@@ -79,6 +88,13 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # The single normalization rule for a submitted email, so the #create
+  # rate limit's `by:` lambda (instance_exec'd here, so it can call a
+  # private method) and #create itself can never drift apart.
+  def normalized_email
+    params[:email].to_s.strip.downcase
+  end
 
   # A bare 429 would drop someone out of the flow with no way back; this keeps
   # them on the page that can request a new code.

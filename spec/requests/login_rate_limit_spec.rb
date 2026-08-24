@@ -17,6 +17,8 @@ RSpec.describe "Login rate limits", type: :request do
       }.not_to have_enqueued_mail(UserMailer, :login_code)
 
       expect(flash[:alert]).to match(/too many/i)
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.body).to include('name="email"')
     end
 
     # Keyed on the address, not the browser: the whole point is to cap how
@@ -30,12 +32,27 @@ RSpec.describe "Login rate limits", type: :request do
       }.not_to have_enqueued_mail(UserMailer, :login_code)
     end
 
-    it "leaves a different address unaffected" do
+    # Proves the by: lambda normalizes exactly like #create does — a limit
+    # that normalized differently would let case or whitespace evade it.
+    it "shares one bucket for an address regardless of case or whitespace" do
       5.times { post login_path, params: { email: "dev@example.com", name: "Dev" } }
 
       expect {
-        post login_path, params: { email: "other@example.com", name: "Other" }
-      }.to have_enqueued_mail(UserMailer, :login_code)
+        post login_path, params: { email: " DEV@Example.com " }
+      }.not_to have_enqueued_mail(UserMailer, :login_code)
+    end
+
+    # Exhausting the #create limit must not touch the #verify_code bucket —
+    # the two rate_limit declarations need distinct `name:`s or they'd
+    # collide into one key, since `by` for #create is attacker-controlled.
+    it "leaves the verify_code limit untouched by exhausting the create limit" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      5.times { post login_path, params: { email: "dev@example.com" } }
+
+      post verify_login_code_path, params: { code: "000000" }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(flash[:alert]).not_to match(/too many/i)
     end
   end
 
@@ -47,6 +64,18 @@ RSpec.describe "Login rate limits", type: :request do
       post verify_login_code_path, params: { code: "000000" }
 
       expect(flash[:alert]).to match(/too many/i)
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.body).to include('name="email"')
+    end
+
+    # Exhausting the #verify_code limit must not touch the #create bucket.
+    it "leaves the create limit untouched by exhausting the verify_code limit" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      11.times { post verify_login_code_path, params: { code: "000000" } }
+
+      expect {
+        post login_path, params: { email: "dev@example.com" }
+      }.to have_enqueued_mail(UserMailer, :login_code)
     end
   end
 
