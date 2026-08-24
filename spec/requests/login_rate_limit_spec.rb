@@ -52,12 +52,29 @@ RSpec.describe "Login rate limits", type: :request do
     # names, #create's posts land in "code_requests:127.0.0.1" and the verify
     # post opens a fresh "code_attempts:127.0.0.1" at 1, so it answers
     # normally instead of 429.
+    # Bounds an attacker who varies the address instead of hammering one —
+    # the address-keyed limit above can't see that pattern at all, since each
+    # address gets its own fresh bucket.
+    it "stops a 21st request from one IP across 21 different addresses" do
+      20.times { |n| post login_path, params: { email: "dev#{n}@example.com", name: "Dev" } }
+
+      expect {
+        post login_path, params: { email: "dev20@example.com" }
+      }.not_to have_enqueued_mail(UserMailer, :login_code)
+
+      expect(flash[:alert]).to match(/too many/i)
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.body).to include('name="email"')
+    end
+
     it "keeps the create and verify_code buckets separate when an attacker submits their IP as the email" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
+      user = User.find_by(email: "dev@example.com")
+      wrong = wrong_code_for(user.generate_login_code!)
 
       11.times { post login_path, params: { email: "127.0.0.1" } }
 
-      post verify_login_code_path, params: { code: "000000" }
+      post verify_login_code_path, params: { code: wrong }
 
       expect(response).to have_http_status(:unprocessable_content)
     end
@@ -66,9 +83,11 @@ RSpec.describe "Login rate limits", type: :request do
   describe "submitting codes" do
     it "stops an eleventh guess from one IP inside the window" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
+      user = User.find_by(email: "dev@example.com")
+      wrong = wrong_code_for(user.generate_login_code!)
 
-      10.times { post verify_login_code_path, params: { code: "000000" } }
-      post verify_login_code_path, params: { code: "000000" }
+      10.times { post verify_login_code_path, params: { code: wrong } }
+      post verify_login_code_path, params: { code: wrong }
 
       expect(flash[:alert]).to match(/too many/i)
       expect(response).to have_http_status(:too_many_requests)
@@ -81,8 +100,9 @@ RSpec.describe "Login rate limits", type: :request do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       user = User.find_by(email: "dev@example.com")
       real_code = user.generate_login_code!
+      wrong = wrong_code_for(real_code)
 
-      5.times { post verify_login_code_path, params: { code: "000000" } }
+      5.times { post verify_login_code_path, params: { code: wrong } }
       post verify_login_code_path, params: { code: real_code }
 
       expect(session[:user_id]).to be_nil

@@ -31,6 +31,17 @@ class SessionsController < ApplicationController
              name:  "code_attempts",
              only:  :verify_code
 
+  # The address-keyed limit above can't bound an attacker who varies the
+  # address on every request — and an unrecognized address creates an
+  # account and sends real mail, so unbounded #create is unbounded outbound
+  # mail from a public, internet-reachable page. `by:` defaults to
+  # request.remote_ip, which is the axis that matters here.
+  rate_limit to: 20, within: User::LOGIN_CODE_EXPIRY,
+             with:  -> { rate_limited("Too many code requests. Try again in a few minutes.") },
+             store: RATE_LIMIT_STORE,
+             name:  "code_requests_by_ip",
+             only:  :create
+
   # GET /login
   def new
     redirect_to root_path if logged_in?
@@ -77,7 +88,15 @@ class SessionsController < ApplicationController
       destination = start_new_session_for(user)
       redirect_to destination || root_path, notice: "Welcome back, #{user.name}!"
     else
-      flash.now[:alert] = "Incorrect or expired code. Try again, or request a new one below."
+      # No pending state renders no code field to try again in — see
+      # new.html.erb's gate on pending_login_email — so the message can't
+      # tell everyone to retry.
+      flash.now[:alert] =
+        if email.present?
+          "Incorrect or expired code. Try again, or request a new one below."
+        else
+          "Incorrect or expired code. Request a new one below."
+        end
       render :new, status: :unprocessable_entity
     end
   end
@@ -105,8 +124,8 @@ class SessionsController < ApplicationController
 
   # The single authority for "is a login pending in this browser," read by
   # both #verify_code and the login page. A stamped state expires with the
-  # link it describes — the pending state is only ever a claim that a live
-  # token is in someone's inbox, and a stale claim used to leave the login
+  # code it describes — the pending state is only ever a claim that a live
+  # code is in someone's inbox, and a stale claim used to leave the login
   # page insisting on an email that could no longer log anyone in. A state
   # carrying no readable stamp is the one exception, and stays pending for the
   # life of the cookie; see #pending_login_expired? for why that is the safer

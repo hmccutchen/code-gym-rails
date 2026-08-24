@@ -3,13 +3,9 @@ require "rails_helper"
 RSpec.describe "ApiKeys", type: :request do
   let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
 
-  def login(user)
-    login_as(user)
-  end
-
   describe "PATCH /setup" do
     it "saves a valid Anthropic key, encrypted, and detects the provider" do
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "sk-ant-api03-abc123" }
 
@@ -20,7 +16,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "saves a valid Gemini key and detects the provider" do
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "AIzaSyExampleKey12345" }
 
@@ -30,7 +26,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "saves a valid Gemini key in Google's newer AQ. format and detects the provider" do
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "AQ.Ab8RN6J5yPUsY9SwLxAS2DYq_cYQFIhR9xG8C0Dz3D9CdyL-qg" }
 
@@ -40,7 +36,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "saves a valid language preference alongside the API key" do
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "sk-ant-api03-abc123", language: "javascript" }
 
@@ -49,7 +45,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "ignores an invalid language value without blocking the API key save" do
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "sk-ant-api03-abc123", language: "python" }
 
@@ -59,7 +55,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "defaults to the user's current language when no language param is given" do
-      login(user)
+      login_as(user)
       user.update!(language: "mixed")
 
       patch setup_path, params: { api_key: "sk-ant-api03-abc123" }
@@ -69,7 +65,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "rejects a key that doesn't look like either provider's key" do
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "not-a-real-key" }
 
@@ -81,7 +77,7 @@ RSpec.describe "ApiKeys", type: :request do
 
     it "updates only the language when the api_key field is blank and a key already exists" do
       user.update!(api_key: "sk-ant-existing", provider: "anthropic")
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "", language: "javascript" }
 
@@ -91,7 +87,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "rejects a language-only update when no key has been set yet" do
-      login(user)
+      login_as(user)
 
       patch setup_path, params: { api_key: "", language: "javascript" }
 

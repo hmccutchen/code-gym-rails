@@ -17,7 +17,7 @@ gem "stimulus-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
-# Magic-link login tokens are digested with BCrypt (User#generate_login_token!)
+# Login codes are digested with BCrypt (User#generate_login_code!)
 gem "bcrypt", "~> 3.1.7"
 
 # Email delivery via Resend's HTTP API (Railway blocks outbound SMTP below Pro)

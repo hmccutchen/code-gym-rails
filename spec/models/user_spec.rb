@@ -83,12 +83,6 @@ RSpec.describe User, type: :model do
   end
 
   describe "login codes" do
-    # The generator emits a random 6-digit string, so a hardcoded "wrong" code
-    # can occasionally *be* the real one. Derive one that never collides.
-    def wrong_code_for(raw_code)
-      format("%06d", (raw_code.to_i + 1) % 1_000_000)
-    end
-
     it "generates a code digest, with attempts reset to zero" do
       user = create_user
       user.generate_login_code!
@@ -97,7 +91,7 @@ RSpec.describe User, type: :model do
       expect(user.login_code_attempts).to eq(0)
     end
 
-    it "returns the raw code, which is not persisted" do
+    it "returns a 6-digit raw code" do
       user = create_user
       raw_code = user.generate_login_code!
 

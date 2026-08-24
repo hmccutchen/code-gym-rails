@@ -92,12 +92,6 @@ RSpec.describe "Sessions", type: :request do
   describe "POST /login/code" do
     include ActiveJob::TestHelper
 
-    # The generated code is random, so a hardcoded "wrong" code can occasionally
-    # be the real one. Derive one that never collides.
-    def wrong_code_for(code)
-      format("%06d", (code.to_i + 1) % 1_000_000)
-    end
-
     it "logs the user in with the code emailed after POST /login" do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev" }
@@ -312,7 +306,7 @@ RSpec.describe "Sessions", type: :request do
 
       post verify_login_code_path, params: { code: code }
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(flash[:alert]).to match(/incorrect or expired/i)
     end
   end

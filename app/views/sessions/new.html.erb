@@ -16,9 +16,10 @@
 
     <%# Never a branch away from the form: the pending state is a banner above
         it, not a replacement for it. A login that cannot complete in this
-        browser — the link opened in a mail client's own cookie jar, a token
-        already consumed — used to leave this page with no way to request a
-        new one, recoverable only by clearing cookies. %>
+        browser — a code requested in a different browser than the one being
+        used, a code already consumed or dead after five wrong guesses — used
+        to leave this page with no way to request a new one, recoverable only
+        by clearing cookies. %>
     <p class="pending-divider">Didn't get the email? Request a new code below, or use a different address.</p>
   <% else %>
     <p>Daily dev exercises.<br>Enter your email to get a login code.</p>

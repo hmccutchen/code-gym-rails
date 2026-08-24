@@ -35,7 +35,7 @@ RSpec.describe "Logging in with an emailed code", type: :system do
     fill_in "Work email *", with: user.email
     click_button "Send code →"
 
-    fill_in "6-digit code from the email", with: "000000"
+    fill_in "6-digit code from the email", with: wrong_code_for(user.generate_login_code!)
     click_button "Verify code →"
 
     # The email carries no link to point a locked-out user at, so the

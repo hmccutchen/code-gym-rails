@@ -39,6 +39,12 @@ module AuthHelpers
     fill_in "6-digit code from the email", with: user.generate_login_code!
     click_button "Verify code →"
   end
+
+  # The generated code is random, so a hardcoded "wrong" code can occasionally
+  # be the real one. Derive one that never collides.
+  def wrong_code_for(raw_code)
+    format("%06d", (raw_code.to_i + 1) % 1_000_000)
+  end
 end
 
 RSpec.configure do |config|
@@ -47,4 +53,5 @@ RSpec.configure do |config|
   config.include AuthHelpers, type: :helper
   config.include AuthHelpers, type: :system
   config.include AuthHelpers, type: :job
+  config.include AuthHelpers, type: :model
 end

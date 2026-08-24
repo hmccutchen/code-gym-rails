@@ -215,7 +215,8 @@ User interacts:
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement only `#call` and `#build_connection`. Adding a provider means adding a subclass, not editing the base.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
   mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
-  the mailer; `User.authenticate_login_code` verifies it in constant time.
+  the mailer; `User.authenticate_login_code` verifies it against the stored
+  BCrypt digest, never against the raw code.
   Codes expire in 15 minutes (`User::LOGIN_CODE_EXPIRY`) and die after five
   wrong guesses (`LOGIN_CODE_MAX_ATTEMPTS`). A code is redeemable **only in
   the browser that requested it** — `SessionsController#verify_code` reads the
@@ -278,7 +279,7 @@ User interacts:
   production or shared-scope Railway variable would enable this, which is why
   the name is reserved for PR deployments and set from committed config only.
   It skips
-  `SessionsController`, so real magic-link login is unchanged and still
+  `SessionsController`, so real code login is unchanged and still
   testable, and a deliberate logout sets a cookie that keeps the reviewer
   signed out.
 
