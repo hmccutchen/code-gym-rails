@@ -43,8 +43,14 @@
   }
 
   const statusUrl = "<%= login_status_path %>";
+  const POLL_INTERVAL_MS = 3000;
   let attempts = 0;
-  const MAX_ATTEMPTS = 200; // ~10 minutes at 3s intervals
+
+  // Derived from the link's own lifetime rather than picked: polling that
+  // stopped first would tell someone their link was dead while it still had
+  // minutes left, and polling past expiry would wait on a link that can no
+  // longer resolve.
+  const MAX_ATTEMPTS = <%= (User::TOKEN_EXPIRY.to_i * 1000) %> / POLL_INTERVAL_MS;
 
   async function poll() {
     attempts += 1;
@@ -61,15 +67,17 @@
     }
 
     // Giving up silently would leave the message above still promising this
-    // page updates itself, with nothing left running to make that true.
+    // page updates itself, with nothing left running to make that true. The
+    // link has expired by now too, so sending them back to the form is not
+    // asking them to abandon a working one.
     if (attempts >= MAX_ATTEMPTS) {
-      message.textContent = "Still not logged in — we stopped checking. Request a new link below.";
+      message.textContent = "That link has expired — request a new one below.";
       return;
     }
 
-    setTimeout(poll, 3000);
+    setTimeout(poll, POLL_INTERVAL_MS);
   }
 
-  setTimeout(poll, 3000);
+  setTimeout(poll, POLL_INTERVAL_MS);
 })();
 </script>

@@ -104,16 +104,25 @@ class SessionsController < ApplicationController
   # inbox, and a stale claim used to leave the login page insisting on an
   # email that could no longer log anyone in.
   def pending_login_email
-    stamped_at = session[:pending_login_at]
-    return nil if stamped_at.blank?
-    return nil if Time.iso8601(stamped_at) < User::TOKEN_EXPIRY.ago
+    return nil if pending_login_expired?
 
     session[:pending_login_email].presence
+  end
+
+  # A stamp this can't read is one a different version of this app wrote — the
+  # session cookie is signed and encrypted, so a hand-edited value never gets
+  # this far. Both unreadable cases resolve toward still-pending rather than
+  # expired: a session that predates the stamp holds a link that may well
+  # still be live, and rejecting its code would strand an in-flight login for
+  # the 15 minutes after a deploy. Nothing is trapped by being generous here,
+  # since the login form now renders either way.
+  def pending_login_expired?
+    stamped_at = session[:pending_login_at]
+    return false if stamped_at.blank?
+
+    Time.iso8601(stamped_at.to_s) < User::TOKEN_EXPIRY.ago
   rescue ArgumentError
-    # An unparseable stamp means a tampered or hand-rolled cookie. Treating it
-    # as "nothing pending" degrades to the plain login form, which is the one
-    # state this page must always be able to reach.
-    nil
+    false
   end
 
   def pending_login_touch?

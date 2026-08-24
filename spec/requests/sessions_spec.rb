@@ -547,7 +547,14 @@ RSpec.describe "Sessions", type: :request do
       end
     end
 
-    it "refuses a login code once the pending state has expired" do
+    # The database is the enforcer here, not the session stamp:
+    # User.authenticate_login_code already filters on login_token_sent_at
+    # within TOKEN_EXPIRY, and both clocks start from the same #create. So
+    # this guards the outcome rather than the mechanism — it would still pass
+    # with pending_login_email's expiry removed from #verify_code, where that
+    # check is redundancy behind one authority rather than the thing keeping
+    # an expired code out.
+    it "refuses a login code once the link's window has passed" do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev", touch_device: "1" }
       end
