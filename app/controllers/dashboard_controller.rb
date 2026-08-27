@@ -1,4 +1,12 @@
 class DashboardController < ApplicationController
+  # A submit navigates away from this page and never comes back to it, so the
+  # entry Back returns to from /history is this URL with the answer form on it.
+  # Without no-store the browser replays that first response body — an empty
+  # form for a day that has since been submitted and reviewed, offering a
+  # Submit button that would re-post it. Chrome does this for history
+  # navigations even under Rails' default must-revalidate.
+  before_action :no_store, only: :show
+
   def show
     @exercise = current_user.daily_exercises.for_date.first
     @response = @exercise&.daily_response ||

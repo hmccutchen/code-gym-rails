@@ -253,12 +253,14 @@
       }
     });
 
-    // The review is a POST navigation, so the entry Back returns to from
-    // /history is this page — and bfcache can restore it as an answer form for
-    // a day that is already submitted and reviewed. Reload instead of resetting
-    // the button the way the review and loading-form scripts do: there it is
-    // only the button that went stale, here it is the whole form. Answers are
-    // auto-saved, so the reload loses nothing.
+    // Second half of the guard DashboardController's no-store header starts:
+    // that stops the browser replaying this response on Back, but Safari
+    // bfcaches a no-store page anyway and would restore this form live for a
+    // day that is submitted and reviewed by then — which this app meets on
+    // every iOS home-screen launch. Reload rather than resetting the button
+    // the way the review and loading-form scripts do: there only the button
+    // went stale, here the whole form has. Answers are auto-saved, so the
+    // reload loses nothing.
     window.addEventListener("pageshow", (event) => {
       if (event.persisted && reviewRequested) window.location.reload();
     });

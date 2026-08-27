@@ -166,6 +166,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to include("You rated this")
   end
 
+  it "forbids the browser from replaying this page on a Back navigation" do
+    create_exercise
+    get root_path
+
+    # The submit chain leaves this URL as the entry Back returns to from
+    # /history, holding an answer form for a day that is submitted by then.
+    expect(response.headers["Cache-Control"]).to include("no-store")
+  end
+
   describe "teaching hints" do
     it "renders a locked hint before submission when a teaching_note exists" do
       ps = base_problem_set

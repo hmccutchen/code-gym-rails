@@ -29,8 +29,12 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
   end
 
   it "shows the submitted state, not the answer form, when Back restores the page" do
-    # The default driver runs Chromium with bfcache off, which would let this
-    # pass with the handler deleted — see spec/support/system_test_helper.rb.
+    # Back can return to this URL two ways — a bfcache restore of the live page,
+    # or a replay of the original response body from the HTTP cache — and each
+    # is guarded separately (the dashboard's pageshow handler, and its no-store
+    # header). This asserts the property both exist for, since which path a
+    # browser takes varies by build. The bfcache driver forces the first one to
+    # be reachable at all; see spec/support/system_test_helper.rb.
     driven_by(:capybara_playwright_bfcache)
 
     user = create_fake_provider_user
