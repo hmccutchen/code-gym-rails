@@ -840,25 +840,25 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  describe "POST /responses redirect targets on final submit" do
-    it "returns the dashboard URL in the JSON redirect key on submit" do
+  describe "POST /responses next-step targets on final submit" do
+    it "returns the review URL on submit, so the dashboard can chain straight into it" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" })
 
       post responses_path,
         params: { response: { answers: { code_review: "a" * 20 }, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      expect(JSON.parse(response.body)["redirect"]).to eq(root_path)
+      expect(JSON.parse(response.body)["review_url"]).to eq(review_response_path(DailyResponse.last))
     end
 
-    it "does not include a redirect key on a non-submitting auto-save" do
+    it "does not include a review URL on a non-submitting auto-save" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
 
       post responses_path,
         params: { response: { answers: { code_review: "a" * 20 } } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
-      expect(JSON.parse(response.body)).not_to have_key("redirect")
+      expect(JSON.parse(response.body)).not_to have_key("review_url")
     end
 
     it "redirects a native (no-JS) final submit back to the dashboard" do

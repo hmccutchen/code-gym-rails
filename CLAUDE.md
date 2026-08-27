@@ -181,10 +181,15 @@ User interacts:
   └→ ResponsesController#create      → auto-saves answers + difficulty rating +
        feedback text in one debounced fetch (idempotent). The rating renders at
        the end of the problem set and gates the Submit button — a set cannot be
-       submitted unrated. Final submit returns to the dashboard.
+       submitted unrated. A successful submit chains straight into #review from
+       the same click — the dashboard posts the review URL #create hands back —
+       so the submitted-state dashboard is reached only when that review didn't
+       complete.
   └→ ResponsesController#review      → AiService#review_response → ai_review saved,
        then redirects to /history anchored at that day. Synchronous; the button
-       disables and relabels while it runs. Still manual/on-demand.
+       disables and relabels while it runs. Fired by a successful submit rather
+       than a second click; the button in responses/_submission is what remains
+       for a failed or part-finished review.
   └→ ResponsesController#email_review→ mails the completed review to the user,
        then returns to the dashboard (where the button lives)
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day),
@@ -247,7 +252,7 @@ User interacts:
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory.
 - **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule).
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so every `answers[section].presence` reader — review prompt, history, `recent_performance` — sees what it saw before scaffolds existed.
-- **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call. The AI review stays a separate, manual step afterward — cost-conscious by design. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
+- **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
@@ -260,6 +265,17 @@ User interacts:
   merely in flight (`DailyResponse#reviewing?`, the same stale-claim window
   `#review` claims with) blocks the same way; an abandoned claim past that window
   does not.
+
+  **Accepted consequence of chaining review onto submit:** the reconsider window
+  that used to sit between the two clicks is gone. Both guards fire within
+  milliseconds of a submit now — `reviewing?` for the length of the provider
+  call, `reviewed?` for good after it — and the success path never renders the
+  dashboard's submitted state, where "Start over" and "Generate new set" live.
+  Reconsidering belongs before submitting, which is untouched. Afterwards those
+  two are reachable only when the automatic review failed outright (its redirect
+  lands back on the dashboard), or once an interrupted claim goes stale with no
+  section written. A partial review blocks them exactly as a partial manual
+  review always did.
 
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database and

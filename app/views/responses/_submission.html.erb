@@ -1,8 +1,10 @@
-<%# Submitted badge, the day's self-rating, the on-demand review trigger, the AI
-    review, and the email button. Rendered by the dashboard's submitted state
-    only — the history page renders responses/_answered_sections plus its own
-    review disclosure, never this partial. Review stays manual: the button only
-    appears when unreviewed; nothing auto-triggers it. Local: response. %>
+<%# Submitted badge, the day's self-rating, the review trigger, the AI review,
+    and the email button. Rendered by the dashboard's submitted state only —
+    the history page renders responses/_answered_sections plus its own review
+    disclosure, never this partial. A submit fires the review itself (see
+    dashboard/_exercise.html.erb), so this button is what remains when that
+    attempt didn't complete: a failure, or a day left part-reviewed.
+    Local: response. %>
 <div class="submit-row">
   <span class="submitted-badge">✓ Submitted</span>
   <% response.section_ratings.each do |section, value| %>
@@ -56,7 +58,7 @@
       setTimeout(() => {
         button.disabled = true;
         button.classList.add("btn-loading");
-        setLabel("Generating review…");
+        setLabel(<%= t("review.generating_label").to_json.html_safe %>);
       }, 0);
     });
 

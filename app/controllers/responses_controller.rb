@@ -80,7 +80,10 @@ class ResponsesController < ApplicationController
       format.json do
         if saved
           payload = { status: "saved", completeness: @response.completeness }
-          payload[:redirect] = root_path if response_params[:submit] == "1"
+          # The dashboard fires #review with this the moment a submit lands, so
+          # one click does both. The two stay separate actions — only the id
+          # this hands back is new, and until the save above there was none.
+          payload[:review_url] = review_response_path(@response) if response_params[:submit] == "1"
           render json: payload
         else
           render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_content

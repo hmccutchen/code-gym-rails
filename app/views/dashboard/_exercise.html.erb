@@ -192,9 +192,29 @@
 
     feedbackText.addEventListener("input", autoSave);
 
-    // Submit goes through fetch with the page's CSRF meta tag. On success we
-    // navigate to the URL the server returns in `redirect` — the dashboard,
-    // which re-renders as the submitted state with the review button.
+    // Submit goes through fetch with the page's CSRF meta tag. On success it
+    // chains straight into the review, which the user asks for every time
+    // anyway — a real form POST to the URL the server returned, so #review's
+    // redirects and flashes land exactly as they do from the manual button in
+    // responses/_submission. A fetch would follow the redirect itself and
+    // swallow the flash. The two stay separate requests, in the same order as
+    // two clicks: submit is saved and confirmed before review is asked for.
+    const GENERATING_REVIEW = <%= t("review.generating_label").to_json.html_safe %>;
+    let reviewRequested = false;
+
+    function requestReview(url) {
+      const reviewForm = document.createElement("form");
+      reviewForm.method = "post";
+      reviewForm.action = url;
+      const token = document.createElement("input");
+      token.type = "hidden";
+      token.name = "authenticity_token";
+      token.value = document.querySelector('meta[name="csrf-token"]').content;
+      reviewForm.appendChild(token);
+      document.body.appendChild(reviewForm);
+      reviewForm.submit();
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       clearTimeout(saveTimer);
@@ -216,7 +236,9 @@
 
         if (res.ok) {
           const data = await res.json();
-          window.location = data.redirect || "/";
+          reviewRequested = true;
+          submitButton.textContent = GENERATING_REVIEW;
+          requestReview(data.review_url);
         } else {
           submitButton.disabled = false;
           submitButton.classList.remove("btn-loading");
@@ -229,6 +251,18 @@
         submitButton.textContent = "Submit answers →";
         alert("Couldn't submit your answers — please try again.");
       }
+    });
+
+    // Second half of the guard DashboardController's no-store header starts:
+    // that stops the browser replaying this response on Back, but Safari
+    // bfcaches a no-store page anyway and would restore this form live for a
+    // day that is submitted and reviewed by then — which this app meets on
+    // every iOS home-screen launch. Reload rather than resetting the button
+    // the way the review and loading-form scripts do: there only the button
+    // went stale, here the whole form has. Answers are auto-saved, so the
+    // reload loses nothing.
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted && reviewRequested) window.location.reload();
     });
 
     // Dispatched by the pseudocode round controls after a critique or a
