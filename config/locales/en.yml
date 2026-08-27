@@ -77,6 +77,7 @@ en:
   review:
     get_button: "Get %{provider} review →"
     finish_button: "Finish review →"
+    generating_label: "Generating review…"
     heading: "%{provider}'s Review"
     history_summary: "%{provider}'s review"
     calibration_note: "You rated this \"%{rating}\" — the review suggests there's more to work on here."
