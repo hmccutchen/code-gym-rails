@@ -28,6 +28,37 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
     end
   end
 
+  it "shows the submitted state, not the answer form, when Back restores the page" do
+    # The default driver runs Chromium with bfcache off, which would let this
+    # pass with the handler deleted — see spec/support/system_test_helper.rb.
+    driven_by(:capybara_playwright_bfcache)
+
+    user = create_fake_provider_user
+    weekday = a_weekday
+
+    travel_to(weekday) do
+      perform_enqueued_jobs { visit_as(user) }
+      expect(page).to have_content(/Code Review/i, wait: 10)
+
+      find(%(textarea[data-field="code_review"])).fill_in(
+        with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop."
+      )
+
+      rate_all_sections
+      click_button "Submit answers →"
+      expect(page).to have_current_path(%r{/history}, wait: 10)
+
+      # history.back(), not Capybara's go_back: a bfcache restore fires no load
+      # event, so go_back's wait-for-load only returns because the handler's
+      # reload provides one — and the assertions below would never be reached
+      # on the failing path.
+      page.execute_script("history.back()")
+
+      expect(page).to have_content("✓ Submitted", wait: 10)
+      expect(page).to have_no_selector("textarea[data-field]")
+    end
+  end
+
   it "leaves a failed automatic review on the dashboard with the manual retry" do
     user = create_fake_provider_user
     weekday = a_weekday

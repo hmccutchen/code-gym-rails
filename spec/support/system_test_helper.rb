@@ -32,6 +32,22 @@ Capybara.register_driver(:capybara_playwright) do |app|
   )
 end
 
+# Playwright launches Chromium with --disable-back-forward-cache among its
+# default switches, so a Back navigation always re-fetches and `pageshow`
+# never fires with `persisted` true. The dashboard's Back-restore handler
+# (dashboard/_exercise.html.erb) is unreachable under the default driver —
+# a spec written against it would pass just as well with the handler deleted.
+# Opt into this driver from the one example that needs a real bfcache restore.
+Capybara.register_driver(:capybara_playwright_bfcache) do |app|
+  Capybara::Playwright::Driver.new(
+    app,
+    browser_type: :chromium,
+    headless: true,
+    ignoreDefaultArgs: [ "--disable-back-forward-cache" ],
+    playwright_cli_executable_path: PLAYWRIGHT_CLI_PATH.to_s
+  )
+end
+
 # Capybara's 2s default wait is too short for a real browser round-tripping
 # through this app's fetch-based autosave/submit/status-poll flows.
 Capybara.default_max_wait_time = 10
