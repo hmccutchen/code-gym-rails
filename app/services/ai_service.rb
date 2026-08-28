@@ -757,9 +757,7 @@ class AiService
   # Used by #flatten_history to render a prior `{ role:, content: }`
   # conversation as "You: .../Them: ..." lines, for a provider that cannot
   # take history as real turns (see GeminiService#call).
-  def render_thread(thread, empty_message: nil)
-    return empty_message if thread.empty?
-
+  def render_thread(thread)
     thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
   end
 
