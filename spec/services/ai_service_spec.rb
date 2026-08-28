@@ -56,7 +56,7 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
         @last_read_timeout = read_timeout
         @last_max_tokens   = max_tokens
         @last_prompt       = prompt
@@ -2118,7 +2118,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           @calls += 1
           raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
@@ -2156,7 +2156,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           # #active_connection? returns the leased connection object or nil (not a
           # boolean) — see ActiveRecord::ConnectionAdapters::ConnectionPool#active_connection?.
           self.class.held_connection_during_call = ActiveRecord::Base.connection_pool.active_connection?
@@ -2176,7 +2176,7 @@ RSpec.describe AiService do
 
       auth_failing = Class.new(AiService) do
         private
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil) = raise(AiService::AuthenticationError, "bad key")
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: []) = raise(AiService::AuthenticationError, "bad key")
         def build_connection = nil
       end.new("fake_key")
 
@@ -2217,7 +2217,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           @last_prompt = prompt
           super
         end
@@ -2271,7 +2271,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           @last_prompt = prompt
           super
         end
@@ -2329,7 +2329,7 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt, :last_system
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           @last_system = system
           @last_prompt = prompt
           super
@@ -2510,7 +2510,7 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt, :last_system
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           @last_system = system
           @last_prompt = prompt
           super
