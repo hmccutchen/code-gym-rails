@@ -62,7 +62,7 @@
       }, 0);
     });
 
-    // A review that errors out redirects to root_path. If the user then
+    // Every exit from #review redirects to root_path. If the user then
     // navigates Back, some browsers restore the page from bfcache exactly as
     // it was — button disabled, label swapped, data-review-wired already set —
     // and this script does not run again on its own, leaving the button dead

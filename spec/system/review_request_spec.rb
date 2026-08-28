@@ -8,7 +8,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
   # carries its own token from the same tag, so it needs :with_csrf
   # (spec/support/csrf_helper.rb) turned on.
 
-  it "reviews and lands on history from the submit click alone" do
+  it "reviews and shows the result on the dashboard from the submit click alone" do
     user = create_fake_provider_user
     weekday = a_weekday
 
@@ -23,7 +23,8 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers →"
 
-      expect(page).to have_current_path(%r{/history}, wait: 10)
+      expect(page).to have_content("Review ready!", wait: 10)
+      expect(page).to have_current_path(root_path)
       expect(page).to have_content("What you got right")
     end
   end
@@ -50,13 +51,20 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
 
       rate_all_sections
       click_button "Submit answers →"
-      expect(page).to have_current_path(%r{/history}, wait: 10)
+      expect(page).to have_content("Review ready!", wait: 10)
+
+      # The review now redirects to the dashboard's own URL, so Back changes no
+      # path and the content assertions below would pass against the page we
+      # are still on. Mark this document first and wait for the mark to go, so
+      # they only run once Back has actually landed somewhere else.
+      page.execute_script("window.__beforeBack = true")
 
       # history.back(), not Capybara's go_back: a bfcache restore fires no load
       # event, so go_back's wait-for-load only returns because the handler's
       # reload provides one — and the assertions below would never be reached
       # on the failing path.
       page.execute_script("history.back()")
+      Timeout.timeout(10) { sleep 0.1 until page.evaluate_script("window.__beforeBack === undefined") }
 
       expect(page).to have_content("✓ Submitted", wait: 10)
       expect(page).to have_no_selector("textarea[data-field]")

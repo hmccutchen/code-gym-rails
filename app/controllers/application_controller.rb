@@ -41,8 +41,8 @@ class ApplicationController < ActionController::Base
   # Page 1 keeps the bare /history URL: the url helper drops a nil param, so the
   # canonical first page has one address rather than two. Every redirect into
   # history goes through here so they cannot drift apart.
-  def history_page_path(page, anchor: nil)
-    history_path(page: (page unless page == 1), anchor: anchor)
+  def history_page_path(page)
+    history_path(page: (page unless page == 1))
   end
 
   # Scoped to `active` so an anonymized user's still-open session (another tab,

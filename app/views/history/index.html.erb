@@ -73,8 +73,10 @@
 
     <%# Same partial the dashboard's submitted state renders — history is the one
         destination for viewing any day's response, so there is no second
-        rendering to keep in sync. Collapsed by default; newest entry open. %>
-    <details class="answers"<%= " open".html_safe if i.zero? && @pagy.page == 1 %>>
+        rendering to keep in sync. Always collapsed: the review below is what
+        someone opening this page came for, and the problems are a page-long
+        scroll past it. %>
+    <details class="answers">
       <summary>Problems &amp; answers</summary>
       <%= render "responses/answered_sections", exercise: daily_response.daily_exercise, response: daily_response %>
     </details>
