@@ -643,7 +643,8 @@ class AiService
 
   # ── Answer one follow-up question about a completed review ────────────────
   # `thread` is an ordered array of { role:, content: } hashes — the prior turns
-  # for this section. Returns plain prose, like #explain_differently.
+  # for this section, passed to the provider as real turns. Returns plain prose,
+  # like #explain_differently.
   def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
     coach  = config_for(exercise.language)[:coach]
     review = daily_response.ai_review&.dig(section) || {}
@@ -653,21 +654,19 @@ class AiService
       "#{field[:label]}: #{points.join('; ')}" if points.any?
     }.join("\n")
 
-    thread_text = render_thread(thread, empty_message: "(no prior questions)")
-
     result = call_and_log(
       user, purpose: "review_follow_up",
-      system: "You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.",
-      prompt: <<~PROMPT
+      system: <<~SYSTEM,
+        You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.
+
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
         Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
 
         The review you gave:
         #{review_summary.presence || "(no detail recorded)"}
-
-        Conversation so far:
-        #{thread_text}
-
+      SYSTEM
+      history: thread,
+      prompt: <<~PROMPT
         Their new question: #{question}
 
         Answer it directly. Stay on this concept — if they drift far off topic, say
@@ -755,10 +754,9 @@ class AiService
     "Conversation so far:\n#{render_thread(history)}\n\n#{prompt}"
   end
 
-  # Shared by #answer_follow_up and #duck_response — both render a prior
-  # `{ role:, content: }` conversation the same "You: .../Them: ..." way, so
-  # a future fix to that rendering (e.g. how an unrecognized role is labeled)
-  # only needs to land in one place.
+  # Used by #flatten_history to render a prior `{ role:, content: }`
+  # conversation as "You: .../Them: ..." lines, for a provider that cannot
+  # take history as real turns (see GeminiService#call).
   def render_thread(thread, empty_message: nil)
     return empty_message if thread.empty?
 

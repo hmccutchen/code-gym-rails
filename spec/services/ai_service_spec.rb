@@ -2272,9 +2272,11 @@ RSpec.describe AiService do
       ]
 
       spy_class = Class.new(double_class) do
-        attr_reader :last_prompt
+        attr_reader :last_prompt, :last_system, :last_history
         def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
-          @last_prompt = prompt
+          @last_system  = system
+          @last_prompt  = prompt
+          @last_history = history
           super
         end
       end
@@ -2285,10 +2287,10 @@ RSpec.describe AiService do
 
       expect(result).to eq("Because the database round-trip dominates.")
       expect(svc.last_prompt).to include("Does eager loading always help?")
-      expect(svc.last_prompt).to include("loads per row")
-      expect(svc.last_prompt).to include("Why is that slow?")
-      expect(svc.last_prompt).to include("Each row triggers its own query.")
-      expect(svc.last_prompt.index("Why is that slow?")).to be < svc.last_prompt.index("Each row triggers its own query.")
+      expect(svc.last_system).to include("loads per row")
+      expect(svc.last_history).to eq(thread)
+      expect(svc.last_prompt).not_to include("Why is that slow?")
+      expect(svc.last_prompt).not_to include("Each row triggers its own query.")
     end
 
     it "logs usage under its own purpose" do
@@ -2824,6 +2826,69 @@ RSpec.describe AiService do
       expect(
         service.duck_response(user, exercise, section: "code_review", message: "hi", thread: [])
       ).to eq(FakeService::DUCK_RESPONSE_TEXT)
+    end
+  end
+
+  describe "#answer_follow_up sending real conversational turns" do
+    let(:user) { User.create!(email: "follow-up@example.com", name: "FollowUp", skill_level: "developing", focus_areas: [], api_key: "fake", provider: "fake") }
+    let(:exercise) do
+      user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
+                                   problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
+                                   generated_at: Time.current)
+    end
+    let(:daily_response) do
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+                                   answers: { "code_review" => "I think it is an N+1 query." },
+                                   ai_review: { "code_review" => { "strengths" => [ "spotted the loop" ] } })
+    end
+    let(:service) { FakeService.new("fake") }
+
+    def captured_call(thread:)
+      captured = nil
+      allow(service).to receive(:call).and_wrap_original do |original, **kwargs|
+        captured = kwargs
+        original.call(**kwargs)
+      end
+      service.answer_follow_up(user, exercise, daily_response,
+                               section: "code_review", question: "why does that matter?", thread: thread)
+      captured
+    end
+
+    it "maps stored rows straight onto history" do
+      thread = [
+        { role: "user",      content: "what did I miss?" },
+        { role: "assistant", content: "the eager load" }
+      ]
+
+      kwargs = captured_call(thread: thread)
+
+      expect(kwargs[:history]).to eq(thread)
+      expect(kwargs[:prompt]).not_to include("Conversation so far:")
+      expect(kwargs[:prompt]).not_to include("what did I miss?")
+    end
+
+    it "moves the question, the answer, and the review into system" do
+      kwargs = captured_call(thread: [])
+
+      expect(kwargs[:system]).to include(exercise.problem_set.dig("code_review", "question"))
+      expect(kwargs[:system]).to include(daily_response.answers["code_review"])
+      expect(kwargs[:prompt]).not_to include(exercise.problem_set.dig("code_review", "question"))
+    end
+
+    it "keeps the per-turn directive attached to the new turn" do
+      kwargs = captured_call(thread: [])
+
+      expect(kwargs[:prompt]).to include("why does that matter?")
+      expect(kwargs[:prompt]).to include("Answer it directly.")
+    end
+
+    # FakeService routes on the system prompt, and this change appends context
+    # to it. The persona text the regex anchors on must survive.
+    it "still routes to the follow-up branch of FakeService" do
+      expect(
+        service.answer_follow_up(user, exercise, daily_response,
+                                 section: "code_review", question: "hi", thread: [])
+      ).to eq(FakeService::FOLLOW_UP_ANSWER_TEXT)
     end
   end
 
