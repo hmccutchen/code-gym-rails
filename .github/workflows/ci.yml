@@ -133,7 +133,7 @@ jobs:
       # the CLI and the browser build together and they can never drift apart.
       - name: Cache Playwright CLI
         id: cache_playwright_cli
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: spec/playwright/node_modules
           key: playwright-cli-${{ runner.os }}-${{ hashFiles('spec/playwright/package-lock.json') }}
@@ -144,7 +144,7 @@ jobs:
 
       - name: Cache Playwright browser
         id: cache_playwright_browser
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-browser-${{ runner.os }}-${{ hashFiles('spec/playwright/package-lock.json') }}
