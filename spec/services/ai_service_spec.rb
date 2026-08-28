@@ -84,11 +84,11 @@ RSpec.describe AiService do
     base.merge(overrides)
   end
 
-  # The six single-shot purposes must never acquire conversational turns. This
-  # asserts the negative directly rather than inferring it from the request
-  # snapshots, so a method that starts passing history fails here by name.
-  # Asserting the full roster directly makes any purpose silently lost to a
-  # regex failure visible, rather than masked by the subtraction.
+  # The six single-shot purposes must never acquire conversational turns without
+  # being noticed. This test names them by scanning the source directly — more
+  # robust than inferring the roster from snapshots — and asserts the complete
+  # list by name rather than by subtraction, so a regex miss that loses one
+  # purpose becomes visible as a failure instead of passing silently.
   describe "single-shot purposes" do
     SINGLE_SHOT_PURPOSES = %w[
       generate_exercise
