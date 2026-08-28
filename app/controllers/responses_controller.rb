@@ -434,6 +434,10 @@ class ResponsesController < ApplicationController
   # "User"/"USER" would silently dodge the cap, and AiService#duck_response's
   # thread rendering would mislabel the speaker for anything it doesn't
   # recognize as exactly "assistant".
+  # Blank content is dropped here too: it used to render harmlessly as
+  # "Them: " in the flattened prompt, but a real Messages API turn rejects an
+  # empty text block outright, which would otherwise reach Anthropic and come
+  # back as a 503 instead of the clean 422 every other malformed turn gets.
   def duck_thread_param
     # first(...+1) bounds the mapping itself while still leaving an
     # over-limit thread detectably over limit for the caller's size check.
@@ -443,7 +447,10 @@ class ResponsesController < ApplicationController
       role = turn[:role].to_s.downcase
       next unless %w[user assistant].include?(role)
 
-      { role: role, content: turn[:content].to_s }
+      content = turn[:content].to_s
+      next if content.blank?
+
+      { role: role, content: content }
     }
   end
 

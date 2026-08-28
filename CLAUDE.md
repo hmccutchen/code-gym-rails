@@ -244,7 +244,13 @@ User interacts:
   system prompt runs ~500-600 tokens against `claude-sonnet-5`'s 1024-token
   cache minimum, so `cache_system` is deliberately not passed. What it buys is
   that a user typing `You:` into the duck box can no longer forge an assistant
-  turn.
+  turn — but only on the Claude path, where `history` reaches the provider as
+  real `messages`. This is the bullet's second Claude/Gemini asymmetry:
+  `GeminiService` still goes through `#flatten_history`, which re-renders the
+  same `You:`/`Them:` lines into `input` that made the forgery possible before
+  role-tagged turns existed, so the vector is unchanged for Gemini users. This
+  is a known, accepted gap rather than a defect to fix here — closing it needs
+  the Interactions API to offer a real turn array, which it does not.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
   mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
   the mailer; `User.authenticate_login_code` verifies it against the stored

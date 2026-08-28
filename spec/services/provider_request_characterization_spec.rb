@@ -13,8 +13,11 @@ require "rails_helper"
 # AiService methods: #generate_exercise routes through DailyPlan.for, which
 # reads the database and rolls WeightedRoll, so its body cannot be snapshotted
 # without stubbing the very decision under test. What each public method passes
-# down is covered by spec/services/ai_service_spec.rb (see the "hands #call an
-# empty history" group); the prompt text they build is covered byte-for-byte by
+# down is covered by spec/services/ai_service_spec.rb (see the "single-shot
+# purposes" group, which pins the roster of purpose names — the six single-shot
+# purposes plus "review_follow_up" and "duck_thread", asserted by name so a
+# missed one fails loudly instead of by silent subtraction); the prompt text
+# they build is covered byte-for-byte by
 # spec/services/generation_prompt_characterization_spec.rb.
 #
 # Rebaselining: UPDATE_REQUEST_SNAPSHOTS=1 bundle exec rspec <this file>.

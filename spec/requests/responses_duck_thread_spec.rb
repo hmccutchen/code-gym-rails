@@ -389,10 +389,6 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     end
   end
 
-  # The motivating defect: turns used to be flattened into "You: ..." /
-  # "Them: ..." lines inside one prompt string, so typing those prefixes forged
-  # an assistant turn. Role-tagged turns make that unrepresentable — the text
-  # stays inside the user turn's content, where it is inert.
   # The motivating defect is two-stage: a user's message gets stored client-side
   # as a thread turn, then sent back on the *next* request. Turns used to be
   # flattened into "You: ..." / "Them: ..." lines inside one prompt string, so
@@ -471,6 +467,21 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(fake).to have_received(:duck_response)
+    end
+
+    it "rejects a thread whose trailing assistant turn is blank, since filtering it out breaks alternation" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hello",
+                     thread: [ { role: "user",      content: "hi" },
+                               { role: "assistant", content: "" } ] },
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(fake).not_to have_received(:duck_response)
     end
   end
 end
