@@ -239,8 +239,11 @@ User interacts:
   replayed exactly as received, and only assistant *text* is stored here). The
   keyword is the third instance of the additive-kwarg pattern after
   `cache_system:` and `max_tokens:`: every other caller omits it and is
-  byte-identical, which `spec/services/provider_request_characterization_spec.rb`
-  pins. **This buys no cost reduction on either provider** — the merged duck
+  byte-identical. Two specs hold that jointly, because neither can alone —
+  `spec/services/provider_request_characterization_spec.rb` pins that an empty
+  history serializes to the same body as before at the `#call` boundary, and
+  `ai_service_spec`'s "single-shot purposes" group drives the six other public
+  entry points and asserts the history each one reaches `#call` with is empty. **This buys no cost reduction on either provider** — the merged duck
   system prompt runs ~500-600 tokens against `claude-sonnet-5`'s 1024-token
   cache minimum, so `cache_system` is deliberately not passed. What it buys is
   that a user typing `You:` into the duck box can no longer forge an assistant

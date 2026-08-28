@@ -1,7 +1,9 @@
 require "rails_helper"
 
-# Pins the exact JSON body each provider posts, for every combination of
-# optional keywords `#call` accepts.
+# Pins the exact JSON body each provider posts, for each keyword shape the six
+# single-shot purposes actually use — not every combination `#call` accepts,
+# and deliberately not `history:` itself, whose whole point here is that it
+# never reaches these callers.
 #
 # This exists to guard the addition of a `history:` keyword to the shared
 # `#call` interface. That addition must change nothing about the request any
@@ -16,8 +18,10 @@ require "rails_helper"
 # down is covered by spec/services/ai_service_spec.rb (see the "single-shot
 # purposes" group, which pins the roster of purpose names — the six single-shot
 # purposes plus "review_follow_up" and "duck_thread", asserted by name so a
-# missed one fails loudly instead of by silent subtraction); the prompt text
-# they build is covered byte-for-byte by
+# missed one fails loudly instead of by silent subtraction — and then drives
+# every public entry point behind those six to assert the history it reaches
+# #call with is empty, which is the caller-level half this file cannot state);
+# the prompt text they build is covered byte-for-byte by
 # spec/services/generation_prompt_characterization_spec.rb.
 #
 # Rebaselining: UPDATE_REQUEST_SNAPSHOTS=1 bundle exec rspec <this file>.

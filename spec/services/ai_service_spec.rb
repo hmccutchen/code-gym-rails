@@ -105,6 +105,63 @@ RSpec.describe AiService do
 
       expect(all_purposes).to contain_exactly(*SINGLE_SHOT_PURPOSES, "review_follow_up", "duck_thread")
     end
+
+    # The roster above is a list of names. On its own it would still pass if one
+    # of these callers started sending turns, so it cannot be the guarantee — it
+    # only fixes which callers the guarantee has to cover. This drives all five
+    # public entry points behind those six purposes and asserts the history
+    # reaching #call is empty every time.
+    #
+    # The purposes the run logged are asserted against the same roster, so a
+    # caller that stops being exercised here fails rather than quietly dropping
+    # out of the guarantee while the empty-history assertion still passes on
+    # whatever is left.
+    it "reaches the provider with no conversational history, from every one of them" do
+      histories = []
+      spy_class = Class.new(double_class) do
+        define_method(:call) do |system:, prompt:, cache_system: false,
+                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: []|
+          histories << history
+          super(system: system, prompt: prompt, cache_system: cache_system,
+                read_timeout: read_timeout, max_tokens: max_tokens, history: history)
+        end
+      end
+
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "cr?", "snippet" => "code" },
+          "pattern"     => { "title" => "P", "question" => "pat?" },
+          "challenge"   => { "question" => "Implement uniq_by" }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
+        ai_review: { "code_review" => { "missed" => [ "The association is loaded per row" ] } }
+      )
+      review_json = {
+        "rating" => "solid", "correct" => [], "missed" => [],
+        "better_questions" => [], "next_step" => "", "improved_code" => ""
+      }.to_json
+      reference_json = {
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
+      }.to_json
+
+      spy_class.new(canned_text: full_problem_set.to_json).generate_exercise(user)
+      spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
+      spy_class.new(canned_text: reference_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      spy_class.new(canned_text: "Another framing.")
+               .explain_differently(user, exercise, response, section: "code_review")
+      spy_class.new(canned_text: { gaps_found: false, gaps: [] }.to_json)
+               .critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
+      spy_class.new(canned_text: "def x\nend")
+               .translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
+
+      expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
+      expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size)
+      expect(histories).to all(be_empty)
+    end
   end
 
   # A truncated response is still a billed response, so the usage row has to
