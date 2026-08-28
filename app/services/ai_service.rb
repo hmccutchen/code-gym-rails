@@ -757,7 +757,17 @@ class AiService
   # `{ role:, content: }` conversation the same "You: .../Them: ..." way, so
   # a future fix to that rendering (e.g. how an unrecognized role is labeled)
   # only needs to land in one place.
-  def render_thread(thread, empty_message:)
+  # A provider that cannot represent a real turn array renders the conversation
+  # into the prompt instead (see GeminiService#call). The wording lives here,
+  # with every other prompt string this class owns, so the subclass decides
+  # only whether to fold — not what the fold says.
+  def flatten_history(history, prompt)
+    return prompt if history.empty?
+
+    "Conversation so far:\n#{render_thread(history)}\n\n#{prompt}"
+  end
+
+  def render_thread(thread, empty_message: nil)
     return empty_message if thread.empty?
 
     thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
@@ -1017,8 +1027,10 @@ class AiService
   # `read_timeout` overrides the connection's default read budget for this
   # call only (see AiService::GENERATION_READ_TIMEOUT). `max_tokens`, when
   # given, overrides the provider's own default output ceiling for this call
-  # only (see AiService::DUCK_RESPONSE_MAX_TOKENS).
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
+  # only (see AiService::DUCK_RESPONSE_MAX_TOKENS). `history` carries the prior
+  # turns of a conversation; `prompt` is always the new final user turn, so an
+  # empty `history` is the single-shot case every non-conversational caller uses.
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -1577,9 +1589,9 @@ class AiService
   # connection already leased to the current thread rather than checking out
   # a second one.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
-                   read_timeout: READ_TIMEOUT, max_tokens: nil)
+                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     result = call(system: system, prompt: prompt, cache_system: cache_system,
-                  read_timeout: read_timeout, max_tokens: max_tokens)
+                  read_timeout: read_timeout, max_tokens: max_tokens, history: history)
     ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
 
     if result[:truncated]

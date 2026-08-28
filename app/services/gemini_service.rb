@@ -28,11 +28,11 @@ class GeminiService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     body = {
       model:              MODEL,
       system_instruction: system,
-      input:              prompt,
+      input:              flatten_history(history, prompt),
       store:              false
     }
     # No default output cap is sent otherwise — existing callers rely on the
