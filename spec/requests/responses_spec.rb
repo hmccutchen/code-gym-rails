@@ -302,7 +302,7 @@ RSpec.describe "Responses", type: :request do
       expect(draft.reload.ai_review).to be_nil
     end
 
-    it "does not re-review an already-reviewed day, and lands on its history entry" do
+    it "does not re-review an already-reviewed day, and lands back on the dashboard" do
       daily_response = create_submitted_response
       daily_response.update!(ai_review: {
         "code_review" => { "rating" => "solid" },
@@ -313,7 +313,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(flash[:notice]).to eq("Already reviewed.")
     end
 
@@ -329,7 +329,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(response).to redirect_to(history_path(anchor: "response-#{daily_response.id}"))
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(daily_response.reload.ai_review.keys).to match_array(%w[code_review pattern challenge])
     end
 
@@ -425,7 +425,7 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.exists?(daily_response.id)).to be false
     end
 
-    it "sends the user to the history page that actually holds the reviewed entry" do
+    it "lands on the dashboard even for an entry far back in history" do
       target = create_submitted_response(date: 30.days.ago.to_date)
       (1..10).each { |i| create_submitted_response(date: i.days.ago.to_date) }
       fake_service = instance_double(ClaudeService)
@@ -438,22 +438,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(target)
 
-      expect(response).to redirect_to(history_path(page: 2, anchor: "response-#{target.id}"))
-    end
-
-    it "omits the page parameter when the entry is on the first page" do
-      target = create_submitted_response(date: 1.day.ago.to_date)
-      fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return(
-        "code_review" => { ok: true, review: { "rating" => "solid" } },
-        "pattern"     => { ok: true, review: { "rating" => "solid" } },
-        "challenge"   => { ok: true, review: { "rating" => "solid" } }
-      )
-      allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-      post review_response_path(target)
-
-      expect(response).to redirect_to(history_path(anchor: "response-#{target.id}"))
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
     end
 
     it "redirects with an alert when the provider raises" do
@@ -557,7 +542,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(resp)
 
-      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(resp.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
       expect(resp.reviewing_since).to be_nil
     end
@@ -659,7 +644,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(resp)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(flash[:notice]).to eq("2 of 3 sections reviewed — 1 couldn't be reviewed, try again.")
       resp.reload
       expect(resp.ai_review.keys).to match_array(%w[code_review pattern])
@@ -682,7 +667,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(resp)
 
-      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(flash[:notice]).to eq("Review ready!")
       resp.reload
       expect(resp).to be_fully_reviewed
@@ -1253,7 +1238,7 @@ RSpec.describe "Responses", type: :request do
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)
-      expect(response).to redirect_to(history_path(anchor: "response-#{resp.id}"))
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(resp.reload.ai_review["security_review"]["rating"]).to eq("solid")
 
       get history_path

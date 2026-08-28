@@ -19,7 +19,7 @@
 </div>
 
 <% if response.reviewed? %>
-  <div class="review-section">
+  <div class="review-section" id="ai-review">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <h3 style="font-size:1rem"><%= t("review.heading", provider: response.user.provider_label) %></h3>
       <%= button_to "Email me this review", email_review_response_path(response), method: :post, class: "btn btn-ghost btn-sm" %>
@@ -62,7 +62,7 @@
       }, 0);
     });
 
-    // A review that errors out redirects to root_path. If the user then
+    // Every exit from #review redirects to root_path. If the user then
     // navigates Back, some browsers restore the page from bfcache exactly as
     // it was — button disabled, label swapped, data-review-wired already set —
     // and this script does not run again on its own, leaving the button dead

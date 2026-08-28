@@ -100,13 +100,19 @@ class ResponsesController < ApplicationController
   end
 
   # POST /responses/:id/review — trigger the inline AI review. Synchronous: the
-  # request blocks for as long as the provider takes, then lands the user on the
-  # history page anchored to the day they just had reviewed.
+  # request blocks for as long as the provider takes, then lands the user back
+  # on the dashboard, whose submitted state renders the finished review in
+  # place. Every exit from this action goes to root_path — success, partial,
+  # already-reviewed, and each rescue below — so the page never changes under
+  # the user based on how the review went.
+  #
+  # The exits that have a review to show anchor it (see review_anchor); the
+  # ones that don't land at the top of that same page.
   def review
     return redirect_to root_path, alert: "Submit your answers first." unless @response.submitted?
 
     missing = @response.section_keys - Array(@response.ai_review&.keys)
-    return redirect_to history_anchor, notice: "Already reviewed." if missing.empty?
+    return redirect_to review_anchor, notice: "Already reviewed." if missing.empty?
 
     unless claim_review!
       return redirect_to root_path, alert: "A review is already being generated for this — check back in a moment."
@@ -117,7 +123,7 @@ class ResponsesController < ApplicationController
     missing = @response.section_keys - Array(@response.ai_review&.keys)
     if missing.empty?
       release_review_claim!
-      return redirect_to history_anchor, notice: "Already reviewed."
+      return redirect_to review_anchor, notice: "Already reviewed."
     end
 
     first_batch = @response.ai_review.blank?
@@ -148,9 +154,9 @@ class ResponsesController < ApplicationController
     log_review_diagnostics(@response, successes.keys) if successes.any?
 
     if failures.empty?
-      redirect_to history_anchor, notice: "Review ready!"
+      redirect_to review_anchor, notice: "Review ready!"
     elsif successes.any?
-      redirect_to root_path, notice: "#{successes.size} of #{missing.size} sections reviewed — #{failures.size} couldn't be reviewed, try again."
+      redirect_to review_anchor, notice: "#{successes.size} of #{missing.size} sections reviewed — #{failures.size} couldn't be reviewed, try again."
     else
       redirect_to root_path, alert: zero_success_alert(failures)
     end
@@ -545,14 +551,13 @@ class ResponsesController < ApplicationController
     nil
   end
 
-  # Errors send the user back to the dashboard, where the retry button lives.
-  # review's non-error redirects land on the history entry for the day in
-  # question; email_review always goes to root_path (see above).
-  #
-  # History is paginated, so the anchor only resolves if the request lands on
-  # the page holding that entry.
-  def history_anchor
-    history_page_path(@response.history_page, anchor: "response-#{@response.id}")
+  # The submitted dashboard renders the whole day's problems and answers above
+  # the review, so landing at the top of it leaves the result the user just
+  # waited on a page-length scroll away. Same page every other exit uses, one
+  # fragment further down; a day with no review renders no #ai-review and the
+  # browser stays at the top, which is where those exits want the user anyway.
+  def review_anchor
+    root_path(anchor: "ai-review")
   end
 
   def set_response

@@ -183,13 +183,18 @@ User interacts:
        the end of the problem set and gates the Submit button — a set cannot be
        submitted unrated. A successful submit chains straight into #review from
        the same click — the dashboard posts the review URL #create hands back —
-       so the submitted-state dashboard is reached only when that review didn't
-       complete.
+       which lands back on the submitted-state dashboard either way, with the
+       finished review rendered in place when it completed.
   └→ ResponsesController#review      → AiService#review_response → ai_review saved,
-       then redirects to /history anchored at that day. Synchronous; the button
-       disables and relabels while it runs. Fired by a successful submit rather
-       than a second click; the button in responses/_submission is what remains
-       for a failed or part-finished review.
+       then redirects to the dashboard, whose submitted state renders the
+       finished review in place — every exit from the action lands there, so
+       the page never changes under the user based on how the review went; the
+       exits that have a review to show anchor it (`#ai-review`), since the
+       day's problems and answers render above it.
+       Synchronous; the button disables and relabels while it runs. Fired by a
+       successful submit rather than a second click; the button in
+       responses/_submission is what remains for a failed or part-finished
+       review.
   └→ ResponsesController#email_review→ mails the completed review to the user,
        then returns to the dashboard (where the button lives)
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day),
@@ -201,6 +206,11 @@ User interacts:
        the single destination for viewing any day's problems, answers, and
        review, today's included. There is no per-day review page.
        (feedback + concept tags are included in tomorrow's generation prompt)
+       No review lands here any more; it is reached by navigation, by a
+       post-login bounce back to a /history URL the user had already asked
+       for, or by #index's own out-of-range correction. Each entry's
+       problems fold by default and the newest entry's review opens, since the
+       review is what someone opening the page came for.
   └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
        the account in place while preserving all exercise/response/usage history
 ```
@@ -269,13 +279,14 @@ User interacts:
   **Accepted consequence of chaining review onto submit:** the reconsider window
   that used to sit between the two clicks is gone. Both guards fire within
   milliseconds of a submit now — `reviewing?` for the length of the provider
-  call, `reviewed?` for good after it — and the success path never renders the
-  dashboard's submitted state, where "Start over" and "Generate new set" live.
-  Reconsidering belongs before submitting, which is untouched. Afterwards those
-  two are reachable only when the automatic review failed outright (its redirect
-  lands back on the dashboard), or once an interrupted claim goes stale with no
-  section written. A partial review blocks them exactly as a partial manual
-  review always did.
+  call, `reviewed?` for good after it. The success path does land back on the
+  dashboard's submitted state, where "Start over" and "Generate new set" live,
+  but both render only while `reviewed?` is false, so neither is there once the
+  review it would discard exists. Reconsidering belongs before submitting,
+  which is untouched. Afterwards those two are reachable only when the
+  automatic review failed outright, or once an interrupted claim goes stale
+  with no section written. A partial review blocks them exactly as a partial
+  manual review always did.
 
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database and
@@ -336,8 +347,8 @@ User interacts:
   is a full rewrite — `Pagy::Method`, `pagy(:offset, …)`, and helper methods on
   the pagy object; the `Pagy::Backend`/`pagy_nav` API in most documentation is
   gone. An out-of-range page raises and redirects to the last real page rather
-  than rendering the empty state to someone who has sessions. The post-review
-  redirect uses `DailyResponse#history_page` so its anchor still resolves.
+  than rendering the empty state to someone who has sessions. No redirect
+  targets a particular entry, so nothing has to work out which page holds one.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
   stalls for 3s. Because dragging is pointer-only, every block is focusable and

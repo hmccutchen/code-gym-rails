@@ -35,10 +35,10 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_button("Submit answers →", disabled: false)
       click_button "Submit answers →"
 
-      # The submitted state is transient now — a successful submit chains into
-      # the review, which lands on history. review_request_spec covers the
-      # chain itself; this one only needs the gated click to have gone through.
-      expect(page).to have_current_path(%r{/history}, wait: 10)
+      # A successful submit chains into the review, which lands back on the
+      # dashboard's submitted state. review_request_spec covers the chain
+      # itself; this one only needs the gated click to have gone through.
+      expect(page).to have_content("Review ready!", wait: 10)
       expect(user.daily_responses.sole).to be_submitted
     end
   end

@@ -379,16 +379,17 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include(%(id="response-#{session.id}"))
     end
 
-    it "opens the newest entry's problems and leaves older ones closed" do
-      create_session_for(user, date: 1.day.ago.to_date)
-      create_session_for(user, date: 3.days.ago.to_date)
+    it "folds every entry's problems and opens the newest entry's review" do
+      create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+      create_session_for(user, date: 3.days.ago.to_date, reviewed: true)
 
       login_as(user)
       get history_path
 
-      # Two entries, exactly one open problems block — the first.
-      expect(response.body.scan(/<details class="answers" open>/).size).to eq(1)
-      expect(response.body.scan(/<details class="answers">/).size).to eq(1)
+      # Two entries, no open problems block, exactly one open review — the first.
+      expect(response.body.scan(/<details class="answers" open>/).size).to eq(0)
+      expect(response.body.scan(/<details class="answers">/).size).to eq(2)
+      expect(response.body.scan(/<details class="review" open>/).size).to eq(1)
     end
 
     it "renders an entry whose stored problem_set is missing sections, without breaking the page" do
@@ -651,15 +652,15 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include(formatted(sessions[0]))
     end
 
-    it "auto-opens the newest entry on page 1 and nothing on later pages" do
-      create_sessions(11)
+    it "auto-opens the newest entry's review on page 1 and nothing on later pages" do
+      11.times { |i| create_session_for(user, date: (i + 1).days.ago.to_date, reviewed: true) }
       login_as(user)
 
       get history_path
-      expect(response.body.scan(/<details class="answers" open>/).size).to eq(1)
+      expect(response.body.scan(/<details class="review" open>/).size).to eq(1)
 
       get history_path(page: 2)
-      expect(response.body.scan(/<details class="answers" open>/).size).to eq(0)
+      expect(response.body.scan(/<details class="review" open>/).size).to eq(0)
     end
 
     it "still renders the empty state when the user has no sessions at all" do

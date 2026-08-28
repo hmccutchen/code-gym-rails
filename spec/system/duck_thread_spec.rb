@@ -199,10 +199,9 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers →"
 
-      # Submitting chains into the review, which lands on history — the
-      # submitted dashboard this asserts against is one navigation away.
-      expect(page).to have_current_path(%r{/history}, wait: 10)
-      visit root_path
+      # Submitting chains into the review, which lands back on the dashboard's
+      # submitted state — where the duck thread must no longer be offered.
+      expect(page).to have_content("Review ready!", wait: 10)
 
       expect(page).to have_content("✓ Submitted")
       expect(page).to have_no_css("[data-duck-thread]")
