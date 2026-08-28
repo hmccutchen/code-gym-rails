@@ -2867,12 +2867,22 @@ RSpec.describe AiService do
       expect(kwargs[:prompt]).not_to include("what did I miss?")
     end
 
-    it "moves the question, the answer, and the review into system" do
+    it "moves the provider-authored question and review into system" do
       kwargs = captured_call(thread: [])
 
       expect(kwargs[:system]).to include(exercise.problem_set.dig("code_review", "question"))
-      expect(kwargs[:system]).to include(daily_response.answers["code_review"])
       expect(kwargs[:prompt]).not_to include(exercise.problem_set.dig("code_review", "question"))
+    end
+
+    # The engineer's answer is the only free-form text they authored in this
+    # call. Keeping it in the user turn is the point of the whole change — a
+    # role boundary the user can write across is not a boundary, so their words
+    # must never arrive carrying system authority.
+    it "keeps the engineer's own answer in the user turn, never in system" do
+      kwargs = captured_call(thread: [])
+
+      expect(kwargs[:prompt]).to include(daily_response.answers["code_review"])
+      expect(kwargs[:system]).not_to include(daily_response.answers["code_review"])
     end
 
     it "keeps the per-turn directive attached to the new turn" do

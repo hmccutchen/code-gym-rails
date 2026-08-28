@@ -656,17 +656,25 @@ class AiService
 
     result = call_and_log(
       user, purpose: "review_follow_up",
+      # Everything stable across the thread lives in `system` EXCEPT the
+      # engineer's own answer, which stays in the user turn deliberately: it is
+      # the one piece of free-form text they authored, and this method exists
+      # because a role boundary that a user can write across is not a boundary.
+      # Re-sending it each round costs nothing that `system` would have saved —
+      # the prompt is far below the provider's minimum cacheable prefix either
+      # way (see CLAUDE.md's "Conversational calls send real turns").
       system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.
 
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
-        Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
 
         The review you gave:
         #{review_summary.presence || "(no detail recorded)"}
       SYSTEM
       history: thread,
       prompt: <<~PROMPT
+        Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
+
         Their new question: #{question}
 
         Answer it directly. Stay on this concept — if they drift far off topic, say
