@@ -431,9 +431,12 @@ class ResponsesController < ApplicationController
   # every other bad-input path in this action returns.
   # Roles are normalized to lowercase and restricted to user/assistant — the
   # cap check below matches turn[:role] == "user" exactly, so an unnormalized
-  # "User"/"USER" would silently dodge the cap, and AiService#duck_response's
-  # thread rendering would mislabel the speaker for anything it doesn't
-  # recognize as exactly "assistant".
+  # "User"/"USER" would silently dodge the cap. The role reaches the provider
+  # now rather than only a rendered transcript, so the second consequence
+  # differs per path: Claude takes it as a Messages API role, where anything
+  # but user/assistant is a 400 surfacing as a 503, while Gemini's fold would
+  # mislabel the speaker for anything it doesn't recognize as exactly
+  # "assistant".
   # Blank content is dropped here too: it used to render harmlessly as
   # "Them: " in the flattened prompt, but a real Messages API turn rejects an
   # empty text block outright, which would otherwise reach Anthropic and come
