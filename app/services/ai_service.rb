@@ -681,22 +681,14 @@ class AiService
   # ── Rubber-duck Socratic thinking-partner turn, pre-submission only ───────
   # Fully unpersisted: no `daily_response` argument, no draft-answer context,
   # no read of any stored state. `thread` is the client's own in-memory
-  # conversation so far, sent back on every request — used only to build this
-  # one prompt, never written anywhere.
+  # conversation so far, sent back on every request — passed to the provider as
+  # real turns, never written anywhere.
   def duck_response(user, exercise, section:, message:, thread: [])
-    context = duck_section_context(exercise, section)
-    thread_text = render_thread(thread, empty_message: "(no prior messages)")
-
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
-      system: DUCK_SYSTEM_PROMPT,
+      system: "#{DUCK_SYSTEM_PROMPT}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
+      history: thread,
       prompt: <<~PROMPT
-        The exercise section:
-        #{context}
-
-        Conversation so far:
-        #{thread_text}
-
         Their new message: #{message}
 
         Respond as their Socratic thinking partner, following your system instructions exactly.

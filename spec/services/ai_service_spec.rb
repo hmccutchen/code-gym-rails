@@ -2478,7 +2478,7 @@ RSpec.describe AiService do
       svc = spy_class.new(canned_text: "A guiding question.")
       svc.duck_response(user, exercise, section: "pseudocode_to_code", message: "stuck", thread: [])
 
-      expect(svc.last_prompt).to include("Merge overlapping ranges. The list may be empty.")
+      expect(svc.last_system).to include("Merge overlapping ranges. The list may be empty.")
     end
 
     # The design constraint made mechanical: one source, two consumers. Two
@@ -2504,23 +2504,25 @@ RSpec.describe AiService do
       })
     end
 
-    # Local spy: the shared `double_class`'s `#call` doesn't expose `system:`,
-    # and #duck_response has no `daily_response` argument to read a draft
-    # answer from in the first place — this class exists purely to capture
-    # both prompt strings this describe block's examples need to inspect.
+    # Local spy: the shared `double_class`'s `#call` doesn't expose `system:`
+    # or `history:`, and #duck_response has no `daily_response` argument to
+    # read a draft answer from in the first place — this class exists purely
+    # to capture the system/history/prompt values this describe block's
+    # examples need to inspect.
     let(:duck_spy_class) do
       Class.new(double_class) do
-        attr_reader :last_prompt, :last_system
+        attr_reader :last_prompt, :last_system, :last_history
 
         def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
-          @last_system = system
-          @last_prompt = prompt
+          @last_system  = system
+          @last_prompt  = prompt
+          @last_history = history
           super
         end
       end
     end
 
-    it "sends the section's question/scenario/snippet, the prior thread in order, and the new message" do
+    it "sends the section's question/scenario/snippet in system, the prior thread as history, and the new message in prompt" do
       thread = [
         { role: "user",      content: "What's slow here?" },
         { role: "assistant", content: "What happens inside that loop on each iteration?" }
@@ -2531,11 +2533,11 @@ RSpec.describe AiService do
                                  message: "I don't see anything wrong", thread: thread)
 
       expect(result).to eq("What would change if the list had a thousand rows instead of ten?")
-      expect(svc.last_prompt).to include("Find the N+1")
-      expect(svc.last_prompt).to include("a billing job")
-      expect(svc.last_prompt).to include("What's slow here?")
+      expect(svc.last_system).to include("Find the N+1")
+      expect(svc.last_system).to include("a billing job")
+      expect(svc.last_history).to eq(thread)
       expect(svc.last_prompt).to include("I don't see anything wrong")
-      expect(svc.last_prompt.index("What's slow here?")).to be < svc.last_prompt.index("I don't see anything wrong")
+      expect(svc.last_prompt).not_to include("What's slow here?")
     end
 
     it "never sends a draft answer — the method has no daily_response argument to read one from" do
@@ -2640,8 +2642,8 @@ RSpec.describe AiService do
 
         svc.duck_response(user, parsons_exercise, section: "parsons_problem", message: "stuck", thread: [])
 
-        expect(svc.last_prompt).to include("def a")
-        expect(svc.last_prompt).to include("work")
+        expect(svc.last_system).to include("def a")
+        expect(svc.last_system).to include("work")
       end
 
       it "sends them in the learner's on-screen order, never the stored correct order" do
@@ -2649,11 +2651,11 @@ RSpec.describe AiService do
 
         svc.duck_response(user, parsons_exercise, section: "parsons_problem", message: "stuck", thread: [])
 
-        expect(svc.last_prompt).to include("1. end")
-        expect(svc.last_prompt).to include("2. def a")
-        expect(svc.last_prompt).to include("3.   work")
-        expect(svc.last_prompt).to match(/NOT the correct order/)
-        expect(svc.last_prompt.index("1. end")).to be < svc.last_prompt.index("2. def a")
+        expect(svc.last_system).to include("1. end")
+        expect(svc.last_system).to include("2. def a")
+        expect(svc.last_system).to include("3.   work")
+        expect(svc.last_system).to match(/NOT the correct order/)
+        expect(svc.last_system.index("1. end")).to be < svc.last_system.index("2. def a")
       end
 
       it "never emits the stored (solved) order when display_order is missing" do
@@ -2666,10 +2668,10 @@ RSpec.describe AiService do
 
         # The blocks are still sent — the model needs the code — but with no
         # positions, since the only order available here is the answer.
-        expect(svc.last_prompt).to include("def a")
-        expect(svc.last_prompt).to include("order withheld")
-        expect(svc.last_prompt).not_to include("1. def a")
-        expect(svc.last_prompt).not_to match(/NOT the correct order/)
+        expect(svc.last_system).to include("def a")
+        expect(svc.last_system).to include("order withheld")
+        expect(svc.last_system).not_to include("1. def a")
+        expect(svc.last_system).not_to match(/NOT the correct order/)
       end
 
       it "refuses an identity display_order, which is the solved order wearing a scramble's name" do
@@ -2683,8 +2685,8 @@ RSpec.describe AiService do
 
         svc.duck_response(user, solved, section: "parsons_problem", message: "stuck", thread: [])
 
-        expect(svc.last_prompt).to include("order withheld")
-        expect(svc.last_prompt).not_to include("1. def a")
+        expect(svc.last_system).to include("order withheld")
+        expect(svc.last_system).not_to include("1. def a")
       end
 
       it "withholds positions rather than raising on a corrupt display_order" do
@@ -2700,7 +2702,7 @@ RSpec.describe AiService do
           svc.duck_response(user, corrupt, section: "parsons_problem", message: "stuck", thread: [])
         }.not_to raise_error
 
-        expect(svc.last_prompt).to include("order withheld")
+        expect(svc.last_system).to include("order withheld")
       end
 
       it "omits the blocks line entirely for a section that has no blocks" do
@@ -2708,7 +2710,7 @@ RSpec.describe AiService do
 
         svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
 
-        expect(svc.last_prompt).not_to include("NOT the correct order")
+        expect(svc.last_system).not_to include("NOT the correct order")
       end
     end
 
@@ -2727,7 +2729,7 @@ RSpec.describe AiService do
 
         svc.duck_response(user, plan_review_exercise, section: "plan_review", message: "stuck", thread: [])
 
-        expect(svc.last_prompt).to include("Cache the response for 300 seconds")
+        expect(svc.last_system).to include("Cache the response for 300 seconds")
       end
     end
 
@@ -2747,7 +2749,7 @@ RSpec.describe AiService do
 
         svc.duck_response(user, ambiguity_hunt_exercise, section: "ambiguity_hunt", message: "stuck", thread: [])
 
-        expect(svc.last_prompt).to include("Add a leaderboard to the dashboard.")
+        expect(svc.last_system).to include("Add a leaderboard to the dashboard.")
       end
 
       it "never leaks planted_ambiguities — that is the hidden grading answer key" do
@@ -2755,10 +2757,73 @@ RSpec.describe AiService do
 
         svc.duck_response(user, ambiguity_hunt_exercise, section: "ambiguity_hunt", message: "stuck", thread: [])
 
-        expect(svc.last_prompt).not_to include("Which metric ranks users is unstated")
-        expect(svc.last_prompt).not_to include("Tie-breaking is unstated")
-        expect(svc.last_prompt).not_to include("planted_ambiguities")
+        expect(svc.last_system).not_to include("Which metric ranks users is unstated")
+        expect(svc.last_system).not_to include("Tie-breaking is unstated")
+        expect(svc.last_system).not_to include("planted_ambiguities")
       end
+    end
+  end
+
+  describe "#duck_response sending real conversational turns" do
+    let(:user) { User.create!(email: "duck@example.com", name: "Duck", skill_level: "developing", focus_areas: [], api_key: "fake", provider: "fake") }
+    let(:exercise) do
+      user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
+                                   problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
+                                   generated_at: Time.current)
+    end
+    let(:service) { FakeService.new("fake") }
+
+    def captured_call(thread:)
+      captured = nil
+      allow(service).to receive(:call).and_wrap_original do |original, **kwargs|
+        captured = kwargs
+        original.call(**kwargs)
+      end
+      service.duck_response(user, exercise, section: "code_review", message: "why is this slow?", thread: thread)
+      captured
+    end
+
+    it "sends prior turns as history rather than as prompt text" do
+      thread = [
+        { role: "user",      content: "is this N+1?" },
+        { role: "assistant", content: "what does the loop do?" }
+      ]
+
+      kwargs = captured_call(thread: thread)
+
+      expect(kwargs[:history]).to eq(thread)
+      expect(kwargs[:prompt]).not_to include("Conversation so far:")
+      expect(kwargs[:prompt]).not_to include("is this N+1?")
+    end
+
+    it "moves the section context into system, where it is sent once" do
+      kwargs = captured_call(thread: [])
+
+      expect(kwargs[:system]).to include(AiService::DUCK_SYSTEM_PROMPT)
+      expect(kwargs[:system]).to include(exercise.problem_set.dig("code_review", "question"))
+      expect(kwargs[:prompt]).not_to include(exercise.problem_set.dig("code_review", "question"))
+    end
+
+    it "keeps the per-turn directive attached to the new turn" do
+      kwargs = captured_call(thread: [])
+
+      expect(kwargs[:prompt]).to include("why is this slow?")
+      expect(kwargs[:prompt]).to include("Respond as their Socratic thinking partner")
+    end
+
+    it "keeps its output ceiling and claims no caching" do
+      kwargs = captured_call(thread: [])
+
+      expect(kwargs[:max_tokens]).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
+      expect(kwargs[:cache_system]).to be(false)
+    end
+
+    # FakeService routes on the system prompt, and this change appends section
+    # context to it. The persona text the regex anchors on must survive.
+    it "still routes to the duck branch of FakeService" do
+      expect(
+        service.duck_response(user, exercise, section: "code_review", message: "hi", thread: [])
+      ).to eq(FakeService::DUCK_RESPONSE_TEXT)
     end
   end
 
