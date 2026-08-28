@@ -1,0 +1,19 @@
+{
+  "model": "claude-sonnet-5",
+  "max_tokens": 16000,
+  "system": [
+    {
+      "type": "text",
+      "text": "SYSTEM TEXT",
+      "cache_control": {
+        "type": "ephemeral"
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ]
+}
