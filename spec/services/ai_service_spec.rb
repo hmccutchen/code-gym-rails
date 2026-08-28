@@ -87,6 +87,8 @@ RSpec.describe AiService do
   # The six single-shot purposes must never acquire conversational turns. This
   # asserts the negative directly rather than inferring it from the request
   # snapshots, so a method that starts passing history fails here by name.
+  # Asserting the full roster directly makes any purpose silently lost to a
+  # regex failure visible, rather than masked by the subtraction.
   describe "single-shot purposes" do
     SINGLE_SHOT_PURPOSES = %w[
       generate_exercise
@@ -101,7 +103,7 @@ RSpec.describe AiService do
       all_purposes = File.read(Rails.root.join("app/services/ai_service.rb"))
                          .scan(/purpose: "(\w+)"/).flatten.uniq
 
-      expect(all_purposes - SINGLE_SHOT_PURPOSES).to contain_exactly("review_follow_up", "duck_thread")
+      expect(all_purposes).to contain_exactly(*SINGLE_SHOT_PURPOSES, "review_follow_up", "duck_thread")
     end
   end
 
