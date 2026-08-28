@@ -356,6 +356,9 @@ class ResponsesController < ApplicationController
        thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
       return render_section_error("This conversation is too long to continue — clear it to keep going.")
     end
+    unless well_formed_thread?(thread)
+      return render_section_error("This conversation is out of step — clear it to keep going.")
+    end
     # Soft, request-level cap: the thread lives only in the browser, so this
     # is not a hardened boundary (a hand-crafted request could understate its
     # own history) — acceptable given each user pays for their own provider
@@ -428,9 +431,16 @@ class ResponsesController < ApplicationController
   # every other bad-input path in this action returns.
   # Roles are normalized to lowercase and restricted to user/assistant — the
   # cap check below matches turn[:role] == "user" exactly, so an unnormalized
-  # "User"/"USER" would silently dodge the cap, and AiService#duck_response's
-  # thread rendering would mislabel the speaker for anything it doesn't
-  # recognize as exactly "assistant".
+  # "User"/"USER" would silently dodge the cap. The role reaches the provider
+  # now rather than only a rendered transcript, so the second consequence
+  # differs per path: Claude takes it as a Messages API role, where anything
+  # but user/assistant is a 400 surfacing as a 503, while Gemini's fold would
+  # mislabel the speaker for anything it doesn't recognize as exactly
+  # "assistant".
+  # Blank content is dropped here too: it used to render harmlessly as
+  # "Them: " in the flattened prompt, but a real Messages API turn rejects an
+  # empty text block outright, which would otherwise reach Anthropic and come
+  # back as a 503 instead of the clean 422 every other malformed turn gets.
   def duck_thread_param
     # first(...+1) bounds the mapping itself while still leaving an
     # over-limit thread detectably over limit for the caller's size check.
@@ -440,8 +450,26 @@ class ResponsesController < ApplicationController
       role = turn[:role].to_s.downcase
       next unless %w[user assistant].include?(role)
 
-      { role: role, content: turn[:content].to_s }
+      content = turn[:content].to_s
+      next if content.blank?
+
+      { role: role, content: content }
     }
+  end
+
+  # A turn array is sent to the provider as real messages now, which is
+  # ordered in a way the old flattened transcript was not: turns alternate and
+  # the client's history always ends on an assistant reply, since the script
+  # pushes both halves of an exchange together. Nothing legitimate produces
+  # anything else, so a thread that breaks it is a hand-crafted request, not a
+  # user mistake.
+  def well_formed_thread?(thread)
+    return true if thread.empty?
+
+    thread.last[:role] == "assistant" &&
+      thread.each_slice(2).all? { |user_turn, assistant_turn|
+        user_turn[:role] == "user" && assistant_turn&.dig(:role) == "assistant"
+      }
   end
 
   # The section is taken from the registry, never from params: these endpoints

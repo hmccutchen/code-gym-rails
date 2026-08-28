@@ -643,7 +643,8 @@ class AiService
 
   # ── Answer one follow-up question about a completed review ────────────────
   # `thread` is an ordered array of { role:, content: } hashes — the prior turns
-  # for this section. Returns plain prose, like #explain_differently.
+  # for this section, passed to the provider as real turns. Returns plain prose,
+  # like #explain_differently.
   def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
     coach  = config_for(exercise.language)[:coach]
     review = daily_response.ai_review&.dig(section) || {}
@@ -653,20 +654,26 @@ class AiService
       "#{field[:label]}: #{points.join('; ')}" if points.any?
     }.join("\n")
 
-    thread_text = render_thread(thread, empty_message: "(no prior questions)")
-
     result = call_and_log(
       user, purpose: "review_follow_up",
-      system: "You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.",
-      prompt: <<~PROMPT
+      # Everything stable across the thread lives in `system` EXCEPT the
+      # engineer's own answer, which stays in the user turn deliberately: it is
+      # the one piece of free-form text they authored, and this method exists
+      # because a role boundary that a user can write across is not a boundary.
+      # Re-sending it each round costs nothing that `system` would have saved —
+      # the prompt is far below the provider's minimum cacheable prefix either
+      # way (see CLAUDE.md's "Conversational calls send real turns").
+      system: <<~SYSTEM,
+        You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.
+
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
-        Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
 
         The review you gave:
         #{review_summary.presence || "(no detail recorded)"}
-
-        Conversation so far:
-        #{thread_text}
+      SYSTEM
+      history: thread,
+      prompt: <<~PROMPT
+        Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
 
         Their new question: #{question}
 
@@ -681,22 +688,14 @@ class AiService
   # ── Rubber-duck Socratic thinking-partner turn, pre-submission only ───────
   # Fully unpersisted: no `daily_response` argument, no draft-answer context,
   # no read of any stored state. `thread` is the client's own in-memory
-  # conversation so far, sent back on every request — used only to build this
-  # one prompt, never written anywhere.
+  # conversation so far, sent back on every request — passed to the provider as
+  # real turns, never written anywhere.
   def duck_response(user, exercise, section:, message:, thread: [])
-    context = duck_section_context(exercise, section)
-    thread_text = render_thread(thread, empty_message: "(no prior messages)")
-
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
-      system: DUCK_SYSTEM_PROMPT,
+      system: "#{DUCK_SYSTEM_PROMPT}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
+      history: thread,
       prompt: <<~PROMPT
-        The exercise section:
-        #{context}
-
-        Conversation so far:
-        #{thread_text}
-
         Their new message: #{message}
 
         Respond as their Socratic thinking partner, following your system instructions exactly.
@@ -753,13 +752,20 @@ class AiService
 
   private
 
-  # Shared by #answer_follow_up and #duck_response — both render a prior
-  # `{ role:, content: }` conversation the same "You: .../Them: ..." way, so
-  # a future fix to that rendering (e.g. how an unrecognized role is labeled)
-  # only needs to land in one place.
-  def render_thread(thread, empty_message:)
-    return empty_message if thread.empty?
+  # A provider that cannot represent a real turn array renders the conversation
+  # into the prompt instead (see GeminiService#call). The wording lives here,
+  # with every other prompt string this class owns, so the subclass decides
+  # only whether to fold — not what the fold says.
+  def flatten_history(history, prompt)
+    return prompt if history.empty?
 
+    "Conversation so far:\n#{render_thread(history)}\n\n#{prompt}"
+  end
+
+  # Used by #flatten_history to render a prior `{ role:, content: }`
+  # conversation as "You: .../Them: ..." lines, for a provider that cannot
+  # take history as real turns (see GeminiService#call).
+  def render_thread(thread)
     thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
   end
 
@@ -1017,8 +1023,10 @@ class AiService
   # `read_timeout` overrides the connection's default read budget for this
   # call only (see AiService::GENERATION_READ_TIMEOUT). `max_tokens`, when
   # given, overrides the provider's own default output ceiling for this call
-  # only (see AiService::DUCK_RESPONSE_MAX_TOKENS).
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
+  # only (see AiService::DUCK_RESPONSE_MAX_TOKENS). `history` carries the prior
+  # turns of a conversation; `prompt` is always the new final user turn, so an
+  # empty `history` is the single-shot case every non-conversational caller uses.
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -1577,9 +1585,9 @@ class AiService
   # connection already leased to the current thread rather than checking out
   # a second one.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
-                   read_timeout: READ_TIMEOUT, max_tokens: nil)
+                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     result = call(system: system, prompt: prompt, cache_system: cache_system,
-                  read_timeout: read_timeout, max_tokens: max_tokens)
+                  read_timeout: read_timeout, max_tokens: max_tokens, history: history)
     ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
 
     if result[:truncated]

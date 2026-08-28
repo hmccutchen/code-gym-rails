@@ -38,12 +38,13 @@ class ClaudeService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     body = {
       model:      MODEL,
       max_tokens: max_tokens || MAX_TOKENS,
       system:     cache_system ? [ { type: "text", text: system, cache_control: { type: "ephemeral" } } ] : system,
-      messages:   [ { role: "user", content: prompt } ]
+      messages:   history.map { |turn| { role: turn[:role], content: turn[:content] } } +
+                  [ { role: "user", content: prompt } ]
     }
     # A caller-supplied max_tokens is, by construction, tighter than MAX_TOKENS
     # (sized generously specifically to leave room for unrequested thinking —

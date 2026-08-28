@@ -319,4 +319,40 @@ RSpec.describe GeminiService do
       expect { service.send(:call, system: "sys", prompt: "prompt") }.to raise_error(AiService::Error)
     end
   end
+
+  describe "#call with history" do
+    def captured_body(**kwargs)
+      body = nil
+      conn = Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(GeminiService::API_URL) do |env|
+            body = JSON.parse(env.body)
+            [ 200, {}, { "steps" => [ { "type" => "model_output",
+                                        "content" => [ { "type" => "text", "text" => "ok" } ] } ],
+                         "usage" => { "total_input_tokens" => 1, "total_output_tokens" => 1 } }.to_json ]
+          end
+        end
+      end
+      service.instance_variable_set(:@conn, conn)
+      service.send(:call, system: "sys", prompt: "new turn", **kwargs)
+      body
+    end
+
+    # The Interactions API has no messages array; prior turns are folded back
+    # into the single input string. See the design doc's Gemini section.
+    it "folds prior turns into the input string" do
+      history = [
+        { role: "user",      content: "first question" },
+        { role: "assistant", content: "first reply" }
+      ]
+
+      expect(captured_body(history: history)["input"]).to eq(
+        "Conversation so far:\nThem: first question\nYou: first reply\n\nnew turn"
+      )
+    end
+
+    it "sends the prompt unchanged when history is empty" do
+      expect(captured_body["input"]).to eq("new turn")
+    end
+  end
 end

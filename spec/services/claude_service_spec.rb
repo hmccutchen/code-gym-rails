@@ -374,4 +374,44 @@ RSpec.describe ClaudeService do
       expect(captured_body["system"]).to eq("sys")
     end
   end
+
+  describe "#call with history" do
+    def captured_body(**kwargs)
+      body = nil
+      conn = Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(ClaudeService::API_URL) do |env|
+            body = JSON.parse(env.body)
+            [ 200, {}, success_body ]
+          end
+        end
+      end
+      service.instance_variable_set(:@conn, conn)
+      service.send(:call, system: "sys", prompt: "new turn", **kwargs)
+      body
+    end
+
+    it "sends prior turns as real messages, with the new turn last" do
+      history = [
+        { role: "user",      content: "first question" },
+        { role: "assistant", content: "first reply" }
+      ]
+
+      expect(captured_body(history: history)["messages"]).to eq([
+        { "role" => "user",      "content" => "first question" },
+        { "role" => "assistant", "content" => "first reply" },
+        { "role" => "user",      "content" => "new turn" }
+      ])
+    end
+
+    it "builds the same single-message body as before when history is empty" do
+      expect(captured_body["messages"]).to eq([ { "role" => "user", "content" => "new turn" } ])
+    end
+
+    it "leaves the flattened transcript out of the final turn entirely" do
+      history = [ { role: "assistant", content: "prior reply" } ]
+
+      expect(captured_body(history: history)["messages"].last["content"]).to eq("new turn")
+    end
+  end
 end

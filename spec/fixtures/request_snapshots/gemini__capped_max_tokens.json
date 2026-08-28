@@ -1,0 +1,9 @@
+{
+  "model": "gemini-3.5-flash",
+  "system_instruction": "SYSTEM TEXT",
+  "input": "PROMPT TEXT",
+  "store": false,
+  "generation_config": {
+    "max_output_tokens": 250
+  }
+}

@@ -228,6 +228,32 @@ User interacts:
 
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement only `#call` and `#build_connection`. Adding a provider means adding a subclass, not editing the base.
+- **Conversational calls send real turns**: `AiService#duck_response` and
+  `#answer_follow_up` pass prior turns as `history:` — an ordered
+  `{ role:, content: }` array — while `prompt` carries only the new user turn,
+  and the section/review context that is stable across a thread lives in
+  `system`. `ClaudeService` renders `history` as a Messages API `messages`
+  array; `GeminiService` folds it back into `input` via
+  `AiService#flatten_history`, because the Interactions API has no equivalent
+  shape (its stateless multi-turn form is a `Step[]` whose model steps must be
+  replayed exactly as received, and only assistant *text* is stored here). The
+  keyword is the third instance of the additive-kwarg pattern after
+  `cache_system:` and `max_tokens:`: every other caller omits it and is
+  byte-identical. Two specs hold that jointly, because neither can alone —
+  `spec/services/provider_request_characterization_spec.rb` pins that an empty
+  history serializes to the same body as before at the `#call` boundary, and
+  `ai_service_spec`'s "single-shot purposes" group drives the six other public
+  entry points and asserts the history each one reaches `#call` with is empty. **This buys no cost reduction on either provider** — the merged duck
+  system prompt runs ~500-600 tokens against `claude-sonnet-5`'s 1024-token
+  cache minimum, so `cache_system` is deliberately not passed. What it buys is
+  that a user typing `You:` into the duck box can no longer forge an assistant
+  turn — but only on the Claude path, where `history` reaches the provider as
+  real `messages`. This is the bullet's second Claude/Gemini asymmetry:
+  `GeminiService` still goes through `#flatten_history`, which re-renders the
+  same `You:`/`Them:` lines into `input` that made the forgery possible before
+  role-tagged turns existed, so the vector is unchanged for Gemini users. This
+  is a known, accepted gap rather than a defect to fix here — closing it needs
+  the Interactions API to offer a real turn array, which it does not.
 - **Emailed-code auth**: No passwords and no links. `User#generate_login_code!`
   mints a 6-digit code, stores a BCrypt digest, and returns the raw code for
   the mailer; `User.authenticate_login_code` verifies it against the stored

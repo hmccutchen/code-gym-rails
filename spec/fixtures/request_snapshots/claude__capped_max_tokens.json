@@ -1,0 +1,14 @@
+{
+  "model": "claude-sonnet-5",
+  "max_tokens": 250,
+  "system": "SYSTEM TEXT",
+  "messages": [
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "thinking": {
+    "type": "disabled"
+  }
+}
