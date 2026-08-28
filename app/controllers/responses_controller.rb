@@ -356,6 +356,9 @@ class ResponsesController < ApplicationController
        thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
       return render_section_error("This conversation is too long to continue — clear it to keep going.")
     end
+    unless well_formed_thread?(thread)
+      return render_section_error("This conversation is out of step — clear it to keep going.")
+    end
     # Soft, request-level cap: the thread lives only in the browser, so this
     # is not a hardened boundary (a hand-crafted request could understate its
     # own history) — acceptable given each user pays for their own provider
@@ -442,6 +445,21 @@ class ResponsesController < ApplicationController
 
       { role: role, content: turn[:content].to_s }
     }
+  end
+
+  # A turn array is sent to the provider as real messages now, which is
+  # ordered in a way the old flattened transcript was not: turns alternate and
+  # the client's history always ends on an assistant reply, since the script
+  # pushes both halves of an exchange together. Nothing legitimate produces
+  # anything else, so a thread that breaks it is a hand-crafted request, not a
+  # user mistake.
+  def well_formed_thread?(thread)
+    return true if thread.empty?
+
+    thread.last[:role] == "assistant" &&
+      thread.each_slice(2).all? { |user_turn, assistant_turn|
+        user_turn[:role] == "user" && assistant_turn&.dig(:role) == "assistant"
+      }
   end
 
   # The section is taken from the registry, never from params: these endpoints

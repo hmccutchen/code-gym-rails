@@ -238,13 +238,15 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     login_as(user)
 
     post duck_thread_responses_path,
-      params: { section: "code_review", message: "help", thread: [ "oops", { role: "user", content: "real turn" } ] },
+      params: { section: "code_review", message: "help", thread: [
+        "oops", { role: "user", content: "real turn" }, { role: "assistant", content: "real reply" }
+      ] },
       as: :json
 
     expect(response).to have_http_status(:ok)
     expect(fake).to have_received(:duck_response).with(
       user, an_instance_of(DailyExercise), section: "code_review", message: "help",
-      thread: [ { role: "user", content: "real turn" } ]
+      thread: [ { role: "user", content: "real turn" }, { role: "assistant", content: "real reply" } ]
     )
   end
 
@@ -266,14 +268,15 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     post duck_thread_responses_path,
       params: { section: "code_review", message: "help", thread: [
         { role: "User", content: "mixed case" },
-        { role: "SYSTEM", content: "not a real role" }
+        { role: "SYSTEM", content: "not a real role" },
+        { role: "assistant", content: "reply" }
       ] },
       as: :json
 
     expect(response).to have_http_status(:ok)
     expect(fake).to have_received(:duck_response).with(
       user, an_instance_of(DailyExercise), section: "code_review", message: "help",
-      thread: [ { role: "user", content: "mixed case" } ]
+      thread: [ { role: "user", content: "mixed case" }, { role: "assistant", content: "reply" } ]
     )
   end
 
@@ -383,6 +386,53 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body)["error"]).to match(/before you submit/i)
+    end
+  end
+
+  describe "thread ordering" do
+    it "rejects a thread whose turns do not alternate" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hello",
+                     thread: [ { role: "user", content: "one" },
+                               { role: "user", content: "two" } ] },
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["status"]).to eq("error")
+      expect(fake).not_to have_received(:duck_response)
+    end
+
+    it "rejects a thread that ends on a user turn" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hello",
+                     thread: [ { role: "user", content: "one" } ] },
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(fake).not_to have_received(:duck_response)
+    end
+
+    it "accepts a well-formed alternating thread" do
+      create_exercise_for(user)
+      fake = stub_answer
+      login_as(user)
+
+      post duck_thread_responses_path,
+           params: { section: "code_review", message: "hello",
+                     thread: [ { role: "user",      content: "one" },
+                               { role: "assistant", content: "two" } ] },
+           as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(fake).to have_received(:duck_response)
     end
   end
 end
