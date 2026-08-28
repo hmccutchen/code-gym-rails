@@ -130,6 +130,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('class="review-rating">solid</span>')
   end
 
+  it "gives the review the anchor ResponsesController#review redirects to" do
+    create_response(create_exercise, ai_review: sample_review)
+    get root_path
+    expect(response.body).to include('id="ai-review"')
+  end
+
   it "shows a calibration note when the self-rating was favorable but the AI rated that section beginner/developing" do
     resp = create_response(create_exercise, ai_review: sample_review)
     resp.update!(section_ratings: {

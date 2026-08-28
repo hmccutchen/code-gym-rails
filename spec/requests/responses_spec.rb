@@ -313,7 +313,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(flash[:notice]).to eq("Already reviewed.")
     end
 
@@ -329,7 +329,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(daily_response.reload.ai_review.keys).to match_array(%w[code_review pattern challenge])
     end
 
@@ -438,7 +438,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(target)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
     end
 
     it "redirects with an alert when the provider raises" do
@@ -542,7 +542,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(resp)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(resp.reload.ai_review).to eq("code_review" => { "rating" => "solid" })
       expect(resp.reviewing_since).to be_nil
     end
@@ -644,7 +644,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(resp)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(flash[:notice]).to eq("2 of 3 sections reviewed — 1 couldn't be reviewed, try again.")
       resp.reload
       expect(resp.ai_review.keys).to match_array(%w[code_review pattern])
@@ -667,7 +667,7 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(resp)
 
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(flash[:notice]).to eq("Review ready!")
       resp.reload
       expect(resp).to be_fully_reviewed
@@ -1238,7 +1238,7 @@ RSpec.describe "Responses", type: :request do
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)
-      expect(response).to redirect_to(root_path)
+      expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(resp.reload.ai_review["security_review"]["rating"]).to eq("solid")
 
       get history_path
