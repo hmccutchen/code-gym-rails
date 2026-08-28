@@ -84,6 +84,27 @@ RSpec.describe AiService do
     base.merge(overrides)
   end
 
+  # The six single-shot purposes must never acquire conversational turns. This
+  # asserts the negative directly rather than inferring it from the request
+  # snapshots, so a method that starts passing history fails here by name.
+  describe "single-shot purposes" do
+    SINGLE_SHOT_PURPOSES = %w[
+      generate_exercise
+      review_response
+      generate_concept_reference
+      explain_differently
+      pseudocode_critique
+      pseudocode_translate
+    ].freeze
+
+    it "covers every purpose except the two conversational ones" do
+      all_purposes = File.read(Rails.root.join("app/services/ai_service.rb"))
+                         .scan(/purpose: "(\w+)"/).flatten.uniq
+
+      expect(all_purposes - SINGLE_SHOT_PURPOSES).to contain_exactly("review_follow_up", "duck_thread")
+    end
+  end
+
   # A truncated response is still a billed response, so the usage row has to
   # be written before the failure propagates — otherwise cost tracking
   # silently under-counts exactly the calls that burn a full output budget.
