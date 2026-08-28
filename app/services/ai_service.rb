@@ -753,10 +753,6 @@ class AiService
 
   private
 
-  # Shared by #answer_follow_up and #duck_response — both render a prior
-  # `{ role:, content: }` conversation the same "You: .../Them: ..." way, so
-  # a future fix to that rendering (e.g. how an unrecognized role is labeled)
-  # only needs to land in one place.
   # A provider that cannot represent a real turn array renders the conversation
   # into the prompt instead (see GeminiService#call). The wording lives here,
   # with every other prompt string this class owns, so the subclass decides
@@ -767,6 +763,10 @@ class AiService
     "Conversation so far:\n#{render_thread(history)}\n\n#{prompt}"
   end
 
+  # Shared by #answer_follow_up and #duck_response — both render a prior
+  # `{ role:, content: }` conversation the same "You: .../Them: ..." way, so
+  # a future fix to that rendering (e.g. how an unrecognized role is labeled)
+  # only needs to land in one place.
   def render_thread(thread, empty_message: nil)
     return empty_message if thread.empty?
 
