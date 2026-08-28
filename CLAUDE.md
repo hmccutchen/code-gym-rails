@@ -204,7 +204,8 @@ User interacts:
        the single destination for viewing any day's problems, answers, and
        review, today's included. There is no per-day review page.
        (feedback + concept tags are included in tomorrow's generation prompt)
-       Nothing redirects here; it is reached by navigation. Each entry's
+       No review lands here any more; it is reached by navigation (the one
+       redirect into it is #index's own out-of-range correction). Each entry's
        problems fold by default and the newest entry's review opens, since the
        review is what someone opening the page came for.
   └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
