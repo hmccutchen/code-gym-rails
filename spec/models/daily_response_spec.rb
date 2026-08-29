@@ -333,6 +333,53 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#difficulty_for" do
+    # The review path has no ProblemSetIngest equivalent, so nothing validates
+    # a review payload on the way in. This reader is the boundary: an
+    # off-vocabulary level is provider drift, and rendering it verbatim would
+    # put an unreviewed word in front of the engineer as if the app chose it.
+    it "returns the stored assessment only when the level is one this app defines" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current, answers: {},
+        ai_review: {
+          "code_review" => { "rating" => "solid",
+                             "difficulty" => { "level" => "demanding", "reason" => "The bug hides behind a callback." } },
+          "pattern"     => { "rating" => "solid",
+                             "difficulty" => { "level" => "brutal", "reason" => "Off-vocabulary." } },
+          "challenge"   => { "rating" => "solid", "difficulty" => "demanding" }
+        }
+      )
+
+      expect(response.difficulty_for("code_review"))
+        .to eq("level" => "demanding", "reason" => "The bug hides behind a callback.")
+      expect(response.difficulty_for("pattern")).to be_nil
+      expect(response.difficulty_for("challenge")).to be_nil
+    end
+
+    it "is nil for a section with no assessment and for an unreviewed response" do
+      reviewed = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current, answers: {},
+        ai_review: { "code_review" => { "rating" => "solid" } }
+      )
+      unreviewed = user.daily_responses.create!(daily_exercise: exercise, date: Date.current + 1, answers: {})
+
+      expect(reviewed.difficulty_for("code_review")).to be_nil
+      expect(reviewed.difficulty_for("pattern")).to be_nil
+      expect(unreviewed.difficulty_for("code_review")).to be_nil
+    end
+
+    # The difficulty note renders next to the AI grade badge, which is the one
+    # thing it must not be mistaken for. Sharing a word with beginner /
+    # developing / solid / strong would invite exactly that reading.
+    it "shares no word with the AI grade or self-rating vocabularies" do
+      overlap = DailyResponse::DIFFICULTY_LEVELS &
+                (DailyResponse::AI_RATING_FAVORABLE + DailyResponse::AI_RATING_UNFAVORABLE +
+                 DailyResponse::SELF_RATINGS)
+
+      expect(overlap).to be_empty
+    end
+  end
+
   describe "#self_rating_label" do
     it "matches the feedback form's copy and is nil when unrated" do
       right_level = user.daily_responses.create!(daily_exercise: exercise, date: Date.current, answers: {}, section_ratings: { "code_review" => "right_level" })

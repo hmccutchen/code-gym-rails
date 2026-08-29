@@ -9,6 +9,21 @@ class DailyResponse < ApplicationRecord
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
 
+  # How hard the PROBLEM was, judged from its content alone — not how well it
+  # was answered, and deliberately not the engineer's ConceptMastery tier,
+  # which is kept invisible to them (see AiService#assess_difficulty, which is
+  # handed no response and no user history at all). Three levels rather than
+  # four, in words that describe a problem rather than a person, because this
+  # renders inches from the AI grade badge and the two must not read as one
+  # axis; a spec holds the two vocabularies disjoint.
+  DIFFICULTY_LEVELS = %w[straightforward moderate demanding].freeze
+
+  # The assessment's one-sentence "why" is provider prose rendered into the
+  # page, so it is bounded here rather than trusted. Long enough for the
+  # sentence the prompt asks for, short enough that a runaway one cannot push
+  # the review off the screen.
+  MAX_DIFFICULTY_REASON_LENGTH = 200
+
   # How many alternate framings a single section may accumulate. Enforced in
   # ResponsesController#explain_differently as well as in the view: the view
   # stops offering the button at the cap, but only the server bound holds
@@ -124,6 +139,18 @@ class DailyResponse < ApplicationRecord
   def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
   def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"
   def self_rating_label(section)       = SELF_RATING_LABELS[self_rating_for(section)]
+
+  # Validates on read: unlike generation, the review path has no
+  # ProblemSetIngest to hold provider output to a closed vocabulary, so an
+  # unrecognized level is dropped here rather than rendered as if this app had
+  # chosen the word. AiService#usable_difficulty refuses the same shapes on the
+  # way in; this is the guard for rows written before it existed.
+  def difficulty_for(section)
+    assessment = ai_review&.dig(section.to_s, "difficulty")
+    return unless assessment.is_a?(Hash) && DIFFICULTY_LEVELS.include?(assessment["level"])
+
+    assessment
+  end
 
   def ai_rating_for(section)        = ai_review&.dig(section.to_s, "rating")
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
