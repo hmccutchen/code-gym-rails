@@ -560,25 +560,109 @@ class AiService
     coach   = config_for(exercise.language)[:coach]
     context = build_review_day_context(coach, exercise, daily_response)
 
-    threads = sections.map do |section|
-      Thread.new do
-        service = self.class.new(@api_key)
-        begin
-          result = service.send(
-            :call_and_log, user, purpose: "review_response",
-            system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
-            cache_system: true
-          )
-          review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
-          review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-          [ section, { ok: true, review: review } ]
-        rescue AiService::Error => e
-          [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
-        end
-      end
-    end
+    # Started first so it overlaps the grading calls rather than following
+    # them: the assessment is an extra provider call, but not extra waiting.
+    difficulty = Thread.new { self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections) }
+    threads    = sections.map { |section| Thread.new { grade_section(user, exercise, daily_response, section, context) } }
 
-    threads.map(&:value).to_h
+    results = threads.map(&:value).to_h
+    merge_difficulty!(results, difficulty.value)
+    results
+  end
+
+  # Only onto a section that actually graded: a failed section has no review
+  # hash to carry an assessment, and a section the day never asked about must
+  # not acquire one.
+  def merge_difficulty!(results, difficulty)
+    results.each do |section, result|
+      next unless result[:ok] && difficulty[section]
+
+      result[:review]["difficulty"] = difficulty[section]
+    end
+  end
+
+  def grade_section(user, exercise, daily_response, section, context)
+    service = self.class.new(@api_key)
+    result  = service.send(
+      :call_and_log, user, purpose: "review_response",
+      system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
+      cache_system: true
+    )
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+    review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+    [ section, { ok: true, review: review } ]
+  rescue AiService::Error => e
+    [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+  end
+
+  # ── Rate how hard each problem is, from its content alone ────────────────
+  # Handed no daily_response, and none of the engineer's history — deliberately.
+  # This must rate the problem, not the person, and above all it must not
+  # become a second readout of their ConceptMastery tier, which the mastery
+  # design keeps invisible to them precisely so it cannot shape engagement. A
+  # prompt sentence asking the model to ignore the answer would be a weaker
+  # guarantee than not having the answer, so the signature is the guarantee:
+  # widening it is what a reviewer should push back on. `user` is here only to
+  # bill the call.
+  #
+  # Failure is swallowed rather than raised. The rating is context for reading
+  # a review; it is never worth costing the engineer the review itself, which
+  # they paid for with their own API key.
+  def assess_difficulty(user, exercise, sections:)
+    result = call_and_log(
+      user, purpose: "assess_difficulty",
+      system: build_difficulty_system_prompt(config_for(exercise.language)[:coach]),
+      prompt: build_difficulty_prompt(exercise, sections)
+    )
+
+    assessed = parse_json_object(result[:text], subject: "difficulty assessment")
+    sections.to_h { |section| [ section, usable_difficulty(assessed[section]) ] }.compact
+  rescue AiService::Error => e
+    Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
+    {}
+  end
+
+  def build_difficulty_system_prompt(coach)
+    "You are a senior #{coach} engineer rating how hard each of several practice problems is. " \
+    "You are not grading anyone, and you will not be shown anyone's answer. Return JSON."
+  end
+
+  def build_difficulty_prompt(exercise, sections)
+    material = sections.map { |section| "## #{section}\n#{duck_section_context(exercise, section)}" }
+
+    <<~PROMPT
+      Rate the objective difficulty of each problem below, on this scale:
+      #{difficulty_scale}
+
+      Judge only the material shown. Weigh how subtle the issue is, how many
+      reasoning steps a complete answer takes, and how much the scenario leaves
+      unstated. You know nothing about who is answering it, how they have done
+      before, or why this problem was chosen for them — none of that is here,
+      and none of it belongs in the rating. Two problems about the same idea can
+      differ; "#{DailyResponse::DIFFICULTY_LEVELS.first}" is a perfectly good answer.
+
+      Return a single JSON object keyed by the section names below:
+      {
+        "<section name>": {
+          "level": #{DailyResponse::DIFFICULTY_LEVELS.map(&:inspect).join(' | ')},
+          "reason": "string — one sentence naming what makes it that, written for the engineer to read after their review"
+        }
+      }
+
+      #{material.join("\n\n")}
+    PROMPT
+  end
+
+  # Descriptions are prompt text; the level names come from the constant, so
+  # the scale offered and the scale storable cannot drift apart.
+  def difficulty_scale
+    straightforward, moderate, demanding = DailyResponse::DIFFICULTY_LEVELS
+
+    [
+      "- \"#{straightforward}\" — one thing to notice; a competent engineer finds it on a first read.",
+      "- \"#{moderate}\" — a couple of reasoning steps, or one detail that is easy to skim past.",
+      "- \"#{demanding}\" — the issue is subtle, several steps chain together, or the scenario leaves something material unstated."
+    ].join("\n")
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
@@ -776,6 +860,13 @@ class AiService
   # — enough context for a Socratic prompt without needing per-section-kind
   # branching. `planted_ambiguities` is deliberately excluded: it's the
   # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
+  #
+  # This is the single authority for "the section as the engineer sees it", and
+  # it now has two callers: the duck, and #build_difficulty_prompt, which needs
+  # exactly the same view for the opposite reason — the difficulty of a problem
+  # is the difficulty of what was actually shown. Widening this to a field the
+  # engineer cannot see widens both, so add such a field to the caller that
+  # needs it rather than here.
   def duck_section_context(exercise, section)
     data = exercise.problem_set.dig(section.to_s) || {}
 
@@ -1525,6 +1616,21 @@ class AiService
   # is discarded and replaced. Skipped when the stored section has no blocks, since there is
   # nothing to grade against and the grader would report a spurious perfect score. Operates on
   # a single un-nested section hash — the shape #review_sections works with.
+  # The review path has no ProblemSetIngest, so provider output bound for the
+  # page is validated here — beside the only other place a review payload is
+  # normalized in-service. Repairs rather than raises, matching the rule the
+  # rest of ingest follows for a field nothing downstream depends on: a bad
+  # assessment costs a note, and discarding a paid review over one would be
+  # the worse failure.
+  def usable_difficulty(assessment)
+    return unless assessment.is_a?(Hash)
+    return unless DailyResponse::DIFFICULTY_LEVELS.include?(assessment["level"])
+
+    reason = assessment["reason"]
+    { "level" => assessment["level"],
+      "reason" => (reason.is_a?(String) ? reason.strip : "").truncate(DailyResponse::MAX_DIFFICULTY_REASON_LENGTH) }
+  end
+
   def override_parsons_section_rating!(review, exercise, daily_response)
     parsons = exercise.parsons_problem
     return review unless parsons.is_a?(Hash)

@@ -70,6 +70,40 @@ RSpec.describe AiService do
     end
   end
 
+  # Like double_class, but answers the grading prompt and the difficulty prompt
+  # differently. #review_sections issues both, and keeping them separable here
+  # is the point — a fake that returned one canned body for every system prompt
+  # could not tell a merged assessment from a coincidence.
+  let(:assessing_class) do
+    Class.new(AiService) do
+      def initialize(api_key_or_config = nil, review: {}, difficulty: {})
+        config = api_key_or_config.is_a?(Hash) ? api_key_or_config : { review: review, difficulty: difficulty }
+        @api_key    = config
+        @review     = config.fetch(:review, {})
+        @difficulty = config.fetch(:difficulty, {})
+      end
+
+      private
+
+      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
+        text =
+          if system.include?("rating how hard")
+            raise AiService::RateLimitError, "rate limited" if @difficulty == :raise
+
+            @difficulty.to_json
+          else
+            @review.to_json
+          end
+
+        { text: text, input_tokens: 1, output_tokens: 1, truncated: false }
+      end
+
+      def build_connection
+        nil
+      end
+    end
+  end
+
   let(:service) { double_class.new }
 
   # reject_missing_sections! now requires whatever DailyPlan actually rolls for
@@ -84,15 +118,18 @@ RSpec.describe AiService do
     base.merge(overrides)
   end
 
-  # The six single-shot purposes must never acquire conversational turns without
+  # The single-shot purposes must never acquire conversational turns without
   # being noticed. This test names them by scanning the source directly — more
   # robust than inferring the roster from snapshots — and asserts the complete
   # list by name rather than by subtraction, so a regex miss that loses one
-  # purpose becomes visible as a failure instead of passing silently.
+  # purpose becomes visible as a failure instead of passing silently. No count
+  # is stated here on purpose: the roster is the list itself, and a number
+  # beside it is one more thing that can go stale as purposes are added.
   describe "single-shot purposes" do
     SINGLE_SHOT_PURPOSES = %w[
       generate_exercise
       review_response
+      assess_difficulty
       generate_concept_reference
       explain_differently
       pseudocode_critique
@@ -108,9 +145,11 @@ RSpec.describe AiService do
 
     # The roster above is a list of names. On its own it would still pass if one
     # of these callers started sending turns, so it cannot be the guarantee — it
-    # only fixes which callers the guarantee has to cover. This drives all five
-    # public entry points behind those six purposes and asserts the history
-    # reaching #call is empty every time.
+    # only fixes which callers the guarantee has to cover. This drives every
+    # public entry point behind those purposes and asserts the history reaching
+    # #call is empty every time. #review_sections stands for two of them: it
+    # issues the grading call and the difficulty assessment, and both must stay
+    # single-shot.
     #
     # The purposes the run logged are asserted against the same roster, so a
     # caller that stops being exercised here fails rather than quietly dropping
@@ -2116,14 +2155,19 @@ RSpec.describe AiService do
       expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
     end
 
-    it "leaves a section review on the short request-thread budget" do
+    # A review issues two kinds of call — the grading call per section and the
+    # one difficulty assessment — and the request thread is blocked on all of
+    # them, so the budget has to hold for every one rather than just the graded
+    # ones. Asserted exactly, not with `all`, so a third kind of call appearing
+    # here has to be looked at rather than silently inheriting the budget.
+    it "leaves every call a section review makes on the short request-thread budget" do
       exercise, response = exercise_and_response_for_review
       review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }
       svc = double_class.new(canned_text: review.to_json)
 
       svc.review_sections(user, exercise, response, sections: %w[code_review])
 
-      expect(double_class.read_timeouts).to eq([ AiService::READ_TIMEOUT ])
+      expect(double_class.read_timeouts).to eq([ AiService::READ_TIMEOUT ] * 2)
     end
   end
 
@@ -3102,6 +3146,169 @@ RSpec.describe AiService do
       expect(ExerciseSection.resolved_fourth_key(problem_set)).to eq("ambiguity_hunt")
       expect(svc.last_prompt).to include("\"ambiguity_hunt\"")
       expect(svc.last_prompt).not_to include("\"plan_review\"")
+    end
+  end
+  # The whole point of assessing difficulty in its own pass is that the
+  # assessor cannot see the engineer. These examples are that claim, made
+  # executable: if someone later threads the response through for convenience,
+  # they fail rather than quietly turning a content rating into a performance
+  # (and therefore tier) readout.
+  describe "difficulty assessment" do
+    def loaded_day
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review"    => { "question" => "What is wrong here?", "snippet" => "Order.all.each { |o| o.user.name }" },
+          "pattern"        => { "title" => "Memoize", "question" => "When would you cache this?" },
+          "ambiguity_hunt" => { "title" => "Leaderboard", "request" => "Add a leaderboard.",
+                                "question" => "What needs clarifying?",
+                                "planted_ambiguities" => [ "AH-SECRET-ONE", "AH-SECRET-TWO" ] }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        answers: { "code_review" => "ANSWER-SENTINEL-TEXT", "pattern" => "ANSWER-SENTINEL-TEXT",
+                   "ambiguity_hunt" => "ANSWER-SENTINEL-TEXT" },
+        section_ratings: { "code_review" => "too_hard", "pattern" => "too_easy" }
+      )
+      [ exercise, response ]
+    end
+
+    def difficulty_prompt(exercise, sections = %w[code_review pattern ambiguity_hunt])
+      service.send(:build_difficulty_prompt, exercise, sections)
+    end
+
+    it "shows the assessor the problem exactly as the engineer sees it" do
+      exercise, = loaded_day
+      prompt = difficulty_prompt(exercise)
+
+      expect(prompt).to include("What is wrong here?")
+      expect(prompt).to include("Order.all.each { |o| o.user.name }")
+      expect(prompt).to include("Add a leaderboard.")
+    end
+
+    # The named risk. ConceptMastery's tier is deliberately invisible to the
+    # engineer; a difficulty rating derived from it would re-expose that signal
+    # under a new name. Nothing tier-shaped can reach this prompt because
+    # nothing tier-shaped is passed to the method that builds it.
+    it "carries nothing about the engineer, their tier, or their history" do
+      exercise, = loaded_day
+      user.update!(name: "Ada Lovelace", skill_level: "beginner")
+      user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :reduced)
+
+      prompt = difficulty_prompt(exercise)
+
+      expect(prompt).not_to include("Ada Lovelace")
+      expect(prompt).not_to include("beginner")
+      expect(prompt).not_to include("(reduced)")
+      expect(prompt).not_to include("(standard)")
+      expect(prompt).not_to include("n_plus_one")
+    end
+
+    # Assessed before it can be coloured by how well this particular engineer
+    # did: a strong answer to a demanding problem is still demanding, and the
+    # only way to guarantee that is to withhold the answer rather than ask for
+    # it to be ignored.
+    it "carries neither the answers nor the self-ratings" do
+      exercise, = loaded_day
+      prompt = difficulty_prompt(exercise)
+
+      expect(prompt).not_to include("ANSWER-SENTINEL-TEXT")
+      expect(prompt).not_to include("too_hard")
+      expect(prompt).not_to include("too easy")
+    end
+
+    # Same rule the duck prompt lives under, and for the same reason — this
+    # prompt is built from duck_section_context, so it inherits the exclusion
+    # rather than restating it. Pinned anyway: the two callers sharing one
+    # authority is exactly what a future edit could break silently.
+    it "carries no answer key" do
+      exercise, = loaded_day
+      prompt = difficulty_prompt(exercise)
+
+      expect(prompt).not_to include("AH-SECRET-ONE")
+      expect(prompt).not_to include("AH-SECRET-TWO")
+    end
+
+    it "offers exactly the levels this app can store" do
+      exercise, = loaded_day
+      prompt = difficulty_prompt(exercise)
+
+      DailyResponse::DIFFICULTY_LEVELS.each { |level| expect(prompt).to include(level) }
+    end
+
+    # A section that failed to grade has no review hash to attach an assessment
+    # to, and one the day never asked about must not acquire one.
+    it "merges an assessment into each successfully graded section" do
+      exercise, response = loaded_day
+      svc = assessing_class.new(
+        review: { "rating" => "solid" },
+        difficulty: {
+          "code_review" => { "level" => "demanding", "reason" => "The n+1 hides inside an association call." },
+          "pattern"     => { "level" => "straightforward", "reason" => "One thing to notice." },
+          "challenge"   => { "level" => "moderate", "reason" => "Not asked about today." }
+        }
+      )
+
+      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+
+      expect(results["code_review"][:review]["difficulty"])
+        .to eq("level" => "demanding", "reason" => "The n+1 hides inside an association call.")
+      expect(results["pattern"][:review]["difficulty"]).to eq("level" => "straightforward", "reason" => "One thing to notice.")
+      expect(results.keys).to match_array(%w[code_review pattern])
+    end
+
+    it "bills the assessment separately from the grading calls" do
+      exercise, response = loaded_day
+      svc = assessing_class.new(review: { "rating" => "solid" },
+                                difficulty: { "code_review" => { "level" => "moderate", "reason" => "r" } })
+
+      expect {
+        svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+      }.to change { ApiUsage.where(purpose: "assess_difficulty").count }.by(1)
+        .and change { ApiUsage.where(purpose: "review_response").count }.by(2)
+    end
+
+    # The note is context for reading a review. It is never worth costing the
+    # engineer the review itself, which they paid for with their own API key.
+    it "leaves the grades intact when the assessment fails outright" do
+      exercise, response = loaded_day
+      svc = assessing_class.new(review: { "rating" => "solid" }, difficulty: :raise)
+
+      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+
+      expect(results["code_review"][:ok]).to be(true)
+      expect(results["code_review"][:review]).not_to have_key("difficulty")
+      expect(results["pattern"][:ok]).to be(true)
+    end
+
+    it "drops a level it has no way to render and a reason of the wrong type" do
+      exercise, response = loaded_day
+      svc = assessing_class.new(
+        review: { "rating" => "solid" },
+        difficulty: {
+          "code_review" => { "level" => "brutal", "reason" => "Off-vocabulary." },
+          "pattern"     => { "level" => "moderate", "reason" => [ "not", "a", "sentence" ] }
+        }
+      )
+
+      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+
+      expect(results["code_review"][:review]).not_to have_key("difficulty")
+      expect(results["pattern"][:review]["difficulty"]).to eq("level" => "moderate", "reason" => "")
+    end
+
+    it "bounds a runaway reason rather than rendering it whole" do
+      exercise, response = loaded_day
+      svc = assessing_class.new(
+        review: { "rating" => "solid" },
+        difficulty: { "code_review" => { "level" => "moderate", "reason" => "x" * 500 } }
+      )
+
+      results = svc.review_sections(user, exercise, response, sections: %w[code_review])
+
+      expect(results["code_review"][:review]["difficulty"]["reason"].length)
+        .to eq(DailyResponse::MAX_DIFFICULTY_REASON_LENGTH)
     end
   end
 end

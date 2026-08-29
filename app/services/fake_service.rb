@@ -172,6 +172,11 @@ class FakeService < AiService
     "improved_code" => ""
   }.freeze
 
+  # One sentence, reused for every section: the fake's job is to make the note
+  # render, not to be interesting. The LEVEL varies (see #difficulty_assessment)
+  # so a spec or a preview can see the range rather than one word forever.
+  DIFFICULTY_REASON = "Rated from the problem text alone, with no sight of anyone's answer."
+
   CONCEPT_REFERENCE = {
     "tagline" => "One clear rule, not a grab-bag of tips.",
     "explanation" => "This concept has one core idea worth internalizing, with a couple of situations where it matters most.",
@@ -237,6 +242,8 @@ class FakeService < AiService
         raise "FakeService could not extract the section key from the review prompt" if section.blank?
 
         REVIEW_SECTION.to_json
+      when /rating how hard/
+        difficulty_assessment(prompt).to_json
       when /writing a concise, durable reference/
         CONCEPT_REFERENCE.to_json
       when /re-explaining one point/
@@ -254,6 +261,21 @@ class FakeService < AiService
       end
 
     { text: text, input_tokens: 0, output_tokens: 0 }
+  end
+
+  # Unlike REVIEW_SECTION, which is one flat hash reused for every section, the
+  # difficulty pass is a single call answering about several sections at once,
+  # so the response has to be keyed by the sections actually asked about.
+  # Levels rotate through the vocabulary by position: deterministic, and it
+  # keeps a multi-section day from showing the same word three times.
+  def difficulty_assessment(prompt)
+    sections = prompt.scan(/^## (\w+)$/).flatten
+    raise "FakeService could not extract any section key from the difficulty prompt" if sections.empty?
+
+    levels = DailyResponse::DIFFICULTY_LEVELS
+    sections.each_with_index.to_h do |section, index|
+      [ section, { "level" => levels[index % levels.size], "reason" => DIFFICULTY_REASON } ]
+    end
   end
 
   def build_connection
