@@ -772,6 +772,42 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  # The same discipline planted_ambiguities is held to, applied to the other
+  # direction of leak. A difficulty rating shown before or during answering
+  # would prime the engineer — "this one is demanding" is a hint — and the note
+  # is meant to reframe a result afterwards, not to set an expectation
+  # beforehand.
+  #
+  # The state below cannot arise through the app: #review refuses an
+  # unsubmitted response, so ai_review is nil until after a submit. That is the
+  # point. Forcing the field into existence early is what proves the answer
+  # form would not render it if a future path ever did, rather than proving
+  # only that nothing writes it today.
+  describe "the difficulty note before an answer exists" do
+    it "renders nowhere on the answer form, even for a response that somehow carries one" do
+      exercise = create_exercise
+      create_response(exercise, submitted: false, ai_review: {
+        "code_review" => { "rating" => "solid",
+                           "difficulty" => { "level" => "demanding", "reason" => "DIFFICULTY-SENTINEL-REASON" } }
+      })
+
+      get root_path
+
+      expect(response.body).to include("Find the bug")
+      expect(response.body).not_to include("DIFFICULTY-SENTINEL-REASON")
+      expect(response.body).not_to include("This problem was rated")
+      DailyResponse::DIFFICULTY_LEVELS.each { |level| expect(response.body).not_to include(level) }
+    end
+
+    it "does not exist yet on a freshly generated day" do
+      create_exercise
+
+      get root_path
+
+      expect(response.body).not_to include("This problem was rated")
+    end
+  end
+
   it "marks the unsubmitted form's code_review snippet for syntax highlighting" do
     exercise = create_exercise
     create_response(exercise, submitted: false)

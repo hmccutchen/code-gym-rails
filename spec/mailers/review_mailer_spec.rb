@@ -50,6 +50,29 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(body).to include("User.includes(:posts)")
     end
 
+    # The email is the same review. A difficulty note the engineer sees on the
+    # page and not in their inbox is a second rendering that disagrees with the
+    # first.
+    it "carries the difficulty note alongside the grade" do
+      daily_response.update!(ai_review: daily_response.ai_review.deep_merge(
+        "code_review" => { "difficulty" => { "level" => "demanding",
+                                             "reason" => "The extra query hides behind an association read." } }
+      ))
+
+      body = mail.body.encoded
+      expect(body).to include("This problem was rated demanding difficulty")
+      expect(body).to include("The extra query hides behind an association read.")
+    end
+
+    it "omits the difficulty note when the level is not one this app defines" do
+      daily_response.update!(ai_review: daily_response.ai_review.deep_merge(
+        "code_review" => { "difficulty" => { "level" => "brutal", "reason" => "OFF-VOCABULARY-MARKER" } }
+      ))
+
+      expect(mail.body.encoded).not_to include("OFF-VOCABULARY-MARKER")
+      expect(mail.body.encoded).not_to include("difficulty")
+    end
+
     it "never renders improved_code for the architecture section" do
       daily_response.update!(
         concept_tags: { "architecture" => "other" },

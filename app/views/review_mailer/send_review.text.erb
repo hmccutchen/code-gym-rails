@@ -10,6 +10,10 @@ Here's your Code Gym review from <%= @response.date.strftime("%A, %B %-d, %Y") %
 Rating: <%= fb["rating"] %>
 
 <% end -%>
+<% if (difficulty = @response.difficulty_for(section)) -%>
+<%= t("review.difficulty_note", level: difficulty["level"]) %> <%= difficulty["reason"] %>
+
+<% end -%>
 <% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| -%>
 <% if field[:list] -%>
 <% points = DailyResponse.review_points(fb[key]) -%>
