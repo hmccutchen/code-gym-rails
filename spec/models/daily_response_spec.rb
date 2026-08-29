@@ -368,6 +368,26 @@ RSpec.describe DailyResponse, type: :model do
       expect(unreviewed.difficulty_for("code_review")).to be_nil
     end
 
+    # ai_review is schemaless jsonb, so the reader cannot assume a row it
+    # renders came through AiService#assess_difficulty. Both directions apply
+    # the same rule, from the same place — a row bypassing the writer must not
+    # be able to put an unbounded, or non-string, reason on the page.
+    it "bounds the reason on read, not only on write" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current, answers: {},
+        ai_review: {
+          "code_review" => { "difficulty" => { "level" => "moderate", "reason" => "x" * 500 } },
+          "pattern"     => { "difficulty" => { "level" => "moderate", "reason" => [ "not", "a", "sentence" ] } },
+          "challenge"   => { "difficulty" => { "level" => "moderate", "reason" => "  padded  " } }
+        }
+      )
+
+      expect(response.difficulty_for("code_review")["reason"].length)
+        .to eq(DailyResponse::MAX_DIFFICULTY_REASON_LENGTH)
+      expect(response.difficulty_for("pattern")["reason"]).to eq("")
+      expect(response.difficulty_for("challenge")["reason"]).to eq("padded")
+    end
+
     # The difficulty note renders next to the AI grade badge, which is the one
     # thing it must not be mistaken for. Sharing a word with beginner /
     # developing / solid / strong would invite exactly that reading.

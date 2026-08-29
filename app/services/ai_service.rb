@@ -1478,7 +1478,10 @@ class AiService
     )
 
     assessed = parse_json_object(result[:text], subject: "difficulty assessment")
-    sections.to_h { |section| [ section, usable_difficulty(assessed[section]) ] }.compact
+    # Repairs rather than raises: a bad assessment costs a note, and discarding
+    # a review the engineer already paid for over one would be the worse
+    # failure. DailyResponse owns the rule, and applies it again on read.
+    sections.to_h { |section| [ section, DailyResponse.usable_difficulty(assessed[section]) ] }.compact
   rescue AiService::Error => e
     Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
     {}
@@ -1626,21 +1629,6 @@ class AiService
     submitted = ExerciseSection::ParsonsProblem.submitted_order(daily_response.answers["parsons_problem"], blocks.size)
     review["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
     review
-  end
-
-  # The review path has no ProblemSetIngest, so provider output bound for the
-  # page is validated here — beside the only other place a review payload is
-  # normalized in-service. Repairs rather than raises, matching the rule the
-  # rest of ingest follows for a field nothing downstream depends on: a bad
-  # assessment costs a note, and discarding a paid review over one would be
-  # the worse failure.
-  def usable_difficulty(assessment)
-    return unless assessment.is_a?(Hash)
-    return unless DailyResponse::DIFFICULTY_LEVELS.include?(assessment["level"])
-
-    reason = assessment["reason"]
-    { "level" => assessment["level"],
-      "reason" => (reason.is_a?(String) ? reason.strip : "").truncate(DailyResponse::MAX_DIFFICULTY_REASON_LENGTH) }
   end
 
   # Never allowed to break generation — a bug here is a lost analytics

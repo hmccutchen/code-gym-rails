@@ -140,16 +140,27 @@ class DailyResponse < ApplicationRecord
   def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"
   def self_rating_label(section)       = SELF_RATING_LABELS[self_rating_for(section)]
 
-  # Validates on read: unlike generation, the review path has no
-  # ProblemSetIngest to hold provider output to a closed vocabulary, so an
-  # unrecognized level is dropped here rather than rendered as if this app had
-  # chosen the word. AiService#usable_difficulty refuses the same shapes on the
-  # way in; this is the guard for rows written before it existed.
-  def difficulty_for(section)
-    assessment = ai_review&.dig(section.to_s, "difficulty")
+  # The one definition of a usable difficulty assessment. The review path has no
+  # ProblemSetIngest to hold provider output to a closed vocabulary, so this
+  # runs on the way in (AiService#assess_difficulty) and again on the way out
+  # (#difficulty_for). Neither direction is redundant: `ai_review` is schemaless
+  # jsonb, so the reader cannot assume every row it renders was written by the
+  # writer. Stating the rule once is what keeps the two from disagreeing about
+  # what is renderable.
+  #
+  # A class method beside .review_points and .improved_code_text — the other
+  # tolerant readers the view and the mailer both share, and for the same
+  # reason: helpers are not included in mailer views by default.
+  def self.usable_difficulty(assessment)
     return unless assessment.is_a?(Hash) && DIFFICULTY_LEVELS.include?(assessment["level"])
 
-    assessment
+    reason = assessment["reason"]
+    { "level"  => assessment["level"],
+      "reason" => (reason.is_a?(String) ? reason.strip : "").truncate(MAX_DIFFICULTY_REASON_LENGTH) }
+  end
+
+  def difficulty_for(section)
+    self.class.usable_difficulty(ai_review&.dig(section.to_s, "difficulty"))
   end
 
   def ai_rating_for(section)        = ai_review&.dig(section.to_s, "rating")
