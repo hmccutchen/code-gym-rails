@@ -312,10 +312,18 @@ User interacts:
   `AiService#duck_section_context`, already the single authority for "the
   section as the engineer sees it", so it inherits that method's answer-key
   exclusion rather than restating it. Cost is one extra provider call per
-  review *attempt* (not per section), billed as `assess_difficulty`, running as
-  one more thread in the existing fan-out so it adds no wall-clock; a failure
-  in it is swallowed, since the note is context for a review and never worth
-  costing the engineer the review itself. Stored at
+  review *attempt* (not per section), billed as `assess_difficulty` and capped
+  by `AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS` — which is derived from the
+  largest valid reply and, by being passed at all, is what turns off the
+  extended thinking `ClaudeService` would otherwise leave on. It runs as one
+  more thread in the existing fan-out, and once grading finishes it gets only
+  `DIFFICULTY_ASSESSMENT_GRACE_SECONDS` to land before the review goes out
+  without it, so the note can never extend the request; a thread abandoned that
+  way still records its `ApiUsage` row, which is honest accounting for a call
+  the provider already billed. Any failure in it is swallowed — `StandardError`
+  wide, not just `AiService::Error`, because `Thread#value` re-raises past
+  `ResponsesController#review`'s rescues, and a note must never cost the
+  engineer the review itself. Stored at
   `ai_review[section]["difficulty"]` — no migration, and no pre-answer surface
   can reach it even in principle, since `ai_review` does not exist until a
   *submitted* response is reviewed. Display-only: nothing about tier

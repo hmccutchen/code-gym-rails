@@ -3298,6 +3298,104 @@ RSpec.describe AiService do
       expect(results["pattern"][:review]["difficulty"]).to eq("level" => "moderate", "reason" => "")
     end
 
+    # The failure this guards cost the engineer everything at once: Thread#value
+    # re-raises anything the assessment did not catch, ResponsesController#review
+    # rescues only the AiService hierarchy, so a JSON::ParserError from a 200
+    # with a non-JSON body — or a ConnectionTimeoutError from the extra pooled
+    # checkout this pass adds — 500s a request whose grades had already
+    # succeeded, discards them after billing, and leaves the review claim held.
+    it "keeps the grades when the assessment raises something outside the AiService hierarchy" do
+      exercise, response = loaded_day
+      exploding_class = Class.new(assessing_class) do
+        private
+
+        def assess_difficulty(_user, _exercise, sections:)
+          raise JSON::ParserError, "unexpected token"
+        end
+      end
+      svc = exploding_class.new(review: { "rating" => "solid" })
+
+      results = nil
+      expect { results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern]) }
+        .not_to raise_error
+
+      expect(results["code_review"][:ok]).to be(true)
+      expect(results["pattern"][:ok]).to be(true)
+      expect(results["code_review"][:review]).not_to have_key("difficulty")
+    end
+
+    # Passing any max_tokens is what turns extended thinking off in
+    # ClaudeService, so this pins the cost model as much as the length: without
+    # it the note runs with thinking on and the full generation budget, billed
+    # to the engineer's own key.
+    it "caps the assessment's output, which is also what disables thinking" do
+      exercise, response = loaded_day
+      caps = []
+      capturing_class = Class.new(double_class) do
+        define_method(:call) do |system:, prompt:, cache_system: false,
+                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: []|
+          caps << [ system.include?("rating how hard") ? :difficulty : :grade, max_tokens ]
+          super(system: system, prompt: prompt, cache_system: cache_system,
+                read_timeout: read_timeout, max_tokens: max_tokens, history: history)
+        end
+      end
+
+      capturing_class.new(canned_text: { "rating" => "solid" }.to_json)
+                     .review_sections(user, exercise, response, sections: %w[code_review])
+
+      expect(caps).to include([ :difficulty, AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS ])
+      expect(caps).to include([ :grade, nil ])
+      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
+    end
+
+    # Sized from the largest response the schema permits, not guessed — a cap
+    # below that truncates, and a truncated assessment is swallowed, so the note
+    # would simply never appear on a full day.
+    it "budgets enough for a reason of the maximum length in every section a day can hold" do
+      worst_case = ExerciseSection.slot_count * (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / 3)
+
+      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be > worst_case
+    end
+
+    # Blocked on a queue rather than a sleep, so the example is deterministic and
+    # does not spend the grace period in real time.
+    #
+    # Wrapped in Timeout because the regression this guards is a HANG, not a
+    # wrong value: drop the bounded join and #review_sections waits on the
+    # assessment forever. A hung example takes the whole CI job down with it and
+    # says nothing about why, so the timeout converts that into a named failure.
+    it "leaves without the note rather than letting a hung assessment hold the review" do
+      exercise, response = loaded_day
+      gate = Queue.new
+      hanging_class = Class.new(assessing_class) do
+        define_method(:assess_difficulty) { |_user, _exercise, sections:| gate.pop }
+        private :assess_difficulty
+      end
+      svc = hanging_class.new(review: { "rating" => "solid" })
+
+      stub_const("AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS", 0.05)
+
+      results = Timeout.timeout(10) do
+        svc.review_sections(user, exercise, response, sections: %w[code_review])
+      end
+
+      expect(results["code_review"][:ok]).to be(true)
+      expect(results["code_review"][:review]).not_to have_key("difficulty")
+    ensure
+      gate << {}
+    end
+
+    # The scale used to be three descriptions destructured off DIFFICULTY_LEVELS
+    # positionally. Adding or reordering a level would have relabelled every
+    # rung silently; these two pin the assumption the prompt still makes.
+    it "has guidance for exactly the levels it can offer" do
+      expect(AiService::DIFFICULTY_GUIDANCE.keys).to eq(DailyResponse::DIFFICULTY_LEVELS)
+    end
+
+    it "orders the vocabulary easiest first, which is what lets the prompt call .first easy" do
+      expect(DailyResponse::DIFFICULTY_LEVELS).to eq(%w[straightforward moderate demanding])
+    end
+
     it "bounds a runaway reason rather than rendering it whole" do
       exercise, response = loaded_day
       svc = assessing_class.new(

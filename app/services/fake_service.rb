@@ -269,7 +269,12 @@ class FakeService < AiService
   # Levels rotate through the vocabulary by position: deterministic, and it
   # keeps a multi-section day from showing the same word three times.
   def difficulty_assessment(prompt)
-    sections = prompt.scan(/^## (\w+)$/).flatten
+    # Intersected with the registry rather than trusted raw: the prompt embeds
+    # each section's own material, and a snippet containing its own "## Heading"
+    # line would otherwise be read as a section, shifting every level assigned
+    # after it. ExerciseSection is the authority on what a section key is, so a
+    # fake meant to be deterministic does not quietly become content-dependent.
+    sections = prompt.scan(/^## (\w+)$/).flatten & ExerciseSection.keys
     raise "FakeService could not extract any section key from the difficulty prompt" if sections.empty?
 
     levels = DailyResponse::DIFFICULTY_LEVELS

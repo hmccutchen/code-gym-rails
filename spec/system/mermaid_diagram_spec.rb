@@ -19,13 +19,15 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
 
   # Travelled here rather than around each example body, the way the sibling
   # specs do it: this spec already enters the page in one place, and that place
-  # is the only one that knows about `weekday`, so dating the record and setting
-  # the browser's clock together is what stops the two disagreeing.
+  # is the only one that knows about `weekday`, so dating the record and
+  # rendering against that same date happen together.
   #
-  # Without it these examples pass Monday to Friday — where a_weekday IS today —
-  # and fail every weekend, when a_weekday jumps forward to the next Monday
-  # while the browser stays on the real day and the dashboard renders its "no
-  # exercises on weekends" empty state instead of the set.
+  # travel_to stubs this process's clock, not the browser's — what matters is
+  # that the SERVER answers the visit as of `weekday`. Without it these examples
+  # pass Monday to Friday, where a_weekday IS today, and fail every weekend,
+  # when a_weekday jumps forward to the next Monday while the server still
+  # answers as the real day and renders its "no exercises on weekends" empty
+  # state instead of the set.
   def start_dashboard(problem_set)
     travel_to(weekday) do
       DailyExercise.create!(user: user, date: weekday.to_date, language: "ruby_rails",
