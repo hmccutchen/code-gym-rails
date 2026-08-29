@@ -17,10 +17,21 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
 
   bad_diagram = "not mermaid syntax @@@ <<< >>>"
 
+  # Travelled here rather than around each example body, the way the sibling
+  # specs do it: this spec already enters the page in one place, and that place
+  # is the only one that knows about `weekday`, so dating the record and setting
+  # the browser's clock together is what stops the two disagreeing.
+  #
+  # Without it these examples pass Monday to Friday — where a_weekday IS today —
+  # and fail every weekend, when a_weekday jumps forward to the next Monday
+  # while the browser stays on the real day and the dashboard renders its "no
+  # exercises on weekends" empty state instead of the set.
   def start_dashboard(problem_set)
-    DailyExercise.create!(user: user, date: weekday.to_date, language: "ruby_rails",
-                          generated_at: Time.current, problem_set: problem_set)
-    visit_as(user)
+    travel_to(weekday) do
+      DailyExercise.create!(user: user, date: weekday.to_date, language: "ruby_rails",
+                            generated_at: Time.current, problem_set: problem_set)
+      visit_as(user)
+    end
   end
 
   # The module script imports Mermaid from a CDN, so cleanup lands after an
