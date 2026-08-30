@@ -128,12 +128,14 @@ class AiService
   # runs with thinking on and ClaudeService::MAX_TOKENS to spend, billed to the
   # engineer's own key for a note that renders in two lines.
   #
-  # GeminiService has no such switch — it only caps output — so there the
-  # budget has to cover any reasoning tokens too, and a truncation is
-  # swallowed like any other failure here. That exposure is not specific to
-  # this constant: DUCK_RESPONSE_MAX_TOKENS and PSEUDOCODE_CRITIQUE_MAX_TOKENS
-  # carry it identically, and closing it means a provider-aware budget for
-  # every capped call rather than a tweak to this one.
+  # GeminiService pairs the same cap with its own least-thinking setting, so
+  # neither provider spends this budget reasoning. The two are not identical
+  # though: Claude turns thinking off outright, while Gemini 3 Flash has no off
+  # switch and only reaches "minimal" (see GeminiService::MINIMAL_THINKING_LEVEL).
+  # So a Gemini call still spends a little before it answers, which is one
+  # reason this stays sized from the largest valid reply rather than trimmed
+  # to the expected one — and why a truncation, swallowed here like any other
+  # failure, is likelier on that provider than on Claude.
   DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
   DIFFICULTY_ASSESSMENT_MAX_TOKENS =
     (ExerciseSection.slot_count * (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / 3)) +
