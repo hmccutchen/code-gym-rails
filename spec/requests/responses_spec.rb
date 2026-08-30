@@ -317,6 +317,28 @@ RSpec.describe "Responses", type: :request do
       expect(flash[:notice]).to eq("Already reviewed.")
     end
 
+    it "persists the difficulty assessment alongside the grade and renders it once reviewed" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "rating" => "developing",
+                                               "difficulty" => { "level" => "demanding",
+                                                                 "reason" => "The extra query hides behind an association read." } } },
+        "pattern"     => { ok: true, review: { "rating" => "solid" } },
+        "challenge"   => { ok: true, review: { "rating" => "solid" } }
+      )
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(daily_response.reload.ai_review.dig("code_review", "difficulty"))
+        .to eq("level" => "demanding", "reason" => "The extra query hides behind an association read.")
+
+      get root_path
+      expect(response.body).to include("This problem was rated demanding difficulty")
+      expect(response.body).to include("The extra query hides behind an association read.")
+    end
+
     it "saves the ai_review from the user's configured provider" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)

@@ -9,6 +9,21 @@ class DailyResponse < ApplicationRecord
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
 
+  # How hard the PROBLEM was, judged from its content alone — not how well it
+  # was answered, and deliberately not the engineer's ConceptMastery tier,
+  # which is kept invisible to them (see AiService#assess_difficulty, which is
+  # handed no response and no user history at all). Three levels rather than
+  # four, in words that describe a problem rather than a person, because this
+  # renders inches from the AI grade badge and the two must not read as one
+  # axis; a spec holds the two vocabularies disjoint.
+  DIFFICULTY_LEVELS = %w[straightforward moderate demanding].freeze
+
+  # The assessment's one-sentence "why" is provider prose rendered into the
+  # page, so it is bounded here rather than trusted. Long enough for the
+  # sentence the prompt asks for, short enough that a runaway one cannot push
+  # the review off the screen.
+  MAX_DIFFICULTY_REASON_LENGTH = 200
+
   # How many alternate framings a single section may accumulate. Enforced in
   # ResponsesController#explain_differently as well as in the view: the view
   # stops offering the button at the cap, but only the server bound holds
@@ -124,6 +139,29 @@ class DailyResponse < ApplicationRecord
   def self_rating_favorable?(section)  = SELF_RATINGS[0, 2].include?(self_rating_for(section)) # too_easy / right_level
   def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"
   def self_rating_label(section)       = SELF_RATING_LABELS[self_rating_for(section)]
+
+  # The one definition of a usable difficulty assessment. The review path has no
+  # ProblemSetIngest to hold provider output to a closed vocabulary, so this
+  # runs on the way in (AiService#assess_difficulty) and again on the way out
+  # (#difficulty_for). Neither direction is redundant: `ai_review` is schemaless
+  # jsonb, so the reader cannot assume every row it renders was written by the
+  # writer. Stating the rule once is what keeps the two from disagreeing about
+  # what is renderable.
+  #
+  # A class method beside .review_points and .improved_code_text — the other
+  # tolerant readers the view and the mailer both share, and for the same
+  # reason: helpers are not included in mailer views by default.
+  def self.usable_difficulty(assessment)
+    return unless assessment.is_a?(Hash) && DIFFICULTY_LEVELS.include?(assessment["level"])
+
+    reason = assessment["reason"]
+    { "level"  => assessment["level"],
+      "reason" => (reason.is_a?(String) ? reason.strip : "").truncate(MAX_DIFFICULTY_REASON_LENGTH) }
+  end
+
+  def difficulty_for(section)
+    self.class.usable_difficulty(ai_review&.dig(section.to_s, "difficulty"))
+  end
 
   def ai_rating_for(section)        = ai_review&.dig(section.to_s, "rating")
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))

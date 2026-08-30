@@ -107,6 +107,33 @@ class AiService
   # deliberately conservative for prose, and the constant covers the JSON
   # envelope on top. Still far below full generation; round 1 returns no code,
   # which is what keeps it cheap.
+  # Derived from the largest VALID response rather than guessed, the same way
+  # PSEUDOCODE_CRITIQUE_MAX_TOKENS below is: one entry per section the day can
+  # hold, each a level name plus a reason of at most
+  # DailyResponse::MAX_DIFFICULTY_REASON_LENGTH characters. Three characters per
+  # token is deliberately conservative for prose, and the overhead covers the
+  # JSON envelope and key names. Getting this too tight costs the note silently
+  # rather than loudly — a truncated response raises TruncatedResponseError,
+  # which this pass swallows by design.
+  #
+  # Passing any max_tokens at all is half the point: ClaudeService disables
+  # extended thinking whenever a caller supplies one, and a reply of one
+  # sentence per section has nothing to think about. Without it the assessment
+  # runs with thinking on and ClaudeService::MAX_TOKENS to spend, billed to the
+  # engineer's own key for a note that renders in two lines.
+  DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
+  DIFFICULTY_ASSESSMENT_MAX_TOKENS =
+    (ExerciseSection.slot_count * (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / 3)) +
+    DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS
+
+  # How long the review may keep waiting for the difficulty note once every
+  # section has been graded. The note is optional context; the grades are what
+  # the engineer paid for, so the assessment gets to run alongside them for
+  # free and then has this long to finish before the request leaves without it.
+  # Without the bound, one hung provider connection could hold a synchronous
+  # request for the full retry budget to deliver a sentence.
+  DIFFICULTY_ASSESSMENT_GRACE_SECONDS = 5
+
   PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS = 100
   PSEUDOCODE_CRITIQUE_MAX_TOKENS =
     (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
@@ -560,25 +587,46 @@ class AiService
     coach   = config_for(exercise.language)[:coach]
     context = build_review_day_context(coach, exercise, daily_response)
 
-    threads = sections.map do |section|
-      Thread.new do
-        service = self.class.new(@api_key)
-        begin
-          result = service.send(
-            :call_and_log, user, purpose: "review_response",
-            system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
-            cache_system: true
-          )
-          review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
-          review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-          [ section, { ok: true, review: review } ]
-        rescue AiService::Error => e
-          [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
-        end
-      end
-    end
+    # Started first so it overlaps the grading calls rather than following
+    # them: the assessment is an extra provider call, but not extra waiting.
+    difficulty = Thread.new { safe_difficulty_assessment(user, exercise, sections) }
+    threads    = sections.map { |section| Thread.new { grade_section(user, exercise, daily_response, section, context) } }
 
-    threads.map(&:value).to_h
+    results = threads.map(&:value).to_h
+    merge_difficulty!(results, awaited_difficulty(difficulty))
+    results
+  end
+
+  # The grades are what the engineer paid for, so the note never gets to hold
+  # them up: once grading is done the assessment has DIFFICULTY_ASSESSMENT_GRACE_SECONDS
+  # to finish, and the review goes out without it otherwise. #join returns the
+  # thread when it finished and nil when it timed out, so this reads as "take it
+  # if it is ready".
+  #
+  # A thread abandoned here keeps running and may still write its ApiUsage row
+  # after the request has ended — deliberate. The provider call really happened
+  # and really cost money, so recording it is honest accounting, and #log_usage
+  # swallows its own errors, so a late write cannot fail anything. Killing the
+  # thread instead would save nothing: the provider bills from the moment the
+  # request is sent.
+  def awaited_difficulty(thread)
+    thread.join(DIFFICULTY_ASSESSMENT_GRACE_SECONDS) ? thread.value : {}
+  end
+
+  # #assess_difficulty is display-only: a failure in it must never cost the
+  # engineer the review they have already paid for. That contract cannot be
+  # kept inside the method alone, because `self.class.new` builds this thread's
+  # Faraday connection and can fail before the method is even entered — and
+  # Thread#value re-raises whatever escapes, straight past
+  # ResponsesController#review's rescues, which would 500 on a request whose
+  # grades had already succeeded and leave the review claim held. So the guard
+  # lives here, around the whole thread body, and is StandardError-wide on
+  # purpose rather than AiService::Error-wide.
+  def safe_difficulty_assessment(user, exercise, sections)
+    self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections)
+  rescue StandardError => e
+    Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
+    {}
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
@@ -776,6 +824,13 @@ class AiService
   # — enough context for a Socratic prompt without needing per-section-kind
   # branching. `planted_ambiguities` is deliberately excluded: it's the
   # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
+  #
+  # This is the single authority for "the section as the engineer sees it", and
+  # it now has two callers: the duck, and #build_difficulty_prompt, which needs
+  # exactly the same view for the opposite reason — the difficulty of a problem
+  # is the difficulty of what was actually shown. Widening this to a field the
+  # engineer cannot see widens both, so add such a field to the caller that
+  # needs it rather than here.
   def duck_section_context(exercise, section)
     data = exercise.problem_set.dig(section.to_s) || {}
 
@@ -1434,6 +1489,109 @@ class AiService
     ExerciseSection.for(section).grading_note(
       section: exercise.problem_set[section] || {}, answer: daily_response.answers[section]
     )
+  end
+
+  # Only onto a section that actually graded: a failed section has no review
+  # hash to carry an assessment, and a section the day never asked about must
+  # not acquire one.
+  def merge_difficulty!(results, difficulty)
+    results.each do |section, result|
+      next unless result[:ok] && difficulty[section]
+
+      result[:review]["difficulty"] = difficulty[section]
+    end
+  end
+
+  def grade_section(user, exercise, daily_response, section, context)
+    service = self.class.new(@api_key)
+    result  = service.send(
+      :call_and_log, user, purpose: "review_response",
+      system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
+      cache_system: true
+    )
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+    review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+    [ section, { ok: true, review: review } ]
+  rescue AiService::Error => e
+    [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+  end
+
+  # Rate how hard each problem is, from its content alone.
+  # Handed no daily_response, and none of the engineer's history — deliberately.
+  # This must rate the problem, not the person, and above all it must not
+  # become a second readout of their ConceptMastery tier, which the mastery
+  # design keeps invisible to them precisely so it cannot shape engagement. A
+  # prompt sentence asking the model to ignore the answer would be a weaker
+  # guarantee than not having the answer, so the signature is the guarantee:
+  # widening it is what a reviewer should push back on. `user` is here only to
+  # bill the call.
+  #
+  # Failure is swallowed rather than raised. The rating is context for reading
+  # a review; it is never worth costing the engineer the review itself, which
+  # they paid for with their own API key.
+  def assess_difficulty(user, exercise, sections:)
+    result = call_and_log(
+      user, purpose: "assess_difficulty", max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS,
+      system: build_difficulty_system_prompt(config_for(exercise.language)[:coach]),
+      prompt: build_difficulty_prompt(exercise, sections)
+    )
+
+    assessed = parse_json_object(result[:text], subject: "difficulty assessment")
+    # Repairs rather than raises: a bad assessment costs a note, and discarding
+    # a review the engineer already paid for over one would be the worse
+    # failure. DailyResponse owns the rule, and applies it again on read.
+    sections.to_h { |section| [ section, DailyResponse.usable_difficulty(assessed[section]) ] }.compact
+  end
+
+  def build_difficulty_system_prompt(coach)
+    "You are a senior #{coach} engineer rating how hard each of several practice problems is. " \
+    "You are not grading anyone, and you will not be shown anyone's answer. Return JSON."
+  end
+
+  def build_difficulty_prompt(exercise, sections)
+    material = sections.map { |section| "## #{section}\n#{duck_section_context(exercise, section)}" }
+
+    <<~PROMPT
+      Rate the objective difficulty of each problem below, on this scale:
+      #{difficulty_scale}
+
+      Judge only the material shown. Weigh how subtle the issue is, how many
+      reasoning steps a complete answer takes, and how much the scenario leaves
+      unstated. You know nothing about who is answering it, how they have done
+      before, or why this problem was chosen for them — none of that is here,
+      and none of it belongs in the rating. Two problems about the same idea can
+      differ; "#{DailyResponse::DIFFICULTY_LEVELS.first}" is a perfectly good answer.
+
+      Return a single JSON object keyed by the section names below:
+      {
+        "<section name>": {
+          "level": #{DailyResponse::DIFFICULTY_LEVELS.map(&:inspect).join(' | ')},
+          "reason": "string — one sentence naming what makes it that, written for the engineer to read after their review"
+        }
+      }
+
+      #{material.join("\n\n")}
+    PROMPT
+  end
+
+  # Descriptions are prompt text and live here; the level names come from
+  # DailyResponse, so the scale offered and the scale storable cannot drift
+  # apart. Keyed by level rather than positional: this was three descriptions
+  # destructured off the constant in order, which would have silently relabelled
+  # every rung the moment a level was added or reordered. #fetch is what makes
+  # that failure loud instead — a level with no guidance raises here rather than
+  # shipping a prompt with a missing rung. A spec pins the ordered vocabulary,
+  # which is what lets #build_difficulty_prompt call .first "the easiest".
+  DIFFICULTY_GUIDANCE = {
+    "straightforward" => "one thing to notice; a competent engineer finds it on a first read.",
+    "moderate"        => "a couple of reasoning steps, or one detail that is easy to skim past.",
+    "demanding"       => "the issue is subtle, several steps chain together, or the scenario leaves something material unstated."
+  }.freeze
+
+  def difficulty_scale
+    DailyResponse::DIFFICULTY_LEVELS
+      .map { |level| "- \"#{level}\" — #{DIFFICULTY_GUIDANCE.fetch(level)}" }
+      .join("\n")
   end
 
   def build_concept_reference_prompt(concept, config)

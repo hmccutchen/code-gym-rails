@@ -221,7 +221,7 @@ User interacts:
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), anonymized_at (nullable — set on self-service deletion) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, a rotating third key, a rotating fourth key), language, generated_at, regenerated_at |
-| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), rating enum, feedback_text, ai_review (jsonb), concept_tags (jsonb) |
+| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), feedback_text, ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
 
 ## Key Design Decisions
@@ -289,6 +289,45 @@ User interacts:
 - **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule).
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so every `answers[section].presence` reader — review prompt, history, `recent_performance` — sees what it saw before scaffolds existed.
 - **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
+- **Post-hoc difficulty rating**: once a section is reviewed, its review block
+  also shows how hard the PROBLEM was — `straightforward` / `moderate` /
+  `demanding` (`DailyResponse::DIFFICULTY_LEVELS`) plus a one-sentence reason —
+  so a rough grade can read as "this was legitimately hard" rather than as
+  unexplained struggle. Three levels in problem-describing words, deliberately
+  disjoint from the 4-level AI grade badge it renders under (a spec holds the
+  vocabularies disjoint), because two same-shaped ratings side by side would be
+  read as one axis. **It must never become a second readout of
+  `ConceptMastery`'s tier**, which the mastery design keeps invisible precisely
+  so it cannot shape engagement — so it is assessed at review time by
+  `AiService#assess_difficulty`, which is handed *no* `daily_response` and none
+  of the user's history. The signature is the guarantee: it cannot see the
+  answers, the self-ratings, the grade it runs beside, or the tier, because
+  none of them are passed to it. Generation-time was rejected for exactly this
+  reason — the generator has just been told "for any concept marked
+  `(reduced)` … ease the difficulty only", so a self-assessment there grades
+  the instruction it was given; folding it into the grading call was rejected
+  because that call's shared context carries every answer and self-rating, and
+  a rating drawn from those launders performance (and so, indirectly, tier)
+  into "difficulty". Its per-section material comes from
+  `AiService#duck_section_context`, already the single authority for "the
+  section as the engineer sees it", so it inherits that method's answer-key
+  exclusion rather than restating it. Cost is one extra provider call per
+  review *attempt* (not per section), billed as `assess_difficulty` and capped
+  by `AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS` — which is derived from the
+  largest valid reply and, by being passed at all, is what turns off the
+  extended thinking `ClaudeService` would otherwise leave on. It runs as one
+  more thread in the existing fan-out, and once grading finishes it gets only
+  `DIFFICULTY_ASSESSMENT_GRACE_SECONDS` to land before the review goes out
+  without it, so the note can never extend the request; a thread abandoned that
+  way still records its `ApiUsage` row, which is honest accounting for a call
+  the provider already billed. Any failure in it is swallowed — `StandardError`
+  wide, not just `AiService::Error`, because `Thread#value` re-raises past
+  `ResponsesController#review`'s rescues, and a note must never cost the
+  engineer the review itself. Stored at
+  `ai_review[section]["difficulty"]` — no migration, and no pre-answer surface
+  can reach it even in principle, since `ai_review` does not exist until a
+  *submitted* response is reviewed. Display-only: nothing about tier
+  transitions, retention scheduling, or generation guidance changed.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
@@ -448,7 +487,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 
 ## File Map
 
-- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging
+- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, and rejects an unusable ambiguity-hunt answer key, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
