@@ -215,12 +215,58 @@ RSpec.describe GeminiService do
 
       expect(fake_conn).to receive(:post) do |_url, body|
         parsed = JSON.parse(body)
-        expect(parsed["generation_config"]).to eq("max_output_tokens" => AiService::DUCK_RESPONSE_MAX_TOKENS)
+        expect(parsed["generation_config"]).to eq(
+          "max_output_tokens" => AiService::DUCK_RESPONSE_MAX_TOKENS,
+          "thinking_level"    => GeminiService::MINIMAL_THINKING_LEVEL
+        )
         expect(parsed).not_to have_key("max_output_tokens")
         fake_response
       end
 
       service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS)
+    end
+
+    # MODEL thinks at medium effort by default and bills thinking into the same
+    # output budget the cap applies to, so a cap sent on its own can be spent
+    # reasoning before any reply text is emitted. ClaudeService pairs a cap with
+    # `thinking: disabled` for exactly this reason; this is the Gemini half of
+    # that rule, and it is the whole point of the cap being honoured at all.
+    it "asks for minimal thinking whenever it caps the budget, so the cap is not spent reasoning" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hi" } ] } ],
+          "usage" => {}
+        }.to_json)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        expect(JSON.parse(body).dig("generation_config", "thinking_level"))
+          .to eq(GeminiService::MINIMAL_THINKING_LEVEL)
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
+    end
+
+    # The other half: an uncapped call is the day's generation, which wants the
+    # model's default effort. Sending minimal there would quietly degrade every
+    # exercise set to buy nothing, since nothing is capping that budget.
+    it "leaves an uncapped call's thinking effort alone" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hi" } ] } ],
+          "usage" => {}
+        }.to_json)
+      fake_conn = instance_double(Faraday::Connection)
+      service.instance_variable_set(:@conn, fake_conn)
+
+      expect(fake_conn).to receive(:post) do |_url, body|
+        expect(JSON.parse(body)).not_to have_key("generation_config")
+        fake_response
+      end
+
+      service.send(:call, system: "sys", prompt: "p")
     end
 
     # The Interactions API response has no stop/finish-reason field to read

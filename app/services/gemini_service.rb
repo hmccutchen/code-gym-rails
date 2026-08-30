@@ -5,6 +5,23 @@ class GeminiService < AiService
   MODEL   = "gemini-3.5-flash"
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
+  # MODEL thinks at "medium" effort unless told otherwise, and thinking tokens
+  # are generated into — and billed as — the same output budget max_output_tokens
+  # caps. So a tight cap shared with default-effort thinking risks the model
+  # spending the budget reasoning and returning little or no reply text, which
+  # surfaces here as a truncated response rather than as anything diagnosable.
+  # Every capped caller asks for a short, shape-constrained answer, so minimal
+  # is the right effort for all of them.
+  #
+  # This is the closest analogue to ClaudeService's `thinking: disabled`, but it
+  # is NOT the same thing: Gemini 3 Flash models have no full off switch, and
+  # "minimal" is documented as the least thinking the model can do while still
+  # producing thought signatures. So a capped Gemini call still spends some
+  # budget before it answers, where the equivalent Claude call spends none —
+  # which is why the caps stay sized with headroom rather than trimmed to the
+  # reply alone.
+  MINIMAL_THINKING_LEVEL = "minimal".freeze
+
   # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
   # every retry decision through `retry_if` — faraday-retry treats a method on
   # its `methods` list as retryable outright and never consults `retry_if`, and
@@ -36,11 +53,18 @@ class GeminiService < AiService
       store:              false
     }
     # No default output cap is sent otherwise — existing callers rely on the
-    # provider's own default ceiling. Only a call that explicitly asks for a
-    # tighter cap (e.g. AiService::DUCK_RESPONSE_MAX_TOKENS) sets this.
-    # Must be nested under generation_config: the Interactions API ignores a
+    # provider's own default ceiling, and on the model's default thinking
+    # effort with it. Only a call that explicitly asks for a tighter cap (e.g.
+    # AiService::DUCK_RESPONSE_MAX_TOKENS) sets this.
+    #
+    # The cap and the thinking level travel together deliberately: asking for a
+    # tight budget without also asking for minimal thinking is what lets the
+    # model spend that budget reasoning (see MINIMAL_THINKING_LEVEL). Both must
+    # be nested under generation_config — the Interactions API ignores a
     # top-level max_output_tokens, which would silently drop the cap.
-    body[:generation_config] = { max_output_tokens: max_tokens } if max_tokens
+    if max_tokens
+      body[:generation_config] = { max_output_tokens: max_tokens, thinking_level: MINIMAL_THINKING_LEVEL }
+    end
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
