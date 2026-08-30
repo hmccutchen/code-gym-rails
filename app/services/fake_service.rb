@@ -228,10 +228,18 @@ class FakeService < AiService
 
   private
 
-  # Both raises are deliberately bare RuntimeErrors, not AiService::Error:
-  # GenerateDailyExercisesJob rescues the AiService hierarchy and turns it into
-  # a persisted, user-facing failure message, which would bury a broken fake as
-  # "generation failed" instead of failing the spec that caused it.
+  # All three raises below are deliberately bare RuntimeErrors, not
+  # AiService::Error: GenerateDailyExercisesJob rescues the AiService hierarchy
+  # and turns it into a persisted, user-facing failure message, which would bury
+  # a broken fake as "generation failed" instead of failing the spec that caused
+  # it.
+  #
+  # The difficulty one is the exception that proves the rule — it can only ever
+  # run inside AiService#safe_difficulty_assessment, whose whole job is to
+  # swallow everything so a note never costs a review, so it is a development
+  # aid rather than a guarantee. What actually catches a broken section scan is
+  # fake_service_spec's "returns a difficulty for every section it was asked
+  # about"; keep that spec if this raise is ever removed.
   def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     text =
       case system

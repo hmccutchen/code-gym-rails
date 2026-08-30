@@ -90,6 +90,31 @@ RSpec.describe FakeService do
       end
     end
 
+    # The fake's own raise cannot protect this: it runs inside
+    # AiService#safe_difficulty_assessment, which swallows everything so a note
+    # never costs a review. So a broken section scan would show up as reviews
+    # that quietly carry no difficulty — this spec is what makes it loud.
+    it "returns a difficulty for every section it was asked about" do
+      user_exercise = DailyExercise.create!(
+        user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+        problem_set: described_class::EXERCISE_PROBLEM_SET
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: user_exercise, date: Date.current,
+        answers: { "code_review" => "N+1 query", "pattern" => "Extract a service object" },
+        submitted_at: Time.current
+      )
+      sections = %w[code_review pattern architecture]
+
+      results = described_class.new(user.api_key).review_sections(user, user_exercise, response, sections: sections)
+
+      sections.each do |section|
+        difficulty = results[section][:review]["difficulty"]
+        expect(difficulty).to be_a(Hash), "#{section} came back with no difficulty note"
+        expect(DailyResponse::DIFFICULTY_LEVELS).to include(difficulty["level"])
+      end
+    end
+
     it "raises a clear error when the section key can't be extracted from the prompt" do
       service = described_class.new(user.api_key)
 

@@ -318,9 +318,10 @@ User interacts:
   extended thinking `ClaudeService` would otherwise leave on. It runs as one
   more thread in the existing fan-out, and once grading finishes it gets only
   `DIFFICULTY_ASSESSMENT_GRACE_SECONDS` to land before the review goes out
-  without it, so the note can never extend the request; a thread abandoned that
-  way still records its `ApiUsage` row, which is honest accounting for a call
-  the provider already billed. Any failure in it is swallowed — `StandardError`
+  without it — so the note can add at most that grace period to a request,
+  never the provider's whole retry budget; a thread abandoned that way still
+  records its `ApiUsage` row, which is honest accounting for a call the
+  provider already billed. Any failure in it is swallowed — `StandardError`
   wide, not just `AiService::Error`, because `Thread#value` re-raises past
   `ResponsesController#review`'s rescues, and a note must never cost the
   engineer the review itself. Stored at

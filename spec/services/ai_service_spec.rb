@@ -2210,6 +2210,67 @@ RSpec.describe AiService do
       }.to change { ApiUsage.where(purpose: "review_response").count }.by(3)
     end
 
+    # A grading thread that hits pool exhaustion used to propagate through
+    # Thread#value past ResponsesController#review's rescues: a 500 on a request
+    # whose other sections had already graded, their results discarded after
+    # being billed, and the review claim held until it went stale.
+    it "tags an infrastructure failure rather than losing the sections that graded" do
+      exercise, response = exercise_and_response
+      starved_class = Class.new(AiService) do
+        def initialize(_api_key = nil, canned_text: "{}")
+          @canned_text = canned_text
+        end
+
+        private
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
+          raise ActiveRecord::ConnectionTimeoutError, "could not obtain a connection" if prompt.include?('"pattern"')
+
+          { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
+        end
+
+        def build_connection = nil
+      end
+      svc = starved_class.new(canned_text: { "rating" => "solid" }.to_json)
+
+      results = nil
+      expect { results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern]) }
+        .not_to raise_error
+
+      expect(results["code_review"][:ok]).to be(true)
+      expect(results["pattern"]).to include(ok: false, error_code: "other")
+    end
+
+    # The other half of the split, and the reason it is a split at all: swallow
+    # everything here and a real bug reaches the engineer as "couldn't be
+    # reviewed, try again", which is a retry button over a stack trace nobody
+    # ever sees.
+    it "lets a programming error through rather than dressing it up as a retryable failure" do
+      exercise, response = exercise_and_response
+      buggy_class = Class.new(AiService) do
+        def initialize(_api_key = nil) = nil
+
+        private
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
+          nil.this_method_does_not_exist
+        end
+
+        def build_connection = nil
+      end
+
+      # Thread#report_on_exception would print the (expected) backtrace to
+      # stderr on every run, which is noise in a suite where a clean log is how
+      # a real thread failure gets noticed.
+      was_reporting = Thread.report_on_exception
+      Thread.report_on_exception = false
+
+      expect { buggy_class.new.review_sections(user, exercise, response, sections: %w[code_review]) }
+        .to raise_error(NoMethodError)
+    ensure
+      Thread.report_on_exception = was_reporting
+    end
+
     it "tags a failed section without affecting a successful one" do
       exercise, response = exercise_and_response
 
