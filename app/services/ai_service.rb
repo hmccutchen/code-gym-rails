@@ -107,8 +107,14 @@ class AiService
   # deliberately conservative for prose, and the constant covers the JSON
   # envelope on top. Still far below full generation; round 1 returns no code,
   # which is what keeps it cheap.
+  PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS = 100
+  PSEUDOCODE_CRITIQUE_MAX_TOKENS =
+    (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
+      ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
+    PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
+
   # Derived from the largest VALID response rather than guessed, the same way
-  # PSEUDOCODE_CRITIQUE_MAX_TOKENS below is: one entry per section the day can
+  # PSEUDOCODE_CRITIQUE_MAX_TOKENS above is: one entry per section the day can
   # hold, each a level name plus a reason of at most
   # DailyResponse::MAX_DIFFICULTY_REASON_LENGTH characters. Three characters per
   # token is deliberately conservative for prose, and the overhead covers the
@@ -121,6 +127,13 @@ class AiService
   # sentence per section has nothing to think about. Without it the assessment
   # runs with thinking on and ClaudeService::MAX_TOKENS to spend, billed to the
   # engineer's own key for a note that renders in two lines.
+  #
+  # GeminiService has no such switch — it only caps output — so there the
+  # budget has to cover any reasoning tokens too, and a truncation is
+  # swallowed like any other failure here. That exposure is not specific to
+  # this constant: DUCK_RESPONSE_MAX_TOKENS and PSEUDOCODE_CRITIQUE_MAX_TOKENS
+  # carry it identically, and closing it means a provider-aware budget for
+  # every capped call rather than a tweak to this one.
   DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
   DIFFICULTY_ASSESSMENT_MAX_TOKENS =
     (ExerciseSection.slot_count * (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / 3)) +
@@ -133,12 +146,6 @@ class AiService
   # Without the bound, one hung provider connection could hold a synchronous
   # request for the full retry budget to deliver a sentence.
   DIFFICULTY_ASSESSMENT_GRACE_SECONDS = 5
-
-  PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS = 100
-  PSEUDOCODE_CRITIQUE_MAX_TOKENS =
-    (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
-      ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
-    PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
 
   # Provider output rendered into the page, so bounded at the boundary like
   # every other such field.
@@ -595,38 +602,6 @@ class AiService
     results = threads.map(&:value).to_h
     merge_difficulty!(results, awaited_difficulty(difficulty))
     results
-  end
-
-  # The grades are what the engineer paid for, so the note never gets to hold
-  # them up: once grading is done the assessment has DIFFICULTY_ASSESSMENT_GRACE_SECONDS
-  # to finish, and the review goes out without it otherwise. #join returns the
-  # thread when it finished and nil when it timed out, so this reads as "take it
-  # if it is ready".
-  #
-  # A thread abandoned here keeps running and may still write its ApiUsage row
-  # after the request has ended — deliberate. The provider call really happened
-  # and really cost money, so recording it is honest accounting, and #log_usage
-  # swallows its own errors, so a late write cannot fail anything. Killing the
-  # thread instead would save nothing: the provider bills from the moment the
-  # request is sent.
-  def awaited_difficulty(thread)
-    thread.join(DIFFICULTY_ASSESSMENT_GRACE_SECONDS) ? thread.value : {}
-  end
-
-  # #assess_difficulty is display-only: a failure in it must never cost the
-  # engineer the review they have already paid for. That contract cannot be
-  # kept inside the method alone, because `self.class.new` builds this thread's
-  # Faraday connection and can fail before the method is even entered — and
-  # Thread#value re-raises whatever escapes, straight past
-  # ResponsesController#review's rescues, which would 500 on a request whose
-  # grades had already succeeded and leave the review claim held. So the guard
-  # lives here, around the whole thread body, and is StandardError-wide on
-  # purpose rather than AiService::Error-wide.
-  def safe_difficulty_assessment(user, exercise, sections)
-    self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections)
-  rescue StandardError => e
-    Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
-    {}
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
@@ -1491,6 +1466,59 @@ class AiService
     )
   end
 
+  # The grades are what the engineer paid for, so the note never gets to hold
+  # them up: once grading is done the assessment has DIFFICULTY_ASSESSMENT_GRACE_SECONDS
+  # to finish, and the review goes out without it otherwise. #join returns the
+  # thread when it finished and nil when it timed out, so this reads as "take it
+  # if it is ready".
+  #
+  # A thread abandoned here keeps running and may still write its ApiUsage row
+  # after the request has ended — deliberate. The provider call really happened
+  # and really cost money, so recording it is honest accounting, and #log_usage
+  # swallows its own errors, so a late write cannot fail anything. Killing the
+  # thread instead would save nothing: the provider bills from the moment the
+  # request is sent.
+  def awaited_difficulty(thread)
+    thread.join(DIFFICULTY_ASSESSMENT_GRACE_SECONDS) ? thread.value : {}
+  end
+
+  # #assess_difficulty is display-only: a failure in it must never cost the
+  # engineer the review they have already paid for. That contract cannot be
+  # kept inside the method alone, because `self.class.new` builds this thread's
+  # Faraday connection and can fail before the method is even entered — and
+  # Thread#value re-raises whatever escapes, straight past
+  # ResponsesController#review's rescues, which would 500 on a request whose
+  # grades had already succeeded and leave the review claim held. So the guard
+  # lives here, around the whole thread body, and is StandardError-wide on
+  # purpose rather than AiService::Error-wide.
+  def safe_difficulty_assessment(user, exercise, sections)
+    self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections)
+  rescue StandardError => e
+    Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
+    {}
+  end
+
+  # Failures that say "the machine could not run this right now" rather than
+  # "this code is wrong". A grading thread that hits one used to propagate
+  # through Thread#value, past ResponsesController#review's rescues, and 500 a
+  # request whose OTHER sections had already graded — discarding results the
+  # engineer was billed for and leaving the review claim held until it went
+  # stale. Tagged like a provider error instead, so the sections that succeeded
+  # still save and the claim is released.
+  #
+  # Deliberately not a blanket StandardError: on the grading path that would
+  # turn a NoMethodError into "couldn't be reviewed, try again" and hide a real
+  # bug behind a retry button. The difficulty note can afford that breadth
+  # because it is display-only; a grade cannot.
+  #
+  # ConnectionTimeoutError is a subclass of ConnectionNotEstablished, so naming
+  # the parent covers the pool exhaustion this is mostly here for.
+  INFRASTRUCTURE_ERRORS = [
+    ActiveRecord::ConnectionNotEstablished,
+    Timeout::Error,
+    IOError
+  ].freeze
+
   # Only onto a section that actually graded: a failed section has no review
   # hash to carry an assessment, and a section the day never asked about must
   # not acquire one.
@@ -1512,7 +1540,7 @@ class AiService
     review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
     review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
     [ section, { ok: true, review: review } ]
-  rescue AiService::Error => e
+  rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
   end
 
@@ -1578,10 +1606,13 @@ class AiService
   # DailyResponse, so the scale offered and the scale storable cannot drift
   # apart. Keyed by level rather than positional: this was three descriptions
   # destructured off the constant in order, which would have silently relabelled
-  # every rung the moment a level was added or reordered. #fetch is what makes
-  # that failure loud instead — a level with no guidance raises here rather than
-  # shipping a prompt with a missing rung. A spec pins the ordered vocabulary,
-  # which is what lets #build_difficulty_prompt call .first "the easiest".
+  # every rung the moment a level was added or reordered. #fetch over [] so a
+  # level with no guidance cannot interpolate nil into the prompt — but note
+  # that the KeyError is NOT the safety net: this runs inside
+  # #safe_difficulty_assessment, which swallows it and drops the note. The spec
+  # "has guidance for exactly the levels it can offer" is what actually catches
+  # a missing rung, and a second spec pins the ordered vocabulary, which is what
+  # lets #build_difficulty_prompt call .first "the easiest".
   DIFFICULTY_GUIDANCE = {
     "straightforward" => "one thing to notice; a competent engineer finds it on a first read.",
     "moderate"        => "a couple of reasoning steps, or one detail that is easy to skim past.",
