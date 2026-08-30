@@ -187,6 +187,12 @@ RSpec.describe GeminiService do
       expect(result).to eq(text: "hello", input_tokens: 8, output_tokens: 12, truncated: false)
     end
 
+    # generation_config is the single key carrying BOTH the cap and the thinking
+    # level, so its absence is what keeps an uncapped call untouched on both
+    # counts. That matters most for the day's exercise generation, the one
+    # uncapped caller: it wants the model's default effort, and sending
+    # "minimal" there would quietly degrade every set to buy nothing, since
+    # nothing is capping that budget in the first place.
     it "omits generation_config entirely when no max_tokens override is given" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
@@ -247,26 +253,6 @@ RSpec.describe GeminiService do
       end
 
       service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
-    end
-
-    # The other half: an uncapped call is the day's generation, which wants the
-    # model's default effort. Sending minimal there would quietly degrade every
-    # exercise set to buy nothing, since nothing is capping that budget.
-    it "leaves an uncapped call's thinking effort alone" do
-      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
-        body: {
-          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hi" } ] } ],
-          "usage" => {}
-        }.to_json)
-      fake_conn = instance_double(Faraday::Connection)
-      service.instance_variable_set(:@conn, fake_conn)
-
-      expect(fake_conn).to receive(:post) do |_url, body|
-        expect(JSON.parse(body)).not_to have_key("generation_config")
-        fake_response
-      end
-
-      service.send(:call, system: "sys", prompt: "p")
     end
 
     # The Interactions API response has no stop/finish-reason field to read
