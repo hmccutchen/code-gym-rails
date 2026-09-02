@@ -52,6 +52,57 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     end
   end
 
+  # Both of these are what the live region and the focus move exist for, and
+  # neither is observable outside a browser.
+  it "announces each framing and keeps focus in the page when the control goes" do
+    user = create_fake_provider_user
+    cache_reference
+
+    travel_to(a_weekday) do
+      box = open_reference(user)
+      status = box.find(".alternate-status")
+
+      box.find(".explain-concept-differently").click
+      expect(status).to have_text("A different explanation was added above", wait: 10)
+      expect(status.text).not_to include("last one")
+
+      box.find(".explain-concept-differently").click
+      expect(status).to have_text("that was the last one", wait: 10)
+      expect(box).to have_no_css(".explain-concept-differently")
+
+      # The button holding focus was just removed; focus must have moved to the
+      # framing rather than falling back to the body.
+      expect(page.evaluate_script("document.activeElement.className")).to eq("alternate-item")
+    end
+  end
+
+  # An expired session redirects to the HTML login form, and fetch follows that
+  # transparently — 200, res.ok true, body a page. Parsing has to fail closed:
+  # an earlier version fell back to {} and appended an undefined framing.
+  it "refuses an OK response that isn't the JSON this endpoint returns" do
+    user = create_fake_provider_user
+    cache_reference
+
+    travel_to(a_weekday) do
+      box = open_reference(user)
+
+      page.execute_script(<<~JS)
+        window.fetch = () => Promise.resolve(Object.defineProperty(
+          new Response("<html><body>Please log in first.</body></html>",
+                       { status: 200, headers: { "Content-Type": "text/html" } }),
+          "redirected", { value: true }
+        ));
+      JS
+
+      box.find(".explain-concept-differently").click
+
+      expect(box).to have_content(/session expired/i, wait: 10)
+      expect(box).to have_no_css(".alternate-item")
+      # Recoverable, and the control is still there to recover with.
+      expect(box.find(".explain-concept-differently")).not_to be_disabled
+    end
+  end
+
   it "takes no space on the page while the dropdown is collapsed" do
     user = create_fake_provider_user
     cache_reference

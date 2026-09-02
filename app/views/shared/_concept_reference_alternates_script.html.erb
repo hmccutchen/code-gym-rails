@@ -42,21 +42,46 @@
           },
           body: JSON.stringify({ prior_alternates: framings.get(refId) || [] })
         });
-        // The server answers in JSON on every path it owns, but a proxy or an
-        // unhandled 500 can still return HTML — parse defensively so that
-        // surfaces as the message below rather than a raw SyntaxError.
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || res.status);
+        // A session that expired while this page sat open redirects to the
+        // HTML login form, and fetch follows that redirect transparently: the
+        // status is 200 and res.ok is true, but the body is a page. Parsing
+        // therefore has to fail CLOSED — an earlier version fell back to {},
+        // which passed the res.ok check and then appended an undefined framing
+        // and removed the control. A proxy or unhandled 500 lands here too.
+        let data = null;
+        try { data = await res.json(); } catch { data = null; }
+        if (!res.ok) throw new Error((data && data.error) || res.status);
+        if (res.redirected) throw new Error("Your session expired — reload the page and try again.");
+        if (!data || data.status !== "ok" || !data.alternate) throw new Error("Couldn't generate that — try again");
 
         framings.set(refId, [...(framings.get(refId) || []), data.alternate]);
+        let focused = null;
         containers.forEach(c => {
           const p = document.createElement("p");
           p.className = "alternate-item";
           p.textContent = data.alternate;
+          // Focusable but out of the tab order: the only thing that focuses it
+          // is the cap branch below, where the button holding focus is about
+          // to be removed.
+          p.tabIndex = -1;
           c.insertBefore(p, c.querySelector(".explain-concept-differently"));
+          if (c === container) focused = p;
         });
-        status.textContent = "";
-        if (data.remaining > 0) { buttons.forEach(b => b.disabled = false); } else { buttons.forEach(b => b.remove()); }
+        // Set, never cleared: the framing is inserted OUTSIDE this live region,
+        // so clearing it left a screen reader with silence on success. The cap
+        // wording also has to say the control is going away, since its removal
+        // is otherwise unannounced.
+        status.textContent = data.remaining > 0
+          ? "A different explanation was added above."
+          : "A different explanation was added above — that was the last one.";
+        if (data.remaining > 0) {
+          buttons.forEach(b => b.disabled = false);
+        } else {
+          // Before the removal, not after: removing the focused button drops
+          // focus to the body and loses the keyboard user's place.
+          if (focused) focused.focus();
+          buttons.forEach(b => b.remove());
+        }
       } catch (e) {
         status.textContent = e.message || "Couldn't generate that — try again";
         // Only re-enable what the cap still allows: a failure spends nothing
