@@ -1,0 +1,72 @@
+<%# Wires every "try a different explanation" control on the page. Its partial
+    renders once per section that has a cached reference, and /history renders
+    every entry's sections, so this is emitted into the layout's shared
+    :page_scripts region only on the FIRST call anywhere on the page — same
+    guard and reasoning as shared/_syntax_highlighting_script. The single copy
+    still reaches every control because the script scans the whole document,
+    not just the caller's own markup. %>
+<% unless @concept_reference_alternates_script_emitted %>
+  <% @concept_reference_alternates_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script>
+// Inline script matching the app's convention; Stimulus is not wired here.
+// Nothing here is persisted: the framings live in this tab and are gone on
+// reload, deliberately (see ConceptReferencesController#explain_differently).
+(() => {
+  const MAX = <%= ConceptReferencesController::MAX_ALTERNATES_PER_CONCEPT %>;
+
+  // Keyed by reference id rather than by container, because one reference can
+  // render several times on a page — two sections of a day can carry the same
+  // concept, and /history renders many days. Per-container state would let the
+  // same person spend MAX paid calls in each copy of the same reference.
+  const framings = new Map();
+
+  document.querySelectorAll(".explain-concept-differently:not([data-cra-wired])").forEach(button => {
+    button.dataset.craWired = "1";
+    const container = button.closest(".concept-alternates");
+    const refId = container.dataset.referenceId;
+
+    button.addEventListener("click", async () => {
+      const containers = document.querySelectorAll(`.concept-alternates[data-reference-id="${refId}"]`);
+      const buttons = [...containers].map(c => c.querySelector(".explain-concept-differently")).filter(Boolean);
+      const status = container.querySelector(".alternate-status");
+
+      buttons.forEach(b => b.disabled = true);
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(container.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ prior_alternates: framings.get(refId) || [] })
+        });
+        // The server answers in JSON on every path it owns, but a proxy or an
+        // unhandled 500 can still return HTML — parse defensively so that
+        // surfaces as the message below rather than a raw SyntaxError.
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        framings.set(refId, [...(framings.get(refId) || []), data.alternate]);
+        containers.forEach(c => {
+          const p = document.createElement("p");
+          p.className = "alternate-item";
+          p.textContent = data.alternate;
+          c.insertBefore(p, c.querySelector(".explain-concept-differently"));
+        });
+        status.textContent = "";
+        if (data.remaining > 0) { buttons.forEach(b => b.disabled = false); } else { buttons.forEach(b => b.remove()); }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't generate that — try again";
+        // Only re-enable what the cap still allows: a failure spends nothing
+        // server-side, but a retry after the cap was reached in another copy
+        // of this reference would just 422.
+        if ((framings.get(refId) || []).length < MAX) { buttons.forEach(b => b.disabled = false); }
+      }
+    });
+  });
+})();
+    </script>
+  <% end %>
+<% end %>

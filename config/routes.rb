@@ -81,6 +81,18 @@ Rails.application.routes.draw do
     end
   end
 
+  # A second framing of one cached concept reference, on demand from inside the
+  # reference's own disclosure. Nothing is created — the framing lives in the
+  # tab that asked for it, like the duck thread — so this is a verb on the
+  # reference, not a nested resource. It still takes an :id, which duck_thread
+  # does not: the reference's text must be read from the server's row rather
+  # than accepted from the client.
+  resources :concept_references, only: [] do
+    member do
+      post :explain_differently
+    end
+  end
+
   namespace :admin do
     resources :suggested_concepts, only: [ :index ] do
       member do

@@ -131,6 +131,7 @@ RSpec.describe AiService do
       review_response
       assess_difficulty
       generate_concept_reference
+      explain_concept_differently
       explain_differently
       pseudocode_critique
       pseudocode_translate
@@ -192,6 +193,11 @@ RSpec.describe AiService do
       spy_class.new(canned_text: reference_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
       spy_class.new(canned_text: "Another framing.")
                .explain_differently(user, exercise, response, section: "code_review")
+      spy_class.new(canned_text: "A different angle on the same concept.")
+               .explain_concept_differently(user, ConceptReference.create!(
+                 concept: "n_plus_one", language: "ruby_rails",
+                 tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
+               ))
       spy_class.new(canned_text: { gaps_found: false, gaps: [] }.to_json)
                .critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
       spy_class.new(canned_text: "def x\nend")
@@ -2366,6 +2372,97 @@ RSpec.describe AiService do
       results = svc.review_sections(user, exercise, response, sections: %w[parsons_problem])
 
       expect(results["parsons_problem"][:review]["rating"]).to eq("strong")
+    end
+  end
+
+  describe "#explain_concept_differently" do
+    let(:reference) do
+      ConceptReference.new(concept: "n_plus_one", language: "ruby_rails",
+                           tagline: "One query per row is the smell",
+                           explanation: "The association loads once per iteration.",
+                           code_example: "Post.all.each { |p| p.author.name }",
+                           senior_lens: "Reach for includes before the loop exists.")
+    end
+
+    let(:capturing_class) do
+      Class.new(double_class) do
+        attr_reader :last_system, :last_prompt, :last_max_tokens
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
+          @last_system = system
+          @last_prompt = prompt
+          @last_max_tokens = max_tokens
+          super
+        end
+      end
+    end
+
+    it "sends the concept, every field of the reference already read, and prior framings" do
+      svc = capturing_class.new(canned_text: "Picture a library courier.")
+
+      result = svc.explain_concept_differently(user, reference,
+                                               prior_alternates: [ "A restaurant-orders analogy" ])
+
+      expect(result).to eq("Picture a library courier.")
+      expect(svc.last_prompt).to include("n_plus_one")
+      AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+        expect(svc.last_prompt).to include(reference.public_send(field))
+      end
+      expect(svc.last_prompt).to include("A restaurant-orders analogy")
+      expect(svc.last_prompt).to include("do NOT reprise these angles")
+    end
+
+    # The point of the whole surface: this runs before a day is submitted, so it
+    # must teach the concept without being able to reach the day's problem. The
+    # signature is what makes that true — there is no argument to pass one in.
+    it "cannot see today's problem, because it has no exercise or response argument" do
+      params = AiService.instance_method(:explain_concept_differently).parameters
+
+      expect(params).not_to include([ :req, :exercise ], [ :req, :daily_response ])
+      expect(params.map(&:last)).to contain_exactly(:user, :reference, :prior_alternates)
+    end
+
+    it "states the durable-reference scope the generating prompt states" do
+      svc = capturing_class.new(canned_text: "Another angle.")
+
+      svc.explain_concept_differently(user, reference)
+
+      expect(svc.last_prompt).to include(AiService::CONCEPT_REFERENCE_SCOPE)
+      expect(svc.last_prompt).to match(/never solve, hint at,\s+or refer to any particular exercise/)
+    end
+
+    # reference.language is the ConceptBucket, so a bucket with no programming
+    # language of its own has to resolve too.
+    it "resolves a language-independent bucket" do
+      svc = capturing_class.new(canned_text: "Another angle.")
+      arch = ConceptReference.new(concept: "scaling_bottlenecks", language: "architecture",
+                                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
+
+      expect { svc.explain_concept_differently(user, arch) }.not_to raise_error
+      expect(svc.last_system).to include("re-teaching one concept")
+    end
+
+    it "caps its own reply, which is also what turns off extended thinking" do
+      svc = capturing_class.new(canned_text: "Another angle.")
+
+      svc.explain_concept_differently(user, reference)
+
+      expect(svc.last_max_tokens).to eq(AiService::CONCEPT_ALTERNATE_MAX_TOKENS)
+    end
+
+    it "logs usage under its own purpose" do
+      svc = double_class.new(canned_text: "Another angle.")
+
+      expect {
+        svc.explain_concept_differently(user, reference)
+      }.to change { ApiUsage.where(purpose: "explain_concept_differently").count }.by(1)
+    end
+
+    it "raises InvalidResponseError instead of returning a blank alternate" do
+      svc = double_class.new(canned_text: "   ")
+
+      expect {
+        svc.explain_concept_differently(user, reference)
+      }.to raise_error(AiService::InvalidResponseError)
     end
   end
 
