@@ -189,6 +189,14 @@ class FakeService < AiService
     "senior_lens" => "A senior engineer reaches for this automatically, without having to reason it out each time."
   }.freeze
 
+  # The concept-reference reframing. Deliberately a different angle from
+  # EXPLAIN_DIFFERENTLY_TEXT below rather than a copy of it, so a spec that
+  # confused the two surfaces fails instead of passing on the same string.
+  CONCEPT_ALTERNATE_TEXT =
+    "Picture a library where every book you request is fetched by a separate courier trip. One trip for one book is " \
+    "fine; a hundred trips for a hundred books is the whole afternoon gone. The fix is always the same shape — ask " \
+    "for everything you know you need in one trip."
+
   EXPLAIN_DIFFERENTLY_TEXT =
     "Think of it like a relay race — each service object is one runner, and its only job is to hand off cleanly " \
     "to the next one. If a single method complains about doing too much, that's the same as one runner trying to " \
@@ -254,6 +262,8 @@ class FakeService < AiService
         difficulty_assessment(prompt).to_json
       when /writing a concise, durable reference/
         CONCEPT_REFERENCE.to_json
+      when /re-teaching one concept/
+        CONCEPT_ALTERNATE_TEXT
       when /re-explaining one point/
         EXPLAIN_DIFFERENTLY_TEXT
       when /answering a follow-up question/

@@ -91,6 +91,20 @@ class AiService
   # full review generation.
   DUCK_RESPONSE_MAX_TOKENS = 250
 
+  # Cost and length control for #explain_concept_differently. Sized the way
+  # DUCK_RESPONSE_MAX_TOKENS is — a budget, not an enforcement mechanism —
+  # rather than derived from a schema the way DIFFICULTY_ASSESSMENT_MAX_TOKENS
+  # is, because a reframing is free prose and has no largest valid reply to
+  # derive from. 500 is the two short paragraphs the prompt asks for with room
+  # for a worked scenario, which is one of the three approaches it offers.
+  #
+  # Passing it at all is the second thing this buys: ClaudeService leaves
+  # extended thinking on unless a max_tokens is given, and a reframing of an
+  # explanation the model itself wrote does not need a thinking budget.
+  # #explain_differently passes none and is left alone deliberately — changing
+  # an existing billed path is not this change's business.
+  CONCEPT_ALTERNATE_MAX_TOKENS = 500
+
   # The message the "Explain this simply" button sends on the user's behalf.
   # Server-owned so its wording lives beside the prompt it is tuned against: it
   # names the exercise rather than the answer, so it reads as a kind-1 request
@@ -500,6 +514,18 @@ class AiService
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
+  # The one statement of what a concept reference is FOR, shared by the prompt
+  # that writes one and the prompt that reframes it. Stated once because a
+  # reframing that drifts into solving the day's problem is the only real
+  # failure mode this surface has, and two copies of the rule can disagree.
+  # It is not what actually holds that line, though —
+  # #explain_concept_differently is handed no exercise and no answer, so it
+  # cannot reach today's problem whatever the prompt says.
+  CONCEPT_REFERENCE_SCOPE = <<~SCOPE.chomp
+    This is a stable explanation an engineer returns to across repeat exposure —
+    not tied to any single problem.
+  SCOPE
+
   # Max bytes of raw provider output logged server-side when a provider
   # response can't be used (invalid JSON, non-success HTTP status). Keeps
   # exception messages — which surface in flash alerts and error trackers —
@@ -629,6 +655,51 @@ class AiService
     reference
   end
 
+  # ── Reframe one cached concept reference a different way ─────────────────
+  # For the engineer the reference itself did not land for. Returns plain prose
+  # rather than JSON, like #explain_differently and for the same reason.
+  #
+  # The signature is the guarantee: no exercise, no daily_response, no section —
+  # the same narrow shape #generate_concept_reference and #assess_difficulty
+  # take. This is the one reframing surface reachable BEFORE a day is submitted,
+  # so "must not hint at today's answer" cannot rest on a prompt line here. It
+  # rests on today's problem never being passed in.
+  #
+  # `prior_alternates` is the framings the client has already been shown, sent
+  # back on every request. Nothing about this call is persisted — same as
+  # #duck_response, and see ConceptReferencesController for why.
+  def explain_concept_differently(user, reference, prior_alternates: [])
+    # reference.language is the ConceptBucket, not a generation language, so
+    # this resolves architecture/plan_review/ambiguity_hunt/pseudocode_to_code
+    # alongside the two programming languages.
+    coach = config_for(reference.language)[:coach]
+
+    already_read = CONCEPT_REFERENCE_FIELDS
+      .map { |field| "#{field}: #{reference.public_send(field)}" }
+      .join("\n")
+
+    result = call_and_log(
+      user, purpose: "explain_concept_differently", max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS,
+      system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.",
+      prompt: <<~PROMPT
+        The concept: "#{reference.concept}"
+
+        The reference they have already read:
+        #{already_read}
+
+        #{prior_framings(prior_alternates)}
+
+        Explain the SAME concept again using a genuinely different approach — a
+        different analogy, a different level of abstraction, or a concrete worked
+        scenario instead of a principle. Do not repeat the original wording.
+        #{CONCEPT_REFERENCE_SCOPE} Teach the concept itself; never solve, hint at,
+        or refer to any particular exercise. Two short paragraphs at most.
+      PROMPT
+    )
+
+    text_or_raise(result, subject: "alternate concept explanation")
+  end
+
   # ── Reframe one section's feedback a different way ───────────────────────
   # Returns a plain string, not JSON: there is no structure to parse, and routing
   # it through parse_json_object would add a failure mode for no benefit.
@@ -636,13 +707,6 @@ class AiService
     coach   = config_for(exercise.language)[:coach]
     review  = daily_response.ai_review&.dig(section) || {}
     missed  = DailyResponse.review_points(review["missed"])
-
-    prior = if prior_alternates.any?
-      "Framings already given (do NOT reprise these angles or analogies):\n" +
-        prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
-    else
-      "No alternate framing has been given yet."
-    end
 
     result = call_and_log(
       user, purpose: "explain_differently",
@@ -654,7 +718,7 @@ class AiService
         What they missed:
         #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
 
-        #{prior}
+        #{prior_framings(prior_alternates)}
 
         Explain the SAME point again using a genuinely different approach — a
         different analogy, a different level of abstraction, or a concrete worked
@@ -894,6 +958,16 @@ class AiService
       "[pseudocode] user=#{user.id} date=#{Date.current} phase=critique " \
       "gaps_found=#{gaps_found} gaps=#{gaps.size}"
     )
+  end
+
+  # The prior-framings block both reframing prompts open with. One rule — do
+  # not reprise what you already said — stated once, since the two callers
+  # differ only in what is being reframed.
+  def prior_framings(prior_alternates)
+    return "No alternate framing has been given yet." if prior_alternates.empty?
+
+    "Framings already given (do NOT reprise these angles or analogies):\n" +
+      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting
@@ -1650,8 +1724,7 @@ class AiService
 
     <<~PROMPT
       Write a durable reference for the #{config[:coach]} concept: "#{concept}".
-      This is a stable explanation an engineer returns to across repeat exposure —
-      not tied to any single problem. Be precise and senior-level.
+      #{CONCEPT_REFERENCE_SCOPE} Be precise and senior-level.
 
       Return JSON matching this schema exactly:
       {

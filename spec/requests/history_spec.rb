@@ -359,6 +359,29 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include('<details class="ref" open>')
     end
 
+    # One reference can render several times on this page. The script keys the
+    # framings it has been shown by reference id rather than by container so
+    # the cap holds across every copy — these are the copies.
+    it "gives every copy of one reference the same reference id to share a cap by" do
+      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                           tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
+      [ 1, 2 ].each do |days_ago|
+        exercise = DailyExercise.create!(
+          user: user, date: days_ago.days.ago.to_date, generated_at: Time.current,
+          problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } }
+        )
+        DailyResponse.create!(user: user, daily_exercise: exercise, date: days_ago.days.ago.to_date,
+                              answers: { "code_review" => "Answer with plenty of substance" },
+                              submitted_at: Time.current)
+      end
+
+      login_as(user)
+      get history_path
+
+      expect(response.body.scan(%(data-reference-id="#{reference.id}")).size).to eq(2)
+      expect(response.body.scan(%(class="btn btn-ghost btn-sm explain-concept-differently")).size).to eq(2)
+    end
+
     it "renders each entry's problems and the user's answers" do
       session = create_session_for(user, date: 1.day.ago.to_date)
 

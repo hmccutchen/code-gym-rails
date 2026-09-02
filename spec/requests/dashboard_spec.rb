@@ -604,6 +604,42 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include('<details class="ref" open>')
     end
 
+    it "offers a different explanation from inside the dropdown, before submission" do
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
+      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                           tagline: "Avoid the loop query", explanation: "e",
+                                           code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("This didn't quite land — try a different explanation")
+      expect(response.body).to include(%(data-url="#{explain_differently_concept_reference_path(reference)}"))
+    end
+
+    # This partial renders inside #gym-form on the dashboard, so a default-type
+    # button here would submit the day's answers and chain into the review.
+    it "renders that control as a non-submitting button" do
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to match(/<button type="button"[^>]*class="[^"]*explain-concept-differently/)
+    end
+
+    it "offers it in the read-only render too, since the reference is the same either way" do
+      exercise = exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("This didn't quite land — try a different explanation")
+    end
+
     it "renders the section scenario label" do
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
 
