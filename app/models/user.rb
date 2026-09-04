@@ -117,10 +117,19 @@ class User < ApplicationRecord
   # streak rather than the day it was generated.
   #
   # `with_lock` for the same reason as #anonymize!: it reloads under a row lock,
-  # so a double-tapped Resume serializes and the second caller sees the pause
-  # already cleared, finds no held set, and no-ops — rather than both racing to
-  # write the same date and one hitting the unique [user_id, date] index. That
-  # covers resume-vs-resume only; a generation racing this is handled below.
+  # so a double-tapped call serializes and the second one sees the pause
+  # already cleared, finds no held set, and no-ops.
+  #
+  # That FOR UPDATE also settles the race against a generation running for this
+  # user, though indirectly: daily_exercises has a foreign key to users, so
+  # inserting today's exercise needs a FOR KEY SHARE lock on this same row,
+  # which FOR UPDATE conflicts with. A generator therefore cannot commit
+  # between the `exists?` check and the move — it either committed before the
+  # lock (and `exists?` sees it, so nothing moves) or blocks until after
+  # (and loses its own set to the unique index, which
+  # GenerateDailyExercisesJob already treats as "generated concurrently").
+  # Resume wins, which is the right way round: the held set carries the user's
+  # own draft answers, a fresh one would not.
   #
   # Runs in the user's own zone rather than trusting the caller's, unlike the
   # read-only #recent_exercise_history and #current_streak: this one *writes* a
@@ -396,21 +405,40 @@ class User < ApplicationRecord
   # would both hide the Generate-new-set button and have the dashboard state
   # something false ("You've already generated a new set today").
   #
-  # A SAVEPOINT, so losing the race below rolls back only the move: an
-  # on-demand generation enqueued by an earlier /generate click can commit
-  # today's exercise between #resume_generation!'s `exists?` check and this
-  # write, and without the savepoint the rollback would take the pause-clearing
-  # UPDATE with it, leaving the user both 500ing and still paused. Today's set
-  # wins and the held one stays put — the same answer the `exists?` check gives
-  # when it sees the row in time.
+  # Clearing a same-day generation error is part of establishing today's
+  # exercise, not an extra: /generate is not pause-gated, so a paused user can
+  # click it, have the job fail with no exercise for today to suppress the
+  # report (see GenerateDailyExercisesJob#persist_failure), and then resume —
+  # leaving DashboardController#show's `last_generation_error_date` check
+  # rendering "Couldn't generate a new set" above the perfectly good set this
+  # just recovered, the exact banner persist_failure exists to avoid.
+  #
+  # A SAVEPOINT so a failed move rolls back only itself, leaving the
+  # pause-clearing UPDATE committed — otherwise a user who hit this would be
+  # both 500ing and still paused. Both rescues are defence in depth rather than
+  # the mechanism: #resume_generation!'s row lock already serializes generation
+  # against this. Both classes are caught because `date` uniqueness is enforced
+  # twice — the model validation raises RecordInvalid before the index ever
+  # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
+  # validation, so an unrelated invalid record still surfaces.
   def carry_forward(held)
     transaction(requires_new: true) do
       held.daily_response&.update!(date: Date.current)
       held.update!(date: Date.current, regenerated_at: nil)
+      clear_same_day_generation_error!
     end
     held
   rescue ActiveRecord::RecordNotUnique
     nil
+  rescue ActiveRecord::RecordInvalid => e
+    raise unless e.record.errors[:date].present?
+    nil
+  end
+
+  def clear_same_day_generation_error!
+    return unless last_generation_error_date == Date.current
+
+    update!(last_generation_error_date: nil, last_generation_error: nil)
   end
 
   # The set the pause stranded: the newest unsubmitted exercise dated on or

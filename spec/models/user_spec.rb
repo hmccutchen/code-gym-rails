@@ -959,17 +959,73 @@ RSpec.describe User, type: :model do
       end
     end
 
-    it "keeps the pause cleared when a generation wins the race to today's date" do
+    # `date` uniqueness is enforced twice, and the model validation fires first,
+    # so RecordInvalid is the likelier of the two — a rescue for only
+    # RecordNotUnique would 500 and roll the pause clearing back with it.
+    [ ActiveRecord::RecordNotUnique.new("duplicate key"),
+      :record_invalid ].each do |failure|
+      it "keeps the pause cleared when the move loses to #{failure.is_a?(Symbol) ? 'a date validation' : 'the unique index'}" do
+        travel_to(wednesday) do
+          held = exercise_on(Date.current - 1)
+          pause_on(Date.current - 1)
+          raised = if failure == :record_invalid
+            invalid = DailyExercise.new
+            invalid.errors.add(:date, :taken)
+            ActiveRecord::RecordInvalid.new(invalid)
+          else
+            failure
+          end
+          allow_any_instance_of(DailyExercise).to receive(:update!).and_raise(raised)
+
+          expect(user.resume_generation!).to be_nil
+
+          expect(user.reload.paused_generation_at).to be_nil
+          expect(held.reload.date).to eq(Date.current - 1)
+        end
+      end
+    end
+
+    it "still surfaces a validation failure that is not the date collision" do
+      travel_to(wednesday) do
+        exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+        invalid = DailyExercise.new
+        invalid.errors.add(:language, :inclusion)
+        allow_any_instance_of(DailyExercise).to receive(:update!)
+          .and_raise(ActiveRecord::RecordInvalid.new(invalid))
+
+        expect { user.resume_generation! }.to raise_error(ActiveRecord::RecordInvalid)
+      end
+    end
+
+    # /generate is not pause-gated, so a paused user can trigger a failing
+    # generation while the held set sits at an earlier date — nothing for
+    # persist_failure to suppress the report against. Recovering that set makes
+    # the error stale, and the dashboard would otherwise render "Couldn't
+    # generate a new set" above it.
+    it "clears a same-day generation error the recovered set makes stale" do
       travel_to(wednesday) do
         held = exercise_on(Date.current - 1)
         pause_on(Date.current - 1)
-        allow_any_instance_of(DailyExercise).to receive(:update!)
-          .and_raise(ActiveRecord::RecordNotUnique.new("duplicate key"))
+        user.update!(last_generation_error_date: Date.current, last_generation_error: "Provider timed out")
 
-        expect(user.resume_generation!).to be_nil
+        user.resume_generation!
 
-        expect(user.reload.paused_generation_at).to be_nil
-        expect(held.reload.date).to eq(Date.current - 1)
+        expect(held.reload.date).to eq(Date.current)
+        expect(user.reload.last_generation_error_date).to be_nil
+        expect(user.last_generation_error).to be_nil
+      end
+    end
+
+    it "leaves an error from an earlier day alone" do
+      travel_to(wednesday) do
+        exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+        user.update!(last_generation_error_date: Date.current - 4, last_generation_error: "Old failure")
+
+        user.resume_generation!
+
+        expect(user.reload.last_generation_error_date).to eq(Date.current - 4)
       end
     end
 
