@@ -119,21 +119,24 @@ class User < ApplicationRecord
   # `with_lock` for the same reason as #anonymize!: it reloads under a row lock,
   # so a double-tapped Resume serializes and the second caller sees the pause
   # already cleared, finds no held set, and no-ops — rather than both racing to
-  # write the same date and one hitting the unique [user_id, date] index.
+  # write the same date and one hitting the unique [user_id, date] index. That
+  # covers resume-vs-resume only; a generation racing this is handled below.
+  #
+  # Runs in the user's own zone rather than trusting the caller's, unlike the
+  # read-only #recent_exercise_history and #current_streak: this one *writes* a
+  # date that has to be the user's today, and it also compares against the
+  # pause's local date, so a caller with a different ambient zone would not
+  # merely read oddly — it would either no-op silently or file the set under a
+  # day that is not the user's.
   def resume_generation!
-    with_lock do
-      held = held_exercise
-      update!(paused_generation_at: nil)
-      next if held.nil? || daily_exercises.for_date.exists?
+    Time.use_zone(effective_time_zone) do
+      with_lock do
+        held = held_exercise
+        update!(paused_generation_at: nil)
+        next if held.nil? || daily_exercises.for_date.exists?
 
-      # The draft moves with its exercise. A response is only ever created
-      # against today's exercise, so leaving it behind would let #create build
-      # a second one for the same exercise while `has_one` returned the stale
-      # row. Deliberately not `regenerated_at`: it is the same set, so the
-      # regeneration it already spent stays spent.
-      held.daily_response&.update!(date: Date.current)
-      held.update!(date: Date.current)
-      held
+        carry_forward(held)
+      end
     end
   end
 
@@ -385,6 +388,31 @@ class User < ApplicationRecord
 
   private
 
+  # Moves the held set onto today. The draft moves with its exercise: a response
+  # is only ever created against today's exercise, so leaving it behind would
+  # let #create build a second one for the same exercise while `has_one`
+  # returned the stale row. `regenerated_at` clears because it means "this
+  # row's day has spent its one regeneration" — carrying it onto a new day
+  # would both hide the Generate-new-set button and have the dashboard state
+  # something false ("You've already generated a new set today").
+  #
+  # A SAVEPOINT, so losing the race below rolls back only the move: an
+  # on-demand generation enqueued by an earlier /generate click can commit
+  # today's exercise between #resume_generation!'s `exists?` check and this
+  # write, and without the savepoint the rollback would take the pause-clearing
+  # UPDATE with it, leaving the user both 500ing and still paused. Today's set
+  # wins and the held one stays put — the same answer the `exists?` check gives
+  # when it sees the row in time.
+  def carry_forward(held)
+    transaction(requires_new: true) do
+      held.daily_response&.update!(date: Date.current)
+      held.update!(date: Date.current, regenerated_at: nil)
+    end
+    held
+  rescue ActiveRecord::RecordNotUnique
+    nil
+  end
+
   # The set the pause stranded: the newest unsubmitted exercise dated on or
   # after the pause and before today. Scoped to the pause rather than to "any
   # unsubmitted exercise" because a day abandoned before pausing was abandoned,
@@ -393,7 +421,7 @@ class User < ApplicationRecord
   def held_exercise
     return nil unless paused_generation_at?
 
-    paused_on = paused_generation_at.in_time_zone(effective_time_zone).to_date
+    paused_on = paused_generation_at.in_time_zone(Time.zone).to_date
     daily_exercises
       .left_joins(:daily_response)
       .where(date: paused_on...Date.current)

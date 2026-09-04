@@ -945,16 +945,49 @@ RSpec.describe User, type: :model do
       end
     end
 
-    it "preserves regenerated_at, so the moved set cannot be regenerated again" do
+    # regenerated_at means "this row's day has spent its regeneration". Carrying
+    # it onto a new day would hide the Generate-new-set button behind a false
+    # claim ("You've already generated a new set today").
+    it "clears regenerated_at, since the set now belongs to a new day" do
       travel_to(wednesday) do
-        regenerated = Time.current - 1.day
-        held = exercise_on(Date.current - 1, regenerated_at: regenerated)
+        held = exercise_on(Date.current - 1, regenerated_at: Time.current - 1.day)
         pause_on(Date.current - 1)
 
         user.resume_generation!
 
-        expect(held.reload.regenerated_at).to be_within(1.second).of(regenerated)
+        expect(held.reload.regenerated_at).to be_nil
       end
+    end
+
+    it "keeps the pause cleared when a generation wins the race to today's date" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+        allow_any_instance_of(DailyExercise).to receive(:update!)
+          .and_raise(ActiveRecord::RecordNotUnique.new("duplicate key"))
+
+        expect(user.resume_generation!).to be_nil
+
+        expect(user.reload.paused_generation_at).to be_nil
+        expect(held.reload.date).to eq(Date.current - 1)
+      end
+    end
+
+    # Reading the pause day in the user's zone but "today" in the caller's is
+    # not merely untidy — the two can name the same date and collapse the
+    # search range to empty. Tokyo is far enough ahead of an ambient-UTC caller
+    # to show it: at 20:00 UTC on the 22nd it is already the 23rd in Tokyo, so
+    # the user's today is the 23rd while the caller's is the 22nd — the same
+    # 22nd the pause began on locally.
+    it "resolves both today and the pause day in the user's zone, not the caller's" do
+      tokyoite = User.create!(email: "tokyo@example.com", name: "Tokyo", time_zone: "Asia/Tokyo")
+      tokyoite.update!(paused_generation_at: Time.utc(2026, 7, 21, 23)) # 08:00 on the 22nd in Tokyo
+      held = tokyoite.daily_exercises.create!(date: Date.new(2026, 7, 22), generated_at: Time.current,
+                                             problem_set: { "code_review" => { "question" => "q" } })
+
+      Time.use_zone("UTC") { travel_to(Time.utc(2026, 7, 22, 20)) { tokyoite.resume_generation! } }
+
+      expect(held.reload.date).to eq(Date.new(2026, 7, 23))
     end
 
     it "reads the pause day in the user's own zone, not the server's" do
