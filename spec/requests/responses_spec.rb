@@ -26,6 +26,30 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  # The point of re-dating on resume: at its original date the held set is
+  # unreachable here — #create looks it up with `for_date` and 404s.
+  describe "POST /responses after resuming from a pause" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    it "saves against the set the resume brought forward" do
+      travel_to(Time.utc(2026, 7, 22, 12)) do
+        held = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current,
+                                     problem_set: { "code_review" => { "question" => "q" } })
+        user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+
+        post responses_path, params: { response: { answers: { "code_review" => "a" * 20 } } }, as: :json
+        expect(response).to have_http_status(:not_found)
+
+        user.resume_generation!
+
+        post responses_path, params: { response: { answers: { "code_review" => "a" * 20 } } }, as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(DailyResponse.find_by(user: user, daily_exercise: held)).to be_present
+      end
+    end
+  end
+
   describe "POST /responses concept_tags copy" do
     it "copies each section's concept from the exercise onto the response" do
       create_exercise(

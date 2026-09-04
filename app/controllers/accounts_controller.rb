@@ -19,11 +19,19 @@ class AccountsController < ApplicationController
 
   # PATCH /account/toggle_generation
   # Flips paused_generation_at between nil and now. While paused, nothing
-  # generates unless the user asks for it explicitly (/generate, /regenerate).
+  # generates unless the user asks for it explicitly (/generate, /regenerate);
+  # submitting and reviewing an existing set are never gated by the pause.
+  # Resuming also brings forward the set the pause stranded, which the notice
+  # names — otherwise an older set would appear on the dashboard unannounced.
   def toggle_generation
     if current_user.paused_generation_at?
-      current_user.update!(paused_generation_at: nil)
-      redirect_to account_path, notice: "Automatic daily generation resumed."
+      resumed = current_user.resume_generation!
+      notice = if resumed
+        "Automatic daily generation resumed. The set you had waiting is on your dashboard."
+      else
+        "Automatic daily generation resumed."
+      end
+      redirect_to account_path, notice: notice
     else
       current_user.update!(paused_generation_at: Time.current)
       redirect_to account_path, notice: "Automatic daily generation paused."

@@ -102,6 +102,41 @@ class User < ApplicationRecord
     paused_generation_at.present?
   end
 
+  # Lifts the pause and brings the set it stranded forward. Clearing the flag
+  # alone would only unblock the next cycle: every "today's exercise" lookup is
+  # `for_date`, so a set generated the morning of the pause is unreachable the
+  # next day — the dashboard won't render it and ResponsesController#create
+  # 404s — while still reading as a skip to SectionCount and as a break to
+  # #current_streak. Re-dating it to today makes it an ordinary today exercise
+  # and drops it out of both windows at once, since #recent_exercise_history
+  # excludes today and #current_streak exempts it.
+  #
+  # Returns the exercise it moved, or nil when there was nothing to move.
+  #
+  # Accepted: the set then counts toward the resume day's completion window and
+  # streak rather than the day it was generated.
+  #
+  # `with_lock` for the same reason as #anonymize!: it reloads under a row lock,
+  # so a double-tapped Resume serializes and the second caller sees the pause
+  # already cleared, finds no held set, and no-ops — rather than both racing to
+  # write the same date and one hitting the unique [user_id, date] index.
+  def resume_generation!
+    with_lock do
+      held = held_exercise
+      update!(paused_generation_at: nil)
+      next if held.nil? || daily_exercises.for_date.exists?
+
+      # The draft moves with its exercise. A response is only ever created
+      # against today's exercise, so leaving it behind would let #create build
+      # a second one for the same exercise while `has_one` returned the stale
+      # row. Deliberately not `regenerated_at`: it is the same set, so the
+      # regeneration it already spent stays spent.
+      held.daily_response&.update!(date: Date.current)
+      held.update!(date: Date.current)
+      held
+    end
+  end
+
   # Idempotent under concurrency: `with_lock` takes a row lock and reloads
   # before the check, so two in-flight calls (double-click, retry from another
   # tab) serialize — the second sees `anonymized?` already true, returns false,
@@ -349,6 +384,23 @@ class User < ApplicationRecord
   end
 
   private
+
+  # The set the pause stranded: the newest unsubmitted exercise dated on or
+  # after the pause and before today. Scoped to the pause rather than to "any
+  # unsubmitted exercise" because a day abandoned before pausing was abandoned,
+  # not held. The range excludes today so a set already dated today is a no-op
+  # instead of a collision with itself.
+  def held_exercise
+    return nil unless paused_generation_at?
+
+    paused_on = paused_generation_at.in_time_zone(effective_time_zone).to_date
+    daily_exercises
+      .left_joins(:daily_response)
+      .where(date: paused_on...Date.current)
+      .where(daily_responses: { submitted_at: nil })
+      .order(date: :desc)
+      .first
+  end
 
   # concept_tags is persisted provider output, so it keeps the name a section
   # was tagged with even after that concept leaves the vocabulary. Reinforcing

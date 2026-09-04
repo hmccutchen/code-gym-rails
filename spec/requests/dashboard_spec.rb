@@ -479,6 +479,22 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).to include('data-rating-for="code_review"')
       end
 
+      it "renders the set the resume brought forward instead of generating a new one" do
+        held = DailyExercise.create!(user: user, date: Date.current - 3, generated_at: Time.current,
+                                     problem_set: base_problem_set)
+        user.update!(paused_generation_at: (Date.current - 3).in_time_zone(user.effective_time_zone) + 9.hours)
+
+        user.resume_generation!
+
+        expect {
+          get root_path
+        }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+        expect(held.reload.date).to eq(Date.current)
+        expect(response.body).not_to include("Automatic generation is paused")
+        expect(response.body).to include('data-rating-for="code_review"')
+      end
+
       context "on a weekend" do
         let(:anchor_date) { Date.new(2026, 7, 18) } # Saturday
 

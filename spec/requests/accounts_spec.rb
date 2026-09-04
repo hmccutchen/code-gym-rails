@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Accounts", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   describe "GET /account" do
     it "shows the identity summary, log out control and settings link" do
       user = create_user_with_key(email: "dev@example.com", name: "Dev")
@@ -147,6 +149,22 @@ RSpec.describe "Accounts", type: :request do
       follow_redirect!
       expect(response.body).to include("Automatic daily generation resumed.")
       expect(user.reload.paused_generation_at).to be_nil
+    end
+
+    it "brings the held set forward to today and says so" do
+      travel_to(Time.utc(2026, 7, 22, 12)) do
+        user = create_user_with_key(email: "held@example.com", name: "Held")
+        held = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current,
+                                            problem_set: { "code_review" => { "question" => "q" } })
+        user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+        login_as(user)
+
+        patch toggle_generation_account_path
+
+        follow_redirect!
+        expect(response.body).to include("The set you had waiting is on your dashboard.")
+        expect(held.reload.date).to eq(Date.current)
+      end
     end
 
     it "does nothing when logged out" do
