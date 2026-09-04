@@ -948,6 +948,20 @@ RSpec.describe User, type: :model do
     # regenerated_at means "this row's day has spent its regeneration". Carrying
     # it onto a new day would hide the Generate-new-set button behind a false
     # claim ("You've already generated a new set today").
+    # RegenerateExerciseJob gates only on `exercise&.regenerating_since` after
+    # resolving for_date, so a claim left over from the pause day would let a
+    # stranded retry replace the carried-forward set and destroy its draft.
+    it "clears a leftover regeneration claim, so a stranded job cannot adopt the set" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1, regenerating_since: Time.current - 2.days)
+        pause_on(Date.current - 1)
+
+        user.resume_generation!
+
+        expect(held.reload.regenerating_since).to be_nil
+      end
+    end
+
     it "clears regenerated_at, since the set now belongs to a new day" do
       travel_to(wednesday) do
         held = exercise_on(Date.current - 1, regenerated_at: Time.current - 1.day)

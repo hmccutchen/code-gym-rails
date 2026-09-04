@@ -33,7 +33,13 @@ class AccountsController < ApplicationController
       end
       redirect_to account_path, notice: notice
     else
-      current_user.update!(paused_generation_at: Time.current)
+      # Only stamp a pause that isn't already running. The timestamp is the
+      # floor #held_exercise searches from, so re-stamping an already-paused
+      # user walks that floor forward past the very set the pause stranded —
+      # a second Pause from a stale Account tab would leave it unreachable for
+      # good, still breaking the streak, with no way back. Pausing twice means
+      # the pause that is already running, not a new one.
+      current_user.update!(paused_generation_at: Time.current) unless current_user.paused_generation_at?
       redirect_to account_path, notice: "Automatic daily generation paused."
     end
   end

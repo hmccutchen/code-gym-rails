@@ -180,13 +180,34 @@ RSpec.describe "Accounts", type: :request do
       expect(user.reload.paused_generation_at).to be_nil
     end
 
-    it "stays paused when Pause is double-tapped" do
+    # Asserts the timestamp is untouched, not merely still set: it is the floor
+    # #held_exercise searches from, so re-stamping it walks that floor past the
+    # set the pause stranded.
+    it "stays paused when Pause is double-tapped, without restamping the pause" do
       user = create_user_with_key(email: "doubletap2@example.com", name: "Double Two")
+      paused_at = 2.days.ago.change(usec: 0)
+      user.update!(paused_generation_at: paused_at)
       login_as(user)
 
       2.times { patch toggle_generation_account_path, params: { paused: "1" } }
 
-      expect(user.reload.paused_generation_at).not_to be_nil
+      expect(user.reload.paused_generation_at).to be_within(1.second).of(paused_at)
+    end
+
+    it "still recovers the held set after a repeated Pause from a stale tab" do
+      travel_to(Time.utc(2026, 7, 22, 12)) do
+        user = create_user_with_key(email: "stale-tab@example.com", name: "Stale")
+        held = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current,
+                                            problem_set: { "code_review" => { "question" => "q" } })
+        user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+        login_as(user)
+
+        patch toggle_generation_account_path, params: { paused: "1" } # stale tab re-pauses
+        patch toggle_generation_account_path, params: { paused: "0" }
+
+        expect(held.reload.date).to eq(Date.current)
+        expect(user.reload.paused_generation_at).to be_nil
+      end
     end
 
     it "does nothing when logged out" do

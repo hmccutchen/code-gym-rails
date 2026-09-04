@@ -95,6 +95,18 @@ class User < ApplicationRecord
     anonymized_at.present?
   end
 
+  # The one home for "today's recorded generation failure no longer describes
+  # anything". Both callers had this byte-identical — ResponsesController after
+  # a review succeeds, and #carry_forward once a recovered set occupies today —
+  # and the guard is part of the rule, not the caller's: an error from an
+  # earlier day is history, not a stale banner. Scoped to the same day because
+  # DashboardController#show only reports it when it matches today.
+  def clear_stale_generation_error!
+    return unless last_generation_error_date == Date.current
+
+    update!(last_generation_error_date: nil, last_generation_error: nil)
+  end
+
   # Suppresses every generation the user didn't ask for — the cron batch and
   # the dashboard's auto-trigger. An explicit /generate or /regenerate click
   # still runs while paused.
@@ -400,10 +412,14 @@ class User < ApplicationRecord
   # Moves the held set onto today. The draft moves with its exercise: a response
   # is only ever created against today's exercise, so leaving it behind would
   # let #create build a second one for the same exercise while `has_one`
-  # returned the stale row. `regenerated_at` clears because it means "this
-  # row's day has spent its one regeneration" — carrying it onto a new day
-  # would both hide the Generate-new-set button and have the dashboard state
-  # something false ("You've already generated a new set today").
+  # returned the stale row. Both regeneration columns clear, for the same reason:
+  # they describe the row's *day*, not the set. `regenerated_at` would hide the
+  # Generate-new-set button behind something false ("You've already generated
+  # a new set today"), and `regenerating_since` is worse than cosmetic — a
+  # RegenerateExerciseJob stranded from the pause day gates only on
+  # `exercise&.regenerating_since` after resolving `for_date`, so a leftover
+  # claim would let it replace the carried-forward problem_set and destroy the
+  # very draft response this went to the trouble of moving.
   #
   # Clearing a same-day generation error is part of establishing today's
   # exercise, not an extra: /generate is not pause-gated, so a paused user can
@@ -424,8 +440,8 @@ class User < ApplicationRecord
   def carry_forward(held)
     transaction(requires_new: true) do
       held.daily_response&.update!(date: Date.current)
-      held.update!(date: Date.current, regenerated_at: nil)
-      clear_same_day_generation_error!
+      held.update!(date: Date.current, regenerated_at: nil, regenerating_since: nil)
+      clear_stale_generation_error!
     end
     held
   rescue ActiveRecord::RecordNotUnique
@@ -435,11 +451,6 @@ class User < ApplicationRecord
     nil
   end
 
-  def clear_same_day_generation_error!
-    return unless last_generation_error_date == Date.current
-
-    update!(last_generation_error_date: nil, last_generation_error: nil)
-  end
 
   # The set the pause stranded: the newest unsubmitted exercise dated on or
   # after the pause and before today. Scoped to the pause rather than to "any
