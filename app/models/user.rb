@@ -95,11 +95,70 @@ class User < ApplicationRecord
     anonymized_at.present?
   end
 
+  # The one home for "today's recorded generation failure no longer describes
+  # anything". Both callers had this byte-identical — ResponsesController after
+  # a review succeeds, and #carry_forward once a recovered set occupies today —
+  # and the guard is part of the rule, not the caller's: an error from an
+  # earlier day is history, not a stale banner. Scoped to the same day because
+  # DashboardController#show only reports it when it matches today.
+  def clear_stale_generation_error!
+    return unless last_generation_error_date == Date.current
+
+    update!(last_generation_error_date: nil, last_generation_error: nil)
+  end
+
   # Suppresses every generation the user didn't ask for — the cron batch and
   # the dashboard's auto-trigger. An explicit /generate or /regenerate click
   # still runs while paused.
   def paused_generation_at?
     paused_generation_at.present?
+  end
+
+  # Lifts the pause and brings the set it stranded forward. Clearing the flag
+  # alone would only unblock the next cycle: every "today's exercise" lookup is
+  # `for_date`, so a set generated the morning of the pause is unreachable the
+  # next day — the dashboard won't render it and ResponsesController#create
+  # 404s — while still reading as a skip to SectionCount and as a break to
+  # #current_streak. Re-dating it to today makes it an ordinary today exercise
+  # and drops it out of both windows at once, since #recent_exercise_history
+  # excludes today and #current_streak exempts it.
+  #
+  # Returns the exercise it moved, or nil when there was nothing to move.
+  #
+  # Accepted: the set then counts toward the resume day's completion window and
+  # streak rather than the day it was generated.
+  #
+  # `with_lock` for the same reason as #anonymize!: it reloads under a row lock,
+  # so a double-tapped call serializes and the second one sees the pause
+  # already cleared, finds no held set, and no-ops.
+  #
+  # That FOR UPDATE also settles the race against a generation running for this
+  # user, though indirectly: daily_exercises has a foreign key to users, so
+  # inserting today's exercise needs a FOR KEY SHARE lock on this same row,
+  # which FOR UPDATE conflicts with. A generator therefore cannot commit
+  # between the `exists?` check and the move — it either committed before the
+  # lock (and `exists?` sees it, so nothing moves) or blocks until after
+  # (and loses its own set to the unique index, which
+  # GenerateDailyExercisesJob already treats as "generated concurrently").
+  # Resume wins, which is the right way round: the held set carries the user's
+  # own draft answers, a fresh one would not.
+  #
+  # Runs in the user's own zone rather than trusting the caller's, unlike the
+  # read-only #recent_exercise_history and #current_streak: this one *writes* a
+  # date that has to be the user's today, and it also compares against the
+  # pause's local date, so a caller with a different ambient zone would not
+  # merely read oddly — it would either no-op silently or file the set under a
+  # day that is not the user's.
+  def resume_generation!
+    Time.use_zone(effective_time_zone) do
+      with_lock do
+        held = held_exercise
+        update!(paused_generation_at: nil)
+        next if held.nil? || daily_exercises.for_date.exists?
+
+        carry_forward(held)
+      end
+    end
   end
 
   # Idempotent under concurrency: `with_lock` takes a row lock and reloads
@@ -349,6 +408,66 @@ class User < ApplicationRecord
   end
 
   private
+
+  # Moves the held set onto today. The draft moves with its exercise: a response
+  # is only ever created against today's exercise, so leaving it behind would
+  # let #create build a second one for the same exercise while `has_one`
+  # returned the stale row. Both regeneration columns clear, for the same reason:
+  # they describe the row's *day*, not the set. `regenerated_at` would hide the
+  # Generate-new-set button behind something false ("You've already generated
+  # a new set today"), and `regenerating_since` is worse than cosmetic — a
+  # RegenerateExerciseJob stranded from the pause day gates only on
+  # `exercise&.regenerating_since` after resolving `for_date`, so a leftover
+  # claim would let it replace the carried-forward problem_set and destroy the
+  # very draft response this went to the trouble of moving.
+  #
+  # Clearing a same-day generation error is part of establishing today's
+  # exercise, not an extra: /generate is not pause-gated, so a paused user can
+  # click it, have the job fail with no exercise for today to suppress the
+  # report (see GenerateDailyExercisesJob#persist_failure), and then resume —
+  # leaving DashboardController#show's `last_generation_error_date` check
+  # rendering "Couldn't generate a new set" above the perfectly good set this
+  # just recovered, the exact banner persist_failure exists to avoid.
+  #
+  # A SAVEPOINT so a failed move rolls back only itself, leaving the
+  # pause-clearing UPDATE committed — otherwise a user who hit this would be
+  # both 500ing and still paused. Both rescues are defence in depth rather than
+  # the mechanism: #resume_generation!'s row lock already serializes generation
+  # against this. Both classes are caught because `date` uniqueness is enforced
+  # twice — the model validation raises RecordInvalid before the index ever
+  # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
+  # validation, so an unrelated invalid record still surfaces.
+  def carry_forward(held)
+    transaction(requires_new: true) do
+      held.daily_response&.update!(date: Date.current)
+      held.update!(date: Date.current, regenerated_at: nil, regenerating_since: nil)
+      clear_stale_generation_error!
+    end
+    held
+  rescue ActiveRecord::RecordNotUnique
+    nil
+  rescue ActiveRecord::RecordInvalid => e
+    raise unless e.record.errors[:date].present?
+    nil
+  end
+
+
+  # The set the pause stranded: the newest unsubmitted exercise dated on or
+  # after the pause and before today. Scoped to the pause rather than to "any
+  # unsubmitted exercise" because a day abandoned before pausing was abandoned,
+  # not held. The range excludes today so a set already dated today is a no-op
+  # instead of a collision with itself.
+  def held_exercise
+    return nil unless paused_generation_at?
+
+    paused_on = paused_generation_at.in_time_zone(Time.zone).to_date
+    daily_exercises
+      .left_joins(:daily_response)
+      .where(date: paused_on...Date.current)
+      .where(daily_responses: { submitted_at: nil })
+      .order(date: :desc)
+      .first
+  end
 
   # concept_tags is persisted provider output, so it keeps the name a section
   # was tagged with even after that concept leaves the vocabulary. Reinforcing

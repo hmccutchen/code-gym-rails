@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Accounts", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   describe "GET /account" do
     it "shows the identity summary, log out control and settings link" do
       user = create_user_with_key(email: "dev@example.com", name: "Dev")
@@ -147,6 +149,65 @@ RSpec.describe "Accounts", type: :request do
       follow_redirect!
       expect(response.body).to include("Automatic daily generation resumed.")
       expect(user.reload.paused_generation_at).to be_nil
+    end
+
+    it "brings the held set forward to today and says so" do
+      travel_to(Time.utc(2026, 7, 22, 12)) do
+        user = create_user_with_key(email: "held@example.com", name: "Held")
+        held = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current,
+                                            problem_set: { "code_review" => { "question" => "q" } })
+        user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+        login_as(user)
+
+        patch toggle_generation_account_path
+
+        follow_redirect!
+        expect(response.body).to include("The set you had waiting is on your dashboard.")
+        expect(held.reload.date).to eq(Date.current)
+      end
+    end
+
+    # The buttons post the state they want. Read as a flip, a double-tapped
+    # Resume would re-read an already-unpaused user and take the pause branch,
+    # leaving generation paused by two clicks of a button labelled "Resume".
+    it "stays resumed when Resume is double-tapped" do
+      user = create_user_with_key(email: "doubletap@example.com", name: "Double")
+      user.update!(paused_generation_at: Time.current)
+      login_as(user)
+
+      2.times { patch toggle_generation_account_path, params: { paused: "0" } }
+
+      expect(user.reload.paused_generation_at).to be_nil
+    end
+
+    # Asserts the timestamp is untouched, not merely still set: it is the floor
+    # #held_exercise searches from, so re-stamping it walks that floor past the
+    # set the pause stranded.
+    it "stays paused when Pause is double-tapped, without restamping the pause" do
+      user = create_user_with_key(email: "doubletap2@example.com", name: "Double Two")
+      paused_at = 2.days.ago.change(usec: 0)
+      user.update!(paused_generation_at: paused_at)
+      login_as(user)
+
+      2.times { patch toggle_generation_account_path, params: { paused: "1" } }
+
+      expect(user.reload.paused_generation_at).to be_within(1.second).of(paused_at)
+    end
+
+    it "still recovers the held set after a repeated Pause from a stale tab" do
+      travel_to(Time.utc(2026, 7, 22, 12)) do
+        user = create_user_with_key(email: "stale-tab@example.com", name: "Stale")
+        held = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current,
+                                            problem_set: { "code_review" => { "question" => "q" } })
+        user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+        login_as(user)
+
+        patch toggle_generation_account_path, params: { paused: "1" } # stale tab re-pauses
+        patch toggle_generation_account_path, params: { paused: "0" }
+
+        expect(held.reload.date).to eq(Date.current)
+        expect(user.reload.paused_generation_at).to be_nil
+      end
     end
 
     it "does nothing when logged out" do

@@ -633,9 +633,7 @@ class ResponsesController < ApplicationController
   # longer do. RegenerateExerciseJob#keep_reviewed_set writes its own message
   # after this point, so the one explanation that is still true survives.
   def clear_stale_generation_error!
-    return unless current_user.last_generation_error_date == Date.current
-
-    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
+    current_user.clear_stale_generation_error!
   end
 
   # Nearly all difficulty adaptation in this app is advisory; nothing

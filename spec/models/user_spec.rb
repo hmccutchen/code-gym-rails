@@ -862,6 +862,270 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#resume_generation!" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # A Wednesday, so the pause day and "today" are both weekdays in one week.
+    let(:wednesday) { Time.utc(2026, 7, 22, 12) }
+
+    # A UTC user, so `Date.current` and the pause's local date agree without
+    # every example having to reason about the offset. The zone resolution
+    # itself gets its own example below.
+    let(:user) { User.create!(email: "resumer@example.com", name: "Resumer", time_zone: "UTC") }
+
+    # Paused mid-morning on `date` in the user's own zone, the way
+    # AccountsController#toggle_generation writes it under use_time_zone.
+    def pause_on(date)
+      user.update!(paused_generation_at: date.in_time_zone(user.effective_time_zone) + 9.hours)
+    end
+
+    def exercise_on(date, **attrs)
+      user.daily_exercises.create!(date: date, generated_at: Time.current,
+                                   problem_set: { "code_review" => { "question" => "q" } }, **attrs)
+    end
+
+    it "clears the pause and re-dates the held exercise to today" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+
+        expect(user.resume_generation!).to eq(held)
+        expect(user.reload.paused_generation_at).to be_nil
+        expect(held.reload.date).to eq(Date.current)
+      end
+    end
+
+    it "moves the draft response with its exercise" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1)
+        draft = user.daily_responses.create!(daily_exercise: held, date: Date.current - 1,
+                                             answers: { "code_review" => "a partial answer here" })
+        pause_on(Date.current - 1)
+
+        user.resume_generation!
+
+        expect(draft.reload.date).to eq(Date.current)
+        expect(held.reload.daily_response).to eq(draft)
+        expect(user.daily_responses.count).to eq(1)
+      end
+    end
+
+    it "leaves a submitted exercise where it is" do
+      travel_to(wednesday) do
+        submitted = exercise_on(Date.current - 1)
+        user.daily_responses.create!(daily_exercise: submitted, date: Date.current - 1,
+                                     submitted_at: Time.current, answers: {})
+        pause_on(Date.current - 1)
+
+        expect(user.resume_generation!).to be_nil
+        expect(submitted.reload.date).to eq(Date.current - 1)
+      end
+    end
+
+    it "leaves an exercise abandoned before the pause where it is" do
+      travel_to(wednesday) do
+        abandoned = exercise_on(Date.current - 2)
+        pause_on(Date.current - 1)
+
+        expect(user.resume_generation!).to be_nil
+        expect(abandoned.reload.date).to eq(Date.current - 2)
+        expect(user.reload.paused_generation_at).to be_nil
+      end
+    end
+
+    it "does not overwrite a set generated explicitly today while paused" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1)
+        today = exercise_on(Date.current)
+        pause_on(Date.current - 1)
+
+        expect(user.resume_generation!).to be_nil
+        expect(held.reload.date).to eq(Date.current - 1)
+        expect(today.reload.date).to eq(Date.current)
+      end
+    end
+
+    # regenerated_at means "this row's day has spent its regeneration". Carrying
+    # it onto a new day would hide the Generate-new-set button behind a false
+    # claim ("You've already generated a new set today").
+    # RegenerateExerciseJob gates only on `exercise&.regenerating_since` after
+    # resolving for_date, so a claim left over from the pause day would let a
+    # stranded retry replace the carried-forward set and destroy its draft.
+    it "clears a leftover regeneration claim, so a stranded job cannot adopt the set" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1, regenerating_since: Time.current - 2.days)
+        pause_on(Date.current - 1)
+
+        user.resume_generation!
+
+        expect(held.reload.regenerating_since).to be_nil
+      end
+    end
+
+    it "clears regenerated_at, since the set now belongs to a new day" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1, regenerated_at: Time.current - 1.day)
+        pause_on(Date.current - 1)
+
+        user.resume_generation!
+
+        expect(held.reload.regenerated_at).to be_nil
+      end
+    end
+
+    # `date` uniqueness is enforced twice, and the model validation fires first,
+    # so RecordInvalid is the likelier of the two — a rescue for only
+    # RecordNotUnique would 500 and roll the pause clearing back with it.
+    [ ActiveRecord::RecordNotUnique.new("duplicate key"),
+      :record_invalid ].each do |failure|
+      it "keeps the pause cleared when the move loses to #{failure.is_a?(Symbol) ? 'a date validation' : 'the unique index'}" do
+        travel_to(wednesday) do
+          held = exercise_on(Date.current - 1)
+          pause_on(Date.current - 1)
+          raised = if failure == :record_invalid
+            invalid = DailyExercise.new
+            invalid.errors.add(:date, :taken)
+            ActiveRecord::RecordInvalid.new(invalid)
+          else
+            failure
+          end
+          allow_any_instance_of(DailyExercise).to receive(:update!).and_raise(raised)
+
+          expect(user.resume_generation!).to be_nil
+
+          expect(user.reload.paused_generation_at).to be_nil
+          expect(held.reload.date).to eq(Date.current - 1)
+        end
+      end
+    end
+
+    it "still surfaces a validation failure that is not the date collision" do
+      travel_to(wednesday) do
+        exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+        invalid = DailyExercise.new
+        invalid.errors.add(:language, :inclusion)
+        allow_any_instance_of(DailyExercise).to receive(:update!)
+          .and_raise(ActiveRecord::RecordInvalid.new(invalid))
+
+        expect { user.resume_generation! }.to raise_error(ActiveRecord::RecordInvalid)
+      end
+    end
+
+    # /generate is not pause-gated, so a paused user can trigger a failing
+    # generation while the held set sits at an earlier date — nothing for
+    # persist_failure to suppress the report against. Recovering that set makes
+    # the error stale, and the dashboard would otherwise render "Couldn't
+    # generate a new set" above it.
+    it "clears a same-day generation error the recovered set makes stale" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+        user.update!(last_generation_error_date: Date.current, last_generation_error: "Provider timed out")
+
+        user.resume_generation!
+
+        expect(held.reload.date).to eq(Date.current)
+        expect(user.reload.last_generation_error_date).to be_nil
+        expect(user.last_generation_error).to be_nil
+      end
+    end
+
+    it "leaves an error from an earlier day alone" do
+      travel_to(wednesday) do
+        exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+        user.update!(last_generation_error_date: Date.current - 4, last_generation_error: "Old failure")
+
+        user.resume_generation!
+
+        expect(user.reload.last_generation_error_date).to eq(Date.current - 4)
+      end
+    end
+
+    # Reading the pause day in the user's zone but "today" in the caller's is
+    # not merely untidy — the two can name the same date and collapse the
+    # search range to empty. Tokyo is far enough ahead of an ambient-UTC caller
+    # to show it: at 20:00 UTC on the 22nd it is already the 23rd in Tokyo, so
+    # the user's today is the 23rd while the caller's is the 22nd — the same
+    # 22nd the pause began on locally.
+    it "resolves both today and the pause day in the user's zone, not the caller's" do
+      tokyoite = User.create!(email: "tokyo@example.com", name: "Tokyo", time_zone: "Asia/Tokyo")
+      tokyoite.update!(paused_generation_at: Time.utc(2026, 7, 21, 23)) # 08:00 on the 22nd in Tokyo
+      held = tokyoite.daily_exercises.create!(date: Date.new(2026, 7, 22), generated_at: Time.current,
+                                             problem_set: { "code_review" => { "question" => "q" } })
+
+      Time.use_zone("UTC") { travel_to(Time.utc(2026, 7, 22, 20)) { tokyoite.resume_generation! } }
+
+      expect(held.reload.date).to eq(Date.new(2026, 7, 23))
+    end
+
+    it "reads the pause day in the user's own zone, not the server's" do
+      new_yorker = User.create!(email: "ny@example.com", name: "NY", time_zone: "America/New_York")
+      # 22:00 on the 21st in New York, which is already the 22nd in UTC.
+      new_yorker.update!(paused_generation_at: Time.utc(2026, 7, 22, 2))
+      held = new_yorker.daily_exercises.create!(date: Date.new(2026, 7, 21), generated_at: Time.current,
+                                               problem_set: { "code_review" => { "question" => "q" } })
+
+      Time.use_zone(new_yorker.effective_time_zone) do
+        travel_to(Time.utc(2026, 7, 22, 16)) { new_yorker.resume_generation! }
+      end
+
+      expect(held.reload.date).to eq(Date.new(2026, 7, 22))
+    end
+
+    it "no-ops on a second call, so a double-tapped Resume moves nothing twice" do
+      travel_to(wednesday) do
+        held = exercise_on(Date.current - 1)
+        pause_on(Date.current - 1)
+
+        expect(user.resume_generation!).to eq(held)
+        expect(user.resume_generation!).to be_nil
+        expect(held.reload.date).to eq(Date.current)
+        expect(user.daily_exercises.count).to eq(1)
+      end
+    end
+
+    it "is a no-op for a user who was never paused" do
+      travel_to(wednesday) do
+        untouched = exercise_on(Date.current - 1)
+
+        expect(user.resume_generation!).to be_nil
+        expect(untouched.reload.date).to eq(Date.current - 1)
+      end
+    end
+
+    context "the signals the move exists to correct" do
+      it "stops the held set reading as a skip in #recent_exercise_history" do
+        travel_to(wednesday) do
+          exercise_on(Date.current - 1)
+          pause_on(Date.current - 1)
+
+          expect(user.recent_exercise_history(limit: 20).map(&:answered)).to eq([ nil ])
+
+          user.resume_generation!
+
+          expect(user.recent_exercise_history(limit: 20)).to be_empty
+        end
+      end
+
+      it "stops the held set breaking the streak" do
+        travel_to(wednesday) do
+          user.daily_responses.create!(daily_exercise: exercise_on(Date.current - 2),
+                                       date: Date.current - 2, submitted_at: Time.current, answers: {})
+          exercise_on(Date.current - 1)
+          pause_on(Date.current - 1)
+
+          expect(user.current_streak).to eq(0)
+
+          user.resume_generation!
+
+          expect(user.current_streak).to eq(1)
+        end
+      end
+    end
+  end
+
   describe ".active" do
     it "excludes anonymized users and includes normal ones" do
       normal = create_user(email: "normal@example.com")
