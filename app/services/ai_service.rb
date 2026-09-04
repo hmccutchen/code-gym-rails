@@ -91,6 +91,20 @@ class AiService
   # full review generation.
   DUCK_RESPONSE_MAX_TOKENS = 250
 
+  # Cost and length control for #explain_concept_differently. Sized the way
+  # DUCK_RESPONSE_MAX_TOKENS is — a budget, not an enforcement mechanism —
+  # rather than derived from a schema the way DIFFICULTY_ASSESSMENT_MAX_TOKENS
+  # is, because a reframing is free prose and has no largest valid reply to
+  # derive from. 500 is the two short paragraphs the prompt asks for with room
+  # for a worked scenario, which is one of the three approaches it offers.
+  #
+  # Passing it at all is the second thing this buys: ClaudeService leaves
+  # extended thinking on unless a max_tokens is given, and a reframing of an
+  # explanation the model itself wrote does not need a thinking budget.
+  # #explain_differently passes none and is left alone deliberately — changing
+  # an existing billed path is not this change's business.
+  CONCEPT_ALTERNATE_MAX_TOKENS = 500
+
   # The message the "Explain this simply" button sends on the user's behalf.
   # Server-owned so its wording lives beside the prompt it is tuned against: it
   # names the exercise rather than the answer, so it reads as a kind-1 request
@@ -112,6 +126,42 @@ class AiService
     (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
       ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
     PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
+
+  # Derived from the largest VALID response rather than guessed, the same way
+  # PSEUDOCODE_CRITIQUE_MAX_TOKENS above is: one entry per section the day can
+  # hold, each a level name plus a reason of at most
+  # DailyResponse::MAX_DIFFICULTY_REASON_LENGTH characters. Three characters per
+  # token is deliberately conservative for prose, and the overhead covers the
+  # JSON envelope and key names. Getting this too tight costs the note silently
+  # rather than loudly — a truncated response raises TruncatedResponseError,
+  # which this pass swallows by design.
+  #
+  # Passing any max_tokens at all is half the point: ClaudeService disables
+  # extended thinking whenever a caller supplies one, and a reply of one
+  # sentence per section has nothing to think about. Without it the assessment
+  # runs with thinking on and ClaudeService::MAX_TOKENS to spend, billed to the
+  # engineer's own key for a note that renders in two lines.
+  #
+  # GeminiService pairs the same cap with its own least-thinking setting, so
+  # neither provider spends this budget reasoning. The two are not identical
+  # though: Claude turns thinking off outright, while Gemini 3 Flash has no off
+  # switch and only reaches "minimal" (see GeminiService::MINIMAL_THINKING_LEVEL).
+  # So a Gemini call still spends a little before it answers, which is one
+  # reason this stays sized from the largest valid reply rather than trimmed
+  # to the expected one — and why a truncation, swallowed here like any other
+  # failure, is likelier on that provider than on Claude.
+  DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
+  DIFFICULTY_ASSESSMENT_MAX_TOKENS =
+    (ExerciseSection.slot_count * (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / 3)) +
+    DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS
+
+  # How long the review may keep waiting for the difficulty note once every
+  # section has been graded. The note is optional context; the grades are what
+  # the engineer paid for, so the assessment gets to run alongside them for
+  # free and then has this long to finish before the request leaves without it.
+  # Without the bound, one hung provider connection could hold a synchronous
+  # request for the full retry budget to deliver a sentence.
+  DIFFICULTY_ASSESSMENT_GRACE_SECONDS = 5
 
   # Provider output rendered into the page, so bounded at the boundary like
   # every other such field.
@@ -464,6 +514,18 @@ class AiService
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
+  # The one statement of what a concept reference is FOR, shared by the prompt
+  # that writes one and the prompt that reframes it. Stated once because a
+  # reframing that drifts into solving the day's problem is the only real
+  # failure mode this surface has, and two copies of the rule can disagree.
+  # It is not what actually holds that line, though —
+  # #explain_concept_differently is handed no exercise and no answer, so it
+  # cannot reach today's problem whatever the prompt says.
+  CONCEPT_REFERENCE_SCOPE = <<~SCOPE.chomp
+    This is a stable explanation an engineer returns to across repeat exposure —
+    not tied to any single problem.
+  SCOPE
+
   # Max bytes of raw provider output logged server-side when a provider
   # response can't be used (invalid JSON, non-success HTTP status). Keeps
   # exception messages — which surface in flash alerts and error trackers —
@@ -560,25 +622,14 @@ class AiService
     coach   = config_for(exercise.language)[:coach]
     context = build_review_day_context(coach, exercise, daily_response)
 
-    threads = sections.map do |section|
-      Thread.new do
-        service = self.class.new(@api_key)
-        begin
-          result = service.send(
-            :call_and_log, user, purpose: "review_response",
-            system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
-            cache_system: true
-          )
-          review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
-          review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-          [ section, { ok: true, review: review } ]
-        rescue AiService::Error => e
-          [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
-        end
-      end
-    end
+    # Started first so it overlaps the grading calls rather than following
+    # them: the assessment is an extra provider call, but not extra waiting.
+    difficulty = Thread.new { safe_difficulty_assessment(user, exercise, sections) }
+    threads    = sections.map { |section| Thread.new { grade_section(user, exercise, daily_response, section, context) } }
 
-    threads.map(&:value).to_h
+    results = threads.map(&:value).to_h
+    merge_difficulty!(results, awaited_difficulty(difficulty))
+    results
   end
 
   # ── Generate the one-time cached reference for a single concept ───────────
@@ -604,6 +655,51 @@ class AiService
     reference
   end
 
+  # ── Reframe one cached concept reference a different way ─────────────────
+  # For the engineer the reference itself did not land for. Returns plain prose
+  # rather than JSON, like #explain_differently and for the same reason.
+  #
+  # The signature is the guarantee: no exercise, no daily_response, no section —
+  # the same narrow shape #generate_concept_reference and #assess_difficulty
+  # take. This is the one reframing surface reachable BEFORE a day is submitted,
+  # so "must not hint at today's answer" cannot rest on a prompt line here. It
+  # rests on today's problem never being passed in.
+  #
+  # `prior_alternates` is the framings the client has already been shown, sent
+  # back on every request. Nothing about this call is persisted — same as
+  # #duck_response, and see ConceptReferencesController for why.
+  def explain_concept_differently(user, reference, prior_alternates: [])
+    # reference.language is the ConceptBucket, not a generation language, so
+    # this resolves architecture/plan_review/ambiguity_hunt/pseudocode_to_code
+    # alongside the two programming languages.
+    coach = config_for(reference.language)[:coach]
+
+    already_read = CONCEPT_REFERENCE_FIELDS
+      .map { |field| "#{field}: #{reference.public_send(field)}" }
+      .join("\n")
+
+    result = call_and_log(
+      user, purpose: "explain_concept_differently", max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS,
+      system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.",
+      prompt: <<~PROMPT
+        The concept: "#{reference.concept}"
+
+        The reference they have already read:
+        #{already_read}
+
+        #{prior_framings(prior_alternates)}
+
+        Explain the SAME concept again using a genuinely different approach — a
+        different analogy, a different level of abstraction, or a concrete worked
+        scenario instead of a principle. Do not repeat the original wording.
+        #{CONCEPT_REFERENCE_SCOPE} Teach the concept itself; never solve, hint at,
+        or refer to any particular exercise. Two short paragraphs at most.
+      PROMPT
+    )
+
+    text_or_raise(result, subject: "alternate concept explanation")
+  end
+
   # ── Reframe one section's feedback a different way ───────────────────────
   # Returns a plain string, not JSON: there is no structure to parse, and routing
   # it through parse_json_object would add a failure mode for no benefit.
@@ -611,13 +707,6 @@ class AiService
     coach   = config_for(exercise.language)[:coach]
     review  = daily_response.ai_review&.dig(section) || {}
     missed  = DailyResponse.review_points(review["missed"])
-
-    prior = if prior_alternates.any?
-      "Framings already given (do NOT reprise these angles or analogies):\n" +
-        prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
-    else
-      "No alternate framing has been given yet."
-    end
 
     result = call_and_log(
       user, purpose: "explain_differently",
@@ -629,7 +718,7 @@ class AiService
         What they missed:
         #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
 
-        #{prior}
+        #{prior_framings(prior_alternates)}
 
         Explain the SAME point again using a genuinely different approach — a
         different analogy, a different level of abstraction, or a concrete worked
@@ -776,6 +865,13 @@ class AiService
   # — enough context for a Socratic prompt without needing per-section-kind
   # branching. `planted_ambiguities` is deliberately excluded: it's the
   # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
+  #
+  # This is the single authority for "the section as the engineer sees it", and
+  # it now has two callers: the duck, and #build_difficulty_prompt, which needs
+  # exactly the same view for the opposite reason — the difficulty of a problem
+  # is the difficulty of what was actually shown. Widening this to a field the
+  # engineer cannot see widens both, so add such a field to the caller that
+  # needs it rather than here.
   def duck_section_context(exercise, section)
     data = exercise.problem_set.dig(section.to_s) || {}
 
@@ -862,6 +958,16 @@ class AiService
       "[pseudocode] user=#{user.id} date=#{Date.current} phase=critique " \
       "gaps_found=#{gaps_found} gaps=#{gaps.size}"
     )
+  end
+
+  # The prior-framings block both reframing prompts open with. One rule — do
+  # not reprise what you already said — stated once, since the two callers
+  # differ only in what is being reframed.
+  def prior_framings(prior_alternates)
+    return "No alternate framing has been given yet." if prior_alternates.empty?
+
+    "Framings already given (do NOT reprise these angles or analogies):\n" +
+      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting
@@ -1436,6 +1542,165 @@ class AiService
     )
   end
 
+  # The grades are what the engineer paid for, so the note never gets to hold
+  # them up: once grading is done the assessment has DIFFICULTY_ASSESSMENT_GRACE_SECONDS
+  # to finish, and the review goes out without it otherwise. #join returns the
+  # thread when it finished and nil when it timed out, so this reads as "take it
+  # if it is ready".
+  #
+  # A thread abandoned here keeps running and may still write its ApiUsage row
+  # after the request has ended — deliberate. The provider call really happened
+  # and really cost money, so recording it is honest accounting, and #log_usage
+  # swallows its own errors, so a late write cannot fail anything. Killing the
+  # thread instead would save nothing: the provider bills from the moment the
+  # request is sent.
+  def awaited_difficulty(thread)
+    thread.join(DIFFICULTY_ASSESSMENT_GRACE_SECONDS) ? thread.value : {}
+  end
+
+  # #assess_difficulty is display-only: a failure in it must never cost the
+  # engineer the review they have already paid for. That contract cannot be
+  # kept inside the method alone, because `self.class.new` builds this thread's
+  # Faraday connection and can fail before the method is even entered — and
+  # Thread#value re-raises whatever escapes, straight past
+  # ResponsesController#review's rescues, which would 500 on a request whose
+  # grades had already succeeded and leave the review claim held. So the guard
+  # lives here, around the whole thread body, and is StandardError-wide on
+  # purpose rather than AiService::Error-wide.
+  def safe_difficulty_assessment(user, exercise, sections)
+    self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections)
+  rescue StandardError => e
+    Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
+    {}
+  end
+
+  # Failures that say "the machine could not run this right now" rather than
+  # "this code is wrong". A grading thread that hits one used to propagate
+  # through Thread#value, past ResponsesController#review's rescues, and 500 a
+  # request whose OTHER sections had already graded — discarding results the
+  # engineer was billed for and leaving the review claim held until it went
+  # stale. Tagged like a provider error instead, so the sections that succeeded
+  # still save and the claim is released.
+  #
+  # Deliberately not a blanket StandardError: on the grading path that would
+  # turn a NoMethodError into "couldn't be reviewed, try again" and hide a real
+  # bug behind a retry button. The difficulty note can afford that breadth
+  # because it is display-only; a grade cannot.
+  #
+  # ConnectionTimeoutError is a subclass of ConnectionNotEstablished, so naming
+  # the parent covers the pool exhaustion this is mostly here for.
+  INFRASTRUCTURE_ERRORS = [
+    ActiveRecord::ConnectionNotEstablished,
+    Timeout::Error,
+    IOError
+  ].freeze
+
+  # Only onto a section that actually graded: a failed section has no review
+  # hash to carry an assessment, and a section the day never asked about must
+  # not acquire one.
+  def merge_difficulty!(results, difficulty)
+    results.each do |section, result|
+      next unless result[:ok] && difficulty[section]
+
+      result[:review]["difficulty"] = difficulty[section]
+    end
+  end
+
+  def grade_section(user, exercise, daily_response, section, context)
+    service = self.class.new(@api_key)
+    result  = service.send(
+      :call_and_log, user, purpose: "review_response",
+      system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
+      cache_system: true
+    )
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+    review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+    [ section, { ok: true, review: review } ]
+  rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
+    [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+  end
+
+  # Rate how hard each problem is, from its content alone.
+  # Handed no daily_response, and none of the engineer's history — deliberately.
+  # This must rate the problem, not the person, and above all it must not
+  # become a second readout of their ConceptMastery tier, which the mastery
+  # design keeps invisible to them precisely so it cannot shape engagement. A
+  # prompt sentence asking the model to ignore the answer would be a weaker
+  # guarantee than not having the answer, so the signature is the guarantee:
+  # widening it is what a reviewer should push back on. `user` is here only to
+  # bill the call.
+  #
+  # Failure is swallowed rather than raised. The rating is context for reading
+  # a review; it is never worth costing the engineer the review itself, which
+  # they paid for with their own API key.
+  def assess_difficulty(user, exercise, sections:)
+    result = call_and_log(
+      user, purpose: "assess_difficulty", max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS,
+      system: build_difficulty_system_prompt(config_for(exercise.language)[:coach]),
+      prompt: build_difficulty_prompt(exercise, sections)
+    )
+
+    assessed = parse_json_object(result[:text], subject: "difficulty assessment")
+    # Repairs rather than raises: a bad assessment costs a note, and discarding
+    # a review the engineer already paid for over one would be the worse
+    # failure. DailyResponse owns the rule, and applies it again on read.
+    sections.to_h { |section| [ section, DailyResponse.usable_difficulty(assessed[section]) ] }.compact
+  end
+
+  def build_difficulty_system_prompt(coach)
+    "You are a senior #{coach} engineer rating how hard each of several practice problems is. " \
+    "You are not grading anyone, and you will not be shown anyone's answer. Return JSON."
+  end
+
+  def build_difficulty_prompt(exercise, sections)
+    material = sections.map { |section| "## #{section}\n#{duck_section_context(exercise, section)}" }
+
+    <<~PROMPT
+      Rate the objective difficulty of each problem below, on this scale:
+      #{difficulty_scale}
+
+      Judge only the material shown. Weigh how subtle the issue is, how many
+      reasoning steps a complete answer takes, and how much the scenario leaves
+      unstated. You know nothing about who is answering it, how they have done
+      before, or why this problem was chosen for them — none of that is here,
+      and none of it belongs in the rating. Two problems about the same idea can
+      differ; "#{DailyResponse::DIFFICULTY_LEVELS.first}" is a perfectly good answer.
+
+      Return a single JSON object keyed by the section names below:
+      {
+        "<section name>": {
+          "level": #{DailyResponse::DIFFICULTY_LEVELS.map(&:inspect).join(' | ')},
+          "reason": "string — one sentence naming what makes it that, written for the engineer to read after their review"
+        }
+      }
+
+      #{material.join("\n\n")}
+    PROMPT
+  end
+
+  # Descriptions are prompt text and live here; the level names come from
+  # DailyResponse, so the scale offered and the scale storable cannot drift
+  # apart. Keyed by level rather than positional: this was three descriptions
+  # destructured off the constant in order, which would have silently relabelled
+  # every rung the moment a level was added or reordered. #fetch over [] so a
+  # level with no guidance cannot interpolate nil into the prompt — but note
+  # that the KeyError is NOT the safety net: this runs inside
+  # #safe_difficulty_assessment, which swallows it and drops the note. The spec
+  # "has guidance for exactly the levels it can offer" is what actually catches
+  # a missing rung, and a second spec pins the ordered vocabulary, which is what
+  # lets #build_difficulty_prompt call .first "the easiest".
+  DIFFICULTY_GUIDANCE = {
+    "straightforward" => "one thing to notice; a competent engineer finds it on a first read.",
+    "moderate"        => "a couple of reasoning steps, or one detail that is easy to skim past.",
+    "demanding"       => "the issue is subtle, several steps chain together, or the scenario leaves something material unstated."
+  }.freeze
+
+  def difficulty_scale
+    DailyResponse::DIFFICULTY_LEVELS
+      .map { |level| "- \"#{level}\" — #{DIFFICULTY_GUIDANCE.fetch(level)}" }
+      .join("\n")
+  end
+
   def build_concept_reference_prompt(concept, config)
     label = config[:label]
     code_example_desc =
@@ -1459,8 +1724,7 @@ class AiService
 
     <<~PROMPT
       Write a durable reference for the #{config[:coach]} concept: "#{concept}".
-      This is a stable explanation an engineer returns to across repeat exposure —
-      not tied to any single problem. Be precise and senior-level.
+      #{CONCEPT_REFERENCE_SCOPE} Be precise and senior-level.
 
       Return JSON matching this schema exactly:
       {

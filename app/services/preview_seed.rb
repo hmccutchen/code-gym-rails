@@ -208,23 +208,33 @@ class PreviewSeed
 
   def sample_review
     {
+      # The difficulty levels deliberately disagree with the grades beside them:
+      # a "strong" on a straightforward problem and a "developing" on a
+      # demanding one are exactly the pairings the note exists to explain, and
+      # a reviewer should see them rather than three rows that agree.
       "code_review" => {
         "rating" => "solid", "correct" => "You named the N+1 and the fix in one breath.",
         "missed" => "Worth saying what includes does to the query count.",
         "better_questions" => "Where else does this loop pattern appear?",
         "next_step" => "Read the Rails guide on eager loading.",
-        "improved_code" => "@orders = Order.includes(:customer)"
+        "improved_code" => "@orders = Order.includes(:customer)",
+        "difficulty" => { "level" => "moderate",
+                          "reason" => "The extra query hides behind an association read inside the loop." }
       },
       "pattern" => {
         "rating" => "strong", "correct" => "Good instinct on who owns the orchestration.",
-        "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => ""
+        "missed" => "", "better_questions" => "", "next_step" => "", "improved_code" => "",
+        "difficulty" => { "level" => "straightforward",
+                          "reason" => "One decision, with the tradeoff stated in the question itself." }
       },
       "challenge" => {
         "rating" => "developing", "correct" => "The happy path is right.",
         "missed" => "An empty collection is not handled.",
         "better_questions" => "What should this return for no orders?",
         "next_step" => "Add a guard clause and a test for the empty case.",
-        "improved_code" => ""
+        "improved_code" => "",
+        "difficulty" => { "level" => "demanding",
+                          "reason" => "The empty case is never mentioned, so noticing it is most of the work." }
       }
     }
   end

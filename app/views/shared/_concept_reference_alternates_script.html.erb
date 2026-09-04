@@ -1,0 +1,97 @@
+<%# Wires every "try a different explanation" control on the page. Its partial
+    renders once per section that has a cached reference, and /history renders
+    every entry's sections, so this is emitted into the layout's shared
+    :page_scripts region only on the FIRST call anywhere on the page — same
+    guard and reasoning as shared/_syntax_highlighting_script. The single copy
+    still reaches every control because the script scans the whole document,
+    not just the caller's own markup. %>
+<% unless @concept_reference_alternates_script_emitted %>
+  <% @concept_reference_alternates_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script>
+// Inline script matching the app's convention; Stimulus is not wired here.
+// Nothing here is persisted: the framings live in this tab and are gone on
+// reload, deliberately (see ConceptReferencesController#explain_differently).
+(() => {
+  const MAX = <%= ConceptReferencesController::MAX_ALTERNATES_PER_CONCEPT %>;
+
+  // Keyed by reference id rather than by container, because one reference can
+  // render several times on a page — two sections of a day can carry the same
+  // concept, and /history renders many days. Per-container state would let the
+  // same person spend MAX paid calls in each copy of the same reference.
+  const framings = new Map();
+
+  document.querySelectorAll(".explain-concept-differently:not([data-cra-wired])").forEach(button => {
+    button.dataset.craWired = "1";
+    const container = button.closest(".concept-alternates");
+    const refId = container.dataset.referenceId;
+
+    button.addEventListener("click", async () => {
+      const containers = document.querySelectorAll(`.concept-alternates[data-reference-id="${refId}"]`);
+      const buttons = [...containers].map(c => c.querySelector(".explain-concept-differently")).filter(Boolean);
+      const status = container.querySelector(".alternate-status");
+
+      buttons.forEach(b => b.disabled = true);
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(container.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ prior_alternates: framings.get(refId) || [] })
+        });
+        // A session that expired while this page sat open redirects to the
+        // HTML login form, and fetch follows that redirect transparently: the
+        // status is 200 and res.ok is true, but the body is a page. Parsing
+        // therefore has to fail CLOSED — an earlier version fell back to {},
+        // which passed the res.ok check and then appended an undefined framing
+        // and removed the control. A proxy or unhandled 500 lands here too.
+        let data = null;
+        try { data = await res.json(); } catch { data = null; }
+        if (!res.ok) throw new Error((data && data.error) || res.status);
+        if (res.redirected) throw new Error("Your session expired — reload the page and try again.");
+        if (!data || data.status !== "ok" || !data.alternate) throw new Error("Couldn't generate that — try again");
+
+        framings.set(refId, [...(framings.get(refId) || []), data.alternate]);
+        let focused = null;
+        containers.forEach(c => {
+          const p = document.createElement("p");
+          p.className = "alternate-item";
+          p.textContent = data.alternate;
+          // Focusable but out of the tab order: the only thing that focuses it
+          // is the cap branch below, where the button holding focus is about
+          // to be removed.
+          p.tabIndex = -1;
+          c.insertBefore(p, c.querySelector(".explain-concept-differently"));
+          if (c === container) focused = p;
+        });
+        // Set, never cleared: the framing is inserted OUTSIDE this live region,
+        // so clearing it left a screen reader with silence on success. The cap
+        // wording also has to say the control is going away, since its removal
+        // is otherwise unannounced.
+        status.textContent = data.remaining > 0
+          ? "A different explanation was added above."
+          : "A different explanation was added above — that was the last one.";
+        if (data.remaining > 0) {
+          buttons.forEach(b => b.disabled = false);
+        } else {
+          // Before the removal, not after: removing the focused button drops
+          // focus to the body and loses the keyboard user's place.
+          if (focused) focused.focus();
+          buttons.forEach(b => b.remove());
+        }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't generate that — try again";
+        // Only re-enable what the cap still allows: a failure spends nothing
+        // server-side, but a retry after the cap was reached in another copy
+        // of this reference would just 422.
+        if ((framings.get(refId) || []).length < MAX) { buttons.forEach(b => b.disabled = false); }
+      }
+    });
+  });
+})();
+    </script>
+  <% end %>
+<% end %>

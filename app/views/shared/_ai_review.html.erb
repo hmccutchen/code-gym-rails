@@ -3,6 +3,17 @@
   <% next unless fb.is_a?(Hash) %>
   <div class="review-block">
     <h4><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h4>
+    <%# Directly under the grade badge, because it is context for reading that
+        grade and nothing else. Never a badge of its own: a second pill beside
+        the first would read as a second score about the engineer, which is the
+        one thing this must not be. Read through #difficulty_for, which drops a
+        level this app has no vocabulary for. %>
+    <% if (difficulty = response.difficulty_for(section)) %>
+      <p class="difficulty-note">
+        <%= t("review.difficulty_note", level: difficulty["level"]) %>
+        <%= difficulty["reason"] %>
+      </p>
+    <% end %>
     <% if response.self_rating_favorable?(section) && response.ai_rating_unfavorable?(section) %>
       <p class="calibration-note"><%= t("review.calibration_note", rating: response.self_rating_label(section)) %></p>
     <% end %>

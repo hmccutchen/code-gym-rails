@@ -172,6 +172,11 @@ class FakeService < AiService
     "improved_code" => ""
   }.freeze
 
+  # One sentence, reused for every section: the fake's job is to make the note
+  # render, not to be interesting. The LEVEL varies (see #difficulty_assessment)
+  # so a spec or a preview can see the range rather than one word forever.
+  DIFFICULTY_REASON = "Rated from the problem text alone, with no sight of anyone's answer."
+
   CONCEPT_REFERENCE = {
     "tagline" => "One clear rule, not a grab-bag of tips.",
     "explanation" => "This concept has one core idea worth internalizing, with a couple of situations where it matters most.",
@@ -183,6 +188,14 @@ class FakeService < AiService
     RUBY
     "senior_lens" => "A senior engineer reaches for this automatically, without having to reason it out each time."
   }.freeze
+
+  # The concept-reference reframing. Deliberately a different angle from
+  # EXPLAIN_DIFFERENTLY_TEXT below rather than a copy of it, so a spec that
+  # confused the two surfaces fails instead of passing on the same string.
+  CONCEPT_ALTERNATE_TEXT =
+    "Picture a library where every book you request is fetched by a separate courier trip. One trip for one book is " \
+    "fine; a hundred trips for a hundred books is the whole afternoon gone. The fix is always the same shape — ask " \
+    "for everything you know you need in one trip."
 
   EXPLAIN_DIFFERENTLY_TEXT =
     "Think of it like a relay race — each service object is one runner, and its only job is to hand off cleanly " \
@@ -223,10 +236,18 @@ class FakeService < AiService
 
   private
 
-  # Both raises are deliberately bare RuntimeErrors, not AiService::Error:
-  # GenerateDailyExercisesJob rescues the AiService hierarchy and turns it into
-  # a persisted, user-facing failure message, which would bury a broken fake as
-  # "generation failed" instead of failing the spec that caused it.
+  # All three raises below are deliberately bare RuntimeErrors, not
+  # AiService::Error: GenerateDailyExercisesJob rescues the AiService hierarchy
+  # and turns it into a persisted, user-facing failure message, which would bury
+  # a broken fake as "generation failed" instead of failing the spec that caused
+  # it.
+  #
+  # The difficulty one is the exception that proves the rule — it can only ever
+  # run inside AiService#safe_difficulty_assessment, whose whole job is to
+  # swallow everything so a note never costs a review, so it is a development
+  # aid rather than a guarantee. What actually catches a broken section scan is
+  # fake_service_spec's "returns a difficulty for every section it was asked
+  # about"; keep that spec if this raise is ever removed.
   def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     text =
       case system
@@ -237,8 +258,12 @@ class FakeService < AiService
         raise "FakeService could not extract the section key from the review prompt" if section.blank?
 
         REVIEW_SECTION.to_json
+      when /rating how hard/
+        difficulty_assessment(prompt).to_json
       when /writing a concise, durable reference/
         CONCEPT_REFERENCE.to_json
+      when /re-teaching one concept/
+        CONCEPT_ALTERNATE_TEXT
       when /re-explaining one point/
         EXPLAIN_DIFFERENTLY_TEXT
       when /answering a follow-up question/
@@ -254,6 +279,26 @@ class FakeService < AiService
       end
 
     { text: text, input_tokens: 0, output_tokens: 0 }
+  end
+
+  # Unlike REVIEW_SECTION, which is one flat hash reused for every section, the
+  # difficulty pass is a single call answering about several sections at once,
+  # so the response has to be keyed by the sections actually asked about.
+  # Levels rotate through the vocabulary by position: deterministic, and it
+  # keeps a multi-section day from showing the same word three times.
+  def difficulty_assessment(prompt)
+    # Intersected with the registry rather than trusted raw: the prompt embeds
+    # each section's own material, and a snippet containing its own "## Heading"
+    # line would otherwise be read as a section, shifting every level assigned
+    # after it. ExerciseSection is the authority on what a section key is, so a
+    # fake meant to be deterministic does not quietly become content-dependent.
+    sections = prompt.scan(/^## (\w+)$/).flatten & ExerciseSection.keys
+    raise "FakeService could not extract any section key from the difficulty prompt" if sections.empty?
+
+    levels = DailyResponse::DIFFICULTY_LEVELS
+    sections.each_with_index.to_h do |section, index|
+      [ section, { "level" => levels[index % levels.size], "reason" => DIFFICULTY_REASON } ]
+    end
   end
 
   def build_connection

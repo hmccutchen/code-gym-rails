@@ -2,7 +2,12 @@
     question whenever a cached ConceptReference exists. Collapsed by default;
     callers may pass `open: true` for a concept's first-ever exposure while
     answering — see ConceptReferencesHelper#first_exposure?. `reference` is a
-    ConceptReference. %>
+    ConceptReference.
+
+    The "try a different explanation" control lives INSIDE the disclosure, so
+    <details> hides it whenever the dropdown is collapsed without any script
+    doing so. What it produces is never persisted — see
+    ConceptReferencesController#explain_differently. %>
 <% open = local_assigns.fetch(:open, false) %>
 <details class="ref"<%= " open".html_safe if open %>>
   <summary>Reference — <%= reference.concept.humanize %>: how it works</summary>
@@ -11,6 +16,15 @@
     <p style="margin-bottom:.75rem"><%= reference.explanation %></p>
     <pre class="snippet"><code<% if (lang = hljs_language(reference.language)) %> data-hljs="<%= lang %>"<% end %>><%= reference.code_example %></code></pre>
     <p>🔭 <%= reference.senior_lens %></p>
+    <div class="concept-alternates" data-reference-id="<%= reference.id %>"
+         data-url="<%= explain_differently_concept_reference_path(reference) %>">
+      <%# type="button" is load-bearing, not stylistic: on the dashboard this
+          partial renders inside #gym-form, so a default-type button here would
+          submit the day's answers and chain into the review. %>
+      <button type="button" class="btn btn-ghost btn-sm explain-concept-differently">This didn't quite land — try a different explanation</button>
+      <span class="alternate-status" aria-live="polite"></span>
+    </div>
   </div>
 </details>
+<%= render "shared/concept_reference_alternates_script" %>
 <%= render "shared/syntax_highlighting_script" %>

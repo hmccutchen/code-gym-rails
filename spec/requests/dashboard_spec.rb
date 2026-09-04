@@ -620,6 +620,42 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include('<details class="ref" open>')
     end
 
+    it "offers a different explanation from inside the dropdown, before submission" do
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
+      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                           tagline: "Avoid the loop query", explanation: "e",
+                                           code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("This didn't quite land — try a different explanation")
+      expect(response.body).to include(%(data-url="#{explain_differently_concept_reference_path(reference)}"))
+    end
+
+    # This partial renders inside #gym-form on the dashboard, so a default-type
+    # button here would submit the day's answers and chain into the review.
+    it "renders that control as a non-submitting button" do
+      exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to match(/<button type="button"[^>]*class="[^"]*explain-concept-differently/)
+    end
+
+    it "offers it in the read-only render too, since the reference is the same either way" do
+      exercise = exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
+
+      get root_path
+
+      expect(response.body).to include("This didn't quite land — try a different explanation")
+    end
+
     it "renders the section scenario label" do
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
 
@@ -785,6 +821,42 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include(%(<div class="plan-excerpt">Add a leaderboard to the dashboard.))
       expect(response.body).not_to include("Which metric ranks users is unstated")
       expect(response.body).not_to include("Tie-breaking is unstated")
+    end
+  end
+
+  # The same discipline planted_ambiguities is held to, applied to the other
+  # direction of leak. A difficulty rating shown before or during answering
+  # would prime the engineer — "this one is demanding" is a hint — and the note
+  # is meant to reframe a result afterwards, not to set an expectation
+  # beforehand.
+  #
+  # The state below cannot arise through the app: #review refuses an
+  # unsubmitted response, so ai_review is nil until after a submit. That is the
+  # point. Forcing the field into existence early is what proves the answer
+  # form would not render it if a future path ever did, rather than proving
+  # only that nothing writes it today.
+  describe "the difficulty note before an answer exists" do
+    it "renders nowhere on the answer form, even for a response that somehow carries one" do
+      exercise = create_exercise
+      create_response(exercise, submitted: false, ai_review: {
+        "code_review" => { "rating" => "solid",
+                           "difficulty" => { "level" => "demanding", "reason" => "DIFFICULTY-SENTINEL-REASON" } }
+      })
+
+      get root_path
+
+      expect(response.body).to include("Find the bug")
+      expect(response.body).not_to include("DIFFICULTY-SENTINEL-REASON")
+      expect(response.body).not_to include("This problem was rated")
+      DailyResponse::DIFFICULTY_LEVELS.each { |level| expect(response.body).not_to include(level) }
+    end
+
+    it "does not exist yet on a freshly generated day" do
+      create_exercise
+
+      get root_path
+
+      expect(response.body).not_to include("This problem was rated")
     end
   end
 

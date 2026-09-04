@@ -221,7 +221,7 @@ User interacts:
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), anonymized_at (nullable — set on self-service deletion) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, a rotating third key, a rotating fourth key), language, generated_at, regenerated_at |
-| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), rating enum, feedback_text, ai_review (jsonb), concept_tags (jsonb) |
+| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), feedback_text, ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
 
 ## Key Design Decisions
@@ -282,6 +282,50 @@ User interacts:
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**: `code_review` rolls one of three content modes per day (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`, roughly even) — `application_code` (realistic snippet, unchanged from before modes existed), `test_file` (a realistic test file exhibiting one test smell, in the day's `test_framework`), or `schema_review` (the day's `schema_artifact` — a Rails migration or a Prisma schema change with its migration — carrying one planted data-modeling flaw). Only `schema_review` narrows the vocabulary, to `AiService::DATA_MODELING_CONCEPTS` (`ProblemSetIngest.code_review_vocabulary`); the other two modes get the full list minus those concepts, unchanged from before modes existed. `pattern` and the rotating third deliberately keep the full vocabulary regardless of the day's `code_review` mode, so a due data-modeling retention check has somewhere to land on a non-schema-review day that includes either of them — a short day may include neither, and `DailyPlan` only offers a check a chosen kind can host. Because that lets a data-modeling concept surface where no schema artifact is shown, `AiService#data_modeling_idiom_guidance` adds one prompt line — stated once for all sections, named from the constant — telling the model to express such a concept in the host section's own idiom (a `pattern` question about `wrong_cardinality` asks how the relationship should be modeled, not for a migration to review). Advisory prompt text, no new machinery; `[retention]` logs are the check on whether it lands.
 - **Meta-skill concepts**: `AiService::META_SKILL_CONCEPTS` (`reading_for_intent`, `spotting_unstated_assumptions`, `separating_symptom_from_cause`) name reasoning skills rather than technical topics, so `ConceptReference` delivers "how to think about this" on a real problem instead of on a tips page. They sit in both `RAILS_CONCEPTS` and `JS_CONCEPTS` like the data-modeling concepts, and for a structural reason rather than a preference: `ConceptBucket` dispatches on section key and never on concept, so a bucket of their own would require a section kind. Per-language mastery is the accepted cost; being outside `LANGUAGE_AGNOSTIC_VOCABULARIES` is the gain, since their reference then shows real code. Their hosts are `code_review` (non-schema modes), `pattern`, and `challenge` — every other kind draws a disjoint vocabulary and is excluded without an exclusion being written, and `parsons_problem` excludes them explicitly (`excluded_vocabulary_keys`) because a sequencing format has nothing to read. Because these are fuzzier than `n_plus_one`, `AiService#meta_skill_framing_guidance` adds one prompt line — stated once for all sections, named from the constant — requiring the section to still contain one findable issue that the concept only *frames*. No grading note changed; the generic rubric grades these, and it needs something missable to have been there. `AiService#can_host?` (given the concept, section key, and the day's generation language) derives third-slot retention hosting from `ProblemSetIngest.selectable_vocabulary_for` rather than restating it, so this exclusion — and the data-modeling one — is correct by construction rather than by coincidence.
+- **Alternate framings of a concept reference**: `ConceptReference` auto-expands
+  on a concept's true first exposure so a beginner has a foothold before
+  attempting anything — but it is one auto-generated explanation with no
+  fallback, and if it doesn't land there is nowhere to go. A low-weight control
+  *inside the disclosure* asks
+  `ConceptReferencesController#explain_differently` for the same concept
+  explained another way, capped at
+  `MAX_ALTERNATES_PER_CONCEPT`. The duck is deliberately not the answer to this:
+  `DUCK_SYSTEM_PROMPT`'s explain mode is scoped to "Describe only what is
+  already on their screen", which is describing a problem rather than
+  re-teaching a concept from zero, and that scoping is intentional.
+
+  **Nothing is persisted** — not a row, not a column. The framings live in the
+  tab that asked for them, exactly as the duck thread's turns do, and the cap is
+  the same soft, request-level kind for the same reason (each user spends their
+  own key). The shared `ConceptReference` row is read and never written, so one
+  engineer asking for another angle cannot change what a teammate reads.
+  Storing per user was considered and rejected as heavier than the value;
+  storing on the reference itself would have made the cap a race between
+  teammates and enlarged the cached artifact everyone reads. Accepted cost: a
+  framing is gone on reload, and meeting the concept again next week costs
+  another call.
+
+  **The safety property is the signature, not the prompt.**
+  `#explain_differently` has no "don't hint at the answer" rule and needs none —
+  it only ever runs post-review. This surface runs *before* a day is submitted,
+  so `AiService#explain_concept_differently(user, reference, prior_alternates:)`
+  is handed no exercise, no response and no section: it cannot reach today's
+  problem because today's problem is never passed in, the same guarantee
+  `#generate_concept_reference` and `#assess_difficulty` carry. A prompt line
+  restates it; the signature is what holds it, and a spec pins the parameter
+  list.
+
+  **Why not a teach-then-practice rotation** (considered, rejected): apps that
+  gate practice behind a lesson step do it mainly because immediate recall of
+  just-read material creates an illusion of competence — it feels like learning
+  but transfers worse than spaced, effortful retrieval. This app's model
+  (attempt first, reference available immediately, the concept resurfacing later
+  in a different framing via the mastery loop) is the better-evidenced one. The
+  single legitimate reason to front-load teaching — a true beginner has zero
+  foothold — is already covered by the first-exposure auto-expand, and
+  difficulty-adapts-to-experience is already live through mastery tiers and
+  scaffold fade. It just isn't branded as a visible "rotation", consistent with
+  tier state staying invisible everywhere else here.
 - **The fourth slot**: an optional fourth `problem_set` key, alongside `code_review`/`pattern`/the rotating third — `DailyPlan::NO_FOURTH_TRACK` lets a day give it up entirely, and `AiService#fourth_reinforcement_line` reads as nil-able rather than assuming the key is always present. When present, it rotates 50/50 between `plan_review` (review a flawed implementation plan) and `ambiguity_hunt` (list what needs clarifying about a vague feature request). Each has its own closed vocabulary (`AiService::PLAN_REVIEW_CONCEPTS` / `AMBIGUITY_HUNT_CONCEPTS`) and its own `ConceptBucket` — language-independent, like `architecture`, so its mastery/reinforcement history never mixes with a programming-language bucket. `DailyPlan#for` decides the fourth slot's kind and its reinforcement/retention state on a track fully independent of the three-slot one, since the vocabularies can never mix. The slot holds exactly one concept (`DailyPlan::FOURTH_SLOT_CAPACITY`), so reinforcement is truncated to one and gives the slot up entirely when an overdue retention check claims it — never both. `ambiguity_hunt` also returns a hidden `planted_ambiguities` list — the answer key for grading coverage — which must never reach the rendered page, a pre-submission AI context (e.g. the duck thread), or log storage (`AiService#without_answer_key` strips it from the difficulty-diagnostics payload, the one place a whole `problem_set` is serialized); `plan_review`/`ambiguity_hunt`'s `plan_excerpt`/`request` fields are visible on screen and so are safe to include there. Since coverage grading has no meaning without that list, `ProblemSetIngest#reject_unusable_answer_key!` validates it at the provider boundary and raises `InvalidResponseError` when no usable entry came back — but only when `ambiguity_hunt` actually won the fourth slot, since an answer key nothing downstream will read is no reason to discard the rest of the day's sections — the one normalizer that can refuse rather than repair. A *wrong count* is not a failure: `ExerciseSection::AmbiguityHunt::PLANTED_COUNT` is the generator's target, but nothing downstream reads it (the review prompt lists the ambiguities, never counts them), so a short list still grades and rejecting it would discard the rest of a variable-length day over the likeliest deviation an LLM makes on a counted list. Long lists are truncated to `ExerciseSection::AmbiguityHunt::MAX_PLANTED`.
 - **Which sections count**: `DailyExercise#active_section_keys` — code_review plus whichever of pattern/third/fourth today's plan chose, precedence-resolved for third and fourth — is the single authority for "how many sections does this day have." A day holds 2-4 sections; `SectionCount`/`SectionRotation` decide how many and which, but `active_section_keys` is still the one place anything downstream reads the answer. Every denominator (progress bar, `completeness`, history's count, the generation prompt's history line), the numerator (`DailyResponse#answered_sections`, via `DailyResponse#section_keys`), the submit gate, the answer/rating param slices, the duck-thread section guard, and the review fan-out derive from it. Never `problem_set.keys`, and never `answers.keys`: a payload can hold more third- or fourth-shaped keys than the page renders (`FakeService` holds all eight deliberately, and a provider can return an extra alternate), and a regenerated day can leave an answer behind for a section it no longer presents — counting either reports a section count the page never showed.
 - **Adaptive sizing toggle**: `User#adaptive_set_size` (default true) is a hard override of the count only, not a reset to a default — `SectionCount.for` takes an early return to `ExerciseSection.slot_count` before any sizing logic runs when it's off, so there is no path from that logic to the output for that user regardless of how the sizing rule changes later. `SectionRotation`'s starvation-weighted kind selection still runs either way: it is not sizing, and it improves a full 4-section day too, so turning the toggle off does not skip the exercise-history query — only the sizing computation. A boolean is the right shape for a single-user-per-account app; if this app ever needed several floors per user, a floor preference would express the intent better than a single on/off switch.
@@ -290,6 +334,46 @@ User interacts:
 - **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule).
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so every `answers[section].presence` reader — review prompt, history, `recent_performance` — sees what it saw before scaffolds existed.
 - **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
+- **Post-hoc difficulty rating**: once a section is reviewed, its review block
+  also shows how hard the PROBLEM was — `straightforward` / `moderate` /
+  `demanding` (`DailyResponse::DIFFICULTY_LEVELS`) plus a one-sentence reason —
+  so a rough grade can read as "this was legitimately hard" rather than as
+  unexplained struggle. Three levels in problem-describing words, deliberately
+  disjoint from the 4-level AI grade badge it renders under (a spec holds the
+  vocabularies disjoint), because two same-shaped ratings side by side would be
+  read as one axis. **It must never become a second readout of
+  `ConceptMastery`'s tier**, which the mastery design keeps invisible precisely
+  so it cannot shape engagement — so it is assessed at review time by
+  `AiService#assess_difficulty`, which is handed *no* `daily_response` and none
+  of the user's history. The signature is the guarantee: it cannot see the
+  answers, the self-ratings, the grade it runs beside, or the tier, because
+  none of them are passed to it. Generation-time was rejected for exactly this
+  reason — the generator has just been told "for any concept marked
+  `(reduced)` … ease the difficulty only", so a self-assessment there grades
+  the instruction it was given; folding it into the grading call was rejected
+  because that call's shared context carries every answer and self-rating, and
+  a rating drawn from those launders performance (and so, indirectly, tier)
+  into "difficulty". Its per-section material comes from
+  `AiService#duck_section_context`, already the single authority for "the
+  section as the engineer sees it", so it inherits that method's answer-key
+  exclusion rather than restating it. Cost is one extra provider call per
+  review *attempt* (not per section), billed as `assess_difficulty` and capped
+  by `AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS` — which is derived from the
+  largest valid reply and, by being passed at all, is what turns off the
+  extended thinking `ClaudeService` would otherwise leave on. It runs as one
+  more thread in the existing fan-out, and once grading finishes it gets only
+  `DIFFICULTY_ASSESSMENT_GRACE_SECONDS` to land before the review goes out
+  without it — so the note can add at most that grace period to a request,
+  never the provider's whole retry budget; a thread abandoned that way still
+  records its `ApiUsage` row, which is honest accounting for a call the
+  provider already billed. Any failure in it is swallowed — `StandardError`
+  wide, not just `AiService::Error`, because `Thread#value` re-raises past
+  `ResponsesController#review`'s rescues, and a note must never cost the
+  engineer the review itself. Stored at
+  `ai_review[section]["difficulty"]` — no migration, and no pre-answer surface
+  can reach it even in principle, since `ai_review` does not exist until a
+  *submitted* response is reviewed. Display-only: nothing about tier
+  transitions, retention scheduling, or generation guidance changed.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
@@ -449,7 +533,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 
 ## File Map
 
-- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging
+- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, and rejects an unusable ambiguity-hunt answer key, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
@@ -465,6 +549,8 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/controllers/sessions_controller.rb` — code request + verification, with rate limits
 - `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
+- `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
+- `app/views/shared/_concept_reference_alternates_script.html.erb` — wires that control across the page, keying the framings already shown by reference id so one reference rendering several times still shares one cap
 - `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
 - `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
 - `app/services/preview_mail.rb` — inline mail delivery in preview apps, gated on `PreviewEnvironment.active?`, so login never needs a worker
