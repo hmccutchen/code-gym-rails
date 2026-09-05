@@ -48,6 +48,24 @@ RSpec.describe "Push subscriptions", type: :request do
       end
     end
 
+    # Postgres `character varying` with no length specifier is unlimited — the
+    # 255-byte default is a MySQL convention, not a Rails one — and 2048 bytes
+    # sits under the ~2704-byte btree limit the UNIQUE index on this column
+    # imposes. Both halves matter, so this drives a real endpoint at the bound
+    # through to a persisted row rather than asserting the column type.
+    it "stores an endpoint at the full permitted length" do
+      configure_vapid
+      login_as(user)
+      prefix   = "https://push.example.com/"
+      endpoint = prefix + ("a" * (PushSubscriptionsController::MAX_ENDPOINT_LENGTH - prefix.length))
+      expect(endpoint.length).to eq(PushSubscriptionsController::MAX_ENDPOINT_LENGTH)
+
+      post push_subscription_path, params: valid_params.merge(endpoint: endpoint)
+
+      expect(response).to have_http_status(:created)
+      expect(user.push_subscriptions.sole.endpoint).to eq(endpoint)
+    end
+
     it "rejects an endpoint longer than the column can be trusted to hold" do
       configure_vapid
       login_as(user)
@@ -121,6 +139,19 @@ RSpec.describe "Push subscriptions", type: :request do
       get account_path
 
       expect(response.body).to include("const VAPID_KEY = \"public\"")
+    end
+
+    # fetch resolves for a 4xx and would follow a logged-out redirect to a 200,
+    # so without both of these a rejected enrolment reloads the page looking
+    # like success and the user is never told it failed.
+    it "treats a rejected or redirected enrolment as a failure, not a success" do
+      configure_vapid
+      login_as(user)
+
+      get account_path
+
+      expect(response.body).to include("redirect: \"error\"")
+      expect(response.body).to include("if (!response.ok) throw new Error")
     end
 
     # The launch re-subscribe is the whole iOS mitigation: a dropped endpoint is

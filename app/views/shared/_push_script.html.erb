@@ -34,17 +34,27 @@
       return Uint8Array.from(raw, (character) => character.charCodeAt(0))
     }
 
+    // A resolved fetch is not a saved subscription: fetch settles normally for a
+    // 4xx, and an expired session answers this POST with a redirect to /login
+    // that it would otherwise follow to a cheerful 200. Both have to reject, or
+    // the enable flow reloads on a failed enrolment and leaves the user looking
+    // at an unchanged toggle with nothing explaining why.
     function register(subscription) {
       const json = subscription.toJSON()
 
       return fetch(REGISTER_PATH, {
         method: "POST",
+        redirect: "error",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
         body: JSON.stringify({
           endpoint: json.endpoint,
           p256dh: json.keys.p256dh,
           auth: json.keys.auth
         })
+      }).then(function (response) {
+        if (!response.ok) throw new Error("This device couldn't be registered for reminders — try again.")
+
+        return response
       })
     }
 
