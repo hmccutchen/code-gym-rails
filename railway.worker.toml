@@ -9,4 +9,16 @@ builder = "nixpacks"
 [deploy]
 startCommand = "bundle exec rake solid_queue:start"
 # No healthcheckPath: the worker exposes no HTTP server.
-# No preDeployCommand: migrations already run once via the web service's pre-deploy step.
+
+# Waits for the schema; does not create it. Migrations still run exactly once,
+# from the web service's pre-deploy step -- Railway starts the two services
+# concurrently and orders neither, so on a pull-request deployment (empty
+# database) a worker that wins the race dies on boot reading
+# solid_queue_recurring_tasks. See SchemaWait for why this waits instead of
+# running a second db:migrate here: against an empty database db:migrate
+# performs an unlocked schema LOAD, so two containers doing it concurrently
+# race and the loser dies on a duplicate constraint.
+#
+# Needs no [environments.pr.deploy] override: unlike the web service's
+# pre-deploy step this runs no preview:seed, and so needs no PREVIEW_APP.
+preDeployCommand = ["bundle exec rails db:wait_for_schema"]

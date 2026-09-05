@@ -143,6 +143,7 @@ advisory signal; it is not evidence that anything was verified.
 - **Solid Queue** — background jobs + recurring 8am weekday cron (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
+- **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
 - **BCrypt** — login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
 - **Railway** — hosting (web + worker services, postgres service)
@@ -219,10 +220,11 @@ User interacts:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), anonymized_at (nullable — set on self-service deletion) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), push_reminders_enabled (boolean, default false), anonymized_at (nullable — set on self-service deletion) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, a rotating third key, a rotating fourth key), language, generated_at, regenerated_at |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), feedback_text, ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
+| `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 
 ## Key Design Decisions
 
@@ -474,8 +476,72 @@ User interacts:
   content stays below the status bar and nothing needs `viewport-fit=cover` or
   safe-area insets. `public/icon.svg` is the committed source of the icon;
   `icon.png`, `icon-192.png` and `apple-touch-icon.png` are rasterized from it.
-  No service worker: nothing registers one, and iOS does not need one for
-  standalone mode.
+  Standalone mode itself still needs no service worker — but one is registered
+  now, for the daily reminder (see "Push reminders" below); `GET
+  /service-worker.js` serves it from the root path, since a worker's scope is
+  the directory it is served from.
+- **Push reminders**: an optional notification each weekday when the day's set
+  is ready, turned on and off on the Account page. `WebPushCredentials` is the
+  single authority for "is push configured here at all" — with no VAPID pair in
+  ENV the control doesn't render, the layout emits no script, `POST
+  /push_subscription` 404s and `SendPushReminderJob` returns without contacting
+  a push service, so an unconfigured deployment offers nothing that could only
+  fail. Setup and key generation: `docs/deploy/web-push-setup.md`.
+
+  **The endpoint is held to a host allowlist at the boundary.**
+  `PushSubscriptionsController::ALLOWED_ENDPOINT_HOSTS` matches by domain
+  suffix, because an endpoint is minted by the browser's own push service and
+  can only come from a known handful of hosts. Without it the stored endpoint
+  is an arbitrary URL chosen by whoever is logged in, which the worker then
+  POSTs to every morning from inside the deployment's network — a blind,
+  authenticated SSRF primitive. A refused host is logged with its name, so a
+  browser using a service the list doesn't yet name is diagnosable rather than
+  a silent failure to enrol.
+
+  **Intent and transport are separate facts, deliberately.**
+  `User#push_reminders_enabled` is the answer to "does this person want
+  reminders"; `PushSubscription` rows are the endpoints that can currently
+  reach them. iOS drops subscriptions on its own, so an endpoint has to be able
+  to die without taking the user's answer with it — that is what lets the next
+  launch re-register silently instead of asking again for a permission the
+  browser already granted. Turning reminders off clears both; anonymizing an
+  account clears both, since a home-screen install keeps its browser-side
+  subscription after the account is gone.
+
+  **The reminder is enqueued by `GenerateDailyExercisesJob`'s cron branch, not
+  scheduled on its own.** "It is this user's 8am on a weekday" already has an
+  owner and a second cron entry would be a second place for it to drift. That
+  branch's `exists?` check therefore gates the whole branch rather than sitting
+  only inside `generate_now`: the cron runs hourly, and leaving it downstream
+  would let every later run re-enqueue the reminder until midnight. The
+  on-demand branch deliberately doesn't enqueue — a user who triggered
+  generation by opening the dashboard is already looking at the set.
+
+  **The permission call must be the first synchronous statement in the click
+  handler.** iOS grants a prompt only to a request made synchronously inside a
+  user gesture and fails *silently* otherwise — no prompt, no console error.
+  So `accounts/_push_reminders` calls `Notification.requestPermission()` before
+  anything else, the VAPID public key is rendered into the page rather than
+  fetched, and the service worker is registered inside the resulting `.then()`.
+  A request spec pins the key's presence in the page, since that is what
+  removes the round trip that would otherwise have to precede the call.
+  Capability is tested as `"PushManager" in window` rather than by sniffing
+  `display-mode` or an iOS version: on iOS that property is simply absent
+  outside a Home Screen app, which is the thing actually worth knowing and
+  stays true however a given release reports itself.
+
+  **Accepted limitation, not a defect to perfect away:** web push on iOS is
+  materially less reliable than native push. Subscriptions are dropped after
+  inactivity or for no visible reason, delivery rates well below native are
+  widely reported, and a user's only recovery is often toggling the OS setting
+  or re-adding the Home Screen app. Two mitigations are built in — `PushDelivery`
+  prunes an endpoint the moment a push service reports it gone (404/410), and
+  every page load re-subscribes and re-registers (`shared/_push_script`,
+  skipping the write when the endpoint is one the server already holds). The
+  second has a hole that cannot be closed from here: it only repairs the
+  subscription of someone who still opens the app, and a user who has drifted
+  away — exactly who the reminder is for — generates no launch for it to run
+  in. Desktop and Android endpoints are stable and none of this applies to them.
 
 ## Railway Deployment
 
@@ -484,6 +550,7 @@ User interacts:
 - Services: web, worker, postgres
 - Web start command: `bundle exec puma -C config/puma.rb` (set in `railway.toml`; don't use `rails server -p $PORT` — Railway start commands run in exec form, so `$PORT` is never shell-expanded, while puma reads `PORT` from ENV)
 - Worker start command: `bundle exec rake solid_queue:start` (set in `railway.worker.toml`; the worker service's Settings → Config-as-code file path must point at `/railway.worker.toml`, otherwise it inherits the web config and fails healthchecks)
+- Worker pre-deploy: `bundle exec rails db:wait_for_schema` (`SchemaWait`). Railway starts web and worker concurrently and orders neither, so on a PR app — where the database starts empty — a worker that wins the race dies on boot reading `solid_queue_recurring_tasks`. It waits rather than migrating: migrations keep one owner (the web pre-deploy), because `db:migrate` against an empty database performs an *unlocked schema load*, so a second migrator races and the loser dies on a duplicate constraint
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
 ## What Still Needs Work
@@ -551,6 +618,15 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
 - `app/controllers/concept_references_controller.rb` — one action: the same concept explained another way, on demand from inside its own disclosure. Persists nothing; owns the cap, since there is no model data for it to live on
 - `app/views/shared/_concept_reference_alternates_script.html.erb` — wires that control across the page, keying the framings already shown by reference id so one reference rendering several times still shares one cap
+- `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
+- `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
+- `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
+- `app/jobs/send_push_reminder_job.rb` — the morning nudge, fanned out over one user's endpoints; enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately
+- `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
+- `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
+- `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
+- `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
+- `app/services/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
 - `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
 - `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
 - `app/services/preview_mail.rb` — inline mail delivery in preview apps, gated on `PreviewEnvironment.active?`, so login never needs a worker

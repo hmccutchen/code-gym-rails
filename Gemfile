@@ -26,6 +26,11 @@ gem "resend"
 # Offset pagination for the History page (HistoryController)
 gem "pagy", "~> 43.6"
 
+# VAPID-signed Web Push delivery for the daily reminder (PushDelivery).
+# The reminder is best-effort: the gem is only ever reached from a background
+# job, so a push failure cannot surface on a request.
+gem "web-push", "~> 3.1"
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 

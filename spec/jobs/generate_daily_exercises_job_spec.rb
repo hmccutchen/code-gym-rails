@@ -271,4 +271,53 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
   end
+
+  describe "the push reminder" do
+    def stub_generation_for(u)
+      svc = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+      allow(AiService).to receive(:for).with(u).and_return(svc)
+    end
+
+    let(:pac) { User.create!(email: "reminded@example.com", name: "Pac", provider: "anthropic", api_key: "sk-ant-test", time_zone: "America/Los_Angeles") }
+
+    it "enqueues one for the batch that generated the set" do
+      stub_generation_for(pac)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform }
+          .to have_enqueued_job(SendPushReminderJob).with(user_id: pac.id).once
+      end
+    end
+
+    # The cron runs hourly. Reading "is there a set for today" only inside
+    # generate_now would leave every run after the generating one free to
+    # enqueue again, and the nudge would repeat every hour until midnight.
+    it "does not enqueue again on later runs the same day" do
+      stub_generation_for(pac)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) { described_class.new.perform }
+
+      travel_to(Time.utc(2026, 7, 13, 16, 0)) do
+        expect { described_class.new.perform }.not_to have_enqueued_job(SendPushReminderJob)
+      end
+    end
+
+    it "does not enqueue for an on-demand generation" do
+      stub_generation_for(pac)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform(user_id: pac.id) }.not_to have_enqueued_job(SendPushReminderJob)
+      end
+    end
+
+    it "does not enqueue when the provider failed and no set exists" do
+      svc = instance_double(ClaudeService)
+      allow(svc).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
+      allow(AiService).to receive(:for).with(pac).and_return(svc)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform }.not_to have_enqueued_job(SendPushReminderJob)
+      end
+    end
+  end
 end

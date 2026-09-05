@@ -6,6 +6,9 @@
   .account-actions { display: flex; align-items: center; gap: 1.25rem; }
   .generation-toggle { margin-top: 2.5rem; }
   .generation-toggle p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
+  .reminder-toggle { margin-top: 2rem; }
+  .reminder-toggle p { color: var(--muted); font-size: .85rem; margin-bottom: .75rem; }
+  .reminder-status { margin-top: .75rem; margin-bottom: 0; }
   .danger-zone { margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 2rem; }
   .danger-zone h2 { font-size: 1rem; color: var(--red); margin-bottom: .4rem; }
   .danger-zone p { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
@@ -34,6 +37,10 @@
       <%= button_to "Pause automatic generation", toggle_generation_account_path, method: :patch, params: { paused: "1" }, class: "btn btn-ghost" %>
     <% end %>
   </div>
+
+  <%# Only where a VAPID keypair is configured — otherwise the control could
+      only ever fail. WebPushCredentials is the one authority for that. %>
+  <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
 
   <div class="danger-zone">
     <h2>Danger zone</h2>

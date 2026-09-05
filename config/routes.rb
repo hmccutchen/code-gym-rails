@@ -14,6 +14,13 @@ Rails.application.routes.draw do
   # MissingTemplate, a 500 on an unauthenticated path any crawler can hit.
   get "manifest.json" => "rails/pwa#manifest", as: :pwa_manifest, defaults: { format: :json }, format: false
 
+  # The service worker that receives a push and shows the notification. Served
+  # from the root path deliberately: a worker's default scope is the directory
+  # it is served from, and only a root-scoped one covers the whole app. Same
+  # format: false reasoning as the manifest above — /service-worker.js.html
+  # would otherwise reach the controller as HTML and raise MissingTemplate.
+  get "service-worker.js" => "rails/pwa#service_worker", as: :pwa_service_worker, defaults: { format: :js }, format: false
+
   # Not used by anything live today — the dashboard's generation-completion
   # signal is a polled JSON endpoint instead (this app loads no Turbo/
   # Stimulus JS, so a broadcast here would have no subscriber). Left mounted
@@ -35,6 +42,11 @@ Rails.application.routes.draw do
   resource :account, only: [ :show, :destroy ] do
     patch :toggle_generation, on: :member
   end
+
+  # Enrolment in the daily push reminder. Singular, and not nested under the
+  # account: a user's answer to "do you want reminders" is one thing however
+  # many browser endpoints happen to back it.
+  resource :push_subscription, only: [ :create, :destroy ]
 
   # Core app
   root "dashboard#show"
