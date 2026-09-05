@@ -540,6 +540,7 @@ User interacts:
 - Services: web, worker, postgres
 - Web start command: `bundle exec puma -C config/puma.rb` (set in `railway.toml`; don't use `rails server -p $PORT` — Railway start commands run in exec form, so `$PORT` is never shell-expanded, while puma reads `PORT` from ENV)
 - Worker start command: `bundle exec rake solid_queue:start` (set in `railway.worker.toml`; the worker service's Settings → Config-as-code file path must point at `/railway.worker.toml`, otherwise it inherits the web config and fails healthchecks)
+- Worker pre-deploy: `bundle exec rails db:wait_for_schema` (`SchemaWait`). Railway starts web and worker concurrently and orders neither, so on a PR app — where the database starts empty — a worker that wins the race dies on boot reading `solid_queue_recurring_tasks`. It waits rather than migrating: migrations keep one owner (the web pre-deploy), because `db:migrate` against an empty database performs an *unlocked schema load*, so a second migrator races and the loser dies on a duplicate constraint
 - Env vars already set in Railway: `RAILS_ENV`, `RAILS_MASTER_KEY`, all three `ACTIVE_RECORD_ENCRYPTION_*` keys, `DATABASE_URL` (references postgres service)
 
 ## What Still Needs Work
@@ -615,6 +616,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing
+- `app/services/schema_wait.rb` — blocks the worker's Railway pre-deploy step until the schema the Solid Queue supervisor boots against exists; waits rather than migrating, so migrations keep exactly one owner
 - `app/services/preview_environment.rb` — single authority for "is this a Railway PR deployment," derived from `PREVIEW_APP`
 - `app/services/preview_seed.rb` — demo content for PR apps; create-only, gated on `PreviewEnvironment.active?`
 - `app/services/preview_mail.rb` — inline mail delivery in preview apps, gated on `PreviewEnvironment.active?`, so login never needs a worker
