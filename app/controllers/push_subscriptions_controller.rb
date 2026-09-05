@@ -13,6 +13,24 @@ class PushSubscriptionsController < ApplicationController
 
   MAX_ENDPOINT_LENGTH = 2048
 
+  # A push endpoint is minted by the browser's own push service, so it can only
+  # come from a known handful of hosts. Without this the endpoint is an
+  # arbitrary URL chosen by whoever is logged in, which the worker then POSTs to
+  # every morning from inside the deployment's network — a blind, authenticated
+  # SSRF primitive. Matched by domain suffix, so per-region and per-tenant
+  # subdomains are covered without enumerating them.
+  #
+  # Add a host here if a teammate's browser uses a push service this list
+  # doesn't name; a rejection is logged with the host so that is diagnosable
+  # rather than a silent failure to enrol.
+  ALLOWED_ENDPOINT_HOSTS = %w[
+    fcm.googleapis.com
+    android.googleapis.com
+    push.services.mozilla.com
+    web.push.apple.com
+    notify.windows.com
+  ].freeze
+
   # POST /push_subscription
   def create
     return head :not_found unless WebPushCredentials.configured?
@@ -48,12 +66,26 @@ class PushSubscriptionsController < ApplicationController
   # Provider-shaped input from the browser, validated where it enters so
   # PushDelivery can assume an endpoint it can actually sign for.
   def valid_subscription?
-    endpoint = params[:endpoint].to_s
+    params[:p256dh].present? && params[:auth].present? && allowed_endpoint?
+  end
 
-    endpoint.present? &&
-      endpoint.length <= MAX_ENDPOINT_LENGTH &&
-      endpoint.start_with?("https://") &&
-      params[:p256dh].present? &&
-      params[:auth].present?
+  def allowed_endpoint?
+    endpoint = params[:endpoint].to_s
+    return false unless endpoint.present? && endpoint.length <= MAX_ENDPOINT_LENGTH
+
+    uri = URI.parse(endpoint)
+    return false unless uri.is_a?(URI::HTTPS)
+
+    allowed_host?(uri.host)
+  rescue URI::InvalidURIError
+    false
+  end
+
+  def allowed_host?(host)
+    return false if host.blank?
+    return true if ALLOWED_ENDPOINT_HOSTS.any? { |allowed| host == allowed || host.end_with?(".#{allowed}") }
+
+    Rails.logger.warn("[push] refused enrolment for unrecognised push host: #{host}")
+    false
   end
 end

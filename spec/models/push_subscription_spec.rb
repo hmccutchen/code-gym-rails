@@ -25,6 +25,46 @@ RSpec.describe PushSubscription, type: :model do
       expect(described_class.sole.p256dh_key).to eq("rotated")
     end
 
+    # The caller wraps this in a transaction. A bare RecordNotUnique there
+    # aborts it, so without the SAVEPOINT the retry's own query raises
+    # PG::InFailedSqlTransaction rather than recovering.
+    it "recovers inside a surrounding transaction when the insert loses a race" do
+      raised = false
+      allow(described_class).to receive(:find_or_initialize_by).and_wrap_original do |original, *args|
+        described_class.unscoped.create!(user: user, endpoint: "https://push.example.com/abc", p256dh_key: "x", auth_key: "y") unless raised
+        raised = true
+        original.call(*args)
+      end
+
+      result = ActiveRecord::Base.transaction { described_class.register!(**attributes) }
+
+      expect(result.p256dh_key).to eq("p256")
+      expect(described_class.count).to eq(1)
+      expect { described_class.count }.not_to raise_error
+    end
+
+    # Uniqueness is enforced twice and the validation fires first, so the loser
+    # of the race sees RecordInvalid at least as often as RecordNotUnique.
+    it "recovers when the uniqueness validation raises rather than the index" do
+      described_class.register!(**attributes.merge(p256dh_key: "stale"))
+
+      calls = 0
+      allow(described_class).to receive(:find_or_initialize_by).and_wrap_original do |original, *args|
+        calls += 1
+        calls == 1 ? described_class.new(endpoint: "https://push.example.com/abc") : original.call(*args)
+      end
+
+      result = described_class.register!(**attributes)
+
+      expect(result.p256dh_key).to eq("p256")
+      expect(described_class.count).to eq(1)
+    end
+
+    it "re-raises an invalid record that has nothing to do with the endpoint" do
+      expect { described_class.register!(**attributes.merge(p256dh_key: "")) }
+        .to raise_error(ActiveRecord::RecordInvalid)
+    end
+
     it "reassigns an endpoint that now belongs to a different user" do
       described_class.register!(**attributes)
       other = create_user_with_key(email: "other@example.com")

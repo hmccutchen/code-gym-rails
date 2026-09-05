@@ -51,6 +51,26 @@ RSpec.describe PushDelivery do
     expect(PushSubscription.exists?(subscription.id)).to be(true)
   end
 
+  # web-push drives Net::HTTP directly and rescues nothing, and
+  # SendPushReminderJob fans out over a user's endpoints in a plain loop — so
+  # anything escaping here takes that user's other devices down with it.
+  [
+    [ "a reset connection",       Errno::ECONNRESET ],
+    [ "an unreachable host",      Errno::EHOSTUNREACH ],
+    [ "a TLS handshake failure",  OpenSSL::SSL::SSLError ],
+    [ "a truncated response",     EOFError ],
+    [ "a malformed response",     Net::HTTPBadResponse ],
+    [ "a read timeout",           Net::ReadTimeout ],
+    [ "a DNS failure",            SocketError ]
+  ].each do |description, error|
+    it "swallows #{description} and keeps the endpoint" do
+      allow(WebPush).to receive(:payload_send).and_raise(error)
+
+      expect { expect(deliver).to be(false) }.not_to raise_error
+      expect(PushSubscription.exists?(subscription.id)).to be(true)
+    end
+  end
+
   it "does not contact a push service when no keypair is configured" do
     ENV.delete("VAPID_PUBLIC_KEY")
     expect(WebPush).not_to receive(:payload_send)

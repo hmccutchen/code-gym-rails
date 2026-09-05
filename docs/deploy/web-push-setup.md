@@ -42,6 +42,19 @@ expose `window.PushManager` in an ordinary tab, so the Account page disables
 the control and says so. The user must open Share → Add to Home Screen, launch
 Code Gym from that icon, and turn reminders on there.
 
+## If a teammate can't enrol
+
+`PushSubscriptionsController::ALLOWED_ENDPOINT_HOSTS` holds enrolment to the
+push services browsers actually use (FCM, Mozilla, Apple, WNS), matched by
+domain suffix. That closes an otherwise-blind SSRF: without it, any logged-in
+teammate could store an arbitrary URL that the worker POSTs to every morning
+from inside the deployment's network.
+
+The cost is that a browser using a service the list doesn't name cannot turn
+reminders on. That is visible rather than silent — the Account page shows the
+error, and the server logs `refused enrolment for unrecognised push host:` with
+the host. Add the host to the constant if it is legitimate.
+
 ## Reliability, honestly
 
 Web push on iOS is materially less reliable than native push, and this is a

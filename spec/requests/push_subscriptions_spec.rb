@@ -14,7 +14,7 @@ RSpec.describe "Push subscriptions", type: :request do
   end
 
   def valid_params
-    { endpoint: "https://push.example.com/abc", p256dh: "p256", auth: "auth" }
+    { endpoint: "https://fcm.googleapis.com/fcm/send/abc", p256dh: "p256", auth: "auth" }
   end
 
   describe "POST /push_subscription" do
@@ -26,13 +26,13 @@ RSpec.describe "Push subscriptions", type: :request do
 
       expect(response).to have_http_status(:created)
       expect(user.reload.push_reminders_enabled).to be(true)
-      expect(user.push_subscriptions.sole.endpoint).to eq("https://push.example.com/abc")
+      expect(user.push_subscriptions.sole.endpoint).to eq("https://fcm.googleapis.com/fcm/send/abc")
     end
 
     # Provider-shaped input from the browser, held at the boundary so
     # PushDelivery can assume an endpoint it can actually sign for.
     [
-      [ "a non-https endpoint", { endpoint: "http://push.example.com/abc" } ],
+      [ "a non-https endpoint", { endpoint: "http://fcm.googleapis.com/fcm/send/abc" } ],
       [ "a missing endpoint",   { endpoint: "" } ],
       [ "a missing p256dh key", { p256dh: "" } ],
       [ "a missing auth key",   { auth: "" } ]
@@ -56,7 +56,7 @@ RSpec.describe "Push subscriptions", type: :request do
     it "stores an endpoint at the full permitted length" do
       configure_vapid
       login_as(user)
-      prefix   = "https://push.example.com/"
+      prefix   = "https://fcm.googleapis.com/fcm/send/"
       endpoint = prefix + ("a" * (PushSubscriptionsController::MAX_ENDPOINT_LENGTH - prefix.length))
       expect(endpoint.length).to eq(PushSubscriptionsController::MAX_ENDPOINT_LENGTH)
 
@@ -70,9 +70,51 @@ RSpec.describe "Push subscriptions", type: :request do
       configure_vapid
       login_as(user)
 
-      post push_subscription_path, params: valid_params.merge(endpoint: "https://push.example.com/#{'a' * 3000}")
+      post push_subscription_path, params: valid_params.merge(endpoint: "https://fcm.googleapis.com/#{'a' * 3000}")
 
       expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    # A push endpoint is minted by the browser's own push service. Accepting an
+    # arbitrary URL would hand any logged-in teammate a blind, authenticated
+    # SSRF primitive: the worker POSTs to whatever is stored here every morning,
+    # from inside the deployment's network.
+    [
+      [ "an internal host",        "https://10.0.0.5/hook" ],
+      [ "localhost",               "https://localhost:5432/hook" ],
+      [ "cloud metadata",          "https://169.254.169.254/latest/meta-data/" ],
+      [ "an attacker's domain",    "https://evil.example.com/collect" ],
+      [ "a lookalike suffix",      "https://fcm.googleapis.com.evil.example/collect" ]
+    ].each do |description, endpoint|
+      it "refuses an endpoint on #{description}" do
+        configure_vapid
+        login_as(user)
+
+        post push_subscription_path, params: valid_params.merge(endpoint: endpoint)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(user.reload.push_reminders_enabled).to be(false)
+        expect(PushSubscription.count).to eq(0)
+      end
+    end
+
+    # Suffix matching, so per-region and per-tenant subdomains work without
+    # every one being enumerated.
+    [
+      "https://fcm.googleapis.com/fcm/send/abc",
+      "https://updates.push.services.mozilla.com/wpush/v2/abc",
+      "https://web.push.apple.com/abc",
+      "https://par02p.notify.windows.com/w/?token=abc"
+    ].each do |endpoint|
+      it "accepts a real push service endpoint (#{URI.parse(endpoint).host})" do
+        configure_vapid
+        login_as(user)
+
+        post push_subscription_path, params: valid_params.merge(endpoint: endpoint)
+
+        expect(response).to have_http_status(:created)
+        expect(user.push_subscriptions.sole.endpoint).to eq(endpoint)
+      end
     end
 
     it "refuses when no VAPID keypair is configured" do

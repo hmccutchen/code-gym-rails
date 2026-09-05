@@ -488,6 +488,16 @@ User interacts:
   a push service, so an unconfigured deployment offers nothing that could only
   fail. Setup and key generation: `docs/deploy/web-push-setup.md`.
 
+  **The endpoint is held to a host allowlist at the boundary.**
+  `PushSubscriptionsController::ALLOWED_ENDPOINT_HOSTS` matches by domain
+  suffix, because an endpoint is minted by the browser's own push service and
+  can only come from a known handful of hosts. Without it the stored endpoint
+  is an arbitrary URL chosen by whoever is logged in, which the worker then
+  POSTs to every morning from inside the deployment's network — a blind,
+  authenticated SSRF primitive. A refused host is logged with its name, so a
+  browser using a service the list doesn't yet name is diagnosable rather than
+  a silent failure to enrol.
+
   **Intent and transport are separate facts, deliberately.**
   `User#push_reminders_enabled` is the answer to "does this person want
   reminders"; `PushSubscription` rows are the endpoints that can currently
