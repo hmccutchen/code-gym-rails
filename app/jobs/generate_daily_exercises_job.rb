@@ -27,10 +27,30 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   private
 
+  # The exists? check gates this whole branch rather than sitting only inside
+  # generate_now, because the cron runs hourly: leaving it downstream would let
+  # every run after the one that generated re-enqueue the reminder, and the
+  # nudge would repeat all morning.
   def generate_if_due(user)
     return unless Date.current.on_weekday?
     return unless Time.current.hour >= 8
-    generate_now(user)
+    return if DailyExercise.exists?(user: user, date: Date.current)
+
+    generate_for(user)
+    remind(user)
+  end
+
+  # Batch-only. An on-demand generation is triggered by someone already looking
+  # at the dashboard, who needs no notification to find it.
+  #
+  # generate_for swallows provider failures so one user can't block the batch,
+  # so whether there is anything to be reminded about is read from the row
+  # rather than from a return value. Whether the user wants reminders at all is
+  # left to SendPushReminderJob, which has to answer it regardless of caller.
+  def remind(user)
+    return unless DailyExercise.exists?(user: user, date: Date.current)
+
+    SendPushReminderJob.perform_later(user_id: user.id)
   end
 
   def generate_now(user)

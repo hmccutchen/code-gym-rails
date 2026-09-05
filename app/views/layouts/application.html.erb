@@ -494,6 +494,10 @@
       partial instance (e.g. shared/_ai_review, shared/_mermaid_diagram on
       /history) — those partials emit into this region exactly once per
       request regardless of how many times they render. %>
+  <%# Defines window.CodeGymPush and, for a user who has reminders on,
+      re-subscribes this browser on launch. Ahead of :page_scripts on purpose —
+      the Account page's enable button binds against the global defined here. %>
+  <%= render "shared/push_script" if logged_in? && WebPushCredentials.configured? %>
   <%= yield :page_scripts %>
 </body>
 </html>

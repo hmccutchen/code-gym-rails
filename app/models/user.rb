@@ -3,6 +3,7 @@ class User < ApplicationRecord
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :api_usages,      dependent: :destroy
   has_many :concept_masteries, dependent: :destroy
+  has_many :push_subscriptions, dependent: :destroy
 
   # Encrypt the user's provider API key at rest. Requires RAILS_MASTER_KEY /
   # credentials to be set (standard Rails setup).
@@ -170,14 +171,22 @@ class User < ApplicationRecord
     with_lock do
       return false if anonymized?
 
+      # Reminders have to stop at the device, not just in the UI: a home-screen
+      # install keeps its browser-side subscription after the account is gone,
+      # so the endpoints are what actually silence it. `active` already keeps
+      # SendPushReminderJob away from this row; destroying them means a
+      # deleted account cannot be reached even if that guard is ever missed.
+      push_subscriptions.destroy_all
+
       update!(
-        email:               "deleted-user-#{id}@anonymized.local",
-        name:                "Deleted user",
-        api_key:             nil,
-        login_code_sent_at:  nil,
-        login_code_digest:   nil,
-        login_code_attempts: 0,
-        anonymized_at:       Time.current
+        email:                  "deleted-user-#{id}@anonymized.local",
+        name:                   "Deleted user",
+        api_key:                nil,
+        login_code_sent_at:     nil,
+        login_code_digest:      nil,
+        login_code_attempts:    0,
+        push_reminders_enabled: false,
+        anonymized_at:          Time.current
       )
     end
     true

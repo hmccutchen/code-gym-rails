@@ -1,0 +1,93 @@
+<%# Shared push plumbing: capability test, subscribe, and register with the
+    server. Rendered from the layout ahead of `yield :page_scripts`, so the
+    Account page's enable button can rely on window.CodeGymPush existing by the
+    time its own script runs.
+
+    Deliberately does NOT request permission — that call has to happen inside a
+    real click handler (see accounts/_push_reminders), and nothing here runs
+    from one. %>
+<script>
+  window.CodeGymPush = (function () {
+    const VAPID_KEY = <%= WebPushCredentials.public_key.to_json.html_safe %>;
+    const REGISTER_PATH = <%= push_subscription_path.to_json.html_safe %>;
+    const KNOWN_ENDPOINTS = <%= (current_user.push_reminders_enabled? ? current_user.push_subscriptions.pluck(:endpoint) : []).to_json.html_safe %>;
+
+    // Tests the capability rather than sniffing the OS version. On iOS,
+    // window.PushManager is simply absent outside a Home Screen app — which is
+    // the thing we actually need to know, and stays true however a given iOS
+    // release reports its display-mode.
+    function supported() {
+      return "Notification" in window &&
+             "serviceWorker" in navigator &&
+             "PushManager" in window
+    }
+
+    function csrfToken() {
+      const tag = document.querySelector("meta[name='csrf-token']")
+      return tag ? tag.content : ""
+    }
+
+    function applicationServerKey(base64) {
+      const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4))
+        .replace(/-/g, "+").replace(/_/g, "/")
+      const raw = window.atob(padded)
+      return Uint8Array.from(raw, (character) => character.charCodeAt(0))
+    }
+
+    function register(subscription) {
+      const json = subscription.toJSON()
+
+      return fetch(REGISTER_PATH, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          p256dh: json.keys.p256dh,
+          auth: json.keys.auth
+        })
+      })
+    }
+
+    // subscribe() is idempotent for a given application server key — it hands
+    // back the existing subscription rather than minting a second one — so this
+    // doubles as "get the current endpoint".
+    function subscribeAndRegister() {
+      return navigator.serviceWorker.register("/service-worker.js")
+        .then(() => navigator.serviceWorker.ready)
+        .then((registration) => registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey(VAPID_KEY)
+        }))
+        .then((subscription) => {
+          if (KNOWN_ENDPOINTS.indexOf(subscription.endpoint) !== -1) return null
+
+          return register(subscription)
+        })
+    }
+
+    return { supported: supported, subscribeAndRegister: subscribeAndRegister }
+  })();
+
+<% if current_user.push_reminders_enabled? %>
+  // Re-subscribe on every launch. iOS drops push subscriptions on its own —
+  // after a stretch of inactivity, or seemingly at random — and the endpoint it
+  // replaces them with is one the server has never seen, so without this the
+  // reminders simply stop and the user is given no sign of it. Needs no gesture
+  // because permission is already granted; the POST is skipped entirely when
+  // the endpoint is one the server already holds, so an ordinary page view
+  // costs no write.
+  //
+  // Known limit: this only repairs the subscription of someone who still opens
+  // the app. A user who has drifted away — exactly who the reminder is for —
+  // has no launch for it to run in, and their endpoint stays dead.
+  (function () {
+    if (!window.CodeGymPush.supported()) return
+
+    window.CodeGymPush.subscribeAndRegister().catch(function () {
+      // Permission revoked in OS settings, or the push service is unreachable.
+      // Nothing to say to the user mid-page — the Account page is where the
+      // state is shown and repaired.
+    })
+  })();
+<% end %>
+</script>

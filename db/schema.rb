@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_200702) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -91,6 +91,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_200702) do
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id"
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
+  end
+
+  create_table "push_subscriptions", force: :cascade do |t|
+    t.string "auth_key", null: false
+    t.datetime "created_at", null: false
+    t.string "endpoint", null: false
+    t.datetime "last_delivered_at"
+    t.string "p256dh_key", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["endpoint"], name: "index_push_subscriptions_on_endpoint", unique: true
+    t.index ["user_id"], name: "index_push_subscriptions_on_user_id"
   end
 
   create_table "review_follow_ups", force: :cascade do |t|
@@ -278,6 +290,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_200702) do
     t.string "name", null: false
     t.datetime "paused_generation_at"
     t.string "provider"
+    t.boolean "push_reminders_enabled", default: false, null: false
     t.string "skill_level", default: "developing", null: false
     t.string "time_zone"
     t.datetime "updated_at", null: false
@@ -289,6 +302,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_200702) do
   add_foreign_key "daily_exercises", "users"
   add_foreign_key "daily_responses", "daily_exercises"
   add_foreign_key "daily_responses", "users"
+  add_foreign_key "push_subscriptions", "users"
   add_foreign_key "review_follow_ups", "daily_responses"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

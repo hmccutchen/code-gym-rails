@@ -795,6 +795,20 @@ RSpec.describe User, type: :model do
       expect(user).to be_anonymized
     end
 
+    # Reminders have to stop at the device. A home-screen install keeps its
+    # browser-side subscription after the account is gone, so deleting the
+    # endpoints is what actually silences it.
+    it "stops push reminders and drops the endpoints they would reach" do
+      user = create_user
+      user.update!(push_reminders_enabled: true)
+      PushSubscription.register!(user: user, endpoint: "https://push.example.com/x", p256dh_key: "p", auth_key: "a")
+
+      user.anonymize!
+
+      expect(user.reload.push_reminders_enabled).to be(false)
+      expect(user.push_subscriptions).to be_empty
+    end
+
     it "keeps non-identifying fields for aggregate stats" do
       user = create_user
       user.update!(provider: "gemini", time_zone: "America/Chicago",

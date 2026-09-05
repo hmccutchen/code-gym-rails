@@ -1,0 +1,73 @@
+<div class="reminder-toggle">
+  <% if current_user.push_reminders_enabled? %>
+    <p>Daily reminders are on. You'll get a notification when each weekday's set is ready.</p>
+    <%= button_to "Turn off daily reminders", push_subscription_path, method: :delete, class: "btn btn-ghost" %>
+  <% else %>
+    <p>Get a notification on this device when each weekday's set is ready.</p>
+    <button type="button" id="push-enable" class="btn btn-ghost">Turn on daily reminders</button>
+    <p class="reminder-status" id="push-status" hidden></p>
+
+    <% content_for :page_scripts do %>
+      <script>
+        (function () {
+          const button = document.getElementById("push-enable");
+          if (!button) return;
+
+          const status = document.getElementById("push-status");
+          const push = window.CodeGymPush;
+
+          function say(message) {
+            status.textContent = message;
+            status.hidden = false;
+          }
+
+          // iPadOS reports itself as a Mac, so touch points are what separate
+          // it from a desktop Safari that has no Home Screen to be added to.
+          function isApplePortable() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+          }
+
+          if (!push || !push.supported()) {
+            button.disabled = true;
+            say(isApplePortable()
+              ? "On iPhone and iPad, notifications only work from the Home Screen app. Tap Share → Add to Home Screen, open Code Gym from there, and turn reminders on again."
+              : "This browser doesn't support notifications.");
+            return;
+          }
+
+          button.addEventListener("click", function () {
+            // This call MUST be the first statement in the handler. iOS grants
+            // a permission prompt only to a request made synchronously inside a
+            // user gesture, and it fails silently — no prompt, no error — if
+            // anything awaits ahead of it. That is why the VAPID key is
+            // rendered into the page rather than fetched, and why the service
+            // worker is registered inside the .then() below rather than here.
+            const permission = Notification.requestPermission();
+
+            button.disabled = true;
+            say("Waiting for permission…");
+
+            permission
+              .then(function (state) {
+                if (state !== "granted") {
+                  throw new Error(state === "denied"
+                    ? "Notifications are blocked for Code Gym in your device settings. Allow them there, then try again."
+                    : "Permission wasn't granted.");
+                }
+
+                return push.subscribeAndRegister();
+              })
+              .then(function () {
+                window.location.reload();
+              })
+              .catch(function (error) {
+                button.disabled = false;
+                say(error.message || "Couldn't turn on reminders — try again.");
+              });
+          });
+        })();
+      </script>
+    <% end %>
+  <% end %>
+</div>
