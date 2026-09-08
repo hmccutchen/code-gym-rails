@@ -12,7 +12,7 @@ class SendPushReminderJob < ApplicationJob
   def perform(user_id:)
     return unless WebPushCredentials.configured?
 
-    user = User.active.where(push_reminders_enabled: true).find_by(id: user_id)
+    user = User.active.where.not(reminder_level: :none).find_by(id: user_id)
     return unless user
 
     Time.use_zone(user.effective_time_zone) do

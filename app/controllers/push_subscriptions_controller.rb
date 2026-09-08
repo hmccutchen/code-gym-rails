@@ -43,7 +43,10 @@ class PushSubscriptionsController < ApplicationController
         p256dh_key: params[:p256dh],
         auth_key:   params[:auth]
       )
-      current_user.update!(push_reminders_enabled: true)
+      # Enrolment turns reminders on; it must not turn nudges off. A browser
+      # re-registering (the layout re-subscribes on every page load) would
+      # otherwise silently walk a ready_and_nudges user back down to ready.
+      current_user.update!(reminder_level: :ready) if current_user.reminders_none?
     end
 
     head :created
@@ -55,7 +58,7 @@ class PushSubscriptionsController < ApplicationController
   def destroy
     User.transaction do
       current_user.push_subscriptions.destroy_all
-      current_user.update!(push_reminders_enabled: false)
+      current_user.update!(reminder_level: :none)
     end
 
     redirect_to account_path, notice: "Daily reminders turned off."

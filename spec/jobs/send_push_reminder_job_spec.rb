@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe SendPushReminderJob do
   let(:user) do
     User.create!(email: "remind@example.com", name: "Remind", provider: "anthropic",
-                 api_key: "sk-ant-test", time_zone: "UTC", push_reminders_enabled: true)
+                 api_key: "sk-ant-test", time_zone: "UTC", reminder_level: :ready)
   end
 
   around do |example|
@@ -51,7 +51,7 @@ RSpec.describe SendPushReminderJob do
   end
 
   it "does nothing when the user has turned reminders off" do
-    user.update!(push_reminders_enabled: false)
+    user.update!(reminder_level: :none)
     create_exercise
     subscribe
 

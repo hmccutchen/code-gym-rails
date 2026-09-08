@@ -25,6 +25,15 @@ class User < ApplicationRecord
 
   scope :active, -> { where(anonymized_at: nil) }
 
+  enum :reminder_level, { none: 0, ready: 1, ready_and_nudges: 2 }, prefix: :reminders
+
+  # One name, two questions. SendPushReminderJob asks it as intent — does this
+  # person want the morning push. The layout's re-subscribe script asks it as
+  # transport — is this browser enrolled at all. The dial refines only the
+  # first, so this stays the answer to the second and those call sites need no
+  # knowledge of levels.
+  def push_reminders_enabled? = !reminders_none?
+
   LOGIN_CODE_EXPIRY = 15.minutes
   LOGIN_CODE_MAX_ATTEMPTS = 5
 
@@ -185,7 +194,7 @@ class User < ApplicationRecord
         login_code_sent_at:     nil,
         login_code_digest:      nil,
         login_code_attempts:    0,
-        push_reminders_enabled: false,
+        reminder_level:         :none,
         anonymized_at:          Time.current
       )
     end
