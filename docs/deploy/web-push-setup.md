@@ -31,6 +31,37 @@ re-subscribe re-registers everyone rather than leaving dead rows behind.
 
 Set them on **both** `web` and `worker`.
 
+`railway variable set` redeploys **the service it targets**. So the usual
+"`--skip-deploys` on everything but the last call" shortcut redeploys only that
+one service; the other keeps running its old environment. A `web` that never
+restarted renders no reminder control while every variable still reads back as
+correctly set, which sends you looking at the variables — the one place the
+problem isn't. Skip deploys on all but the *final call for each service*:
+
+```bash
+railway login
+railway link   # the "Code Gym" project, production environment
+
+railway variable set VAPID_PUBLIC_KEY=<public> --service web    --skip-deploys
+railway variable set VAPID_PUBLIC_KEY=<public> --service worker --skip-deploys
+
+# --stdin keeps the private key out of shell history. No --skip-deploys on
+# either of these, so each service gets exactly one deploy.
+printf %s '<private>' | railway variable set VAPID_PRIVATE_KEY --stdin --service web
+printf %s '<private>' | railway variable set VAPID_PRIVATE_KEY --stdin --service worker
+```
+
+The subcommand is `variable`, singular, in CLI v5.x; anything showing
+`railway variables set` is v3 and will fail. Confirm each service actually
+restarted rather than trusting the variable list:
+
+```bash
+railway deployment list --service web    --json | jq '.[0] | {status, createdAt}'
+railway deployment list --service worker --json | jq '.[0] | {status, createdAt}'
+```
+
+Both deployments must be newer than the variable set, and `SUCCESS`.
+
 ## What users have to do
 
 Turning reminders on is one tap on the Account page, and it must happen on the
