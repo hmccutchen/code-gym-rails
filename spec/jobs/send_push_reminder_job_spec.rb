@@ -100,4 +100,54 @@ RSpec.describe SendPushReminderJob do
 
     described_class.new.perform(user_id: user.id)
   end
+
+  describe "the unstarted nudge" do
+    it "carries the section count and the hours left in the local day" do
+      create_exercise
+      subscribe
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "Today's set is still waiting",
+                                 body:  "2 sections · about 10h left today.")
+      ).and_return(true)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    it "is refused for a user who only opted into the morning push" do
+      create_exercise
+      subscribe
+      user.update!(reminder_level: :ready)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      described_class.new.perform(user_id: user.id, kind: :nudge)
+    end
+
+    it "still sends the ready push at that level, which is what they asked for" do
+      create_exercise
+      subscribe
+      user.update!(reminder_level: :ready)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "Today's Code Gym is ready")
+      ).and_return(true)
+
+      described_class.new.perform(user_id: user.id)
+    end
+
+    # Pins the assumption that justifies the absent sub-hour branch in
+    # #hours_left_today. Widen NUDGE_HOURS and this fails, which is the point.
+    it "never reaches its last nudge with less than an hour left in the day" do
+      Time.use_zone("UTC") do
+        last = Time.zone.local(2026, 9, 8, PushNudgePlan::NUDGE_HOURS.max, 59, 59)
+        expect(last.end_of_day - last).to be > 1.hour
+      end
+    end
+  end
 end
