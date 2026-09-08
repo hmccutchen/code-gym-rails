@@ -45,15 +45,24 @@ railway link   # the "Code Gym" project, production environment
 railway variable set VAPID_PUBLIC_KEY=<public> --service web    --skip-deploys
 railway variable set VAPID_PUBLIC_KEY=<public> --service worker --skip-deploys
 
-# --stdin keeps the private key out of shell history. No --skip-deploys on
-# either of these, so each service gets exactly one deploy.
-printf %s '<private>' | railway variable set VAPID_PRIVATE_KEY --stdin --service web
-printf %s '<private>' | railway variable set VAPID_PRIVATE_KEY --stdin --service worker
+# Read the private half into a variable rather than typing it into the command:
+# -s doesn't echo it, and the shell records the variable name, not the value.
+# Pasting it as a literal argument here would put it in your history instead.
+read -rs VAPID_PRIVATE
+
+# No --skip-deploys on either of these, so each service gets exactly one deploy.
+printf %s "$VAPID_PRIVATE" | railway variable set VAPID_PRIVATE_KEY --stdin --service web
+printf %s "$VAPID_PRIVATE" | railway variable set VAPID_PRIVATE_KEY --stdin --service worker
+unset VAPID_PRIVATE
 ```
 
-The subcommand is `variable`, singular, in CLI v5.x; anything showing
-`railway variables set` is v3 and will fail. Confirm each service actually
-restarted rather than trusting the variable list:
+`variable` is the canonical subcommand on CLI v5.x and what the examples above
+use; `variables`, `vars` and `var` are registered aliases, so older writeups
+using the plural still run. The form that is genuinely legacy is
+`railway variables --set "KEY=VALUE"`, which the CLI's own help flags as
+superseded by `variable set`.
+
+Confirm each service actually restarted rather than trusting the variable list:
 
 ```bash
 railway deployment list --service web    --json | jq '.[0] | {status, createdAt}'
