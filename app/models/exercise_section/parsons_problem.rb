@@ -48,8 +48,18 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # operational rather than structural — and the fix for that is to stop
     # grouping it with them, not to special-case one consumer. Revisit here if
     # that regrouping ever happens.
+    # The silent-correctness concepts fail on the same axis: a wrong unit, an
+    # incomplete cache key, and a missing secondary sort are each one wrong
+    # VALUE, and no permutation of blocks expresses any of them.
+    # allocation_rounding is that group's arguable exception, for the same
+    # reason unsafe_migration is this list's — validate, floor-divide, then
+    # distribute the remainder is a genuinely correct step order, which is this
+    # format's shape. It is excluded anyway, and for the same reason: the case
+    # for it is evidence that it sits on a different axis from the other three
+    # (algorithmic rather than invariant-spotting), and the fix is to regroup
+    # if that ever matters, not to special-case one consumer.
     def excluded_vocabulary_keys
-      [ :data_modeling, :meta_skill, :code_smell, :oo_design, :module_design ]
+      [ :data_modeling, :meta_skill, :code_smell, :oo_design, :module_design, :silent_correctness ]
     end
 
     # The answer is an ordering, not prose: a draggable, keyboard-reorderable

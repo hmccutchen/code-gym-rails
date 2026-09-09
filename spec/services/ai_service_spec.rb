@@ -334,8 +334,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 38-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(38)
+    it "is a frozen 42-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(42)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -354,8 +354,8 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 40-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(40)
+    it "is a frozen 44-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(44)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -585,6 +585,122 @@ RSpec.describe AiService do
 
       expect(prompt).to include(service.send(:module_design_depth_guidance))
       expect(prompt.scan("The module-design concepts").size).to eq(1)
+    end
+  end
+
+  describe "SILENT_CORRECTNESS_CONCEPTS" do
+    it "names the four invariant defects that survived the overlap filter" do
+      expect(AiService::SILENT_CORRECTNESS_CONCEPTS)
+        .to contain_exactly("allocation_rounding", "semantic_input_validation",
+                            "cache_key_completeness", "deterministic_ordering")
+      expect(AiService::SILENT_CORRECTNESS_CONCEPTS).to be_frozen
+    end
+
+    it "is reachable from both language vocabularies" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+    end
+
+    it "stays out of the language-agnostic vocabularies, so its references show real code" do
+      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
+        expect(vocabulary).not_to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+      end
+    end
+
+    # Each names a discipline to reach for — largest-remainder distribution, a
+    # complete key, a total order — so the remedy lens is the right one, the
+    # same call the design principles got. The defect is the violation; the
+    # concept is not.
+    it "stays off the anti-shape list, so its reference keeps the remedy lens" do
+      expect(AiService::ANTI_SHAPE_CONCEPTS).not_to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+    end
+
+    # deterministic_ordering and PSEUDOCODE_TO_CODE_CONCEPTS' ambiguous_ordering
+    # are adjacent by name and must stay in separate buckets: one is code whose
+    # order is underdetermined at runtime, the other a plan that never states
+    # an order at all.
+    it "shares no entry with the fourth-slot or architecture vocabularies" do
+      [ AiService::ARCHITECTURE_CONCEPTS, AiService::PLAN_REVIEW_CONCEPTS,
+        AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::PSEUDOCODE_TO_CODE_CONCEPTS ].each do |vocabulary|
+        expect(vocabulary & AiService::SILENT_CORRECTNESS_CONCEPTS).to be_empty
+      end
+    end
+  end
+
+  describe "#silent_correctness_guidance" do
+    let(:user) { User.create!(email: "invariants@example.com", name: "Invariants") }
+    let(:service) { FakeService.new("fake-key") }
+
+    it "names the group from the constant" do
+      expect(service.send(:silent_correctness_guidance)).to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+    end
+
+    # The inverse of every other group's failure mode: these risk a section
+    # whose defect is too visible. Code that raises is no longer an example of
+    # a defect that survives every check the engineer makes.
+    it "requires code that runs clean and still answers wrongly" do
+      guidance = service.send(:silent_correctness_guidance)
+
+      expect(guidance).to match(/runs clean/i)
+      expect(guidance).to match(/no exception/i)
+      expect(guidance).to match(/still produce a wrong answer/i)
+    end
+
+    it "draws the line between cache_key_completeness and the caching concept" do
+      expect(service.send(:silent_correctness_guidance))
+        .to match(/never about whether to cache at all/i)
+    end
+
+    # validations shares a vocabulary line with semantic_input_validation on
+    # every Rails day, so the same boundary the caching neighbour gets is owed
+    # here: mastery is keyed on the tag, and a section tagged the wrong side of
+    # this line schedules reinforcement for a concept the engineer never saw.
+    it "draws the line between semantic_input_validation and the validations concept" do
+      expect(service.send(:silent_correctness_guidance))
+        .to match(/never about one that is absent or malformed, which is validations/i)
+    end
+
+    # A negative total is legitimate in a refund, credit, or reversal domain.
+    # Requiring every generated exercise to reject one would put a wrong answer
+    # key in front of the engineer, so the rejection case defers to the
+    # scenario's own domain rather than asserting a universal rule.
+    it "leaves whether a negative total is meaningless to the scenario's domain" do
+      guidance = service.send(:silent_correctness_guidance)
+
+      expect(guidance).to match(/an input its own scenario makes meaningless/i)
+      expect(guidance).to match(/in a domain where only positive quantities exist/i)
+    end
+
+    # The group is selectable on a test_file code_review, whose content
+    # instruction demands a planted test smell — the same collision the code
+    # smell, OO design, and module design rules each close explicitly.
+    it "says what the defect looks like on a test-file code_review" do
+      guidance = service.send(:silent_correctness_guidance)
+
+      expect(guidance).to match(/test-file code_review/i)
+      expect(guidance).to match(/computed the same wrong way as the subject/i)
+    end
+
+    # The group sits in JS_CONCEPTS too, so a calibration that only ever says
+    # "query" and "pagination" leaves a javascript day under-calibrated.
+    it "calibrates deterministic_ordering for a comparator as well as a query" do
+      expect(service.send(:silent_correctness_guidance)).to match(/sort or comparator/i)
+    end
+
+    # pattern shows no code, and challenge's answer IS code — the same two
+    # idiom carve-outs the other group rules make.
+    it "gives pattern and challenge their own answer shapes" do
+      guidance = service.send(:silent_correctness_guidance)
+
+      expect(guidance).to match(/a pattern, which shows no code/i)
+      expect(guidance).to match(/challenge section is the exception/i)
+    end
+
+    it "is stated once in the generation prompt, for every section rather than per kind" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+
+      expect(prompt).to include(service.send(:silent_correctness_guidance))
+      expect(prompt.scan("The silent-correctness concepts").size).to eq(1)
     end
   end
 
