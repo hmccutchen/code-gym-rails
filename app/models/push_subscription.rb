@@ -1,7 +1,7 @@
 # One push endpoint for one browser install. A user can hold several (a laptop
 # and a home-screen iPhone), so the reminder fans out over all of them.
 #
-# These rows are transport, not intent — `User#push_reminders_enabled` is the
+# These rows are transport, not intent — `User#reminder_level` is the
 # intent. Keeping them apart is what makes iOS's habit of silently dropping a
 # subscription survivable: the endpoint can vanish without the user's answer to
 # "do you want reminders" vanishing with it, so the next launch re-registers

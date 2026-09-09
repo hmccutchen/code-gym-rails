@@ -220,7 +220,7 @@ User interacts:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), push_reminders_enabled (boolean, default false), anonymized_at (nullable — set on self-service deletion) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, a rotating third key, a rotating fourth key), language, generated_at, regenerated_at |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), feedback_text, ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
@@ -499,9 +499,9 @@ User interacts:
   a silent failure to enrol.
 
   **Intent and transport are separate facts, deliberately.**
-  `User#push_reminders_enabled` is the answer to "does this person want
-  reminders"; `PushSubscription` rows are the endpoints that can currently
-  reach them. iOS drops subscriptions on its own, so an endpoint has to be able
+  `User#reminder_level` is the answer to "how much does this person want to
+  hear from us"; `PushSubscription` rows are the endpoints that can
+  currently reach them. iOS drops subscriptions on its own, so an endpoint has to be able
   to die without taking the user's answer with it — that is what lets the next
   launch re-register silently instead of asking again for a permission the
   browser already granted. Turning reminders off clears both; anonymizing an
