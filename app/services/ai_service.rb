@@ -366,10 +366,15 @@ class AiService
   # off ANTI_SHAPE_CONCEPTS: the defect is the violation, the concept is the
   # discipline.
   #
-  # Two neighbours the names sit close to, recorded because a reader will ask.
+  # Three neighbours the names sit close to, recorded because a reader will ask.
   # cache_key_completeness is NOT `caching`: that one names a topic (should
   # this be cached, for how long), this names one correctness defect with a
-  # specific failure — unrelated requests receiving each other's data. And
+  # specific failure — unrelated requests receiving each other's data.
+  # semantic_input_validation is NOT `validations`, which is the absent or
+  # malformed field; this is the field that arrives well-formed and means the
+  # wrong thing, which is why no type or schema check catches it. Both share a
+  # vocabulary line with their neighbour on every Rails day, so the guidance
+  # method draws each boundary for the generator too. And
   # deterministic_ordering is NOT PSEUDOCODE_TO_CODE_CONCEPTS' ambiguous_ordering,
   # which is a plan that fails to specify an order; this is code whose order is
   # underdetermined at runtime. Those vocabularies are disjoint, so the
@@ -1507,17 +1512,24 @@ class AiService
       "looks like a working result. A section tagged with one must show code that runs clean — no exception, no " \
       "type or schema error, nothing a passing test would catch — and still produce a wrong answer, and the " \
       "engineer's job is to say which invariant it breaks and on what input. Calibrate to one specific defect at " \
-      "this severity: an allocation_rounding split whose parts don't sum back to the total and whose negative " \
-      "input is distributed instead of rejected; a semantic_input_validation boundary where an unrecognized unit " \
-      "falls through a lookup default and is stored as the canonical one, right type and plausible magnitude, " \
-      "wrong meaning; a cache_key_completeness key naming one of the two dimensions its value varies on, so every " \
-      "other request reads the first one cached; a deterministic_ordering sort with no secondary key, so " \
-      "paginating over a tied column repeats or skips rows. cache_key_completeness is about the key's " \
-      "correctness, never about whether to cache at all — that is the caching concept. Express it in the host " \
-      "section's own idiom: a pattern, which shows no code, describes the computation and asks which inputs the " \
-      "result actually varies on and what the missing one costs. The challenge section is the exception to the " \
-      "answer shape, since its answer is code: there starter_code carries the defect and the question asks for " \
-      "the version that holds the invariant, so writing the correct distribution, key, or ordering IS the answer."
+      "this severity: an allocation_rounding split whose parts don't sum back to the total, or one that " \
+      "distributes an input its own scenario makes meaningless — no buckets to split across, or a negative total " \
+      "in a domain where only positive quantities exist — instead of rejecting it; a semantic_input_validation " \
+      "boundary where an unrecognized unit falls through a lookup default and is stored as the canonical one, " \
+      "right type and plausible magnitude, wrong meaning; a cache_key_completeness key naming one of the two " \
+      "dimensions its value varies on, so every other request reads the first one cached; a " \
+      "deterministic_ordering sort or comparator with no secondary key, so re-running the same query or " \
+      "re-sorting the same list returns tied entries in a different order and a paginated pass repeats or skips " \
+      "them. Two neighbours to stay clear of: cache_key_completeness is about the key's correctness, never about " \
+      "whether to cache at all — that is the caching concept — and semantic_input_validation is about a value " \
+      "whose meaning is wrong, never about one that is absent or malformed, which is validations. Express it in " \
+      "the host section's own idiom: a pattern, which shows no code, describes the computation and asks which " \
+      "inputs the result actually varies on and what the missing one costs; on a test-file code_review the " \
+      "planted test smell must BE the silent defect rather than sit beside it — a test whose expected value is " \
+      "computed the same wrong way as the subject, so it passes and proves nothing. The challenge section is the " \
+      "exception to the answer shape, since its answer is code: there starter_code carries the defect and the " \
+      "question asks for the version that holds the invariant, so writing the correct distribution, key, or " \
+      "ordering IS the answer."
   end
 
   # A kind's generation instructions. The vocabulary comes from

@@ -9,7 +9,7 @@ module Glossary
     "abstraction" => "Hiding the messy details behind a simpler interface so callers only need to know what something does, not how.",
     "acid" => "Atomicity, Consistency, Isolation, Durability — the four guarantees a database transaction makes about behaving as a single, safe unit.",
     "adapter pattern" => "A wrapper that translates one interface into another so two incompatible pieces of code can work together.",
-    "allocation rounding" => "Splitting a total across several buckets so the parts still sum back to it — naive division either loses units or invents them, and an impossible total (negative, or zero buckets) is a case to reject rather than distribute.",
+    "allocation rounding" => "Splitting a total across several buckets so the parts still sum back to it — naive division either loses units or invents them. An input the domain makes meaningless (no buckets to split across, or a negative total where only positive quantities exist) is a case to reject rather than distribute.",
     "api versioning" => "Marking breaking changes to an API (e.g. /v1, /v2) so existing clients keep working while new ones adopt the new shape.",
     "arrow function" => "A shorthand JS function syntax that doesn't rebind `this`, inheriting it from the surrounding scope instead.",
     "array mutation" => "Changing an array in place (push, splice, sort) rather than creating a new one — can surprise code that expected the original to stay untouched.",
