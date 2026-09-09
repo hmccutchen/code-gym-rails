@@ -75,7 +75,10 @@ Both deployments must be newer than the variable set, and `SUCCESS`.
 
 Turning reminders on is one tap on the Account page, and it must happen on the
 device that will receive them — a permission grant is per-browser, so a
-laptop and a phone each need their own.
+laptop and a phone each need their own. A second, optional checkbox there adds
+a nudge during the day (hourly between 1pm and 5pm local) on days the set has
+not been started; it is off unless asked for, and it changes nothing about
+enrolment.
 
 **On iPhone and iPad it only works from a Home Screen app.** Safari does not
 expose `window.PushManager` in an ordinary tab, so the Account page disables

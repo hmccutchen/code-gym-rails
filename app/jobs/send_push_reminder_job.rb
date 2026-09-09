@@ -1,10 +1,11 @@
-# The morning nudge, fanned out over one user's push endpoints.
+# The daily reminders, fanned out over one user's push endpoints.
 #
-# Enqueued by GenerateDailyExercisesJob's cron branch once a set exists, rather
-# than run on a schedule of its own: "it is this user's 8am on a weekday" is a
-# rule that already has an owner, and a second cron entry would be a second
-# place for it to drift. The on-demand branch deliberately doesn't enqueue it —
-# a user who triggered generation by opening the dashboard is already looking
+# Two kinds, one job. :ready is enqueued by GenerateDailyExercisesJob's cron
+# branch on the tick that generates the set — "it is this user's 8am on a
+# weekday" is a rule that already has an owner, and a second cron entry would
+# be a second place for it to drift. :nudge is enqueued from that same branch
+# on later ticks, gated by PushNudgePlan. The on-demand branch sends neither:
+# someone who triggered generation by opening the dashboard is already looking
 # at the set this would tell them about.
 class SendPushReminderJob < ApplicationJob
   queue_as :default

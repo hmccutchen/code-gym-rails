@@ -508,14 +508,22 @@ User interacts:
   account clears both, since a home-screen install keeps its browser-side
   subscription after the account is gone.
 
-  **The reminder is enqueued by `GenerateDailyExercisesJob`'s cron branch, not
-  scheduled on its own.** "It is this user's 8am on a weekday" already has an
-  owner and a second cron entry would be a second place for it to drift. That
-  branch's `exists?` check therefore gates the whole branch rather than sitting
-  only inside `generate_now`: the cron runs hourly, and leaving it downstream
-  would let every later run re-enqueue the reminder until midnight. The
-  on-demand branch deliberately doesn't enqueue — a user who triggered
-  generation by opening the dashboard is already looking at the set.
+  **Both reminders are enqueued by `GenerateDailyExercisesJob`'s cron branch,
+  not scheduled on their own.** "It is this user's 8am on a weekday" already
+  has an owner and a second cron entry would be a second place for it to
+  drift — and the tick is already hourly, so a nudge needs no new schedule.
+  That branch's `exists?` check is therefore a fork rather than a gate: the
+  tick that finds no set generates and sends `:ready`, and later ticks consult
+  `PushNudgePlan` and may send `:nudge`. What stops the nudge repeating all
+  day is the user starting the set, not the hour having passed once. The
+  on-demand branch still enqueues neither — a user who triggered generation by
+  opening the dashboard is already looking at the set.
+
+  **Intent is a three-value dial, `User#reminder_level`** (`none` / `ready` /
+  `ready_and_nudges`). `#push_reminders_enabled?` is derived from it rather
+  than stored, because that name answers transport as well as intent: the
+  layout's re-subscribe script uses it to ask whether this browser is enrolled
+  at all, which the dial does not change.
 
   **The permission call must be the first synchronous statement in the click
   handler.** iOS grants a prompt only to a request made synchronously inside a
