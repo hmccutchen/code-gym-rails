@@ -41,23 +41,41 @@ RSpec.describe ConceptGroup do
     end
   end
 
-  # This is what catches a language vocabulary growing a new named constant
-  # without a display group to render it in: the new concepts would silently
-  # land in core rather than failing.
   describe "coverage of the language vocabularies" do
+    # Constants that are strict subsets of a language vocabulary for reasons
+    # other than display grouping: the two security lists narrow what
+    # security_review may draw from, and TYPESCRIPT_FLAVORED_CONCEPTS switches
+    # a section's syntax. A new one has to be named here deliberately.
+    NON_GROUPING_SUBSETS = %i[
+      RAILS_SECURITY_CONCEPTS JS_SECURITY_CONCEPTS TYPESCRIPT_FLAVORED_CONCEPTS
+    ].freeze
+
     %w[ruby_rails javascript].each do |language|
-      it "assigns every #{language} concept to exactly one group" do
+      it "partitions every #{language} concept without loss or duplication" do
         concepts = ConceptBucket.vocabulary_for(language)
-        grouped  = described_class.grouped(concepts)
 
-        expect(grouped.flat_map(&:last)).to match_array(concepts)
+        expect(described_class.grouped(concepts).flat_map(&:last)).to match_array(concepts)
       end
-    end
 
-    it "keeps every named group non-empty in both language vocabularies" do
-      described_class::NAMED.each do |key, group_concepts|
-        expect(group_concepts).not_to be_empty, "#{key} is an empty display group"
-        expect(ConceptBucket.vocabulary_for("ruby_rails")).to include(*group_concepts)
+      # The partition test above cannot catch this: an unregistered group's
+      # concepts still come back, silently under CORE. Reflecting over
+      # AiService's own group constants is what makes the omission loud.
+      it "registers every group constant #{language} folds in" do
+        vocabulary = ConceptBucket.vocabulary_for(language)
+        registered = described_class::NAMED.map(&:last)
+
+        unregistered = AiService.constants.grep(/_CONCEPTS\z/).reject do |name|
+          next true if NON_GROUPING_SUBSETS.include?(name)
+
+          concepts = AiService.const_get(name)
+          next true unless concepts.is_a?(Array) && concepts.any?
+          next true unless concepts.size < vocabulary.size && concepts.all? { |c| vocabulary.include?(c) }
+
+          registered.include?(concepts)
+        end
+
+        expect(unregistered).to be_empty,
+          "#{unregistered.join(', ')} folds into #{language} but has no ConceptGroup display group"
       end
     end
   end
