@@ -178,6 +178,14 @@ RSpec.describe "Push subscriptions", type: :request do
       patch push_subscription_path, params: { nudges: "1" }
       expect(user.reload.reminders_none?).to be(true)
     end
+
+    it "refuses when no VAPID keypair is configured" do
+      login_as(user)
+
+      patch push_subscription_path, params: { nudges: "1" }
+
+      expect(response).to have_http_status(:not_found)
+    end
   end
 
   describe "DELETE /push_subscription" do
@@ -259,6 +267,16 @@ RSpec.describe "Push subscriptions", type: :request do
       get login_path
 
       expect(response.body).not_to include("CodeGymPush")
+    end
+
+    it "renders the nudge opt-in on the Account page once enrolled" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :ready)
+
+      get account_path
+
+      expect(response.body).to include("Also remind me during the day")
     end
   end
 

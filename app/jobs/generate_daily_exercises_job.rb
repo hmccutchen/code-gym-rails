@@ -35,18 +35,15 @@ class GenerateDailyExercisesJob < ApplicationJob
     return unless Date.current.on_weekday?
     return unless Time.current.hour >= 8
 
-    if DailyExercise.exists?(user: user, date: Date.current)
-      nudge_if_due(user)
+    if (exercise = DailyExercise.find_by(user: user, date: Date.current))
+      nudge_if_due(user, exercise)
     else
       generate_for(user)
       remind(user)
     end
   end
 
-  def nudge_if_due(user)
-    exercise = user.daily_exercises.for_date(Date.current).first
-    return unless exercise
-
+  def nudge_if_due(user, exercise)
     response = user.daily_responses.find_by(daily_exercise: exercise)
 
     return unless PushNudgePlan.due?(

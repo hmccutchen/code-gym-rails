@@ -5,6 +5,10 @@
 # users who haven't set one).
 # Adjust the cron expression below if you need a different polling frequency.
 
+# The hourly frequency is load-bearing beyond generation: PushNudgePlan holds
+# no per-day dedupe, so the "at most five nudges" bound is a property of this
+# schedule rather than of the plan object. Raising the frequency multiplies
+# how many nudges an untouched day sends.
 production:
   generate_daily_exercises:
     class: GenerateDailyExercisesJob

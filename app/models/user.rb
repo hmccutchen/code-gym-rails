@@ -27,11 +27,11 @@ class User < ApplicationRecord
 
   enum :reminder_level, { none: 0, ready: 1, ready_and_nudges: 2 }, prefix: :reminders
 
-  # One name, two questions. SendPushReminderJob asks it as intent — does this
-  # person want the morning push. The layout's re-subscribe script asks it as
-  # transport — is this browser enrolled at all. The dial refines only the
-  # first, so this stays the answer to the second and those call sites need no
-  # knowledge of levels.
+  # "Is this user enrolled at all", which is a transport question, not an
+  # intent one — `reminder_level` carries intent, and the job reads that enum
+  # directly. Kept as a derived predicate so the layout's re-subscribe script,
+  # the Account page's on/off gate, and #update's enrolment precondition can
+  # all ask the simple question without knowing about levels.
   def push_reminders_enabled? = !reminders_none?
 
   LOGIN_CODE_EXPIRY = 15.minutes

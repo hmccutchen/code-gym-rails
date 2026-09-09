@@ -140,7 +140,7 @@ advisory signal; it is not evidence that anything was verified.
 ## Stack
 
 - **Rails 8.0.5** + PostgreSQL
-- **Solid Queue** — background jobs + recurring 8am weekday cron (no Redis needed)
+- **Solid Queue** — background jobs + recurring hourly cron, gated per user to 8am weekdays for generation and to early afternoon for reminder nudges (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
 - **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
@@ -482,7 +482,11 @@ User interacts:
   the directory it is served from.
 - **Push reminders**: an optional notification each weekday when the day's set
   is ready, and an optional afternoon nudge on days it goes untouched, turned
-  on and off on the Account page. `WebPushCredentials` is the
+  on and off on the Account page.
+  The nudge window is `PushNudgePlan::NUDGE_HOURS` (13-17 local, inclusive), so
+  an untouched day sends at most five on the hourly cron — a bound that belongs
+  to the schedule, not to the plan object, which holds no dedupe.
+  `WebPushCredentials` is the
   single authority for "is push configured here at all" — with no VAPID pair in
   ENV the control doesn't render, the layout emits no script, `POST
   /push_subscription` 404s and `SendPushReminderJob` returns without contacting
@@ -631,6 +635,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
 - `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately
+- `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, and the not-started/not-submitted stopping rule. Pure, so its specs need no database
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

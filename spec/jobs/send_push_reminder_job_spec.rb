@@ -142,13 +142,24 @@ RSpec.describe SendPushReminderJob do
       described_class.new.perform(user_id: user.id)
     end
 
-    # Pins the assumption that justifies the absent sub-hour branch in
-    # #hours_left_today. Widen NUDGE_HOURS and this fails, which is the point.
-    it "never reaches its last nudge with less than an hour left in the day" do
+    # Pins the claim in #hours_left_today's comment that the last nudge always
+    # leaves about six hours, which is why no sub-hour branch is written.
+    # Widen NUDGE_HOURS past the early evening and this fails, as it should.
+    it "leaves at least six hours in the day at its last nudge hour" do
       Time.use_zone("UTC") do
         last = Time.zone.local(2026, 9, 8, PushNudgePlan::NUDGE_HOURS.max, 59, 59)
-        expect(last.end_of_day - last).to be > 1.hour
+        expect(last.end_of_day - last).to be >= 6.hours
       end
+    end
+
+    it "sends nothing for a kind it does not recognise" do
+      create_exercise
+      subscribe
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      described_class.new.perform(user_id: user.id, kind: :something_else)
     end
   end
 end

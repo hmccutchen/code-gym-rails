@@ -35,4 +35,10 @@ RSpec.describe PushNudgePlan do
   it "accepts a symbol level, since the enum reader returns a string" do
     expect(due(level: :ready_and_nudges)).to be(true)
   end
+
+  it "describes its window for the opt-in label, derived from the constant" do
+    Time.use_zone("UTC") do
+      expect(described_class.window_description).to eq("1pm–5pm")
+    end
+  end
 end

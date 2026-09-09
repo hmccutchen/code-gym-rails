@@ -7,6 +7,7 @@
         <%= form.check_box :nudges, checked: current_user.reminders_ready_and_nudges?,
                                     checked_value: "1", unchecked_value: "0" %>
         Also remind me during the day if I haven't started
+        (hourly, <%= PushNudgePlan.window_description %>)
       </label>
       <%= form.submit "Save", class: "btn btn-ghost" %>
     <% end %>
