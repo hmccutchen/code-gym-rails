@@ -52,6 +52,20 @@ class PushSubscriptionsController < ApplicationController
     head :created
   end
 
+  # PATCH /push_subscription
+  # The dial, not the enrolment. Turning reminders on has to happen inside a
+  # click handler so iOS will grant permission; this is an ordinary form post,
+  # so it deliberately refuses to enrol and only moves an already-enrolled
+  # user between ready and ready_and_nudges.
+  def update
+    return head :not_found unless WebPushCredentials.configured?
+    return redirect_to account_path unless current_user.push_reminders_enabled?
+
+    current_user.update!(reminder_level: params[:nudges] == "1" ? :ready_and_nudges : :ready)
+
+    redirect_to account_path, notice: "Reminder settings saved."
+  end
+
   # DELETE /push_subscription
   # Drops the endpoints as well as the intent. Leaving rows behind would keep
   # tomorrow's job pushing at a browser whose owner just asked it to stop.

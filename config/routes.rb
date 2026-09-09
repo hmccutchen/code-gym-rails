@@ -46,7 +46,7 @@ Rails.application.routes.draw do
   # Enrolment in the daily push reminder. Singular, and not nested under the
   # account: a user's answer to "do you want reminders" is one thing however
   # many browser endpoints happen to back it.
-  resource :push_subscription, only: [ :create, :destroy ]
+  resource :push_subscription, only: [ :create, :update, :destroy ]
 
   # Core app
   root "dashboard#show"

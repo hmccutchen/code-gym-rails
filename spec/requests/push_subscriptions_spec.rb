@@ -147,6 +147,39 @@ RSpec.describe "Push subscriptions", type: :request do
     end
   end
 
+  describe "PATCH /push_subscription" do
+    before { user.update!(reminder_level: :ready) }
+
+    it "opts an enrolled user into nudges" do
+      configure_vapid
+      login_as(user)
+
+      patch push_subscription_path, params: { nudges: "1" }
+      expect(user.reload.reminders_ready_and_nudges?).to be(true)
+    end
+
+    it "opts them back out without un-enrolling them" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :ready_and_nudges)
+
+      patch push_subscription_path, params: { nudges: "0" }
+      expect(user.reload.reminders_ready?).to be(true)
+    end
+
+    # The dial is a plain form post. Enrolment has to happen inside a click
+    # handler for iOS to grant permission, so this must never be a way to turn
+    # reminders on from nothing.
+    it "cannot enrol a user who has never turned reminders on" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :none)
+
+      patch push_subscription_path, params: { nudges: "1" }
+      expect(user.reload.reminders_none?).to be(true)
+    end
+  end
+
   describe "DELETE /push_subscription" do
     # The endpoints go too, not just the flag: leaving rows behind would keep
     # tomorrow's job pushing at a browser whose owner just asked it to stop.
