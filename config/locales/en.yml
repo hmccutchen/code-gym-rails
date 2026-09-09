@@ -37,6 +37,26 @@ en:
     ruby_rails: "Ruby / Rails"
     javascript: "JavaScript"
     mixed: "Mixed"
+  learn:
+    title: "Learn"
+    intro: "Every concept your sets can draw from — read up on one whenever you like."
+    encountered: "in your sets"
+    not_generated: "not written yet"
+    buckets:
+      ruby_rails: "Ruby/Rails"
+      javascript: "JavaScript/React"
+      architecture: "Architecture"
+      plan_review: "Plan review"
+      ambiguity_hunt: "Ambiguity hunting"
+      pseudocode_to_code: "Pseudocode to code"
+    groups:
+      core: "Core"
+      data_modeling: "Data modeling"
+      silent_correctness: "Silent correctness"
+      meta_skill: "Reading and reasoning"
+      code_smell: "Code smells"
+      oo_design: "Design principles"
+      module_design: "Module design"
   sections:
     code_review:
       name: "Code Review"

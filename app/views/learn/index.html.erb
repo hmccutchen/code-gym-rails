@@ -1,0 +1,31 @@
+<h1><%= t("learn.title") %></h1>
+<p class="learn-intro"><%= t("learn.intro") %></p>
+
+<% @buckets.each do |bucket| %>
+  <section class="learn-bucket">
+    <h2><%= t("learn.buckets.#{bucket[:key]}") %></h2>
+
+    <% bucket[:groups].each do |group_key, concepts| %>
+      <%# A bucket whose concepts all fall in one group renders flat — that is
+          every language-independent bucket, and a heading over the only group
+          would be noise. %>
+      <% if bucket[:groups].size > 1 %>
+        <h3 class="learn-group"><%= t("learn.groups.#{group_key}") %></h3>
+      <% end %>
+
+      <ul class="learn-list">
+        <% concepts.each do |concept| %>
+          <li class="learn-entry" data-concept="<%= concept %>">
+            <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
+            <% if encountered?(concept, bucket[:key]) %>
+              <span class="learn-seen"><%= t("learn.encountered") %></span>
+            <% end %>
+            <% unless @references[[ concept, bucket[:key] ]]&.guide? %>
+              <span class="learn-ungenerated"><%= t("learn.not_generated") %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+<% end %>
