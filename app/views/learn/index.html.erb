@@ -1,6 +1,15 @@
 <h1><%= t("learn.title") %></h1>
 <p class="learn-intro"><%= t("learn.intro") %></p>
 
+<% if @ungenerated.positive? %>
+  <%# Quotes the count and says whose key pays, because it spends the user's
+      own provider key and the rows it writes are shared with the whole team. %>
+  <div class="learn-prepare">
+    <p><%= t("learn.prepare_prompt", count: @ungenerated) %></p>
+    <%= button_to t("learn.prepare_button"), prepare_learn_path, class: "btn btn-sm" %>
+  </div>
+<% end %>
+
 <% @buckets.each do |bucket| %>
   <section class="learn-bucket">
     <h2><%= t("learn.buckets.#{bucket[:key]}") %></h2>

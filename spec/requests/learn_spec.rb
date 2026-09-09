@@ -213,4 +213,81 @@ RSpec.describe "Learn", type: :request do
       expect(response.parsed_body["ready"]).to be(true)
     end
   end
+
+  describe "POST /learn/:bucket/:concept/prepare" do
+    before { user.update!(language: "ruby_rails") }
+
+    it "enqueues a refreshing generation for that concept" do
+      expect {
+        post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh_guide: true)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["status"]).to eq("queued")
+    end
+
+    it "404s on an off-vocabulary pair" do
+      post prepare_learn_concept_path(bucket: "ruby_rails", concept: "prototype_chain")
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe "POST /learn/prepare" do
+    before { user.update!(language: "ruby_rails") }
+
+    # Derived from the same authority the controller reads, not a hand-added
+    # sum: a vocabulary that grows must not need this number edited.
+    it "enqueues one job per concept with no row at all" do
+      expected = (%w[ruby_rails] + LearnController::AGNOSTIC_BUCKETS)
+                   .sum { |bucket| ConceptBucket.vocabulary_for(bucket).size }
+
+      expect {
+        post prepare_learn_path
+      }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(expected).times
+
+      expect(response).to redirect_to(learn_path)
+    end
+
+    it "skips a concept that already has a row" do
+      ConceptReference.create!(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
+      )
+
+      expect {
+        post prepare_learn_path
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(hash_including(concept: "n_plus_one"))
+    end
+
+    # The backfill must never rewrite a legacy row in bulk — that would change
+    # inline reference text for concepts nobody asked about. Only the
+    # per-concept path, on a concept someone opened, may do that.
+    it "does not ask to refresh a guide-less row" do
+      ConceptReference.create!(
+        concept: "memoization", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
+      )
+
+      expect {
+        post prepare_learn_path
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(hash_including(refresh_guide: true))
+    end
+
+    it "enqueues nothing once every concept has a row" do
+      (%w[ruby_rails] + LearnController::AGNOSTIC_BUCKETS).each do |bucket|
+        ConceptBucket.vocabulary_for(bucket).each do |concept|
+          ConceptReference.create!(
+            concept: concept, language: bucket,
+            tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
+          )
+        end
+      end
+
+      expect { post prepare_learn_path }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+    end
+  end
 end

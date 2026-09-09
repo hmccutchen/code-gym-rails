@@ -49,6 +49,11 @@ en:
     write_guide: "Write this up"
     writing_guide: "Writing it up — this takes a few seconds."
     write_guide_failed: "That didn't work. Try again in a moment."
+    prepare_prompt:
+      one: "1 concept hasn't been written up yet. Writing it up runs against your own API key, and what it writes is shared with everyone on the team."
+      other: "%{count} concepts haven't been written up yet. Writing them up runs against your own API key — roughly 2 cents each — and what it writes is shared with everyone on the team."
+    prepare_button: "Write up the rest"
+    preparing: "Writing them up now — they'll appear as each one finishes."
     buckets:
       ruby_rails: "Ruby/Rails"
       javascript: "JavaScript/React"

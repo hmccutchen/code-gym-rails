@@ -37,6 +37,42 @@ class LearnController < ApplicationController
     render json: { ready: ConceptReference.find_by(concept: concept, language: bucket)&.guide? || false }
   end
 
+  # POST /learn/:bucket/:concept/prepare — write up this one concept now.
+  #
+  # `refresh_guide: true` is what lets this rewrite a row that predates guides.
+  # Confining that to a concept someone deliberately opened is why the
+  # backfill below refuses to do it.
+  #
+  # JSON, since only script calls it: the page posts and polls rather than
+  # holding a request open for a provider call that runs with thinking on.
+  def prepare_concept
+    bucket  = validated_bucket
+    concept = validated_concept(bucket)
+
+    GenerateConceptReferenceJob.perform_later(
+      concept: concept, language: bucket, user_id: current_user.id, refresh_guide: true
+    )
+
+    render json: { status: "queued" }
+  end
+
+  # POST /learn/prepare — write up every concept in this user's slice that has
+  # no row at all.
+  #
+  # Idempotent and resumable: each job re-checks before calling, so pressing
+  # this again after a partial run enqueues only what is still missing and
+  # there is no run record to reconcile. Rows are shared team-wide, so the
+  # second person to press it finds almost everything done.
+  def prepare
+    @references = references_by_key
+
+    ungenerated_concepts.each do |concept, bucket|
+      GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id)
+    end
+
+    redirect_to learn_path, notice: t("learn.preparing")
+  end
+
   private
 
   # This user's slice: their own language plus every language-independent

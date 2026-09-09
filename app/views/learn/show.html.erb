@@ -34,3 +34,56 @@
     <span class="learn-status" aria-live="polite"></span>
   </div>
 <% end %>
+
+<% unless @reference&.guide? %>
+  <%# Inline script, matching the working convention here: the layout emits no
+      importmap tags, so nothing else would run. Polls rather than holding the
+      request, since this generation runs with extended thinking on. %>
+  <script>
+    (function () {
+      const box    = document.getElementById("learn-guide");
+      const button = document.getElementById("write-guide");
+      const status = box.querySelector(".learn-status");
+
+      // Bounded so a job that dies silently ends in a message rather than a
+      // spinner that never resolves.
+      const INTERVAL_MS = 2000;
+      const MAX_ATTEMPTS = 45;
+      let attempts = 0;
+
+      function poll() {
+        attempts++;
+        if (attempts > MAX_ATTEMPTS) {
+          button.disabled = false;
+          status.textContent = "<%= j t("learn.write_guide_failed") %>";
+          return;
+        }
+
+        fetch(box.dataset.statusUrl, { headers: { "Accept": "application/json" } })
+          .then((response) => response.json())
+          .then((data) => (data.ready ? window.location.reload() : setTimeout(poll, INTERVAL_MS)))
+          .catch(() => setTimeout(poll, INTERVAL_MS));
+      }
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        status.textContent = "<%= j t("learn.writing_guide") %>";
+
+        try {
+          const response = await fetch(box.dataset.url, {
+            method: "POST",
+            headers: {
+              "Accept": "application/json",
+              "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+            }
+          });
+          if (!response.ok) throw new Error("request failed");
+          poll();
+        } catch {
+          button.disabled = false;
+          status.textContent = "<%= j t("learn.write_guide_failed") %>";
+        }
+      });
+    })();
+  </script>
+<% end %>
