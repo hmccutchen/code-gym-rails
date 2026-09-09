@@ -15,8 +15,8 @@ class PushSubscriptionsController < ApplicationController
 
   # A push endpoint is minted by the browser's own push service, so it can only
   # come from a known handful of hosts. Without this the endpoint is an
-  # arbitrary URL chosen by whoever is logged in, which the worker then POSTs to
-  # every morning from inside the deployment's network — a blind, authenticated
+  # arbitrary URL chosen by whoever is logged in, which the worker then POSTs
+  # to on every reminder from inside the deployment's network — a blind, authenticated
   # SSRF primitive. Matched by domain suffix, so per-region and per-tenant
   # subdomains are covered without enumerating them.
   #

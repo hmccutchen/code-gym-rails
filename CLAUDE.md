@@ -481,7 +481,8 @@ User interacts:
   /service-worker.js` serves it from the root path, since a worker's scope is
   the directory it is served from.
 - **Push reminders**: an optional notification each weekday when the day's set
-  is ready, turned on and off on the Account page. `WebPushCredentials` is the
+  is ready, and an optional afternoon nudge on days it goes untouched, turned
+  on and off on the Account page. `WebPushCredentials` is the
   single authority for "is push configured here at all" — with no VAPID pair in
   ENV the control doesn't render, the layout emits no script, `POST
   /push_subscription` 404s and `SendPushReminderJob` returns without contacting
@@ -493,7 +494,7 @@ User interacts:
   suffix, because an endpoint is minted by the browser's own push service and
   can only come from a known handful of hosts. Without it the stored endpoint
   is an arbitrary URL chosen by whoever is logged in, which the worker then
-  POSTs to every morning from inside the deployment's network — a blind,
+  POSTs to on every reminder from inside the deployment's network — a blind,
   authenticated SSRF primitive. A refused host is logged with its name, so a
   browser using a service the list doesn't yet name is diagnosable rather than
   a silent failure to enrol.
@@ -629,7 +630,7 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
-- `app/jobs/send_push_reminder_job.rb` — the morning nudge, fanned out over one user's endpoints; enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately
+- `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
