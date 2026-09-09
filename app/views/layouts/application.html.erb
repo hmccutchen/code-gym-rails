@@ -283,6 +283,9 @@
     .learn-list { list-style: none; padding: 0; }
     .learn-group-block { margin-bottom: 1rem; }
     .learn-entry { padding: .35rem 0; display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+    /* `hidden` alone cannot hide a flex item — .learn-entry's own display beats
+       the UA's [hidden] rule, so the filter needs this to bite. */
+    .learn-entry[hidden] { display: none; }
     .learn-seen { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; }
     .learn-ungenerated { font-size: .75rem; color: var(--muted); }
     .learn-intro, .learn-bucket-label, .learn-no-guide, .learn-empty { color: var(--muted); }
