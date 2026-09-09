@@ -10,31 +10,79 @@
   </div>
 <% end %>
 
+<div class="learn-filter">
+  <input type="search" id="learn-filter-input" placeholder="<%= t("learn.filter_placeholder") %>"
+         aria-label="<%= t("learn.filter_placeholder") %>">
+  <label>
+    <input type="checkbox" id="learn-seen-only">
+    <%= t("learn.seen_only") %>
+  </label>
+  <p id="learn-empty" class="learn-empty" hidden><%= t("learn.no_matches") %></p>
+</div>
+
 <% @buckets.each do |bucket| %>
   <section class="learn-bucket">
     <h2><%= t("learn.buckets.#{bucket[:key]}") %></h2>
 
     <% bucket[:groups].each do |group_key, concepts| %>
-      <%# A bucket whose concepts all fall in one group renders flat — that is
-          every language-independent bucket, and a heading over the only group
-          would be noise. %>
-      <% if bucket[:groups].size > 1 %>
-        <h3 class="learn-group"><%= t("learn.groups.#{group_key}") %></h3>
-      <% end %>
-
-      <ul class="learn-list">
-        <% concepts.each do |concept| %>
-          <li class="learn-entry" data-concept="<%= concept %>">
-            <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
-            <% if encountered?(concept, bucket[:key]) %>
-              <span class="learn-seen"><%= t("learn.encountered") %></span>
-            <% end %>
-            <% unless @references[[ concept, bucket[:key] ]]&.guide? %>
-              <span class="learn-ungenerated"><%= t("learn.not_generated") %></span>
-            <% end %>
-          </li>
+      <div class="learn-group-block">
+        <%# A bucket whose concepts all fall in one group renders flat — that is
+            every language-independent bucket, and a heading over the only group
+            would be noise. %>
+        <% if bucket[:groups].size > 1 %>
+          <h3 class="learn-group"><%= t("learn.groups.#{group_key}") %></h3>
         <% end %>
-      </ul>
+
+        <ul class="learn-list">
+          <% concepts.each do |concept| %>
+            <li class="learn-entry" data-concept="<%= concept %>">
+              <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
+              <% if encountered?(concept, bucket[:key]) %>
+                <span class="learn-seen"><%= t("learn.encountered") %></span>
+              <% end %>
+              <% unless @references[[ concept, bucket[:key] ]]&.guide? %>
+                <span class="learn-ungenerated"><%= t("learn.not_generated") %></span>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
     <% end %>
   </section>
 <% end %>
+
+<script>
+  (function () {
+    const input    = document.getElementById("learn-filter-input");
+    const seenOnly = document.getElementById("learn-seen-only");
+    const empty    = document.getElementById("learn-empty");
+    const entries  = Array.from(document.querySelectorAll(".learn-entry"));
+
+    function apply() {
+      const term = input.value.trim().toLowerCase();
+      let shown = 0;
+
+      entries.forEach((entry) => {
+        const matchesTerm = entry.dataset.concept.includes(term);
+        const matchesSeen = !seenOnly.checked || entry.querySelector(".learn-seen") !== null;
+        const visible = matchesTerm && matchesSeen;
+        entry.hidden = !visible;
+        if (visible) shown++;
+      });
+
+      // A group or bucket whose every entry is filtered out hides its heading
+      // too, so the page doesn't leave empty sections behind.
+      document.querySelectorAll(".learn-group-block").forEach((block) => {
+        block.hidden = Array.from(block.querySelectorAll(".learn-entry")).every((e) => e.hidden);
+      });
+      document.querySelectorAll(".learn-bucket").forEach((section) => {
+        section.hidden = Array.from(section.querySelectorAll(".learn-entry")).every((e) => e.hidden);
+      });
+
+      empty.hidden = shown > 0;
+    }
+
+    input.addEventListener("input", apply);
+    seenOnly.addEventListener("change", apply);
+  })();
+</script>
