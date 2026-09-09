@@ -3683,4 +3683,84 @@ RSpec.describe AiService do
         .to eq(DailyResponse::MAX_DIFFICULTY_REASON_LENGTH)
     end
   end
+
+  describe "#generate_concept_reference guide fields" do
+    let(:full_reference) do
+      {
+        "tagline" => "t", "explanation" => "e", "code_example" => "c", "senior_lens" => "s",
+        "guide_plain_language" => "plain", "guide_worked_example" => "worked",
+        "guide_pitfalls" => "pitfalls"
+      }
+    end
+
+    it "asks for the guide fields in the same request as the reference" do
+      service = double_class.new(canned_text: full_reference.to_json)
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      AiService::CONCEPT_GUIDE_FIELDS.each do |field|
+        expect(service.last_prompt).to include(field)
+      end
+    end
+
+    it "bills one call for both halves" do
+      service = double_class.new(canned_text: full_reference.to_json)
+
+      expect {
+        service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.to change { ApiUsage.where(purpose: "generate_concept_reference").count }.by(1)
+    end
+
+    it "returns the guide fields alongside the reference fields" do
+      result = double_class.new(canned_text: full_reference.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result).to include(*AiService::CONCEPT_GUIDE_FIELDS)
+    end
+
+    # The preserved-behavior assertion. A provider that writes a good reference
+    # and flubs the guide used to succeed, and must keep succeeding — otherwise
+    # a first-exposure inline dropdown that would have existed doesn't.
+    # Do not weaken this to make a stricter validation pass.
+    it "still succeeds when the provider omits the guide entirely" do
+      legacy = { "tagline" => "t", "explanation" => "e", "code_example" => "c", "senior_lens" => "s" }
+
+      expect {
+        double_class.new(canned_text: legacy.to_json)
+                    .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.not_to raise_error
+    end
+
+    it "still raises when a reference field is missing" do
+      missing_lens = full_reference.except("senior_lens")
+
+      expect {
+        double_class.new(canned_text: missing_lens.to_json)
+                    .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+    end
+  end
+
+  # CONCEPT_REFERENCE_FIELDS is what #explain_concept_differently sends as
+  # "the reference they have already read". Widening it would change that
+  # existing prompt, so this pins the two lists apart.
+  describe "concept field constants" do
+    it "keeps the guide out of the reference field list" do
+      expect(AiService::CONCEPT_REFERENCE_FIELDS)
+        .to eq(%w[tagline explanation code_example senior_lens])
+      expect(AiService::CONCEPT_REFERENCE_FIELDS & AiService::CONCEPT_GUIDE_FIELDS).to be_empty
+    end
+
+    it "does not send the guide to the alternate-framing prompt" do
+      reference = ConceptReference.create!(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+        guide_plain_language: "PLAIN_MARKER", guide_worked_example: "WORKED_MARKER",
+        guide_pitfalls: "PITFALLS_MARKER"
+      )
+      service = double_class.new(canned_text: "Another angle.")
+      service.explain_concept_differently(user, reference)
+
+      expect(service.last_prompt).not_to include("PLAIN_MARKER", "WORKED_MARKER", "PITFALLS_MARKER")
+    end
+  end
 end

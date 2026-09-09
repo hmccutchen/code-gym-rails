@@ -186,7 +186,22 @@ class FakeService < AiService
         true
       end
     RUBY
-    "senior_lens" => "A senior engineer reaches for this automatically, without having to reason it out each time."
+    "senior_lens" => "A senior engineer reaches for this automatically, without having to reason it out each time.",
+    "guide_plain_language" =>
+      "Stated without the jargon: there is one thing this concept asks you to notice, and once you have noticed it the " \
+      "rest follows. Everything else written about it is commentary on that one thing.",
+    "guide_worked_example" => <<~RUBY.strip,
+      # The situation: this runs once per request and nobody minds.
+      def example
+        true
+      end
+
+      # What it costs: called in a loop over a hundred records, the same work
+      # happens a hundred times, and the page takes a hundred times as long.
+    RUBY
+    "guide_pitfalls" =>
+      "The appealing wrong idea is that this only matters at scale, so it can wait. It matters as soon as the code is " \
+      "read by someone who did not write it, which is usually sooner."
   }.freeze
 
   # The concept-reference reframing. Deliberately a different angle from

@@ -1815,12 +1815,20 @@ class AiService
       Write a durable reference for the #{config[:coach]} concept: "#{concept}".
       #{CONCEPT_REFERENCE_SCOPE} Be precise and senior-level.
 
+      Then write a longer, plainer-language guide for someone meeting this
+      concept in a library rather than in a problem — no exercise in front of
+      them, no answer to reach. Thorough but not an essay: each guide field is
+      at most two short paragraphs.
+
       Return JSON matching this schema exactly:
       {
         "tagline":      "string — bold one-liner",
         "explanation":  "string — 2-3 sentences",
         "code_example": "string — #{code_example_desc}",
-        "senior_lens":  "string — #{senior_lens_desc}"
+        "senior_lens":  "string — #{senior_lens_desc}",
+        "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term; unpack any jargon in place rather than assuming it",
+        "guide_worked_example": "string — one concrete scenario end to end: the situation, what it costs or breaks, and what changes. May contain #{code_example_desc}",
+        "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing"
       }
     PROMPT
   end
