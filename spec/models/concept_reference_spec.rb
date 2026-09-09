@@ -33,4 +33,34 @@ RSpec.describe ConceptReference do
     dup = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")
     expect { dup.save!(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
   end
+
+  describe "#guide?" do
+    def reference(**guide_fields)
+      ConceptReference.new(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+        **guide_fields
+      )
+    end
+
+    it "is false for a row generated before guides existed" do
+      expect(reference).not_to be_guide
+    end
+
+    it "is false when only some guide fields came back" do
+      expect(reference(guide_plain_language: "plain", guide_worked_example: "worked")).not_to be_guide
+    end
+
+    it "is false when a guide field is blank rather than nil" do
+      expect(
+        reference(guide_plain_language: "plain", guide_worked_example: "worked", guide_pitfalls: "  ")
+      ).not_to be_guide
+    end
+
+    it "is true when every guide field is present" do
+      expect(
+        reference(guide_plain_language: "plain", guide_worked_example: "worked", guide_pitfalls: "pitfalls")
+      ).to be_guide
+    end
+  end
 end

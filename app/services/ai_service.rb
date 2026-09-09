@@ -559,6 +559,17 @@ class AiService
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
+  # The Learn tab's longer, plainer-language guide. A SECOND constant rather
+  # than three more entries in CONCEPT_REFERENCE_FIELDS above: that one is read
+  # by #explain_concept_differently to build "the reference they have already
+  # read", and widening it would silently change an existing prompt.
+  #
+  # Deliberately absent from #generate_concept_reference's required-field
+  # check. A provider that writes a good reference and flubs the guide leaves a
+  # row the inline dropdown renders exactly as before; the Learn tab treats it
+  # as ungenerated and regenerates it when someone opens it.
+  CONCEPT_GUIDE_FIELDS = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
+
   # The one statement of what a concept reference is FOR, shared by the prompt
   # that writes one and the prompt that reframes it. Stated once because a
   # reframing that drifts into solving the day's problem is the only real
