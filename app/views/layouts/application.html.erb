@@ -275,6 +275,23 @@
       border-color: var(--border);
     }
     .name-editor-status { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
+
+    .learn-filter { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .learn-filter input[type="search"] { flex: 1 1 16rem; padding: .5rem; border: 1px solid var(--border); border-radius: 4px; }
+    .learn-bucket { margin-bottom: 2rem; }
+    .learn-group { font-size: .95rem; color: var(--muted); margin: 1rem 0 .5rem; }
+    .learn-list { list-style: none; padding: 0; }
+    .learn-group-block { margin-bottom: 1rem; }
+    .learn-entry { padding: .35rem 0; display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+    /* `hidden` alone cannot hide a flex item — .learn-entry's own display beats
+       the UA's [hidden] rule, so the filter needs this to bite. */
+    .learn-entry[hidden] { display: none; }
+    .learn-seen { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; }
+    .learn-ungenerated { font-size: .75rem; color: var(--muted); }
+    .learn-intro, .learn-bucket-label, .learn-no-guide, .learn-empty { color: var(--muted); }
+    .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
+    .learn-prepare { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
+    .learn-worked-example { white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -372,6 +389,7 @@
               })();
             </script>
           <% end %>
+          <%= link_to t("learn.title"), learn_path %>
           <%= link_to "History", history_path %>
           <%= link_to "Account", account_path %>
         </div>

@@ -214,6 +214,13 @@ User interacts:
        review is what someone opening the page came for.
   └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
        the account in place while preserving all exercise/response/usage history
+
+User browses /learn (independent of the daily flow above):
+  └→ LearnController#index            → every concept in the user's vocabularies
+       (their language plus the four language-independent buckets), whether or
+       not they have ever been assigned one — a library, not a day's plan
+  └→ LearnController#show              → one concept's cached reference plus its
+       guide, generating either on demand when the row is missing or stale
 ```
 
 ## Models
@@ -225,6 +232,11 @@ User interacts:
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), feedback_text, ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
+
+`ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
+below) now also carries `guide_plain_language`, `guide_worked_example`,
+`guide_pitfalls` (all nullable text). `ConceptReference#guide?` — all three
+present — is the single authority for "does this row carry a guide."
 
 ## Key Design Decisions
 
@@ -401,6 +413,45 @@ User interacts:
   with no section written. A partial review blocks them exactly as a partial
   manual review always did.
 
+- **The Learn tab**: `/learn` lists every concept in the user's vocabularies —
+  their language plus the four language-independent buckets, both languages
+  for a `"mixed"` user — not only ones they've been assigned. It reads
+  `user.language`, never `#language_for_today`: that method resolves "mixed"
+  to one concrete language for a single day's generation, and a library's
+  contents must not change depending on which language tomorrow happens to
+  be. **This deliberately shows the full explanation before first exposure** —
+  the opposite of `ConceptReference`'s first-exposure-only auto-expand
+  everywhere else, which exists because reading an explanation before
+  attempting a problem replaces effortful retrieval with recognition. A
+  locked, title-only teaser was offered and declined. This trade is scoped to
+  this tab; it is not a precedent for loosening exposure gating on the inline
+  dropdown, the duck's explain mode, or anywhere else that logic runs.
+  The guide (`AiService::CONCEPT_GUIDE_FIELDS`) is produced by the *same*
+  `#generate_concept_reference` call that writes the inline reference, in one
+  request — so the two cannot drift apart by construction rather than by
+  hope. `CONCEPT_REFERENCE_FIELDS` is deliberately not extended (it is read by
+  `#explain_concept_differently` to build "the reference they've already
+  read," and widening it would silently change that prompt), and the guide
+  fields are deliberately outside the required-field check
+  `#generate_concept_reference` already runs — so a provider that flubs the
+  guide still leaves a usable inline reference rather than failing a call that
+  used to succeed. Two triggers, not one: a user-initiated backfill for
+  concepts with no row at all, and on-demand regeneration — only when someone
+  opens that concept's Learn entry — for a legacy row that has a reference but
+  no guide. Bulk-rewriting legacy rows would change inline reference wording
+  nobody asked to change; confining it to on-demand accepts that **an inline
+  reference's wording can change once, for a concept someone deliberately
+  opens.** `ConceptReference` has no `user_id` — it's a shared, team-wide cache
+  keyed on `(concept, language)`, so the first person to run the backfill pays
+  for everyone and every later teammate pays almost nothing. Roughly $0.02 per
+  concept against `claude-sonnet-5`, so roughly $1.50 for one user's
+  ~74-concept slice — estimates from prompt shape, not measurements, and
+  checkable against `ApiUsage` rows under
+  `purpose: "generate_concept_reference"`. The "seen in your sets" marker
+  derives from `User#concept_exposure_count` (submitted responses only), never
+  from `ConceptMastery`: tier is kept invisible everywhere by design, and a
+  marker sourced from it would be exactly the readout the post-hoc difficulty
+  rating went to lengths to avoid becoming.
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database and
   needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block
@@ -647,6 +698,23 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/controllers/concerns/preview_auto_login.rb` — preview-only auto-login callback, registered only when `PreviewEnvironment.active?`
 - `lib/boot/app_host.rb` — `AppHost.resolve`: `APP_HOST` then `RAILWAY_PUBLIC_DOMAIN`, with that order inverted on a preview app (see "Host resolution" above); outside the autoload path
 - `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
+- `app/controllers/learn_controller.rb` — the `/learn` library: lists every
+  concept in the user's slice (assigned or not), the per-concept detail page,
+  and the two generation triggers (a one-concept `#prepare_concept` and a
+  slice-wide `#prepare` backfill). Validates `:bucket`/`:concept` against the
+  closed vocabulary at the boundary, same as everywhere else provider-adjacent
+  input arrives from a URL.
+- `app/models/concept_group.rb` — `ConceptGroup`: which display group a
+  concept renders under on the Learn index, and the order groups appear in.
+  Display-only, derived from `AiService`'s named vocabulary constants rather
+  than restating their membership. Has no relationship to `ConceptBucket`,
+  which decides where a concept's mastery history records, and must not
+  acquire one.
+- `spec/system/learn_filter_spec.rb` — pins that typing the humanized label
+  actually shown on screen narrows the Learn list; the filter script matches
+  against a rendered attribute a request spec never executes, so a mismatch
+  between that label and the raw concept key was invisible to request specs
+  and only caught here.
 - `spec/system/` — real-browser specs (Capybara + capybara-playwright-driver) against the fake provider; `spec/support/system_test_helper.rb` registers the driver
 - `config/recurring.yml` — Solid Queue cron schedule (8am UTC weekdays)
 - `railway.toml` — build + deploy config for Railway

@@ -54,6 +54,18 @@ Rails.application.routes.draw do
   # Past sessions, newest first
   get "history", to: "history#index"
 
+  # The concept library: every concept in the user's vocabularies, whether or
+  # not they have met one. Not nested under anything — a concept's guide
+  # belongs to the vocabulary, not to a user or to a day.
+  get  "learn", to: "learn#index"
+  post "learn/prepare", to: "learn#prepare", as: :prepare_learn
+  get  "learn/:bucket/:concept", to: "learn#show", as: :learn_concept
+  post "learn/:bucket/:concept/prepare", to: "learn#prepare_concept", as: :prepare_learn_concept
+  # Polled while a guide is being written, the way the dashboard polls for a
+  # finished generation: this app loads no Turbo/ActionCable, so a page learns
+  # that background work finished by checking in.
+  get  "learn/:bucket/:concept/status", to: "learn#status", as: :learn_concept_status
+
   # Inline name autosave (JSON)
   patch "profile", to: "profile#update", as: :profile
 

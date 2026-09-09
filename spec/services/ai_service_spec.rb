@@ -2277,6 +2277,18 @@ RSpec.describe AiService do
       expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
     end
 
+    # .call_budget_seconds takes the timeout as an argument rather than closing
+    # over READ_TIMEOUT, precisely so a poller waiting on a call made with a
+    # different timeout (learn/show.html.erb, CONCEPT_REFERENCE_READ_TIMEOUT)
+    # derives its wait from the timeout that call actually uses.
+    it "computes the worst-case wait for whichever read timeout it is given" do
+      expect(AiService.call_budget_seconds(AiService::READ_TIMEOUT))
+        .to eq((AiService::READ_TIMEOUT * (AiService::RETRY_MAX + 1)) + (AiService::RETRY_MAX * AiService::RETRY_MAX_INTERVAL))
+
+      expect(AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT))
+        .to be > AiService.call_budget_seconds(AiService::READ_TIMEOUT)
+    end
+
     # A review issues two kinds of call — the grading call per section and the
     # one difficulty assessment — and the request thread is blocked on all of
     # them, so the budget has to hold for every one rather than just the graded
@@ -3312,6 +3324,19 @@ RSpec.describe AiService do
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
     end
 
+    # Now asks for seven fields with extended thinking on, so READ_TIMEOUT (sized
+    # for a single-section review) under-times it — and under-times it silently,
+    # since staying under READ_TIMEOUT keeps the call from ever being tagged
+    # long_running, letting RETRY_TIMEOUT_GUARD retry a genuine timeout into
+    # duplicate billed calls.
+    it "uses CONCEPT_REFERENCE_READ_TIMEOUT rather than the base READ_TIMEOUT" do
+      service = double_class.new(canned_text: valid_json)
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(service.last_read_timeout).to eq(AiService::CONCEPT_REFERENCE_READ_TIMEOUT)
+      expect(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).to be > AiService::READ_TIMEOUT
+    end
+
     it "logs usage with the generate_concept_reference purpose" do
       service = double_class.new(canned_text: valid_json)
       expect {
@@ -3681,6 +3706,122 @@ RSpec.describe AiService do
 
       expect(results["code_review"][:review]["difficulty"]["reason"].length)
         .to eq(DailyResponse::MAX_DIFFICULTY_REASON_LENGTH)
+    end
+  end
+
+  describe "#generate_concept_reference guide fields" do
+    let(:full_reference) do
+      {
+        "tagline" => "t", "explanation" => "e", "code_example" => "c", "senior_lens" => "s",
+        "guide_plain_language" => "plain", "guide_worked_example" => "worked",
+        "guide_pitfalls" => "pitfalls"
+      }
+    end
+
+    it "asks for the guide fields in the same request as the reference" do
+      service = double_class.new(canned_text: full_reference.to_json)
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      AiService::CONCEPT_GUIDE_FIELDS.each do |field|
+        expect(service.last_prompt).to include(field)
+      end
+    end
+
+    it "bills one call for both halves" do
+      service = double_class.new(canned_text: full_reference.to_json)
+
+      expect {
+        service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.to change { ApiUsage.where(purpose: "generate_concept_reference").count }.by(1)
+    end
+
+    it "returns the guide fields alongside the reference fields" do
+      result = double_class.new(canned_text: full_reference.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result).to include(*AiService::CONCEPT_GUIDE_FIELDS)
+    end
+
+    # The preserved-behavior assertion. A provider that writes a good reference
+    # and flubs the guide used to succeed, and must keep succeeding — otherwise
+    # a first-exposure inline dropdown that would have existed doesn't.
+    # Do not weaken this to make a stricter validation pass.
+    it "still succeeds when the provider omits the guide entirely" do
+      legacy = { "tagline" => "t", "explanation" => "e", "code_example" => "c", "senior_lens" => "s" }
+
+      expect {
+        double_class.new(canned_text: legacy.to_json)
+                    .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.not_to raise_error
+    end
+
+    it "still raises when a reference field is missing" do
+      missing_lens = full_reference.except("senior_lens")
+
+      expect {
+        double_class.new(canned_text: missing_lens.to_json)
+                    .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+    end
+
+    it "normalizes a non-String guide value to nil" do
+      malformed = full_reference.merge("guide_worked_example" => [ "not", "a", "string" ])
+
+      result = double_class.new(canned_text: malformed.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_worked_example"]).to be_nil
+    end
+
+    it "normalizes an over-length guide value to nil" do
+      too_long = full_reference.merge("guide_pitfalls" => "x" * (AiService::MAX_CONCEPT_GUIDE_LENGTH + 1))
+
+      result = double_class.new(canned_text: too_long.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_pitfalls"]).to be_nil
+    end
+
+    it "normalizes a whitespace-only guide value to nil" do
+      blank = full_reference.merge("guide_plain_language" => "   \n  ")
+
+      result = double_class.new(canned_text: blank.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_plain_language"]).to be_nil
+    end
+
+    it "leaves a normal guide value untouched" do
+      result = double_class.new(canned_text: full_reference.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_plain_language"]).to eq("plain")
+      expect(result["guide_worked_example"]).to eq("worked")
+      expect(result["guide_pitfalls"]).to eq("pitfalls")
+    end
+  end
+
+  # CONCEPT_REFERENCE_FIELDS is what #explain_concept_differently sends as
+  # "the reference they have already read". Widening it would change that
+  # existing prompt, so this pins the two lists apart.
+  describe "concept field constants" do
+    it "keeps the guide out of the reference field list" do
+      expect(AiService::CONCEPT_REFERENCE_FIELDS)
+        .to eq(%w[tagline explanation code_example senior_lens])
+      expect(AiService::CONCEPT_REFERENCE_FIELDS & AiService::CONCEPT_GUIDE_FIELDS).to be_empty
+    end
+
+    it "does not send the guide to the alternate-framing prompt" do
+      reference = ConceptReference.create!(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+        guide_plain_language: "PLAIN_MARKER", guide_worked_example: "WORKED_MARKER",
+        guide_pitfalls: "PITFALLS_MARKER"
+      )
+      service = double_class.new(canned_text: "Another angle.")
+      service.explain_concept_differently(user, reference)
+
+      expect(service.last_prompt).not_to include("PLAIN_MARKER", "WORKED_MARKER", "PITFALLS_MARKER")
     end
   end
 end

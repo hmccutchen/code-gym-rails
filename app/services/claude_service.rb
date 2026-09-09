@@ -26,9 +26,9 @@ class ClaudeService < AiService
   # computed backoff. Exposed as a constant so specs can build an equivalent
   # test connection instead of duplicating these values.
   RETRY_OPTIONS = {
-    max:                 2,
+    max:                 AiService::RETRY_MAX,
     interval:            0.5,
-    max_interval:        8,
+    max_interval:        AiService::RETRY_MAX_INTERVAL,
     backoff_factor:      2,
     interval_randomness: 0.5,
     methods:             [],

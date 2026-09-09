@@ -3,31 +3,59 @@ class GenerateConceptReferenceJob < ApplicationJob
 
   # Best-effort: any failure is logged and swallowed, so a missing reference
   # renders as nothing and is retried the next time anyone submits the concept.
-  def perform(concept:, language:, user_id:)
+  #
+  # `refresh_guide` is what the Learn tab passes to regenerate a row that
+  # predates guides. It defaults to false so the first-exposure caller in
+  # ResponsesController keeps its original contract: any existing row is a
+  # no-op there, whatever it does or doesn't carry.
+  #
+  # A legacy row is rewritten WHOLE, reference text included, because both
+  # halves have to come from one response for them to be consistent by
+  # construction. That is why the Learn tab only ever asks for it on a concept
+  # someone deliberately opened, never in bulk.
+  def perform(concept:, language:, user_id:, refresh_guide: false)
     # "other" is the off-vocabulary catch-all from ProblemSetIngest#normalize_concepts!,
     # not a real concept worth a reference.
     return if concept == "other"
 
     # Another job may have generated it in the enqueue/run gap.
-    return if ConceptReference.exists?(concept: concept, language: language)
+    existing = ConceptReference.find_by(concept: concept, language: language)
+    return if existing && (existing.guide? || !refresh_guide)
 
     user = User.find_by(id: user_id)
     return unless user
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
+    attributes = (AiService::CONCEPT_REFERENCE_FIELDS + AiService::CONCEPT_GUIDE_FIELDS)
+                   .index_with { |field| reference[field] }
 
-    ConceptReference.create!(
-      concept:      concept,
-      language:     language,
-      tagline:      reference["tagline"],
-      explanation:  reference["explanation"],
-      code_example: reference["code_example"],
-      senior_lens:  reference["senior_lens"]
-    )
+    if existing
+      # The provider call runs unlocked (it can take up to READ_TIMEOUT
+      # seconds); only the write is guarded. A second job racing this one may
+      # have written a guide in the gap, so the row is re-read under lock and
+      # re-checked before writing — the loser discards its result rather than
+      # overwriting the winner's, the same shape User#resume_generation! uses
+      # to settle its own race.
+      existing.with_lock do
+        next if existing.guide?
+
+        existing.update!(attributes)
+      end
+    else
+      ConceptReference.create!(attributes.merge("concept" => concept, "language" => language))
+    end
 
     Rails.logger.info("Generated concept reference for #{concept}/#{language}")
-  rescue ActiveRecord::RecordNotUnique
-    # A concurrent job won the race; nothing to do.
+  rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
+    # Uniqueness is enforced twice here, the same as User#resume_generation!'s
+    # date race: the model validation's SELECT can see the other job's
+    # already-committed row and raise RecordInvalid before the database
+    # constraint ever gets a chance to raise RecordNotUnique. With 74-118 jobs
+    # racing over 3 worker threads, the validation losing that race is the
+    # common case, not the rare one, so both exceptions mean the same thing —
+    # a concurrent job won.
+    raise if e.is_a?(ActiveRecord::RecordInvalid) && e.record.errors[:concept].blank?
+
     Rails.logger.info("Skipped duplicate concept reference for #{concept}/#{language}")
   rescue AiService::Error => e
     Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language}: #{e.message}")
