@@ -42,6 +42,13 @@ en:
     intro: "Every concept your sets can draw from — read up on one whenever you like."
     encountered: "in your sets"
     not_generated: "not written yet"
+    back: "← All concepts"
+    worked_example: "Worked example"
+    pitfalls: "What people get wrong"
+    no_guide: "Nobody has written this one up yet."
+    write_guide: "Write this up"
+    writing_guide: "Writing it up — this takes a few seconds."
+    write_guide_failed: "That didn't work. Try again in a moment."
     buckets:
       ruby_rails: "Ruby/Rails"
       javascript: "JavaScript/React"

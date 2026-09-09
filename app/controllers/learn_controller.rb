@@ -16,6 +16,27 @@ class LearnController < ApplicationController
     @ungenerated = ungenerated_concepts.size
   end
 
+  # GET /learn/:bucket/:concept
+  def show
+    @bucket    = validated_bucket
+    @concept   = validated_concept(@bucket)
+    @reference = ConceptReference.find_by(concept: @concept, language: @bucket)
+  end
+
+  # GET /learn/:bucket/:concept/status — is the guide written yet?
+  #
+  # Same shape and same reason as DashboardController#status. A fixed client
+  # timeout would have to guess how long a provider call takes, and this one
+  # runs with extended thinking on, so the guess would be wrong in both
+  # directions — reloading onto an unfinished page, or waiting long after it
+  # finished.
+  def status
+    bucket  = validated_bucket
+    concept = validated_concept(bucket)
+
+    render json: { ready: ConceptReference.find_by(concept: concept, language: bucket)&.guide? || false }
+  end
+
   private
 
   # This user's slice: their own language plus every language-independent
@@ -67,5 +88,27 @@ class LearnController < ApplicationController
   # facts, and only the first is shown here.
   def encountered?(concept, bucket)
     current_user.concept_exposure_count(concept, bucket, on_or_before: Date.current).positive?
+  end
+
+  # :bucket and :concept arrive from a URL, so they are held to the closed
+  # vocabulary here rather than trusted downstream — the same boundary rule
+  # ProblemSetIngest applies to provider output. An unknown pair is a 404, not
+  # a page rendering an empty concept.
+  #
+  # Validating the bucket against learn_buckets rather than every bucket also
+  # means a user cannot browse the language they are not assigned by typing
+  # the URL, which keeps the page and its address saying the same thing.
+  def validated_bucket
+    bucket = params[:bucket].to_s
+    raise ActiveRecord::RecordNotFound unless learn_buckets.include?(bucket)
+
+    bucket
+  end
+
+  def validated_concept(bucket)
+    concept = params[:concept].to_s
+    raise ActiveRecord::RecordNotFound unless ConceptBucket.vocabulary_for(bucket).include?(concept)
+
+    concept
   end
 end

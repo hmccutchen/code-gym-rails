@@ -115,4 +115,102 @@ RSpec.describe "Learn", type: :request do
       end
     end
   end
+
+  describe "GET /learn/:bucket/:concept" do
+    before { user.update!(language: "ruby_rails") }
+
+    def full_reference
+      ConceptReference.create!(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "TAGLINE", explanation: "EXPLANATION",
+        code_example: "User.includes(:posts)", senior_lens: "SENIOR LENS",
+        guide_plain_language: "PLAIN LANGUAGE", guide_worked_example: "WORKED EXAMPLE",
+        guide_pitfalls: "PITFALLS"
+      )
+    end
+
+    it "renders the reference and the guide together" do
+      full_reference
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("TAGLINE", "EXPLANATION", "SENIOR LENS")
+      expect(response.body).to include("PLAIN LANGUAGE", "WORKED EXAMPLE", "PITFALLS")
+    end
+
+    it "renders a legacy row's reference with a control to write the guide" do
+      ConceptReference.create!(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "TAGLINE", explanation: "EXPLANATION",
+        code_example: "code", senior_lens: "SENIOR LENS"
+      )
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.body).to include("TAGLINE")
+      expect(response.body).to include(I18n.t("learn.write_guide"))
+    end
+
+    it "renders a concept with no row at all as an offer to generate it" do
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("learn.write_guide"))
+    end
+
+    it "404s on a concept that is not in that bucket's vocabulary" do
+      get learn_concept_path(bucket: "ruby_rails", concept: "prototype_chain")
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "404s on an invented concept" do
+      get learn_concept_path(bucket: "ruby_rails", concept: "not_a_concept")
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "404s on a bucket outside the user's slice" do
+      get learn_concept_path(bucket: "javascript", concept: "prototype_chain")
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "serves the other language to a mixed user" do
+      user.update!(language: "mixed")
+      get learn_concept_path(bucket: "javascript", concept: "prototype_chain")
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "GET /learn/:bucket/:concept/status" do
+    before { user.update!(language: "ruby_rails") }
+
+    it "is not ready when no row exists" do
+      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.parsed_body["ready"]).to be(false)
+    end
+
+    it "is not ready for a row that has no guide" do
+      ConceptReference.create!(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
+      )
+      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.parsed_body["ready"]).to be(false)
+    end
+
+    it "is ready once the guide is written" do
+      ConceptReference.create!(
+        concept: "n_plus_one", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+        guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x"
+      )
+      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.parsed_body["ready"]).to be(true)
+    end
+  end
 end

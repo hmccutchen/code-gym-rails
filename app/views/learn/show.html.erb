@@ -1,0 +1,36 @@
+<p><%= link_to t("learn.back"), learn_path %></p>
+<h1><%= @concept.humanize %></h1>
+<p class="learn-bucket-label"><%= t("learn.buckets.#{@bucket}") %></p>
+
+<% if @reference %>
+  <p><strong><%= @reference.tagline %></strong></p>
+  <p><%= @reference.explanation %></p>
+<% end %>
+
+<% if @reference&.guide? %>
+  <%# The reference fields render INSIDE the guide rather than beside it: one
+      account of the concept, deepened, not two competing ones. That ordering is
+      the visible half of generating both in a single response. %>
+  <p><%= @reference.guide_plain_language %></p>
+
+  <pre class="snippet"><code<% if (lang = hljs_language(@bucket)) %> data-hljs="<%= lang %>"<% end %>><%= @reference.code_example %></code></pre>
+
+  <h2><%= t("learn.worked_example") %></h2>
+  <pre class="snippet"><code<% if (lang = hljs_language(@bucket)) %> data-hljs="<%= lang %>"<% end %>><%= @reference.guide_worked_example %></code></pre>
+
+  <h2><%= t("learn.pitfalls") %></h2>
+  <p><%= @reference.guide_pitfalls %></p>
+
+  <p>🔭 <%= @reference.senior_lens %></p>
+  <%= render "shared/syntax_highlighting_script" %>
+<% else %>
+  <%# Neither state is an error: the library is browsable from the first page
+      load, before anything has been generated. %>
+  <div id="learn-guide"
+       data-url="<%= prepare_learn_concept_path(bucket: @bucket, concept: @concept) %>"
+       data-status-url="<%= learn_concept_status_path(bucket: @bucket, concept: @concept) %>">
+    <p class="learn-no-guide"><%= t("learn.no_guide") %></p>
+    <button type="button" class="btn btn-sm" id="write-guide"><%= t("learn.write_guide") %></button>
+    <span class="learn-status" aria-live="polite"></span>
+  </div>
+<% end %>
