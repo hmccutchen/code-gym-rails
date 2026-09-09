@@ -190,15 +190,11 @@ class FakeService < AiService
     "guide_plain_language" =>
       "Stated without the jargon: there is one thing this concept asks you to notice, and once you have noticed it the " \
       "rest follows. Everything else written about it is commentary on that one thing.",
-    "guide_worked_example" => <<~RUBY.strip,
-      # The situation: this runs once per request and nobody minds.
-      def example
-        true
-      end
-
-      # What it costs: called in a loop over a hundred records, the same work
-      # happens a hundred times, and the page takes a hundred times as long.
-    RUBY
+    "guide_worked_example" =>
+      "Picture the method running once per request: nobody notices, and nobody should. Now picture the same " \
+      "method called inside a loop over a hundred records. The identical work happens a hundred times, the page " \
+      "takes a hundred times as long, and nothing in the code looks different — which is exactly why it survives " \
+      "review.",
     "guide_pitfalls" =>
       "The appealing wrong idea is that this only matters at scale, so it can wait. It matters as soon as the code is " \
       "read by someone who did not write it, which is usually sooner."

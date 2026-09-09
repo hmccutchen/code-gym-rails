@@ -16,11 +16,12 @@
   <pre class="snippet"><code<% if (lang = hljs_language(@bucket)) %> data-hljs="<%= lang %>"<% end %>><%= @reference.code_example %></code></pre>
 
   <h2><%= t("learn.worked_example") %></h2>
-  <pre class="snippet"><code<% if (lang = hljs_language(@bucket)) %> data-hljs="<%= lang %>"<% end %>><%= @reference.guide_worked_example %></code></pre>
+  <p class="learn-worked-example"><%= @reference.guide_worked_example %></p>
 
   <h2><%= t("learn.pitfalls") %></h2>
   <p><%= @reference.guide_pitfalls %></p>
 
+  <h2><%= t("learn.senior_lens") %></h2>
   <p>🔭 <%= @reference.senior_lens %></p>
   <%= render "shared/syntax_highlighting_script" %>
 <% else %>
@@ -33,9 +34,7 @@
     <button type="button" class="btn btn-sm" id="write-guide"><%= t("learn.write_guide") %></button>
     <span class="learn-status" aria-live="polite"></span>
   </div>
-<% end %>
 
-<% unless @reference&.guide? %>
   <%# Inline script, matching the working convention here: the layout emits no
       importmap tags, so nothing else would run. Polls rather than holding the
       request, since this generation runs with extended thinking on. %>

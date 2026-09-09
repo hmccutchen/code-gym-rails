@@ -1,8 +1,8 @@
 class LearnController < ApplicationController
   helper_method :encountered?
 
-  # The four language-independent buckets, from the authority that already
-  # names them, so a fifth one added to ConceptBucket appears here without an
+  # The language-independent buckets, derived from the authority that already
+  # names them, so a new one added to ConceptBucket appears here without an
   # edit.
   AGNOSTIC_BUCKETS = ConceptBucket::SPECIAL_BUCKETS.values.freeze
 
@@ -13,7 +13,7 @@ class LearnController < ApplicationController
     @buckets    = learn_buckets.map do |bucket|
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
-    @ungenerated = ungenerated_concepts.size
+    @ungenerated = ungenerated_concepts(@references).size
   end
 
   # GET /learn/:bucket/:concept
@@ -64,9 +64,9 @@ class LearnController < ApplicationController
   # there is no run record to reconcile. Rows are shared team-wide, so the
   # second person to press it finds almost everything done.
   def prepare
-    @references = references_by_key
+    references = references_by_key
 
-    ungenerated_concepts.each do |concept, bucket|
+    ungenerated_concepts(references).each do |concept, bucket|
       GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id)
     end
 
@@ -107,10 +107,10 @@ class LearnController < ApplicationController
   # without a guide is deliberately NOT counted here: rewriting it in bulk
   # would change inline reference text for concepts nobody asked about, so it
   # is left to the on-demand path.
-  def ungenerated_concepts
+  def ungenerated_concepts(references)
     learn_buckets.flat_map do |bucket|
       ConceptBucket.vocabulary_for(bucket)
-                   .reject { |concept| @references.key?([ concept, bucket ]) }
+                   .reject { |concept| references.key?([ concept, bucket ]) }
                    .map { |concept| [ concept, bucket ] }
     end
   end

@@ -35,7 +35,7 @@
 
         <ul class="learn-list">
           <% concepts.each do |concept| %>
-            <li class="learn-entry" data-concept="<%= concept %>">
+            <li class="learn-entry" data-concept="<%= concept %>" data-search="<%= "#{concept} #{concept.humanize}".downcase %>">
               <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
               <% if encountered?(concept, bucket[:key]) %>
                 <span class="learn-seen"><%= t("learn.encountered") %></span>
@@ -63,7 +63,7 @@
       let shown = 0;
 
       entries.forEach((entry) => {
-        const matchesTerm = entry.dataset.concept.includes(term);
+        const matchesTerm = entry.dataset.search.includes(term);
         const matchesSeen = !seenOnly.checked || entry.querySelector(".learn-seen") !== null;
         const visible = matchesTerm && matchesSeen;
         entry.hidden = !visible;

@@ -1827,7 +1827,7 @@ class AiService
         "code_example": "string — #{code_example_desc}",
         "senior_lens":  "string — #{senior_lens_desc}",
         "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term; unpack any jargon in place rather than assuming it",
-        "guide_worked_example": "string — one concrete scenario end to end: the situation, what it costs or breaks, and what changes. May contain #{code_example_desc}",
+        "guide_worked_example": "string — one concrete scenario end to end: the situation, what it costs or breaks, and what changes. Narrate it in prose; include a short code fragment only where it genuinely helps.",
         "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing"
       }
     PROMPT
