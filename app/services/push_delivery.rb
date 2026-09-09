@@ -6,8 +6,8 @@ require "web_push"
 # That pruning is the load-bearing part. iOS drops subscriptions on its own —
 # after a stretch of inactivity, or seemingly at random — and a dropped endpoint
 # answers 404/410 forever after. Without deleting those rows the reminder job
-# spends every morning pushing at addresses that will never deliver again, and
-# the delivery log stops meaning anything.
+# keeps pushing at addresses that will never deliver again, and the delivery log
+# stops meaning anything.
 class PushDelivery
   # A push that isn't shown is worse than one not sent: Safari revokes the
   # permission outright if a service worker receives a push and displays
