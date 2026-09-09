@@ -103,8 +103,6 @@ RSpec.describe SendPushReminderJob do
 
   describe "the unstarted nudge" do
     it "carries the section count and the hours left in the local day" do
-      create_exercise
-      subscribe
       user.update!(reminder_level: :ready_and_nudges)
 
       expect(PushDelivery).to receive(:deliver).with(
@@ -114,6 +112,9 @@ RSpec.describe SendPushReminderJob do
 
       Time.use_zone("UTC") do
         travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          create_exercise
+          subscribe
+
           described_class.new.perform(user_id: user.id, kind: :nudge)
         end
       end
