@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe SendPushReminderJob do
   let(:user) do
     User.create!(email: "remind@example.com", name: "Remind", provider: "anthropic",
-                 api_key: "sk-ant-test", time_zone: "UTC", push_reminders_enabled: true)
+                 api_key: "sk-ant-test", time_zone: "UTC", reminder_level: :ready)
   end
 
   around do |example|
@@ -51,7 +51,7 @@ RSpec.describe SendPushReminderJob do
   end
 
   it "does nothing when the user has turned reminders off" do
-    user.update!(push_reminders_enabled: false)
+    user.update!(reminder_level: :none)
     create_exercise
     subscribe
 
@@ -99,5 +99,103 @@ RSpec.describe SendPushReminderJob do
     expect(PushDelivery).not_to receive(:deliver)
 
     described_class.new.perform(user_id: user.id)
+  end
+
+  describe "the unstarted nudge" do
+    it "carries the section count and the hours left in the local day" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "Today's set is still waiting",
+                                 body:  "2 sections · about 10h left today.")
+      ).and_return(true)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          create_exercise
+          subscribe
+
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    it "is refused for a user who only opted into the morning push" do
+      create_exercise
+      subscribe
+      user.update!(reminder_level: :ready)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      described_class.new.perform(user_id: user.id, kind: :nudge)
+    end
+
+    it "still sends the ready push at that level, which is what they asked for" do
+      create_exercise
+      subscribe
+      user.update!(reminder_level: :ready)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "Today's Code Gym is ready")
+      ).and_return(true)
+
+      described_class.new.perform(user_id: user.id)
+    end
+
+    # Pins the claim in #hours_left_today's comment that the last nudge always
+    # leaves about six hours, which is why no sub-hour branch is written.
+    # Widen NUDGE_HOURS past the early evening and this fails, as it should.
+    it "leaves at least six hours in the day at its last nudge hour" do
+      Time.use_zone("UTC") do
+        last = Time.zone.local(2026, 9, 8, PushNudgePlan::NUDGE_HOURS.max, 59, 59)
+        expect(last.end_of_day - last).to be >= 6.hours
+      end
+    end
+
+    # The job runs asynchronously, so every fact the enqueue decided on can have
+    # moved by the time it lands. A queue backlog is the realistic case.
+    it "sends nothing once the hour has left the nudge window" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          create_exercise
+          subscribe
+        end
+
+        travel_to Time.zone.local(2026, 9, 8, 22, 15) do
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    it "sends nothing once the user has started the set" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          exercise = create_exercise
+          subscribe
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                answers: { "code_review" => "a genuinely substantive answer here" })
+
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    it "sends nothing for a kind it does not recognise" do
+      create_exercise
+      subscribe
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      described_class.new.perform(user_id: user.id, kind: :something_else)
+    end
   end
 end

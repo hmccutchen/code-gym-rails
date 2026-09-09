@@ -1,6 +1,6 @@
 # Daily reminder push notifications (Web Push / VAPID)
 
-The morning reminder is sent from `SendPushReminderJob`, which runs in the
+The daily reminders are sent from `SendPushReminderJob`, which runs in the
 **worker** service — but the VAPID **public** key is rendered into every page
 by `web`, so both services need the vars below. Until they are set,
 `WebPushCredentials.configured?` is false: the Account page shows no reminder
@@ -75,7 +75,10 @@ Both deployments must be newer than the variable set, and `SUCCESS`.
 
 Turning reminders on is one tap on the Account page, and it must happen on the
 device that will receive them — a permission grant is per-browser, so a
-laptop and a phone each need their own.
+laptop and a phone each need their own. A second, optional checkbox there adds
+a nudge during the day (hourly between 1pm and 5pm local) on days the set has
+not been started; it is off unless asked for, and it changes nothing about
+enrolment.
 
 **On iPhone and iPad it only works from a Home Screen app.** Safari does not
 expose `window.PushManager` in an ordinary tab, so the Account page disables
@@ -87,8 +90,8 @@ Code Gym from that icon, and turn reminders on there.
 `PushSubscriptionsController::ALLOWED_ENDPOINT_HOSTS` holds enrolment to the
 push services browsers actually use (FCM, Mozilla, Apple, WNS), matched by
 domain suffix. That closes an otherwise-blind SSRF: without it, any logged-in
-teammate could store an arbitrary URL that the worker POSTs to every morning
-from inside the deployment's network.
+teammate could store an arbitrary URL that the worker POSTs to on every
+reminder from inside the deployment's network.
 
 The cost is that a browser using a service the list doesn't name cannot turn
 reminders on. That is visible rather than silent — the Account page shows the

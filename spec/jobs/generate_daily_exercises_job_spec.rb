@@ -320,4 +320,57 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
   end
+
+  describe "the unstarted nudge on a later tick" do
+    it "nudges when the set exists and nothing has been answered" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      Time.use_zone("UTC") do
+        travel_to(Time.zone.local(2026, 9, 8, 14, 0)) do
+          DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                language: "ruby_rails",
+                                problem_set: { "code_review" => { "question" => "q" } })
+
+          expect(SendPushReminderJob).to receive(:perform_later).with(user_id: user.id, kind: :nudge)
+
+          described_class.new.perform
+        end
+      end
+    end
+
+    it "goes quiet once any section has been answered" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      Time.use_zone("UTC") do
+        travel_to(Time.zone.local(2026, 9, 8, 14, 0)) do
+          exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                           language: "ruby_rails",
+                                           problem_set: { "code_review" => { "question" => "q" } })
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                answers: { "code_review" => "a genuinely substantive answer here" })
+
+          expect(SendPushReminderJob).not_to receive(:perform_later)
+
+          described_class.new.perform
+        end
+      end
+    end
+
+    it "does not regenerate the set it nudges about" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      Time.use_zone("UTC") do
+        travel_to(Time.zone.local(2026, 9, 8, 14, 0)) do
+          DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                language: "ruby_rails",
+                                problem_set: { "code_review" => { "question" => "q" } })
+          allow(SendPushReminderJob).to receive(:perform_later)
+
+          described_class.new.perform
+
+          expect(DailyExercise.where(user: user, date: Date.current).count).to eq(1)
+        end
+      end
+    end
+  end
 end

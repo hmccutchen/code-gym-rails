@@ -140,7 +140,7 @@ advisory signal; it is not evidence that anything was verified.
 ## Stack
 
 - **Rails 8.0.5** + PostgreSQL
-- **Solid Queue** — background jobs + recurring 8am weekday cron (no Redis needed)
+- **Solid Queue** — background jobs + recurring hourly cron, gated per user to 8am weekdays for generation and to early afternoon for reminder nudges (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
 - **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
@@ -220,7 +220,7 @@ User interacts:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), push_reminders_enabled (boolean, default false), anonymized_at (nullable — set on self-service deletion) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, a rotating third key, a rotating fourth key), language, generated_at, regenerated_at |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), feedback_text, ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
@@ -481,7 +481,12 @@ User interacts:
   /service-worker.js` serves it from the root path, since a worker's scope is
   the directory it is served from.
 - **Push reminders**: an optional notification each weekday when the day's set
-  is ready, turned on and off on the Account page. `WebPushCredentials` is the
+  is ready, and an optional afternoon nudge on days it goes untouched, turned
+  on and off on the Account page.
+  The nudge window is `PushNudgePlan::NUDGE_HOURS` (13-17 local, inclusive), so
+  an untouched day sends at most five on the hourly cron — a bound that belongs
+  to the schedule, not to the plan object, which holds no dedupe.
+  `WebPushCredentials` is the
   single authority for "is push configured here at all" — with no VAPID pair in
   ENV the control doesn't render, the layout emits no script, `POST
   /push_subscription` 404s and `SendPushReminderJob` returns without contacting
@@ -493,29 +498,37 @@ User interacts:
   suffix, because an endpoint is minted by the browser's own push service and
   can only come from a known handful of hosts. Without it the stored endpoint
   is an arbitrary URL chosen by whoever is logged in, which the worker then
-  POSTs to every morning from inside the deployment's network — a blind,
+  POSTs to on every reminder from inside the deployment's network — a blind,
   authenticated SSRF primitive. A refused host is logged with its name, so a
   browser using a service the list doesn't yet name is diagnosable rather than
   a silent failure to enrol.
 
   **Intent and transport are separate facts, deliberately.**
-  `User#push_reminders_enabled` is the answer to "does this person want
-  reminders"; `PushSubscription` rows are the endpoints that can currently
-  reach them. iOS drops subscriptions on its own, so an endpoint has to be able
+  `User#reminder_level` is the answer to "how much does this person want to
+  hear from us"; `PushSubscription` rows are the endpoints that can
+  currently reach them. iOS drops subscriptions on its own, so an endpoint has to be able
   to die without taking the user's answer with it — that is what lets the next
   launch re-register silently instead of asking again for a permission the
   browser already granted. Turning reminders off clears both; anonymizing an
   account clears both, since a home-screen install keeps its browser-side
   subscription after the account is gone.
 
-  **The reminder is enqueued by `GenerateDailyExercisesJob`'s cron branch, not
-  scheduled on its own.** "It is this user's 8am on a weekday" already has an
-  owner and a second cron entry would be a second place for it to drift. That
-  branch's `exists?` check therefore gates the whole branch rather than sitting
-  only inside `generate_now`: the cron runs hourly, and leaving it downstream
-  would let every later run re-enqueue the reminder until midnight. The
-  on-demand branch deliberately doesn't enqueue — a user who triggered
-  generation by opening the dashboard is already looking at the set.
+  **Both reminders are enqueued by `GenerateDailyExercisesJob`'s cron branch,
+  not scheduled on their own.** "It is this user's 8am on a weekday" already
+  has an owner and a second cron entry would be a second place for it to
+  drift — and the tick is already hourly, so a nudge needs no new schedule.
+  That branch's `exists?` check is therefore a fork rather than a gate: the
+  tick that finds no set generates and sends `:ready`, and later ticks consult
+  `PushNudgePlan` and may send `:nudge`. What stops the nudge repeating all
+  day is the user starting the set, not the hour having passed once. The
+  on-demand branch still enqueues neither — a user who triggered generation by
+  opening the dashboard is already looking at the set.
+
+  **Intent is a three-value dial, `User#reminder_level`** (`none` / `ready` /
+  `ready_and_nudges`). `#push_reminders_enabled?` is derived from it rather
+  than stored, because that name answers transport as well as intent: the
+  layout's re-subscribe script uses it to ask whether this browser is enrolled
+  at all, which the dial does not change.
 
   **The permission call must be the first synchronous statement in the click
   handler.** iOS grants a prompt only to a request made synchronously inside a
@@ -621,7 +634,8 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
-- `app/jobs/send_push_reminder_job.rb` — the morning nudge, fanned out over one user's endpoints; enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately
+- `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately
+- `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, and the not-started/not-submitted stopping rule. Pure, so its specs need no database
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

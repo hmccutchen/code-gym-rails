@@ -25,7 +25,7 @@ RSpec.describe "Push subscriptions", type: :request do
       post push_subscription_path, params: valid_params
 
       expect(response).to have_http_status(:created)
-      expect(user.reload.push_reminders_enabled).to be(true)
+      expect(user.reload.reminders_ready?).to be(true)
       expect(user.push_subscriptions.sole.endpoint).to eq("https://fcm.googleapis.com/fcm/send/abc")
     end
 
@@ -44,7 +44,7 @@ RSpec.describe "Push subscriptions", type: :request do
         post push_subscription_path, params: valid_params.merge(override)
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.push_reminders_enabled).to be(false)
+        expect(user.reload.reminders_none?).to be(true)
       end
     end
 
@@ -93,7 +93,7 @@ RSpec.describe "Push subscriptions", type: :request do
         post push_subscription_path, params: valid_params.merge(endpoint: endpoint)
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(user.reload.push_reminders_enabled).to be(false)
+        expect(user.reload.reminders_none?).to be(true)
         expect(PushSubscription.count).to eq(0)
       end
     end
@@ -123,7 +123,7 @@ RSpec.describe "Push subscriptions", type: :request do
       post push_subscription_path, params: valid_params
 
       expect(response).to have_http_status(:not_found)
-      expect(user.reload.push_reminders_enabled).to be(false)
+      expect(user.reload.reminders_none?).to be(true)
     end
 
     it "requires a logged-in user" do
@@ -132,6 +132,59 @@ RSpec.describe "Push subscriptions", type: :request do
       post push_subscription_path, params: valid_params
 
       expect(response).to redirect_to(login_path)
+    end
+
+    it "does not walk a nudges user back to ready when their browser re-enrols" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :ready_and_nudges)
+
+      post push_subscription_path, params: {
+        endpoint: "https://fcm.googleapis.com/fcm/send/abc", p256dh: "p", auth: "a"
+      }
+
+      expect(user.reload.reminders_ready_and_nudges?).to be(true)
+    end
+  end
+
+  describe "PATCH /push_subscription" do
+    before { user.update!(reminder_level: :ready) }
+
+    it "opts an enrolled user into nudges" do
+      configure_vapid
+      login_as(user)
+
+      patch push_subscription_path, params: { nudges: "1" }
+      expect(user.reload.reminders_ready_and_nudges?).to be(true)
+    end
+
+    it "opts them back out without un-enrolling them" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :ready_and_nudges)
+
+      patch push_subscription_path, params: { nudges: "0" }
+      expect(user.reload.reminders_ready?).to be(true)
+    end
+
+    # The dial is a plain form post. Enrolment has to happen inside a click
+    # handler for iOS to grant permission, so this must never be a way to turn
+    # reminders on from nothing.
+    it "cannot enrol a user who has never turned reminders on" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :none)
+
+      patch push_subscription_path, params: { nudges: "1" }
+      expect(user.reload.reminders_none?).to be(true)
+    end
+
+    it "refuses when no VAPID keypair is configured" do
+      login_as(user)
+
+      patch push_subscription_path, params: { nudges: "1" }
+
+      expect(response).to have_http_status(:not_found)
     end
   end
 
@@ -146,7 +199,7 @@ RSpec.describe "Push subscriptions", type: :request do
       delete push_subscription_path
 
       expect(response).to redirect_to(account_path)
-      expect(user.reload.push_reminders_enabled).to be(false)
+      expect(user.reload.reminders_none?).to be(true)
       expect(user.push_subscriptions).to be_empty
     end
   end
@@ -200,7 +253,7 @@ RSpec.describe "Push subscriptions", type: :request do
     # replaced with one the server has never seen, and nothing else repairs it.
     it "re-subscribes on launch for a user who has reminders on" do
       configure_vapid
-      user.update!(push_reminders_enabled: true)
+      user.update!(reminder_level: :ready)
       login_as(user)
 
       get account_path
@@ -214,6 +267,16 @@ RSpec.describe "Push subscriptions", type: :request do
       get login_path
 
       expect(response.body).not_to include("CodeGymPush")
+    end
+
+    it "renders the nudge opt-in on the Account page once enrolled" do
+      configure_vapid
+      login_as(user)
+      user.update!(reminder_level: :ready)
+
+      get account_path
+
+      expect(response.body).to include("Also remind me during the day")
     end
   end
 

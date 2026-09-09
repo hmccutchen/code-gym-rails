@@ -25,6 +25,15 @@ class User < ApplicationRecord
 
   scope :active, -> { where(anonymized_at: nil) }
 
+  enum :reminder_level, { none: 0, ready: 1, ready_and_nudges: 2 }, prefix: :reminders
+
+  # "Is this user enrolled at all", which is a transport question, not an
+  # intent one — `reminder_level` carries intent, and the job reads that enum
+  # directly. Kept as a derived predicate so the layout's re-subscribe script,
+  # the Account page's on/off gate, and #update's enrolment precondition can
+  # all ask the simple question without knowing about levels.
+  def push_reminders_enabled? = !reminders_none?
+
   LOGIN_CODE_EXPIRY = 15.minutes
   LOGIN_CODE_MAX_ATTEMPTS = 5
 
@@ -185,7 +194,7 @@ class User < ApplicationRecord
         login_code_sent_at:     nil,
         login_code_digest:      nil,
         login_code_attempts:    0,
-        push_reminders_enabled: false,
+        reminder_level:         :none,
         anonymized_at:          Time.current
       )
     end

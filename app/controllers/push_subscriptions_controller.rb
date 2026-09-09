@@ -15,8 +15,8 @@ class PushSubscriptionsController < ApplicationController
 
   # A push endpoint is minted by the browser's own push service, so it can only
   # come from a known handful of hosts. Without this the endpoint is an
-  # arbitrary URL chosen by whoever is logged in, which the worker then POSTs to
-  # every morning from inside the deployment's network — a blind, authenticated
+  # arbitrary URL chosen by whoever is logged in, which the worker then POSTs
+  # to on every reminder from inside the deployment's network — a blind, authenticated
   # SSRF primitive. Matched by domain suffix, so per-region and per-tenant
   # subdomains are covered without enumerating them.
   #
@@ -43,10 +43,27 @@ class PushSubscriptionsController < ApplicationController
         p256dh_key: params[:p256dh],
         auth_key:   params[:auth]
       )
-      current_user.update!(push_reminders_enabled: true)
+      # Enrolment turns reminders on; it must not turn nudges off. A browser
+      # re-registering (the layout re-subscribes on every page load) would
+      # otherwise silently walk a ready_and_nudges user back down to ready.
+      current_user.update!(reminder_level: :ready) if current_user.reminders_none?
     end
 
     head :created
+  end
+
+  # PATCH /push_subscription
+  # The dial, not the enrolment. Turning reminders on has to happen inside a
+  # click handler so iOS will grant permission; this is an ordinary form post,
+  # so it deliberately refuses to enrol and only moves an already-enrolled
+  # user between ready and ready_and_nudges.
+  def update
+    return head :not_found unless WebPushCredentials.configured?
+    return redirect_to account_path unless current_user.push_reminders_enabled?
+
+    current_user.update!(reminder_level: params[:nudges] == "1" ? :ready_and_nudges : :ready)
+
+    redirect_to account_path, notice: "Reminder settings saved."
   end
 
   # DELETE /push_subscription
@@ -55,7 +72,7 @@ class PushSubscriptionsController < ApplicationController
   def destroy
     User.transaction do
       current_user.push_subscriptions.destroy_all
-      current_user.update!(push_reminders_enabled: false)
+      current_user.update!(reminder_level: :none)
     end
 
     redirect_to account_path, notice: "Daily reminders turned off."

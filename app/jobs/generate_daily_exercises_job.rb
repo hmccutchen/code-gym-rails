@@ -27,17 +27,35 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   private
 
-  # The exists? check gates this whole branch rather than sitting only inside
-  # generate_now, because the cron runs hourly: leaving it downstream would let
-  # every run after the one that generated re-enqueue the reminder, and the
-  # nudge would repeat all morning.
+  # The exists? check is a fork, not a bail-out. On the tick that finds no set
+  # it generates and sends the ready push; on every later tick that day it is
+  # the nudge's turn. What stops the nudge repeating is the user starting the
+  # day, not the hour having passed once — PushNudgePlan owns that rule.
   def generate_if_due(user)
     return unless Date.current.on_weekday?
     return unless Time.current.hour >= 8
-    return if DailyExercise.exists?(user: user, date: Date.current)
 
-    generate_for(user)
-    remind(user)
+    if (exercise = DailyExercise.find_by(user: user, date: Date.current))
+      nudge_if_due(user, exercise)
+    else
+      generate_for(user)
+      remind(user)
+    end
+  end
+
+  def nudge_if_due(user, exercise)
+    return unless PushNudgePlan.possible?(level: user.reminder_level, hour: Time.current.hour)
+
+    response = user.daily_responses.find_by(daily_exercise: exercise)
+
+    return unless PushNudgePlan.due?(
+      level:     user.reminder_level,
+      hour:      Time.current.hour,
+      started:   response&.answered_sections.present?,
+      submitted: response&.submitted_at.present?
+    )
+
+    SendPushReminderJob.perform_later(user_id: user.id, kind: :nudge)
   end
 
   # Batch-only. An on-demand generation is triggered by someone already looking

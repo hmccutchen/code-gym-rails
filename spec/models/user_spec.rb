@@ -800,12 +800,12 @@ RSpec.describe User, type: :model do
     # endpoints is what actually silences it.
     it "stops push reminders and drops the endpoints they would reach" do
       user = create_user
-      user.update!(push_reminders_enabled: true)
+      user.update!(reminder_level: :ready)
       PushSubscription.register!(user: user, endpoint: "https://push.example.com/x", p256dh_key: "p", auth_key: "a")
 
       user.anonymize!
 
-      expect(user.reload.push_reminders_enabled).to be(false)
+      expect(user.reload.reminders_none?).to be(true)
       expect(user.push_subscriptions).to be_empty
     end
 
@@ -1311,6 +1311,32 @@ RSpec.describe User, type: :model do
       user = User.create!(email: "toggle@example.com", name: "Toggle")
 
       expect(user.adaptive_set_size?).to be(true)
+    end
+  end
+
+  describe "reminder level" do
+    let(:user) do
+      User.create!(email: "level@example.com", name: "Level", provider: "anthropic",
+                   api_key: "sk-ant-test")
+    end
+
+    it "defaults to none, so a new account is not enrolled" do
+      expect(user.reminders_none?).to be(true)
+      expect(user.push_reminders_enabled?).to be(false)
+    end
+
+    it "treats every non-none level as enrolled, since that predicate answers transport" do
+      user.update!(reminder_level: :ready)
+      expect(user.push_reminders_enabled?).to be(true)
+
+      user.update!(reminder_level: :ready_and_nudges)
+      expect(user.push_reminders_enabled?).to be(true)
+    end
+
+    it "drops to none when the account is anonymized" do
+      user.update!(reminder_level: :ready_and_nudges)
+      user.anonymize!
+      expect(user.reload.reminders_none?).to be(true)
     end
   end
 end
