@@ -46,8 +46,16 @@ class GenerateConceptReferenceJob < ApplicationJob
     end
 
     Rails.logger.info("Generated concept reference for #{concept}/#{language}")
-  rescue ActiveRecord::RecordNotUnique
-    # A concurrent job won the race; nothing to do.
+  rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
+    # Uniqueness is enforced twice here, the same as User#resume_generation!'s
+    # date race: the model validation's SELECT can see the other job's
+    # already-committed row and raise RecordInvalid before the database
+    # constraint ever gets a chance to raise RecordNotUnique. With 74-118 jobs
+    # racing over 3 worker threads, the validation losing that race is the
+    # common case, not the rare one, so both exceptions mean the same thing —
+    # a concurrent job won.
+    raise if e.is_a?(ActiveRecord::RecordInvalid) && e.record.errors[:concept].blank?
+
     Rails.logger.info("Skipped duplicate concept reference for #{concept}/#{language}")
   rescue AiService::Error => e
     Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language}: #{e.message}")

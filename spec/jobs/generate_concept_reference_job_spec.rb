@@ -79,6 +79,39 @@ RSpec.describe GenerateConceptReferenceJob do
     }.not_to raise_error
   end
 
+  # The model validation's SELECT can see a concurrently-committed row and
+  # raise RecordInvalid before the database's own unique index ever gets a
+  # chance to raise RecordNotUnique — the same doubled-uniqueness shape
+  # User#resume_generation! already handles for its date race. With the bulk
+  # backfill enqueuing dozens of jobs at once, this path is the common way a
+  # concurrent create loses, not the rare one, so it must be swallowed too.
+  it "swallows a RecordInvalid from a concurrently-created row without raising" do
+    stub_service
+    # Simulates the model validation losing the same race RecordNotUnique
+    # covers above: the winner's row already committed, so the uniqueness
+    # check on this attempt fails on :concept exactly as it would for real.
+    other = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")
+    other.errors.add(:concept, :taken)
+    allow(ConceptReference).to receive(:create!)
+      .and_raise(ActiveRecord::RecordInvalid.new(other))
+
+    expect {
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+    }.not_to raise_error
+  end
+
+  it "re-raises a RecordInvalid unrelated to the concept uniqueness race" do
+    stub_service
+    other = ConceptReference.new(concept: "n_plus_one", language: nil)
+    other.errors.add(:language, :blank)
+    allow(ConceptReference).to receive(:create!)
+      .and_raise(ActiveRecord::RecordInvalid.new(other))
+
+    expect {
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+    }.to raise_error(ActiveRecord::RecordInvalid)
+  end
+
   describe "guide persistence" do
     it "persists the guide fields alongside the reference fields" do
       stub_service

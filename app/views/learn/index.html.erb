@@ -6,8 +6,19 @@
       own provider key and the rows it writes are shared with the whole team. %>
   <div class="learn-prepare">
     <p><%= t("learn.prepare_prompt", count: @ungenerated) %></p>
-    <%= button_to t("learn.prepare_button"), prepare_learn_path, class: "btn btn-sm" %>
+    <%= button_to t("learn.prepare_button"), prepare_learn_path, class: "btn btn-sm", form: { id: "learn-prepare-form" } %>
   </div>
+
+  <%# #prepare derives what to enqueue from rows that exist, so a reload-and-
+      press-again double-submit would re-enqueue jobs still in flight. Disabling
+      client-side on submit covers the realistic double-click without adding a
+      persisted in-flight marker for a case the job's own re-check already
+      makes mostly harmless. %>
+  <script>
+    document.getElementById("learn-prepare-form").addEventListener("submit", (event) => {
+      event.target.querySelector('[type="submit"]').disabled = true;
+    });
+  </script>
 <% end %>
 
 <div class="learn-filter">
@@ -40,8 +51,15 @@
               <% if encountered?(concept, bucket[:key]) %>
                 <span class="learn-seen"><%= t("learn.encountered") %></span>
               <% end %>
-              <% unless @references[[ concept, bucket[:key] ]]&.guide? %>
+              <%# Row-existence and guide-existence are different facts, stated
+                  once each rather than collapsed into one marker: a row can
+                  exist (pre-guide) without the bulk button's count — driven by
+                  row existence — ever offering to clear it. %>
+              <% reference = @references[[ concept, bucket[:key] ]] %>
+              <% if reference.nil? %>
                 <span class="learn-ungenerated"><%= t("learn.not_generated") %></span>
+              <% elsif !reference.guide? %>
+                <span class="learn-ungenerated"><%= t("learn.reference_only") %></span>
               <% end %>
             </li>
           <% end %>

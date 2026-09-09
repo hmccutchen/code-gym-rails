@@ -97,6 +97,24 @@ RSpec.describe "Learn", type: :request do
 
       expect(response).to redirect_to(login_path)
     end
+
+    # A row that exists but lacks a guide is a different fact from no row at
+    # all — the bulk button's count is row-existence based, so the "not written
+    # yet" marker must mean exactly that, and a guide-less row needs its own
+    # marker or the two disagree once the button's count reaches zero while
+    # guide-less rows remain.
+    it "marks a concept with no row at all as not written yet, distinct from one with a reference but no guide" do
+      user.update!(language: "ruby_rails")
+      ConceptReference.create!(
+        concept: "memoization", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
+      )
+
+      get learn_path
+
+      expect(response.body).to include(I18n.t("learn.not_generated"))
+      expect(response.body).to include(I18n.t("learn.reference_only"))
+    end
   end
 
   # The views resolve headings by key, so a bucket or group added without its

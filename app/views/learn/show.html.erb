@@ -54,12 +54,13 @@
       importmap tags, so nothing else would run. Polls rather than holding the
       request, since this generation runs with extended thinking on. %>
   <%# The 2s interval is the one place that number lives; MAX_ATTEMPTS derives
-      from it and from AiService::CALL_BUDGET_SECONDS — the worst-case time a
-      concept-reference call can take across every retry it's allowed —
-      matching dashboard/_generating.html.erb's pattern for the same reason:
-      a hardcoded attempt count bore no relationship to how long the job could
-      actually run, so a healthy call could still be in flight when the poller
-      gave up and re-enabled the button. %>
+      from it and from AiService.call_budget_seconds(CONCEPT_REFERENCE_READ_TIMEOUT)
+      — the worst-case time a concept-reference call can take across every
+      retry it's allowed, at the timeout #generate_concept_reference actually
+      calls with — matching dashboard/_generating.html.erb's pattern for the
+      same reason: a hardcoded attempt count bore no relationship to how long
+      the job could actually run, so a healthy call could still be in flight
+      when the poller gave up. %>
   <% poll_interval_s = 2.0 %>
   <script>
     (function () {
@@ -68,13 +69,17 @@
       const status = box.querySelector(".learn-status");
 
       const INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
-      const MAX_ATTEMPTS = <%= (AiService::CALL_BUDGET_SECONDS / poll_interval_s).ceil %>;
+      const MAX_ATTEMPTS = <%= (AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil %>;
       let attempts = 0;
 
+      <%# The bulk backfill and this per-concept job share the default queue
+          against 3 worker threads, so a slow batch can leave this one still
+          queued when the budget above runs out — the likeliest state, not a
+          dead job. The button stays disabled; a genuine failure is recovered
+          by reloading, which re-renders it enabled. %>
       function poll() {
         attempts++;
         if (attempts > MAX_ATTEMPTS) {
-          button.disabled = false;
           status.textContent = "<%= j t("learn.write_guide_failed") %>";
           return;
         }

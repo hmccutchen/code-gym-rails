@@ -63,6 +63,25 @@ class AiService
   GENERATION_READ_TIMEOUT      = 300
   SYNC_GENERATION_READ_TIMEOUT = 90
 
+  # #generate_concept_reference now asks for seven fields (the original four
+  # CONCEPT_REFERENCE_FIELDS plus CONCEPT_GUIDE_FIELDS) in one response, with
+  # extended thinking left on (no max_tokens is passed), from the Learn tab's
+  # bulk backfill of 74-118 jobs. READ_TIMEOUT was sized for a single-section
+  # review's much smaller reply, so it under-times this call the same way
+  # GENERATION_READ_TIMEOUT exists because READ_TIMEOUT under-timed generation.
+  # SYNC_GENERATION_READ_TIMEOUT is the reference point for magnitude: another
+  # blocking, thinking-on call, so this one is sized the same order.
+  #
+  # The second thing this buys: RETRY_TIMEOUT_GUARD only marks a timeout final
+  # (rather than retryable) when the call is tagged `long_running`, and that
+  # tag is set once the call exceeds READ_TIMEOUT. At READ_TIMEOUT this call
+  # was still "short" to the guard, so faraday-retry could retry a genuine
+  # timeout twice — up to three billed calls — before GenerateConceptReferenceJob
+  # swallows the resulting TimeoutError. A larger, dedicated timeout here means
+  # a call that actually needs this long is recognized as long_running instead
+  # of retried into duplicate spend.
+  CONCEPT_REFERENCE_READ_TIMEOUT = SYNC_GENERATION_READ_TIMEOUT
+
   # Both providers configure the same retry policy (see ClaudeService::RETRY_OPTIONS /
   # GeminiService::RETRY_OPTIONS), so how many attempts and how long the backoff
   # can grow are base-class facts, not per-provider ones — a caller computing a
@@ -70,10 +89,17 @@ class AiService
   RETRY_MAX          = 2
   RETRY_MAX_INTERVAL = 8
 
-  # The worst case a caller can wait on one provider call: the read timeout
-  # spent on each attempt faraday-retry allows, plus the capped backoff between
-  # them. What a poller has to outlast before it can honestly call a job failed.
-  CALL_BUDGET_SECONDS = (READ_TIMEOUT * (RETRY_MAX + 1)) + (RETRY_MAX * RETRY_MAX_INTERVAL)
+  # The worst case a caller can wait on one provider call at a given read
+  # timeout: that timeout spent on each attempt faraday-retry allows, plus the
+  # capped backoff between them. What a poller has to outlast before it can
+  # honestly call a job failed. A class method rather than one constant per
+  # timeout because a poller must derive its wait from the SAME timeout the
+  # call it's waiting on actually uses — learn/show.html.erb calls this with
+  # CONCEPT_REFERENCE_READ_TIMEOUT rather than READ_TIMEOUT, or it would
+  # under-wait a call sized for the larger budget.
+  def self.call_budget_seconds(read_timeout)
+    (read_timeout * (RETRY_MAX + 1)) + (RETRY_MAX * RETRY_MAX_INTERVAL)
+  end
 
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the
@@ -714,7 +740,8 @@ class AiService
     result = call_and_log(
       user, purpose: "generate_concept_reference",
       system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
-      prompt: build_concept_reference_prompt(concept, config)
+      prompt: build_concept_reference_prompt(concept, config),
+      read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT
     )
 
     reference = parse_json_object(result[:text], subject: "concept reference")

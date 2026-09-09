@@ -2277,6 +2277,18 @@ RSpec.describe AiService do
       expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
     end
 
+    # .call_budget_seconds takes the timeout as an argument rather than closing
+    # over READ_TIMEOUT, precisely so a poller waiting on a call made with a
+    # different timeout (learn/show.html.erb, CONCEPT_REFERENCE_READ_TIMEOUT)
+    # derives its wait from the timeout that call actually uses.
+    it "computes the worst-case wait for whichever read timeout it is given" do
+      expect(AiService.call_budget_seconds(AiService::READ_TIMEOUT))
+        .to eq((AiService::READ_TIMEOUT * (AiService::RETRY_MAX + 1)) + (AiService::RETRY_MAX * AiService::RETRY_MAX_INTERVAL))
+
+      expect(AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT))
+        .to be > AiService.call_budget_seconds(AiService::READ_TIMEOUT)
+    end
+
     # A review issues two kinds of call — the grading call per section and the
     # one difficulty assessment — and the request thread is blocked on all of
     # them, so the budget has to hold for every one rather than just the graded
@@ -3310,6 +3322,19 @@ RSpec.describe AiService do
         "tagline", "explanation", "code_example", "senior_lens"
       )
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
+    end
+
+    # Now asks for seven fields with extended thinking on, so READ_TIMEOUT (sized
+    # for a single-section review) under-times it — and under-times it silently,
+    # since staying under READ_TIMEOUT keeps the call from ever being tagged
+    # long_running, letting RETRY_TIMEOUT_GUARD retry a genuine timeout into
+    # duplicate billed calls.
+    it "uses CONCEPT_REFERENCE_READ_TIMEOUT rather than the base READ_TIMEOUT" do
+      service = double_class.new(canned_text: valid_json)
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(service.last_read_timeout).to eq(AiService::CONCEPT_REFERENCE_READ_TIMEOUT)
+      expect(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).to be > AiService::READ_TIMEOUT
     end
 
     it "logs usage with the generate_concept_reference purpose" do
