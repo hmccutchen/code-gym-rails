@@ -152,6 +152,42 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
+    # The job runs asynchronously, so every fact the enqueue decided on can have
+    # moved by the time it lands. A queue backlog is the realistic case.
+    it "sends nothing once the hour has left the nudge window" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          create_exercise
+          subscribe
+        end
+
+        travel_to Time.zone.local(2026, 9, 8, 22, 15) do
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    it "sends nothing once the user has started the set" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).not_to receive(:deliver)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          exercise = create_exercise
+          subscribe
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                answers: { "code_review" => "a genuinely substantive answer here" })
+
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
     it "sends nothing for a kind it does not recognise" do
       create_exercise
       subscribe

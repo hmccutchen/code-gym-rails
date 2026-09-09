@@ -15,11 +15,18 @@ class PushNudgePlan
   # and you change the volume.
   NUDGE_HOURS = (13..17)
 
+  # The half of the decision that needs no response row. Callers use it to
+  # avoid a query they would only throw away — the cron before loading the
+  # day's response, since most users on any tick are at the wrong level or
+  # outside the window. It is not a second statement of the rule: due? is
+  # defined in terms of it, so there is still one place the level and the
+  # window are decided.
+  def self.possible?(level:, hour:)
+    level.to_s == "ready_and_nudges" && NUDGE_HOURS.cover?(hour)
+  end
+
   def self.due?(level:, hour:, started:, submitted:)
-    level.to_s == "ready_and_nudges" &&
-      NUDGE_HOURS.cover?(hour) &&
-      !started &&
-      !submitted
+    possible?(level: level, hour: hour) && !started && !submitted
   end
 
   # Rendered into the Account page's opt-in label, so the user is told the

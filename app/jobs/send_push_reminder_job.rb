@@ -15,12 +15,12 @@ class SendPushReminderJob < ApplicationJob
 
     user = User.active.find_by(id: user_id)
     return unless user
-    return unless wanted?(user, kind)
 
     Time.use_zone(user.effective_time_zone) do
       exercise = user.daily_exercises.for_date(Date.current).first
       return unless exercise
       return if already_submitted?(user, exercise)
+      return unless still_wanted?(user, exercise, kind)
 
       deliver_to_each_endpoint(user, exercise, kind)
     end
@@ -28,15 +28,31 @@ class SendPushReminderJob < ApplicationJob
 
   private
 
-  # Re-asked here rather than trusted from the caller, for the same reason the
-  # scope used to sit in this job: it is enqueued asynchronously and the level
-  # can move between enqueue and run. An unknown kind falls through to nil and
-  # sends nothing.
-  def wanted?(user, kind)
+  # Decided here at run time rather than trusted from the enqueue, because
+  # every fact behind it can move in between: the level, whether the day has
+  # been started, and — under a queue backlog — the hour itself. Without this
+  # a nudge queued at five could arrive near midnight telling someone who
+  # finished at six that they have not started. Inside Time.use_zone, so the
+  # hour is the user's own. An unknown kind falls through to nil and sends
+  # nothing.
+  def still_wanted?(user, exercise, kind)
     case kind.to_sym
     when :ready then !user.reminders_none?
-    when :nudge then user.reminders_ready_and_nudges?
+    when :nudge then nudge_still_due?(user, exercise)
     end
+  end
+
+  # PushNudgePlan stays the only place the nudge rule lives; this re-asks it
+  # with what is true now instead of what was true at enqueue.
+  def nudge_still_due?(user, exercise)
+    response = user.daily_responses.find_by(daily_exercise: exercise)
+
+    PushNudgePlan.due?(
+      level:     user.reminder_level,
+      hour:      Time.current.hour,
+      started:   response&.answered_sections.present?,
+      submitted: response&.submitted_at.present?
+    )
   end
 
   # Nothing to nudge someone toward if they have already finished it — the set

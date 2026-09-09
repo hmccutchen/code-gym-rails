@@ -44,6 +44,8 @@ class GenerateDailyExercisesJob < ApplicationJob
   end
 
   def nudge_if_due(user, exercise)
+    return unless PushNudgePlan.possible?(level: user.reminder_level, hour: Time.current.hour)
+
     response = user.daily_responses.find_by(daily_exercise: exercise)
 
     return unless PushNudgePlan.due?(
