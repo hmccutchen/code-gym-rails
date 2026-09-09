@@ -345,6 +345,41 @@ class AiService
     shallow_module pass_through_method temporal_decomposition
   ].freeze
 
+  # Defects that survive every check the engineer normally makes: the code
+  # runs, nothing raises, no type or schema validator fires, and the output is
+  # wrong anyway. That is the group's identity, and it is what separates these
+  # from every other group here — the code smells name a shape, the design
+  # principles a rule, the module-design concepts an interface's cost, and the
+  # language vocabularies a remedy, but nothing named a broken invariant that
+  # looks like a working result.
+  #
+  # Shared across both languages rather than split, like the three groups
+  # above: integer division truncates in Ruby and JavaScript alike, an
+  # ingestion boundary is stack-neutral, and `ORDER BY created_at` with no
+  # tiebreak is the same defect as a comparator over a non-total order. Two
+  # identical lists would only be somewhere to drift. Deliberately outside
+  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code — a
+  # rounding split that loses a unit is only convincing when you can run it.
+  #
+  # These are remedies to reach for (largest-remainder distribution, semantic
+  # validation at the boundary, a complete key, a total order), so they stay
+  # off ANTI_SHAPE_CONCEPTS: the defect is the violation, the concept is the
+  # discipline.
+  #
+  # Two neighbours the names sit close to, recorded because a reader will ask.
+  # cache_key_completeness is NOT `caching`: that one names a topic (should
+  # this be cached, for how long), this names one correctness defect with a
+  # specific failure — unrelated requests receiving each other's data. And
+  # deterministic_ordering is NOT PSEUDOCODE_TO_CODE_CONCEPTS' ambiguous_ordering,
+  # which is a plan that fails to specify an order; this is code whose order is
+  # underdetermined at runtime. Those vocabularies are disjoint, so the
+  # adjacency costs nothing mechanically — the same relationship idempotency
+  # and idempotency_at_scale already have.
+  SILENT_CORRECTNESS_CONCEPTS = %w[
+    allocation_rounding semantic_input_validation cache_key_completeness
+    deterministic_ordering
+  ].freeze
+
   # The architecture-level causes of complexity, kept as their own constant
   # because ANTI_SHAPE_CONCEPTS below has to name them and ARCHITECTURE_CONCEPTS
   # is defined further down.
@@ -367,7 +402,7 @@ class AiService
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
   ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
-    MODULE_DESIGN_CONCEPTS).freeze
+    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -377,7 +412,7 @@ class AiService
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
   ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
-    MODULE_DESIGN_CONCEPTS).freeze
+    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -435,6 +470,11 @@ class AiService
   # decomposition, not in a language. Deliberately disjoint from every language
   # vocabulary and from the other two fourth-slot ones, which is what lets this
   # kind carry a ConceptBucket of its own (see DailyPlan::FOURTH_BUCKET_FOR).
+  #
+  # ambiguous_ordering is a plan that never says what the order should be, not
+  # SILENT_CORRECTNESS_CONCEPTS' deterministic_ordering, which is code whose
+  # order is underdetermined at runtime. The names are close; the buckets are
+  # disjoint and the sections they generate share nothing.
   PSEUDOCODE_TO_CODE_CONCEPTS = %w[
     missing_base_case unhandled_empty_input off_by_one_boundary ambiguous_ordering
     unstated_mutation conflated_responsibilities missing_termination_condition
@@ -1336,6 +1376,7 @@ class AiService
       #{code_smell_naming_guidance}
       #{oo_design_violation_guidance}
       #{module_design_depth_guidance}
+      #{silent_correctness_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1452,6 +1493,31 @@ class AiService
       "for temporal_decomposition, a flow split into objects that exist only because they run in that order — and " \
       "the question asks for the version organized around information instead, so writing the deeper module IS " \
       "the answer rather than describing it."
+  end
+
+  # The one group whose failure mode is the opposite of the other four's. They
+  # risk a section with nothing missable in it; this one risks a section whose
+  # defect is too visible — code that raises, or an obviously broken line — at
+  # which point the concept is no longer what it names. So the rule here is
+  # that the planted code must LOOK like it works. Stated once for every
+  # section, like the other group rules, because it is a rule about the concept
+  # and not about any one kind.
+  def silent_correctness_guidance
+    "- The silent-correctness concepts (#{SILENT_CORRECTNESS_CONCEPTS.join(', ')}) name a broken invariant that " \
+      "looks like a working result. A section tagged with one must show code that runs clean — no exception, no " \
+      "type or schema error, nothing a passing test would catch — and still produce a wrong answer, and the " \
+      "engineer's job is to say which invariant it breaks and on what input. Calibrate to one specific defect at " \
+      "this severity: an allocation_rounding split whose parts don't sum back to the total and whose negative " \
+      "input is distributed instead of rejected; a semantic_input_validation boundary where an unrecognized unit " \
+      "falls through a lookup default and is stored as the canonical one, right type and plausible magnitude, " \
+      "wrong meaning; a cache_key_completeness key naming one of the two dimensions its value varies on, so every " \
+      "other request reads the first one cached; a deterministic_ordering sort with no secondary key, so " \
+      "paginating over a tied column repeats or skips rows. cache_key_completeness is about the key's " \
+      "correctness, never about whether to cache at all — that is the caching concept. Express it in the host " \
+      "section's own idiom: a pattern, which shows no code, describes the computation and asks which inputs the " \
+      "result actually varies on and what the missing one costs. The challenge section is the exception to the " \
+      "answer shape, since its answer is code: there starter_code carries the defect and the question asks for " \
+      "the version that holds the invariant, so writing the correct distribution, key, or ordering IS the answer."
   end
 
   # A kind's generation instructions. The vocabulary comes from

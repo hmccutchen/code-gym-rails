@@ -76,13 +76,13 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-    # The exclusion is exactly those five groups and nothing else: parsons
+    # The exclusion is exactly those six groups and nothing else: parsons
     # ends up with the same list every other language-bucket kind gets, minus
     # them.
     it "changes nothing about parsons beyond the exclusion" do
       excluded = AiService::DATA_MODELING_CONCEPTS + AiService::META_SKILL_CONCEPTS +
                  AiService::CODE_SMELL_CONCEPTS + AiService::OO_DESIGN_CONCEPTS +
-                 AiService::MODULE_DESIGN_CONCEPTS
+                 AiService::MODULE_DESIGN_CONCEPTS + AiService::SILENT_CORRECTNESS_CONCEPTS
 
       %w[ruby_rails javascript].each do |language|
         expect(described_class.selectable_vocabulary_for("parsons_problem", language))
@@ -189,6 +189,43 @@ RSpec.describe ProblemSetIngest do
       vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review)
 
       expect(vocabulary).not_to include(*AiService::OO_DESIGN_CONCEPTS)
+    end
+
+    # A wrong unit, an incomplete cache key and a missing tiebreak are each one
+    # wrong VALUE, which no permutation of blocks expresses. allocation_rounding
+    # is the arguable exception — see the comment on ParsonsProblem — and is
+    # excluded with the group rather than special-cased.
+    it "withholds silent-correctness concepts from parsons_problem, whose grade is an ordering" do
+      vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
+
+      expect(vocabulary).not_to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+    end
+
+    it "offers silent-correctness concepts to code_review, pattern, and challenge in both languages" do
+      %w[ruby_rails javascript].each do |language|
+        %w[pattern challenge].each do |key|
+          expect(described_class.selectable_vocabulary_for(key, language))
+            .to include(*AiService::SILENT_CORRECTNESS_CONCEPTS), "#{key}/#{language} was missing the group"
+        end
+
+        %i[application_code test_file].each do |mode|
+          expect(described_class.selectable_vocabulary_for("code_review", language, mode: mode))
+            .to include(*AiService::SILENT_CORRECTNESS_CONCEPTS), "code_review/#{mode}/#{language} was missing the group"
+        end
+      end
+    end
+
+    it "withholds silent-correctness concepts from a schema-review code_review" do
+      vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :schema_review)
+
+      expect(vocabulary).not_to include(*AiService::SILENT_CORRECTNESS_CONCEPTS)
+    end
+
+    it "withholds them from the kinds whose own vocabulary is disjoint" do
+      %w[security_review architecture plan_review ambiguity_hunt pseudocode_to_code].each do |key|
+        expect(described_class.selectable_vocabulary_for(key, "ruby_rails"))
+          .not_to include(*AiService::SILENT_CORRECTNESS_CONCEPTS), "#{key} could be offered a silent-correctness concept"
+      end
     end
   end
 
