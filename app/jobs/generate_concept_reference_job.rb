@@ -30,7 +30,17 @@ class GenerateConceptReferenceJob < ApplicationJob
                    .index_with { |field| reference[field] }
 
     if existing
-      existing.update!(attributes)
+      # The provider call runs unlocked (it can take up to READ_TIMEOUT
+      # seconds); only the write is guarded. A second job racing this one may
+      # have written a guide in the gap, so the row is re-read under lock and
+      # re-checked before writing — the loser discards its result rather than
+      # overwriting the winner's, the same shape User#resume_generation! uses
+      # to settle its own race.
+      existing.with_lock do
+        next if existing.guide?
+
+        existing.update!(attributes)
+      end
     else
       ConceptReference.create!(attributes.merge("concept" => concept, "language" => language))
     end

@@ -147,6 +147,8 @@ RSpec.describe "Learn", type: :request do
       get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
       expect(response.body).to include("TAGLINE")
+      expect(response.body).to include("code")
+      expect(response.body).to include("SENIOR LENS")
       expect(response.body).to include(I18n.t("learn.write_guide"))
     end
 

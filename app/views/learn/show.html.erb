@@ -3,6 +3,12 @@
 <p class="learn-bucket-label"><%= t("learn.buckets.#{@bucket}") %></p>
 
 <% if @reference %>
+  <%# tagline/explanation/code_example/senior_lens render for ANY present
+      reference, guide or not — a legacy row (every row generated before
+      guides existed) still has to show its full reference rather than half
+      of it. Only the three guide fields and their headings are gated on
+      guide?, and only the single if/else below decides guide content vs the
+      write-guide control. %>
   <p><strong><%= @reference.tagline %></strong></p>
   <p><%= @reference.explanation %></p>
 <% end %>
@@ -12,17 +18,26 @@
       account of the concept, deepened, not two competing ones. That ordering is
       the visible half of generating both in a single response. %>
   <p><%= @reference.guide_plain_language %></p>
+<% end %>
 
+<% if @reference %>
   <pre class="snippet"><code<% if (lang = hljs_language(@bucket)) %> data-hljs="<%= lang %>"<% end %>><%= @reference.code_example %></code></pre>
+<% end %>
 
+<% if @reference&.guide? %>
   <h2><%= t("learn.worked_example") %></h2>
   <p class="learn-worked-example"><%= @reference.guide_worked_example %></p>
 
   <h2><%= t("learn.pitfalls") %></h2>
   <p><%= @reference.guide_pitfalls %></p>
+<% end %>
 
+<% if @reference %>
   <h2><%= t("learn.senior_lens") %></h2>
   <p>🔭 <%= @reference.senior_lens %></p>
+<% end %>
+
+<% if @reference&.guide? %>
   <%= render "shared/syntax_highlighting_script" %>
 <% else %>
   <%# Neither state is an error: the library is browsable from the first page
@@ -38,16 +53,22 @@
   <%# Inline script, matching the working convention here: the layout emits no
       importmap tags, so nothing else would run. Polls rather than holding the
       request, since this generation runs with extended thinking on. %>
+  <%# The 2s interval is the one place that number lives; MAX_ATTEMPTS derives
+      from it and from AiService::CALL_BUDGET_SECONDS — the worst-case time a
+      concept-reference call can take across every retry it's allowed —
+      matching dashboard/_generating.html.erb's pattern for the same reason:
+      a hardcoded attempt count bore no relationship to how long the job could
+      actually run, so a healthy call could still be in flight when the poller
+      gave up and re-enabled the button. %>
+  <% poll_interval_s = 2.0 %>
   <script>
     (function () {
       const box    = document.getElementById("learn-guide");
       const button = document.getElementById("write-guide");
       const status = box.querySelector(".learn-status");
 
-      // Bounded so a job that dies silently ends in a message rather than a
-      // spinner that never resolves.
-      const INTERVAL_MS = 2000;
-      const MAX_ATTEMPTS = 45;
+      const INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
+      const MAX_ATTEMPTS = <%= (AiService::CALL_BUDGET_SECONDS / poll_interval_s).ceil %>;
       let attempts = 0;
 
       function poll() {

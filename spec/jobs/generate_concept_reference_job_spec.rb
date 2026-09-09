@@ -145,5 +145,29 @@ RSpec.describe GenerateConceptReferenceJob do
         concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh_guide: true
       )
     end
+
+    # Two jobs can both pass the initial existing.guide? check before either
+    # writes. The second one to reach the write must discard its result rather
+    # than clobber the winner's guide.
+    it "does not overwrite a guide that appeared between the check and the write" do
+      row = legacy_row
+      stub_service
+
+      allow_any_instance_of(ConceptReference).to receive(:with_lock) do |record, &block|
+        record.update!(
+          guide_plain_language: "winner plain", guide_worked_example: "winner worked",
+          guide_pitfalls: "winner pitfalls"
+        )
+        block.call
+      end
+
+      described_class.perform_now(
+        concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh_guide: true
+      )
+
+      row.reload
+      expect(row.guide_plain_language).to eq("winner plain")
+      expect(row.tagline).to eq("old tagline")
+    end
   end
 end

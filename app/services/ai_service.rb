@@ -63,6 +63,18 @@ class AiService
   GENERATION_READ_TIMEOUT      = 300
   SYNC_GENERATION_READ_TIMEOUT = 90
 
+  # Both providers configure the same retry policy (see ClaudeService::RETRY_OPTIONS /
+  # GeminiService::RETRY_OPTIONS), so how many attempts and how long the backoff
+  # can grow are base-class facts, not per-provider ones — a caller computing a
+  # timeout budget from these reads one number, not two duplicated literals.
+  RETRY_MAX          = 2
+  RETRY_MAX_INTERVAL = 8
+
+  # The worst case a caller can wait on one provider call: the read timeout
+  # spent on each attempt faraday-retry allows, plus the capped backoff between
+  # them. What a poller has to outlast before it can honestly call a job failed.
+  CALL_BUDGET_SECONDS = (READ_TIMEOUT * (RETRY_MAX + 1)) + (RETRY_MAX * RETRY_MAX_INTERVAL)
+
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the
   # work we stopped waiting for, so retrying buys a duplicate charge for the
@@ -570,6 +582,13 @@ class AiService
   # as ungenerated and regenerates it when someone opens it.
   CONCEPT_GUIDE_FIELDS = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
 
+  # Bounds provider prose rendered straight into a page, the same reason
+  # ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH bounds a scaffold label. Not
+  # derived from a schema — the prompt asks for at most two short paragraphs per
+  # field, and this is several times that, so it catches a runaway response
+  # without truncating an honest one.
+  MAX_CONCEPT_GUIDE_LENGTH = 4_000
+
   # The one statement of what a concept reference is FOR, shared by the prompt
   # that writes one and the prompt that reframes it. Stated once because a
   # reframing that drifts into solving the day's problem is the only real
@@ -707,6 +726,8 @@ class AiService
     if missing.any?
       raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
     end
+
+    normalize_concept_guide_fields!(reference)
 
     reference
   end
@@ -896,6 +917,22 @@ class AiService
   end
 
   private
+
+  # Guide fields are optional (see CONCEPT_GUIDE_FIELDS), but anything present
+  # is prose rendered straight into the Learn tab, so it gets the same
+  # boundary treatment as every other provider field this app trusts into a
+  # page: only a String survives, stripped, and bounded to
+  # MAX_CONCEPT_GUIDE_LENGTH. Anything else — an array, an object, a
+  # whitespace-only string, a runaway one — normalizes to nil rather than
+  # raising: an unusable guide is still a legacy row, not a failed generation.
+  def normalize_concept_guide_fields!(reference)
+    CONCEPT_GUIDE_FIELDS.each do |field|
+      value = reference[field]
+      value = value.is_a?(String) ? value.strip : nil
+      value = nil if value.blank? || value.length > MAX_CONCEPT_GUIDE_LENGTH
+      reference[field] = value
+    end
+  end
 
   # A provider that cannot represent a real turn array renders the conversation
   # into the prompt instead (see GeminiService#call). The wording lives here,

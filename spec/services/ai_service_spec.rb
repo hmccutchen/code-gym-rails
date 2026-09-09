@@ -3738,6 +3738,42 @@ RSpec.describe AiService do
                     .generate_concept_reference(user, "n_plus_one", "ruby_rails")
       }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
     end
+
+    it "normalizes a non-String guide value to nil" do
+      malformed = full_reference.merge("guide_worked_example" => [ "not", "a", "string" ])
+
+      result = double_class.new(canned_text: malformed.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_worked_example"]).to be_nil
+    end
+
+    it "normalizes an over-length guide value to nil" do
+      too_long = full_reference.merge("guide_pitfalls" => "x" * (AiService::MAX_CONCEPT_GUIDE_LENGTH + 1))
+
+      result = double_class.new(canned_text: too_long.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_pitfalls"]).to be_nil
+    end
+
+    it "normalizes a whitespace-only guide value to nil" do
+      blank = full_reference.merge("guide_plain_language" => "   \n  ")
+
+      result = double_class.new(canned_text: blank.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_plain_language"]).to be_nil
+    end
+
+    it "leaves a normal guide value untouched" do
+      result = double_class.new(canned_text: full_reference.to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result["guide_plain_language"]).to eq("plain")
+      expect(result["guide_worked_example"]).to eq("worked")
+      expect(result["guide_pitfalls"]).to eq("pitfalls")
+    end
   end
 
   # CONCEPT_REFERENCE_FIELDS is what #explain_concept_differently sends as
