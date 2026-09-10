@@ -898,6 +898,120 @@ RSpec.describe AiService do
     end
   end
 
+  # guide_worked_example asks for a contrastive PAIR, and which kind of
+  # contrast is a property of the concept rather than of the vocabulary it
+  # arrived in: ARCHITECTURE_CONCEPTS carries two anti-shapes and
+  # DATA_MODELING_CONCEPTS carries one genuine tradeoff, so a group-level
+  # branch would frame both wrong. Generated once and cached forever, like the
+  # senior_lens framing above, so neither mistake self-corrects.
+  describe "#build_concept_reference_prompt (worked-example contrast)" do
+    it "asks a defect-shaped concept for a failure-mode/corrected pair of the same scenario" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
+
+      expect(prompt).to include("two short")
+      expect(prompt).to include("failure mode")
+      expect(prompt).to include("corrected version")
+    end
+
+    it "requires the pair to be stated as a mechanism rather than an association" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "shallow_module", config)
+
+      expect(prompt).to include("X causes Y")
+      expect(prompt).to include("never merely that they are associated")
+    end
+
+    # Both options are legitimate, so calling either one "corrected" would
+    # misrepresent a real decision as having one right answer.
+    it "asks a tradeoff-shaped concept for two legitimate options, neither corrected" do
+      config = service.send(:config_for, "architecture")
+      prompt = service.send(:build_concept_reference_prompt, "caching_strategy", config)
+
+      expect(prompt).to include("NEITHER is the corrected version")
+      expect(prompt).not_to include("failure mode")
+    end
+
+    it "keeps the defect framing for an architecture concept that names a cause of complexity" do
+      config = service.send(:config_for, "architecture")
+
+      AiService::COMPLEXITY_CAUSE_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, config)
+
+        expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
+        expect(prompt).not_to include("NEITHER is the corrected version")
+      end
+    end
+
+    # Reached through a language config rather than the architecture one: a
+    # tradeoff-shaped concept keeps its contrast wherever it is hosted.
+    it "gives a tradeoff-shaped data-modeling concept the tradeoff contrast in both languages" do
+      %w[ruby_rails javascript].each do |language|
+        config = service.send(:config_for, language)
+        prompt = service.send(:build_concept_reference_prompt, "denormalization_tradeoffs", config)
+
+        expect(prompt).to include("NEITHER is the corrected version"), "#{language} got the defect contrast"
+      end
+    end
+
+    it "keeps the defect contrast for the data-modeling concepts that name a flaw" do
+      config = service.send(:config_for, "ruby_rails")
+
+      (AiService::DATA_MODELING_CONCEPTS - AiService::TRADEOFF_CONCEPTS).each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, config)
+
+        expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
+      end
+    end
+
+    it "asks for the pair in pseudocode on a language-agnostic config and in real code otherwise" do
+      agnostic = service.send(:build_concept_reference_prompt, "service_boundaries", service.send(:config_for, "architecture"))
+      language = service.send(:build_concept_reference_prompt, "n_plus_one", service.send(:config_for, "ruby_rails"))
+
+      expect(agnostic).to include("two short pseudocode fragments")
+      expect(language).to include("two short Ruby/Rails fragments")
+    end
+
+    # An uncapped field drifts into the essay the guide exists not to be.
+    it "still states a bound on the worked example's length" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
+
+      expect(prompt).to include("At most the two fragments plus four sentences of prose")
+    end
+  end
+
+  describe "TRADEOFF_CONCEPTS" do
+    it "excludes the architecture concepts that name a cause of complexity rather than a decision" do
+      expect(AiService::TRADEOFF_CONCEPTS & AiService::COMPLEXITY_CAUSE_CONCEPTS).to be_empty
+    end
+
+    # The whole point of the constant: shape follows the concept, so a group
+    # can be split across both contrasts.
+    it "is disjoint from every anti-shape concept" do
+      expect(AiService::TRADEOFF_CONCEPTS & AiService::ANTI_SHAPE_CONCEPTS).to be_empty
+    end
+
+    it "names only concepts that exist in a tracked vocabulary" do
+      tracked = AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS
+      expect(AiService::TRADEOFF_CONCEPTS - tracked).to be_empty
+    end
+
+    # The constant is written out rather than derived from ARCHITECTURE_CONCEPTS
+    # so a concept added there cannot inherit the tradeoff framing by accident.
+    # This is what makes that deliberate: growing the vocabulary fails here
+    # until the new concept is either listed above as having two defensible
+    # sides, or named below as one to catch rather than choose between. A
+    # reference is generated once and cached forever, so an unconsidered
+    # framing does not self-correct.
+    it "holds every architecture concept to a deliberate classification" do
+      unclassified =
+        AiService::ARCHITECTURE_CONCEPTS - AiService::TRADEOFF_CONCEPTS - AiService::COMPLEXITY_CAUSE_CONCEPTS
+
+      expect(unclassified).to be_empty
+    end
+  end
+
   describe "LANGUAGE_CONFIG for the fourth-slot pseudo-language buckets" do
     it "resolves plan_review and ambiguity_hunt via config_for, like architecture" do
       plan_review_config    = service.send(:config_for, "plan_review")

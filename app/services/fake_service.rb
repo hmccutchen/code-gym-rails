@@ -190,11 +190,15 @@ class FakeService < AiService
     "guide_plain_language" =>
       "Stated without the jargon: there is one thing this concept asks you to notice, and once you have noticed it the " \
       "rest follows. Everything else written about it is commentary on that one thing.",
-    "guide_worked_example" =>
-      "Picture the method running once per request: nobody notices, and nobody should. Now picture the same " \
-      "method called inside a loop over a hundred records. The identical work happens a hundred times, the page " \
-      "takes a hundred times as long, and nothing in the code looks different — which is exactly why it survives " \
-      "review.",
+    "guide_worked_example" => <<~EXAMPLE.strip,
+      orders.each { |order| render_total(order.customer.name) }
+
+      orders.includes(:customer).each { |order| render_total(order.customer.name) }
+
+      The slow page is what happens when the association is never loaded:
+      touching it per row is what issues a query per row. Load it up front and
+      the extra queries stop, because they were only ever that omission.
+    EXAMPLE
     "guide_pitfalls" =>
       "The appealing wrong idea is that this only matters at scale, so it can wait. It matters as soon as the code is " \
       "read by someone who did not write it, which is usually sooner."
