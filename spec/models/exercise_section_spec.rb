@@ -130,6 +130,21 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".translated_before_grading?" do
+    it "is true for pseudocode_to_code, whose grade is about the code its plan produced" do
+      expect(described_class.find("pseudocode_to_code").translated_before_grading?).to be(true)
+    end
+
+    # The count is load-bearing beyond this facet: each such kind adds a
+    # provider call the review makes in sequence, which the review claim window
+    # has to outlast (see ai_service_spec's request timeout budget).
+    it "is false for every other kind, whose answer is graded as written" do
+      (described_class.keys - [ "pseudocode_to_code" ]).each do |key|
+        expect(described_class.find(key).translated_before_grading?).to be(false)
+      end
+    end
+  end
+
   describe ".improved_code_label / .improved_code_prose?" do
     it "describes plan_review's improvement as a revised plan rendered as prose" do
       kind = described_class.find("plan_review")

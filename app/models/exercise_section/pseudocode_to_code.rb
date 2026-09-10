@@ -1,7 +1,8 @@
-# Given a problem statement, the engineer writes pseudocode; one call then
-# translates it into real code FAITHFULLY, preserving whatever the plan got
-# wrong. Unscaffolded deliberately — a labelled scaffold would hand over the
-# decomposition, and choosing the decomposition is the exercise.
+# Given a problem statement, the engineer writes pseudocode; one call at review
+# time then translates it into real code FAITHFULLY, preserving whatever the
+# plan got wrong, and the grading call reads that code. Unscaffolded
+# deliberately — a labelled scaffold would hand over the decomposition, and
+# choosing the decomposition is the exercise.
 class ExerciseSection::PseudocodeToCode < ExerciseSection
   # What the round-1 critique may return, bounded because it is provider text
   # rendered into the page. Three is enough to redirect a plan without
@@ -21,6 +22,13 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
 
   def self.default_scaffold
     nil
+  end
+
+  # The only kind that answers true: its grade is about the code its plan
+  # produced, so the translation has to exist before the review's day context
+  # is assembled. See AiService#translate_before_grading.
+  def self.translated_before_grading?
+    true
   end
 
   # A diagram of the structure would hand over the decomposition this section
@@ -84,7 +92,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
           "title":    "string — short name for the problem",
           "scenario": "string — the concrete business-domain framing, e.g. 'deduplicating a nightly import feed'",
           "problem_statement": "string — a self-contained problem solvable in roughly 15-25 lines of pseudocode, stating at least one requirement an under-specified plan would miss. No starter code, no signature, no worked example.",
-          "question": "string — e.g. 'Write pseudocode for this, then translate it.'",
+          "question": "string — e.g. 'Write pseudocode for this.'",
           "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
           "concept": "string — exactly one concept from the provided vocabulary"
         }
@@ -120,13 +128,15 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   end
   private_class_method :critique_lines
 
-  # The stored code was translated from whatever the plan said at the moment the
-  # engineer pressed translate, and they can keep editing afterwards. Saying so
-  # is what keeps .grading_note's "any flaw in the code is a flaw in the plan"
-  # rule honest: without it, a draft's flaws get attributed to a plan that no
-  # longer contains them, and improved_code gets written against the wrong
-  # approach. This is the only reader of translated_from, which is why it is
-  # stored separately from the answer at all.
+  # Translation runs at review time against the submitted answer, so the two
+  # normally match and the first branch is what a new day takes. The second is
+  # for rows from when translating was a button the engineer pressed before
+  # submitting and could keep editing after: saying so is what keeps
+  # .grading_note's "any flaw in the code is a flaw in the plan" rule honest,
+  # since otherwise a draft's flaws get attributed to a plan that no longer
+  # contains them, and improved_code gets written against the wrong approach.
+  # This is the only reader of translated_from, which is why it is stored
+  # separately from the answer at all.
   def self.translation_lines(rounds, answer)
     code = rounds["generated_code"].presence
     return "They never translated their plan into code." if code.nil?

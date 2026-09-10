@@ -1,6 +1,7 @@
-<%# Textarea plus the two round controls. Both states live here, because the
-    submitted state must still show the critique and the generated code — those
-    are the artifacts the review was graded against.
+<%# Textarea plus the critique control. Both states live here, because the
+    submitted state must still show the critique and the code the plan was
+    translated into at review time — those are the artifacts the review was
+    graded against.
     Locals: kind, key, data, exercise, response, submitted. %>
 <% round  = response.pseudocode_round(key) %>
 <% points = ExerciseSection::PseudocodeToCode.normalize_critique(round["critique"]) %>
@@ -18,8 +19,6 @@
     <div class="pseudocode-controls">
       <button type="button" class="btn btn-ghost btn-sm" data-pseudocode-critique
               <%= "disabled" if response.critiqued?(key) %>><%= t("pseudocode.critique_button") %></button>
-      <button type="button" class="btn btn-ghost btn-sm" data-pseudocode-translate
-              <%= "disabled" if response.translated?(key) %>><%= t("pseudocode.translate_button") %></button>
       <span class="pseudocode-status" aria-live="polite"></span>
     </div>
   <% end %>
@@ -35,7 +34,10 @@
     <% end %>
   </div>
 
-  <div class="pseudocode-code" data-pseudocode-code>
+  <%# Written by the review, never by this page — but still rendered in both
+      states, for the rows that were translated back when translating was a
+      button here. %>
+  <div class="pseudocode-code">
     <% if round["generated_code"].present? %>
       <pre><%= round["generated_code"] %></pre>
       <%# Load-bearing copy, not decoration: without it the generated code reads
@@ -58,90 +60,56 @@
       const form     = document.getElementById("gym-form");
       const textarea = form.querySelector(`textarea[data-field="${section}"]`);
       const status   = box.querySelector(".pseudocode-status");
-      const critiqueBtn  = box.querySelector("[data-pseudocode-critique]");
-      const translateBtn = box.querySelector("[data-pseudocode-translate]");
-      const critiqueOut  = box.querySelector("[data-pseudocode-critique-out]");
-      const codeOut      = box.querySelector("[data-pseudocode-code]");
+      const critiqueBtn = box.querySelector("[data-pseudocode-critique]");
+      const critiqueOut = box.querySelector("[data-pseudocode-critique-out]");
 
       const CRITIQUE_HEADING = <%= t("pseudocode.critique_heading").to_json.html_safe %>;
       const NO_GAPS  = <%= t("pseudocode.no_gaps").to_json.html_safe %>;
-      const CAPTION  = <%= t("pseudocode.caption").to_json.html_safe %>;
       const WORKING  = <%= t("pseudocode.working").to_json.html_safe %>;
-      const TRANSLATE_FAILED = <%= t("pseudocode.translate_failed").to_json.html_safe %>;
 
-      const post = async (url) => {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify({ section: section, pseudocode: textarea.value })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || res.status);
-        return data;
-      };
-
-      // Both buttons lock while either call is in flight, since both spend a
-      // provider call against the same section. On failure the button that
-      // failed re-enables: the server did not consume its cap, so neither does
-      // the page.
-      const run = async (button, url, render) => {
-        if (button.disabled) return;
-        const others = [critiqueBtn, translateBtn].filter(b => b !== button);
-        const wasDisabled = new Map(others.map(b => [b, b.disabled]));
-        [button, ...others].forEach(b => b.disabled = true);
+      // The button locks for the length of the call and stays locked on
+      // success: the round is one-shot. On failure it re-enables, because the
+      // server did not consume the cap either.
+      critiqueBtn.addEventListener("click", async () => {
+        if (critiqueBtn.disabled) return;
+        critiqueBtn.disabled = true;
         status.textContent = WORKING;
+
         try {
-          render(await post(url));
+          const res = await fetch("<%= pseudocode_critique_responses_path %>", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify({ section: section, pseudocode: textarea.value })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || res.status);
+
+          critiqueOut.replaceChildren();
+          const label = document.createElement("p");
+          label.className = "pseudocode-critique-label";
+          if (!data.gaps_found) {
+            label.textContent = NO_GAPS;
+            critiqueOut.appendChild(label);
+          } else {
+            label.textContent = CRITIQUE_HEADING;
+            const ul = document.createElement("ul");
+            data.gaps.forEach((gap) => {
+              const li = document.createElement("li");
+              // textContent, never innerHTML: this is provider output.
+              li.textContent = gap;
+              ul.appendChild(li);
+            });
+            critiqueOut.append(label, ul);
+          }
           status.textContent = "";
-          others.forEach(b => b.disabled = wasDisabled.get(b));
         } catch (e) {
           status.textContent = e.message;
-          button.disabled = false;
-          others.forEach(b => b.disabled = wasDisabled.get(b));
-          // A translation the provider refused must not hold the whole day
-          // hostage: the engineer cannot fix a rejected key or an outage from
-          // here, and every other section is ready to submit. Recording the
-          // attempt releases the gate (see pseudocodeReady in dashboard/_exercise).
-          if (button === translateBtn) {
-            box.dataset.translateFailed = "1";
-            status.textContent = e.message + " " + TRANSLATE_FAILED;
-          }
+          critiqueBtn.disabled = false;
         }
-        form.dispatchEvent(new Event("pseudocode:changed", { bubbles: true }));
-      };
-
-      critiqueBtn.addEventListener("click", () => run(critiqueBtn, "<%= pseudocode_critique_responses_path %>", (data) => {
-        critiqueOut.replaceChildren();
-        const label = document.createElement("p");
-        label.className = "pseudocode-critique-label";
-        if (!data.gaps_found) {
-          label.textContent = NO_GAPS;
-          critiqueOut.appendChild(label);
-          return;
-        }
-        label.textContent = CRITIQUE_HEADING;
-        const ul = document.createElement("ul");
-        data.gaps.forEach((gap) => {
-          const li = document.createElement("li");
-          li.textContent = gap;
-          ul.appendChild(li);
-        });
-        critiqueOut.append(label, ul);
-      }));
-
-      translateBtn.addEventListener("click", () => run(translateBtn, "<%= pseudocode_translate_responses_path %>", (data) => {
-        codeOut.replaceChildren();
-        const pre = document.createElement("pre");
-        // textContent, never innerHTML: this is provider output.
-        pre.textContent = data.code;
-        const caption = document.createElement("p");
-        caption.className = "pseudocode-caption";
-        caption.textContent = CAPTION;
-        codeOut.append(pre, caption);
-      }));
+      });
     })();
     </script>
   <% end %>

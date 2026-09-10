@@ -198,6 +198,14 @@ class ExerciseSection
       true
     end
 
+    # Whether grading this kind needs the engineer's answer translated into
+    # code first (AiService#translate_before_grading). A declared per-kind fact
+    # rather than a name comparison in the review path, like every other facet
+    # here — and false for every kind whose answer is graded as written.
+    def translated_before_grading?
+      false
+    end
+
     # What the review's improved_code actually IS for this kind, and whether it
     # is prose rather than source. Both default to corrected source, which is
     # what every code-bearing kind carries — a kind whose "improvement" is

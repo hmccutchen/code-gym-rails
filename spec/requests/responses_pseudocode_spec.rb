@@ -1,8 +1,10 @@
 require "rails_helper"
 
-# The two pseudocode_to_code rounds. Both are pre-submission provider calls the
-# user pays for with their own key, so every guard here is about not spending a
-# call the engineer didn't ask for — or spending one and not counting it.
+# The pseudocode_to_code critique round, plus the translation the review now
+# makes on the engineer's behalf. Every one of these is a provider call the
+# user pays for with their own key, so most of the guards here are about not
+# spending a call the engineer didn't ask for — or spending one and not
+# counting it.
 RSpec.describe "Pseudocode rounds", type: :request do
   let(:user) { create_fake_provider_user }
 
@@ -26,12 +28,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
   def critique(params = {})
     post pseudocode_critique_responses_path,
-         params: { section: "pseudocode_to_code", pseudocode: "sort the ranges then walk them" }.merge(params),
-         as: :json
-  end
-
-  def translate(params = {})
-    post pseudocode_translate_responses_path,
          params: { section: "pseudocode_to_code", pseudocode: "sort the ranges then walk them" }.merge(params),
          as: :json
   end
@@ -300,49 +296,77 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
-  describe "POST pseudocode_translate" do
-    it "stores the generated code and the plan that produced it" do
-      translate
+  # Round 2 is no longer a button: the review translates whatever pseudocode was
+  # submitted, then grades the plan against it. These cover the ordering the
+  # grading call depends on, and the two skips that keep it from paying twice.
+  describe "translation at review time" do
+    def submit_and_review(answer: "sort the ranges then walk them", rounds: {})
+      row = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        answers: { "pseudocode_to_code" => answer },
+        pseudocode_rounds: rounds.present? ? { "pseudocode_to_code" => rounds } : {}
+      )
+      post review_response_path(row)
+      row.reload
+    end
 
-      expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)["code"]).to include("def merge_ranges")
+    it "translates the submitted plan and stores it exactly as the round did" do
+      row = submit_and_review
 
+      round = row.pseudocode_round("pseudocode_to_code")
       expect(round["generated_code"]).to include("def merge_ranges")
       expect(round["translated_from"]).to eq("sort the ranges then walk them")
       expect(round["translated_at"]).to be_present
     end
 
-    # translated_from is stored rather than assumed equal to answers[section]:
-    # the engineer can keep editing the textarea after translating, and the
-    # review has to know which text actually produced the code it is reading.
-    it "records the plan it translated, not whatever the answer later becomes" do
-      translate(pseudocode: "first version of the plan")
+    # The whole point of the ordering: the day context every grading thread
+    # shares is assembled AFTER the translation is stored, so the graded prompt
+    # carries the code rather than "They never translated their plan into code."
+    it "grades the section against the code it just generated" do
+      prompts = []
+      allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, **kwargs|
+        prompts << [ kwargs[:system], kwargs[:prompt] ]
+        original.call(**kwargs)
+      end
 
-      expect(round["translated_from"]).to eq("first version of the plan")
+      submit_and_review
+
+      _system, grading_prompt = prompts.find { |system, _| system.to_s.include?("giving direct, specific feedback") }
+      expect(grading_prompt).to be_present
+      _system, day_context = prompts.find { |system, _| system.to_s.include?("def merge_ranges") }
+      expect(day_context).to be_present
     end
 
-    it "refuses a second translation" do
-      translate
-      translate
+    it "skips a section nobody answered rather than translating a blank plan" do
+      expect_any_instance_of(FakeService).not_to receive(:translate_pseudocode)
 
-      expect(response).to have_http_status(:unprocessable_content)
+      row = submit_and_review(answer: "")
+
+      expect(row.pseudocode_round("pseudocode_to_code")["translated_at"]).to be_nil
     end
 
-    # Round 2 is never gated on round 1 — there is no way to get stuck.
-    it "works without a critique having been requested" do
-      translate
+    # A partial review is retried section by section, so a translation already
+    # paid for is never bought again.
+    it "leaves an existing translation alone" do
+      expect_any_instance_of(FakeService).not_to receive(:translate_pseudocode)
 
-      expect(response).to have_http_status(:ok)
-      expect(round["critiqued_at"]).to be_nil
+      row = submit_and_review(rounds: { "generated_code" => "def already; end",
+                                        "translated_from" => "an earlier plan",
+                                        "translated_at" => 1.hour.ago.iso8601 })
+
+      expect(row.pseudocode_round("pseudocode_to_code")["generated_code"]).to eq("def already; end")
     end
 
-    it "surfaces a provider failure as a 503 and stores nothing" do
+    # The grade is what the engineer paid for. A translation that fails costs
+    # them the code, never the review.
+    it "still reviews every section when the translation fails" do
       allow_any_instance_of(FakeService).to receive(:translate_pseudocode)
         .and_raise(AiService::Error, "provider down")
 
-      translate
-      expect(response).to have_http_status(:service_unavailable)
-      expect(round["translated_at"]).to be_nil
+      row = submit_and_review
+
+      expect(row.ai_review.keys).to include("pseudocode_to_code")
+      expect(row.pseudocode_round("pseudocode_to_code")["translated_at"]).to be_nil
     end
   end
 end

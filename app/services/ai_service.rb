@@ -720,13 +720,16 @@ class AiService
   # database.yml's pool sized 1:1, that used to leave zero spare connections
   # for any concurrent request.
   def review_sections(user, exercise, daily_response, sections:)
+    # Started first so it overlaps everything below rather than following it:
+    # the assessment is an extra provider call, but not extra waiting. It reads
+    # the problems alone, so the translation step below writes nothing it needs.
+    difficulty = Thread.new { safe_difficulty_assessment(user, exercise, sections) }
+
+    translate_before_grading(user, exercise, daily_response, sections)
+
     coach   = config_for(exercise.language)[:coach]
     context = build_review_day_context(coach, exercise, daily_response)
-
-    # Started first so it overlaps the grading calls rather than following
-    # them: the assessment is an extra provider call, but not extra waiting.
-    difficulty = Thread.new { safe_difficulty_assessment(user, exercise, sections) }
-    threads    = sections.map { |section| Thread.new { grade_section(user, exercise, daily_response, section, context) } }
+    threads = sections.map { |section| Thread.new { grade_section(user, exercise, daily_response, section, context) } }
 
     results = threads.map(&:value).to_h
     merge_difficulty!(results, awaited_difficulty(difficulty))
@@ -1720,11 +1723,40 @@ class AiService
   # grades had already succeeded and leave the review claim held. So the guard
   # lives here, around the whole thread body, and is StandardError-wide on
   # purpose rather than AiService::Error-wide.
+
   def safe_difficulty_assessment(user, exercise, sections)
     self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections)
   rescue StandardError => e
     Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
     {}
+  end
+
+  # Translate the engineer's pseudocode into code before grading reads it —
+  # faithfully, gaps and all (see #translate_pseudocode). Sequential, and ahead
+  # of the fan-out rather than inside the section's own thread, because
+  # #build_review_day_context reads the stored translation ONCE for every
+  # grading thread: a translation written later than this line would be graded
+  # against a day context that never mentions it. The cost is that a day
+  # carrying such a kind spends two provider calls end to end where every other
+  # day spends one, which ai_service_spec holds against the review claim window.
+  #
+  # Failure is swallowed as widely as the difficulty note's, and for the same
+  # reason: the grades are what the engineer paid for, and .review_context
+  # already states an absent translation rather than assuming one. A section
+  # nobody answered has nothing to translate, and one already translated is
+  # left alone, so retrying a partial review never pays for the same
+  # translation twice.
+  def translate_before_grading(user, exercise, daily_response, sections)
+    sections.each do |section|
+      next unless ExerciseSection.for(section).translated_before_grading?
+      next if daily_response.translated?(section) || !daily_response.answered?(section)
+
+      pseudocode = daily_response.answers[section].to_s
+      code       = translate_pseudocode(user, exercise, section: section, pseudocode: pseudocode)
+      daily_response.record_translation!(section, code: code, pseudocode: pseudocode)
+    rescue StandardError => e
+      Rails.logger.warn("[pseudocode] review-time translation failed: #{e.message}")
+    end
   end
 
   # Failures that say "the machine could not run this right now" rather than
