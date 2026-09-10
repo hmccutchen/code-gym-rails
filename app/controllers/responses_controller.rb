@@ -10,10 +10,6 @@ class ResponsesController < ApplicationController
   # straight off this controller.
   MAX_DUCK_TURNS_PER_SECTION = 6
 
-  # A pseudocode plan for a 15-25 line problem. Generous enough not to clip a
-  # verbose planner, bounded because it is user text going into a prompt.
-  MAX_PSEUDOCODE_LENGTH = 6_000
-
   # The thread is client-held, so its size is attacker-controlled: the turn cap
   # above counts only "user" roles and so bounds nothing on its own (a crafted
   # request can carry unlimited "assistant" entries). These bound what gets
@@ -473,7 +469,9 @@ class ResponsesController < ApplicationController
   def validated_pseudocode
     value = params[:pseudocode].to_s.strip
     return pseudocode_error("Write your pseudocode first.") if value.blank?
-    return pseudocode_error("That's too long — keep it under #{MAX_PSEUDOCODE_LENGTH} characters.") if value.length > MAX_PSEUDOCODE_LENGTH
+    if value.length > ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
+      return pseudocode_error("That's too long — keep it under #{ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH} characters.")
+    end
 
     value
   end

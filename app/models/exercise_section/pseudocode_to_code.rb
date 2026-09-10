@@ -16,6 +16,15 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   # same split AmbiguityHunt::MAX_PLANTED uses.
   MAX_PROBLEM_STATEMENT_LENGTH = 2_000
 
+  # A pseudocode plan for a 15-25 line problem. Generous enough not to clip a
+  # verbose planner, bounded because it is user text going into a prompt. Lives
+  # on the kind rather than on either caller, because both of this kind's
+  # provider calls read it from two different entry points — the critique
+  # endpoint validates a request param against it, and
+  # AiService#translate_before_grading checks the submitted answer, which
+  # ResponsesController#create does not length-bound.
+  MAX_PSEUDOCODE_LENGTH = 6_000
+
   def self.vocabulary_key
     :pseudocode_to_code
   end

@@ -144,11 +144,20 @@ class DailyResponse < ApplicationRecord
 
   # The translation and the exact text it was made from, which #translated? and
   # ExerciseSection::PseudocodeToCode.translation_lines then read back.
+  #
+  # Under the row lock, because the merge above is a read-modify-write of one
+  # jsonb column and a critique round can be in flight while the review runs:
+  # submitting no longer waits for it. Without the lock, this writer could read
+  # the rounds, wait behind ResponsesController#write_pseudocode_round!, and
+  # then overwrite the critique it just stored. #with_lock reloads, so the
+  # merge always builds on the newest rounds.
   def record_translation!(section, code:, pseudocode:)
-    merge_pseudocode_round!(section,
-      "generated_code"  => code,
-      "translated_from" => pseudocode,
-      "translated_at"   => Time.current.iso8601)
+    with_lock do
+      merge_pseudocode_round!(section,
+        "generated_code"  => code,
+        "translated_from" => pseudocode,
+        "translated_at"   => Time.current.iso8601)
+    end
   end
 
   # A round whose provider call was claimed and has not come back. Mirrors

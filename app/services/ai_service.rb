@@ -901,7 +901,11 @@ class AiService
     text_or_raise(result, subject: "duck response")
   end
 
-  # ── The pseudocode_to_code rounds, pre-submission only ───────────────────
+  # ── The pseudocode_to_code rounds ────────────────────────────────────────
+  # Round 1 runs pre-submission, from the engineer's own request. Round 2 runs
+  # at review time (see #translate_before_grading), so neither this group nor
+  # #translate_pseudocode is pre-submission-only any more.
+  #
   # Round 1: one text-only critique. `gaps_found` is returned as a typed boolean
   # rather than letting an empty list carry the meaning — an empty list is also
   # what a malformed response normalizes to, so the list can never be the signal.
@@ -1752,11 +1756,31 @@ class AiService
       next if daily_response.translated?(section) || !daily_response.answered?(section)
 
       pseudocode = daily_response.answers[section].to_s
-      code       = translate_pseudocode(user, exercise, section: section, pseudocode: pseudocode)
+      next unless translatable_length?(pseudocode)
+
+      code = translate_pseudocode(user, exercise, section: section, pseudocode: pseudocode)
       daily_response.record_translation!(section, code: code, pseudocode: pseudocode)
     rescue StandardError => e
       Rails.logger.warn("[pseudocode] review-time translation failed: #{e.message}")
     end
+  end
+
+  # The bound the critique endpoint applies to its own param, applied here too:
+  # this reads a submitted answer, and ResponsesController#create length-bounds
+  # no answer of any kind, so nothing else stands between a pasted novel and
+  # this prompt. Skipped rather than truncated, for the reason
+  # #translate_pseudocode refuses to truncate its output — code translated from
+  # a clipped plan is not translated from their plan, and the page would caption
+  # it as though it were. The grade is unaffected: it reads the answer itself,
+  # which every other kind sends to the same provider unbounded.
+  def translatable_length?(pseudocode)
+    return true if pseudocode.length <= ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
+
+    Rails.logger.warn(
+      "[pseudocode] review-time translation skipped: plan is #{pseudocode.length} characters, " \
+      "over the #{ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH} limit"
+    )
+    false
   end
 
   # Failures that say "the machine could not run this right now" rather than

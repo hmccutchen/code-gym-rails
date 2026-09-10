@@ -2306,11 +2306,14 @@ RSpec.describe AiService do
         .to be > AiService.call_budget_seconds(AiService::READ_TIMEOUT)
     end
 
-    # A review issues two kinds of call — the grading call per section and the
-    # one difficulty assessment — and the request thread is blocked on all of
+    # A review issues three kinds of call — the grading call per section, the one
+    # difficulty assessment, and the pre-grading translation on the days that
+    # have a kind needing one — and the request thread is blocked on all of
     # them, so the budget has to hold for every one rather than just the graded
-    # ones. Asserted exactly, not with `all`, so a third kind of call appearing
-    # here has to be looked at rather than silently inheriting the budget.
+    # ones. Both examples assert the count exactly, not with `all`, so a fourth
+    # kind appearing has to be looked at rather than silently inheriting the
+    # budget. This one covers a day with no translation; the next covers one
+    # with.
     it "leaves every call a section review makes on the short request-thread budget" do
       exercise, response = exercise_and_response_for_review
       review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }
@@ -2321,10 +2324,9 @@ RSpec.describe AiService do
       expect(double_class.read_timeouts).to eq([ AiService::READ_TIMEOUT ] * 2)
     end
 
-    # The third kind of call, on the days that have one: the translation the
-    # grade waits on. It is on the same short budget as the rest, which is what
-    # makes the claim-window arithmetic above two READ_TIMEOUT chains rather
-    # than one plus something larger.
+    # The translation the grade waits on is on the same short budget as the
+    # rest, which is what makes the claim-window arithmetic above two
+    # READ_TIMEOUT chains rather than one plus something larger.
     it "leaves the pre-grading translation on that budget too" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",

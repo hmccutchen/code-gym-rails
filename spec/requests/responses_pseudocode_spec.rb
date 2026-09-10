@@ -190,7 +190,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       critique(pseudocode: "   ")
       expect(response).to have_http_status(:unprocessable_content)
 
-      critique(pseudocode: "x" * (ResponsesController::MAX_PSEUDOCODE_LENGTH + 1))
+      critique(pseudocode: "x" * (ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH + 1))
       expect(response).to have_http_status(:unprocessable_content)
     end
 
@@ -355,6 +355,47 @@ RSpec.describe "Pseudocode rounds", type: :request do
                                         "translated_at" => 1.hour.ago.iso8601 })
 
       expect(row.pseudocode_round("pseudocode_to_code")["generated_code"]).to eq("def already; end")
+    end
+
+    # #create length-bounds no answer, so this is the only thing between a
+    # pasted novel and the translation prompt. Skipped rather than clipped: code
+    # translated from half a plan is not translated from their plan, and the
+    # page captions it as though it were.
+    it "does not translate a plan past the length bound, but still reviews" do
+      over_limit = "x" * (ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH + 1)
+      expect_any_instance_of(FakeService).not_to receive(:translate_pseudocode)
+
+      row = submit_and_review(answer: over_limit)
+
+      expect(row.pseudocode_round("pseudocode_to_code")["translated_at"]).to be_nil
+      expect(row.ai_review.keys).to include("pseudocode_to_code")
+    end
+
+    # Submitting no longer waits for the critique, so that write can land while
+    # the review runs. The translation merges one jsonb column, so without the
+    # row lock it would read the rounds, wait behind the critique's writer, and
+    # then overwrite what it stored.
+    it "keeps a critique that lands mid-review instead of overwriting it" do
+      row = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        answers: { "pseudocode_to_code" => "sort the ranges then walk them" }
+      )
+
+      allow_any_instance_of(FakeService).to receive(:translate_pseudocode).and_wrap_original do |original, *args, **kwargs|
+        DailyResponse.find(row.id).merge_pseudocode_round!(
+          "pseudocode_to_code",
+          "critique" => [ "No empty-input case." ], "gaps_found" => true,
+          "critiqued_at" => Time.current.iso8601
+        )
+        original.call(*args, **kwargs)
+      end
+
+      post review_response_path(row)
+
+      round = row.reload.pseudocode_round("pseudocode_to_code")
+      expect(round["critiqued_at"]).to be_present
+      expect(round["critique"]).to eq([ "No empty-input case." ])
+      expect(round["generated_code"]).to include("def merge_ranges")
     end
 
     # The grade is what the engineer paid for. A translation that fails costs
