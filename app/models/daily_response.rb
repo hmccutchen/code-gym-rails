@@ -81,13 +81,22 @@ class DailyResponse < ApplicationRecord
     end.then { |text| text.blank? ? nil : text }
   end
 
-  # How long a claimed-but-unfinished review blocks a retry. The provider call
-  # has no configured timeout, so a crash or hang mid-review must not lock the
-  # user out forever — after this window a new request may reclaim the row.
+  # How long a claimed-but-unfinished review blocks a retry. A crash or hang
+  # mid-review must not lock the user out forever, so after this window a new
+  # request may reclaim the row — which means the window has to outlast the
+  # longest a review can honestly still be running, or a second review starts
+  # billing the same sections while the first is in flight.
   # Lives here rather than on ResponsesController because regeneration asks the
   # same question from a controller and a job, and a second statement of the
   # window could disagree with this one.
-  REVIEW_CLAIM_STALE_AFTER = 3.minutes
+  #
+  # Six minutes rather than three because a pseudocode_to_code day spends two
+  # provider calls in sequence (the translation, then the grade — see
+  # AiService#translate_before_grading), and each of those can spend the whole
+  # of AiService.call_budget_seconds(READ_TIMEOUT) before it gives up.
+  # ai_service_spec asserts the two constants stay in that relationship rather
+  # than drifting apart.
+  REVIEW_CLAIM_STALE_AFTER = 6.minutes
 
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
@@ -122,6 +131,33 @@ class DailyResponse < ApplicationRecord
 
   def translated?(section)
     pseudocode_round(section)["translated_at"].present?
+  end
+
+  # The one writer of a section's rounds, next to the readers above so the key
+  # names live in one class. Nils are dropped rather than stored, which is what
+  # lets a caller clear a claim in the same merge that records its result.
+  def merge_pseudocode_round!(section, attrs)
+    rounds = pseudocode_rounds.deep_dup
+    rounds[section.to_s] = (rounds[section.to_s] || {}).merge(attrs).compact
+    update!(pseudocode_rounds: rounds)
+  end
+
+  # The translation and the exact text it was made from, which #translated? and
+  # ExerciseSection::PseudocodeToCode.translation_lines then read back.
+  #
+  # Under the row lock, because the merge above is a read-modify-write of one
+  # jsonb column and a critique round can be in flight while the review runs:
+  # submitting no longer waits for it. Without the lock, this writer could read
+  # the rounds, wait behind ResponsesController#write_pseudocode_round!, and
+  # then overwrite the critique it just stored. #with_lock reloads, so the
+  # merge always builds on the newest rounds.
+  def record_translation!(section, code:, pseudocode:)
+    with_lock do
+      merge_pseudocode_round!(section,
+        "generated_code"  => code,
+        "translated_from" => pseudocode,
+        "translated_at"   => Time.current.iso8601)
+    end
   end
 
   # A round whose provider call was claimed and has not come back. Mirrors

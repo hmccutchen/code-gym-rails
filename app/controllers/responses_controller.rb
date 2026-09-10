@@ -10,10 +10,6 @@ class ResponsesController < ApplicationController
   # straight off this controller.
   MAX_DUCK_TURNS_PER_SECTION = 6
 
-  # A pseudocode plan for a 15-25 line problem. Generous enough not to clip a
-  # verbose planner, bounded because it is user text going into a prompt.
-  MAX_PSEUDOCODE_LENGTH = 6_000
-
   # The thread is client-held, so its size is attacker-controlled: the turn cap
   # above counts only "user" roles and so bounds nothing on its own (a crafted
   # request can carry unlimited "assistant" entries). These bound what gets
@@ -400,29 +396,6 @@ class ResponsesController < ApplicationController
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end
 
-  # POST /responses/pseudocode_translate — round 2. Never gated on round 1:
-  # whatever plan exists is translated, so there is no way to get stuck.
-  def pseudocode_translate
-    return unless (context = load_pseudocode_context)
-
-    row, section, pseudocode = context
-    return render_section_error(translate_busy_message(row, section)) unless claim_pseudocode_round!(row, section, "translate", :translated?)
-
-    code = AiService.for(current_user).translate_pseudocode(
-      current_user, row.daily_exercise, section: section, pseudocode: pseudocode
-    )
-
-    write_pseudocode_round!(row, section, "translate",
-      "generated_code"  => code,
-      "translated_from" => pseudocode,
-      "translated_at"   => Time.current.iso8601)
-
-    render json: { status: "ok", code: code }
-  rescue AiService::Error => e
-    release_pseudocode_claim!(row, section, "translate")
-    render json: { status: "error", error: e.message }, status: :service_unavailable
-  end
-
   private
 
   # A non-Hash-like element (e.g. thread: ["oops"] or thread: "not-an-array",
@@ -496,7 +469,9 @@ class ResponsesController < ApplicationController
   def validated_pseudocode
     value = params[:pseudocode].to_s.strip
     return pseudocode_error("Write your pseudocode first.") if value.blank?
-    return pseudocode_error("That's too long — keep it under #{MAX_PSEUDOCODE_LENGTH} characters.") if value.length > MAX_PSEUDOCODE_LENGTH
+    if value.length > ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
+      return pseudocode_error("That's too long — keep it under #{ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH} characters.")
+    end
 
     value
   end
@@ -537,7 +512,7 @@ class ResponsesController < ApplicationController
     row.with_lock do
       next if row.public_send(done, section) || row.pseudocode_claimed?(section, phase)
 
-      merge_pseudocode_round!(row, section, "#{phase}_claimed_at" => Time.current.iso8601)
+      row.merge_pseudocode_round!(section, "#{phase}_claimed_at" => Time.current.iso8601)
       claimed = true
     end
 
@@ -546,7 +521,7 @@ class ResponsesController < ApplicationController
 
   # Writing the result also releases the claim, so the two can never disagree.
   def write_pseudocode_round!(row, section, phase, attrs)
-    row.with_lock { merge_pseudocode_round!(row, section, attrs.merge("#{phase}_claimed_at" => nil)) }
+    row.with_lock { row.merge_pseudocode_round!(section, attrs.merge("#{phase}_claimed_at" => nil)) }
   end
 
   # A handled provider failure hands the round back rather than burning it: the
@@ -555,21 +530,11 @@ class ResponsesController < ApplicationController
   def release_pseudocode_claim!(row, section, phase)
     return if row.nil?
 
-    row.with_lock { merge_pseudocode_round!(row, section, "#{phase}_claimed_at" => nil) }
-  end
-
-  def merge_pseudocode_round!(row, section, attrs)
-    rounds          = row.pseudocode_rounds.deep_dup
-    rounds[section] = (rounds[section] || {}).merge(attrs).compact
-    row.update!(pseudocode_rounds: rounds)
+    row.with_lock { row.merge_pseudocode_round!(section, "#{phase}_claimed_at" => nil) }
   end
 
   def critique_busy_message(row, section)
     row.critiqued?(section) ? "You've already had this plan checked." : "A check of this plan is already running."
-  end
-
-  def translate_busy_message(row, section)
-    row.translated?(section) ? "This plan has already been translated." : "A translation of this plan is already running."
   end
 
   # render_section_error returns the rendered response, which is truthy; the

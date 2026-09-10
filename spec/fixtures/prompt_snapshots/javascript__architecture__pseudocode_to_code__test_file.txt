@@ -94,7 +94,7 @@ Return JSON matching this schema exactly:
     "title":    "string — short name for the problem",
     "scenario": "string — the concrete business-domain framing, e.g. 'deduplicating a nightly import feed'",
     "problem_statement": "string — a self-contained problem solvable in roughly 15-25 lines of pseudocode, stating at least one requirement an under-specified plan would miss. No starter code, no signature, no worked example.",
-    "question": "string — e.g. 'Write pseudocode for this, then translate it.'",
+    "question": "string — e.g. 'Write pseudocode for this.'",
     "teaching_note": "string — 1-2 sentence hint toward HOW to reason, never the answer",
     "concept": "string — exactly one concept from the provided vocabulary"
   }

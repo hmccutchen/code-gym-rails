@@ -5,18 +5,35 @@ RSpec.describe AiService do
 
   describe "request timeout budget" do
     # #review claims the row for REVIEW_CLAIM_STALE_AFTER and only then lets a
-    # retry through. Sections are reviewed in parallel threads, so one section's
-    # worst case is the whole request's: every attempt timing out, plus the
-    # retry backoff between them. If that can exceed the claim window, a second
-    # review can start while the first is still running — so this asserts the
-    # two constants stay in a safe relationship rather than drifting apart.
-    it "cannot exceed the review claim window even when every attempt times out" do
+    # retry through. If the request can outlast the claim, a second review
+    # starts while the first is still running and bills the same sections
+    # twice — so this asserts the two constants stay in a safe relationship
+    # rather than drifting apart.
+    #
+    # Sections are graded in parallel threads, so the grades contribute ONE
+    # call's worst case however many there are. The chain that sets the bound
+    # is the pseudocode day's: #translate_before_grading runs before the
+    # fan-out (the day context every thread shares is assembled from its
+    # result), so that request spends two calls end to end, each able to time
+    # out on every attempt it is allowed. Only one kind translates and it fills
+    # one slot, so two is the longest such chain a single request can have.
+    SEQUENTIAL_REVIEW_CALLS = 2
+
+    it "cannot exceed the review claim window even when every attempt of every sequential call times out" do
       retries = ClaudeService::RETRY_OPTIONS[:max]
       backoff = (0..retries).sum { |i| ClaudeService::RETRY_OPTIONS[:interval] * (ClaudeService::RETRY_OPTIONS[:backoff_factor]**i) }
       backoff *= (1 + ClaudeService::RETRY_OPTIONS[:interval_randomness])
-      worst_case = (retries + 1) * (AiService::OPEN_TIMEOUT + AiService::READ_TIMEOUT) + backoff
+      per_call = (retries + 1) * (AiService::OPEN_TIMEOUT + AiService::READ_TIMEOUT) + backoff
 
-      expect(worst_case).to be < DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i
+      expect(per_call * SEQUENTIAL_REVIEW_CALLS).to be < DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i
+    end
+
+    # The count above is a claim about the app, not a free parameter: exactly
+    # one kind translates before it is graded, so a second one appearing has to
+    # come back here and to the claim window rather than quietly doubling the
+    # worst case again.
+    it "has one section kind whose grade waits on a call of its own" do
+      expect(ExerciseSection.all.count(&:translated_before_grading?)).to eq(SEQUENTIAL_REVIEW_CALLS - 1)
     end
 
     # The review budget above is driven by #review holding a request thread and
@@ -2289,11 +2306,14 @@ RSpec.describe AiService do
         .to be > AiService.call_budget_seconds(AiService::READ_TIMEOUT)
     end
 
-    # A review issues two kinds of call — the grading call per section and the
-    # one difficulty assessment — and the request thread is blocked on all of
+    # A review issues three kinds of call — the grading call per section, the one
+    # difficulty assessment, and the pre-grading translation on the days that
+    # have a kind needing one — and the request thread is blocked on all of
     # them, so the budget has to hold for every one rather than just the graded
-    # ones. Asserted exactly, not with `all`, so a third kind of call appearing
-    # here has to be looked at rather than silently inheriting the budget.
+    # ones. Both examples assert the count exactly, not with `all`, so a fourth
+    # kind appearing has to be looked at rather than silently inheriting the
+    # budget. This one covers a day with no translation; the next covers one
+    # with.
     it "leaves every call a section review makes on the short request-thread budget" do
       exercise, response = exercise_and_response_for_review
       review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }
@@ -2302,6 +2322,26 @@ RSpec.describe AiService do
       svc.review_sections(user, exercise, response, sections: %w[code_review])
 
       expect(double_class.read_timeouts).to eq([ AiService::READ_TIMEOUT ] * 2)
+    end
+
+    # The translation the grade waits on is on the same short budget as the
+    # rest, which is what makes the claim-window arithmetic above two
+    # READ_TIMEOUT chains rather than one plus something larger.
+    it "leaves the pre-grading translation on that budget too" do
+      exercise = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "question" => "cr?", "snippet" => "code" },
+                       "pseudocode_to_code" => { "title" => "P2C", "problem_statement" => "merge ranges" } }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "pseudocode_to_code" => "a" * 20 }, submitted_at: Time.current
+      )
+      svc = double_class.new(canned_text: { "rating" => "solid" }.to_json)
+
+      svc.review_sections(user, exercise, response, sections: %w[pseudocode_to_code])
+
+      expect(double_class.read_timeouts).to eq([ AiService::READ_TIMEOUT ] * 3)
     end
   end
 

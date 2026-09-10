@@ -97,4 +97,33 @@ RSpec.describe "PWA", type: :request do
       expect(response.body).to include(%(<span class="brand"><span class="brand-mark">⚡</span> Code Gym</span>))
     end
   end
+
+  # The nav's name editor is hidden in the installed app and nowhere else, so
+  # renaming yourself is a browser-tab-only control by design. The control is
+  # still rendered for every signed-in user (dashboard_spec's "editable nav
+  # name" covers that) — only this rule decides who can see it.
+  #
+  # Asserted against the stylesheet rather than in a browser because Playwright
+  # cannot emulate display-mode (neither #emulate_media nor a CDP override
+  # reaches it), so no system spec can put the page in the state this rule
+  # fires in.
+  describe "the name editor in standalone mode" do
+    let(:standalone_block) do
+      Rails.root.join("app/views/layouts/application.html.erb").read[
+        /@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1
+      ]
+    end
+
+    it "hides it from inside the app's one standalone-mode media query" do
+      expect(standalone_block).to include("name-editor { display: none; }")
+    end
+
+    # The base rule sets a display of its own further down the sheet, and a
+    # media query adds no specificity — so the hide has to outrank it rather
+    # than rely on order. Two class selectors under `nav` against the base
+    # rule's one is what does it.
+    it "outranks the base rule that comes after it" do
+      expect(standalone_block).to include("nav .nav-links .name-editor")
+    end
+  end
 end
