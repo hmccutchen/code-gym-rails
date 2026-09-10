@@ -494,24 +494,35 @@ class AiService
   ] + COMPLEXITY_CAUSE_CONCEPTS).freeze
 
   # The concepts whose Learn-tab worked example contrasts two legitimate
-  # options rather than a failure mode against its fix — see the
-  # worked_example_desc branch in #build_concept_reference_prompt. Membership
-  # rather than "the architecture vocabulary", because the shape follows the
-  # concept and not the list it arrived in: COMPLEXITY_CAUSE_CONCEPTS sit
-  # inside ARCHITECTURE_CONCEPTS and are things to catch rather than choose
-  # between, while denormalization_tradeoffs reaches this from both language
-  # vocabularies and is a real decision. That one is planted as a flaw on a
-  # schema-review day and taught as a tradeoff here without contradiction:
+  # options rather than a failure mode against its fix — see
+  # #worked_example_description. The test for membership is whether the concept
+  # has two defensible sides: at-most-once against at-least-once, fail-open
+  # against fail-closed. Not which existing group it sits nearest, and
+  # deliberately NOT the ANTI_SHAPE_CONCEPTS axis, which answers a different
+  # question (a shape to find against a remedy to reach for) — n_plus_one is a
+  # remedy and still contrasts as a defect.
+  #
+  # Written out rather than derived as "ARCHITECTURE_CONCEPTS minus today's
+  # exceptions". A derivation would hand the tradeoff framing to every
+  # architecture concept added later without anyone deciding it has two sides,
+  # and a reference is generated once and cached forever, so a concept framed
+  # wrong stays wrong. The list is deliberately mixed-vocabulary for the same
+  # reason the shape follows the concept: COMPLEXITY_CAUSE_CONCEPTS sit inside
+  # ARCHITECTURE_CONCEPTS and name things to catch rather than choose between,
+  # so they are absent here, while denormalization_tradeoffs arrives from both
+  # language vocabularies and is a real decision. That one is planted as a flaw
+  # on a schema-review day and taught as a tradeoff here without contradiction:
   # grading one instance and explaining the concept are different jobs.
   #
-  # The test for membership is whether the concept has two defensible sides —
-  # at-most-once against at-least-once, fail-open against fail-closed — not
-  # which existing group it sits nearest. It is deliberately NOT the
-  # ANTI_SHAPE_CONCEPTS axis, which answers a different question (a shape to
-  # find against a remedy to reach for): n_plus_one is a remedy and still
-  # contrasts as a defect.
-  TRADEOFF_CONCEPTS = (ARCHITECTURE_CONCEPTS - COMPLEXITY_CAUSE_CONCEPTS +
-                       %w[denormalization_tradeoffs]).freeze
+  # A spec holds every architecture concept to a deliberate classification, so
+  # growing that vocabulary fails until someone chooses a side for the new one.
+  TRADEOFF_CONCEPTS = %w[
+    sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
+    caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
+    api_versioning event_driven_vs_request_response data_ownership
+    idempotency_at_scale observability_tradeoffs
+    denormalization_tradeoffs
+  ].freeze
 
   # Vocabulary for the plan_review fourth-slot kind. Entirely disjoint from
   # RAILS_CONCEPTS/JS_CONCEPTS/ARCHITECTURE_CONCEPTS — a plan_review concept
@@ -1937,14 +1948,9 @@ class AiService
   end
 
   def build_concept_reference_prompt(concept, config)
-    label    = config[:label]
-    agnostic = LANGUAGE_AGNOSTIC_VOCABULARIES.include?(config[:concepts])
-    code_example_desc =
-      if agnostic
-        "illustrative pseudocode or a short language-agnostic snippet, ~15 lines"
-      else
-        "annotated #{label} code, ~15 lines"
-      end
+    # A concept with no code of its own to show is illustrated in pseudocode;
+    # every other concept gets real source in the day's language.
+    medium = LANGUAGE_AGNOSTIC_VOCABULARIES.include?(config[:concepts]) ? nil : config[:label]
 
     # A shape you find is never a technique to choose, so the remedy lens the
     # other concepts get would have the provider explain when to reach for a
@@ -1956,26 +1962,6 @@ class AiService
         "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"
       else
         "when to reach for it / tradeoffs"
-      end
-
-    # A pair of the SAME scenario, so the difference is visible structurally
-    # rather than held in the reader's head across two unrelated examples. The
-    # tradeoff branch withholds the word "corrected" on purpose: both options
-    # are legitimate, and a flaw/fix frame would sell a real decision as having
-    # one right answer.
-    pair_opening = "two short #{agnostic ? 'pseudocode' : label} fragments of the SAME scenario, " \
-                   "keeping the same names and shape so the difference reads structurally"
-    worked_example_desc =
-      if TRADEOFF_CONCEPTS.include?(concept)
-        "string — #{pair_opening}: option A, then option B. NEITHER is the corrected version — both are " \
-          "legitimate and the choice is context-dependent. Then say in prose what each option buys, what it " \
-          "costs, and which property of the context decides between them. " \
-          "#{WORKED_EXAMPLE_BOUND}"
-      else
-        "string — #{pair_opening}: first the version exhibiting the concept's failure mode, then the " \
-          "corrected version of that same scenario. Then say in prose WHY the two relate as a mechanism " \
-          "('X causes Y', 'Y is what happens when X breaks down') — never merely that they are " \
-          "associated or related. #{WORKED_EXAMPLE_BOUND}"
       end
 
     <<~PROMPT
@@ -1992,13 +1978,42 @@ class AiService
       {
         "tagline":      "string — bold one-liner",
         "explanation":  "string — 2-3 sentences",
-        "code_example": "string — #{code_example_desc}",
+        "code_example": "string — #{code_example_description(medium)}",
         "senior_lens":  "string — #{senior_lens_desc}",
         "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term; unpack any jargon in place rather than assuming it",
-        "guide_worked_example": "#{worked_example_desc}",
+        "guide_worked_example": "#{worked_example_description(concept, medium)}",
         "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing"
       }
     PROMPT
+  end
+
+  # `medium` is nil for a concept with no code of its own — see
+  # LANGUAGE_AGNOSTIC_VOCABULARIES.
+  def code_example_description(medium)
+    return "illustrative pseudocode or a short language-agnostic snippet, ~15 lines" if medium.nil?
+
+    "annotated #{medium} code, ~15 lines"
+  end
+
+  # A pair of the SAME scenario, so the difference is visible structurally
+  # rather than held in the reader's head across two unrelated examples. The
+  # tradeoff branch withholds the word "corrected" on purpose: both options are
+  # legitimate, and a flaw/fix frame would sell a real decision as having one
+  # right answer.
+  def worked_example_description(concept, medium)
+    opening = "two short #{medium || 'pseudocode'} fragments of the SAME scenario, " \
+              "keeping the same names and shape so the difference reads structurally"
+
+    if TRADEOFF_CONCEPTS.include?(concept)
+      "string — #{opening}: option A, then option B. NEITHER is the corrected version — both are " \
+        "legitimate and the choice is context-dependent. Then say in prose what each option buys, what it " \
+        "costs, and which property of the context decides between them. #{WORKED_EXAMPLE_BOUND}"
+    else
+      "string — #{opening}: first the version exhibiting the concept's failure mode, then the " \
+        "corrected version of that same scenario. Then say in prose WHY the two relate as a mechanism " \
+        "('X causes Y', 'Y is what happens when X breaks down') — never merely that they are " \
+        "associated or related. #{WORKED_EXAMPLE_BOUND}"
+    end
   end
 
   # Both callers persist the result into a jsonb column and then index into it

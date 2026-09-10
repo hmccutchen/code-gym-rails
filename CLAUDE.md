@@ -441,13 +441,19 @@ present — is the single authority for "does this row carry a guide."
   than an association. Which *kind* of contrast is a property of the concept,
   not of the vocabulary it arrived in: `AiService::TRADEOFF_CONCEPTS` gets
   option A against option B with neither called corrected, everything else gets
-  failure mode against fix. Membership rather than a group-level branch because
-  `COMPLEXITY_CAUSE_CONCEPTS` sit inside `ARCHITECTURE_CONCEPTS` and are things
-  to catch, while `denormalization_tradeoffs` reaches it from both language
-  vocabularies and is a real decision — the test is whether the concept has two
-  defensible sides (at-most-once against at-least-once), never which group it
-  sits nearest, and deliberately not the `ANTI_SHAPE_CONCEPTS` axis, which
-  answers a different question. That concept being planted as a flaw on a
+  failure mode against fix. That constant is **written out rather than derived**
+  from `ARCHITECTURE_CONCEPTS`: a derivation would hand the tradeoff framing to
+  every architecture concept added later without anyone deciding it has two
+  sides, and a reference is cached forever, so a concept framed wrong stays
+  wrong. A spec holds every architecture concept to a deliberate
+  classification, so growing that vocabulary fails until someone chooses a side
+  for the new one. The list is mixed-vocabulary because the shape follows the
+  concept: `COMPLEXITY_CAUSE_CONCEPTS` sit inside `ARCHITECTURE_CONCEPTS` and
+  are things to catch, so they are absent, while `denormalization_tradeoffs`
+  arrives from both language vocabularies and is a real decision. The test is
+  whether the concept has two defensible sides (at-most-once against
+  at-least-once), never which group it sits nearest, and deliberately not the
+  `ANTI_SHAPE_CONCEPTS` axis, which answers a different question. That concept being planted as a flaw on a
   schema-review day and taught as a tradeoff here is not a contradiction:
   grading one instance and explaining the concept are different jobs. The
   inline `code_example` is untouched — it stays terse and single-snippet,

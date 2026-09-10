@@ -996,6 +996,20 @@ RSpec.describe AiService do
       tracked = AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS
       expect(AiService::TRADEOFF_CONCEPTS - tracked).to be_empty
     end
+
+    # The constant is written out rather than derived from ARCHITECTURE_CONCEPTS
+    # so a concept added there cannot inherit the tradeoff framing by accident.
+    # This is what makes that deliberate: growing the vocabulary fails here
+    # until the new concept is either listed above as having two defensible
+    # sides, or named below as one to catch rather than choose between. A
+    # reference is generated once and cached forever, so an unconsidered
+    # framing does not self-correct.
+    it "holds every architecture concept to a deliberate classification" do
+      unclassified =
+        AiService::ARCHITECTURE_CONCEPTS - AiService::TRADEOFF_CONCEPTS - AiService::COMPLEXITY_CAUSE_CONCEPTS
+
+      expect(unclassified).to be_empty
+    end
   end
 
   describe "LANGUAGE_CONFIG for the fourth-slot pseudo-language buckets" do
