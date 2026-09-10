@@ -41,10 +41,24 @@
        chrome around them is gone: the rubber-band bounce past the end of a
        page, and the grey flash on tap. Scoped to the installed app rather than
        applied everywhere, so a Safari tab keeps its pull-to-refresh and its
-       tap feedback. */
+       tap feedback.
+
+       The nav name editor goes with them, for space rather than for feel: the
+       installed app has no browser chrome above the nav, so the row is at its
+       tightest exactly where the brand and the links matter most. The whole
+       .name-editor, not just its input — the status readout it flashes has
+       nothing to report once the field it belongs to is gone. This is the only
+       way to rename yourself in the app, so in the installed app there is no
+       way to; a deliberate trade, and renaming is unchanged in a browser tab.
+       This media query is the app's one standalone-mode test (it is also what
+       the two rules above are scoped by) — a second mechanism could disagree
+       with it. Selected through .nav-links to outrank `nav .name-editor`,
+       which sets a display of its own further down the sheet: a media query
+       adds no specificity, so the later rule would otherwise win. */
     @media (display-mode: standalone) {
       html, body { overscroll-behavior-y: none; }
       body { -webkit-tap-highlight-color: transparent; }
+      nav .nav-links .name-editor { display: none; }
     }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -55,11 +69,12 @@
     nav .inner { display: flex; justify-content: space-between; align-items: center; }
     /* The brand refuses to shrink or wrap: squeezed between the name editor and
        the links on a phone, it otherwise broke into three lines (the bolt, then
-       "Code", then "Gym"), which is most visible in the installed app where
-       there is no browser chrome above it to distract from it. The name editor
-       absorbs the squeeze instead — a truncated name still reads and still
-       edits, a stacked wordmark reads as broken. min-width: 0 all the way down
-       is what lets it: a flex item will not shrink below its content otherwise. */
+       "Code", then "Gym"). A browser tab is where that still happens, since the
+       installed app hides the name editor (see the standalone block above). The
+       name editor absorbs the squeeze instead — a truncated name still reads and
+       still edits, a stacked wordmark reads as broken. min-width: 0 all the way
+       down is what lets it: a flex item will not shrink below its content
+       otherwise. */
     nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
     nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
