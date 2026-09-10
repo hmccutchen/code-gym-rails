@@ -435,7 +435,27 @@ present — is the single authority for "does this row carry a guide."
   fields are deliberately outside the required-field check
   `#generate_concept_reference` already runs — so a provider that flubs the
   guide still leaves a usable inline reference rather than failing a call that
-  used to succeed. Two triggers, not one: a user-initiated backfill for
+  used to succeed. `guide_worked_example` asks for a contrastive PAIR of the
+  same scenario — same names, same shape, so the difference reads structurally
+  — and for the mechanism relating them stated outright ("X causes Y") rather
+  than an association. Which *kind* of contrast is a property of the concept,
+  not of the vocabulary it arrived in: `AiService::TRADEOFF_CONCEPTS` gets
+  option A against option B with neither called corrected, everything else gets
+  failure mode against fix. Membership rather than a group-level branch because
+  `COMPLEXITY_CAUSE_CONCEPTS` sit inside `ARCHITECTURE_CONCEPTS` and are things
+  to catch, while `denormalization_tradeoffs` reaches it from both language
+  vocabularies and is a real decision — the test is whether the concept has two
+  defensible sides (at-most-once against at-least-once), never which group it
+  sits nearest, and deliberately not the `ANTI_SHAPE_CONCEPTS` axis, which
+  answers a different question. That concept being planted as a flaw on a
+  schema-review day and taught as a tradeoff here is not a contradiction:
+  grading one instance and explaining the concept are different jobs. The
+  inline `code_example` is untouched — it stays terse and single-snippet,
+  because it serves first exposure. This is the one guide field past the
+  two-paragraph cap, and it carries a stated bound of its own
+  (`WORKED_EXAMPLE_BOUND`) rather than none, since an unbounded field drifts
+  into the essay the guide exists not to be. Two triggers, not one: a
+  user-initiated backfill for
   concepts with no row at all, and on-demand regeneration — only when someone
   opens that concept's Learn entry — for a legacy row that has a reference but
   no guide. Bulk-rewriting legacy rows would change inline reference wording
