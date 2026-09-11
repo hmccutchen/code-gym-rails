@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_11_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -49,6 +49,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_000001) do
     t.string "concept", null: false
     t.datetime "created_at", null: false
     t.text "explanation"
+    t.date "featured_on"
     t.text "guide_pitfalls"
     t.text "guide_plain_language"
     t.text "guide_worked_example"
@@ -57,6 +58,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_000001) do
     t.text "tagline"
     t.datetime "updated_at", null: false
     t.index ["concept", "language"], name: "index_concept_references_on_concept_and_language", unique: true
+    t.index ["featured_on"], name: "index_concept_references_on_featured_on", unique: true
   end
 
   create_table "daily_exercises", force: :cascade do |t|

@@ -51,6 +51,8 @@ en:
     write_guide: "Write this up"
     writing_guide: "Writing it up — this takes a few seconds."
     write_guide_failed: "Still working on it. Reload this page in a minute to check."
+    featured:
+      label: "Today's concept"
     filter_placeholder: "Filter concepts"
     seen_only: "Only ones I've seen"
     no_matches: "No concepts match that."

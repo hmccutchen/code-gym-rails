@@ -307,6 +307,19 @@
     .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
     .learn-prepare { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
     .learn-worked-example { white-space: pre-wrap; }
+
+    /* shared/_featured_concept renders on BOTH the Learn tab and the dashboard,
+       so like the submission-rendering styles above it cannot live in a
+       per-page <style> block. .featured-compact is the dashboard's wrapper;
+       it dials the same block down rather than giving it a second markup. */
+    .featured-concept { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .featured-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .5rem; }
+    .featured-title { font-size: 1.25rem; margin-bottom: .25rem; }
+    .featured-bucket, .featured-tagline { color: var(--muted); font-size: .9rem; }
+    .featured-tagline { margin-top: .5rem; }
+    .featured-compact { margin-top: 2rem; }
+    .featured-compact .featured-concept { padding: .9rem 1rem; margin-bottom: 0; }
+    .featured-compact .featured-title { font-size: 1rem; }
   </style>
 </head>
 <body>

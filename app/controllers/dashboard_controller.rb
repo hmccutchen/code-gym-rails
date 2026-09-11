@@ -8,6 +8,11 @@ class DashboardController < ApplicationController
   before_action :no_store, only: :show
 
   def show
+    # Rendered in every state below, weekends and pauses included: it is the one
+    # thing this page always has to offer. #status deliberately does not ask —
+    # the poller reads generation progress, and a pick is not that.
+    @featured = ConceptReference.featured
+
     @exercise = current_user.daily_exercises.for_date.first
     @response = @exercise&.daily_response ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)

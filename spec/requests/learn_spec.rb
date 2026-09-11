@@ -260,7 +260,7 @@ RSpec.describe "Learn", type: :request do
     # Derived from the same authority the controller reads, not a hand-added
     # sum: a vocabulary that grows must not need this number edited.
     it "enqueues one job per concept with no row at all" do
-      expected = (%w[ruby_rails] + LearnController::AGNOSTIC_BUCKETS)
+      expected = (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT)
                    .sum { |bucket| ConceptBucket.vocabulary_for(bucket).size }
 
       expect {
@@ -298,7 +298,7 @@ RSpec.describe "Learn", type: :request do
     end
 
     it "enqueues nothing once every concept has a row" do
-      (%w[ruby_rails] + LearnController::AGNOSTIC_BUCKETS).each do |bucket|
+      (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
           ConceptReference.create!(
             concept: concept, language: bucket,

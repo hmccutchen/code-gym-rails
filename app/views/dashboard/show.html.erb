@@ -45,3 +45,15 @@
     <%= render "dashboard/exercise", exercise: @exercise, response: @response %>
   <% end %>
 </div>
+
+<%# Below the day's set rather than above it: the workout is what this page is
+    for, and a second call to action over it would compete. On the short states
+    — weekend, paused, generating, failed — there is nothing to scroll past, so
+    it lands in view on exactly the days it has the most to offer. Outside
+    #dashboard-content so the generating state's poller, which replaces that
+    div, cannot take the callout with it. %>
+<% if @featured %>
+  <div class="featured-compact">
+    <%= render "shared/featured_concept", reference: @featured %>
+  </div>
+<% end %>

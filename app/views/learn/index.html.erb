@@ -1,6 +1,12 @@
 <h1><%= t("learn.title") %></h1>
 <p class="learn-intro"><%= t("learn.intro") %></p>
 
+<%# Above the filter and the list: opening this tab and reading one thing
+    should take no decision. %>
+<% if @featured %>
+  <%= render "shared/featured_concept", reference: @featured %>
+<% end %>
+
 <% if @ungenerated.positive? %>
   <%# Quotes the count and says whose key pays, because it spends the user's
       own provider key and the rows it writes are shared with the whole team. %>
