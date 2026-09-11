@@ -719,14 +719,16 @@ class AiService
                                     established: plan.established, history: history,
                                     fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
                                     fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
-                                    code_review_mode: plan.code_review_mode)
+                                    code_review_mode: plan.code_review_mode,
+                                    code_review_source: plan.code_review_source)
     )
 
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set"),
       language: language,
       expected_keys: ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth,
-                                              pattern: plan.pattern).map(&:key)
+                                              pattern: plan.pattern).map(&:key),
+      code_review_source: plan.code_review_source
     )
     problem_set = ingested.problem_set
     # After ingest, never during: ingest writes nothing and raises on an
@@ -1261,6 +1263,7 @@ class AiService
       requested: {
         skill_level: user.skill_level,
         code_review_mode: plan.code_review_mode,
+        code_review_source: plan.code_review_source&.id,
         pattern: plan.pattern,
         third: plan.third,
         fourth: plan.fourth,
@@ -1344,7 +1347,7 @@ class AiService
                             reinforcement: nil, due_checks: [],
                             established: [], history: user.recent_performance,
                             fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
-                            code_review_mode: :application_code)
+                            code_review_mode: :application_code, code_review_source: nil)
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -1460,10 +1463,12 @@ class AiService
     # Each chosen kind gives its own guidance line, keyed off the same `kinds`
     # the schema and retention hosting derive from — so guidance can never
     # disagree with what the schema actually asks for. code_review is the only
-    # kind whose guidance depends on the day's content mode.
+    # kind whose guidance depends on the day's content mode. The real-source
+    # excerpt is handed to every kind unconditionally: only code_review reads
+    # it and the rest absorb it, which is what the uniform context is for.
     sections_guidance = kinds.map { |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
-      generation_guidance_for(kind, language, mode: mode)
+      generation_guidance_for(kind, language, mode: mode, source: code_review_source)
     }.join("\n")
 
     <<~PROMPT
@@ -1662,7 +1667,7 @@ class AiService
   # one lived here for code_review's mode arguments, which put per-kind
   # knowledge back into the shared assembler that .generation_guidance exists
   # to keep it out of.
-  def generation_guidance_for(kind, language, mode: nil)
+  def generation_guidance_for(kind, language, mode: nil, source: nil)
     config = config_for(language)
 
     kind.generation_guidance(
@@ -1670,7 +1675,8 @@ class AiService
       label:          config[:label],
       mode:           mode,
       artifact:       config[:schema_artifact],
-      test_framework: config[:test_framework]
+      test_framework: config[:test_framework],
+      source:         source
     )
   end
 

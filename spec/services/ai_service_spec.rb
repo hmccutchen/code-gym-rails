@@ -1088,6 +1088,39 @@ RSpec.describe AiService do
       expect(prompt).to include("one planted data-modeling flaw")
     end
 
+    describe "grounded in Code Gym's own source" do
+      it "replaces the mode's toy line with the excerpt's own instruction" do
+        excerpt = RealSource::APPLICATION_CODE.first
+        prompt  = service.send(:build_exercise_prompt, user, "ruby_rails",
+                               code_review_mode: :application_code, code_review_source: excerpt)
+
+        expect(prompt).to include("MODIFIED COPY of this real method")
+        expect(prompt).to include(excerpt.id)
+        expect(prompt).to include("The scenario field must be exactly")
+        expect(prompt).not_to include("must be realistic Ruby/Rails code")
+      end
+
+      it "hands a schema_review day the real migration as reference, not as the snippet" do
+        excerpt = RealSource::SCHEMA_REVIEW.first
+        prompt  = service.send(:build_exercise_prompt, user, "ruby_rails",
+                               code_review_mode: :schema_review, code_review_source: excerpt)
+
+        expect(prompt).to include("MODELLED ON this real one")
+        expect(prompt).to include("create_table :push_subscriptions")
+        expect(prompt).not_to include("The code_review snippet must be a Rails migration")
+      end
+
+      # The fourth additive kwarg after cache_system:, max_tokens: and
+      # history: — a toy day must read exactly as it did before the grounded
+      # path existed.
+      it "leaves a toy day's prompt untouched" do
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", code_review_mode: :application_code)
+
+        expect(prompt).to include("must be realistic Ruby/Rails code")
+        expect(prompt).not_to include("Code Gym's own source")
+      end
+    end
+
     it "asks for realistic application code by default" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
       expect(prompt).to include("The code_review snippet must be realistic Ruby/Rails code — not toy examples.")
@@ -1732,6 +1765,7 @@ RSpec.describe AiService do
     it "leaves problem sets without a parsons_problem section untouched" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
       set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => {},
               "architecture" => {}, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
@@ -1785,6 +1819,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
     end
@@ -1828,6 +1863,7 @@ RSpec.describe AiService do
       svc = spy_class.new(canned_text: set.to_json)
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       svc.generate_exercise(user, language: "ruby_rails")
 
@@ -1868,6 +1904,7 @@ RSpec.describe AiService do
         svc = spy_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" }).to_json)
         allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: third, fourth: :plan_review)
         allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+        allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
         svc.generate_exercise(user, language: "ruby_rails")
         captured_prompt
@@ -1963,6 +2000,7 @@ RSpec.describe AiService do
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       logged = []
       allow(Rails.logger).to receive(:info) do |msg|
@@ -2072,6 +2110,7 @@ RSpec.describe AiService do
     it "threads the rolled mode into both the prompt and the diagnostics payload" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       set = full_problem_set("code_review" => { "concept" => "missing_index" })
       svc = double_class.new(canned_text: set.to_json)
@@ -2088,6 +2127,36 @@ RSpec.describe AiService do
 
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
       expect(payload["requested"]["code_review_mode"]).to eq("schema_review")
+    end
+
+    # The same reasoning as the example above, for the grounded path: every
+    # other real-source example drives build_exercise_prompt or ingest
+    # directly, so only this one proves the plan's excerpt reaches all three
+    # of the prompt, the stamped set, and the logged payload.
+    it "threads a grounded code_review into the prompt, the stamped set, and the diagnostics payload" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:real)
+      excerpt = RealSource::APPLICATION_CODE.first
+
+      set = full_problem_set("code_review" => { "concept" => "memoization", "scenario" => "inventory restocking service" })
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+
+      problem_set = svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(svc.last_prompt).to include("MODIFIED COPY of this real method")
+      expect(svc.last_prompt).to include(excerpt.text.strip_heredoc.chomp)
+      expect(problem_set["code_review"]["scenario"]).to eq(excerpt.scenario)
+      expect(problem_set["code_review"]["source"]).to eq(excerpt.id)
+
+      payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+      expect(payload["requested"]["code_review_source"]).to eq(excerpt.id)
     end
   end
 
@@ -3582,6 +3651,7 @@ RSpec.describe AiService do
       allow(DailyPlan).to receive(:for).and_call_original
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :ambiguity_hunt)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },

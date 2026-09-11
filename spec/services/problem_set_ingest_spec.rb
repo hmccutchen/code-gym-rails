@@ -25,6 +25,38 @@ RSpec.describe ProblemSetIngest do
     described_class.call(problem_set, language: language, expected_keys: problem_set.keys)
   end
 
+  describe "grounding a code_review in real source" do
+    # A pool entry whose scenario and id need no file read, so this file stays
+    # database- and disk-free.
+    let(:excerpt) { RealSource::APPLICATION_CODE.first }
+
+    def grounded(problem_set, source:)
+      described_class.call(problem_set, language: "ruby_rails", expected_keys: problem_set.keys,
+                           code_review_source: source).problem_set
+    end
+
+    it "stamps the server's scenario over whatever the provider wrote" do
+      set = grounded({ "code_review" => { "concept" => "memoization", "scenario" => "inventory restocking service" } },
+                     source: excerpt)
+
+      expect(set["code_review"]["scenario"]).to eq(excerpt.scenario)
+    end
+
+    it "leaves the trace the next pick reads" do
+      set = grounded({ "code_review" => { "concept" => "memoization" } }, source: excerpt)
+
+      expect(set["code_review"]["source"]).to eq(excerpt.id)
+    end
+
+    it "touches nothing on a toy day" do
+      set = grounded({ "code_review" => { "concept" => "memoization", "scenario" => "inventory restocking service" } },
+                     source: nil)
+
+      expect(set["code_review"]["scenario"]).to eq("inventory restocking service")
+      expect(set["code_review"]).not_to have_key("source")
+    end
+  end
+
   describe ".call" do
     it "returns the cleaned problem set and the concepts it could not place" do
       result = ingest({ "code_review" => { "concept" => "not_a_real_concept" } })

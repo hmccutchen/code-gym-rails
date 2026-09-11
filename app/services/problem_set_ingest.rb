@@ -35,8 +35,11 @@ class ProblemSetIngest
   Result = Data.define(:problem_set, :suggested_concepts)
 
   # Raises AiService::InvalidResponseError when the set cannot be used at all.
-  def self.call(problem_set, language:, expected_keys:)
-    new(problem_set, language: language, expected_keys: expected_keys).call
+  # `code_review_source` is the RealSource excerpt today's code_review was
+  # grounded in, or nil for a toy day.
+  def self.call(problem_set, language:, expected_keys:, code_review_source: nil)
+    new(problem_set, language: language, expected_keys: expected_keys,
+        code_review_source: code_review_source).call
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -129,10 +132,11 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:, expected_keys:)
+  def initialize(problem_set, language:, expected_keys:, code_review_source: nil)
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
+    @code_review_source = code_review_source
     @suggested_concepts = []
   end
 
@@ -149,6 +153,7 @@ class ProblemSetIngest
     normalize_answer_scaffolds!
     normalize_diagrams!
     shuffle_parsons_blocks!
+    ground_code_review!
 
     Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts)
   end
@@ -300,6 +305,23 @@ class ProblemSetIngest
 
       usable ? section_data["diagram"] = diagram.strip : section_data.delete("diagram")
     end
+  end
+
+  # On a grounded day the scenario is a fact the server knows — which file,
+  # which method, and that the copy is altered — not creative output, so it is
+  # stamped here regardless of what the provider wrote. The prompt asks for the
+  # same string; this is what guarantees it, since a model that ignores the
+  # ask and invents a business domain would leave the page saying something
+  # untrue about deployed code. `source` is the trace RealSource.last_seen_for
+  # reads back: code_review_mode itself is never persisted, so this is the
+  # only record of what was grounded. Runs after reject_missing_sections!,
+  # which has already refused a set whose code_review is not a section.
+  def ground_code_review!
+    return if @code_review_source.nil?
+
+    section = @problem_set["code_review"]
+    section["scenario"] = @code_review_source.scenario
+    section["source"]   = @code_review_source.id
   end
 
   # The provider returns "blocks" already in correct order, so the scramble is

@@ -13,7 +13,7 @@
 class DailyPlan
   Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode)
+                        :code_review_mode, :code_review_source)
 
   # Which content mode code_review takes. Equal thirds, as close as float
   # weights get — application_code keeps a 1% edge rather than the split
@@ -116,11 +116,29 @@ class DailyPlan
     established   = established_concepts_for(user, language, kinds: kinds,
                                              reinforcement: reinforcement, due_checks: due_checks)
 
+    code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
+
     Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third),
                reinforcement: reinforcement, due_checks: due_checks, established: established,
-               code_review_mode: WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS),
+               code_review_mode: code_review_mode,
+               code_review_source: code_review_source_for(user, language, code_review_mode),
                **fourth_track(user, rotation.fetch(:fourth)))
   end
+
+  # Whether today's code_review is grounded in Code Gym's own source, and in
+  # which excerpt. Gated before it is rolled: only a day generating in the
+  # language this codebase is written in can use it, and only a mode with a
+  # pool — test_file has none. A second WeightedRoll inside the mode rather
+  # than more entries in CODE_REVIEW_MODE_WEIGHTS, so the three-way mode
+  # split stays exactly what it is and a grounded day is still that mode.
+  # The excerpt is chosen here and read later, when the prompt is built.
+  def self.code_review_source_for(user, language, mode)
+    return nil unless language == RealSource::LANGUAGE && RealSource.pool(mode).any?
+    return nil unless WeightedRoll.pick(RealSource::WEIGHTS) == :real
+
+    RealSource.pick(mode, last_seen: RealSource.last_seen_for(user))
+  end
+  private_class_method :code_review_source_for
 
   # The fourth slot's own independent track — a parallel state machine rather
   # than a generalization of the non-fourth pool above, because the two
