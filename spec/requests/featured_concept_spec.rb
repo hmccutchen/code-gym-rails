@@ -61,7 +61,13 @@ RSpec.describe "Daily featured concept", type: :request do
     # offer.
     it "surfaces it on a weekend, when the page has no set to show" do
       write_up("idempotency_at_scale")
-      travel_to Date.new(2026, 9, 12) do
+
+      # Midday Saturday in the team's own zone, not a bare Date: the pick
+      # resolves its day there, so a date pinned in some other zone could land
+      # on the Friday and quietly stop testing a weekend at all.
+      travel_to Time.utc(2026, 9, 12, 16, 0, 0) do
+        expect(ConceptReference.team_today).to be_on_weekend
+
         get root_path
 
         expect(response.body).to include(featured_label)

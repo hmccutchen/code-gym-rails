@@ -521,6 +521,18 @@ the row was the featured concept, and nil means it never has been.
   vocabulary only lengthens it; two specs hold the exclusion itself, which is
   the part that can break.
 
+  **The day is the team's, never the viewer's.** `ApplicationController`'s
+  `around_action :use_time_zone` runs every action inside the current user's
+  zone, so a bare `Date.current` in `.featured` would resolve per viewer — two
+  teammates either side of midnight would ask about different dates, each stamp
+  a row, and each get their own "today's concept", which is the one global pick
+  this feature exists to be, broken. The unique index cannot catch that, since
+  the two dates genuinely differ. `ConceptReference.team_today` resolves it in
+  `User::DEFAULT_TIME_ZONE` — the zone `User` already falls back to and
+  `config/recurring.yml` already calls the team default — rather than a second
+  constant of the same value that could later disagree. UTC was the alternative
+  and is worse: it rolls the concept over mid-evening for this team.
+
   **The same-day race guard is the unique index on `featured_on`**, not a row
   lock. Two first-visits landing together both read nothing and both try to
   stamp; the loser's write violates the index, and `.claim_feature` rescues
@@ -528,7 +540,14 @@ the row was the featured concept, and nil means it never has been.
   concept. Deliberately lighter than the `with_lock` the cost-bearing paths
   take (`User#resume_generation!`, `ResponsesController#review`) — this picks a
   row to *read*, so losing costs a re-read rather than a duplicated provider
-  call.
+  call. The stamp sits in a SAVEPOINT (`requires_new: true`) for the same
+  reason `PushSubscription.upsert` and `User#carry_forward` do: without one the
+  write joins a caller's open transaction and the violation aborts it, so the
+  recovery read raises `PG::InFailedSqlTransaction` instead of returning the
+  winner. No caller opens a transaction around it today — and note that
+  transactional specs cannot surface this, since Rails opens its test wrapper
+  non-joinable and `update!` then gets a savepoint of its own; the spec that
+  pins it opens an ordinary caller transaction explicitly.
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database and
   needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block

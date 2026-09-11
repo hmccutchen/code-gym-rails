@@ -60,7 +60,7 @@ RSpec.describe ConceptReference do
     it "stamps the pick with the date it was asked about" do
       featurable("idempotency_at_scale")
 
-      expect(ConceptReference.featured.featured_on).to eq(Date.current)
+      expect(ConceptReference.featured(Date.new(2026, 3, 4)).featured_on).to eq(Date.new(2026, 3, 4))
     end
 
     it "returns the same concept on every later visit that day" do
@@ -75,7 +75,7 @@ RSpec.describe ConceptReference do
       featurable("caching_strategy")
       today = ConceptReference.featured
 
-      expect(ConceptReference.featured(Date.current + 1)).not_to eq(today)
+      expect(ConceptReference.featured(ConceptReference.team_today + 1)).not_to eq(today)
     end
 
     # Weekends are not a case the picker knows about — the date it is asked
@@ -101,22 +101,75 @@ RSpec.describe ConceptReference do
       expect(reference).not_to be_guide
     end
 
-    # The two halves of the same-day race guard: the database refuses the
-    # loser's stamp (pinned below, against the index itself), and .featured
-    # turns that refusal into the winner's pick rather than an exception. Real
-    # threads were tried here and could not discriminate — the window between
-    # the read and the stamp is a few microseconds wide, so the test passed
+    # The same-day race, driven through a REAL unique violation rather than a
+    # stubbed exception: only the initial read is faked, to open the window a
+    # concurrent visit would open. The stamp then genuinely collides with the
+    # winner's row, and the recovery read is a genuine query.
+    #
+    # Real threads were tried here first and could not discriminate: the window
+    # between the read and the stamp is microseconds wide, so the test passed
     # with the unique index dropped, which is worse than no test.
-    it "hands back the winner's pick when its own stamp loses the race" do
-      featurable("caching_strategy")
-      winner = featurable("idempotency_at_scale")
+    def losing_the_race
+      missed_once = false
 
-      allow_any_instance_of(ConceptReference).to receive(:update!) do
-        winner.update_column(:featured_on, Date.current)
-        raise ActiveRecord::RecordNotUnique, "featured_on"
+      allow(ConceptReference).to receive(:find_by).and_wrap_original do |original, *args|
+        next original.call(*args) if missed_once
+
+        missed_once = true
+        nil
       end
 
-      expect(ConceptReference.featured).to eq(winner)
+      yield
+    end
+
+    it "hands back the winner's pick when its own stamp loses the race" do
+      featurable("caching_strategy")
+      winner = featurable("idempotency_at_scale", featured_on: ConceptReference.team_today)
+
+      losing_the_race { expect(ConceptReference.featured).to eq(winner) }
+    end
+
+    # The SAVEPOINT, which the example above cannot reach: under transactional
+    # specs Rails opens its wrapper NON-joinable, so update!'s own transaction
+    # becomes a savepoint on its own and masks the bug. A caller's ordinary
+    # transaction is joinable, update! joins it, and without requires_new the
+    # collision aborts that transaction — the recovery read then dies of
+    # PG::InFailedSqlTransaction instead of returning the winner. No caller
+    # opens one today; this pins the guard before one does.
+    it "recovers from the collision inside a caller's own transaction" do
+      featurable("caching_strategy")
+      winner = featurable("idempotency_at_scale", featured_on: ConceptReference.team_today)
+
+      losing_the_race do
+        expect(ConceptReference.transaction { ConceptReference.featured }).to eq(winner)
+      end
+    end
+
+    # ApplicationController runs every action inside the viewer's own zone, so a
+    # date resolved there would differ between teammates across midnight and
+    # each would stamp their own concept. Driven at an instant where the team
+    # zone and the viewer's zone genuinely disagree about the date.
+    it "resolves the day in the team's zone, not the viewer's" do
+      reference = featurable("idempotency_at_scale")
+
+      # 03:00 UTC on the 12th is still the 11th in America/New_York.
+      travel_to Time.utc(2026, 9, 12, 3, 0, 0) do
+        Time.use_zone("Asia/Tokyo") { ConceptReference.featured }
+      end
+
+      expect(reference.reload.featured_on).to eq(Date.new(2026, 9, 11))
+    end
+
+    it "gives two teammates in different zones the same concept" do
+      featurable("idempotency_at_scale")
+      featurable("caching_strategy")
+
+      travel_to Time.utc(2026, 9, 12, 3, 0, 0) do
+        tokyo    = Time.use_zone("Asia/Tokyo") { ConceptReference.featured }
+        honolulu = Time.use_zone("Pacific/Honolulu") { ConceptReference.featured }
+
+        expect(tokyo).to eq(honolulu)
+      end
     end
 
     it "spends nothing to pick" do
