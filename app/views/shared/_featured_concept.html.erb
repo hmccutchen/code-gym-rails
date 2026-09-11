@@ -1,0 +1,17 @@
+<%# Required locals: reference (a ConceptReference stamped for today).
+
+    Links into the ordinary Learn page rather than rendering the guide here:
+    that page already handles a row whose guide is missing, offering the
+    on-demand "Write this up" control, so a featured concept the backfill
+    never finished needs no fallback of its own. %>
+<div class="featured-concept">
+  <p class="featured-label"><%= t("learn.featured.label") %></p>
+  <h2 class="featured-title">
+    <%= link_to reference.concept.humanize,
+                learn_concept_path(bucket: reference.language, concept: reference.concept) %>
+  </h2>
+  <p class="featured-bucket"><%= t("learn.buckets.#{reference.language}") %></p>
+  <% if reference.tagline.present? %>
+    <p class="featured-tagline"><%= reference.tagline %></p>
+  <% end %>
+</div>

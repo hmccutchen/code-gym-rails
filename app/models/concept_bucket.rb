@@ -31,6 +31,10 @@ class ConceptBucket
     PSEUDOCODE_TO_CODE => PSEUDOCODE_TO_CODE
   }.freeze
 
+  # The buckets every user holds, whatever language they are assigned. Derived
+  # from the map above so a fifth special bucket joins it without an edit.
+  LANGUAGE_INDEPENDENT = SPECIAL_BUCKETS.values.freeze
+
   def self.for(sections, language)
     Array(sections).each do |section|
       special = SPECIAL_BUCKETS[section.to_s]

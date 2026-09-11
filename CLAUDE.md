@@ -221,6 +221,11 @@ User browses /learn (independent of the daily flow above):
        not they have ever been assigned one — a library, not a day's plan
   └→ LearnController#show              → one concept's cached reference plus its
        guide, generating either on demand when the row is missing or stale
+
+Every page load, any day of the week:
+  └→ ConceptReference.featured        → the day's one globally-featured concept,
+       picked on the first visit that asks and read by every visit after —
+       rendered at the top of /learn and as a small callout on the dashboard
 ```
 
 ## Models
@@ -235,8 +240,10 @@ User browses /learn (independent of the daily flow above):
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
 below) now also carries `guide_plain_language`, `guide_worked_example`,
-`guide_pitfalls` (all nullable text). `ConceptReference#guide?` — all three
-present — is the single authority for "does this row carry a guide."
+`guide_pitfalls` (all nullable text) and `featured_on` (nullable date, uniquely
+indexed). `ConceptReference#guide?` — all three guide fields present — is the
+single authority for "does this row carry a guide"; `featured_on` is the day
+the row was the featured concept, and nil means it never has been.
 
 ## Key Design Decisions
 
@@ -478,6 +485,50 @@ present — is the single authority for "does this row carry a guide."
   from `ConceptMastery`: tier is kept invisible everywhere by design, and a
   marker sourced from it would be exactly the readout the post-hoc difficulty
   rating went to lengths to avoid becoming.
+- **The daily featured concept**: one concept surfaced each day, the same one
+  for the whole team — `ConceptReference.featured`, read at the top of `/learn`
+  and as a small callout on the dashboard. **Global, not per-user**, because
+  `ConceptReference` is itself a shared row with no `user_id`; no per-user state
+  exists for this and none should be added.
+
+  **Picked lazily on visit, not by a cron entry.** The first page load of a day
+  that asks finds no row stamped with that date, takes the stalest one and
+  stamps it; every load after reads it. The date being asked about is the
+  method's only input, so a Saturday behaves exactly like a Tuesday with
+  nothing to configure — unlike generation, which `config/recurring.yml` and
+  `GenerateDailyExercisesJob` deliberately gate to 8am weekdays. Ordering is
+  `featured_on ASC NULLS FIRST`: a never-featured concept outranks every dated
+  one, the same "unseen outranks stale" rule `SectionRotation` applies to
+  exercise kinds.
+
+  **Selects and displays only — it never generates.** Every field it renders
+  was written by the Learn tab's existing `#generate_concept_reference`, so the
+  feature adds no provider call and no `ApiUsage` row (a spec pins that). A
+  featured row whose guide was never written needs no fallback of its own: the
+  callout links to the ordinary `LearnController#show` page, which already
+  offers the on-demand "Write this up" control for exactly that row.
+
+  **The pool is the four language-independent buckets**
+  (`ConceptReference::FEATURABLE_BUCKETS`, derived from
+  `ConceptBucket::LANGUAGE_INDEPENDENT`), not every vocabulary. A single global
+  pick has to be readable and relevant to everyone, and `LearnController#show`
+  validates `:bucket` against the viewer's own slice — so a `javascript` pick
+  is a 404 for a Rails user, and the reverse for a JS user. On a team split
+  across stacks these are the only concepts that are genuinely
+  one-for-everyone. Accepted cost: neither language vocabulary is ever
+  featured, and they are the larger half. No count is quoted here on purpose —
+  the rotation's length is however many rows the pool holds, and growing a
+  vocabulary only lengthens it; two specs hold the exclusion itself, which is
+  the part that can break.
+
+  **The same-day race guard is the unique index on `featured_on`**, not a row
+  lock. Two first-visits landing together both read nothing and both try to
+  stamp; the loser's write violates the index, and `.claim_feature` rescues
+  `RecordNotUnique` by re-reading the winner's pick, so both visitors see one
+  concept. Deliberately lighter than the `with_lock` the cost-bearing paths
+  take (`User#resume_generation!`, `ResponsesController#review`) — this picks a
+  row to *read*, so losing costs a re-read rather than a duplicated provider
+  call.
 - **Idempotent saves**: `ResponsesController#create` uses `find_or_initialize_by(daily_exercise:, date:)` so auto-saves never create duplicates.
 - **Preview apps**: a Railway PR environment starts with an empty database and
   needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block
@@ -730,6 +781,9 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
   slice-wide `#prepare` backfill). Validates `:bucket`/`:concept` against the
   closed vocabulary at the boundary, same as everywhere else provider-adjacent
   input arrives from a URL.
+- `app/views/shared/_featured_concept.html.erb` — the daily featured concept's
+  one rendering, shared by the Learn tab and the dashboard; its styles live in
+  the layout for that reason, like `responses/_answered_sections`
 - `app/models/concept_group.rb` — `ConceptGroup`: which display group a
   concept renders under on the Learn index, and the order groups appear in.
   Display-only, derived from `AiService`'s named vocabulary constants rather

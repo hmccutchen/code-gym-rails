@@ -1,14 +1,10 @@
 class LearnController < ApplicationController
   helper_method :encountered?
 
-  # The language-independent buckets, derived from the authority that already
-  # names them, so a new one added to ConceptBucket appears here without an
-  # edit.
-  AGNOSTIC_BUCKETS = ConceptBucket::SPECIAL_BUCKETS.values.freeze
-
   # GET /learn — every concept in this user's vocabularies, grouped, whether or
   # not they have ever been assigned one.
   def index
+    @featured   = ConceptReference.featured
     @references = references_by_key
     @buckets    = learn_buckets.map do |bucket|
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
@@ -82,7 +78,7 @@ class LearnController < ApplicationController
   # which language tomorrow happens to be. A mixed user is assigned both, so a
   # mixed user browses both.
   def learn_buckets
-    language_buckets + AGNOSTIC_BUCKETS
+    language_buckets + ConceptBucket::LANGUAGE_INDEPENDENT
   end
 
   # Derived, never a hardcoded pair: LANGUAGE_CONFIG is this app's stated
