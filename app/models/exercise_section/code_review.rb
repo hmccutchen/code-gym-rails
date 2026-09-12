@@ -10,10 +10,12 @@ class ExerciseSection::CodeReview < ExerciseSection
   # The only kind with a content mode. `artifact` is the day's language-
   # specific schema artifact and `test_framework` its test-framework steer
   # (both from AiService::LANGUAGE_CONFIG); each is read only on the matching
-  # mode.
-  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil)
+  # mode. `source` is the RealSource excerpt today's snippet is grounded in,
+  # when there is one: its own instruction replaces the mode's toy line,
+  # since a grounded snippet is still that mode, just with its material given.
+  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil)
     <<~GUIDANCE.chomp
-      #{content_instruction(label, mode, artifact, test_framework)}
+      #{source ? source.instruction : content_instruction(label, mode, artifact, test_framework)}
       - Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}
     GUIDANCE
   end

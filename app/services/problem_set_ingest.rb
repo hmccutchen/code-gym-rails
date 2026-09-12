@@ -35,8 +35,11 @@ class ProblemSetIngest
   Result = Data.define(:problem_set, :suggested_concepts)
 
   # Raises AiService::InvalidResponseError when the set cannot be used at all.
-  def self.call(problem_set, language:, expected_keys:)
-    new(problem_set, language: language, expected_keys: expected_keys).call
+  # `code_review_source` is the RealSource excerpt today's code_review was
+  # grounded in, or nil for a toy day.
+  def self.call(problem_set, language:, expected_keys:, code_review_source: nil)
+    new(problem_set, language: language, expected_keys: expected_keys,
+        code_review_source: code_review_source).call
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -129,10 +132,11 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:, expected_keys:)
+  def initialize(problem_set, language:, expected_keys:, code_review_source: nil)
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
+    @code_review_source = code_review_source
     @suggested_concepts = []
   end
 
@@ -149,6 +153,7 @@ class ProblemSetIngest
     normalize_answer_scaffolds!
     normalize_diagrams!
     shuffle_parsons_blocks!
+    ground_code_review!
 
     Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts)
   end
@@ -299,6 +304,33 @@ class ProblemSetIngest
                 diagram.strip.length.between?(1, MAX_DIAGRAM_LENGTH)
 
       usable ? section_data["diagram"] = diagram.strip : section_data.delete("diagram")
+    end
+  end
+
+  # On a grounded day the scenario is a fact the server knows — which file,
+  # which method, and that the copy is altered — not creative output, so it is
+  # stamped here regardless of what the provider wrote. The prompt asks for the
+  # same string; this is what guarantees it, since a model that ignores the
+  # ask and invents a business domain would leave the page saying something
+  # untrue about deployed code. `source` is the trace RealSource.last_seen_for
+  # reads back: code_review_mode itself is never persisted, so this is the
+  # only record of what was grounded — so only the server may write it. A toy
+  # day deletes whatever the provider put there rather than leaving it, or a
+  # model that happened to emit a `source` key would mint a trace for an
+  # excerpt this set never showed. In production code_review is always
+  # present — ExerciseSection.for_plan never omits it — but ingest is also
+  # called on partial sets, and a set with no code_review has no trace to
+  # strip or stamp.
+  def ground_code_review!
+    return unless ExerciseSection.present?(@problem_set, "code_review")
+
+    section = @problem_set["code_review"]
+
+    if @code_review_source.nil?
+      section.delete("source")
+    else
+      section["scenario"] = @code_review_source.scenario
+      section["source"]   = @code_review_source.id
     end
   end
 

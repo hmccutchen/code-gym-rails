@@ -184,13 +184,14 @@ class ExerciseSection
     # Every kind is handed the same context and reads only the part it needs:
     # `vocabulary` (this kind's own, resolved by the caller from
     # .vocabulary_key), `label`, `mode` (the rolled content mode — only
-    # code_review has one today), and `artifact`/`test_framework` (the day's
-    # language config, which only a code_review mode reads). Uniform, so the
-    # assembler never has to know which kind it is holding; a kind that reads
-    # none of the optional values absorbs them with `**` rather than naming
-    # them. Widening this context stays a one-line change here and at the
-    # single call site, and touches no other kind.
-    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil)
+    # code_review has one today), `artifact`/`test_framework` (the day's
+    # language config, which only a code_review mode reads), and `source`
+    # (the RealSource excerpt a code_review is grounded in today, or nil).
+    # Uniform, so the assembler never has to know which kind it is holding; a
+    # kind that reads none of the optional values absorbs them with `**`
+    # rather than naming them. Widening this context stays a one-line change
+    # here and at the single call site, and touches no other kind.
+    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil)
       raise NotImplementedError, "#{self} must implement .generation_guidance"
     end
 

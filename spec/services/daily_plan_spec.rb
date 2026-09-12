@@ -497,4 +497,49 @@ RSpec.describe DailyPlan do
       expect(DailyPlan.for(user, language: "ruby_rails").code_review_mode).to eq(:schema_review)
     end
   end
+
+  describe "#code_review_source on the plan" do
+    let(:user) { User.create!(email: "source@example.com", name: "Source") }
+
+    def plan(language: "ruby_rails", mode: :application_code, roll: :real)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(mode)
+      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(roll)
+      DailyPlan.for(user, language: language)
+    end
+
+    it "is an excerpt from the mode's own pool when the roll lands real" do
+      expect(RealSource::APPLICATION_CODE).to include(plan.code_review_source)
+      expect(RealSource::SCHEMA_REVIEW).to include(plan(mode: :schema_review).code_review_source)
+    end
+
+    it "is nil when the roll lands toy" do
+      expect(plan(roll: :toy).code_review_source).to be_nil
+    end
+
+    # Code Gym is Ruby; a javascript day asks for JS/React code or a Prisma
+    # schema, and there is nothing here to ground either in. The roll is
+    # pinned to :real so the example proves the gate, not the dice.
+    it "is nil on a day generating in a language this codebase is not written in" do
+      expect(plan(language: "javascript").code_review_source).to be_nil
+    end
+
+    it "is nil on a test_file day, which has no pool" do
+      expect(plan(mode: :test_file).code_review_source).to be_nil
+    end
+
+    it "never rolls at all when the gate closes" do
+      expect(WeightedRoll).not_to receive(:pick).with(RealSource::WEIGHTS)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:test_file)
+
+      DailyPlan.for(user, language: "ruby_rails")
+    end
+
+    it "prefers what this user has not seen, reading the stamped trace" do
+      first = RealSource::APPLICATION_CODE.first
+      user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                   problem_set: { "code_review" => { "source" => first.id } })
+
+      expect(plan.code_review_source).to eq(RealSource::APPLICATION_CODE.second)
+    end
+  end
 end

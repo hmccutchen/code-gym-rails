@@ -684,9 +684,9 @@ RSpec.describe ExerciseSection do
   describe ".generation_guidance" do
     RAILS_VOCAB = AiService::RAILS_CONCEPTS.freeze
 
-    def guidance(kind, vocabulary:, label: "Ruby/Rails", mode: nil, artifact: nil, test_framework: nil)
+    def guidance(kind, vocabulary:, label: "Ruby/Rails", mode: nil, artifact: nil, test_framework: nil, source: nil)
       kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
-                                artifact: artifact, test_framework: test_framework)
+                                artifact: artifact, test_framework: test_framework, source: source)
     end
 
     # The contract is uniform on purpose: AiService#generation_guidance_for
@@ -697,7 +697,8 @@ RSpec.describe ExerciseSection do
     it "is accepted by every kind with the full context the assembler passes" do
       ExerciseSection.all.each do |kind|
         expect { guidance(kind, vocabulary: RAILS_VOCAB, mode: :application_code,
-                                 artifact: "a Rails migration", test_framework: "an RSpec-style") }
+                                 artifact: "a Rails migration", test_framework: "an RSpec-style",
+                                 source: RealSource::APPLICATION_CODE.first) }
           .not_to raise_error, "#{kind} rejected the assembler's context"
       end
     end
