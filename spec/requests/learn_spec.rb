@@ -163,6 +163,10 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).to include(I18n.t("learn.sources"))
       ConceptBookSources.for("shotgun_surgery").each do |source|
         expect(response.body).to include(source[:title], source[:author])
+        # The pointer is the half a title-and-author assertion cannot see:
+        # without this, deleting its interpolation from the view leaves every
+        # Learn spec green.
+        expect(response.body).to include(source[:pointer]) if source[:pointer]
       end
     end
 

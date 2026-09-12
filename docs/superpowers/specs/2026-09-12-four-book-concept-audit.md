@@ -197,3 +197,38 @@ those, *all* its genuine sources rather than only the four in scope — so
 `shallow_module` carries *A Philosophy of Software Design* before
 *Refactoring*'s Lazy Element. Concepts none of these books touch stay uncited;
 a later pass can widen it.
+
+## The pointer contract, corrected in review
+
+The first draft of `ConceptBookSources` stated the coined-term rule and then
+broke it in 24 of its 53 sources. Review caught it; both failure modes are
+recorded here because only one half of the rule is machine-checkable and the
+next person extending the store will face the same two temptations.
+
+**A topic is not a term.** `"clean tests"`, `"shared state"`, `"functions
+should do one thing"`, `"classes should be small"`, `"meaningful names"`,
+`"function arguments"`, `"cohesion"`, `"don't return null"`, `"managing
+dependencies"`, `"boundaries around third-party code"`, `"reversibility"` and
+`"parameterize from the outside"` all describe something the cited book
+genuinely covers — but none is the book's own name for it. Each was dropped;
+the source stayed.
+
+**The popularizer is not the coiner.** This is the subtler half, and it is the
+one the store exists to prevent, since a citation asserting a false origin
+reads as authoritative and nothing downstream can check it.
+
+| Pointer | Was cited to | Actually coined by |
+| --- | --- | --- |
+| design by contract | The Pragmatic Programmer | Bertrand Meyer |
+| command-query separation | Clean Code | Bertrand Meyer |
+| the Anemic Domain Model | Domain-Driven Design | Martin Fowler |
+| the Law of Demeter | The Pragmatic Programmer | Lieberherr et al. |
+
+Each book does discuss the idea, so each remains a source; only the pointer
+went. Note that `command-query separation` is also the audit's declined
+candidate above — the misattribution is independent of that decision and would
+have been wrong either way.
+
+Result: 35 concepts still cited, 53 sources, 29 pointers — every one of them a
+term its book actually coined. When the coiner is uncertain, the pointer is
+omitted: a source without one costs a reader nothing.

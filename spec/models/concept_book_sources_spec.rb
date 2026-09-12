@@ -84,17 +84,33 @@ RSpec.describe ConceptBookSources do
       private def build_connection = nil
     end
     service = double_class.new("key")
-    config  = service.send(:config_for, "ruby_rails")
     titles  = described_class::SOURCES.values.flatten.map { |source| source[:title] }.uniq
 
-    described_class::SOURCES.each_key do |concept|
-      next unless AiService::RAILS_CONCEPTS.include?(concept)
+    # Every vocabulary, not just the Rails one: SOURCES also keys architecture,
+    # plan-review, ambiguity-hunt and pseudocode concepts, and a leak reached
+    # through any of their configs would be the same leak. Derived from
+    # LANGUAGE_CONFIG so a seventh bucket is covered without editing this.
+    AiService::LANGUAGE_CONFIG.each do |language, config|
+      described_class::SOURCES.each_key do |concept|
+        next unless config[:concepts].include?(concept)
 
-      prompt = service.send(:build_concept_reference_prompt, concept, config)
+        prompt = service.send(:build_concept_reference_prompt, concept, config)
 
-      titles.each do |title|
-        expect(prompt).not_to include(title), "#{concept}'s reference prompt carries #{title}"
+        titles.each do |title|
+          expect(prompt).not_to include(title),
+            "#{concept}'s #{language} reference prompt carries #{title}"
+        end
       end
     end
+  end
+
+  # What makes the loop above provably exhaustive rather than merely wide: a
+  # citation keyed on a concept no vocabulary holds would be skipped by every
+  # iteration and silently pass. Subsumes the tracked-vocabulary check above,
+  # and states the stronger property.
+  it "keys every entry on a concept some LANGUAGE_CONFIG vocabulary holds" do
+    covered = AiService::LANGUAGE_CONFIG.values.flat_map { |config| config[:concepts] }.uniq
+
+    expect(described_class::SOURCES.keys - covered).to be_empty
   end
 end

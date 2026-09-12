@@ -14,7 +14,20 @@
 #   "DRY", "Bounded Context"). Never a chapter number and never a page — a
 #   number recalled rather than checked is a fabrication that reads as
 #   authoritative. Where a book has no coined term for the idea, the field is
-#   omitted rather than invented.
+#   omitted rather than invented: a source with no pointer costs a reader
+#   nothing, and a wrong one costs the whole store its credibility.
+#
+#   Only the no-digit half of that is machine-checkable, and the first draft of
+#   this file broke the rest of it twice over, so both failures are recorded
+#   here rather than left to be rediscovered. The first was writing a topic
+#   where a term was required ("clean tests", "shared state", "functions should
+#   do one thing") — the book covers it, but those are not its words for it.
+#   The second is subtler and is the one to watch for: attributing a term to
+#   the book that POPULARIZED it rather than the one that coined it. Design by
+#   contract and command-query separation are Meyer's, the Law of Demeter is
+#   Lieberherr's, the Anemic Domain Model is Fowler's — every one of those was
+#   briefly cited here to a book that merely discusses it. When in doubt about
+#   who coined a term, the pointer is omitted.
 # - Never a quotation or a close paraphrase. This is a pointer to go read the
 #   book, not a substitute for reading it.
 # - A concept's sources are listed origin-first, so the book that introduced
@@ -40,58 +53,58 @@ module ConceptBookSources
       source(DDD, "Aggregates and the aggregate root")
     ],
     "api_versioning" => [
-      source(PRAGMATIC, "reversibility")
+      source(PRAGMATIC)
     ],
     "array_mutation_pitfalls" => [
       source(REFACTORING, "the Mutable Data smell")
     ],
     "build_vs_buy" => [
-      source(PRAGMATIC, "reversibility"),
-      source(CLEAN_CODE, "boundaries around third-party code")
+      source(PRAGMATIC),
+      source(CLEAN_CODE)
     ],
     "composition_over_inheritance" => [
       source(POODR),
       source(REFACTORING, "the Refused Bequest smell")
     ],
     "concurrency" => [
-      source(PRAGMATIC, "shared state")
+      source(PRAGMATIC)
     ],
     "conflated_responsibilities" => [
-      source(CLEAN_CODE, "functions should do one thing")
+      source(CLEAN_CODE)
     ],
     "coupling_cohesion" => [
       source(PRAGMATIC, "orthogonality"),
-      source(CLEAN_CODE, "cohesion")
+      source(CLEAN_CODE)
     ],
     "dependency_inversion" => [
-      source(POODR, "managing dependencies"),
-      source(CLEAN_CODE, "boundaries around third-party code"),
+      source(POODR),
+      source(CLEAN_CODE),
       source(DDD, "the Anticorruption Layer")
     ],
     "error_handling" => [
       source(PRAGMATIC, "crash early"),
-      source(CLEAN_CODE, "don't return null")
+      source(CLEAN_CODE)
     ],
     "event_driven_vs_request_response" => [
       source(DDD, "Domain Events")
     ],
     "feature_envy" => [
       source(REFACTORING, "the Feature Envy, Message Chains and Insider Trading smells"),
-      source(DDD, "the Anemic Domain Model"),
-      source(PRAGMATIC, "the Law of Demeter")
+      source(DDD),
+      source(PRAGMATIC)
     ],
     "god_object" => [
       source(REFACTORING, "the Large Class and Divergent Change smells"),
-      source(CLEAN_CODE, "classes should be small")
+      source(CLEAN_CODE)
     ],
     "missing_constraint" => [
-      source(PRAGMATIC, "design by contract")
+      source(PRAGMATIC)
     ],
     "open_closed" => [
       source(REFACTORING, "the Repeated Switches smell")
     ],
     "over_mocking" => [
-      source(CLEAN_CODE, "clean tests")
+      source(CLEAN_CODE)
     ],
     "pass_through_method" => [
       source(APOSD, "shallow modules"),
@@ -108,14 +121,14 @@ module ConceptBookSources
       source(DDD, "the Repository pattern")
     ],
     "reading_for_intent" => [
-      source(CLEAN_CODE, "meaningful names"),
+      source(CLEAN_CODE),
       source(REFACTORING, "the Mysterious Name smell")
     ],
     "scope_creep" => [
       source(REFACTORING, "the Speculative Generality smell")
     ],
     "semantic_input_validation" => [
-      source(PRAGMATIC, "design by contract"),
+      source(PRAGMATIC),
       source(DDD, "the Anticorruption Layer")
     ],
     "separating_symptom_from_cause" => [
@@ -126,7 +139,7 @@ module ConceptBookSources
     ],
     "shallow_module" => [
       source(APOSD, "deep and shallow modules"),
-      source(CLEAN_CODE, "function arguments"),
+      source(CLEAN_CODE),
       source(REFACTORING, "the Lazy Element smell")
     ],
     "shotgun_surgery" => [
@@ -137,27 +150,27 @@ module ConceptBookSources
       source(PRAGMATIC, "programming by coincidence")
     ],
     "testing_implementation_not_behavior" => [
-      source(CLEAN_CODE, "clean tests")
+      source(CLEAN_CODE)
     ],
     "transaction_safety" => [
-      source(PRAGMATIC, "shared state")
+      source(PRAGMATIC)
     ],
     "ubiquitous_language" => [
       source(DDD, "the Ubiquitous Language")
     ],
     "undefined_failure_path" => [
       source(PRAGMATIC, "crash early"),
-      source(CLEAN_CODE, "error handling")
+      source(CLEAN_CODE)
     ],
     "unjustified_constant" => [
-      source(PRAGMATIC, "parameterize from the outside")
+      source(PRAGMATIC)
     ],
     "unstated_mutation" => [
       source(REFACTORING, "the Mutable Data and Temporary Field smells"),
-      source(CLEAN_CODE, "command-query separation")
+      source(CLEAN_CODE)
     ],
     "validations" => [
-      source(PRAGMATIC, "design by contract")
+      source(PRAGMATIC)
     ]
   }.freeze
 
