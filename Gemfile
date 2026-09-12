@@ -25,6 +25,10 @@ gem "resend"
 
 # Offset pagination for the History page (HistoryController)
 gem "pagy", "~> 43.6"
+# Slices RealSource method excerpts out of their files by AST position.
+# Declared, not left to irb's transitive dependency: a production boot never
+# requires it on its own, and a Rails upgrade could drop that path silently.
+gem "prism", "~> 1.9"
 
 # VAPID-signed Web Push delivery for the daily reminder (PushDelivery).
 # The reminder is best-effort: the gem is only ever reached from a background

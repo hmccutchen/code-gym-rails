@@ -48,11 +48,20 @@ RSpec.describe ProblemSetIngest do
       expect(set["code_review"]["source"]).to eq(excerpt.id)
     end
 
-    it "touches nothing on a toy day" do
+    it "leaves the provider's scenario alone on a toy day" do
       set = grounded({ "code_review" => { "concept" => "memoization", "scenario" => "inventory restocking service" } },
                      source: nil)
 
       expect(set["code_review"]["scenario"]).to eq("inventory restocking service")
+      expect(set["code_review"]).not_to have_key("source")
+    end
+
+    # The trace is server-owned: a provider that emits a `source` key on a toy
+    # day must not be able to mark an excerpt as seen for a set that never
+    # showed it.
+    it "strips a provider-supplied source on a toy day" do
+      set = grounded({ "code_review" => { "concept" => "memoization", "source" => excerpt.id } }, source: nil)
+
       expect(set["code_review"]).not_to have_key("source")
     end
   end

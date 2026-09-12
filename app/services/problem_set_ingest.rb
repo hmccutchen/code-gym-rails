@@ -314,14 +314,24 @@ class ProblemSetIngest
   # ask and invents a business domain would leave the page saying something
   # untrue about deployed code. `source` is the trace RealSource.last_seen_for
   # reads back: code_review_mode itself is never persisted, so this is the
-  # only record of what was grounded. Runs after reject_missing_sections!,
-  # which has already refused a set whose code_review is not a section.
+  # only record of what was grounded — so only the server may write it. A toy
+  # day deletes whatever the provider put there rather than leaving it, or a
+  # model that happened to emit a `source` key would mint a trace for an
+  # excerpt this set never showed. In production code_review is always
+  # present — ExerciseSection.for_plan never omits it — but ingest is also
+  # called on partial sets, and a set with no code_review has no trace to
+  # strip or stamp.
   def ground_code_review!
-    return if @code_review_source.nil?
+    return unless ExerciseSection.present?(@problem_set, "code_review")
 
     section = @problem_set["code_review"]
-    section["scenario"] = @code_review_source.scenario
-    section["source"]   = @code_review_source.id
+
+    if @code_review_source.nil?
+      section.delete("source")
+    else
+      section["scenario"] = @code_review_source.scenario
+      section["source"]   = @code_review_source.id
+    end
   end
 
   # The provider returns "blocks" already in correct order, so the scramble is

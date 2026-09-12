@@ -28,9 +28,13 @@ never a branch in shared code.
 call, and it guarantees the excerpt is exactly what is currently deployed.
 
 **Scoping is by method name, resolved with Prism.** A `Method` entry names
-`path` and `method`; at read time the file is parsed with Prism (bundled with
-Ruby 3.3, already in the lockfile — no new dependency) and the first `def`
-with that name is sliced out by its exact start/end line. Line ranges were
+`path` and `method`; at read time the file is parsed with Prism and the first
+`def` with that name is sliced out by its exact start/end line. Prism was
+already in the lockfile, but only as `irb`'s transitive dependency — nothing
+in a production boot requires it, so the first pick in a Puma process raised
+`NameError` (caught in review). `real_source.rb` now requires it explicitly
+and the Gemfile declares it: no new install, but a dependency the app owns
+rather than one it borrowed from a console gem a Rails upgrade could drop. Line ranges were
 rejected: every unrelated edit above a method would shift them, silently
 handing the exercise the wrong lines. A method name survives edits elsewhere
 in the file and only breaks when the method itself is renamed or removed —

@@ -1,3 +1,10 @@
+# Required here rather than trusted to be present: nothing in a production
+# boot loads it — only irb, debug, and the lint tooling do, none of which a
+# Puma process touches — so without this line the first real-source pick
+# raised NameError. A spec loads this file in a production-only bundle to pin
+# it.
+require "prism"
+
 # Curated excerpts of Code Gym's own source that a code_review may be grounded
 # in, in the same shape as ExerciseSection: closed Ruby lists, one class per
 # kind of excerpt, and nothing eligible unless deliberately added here. The

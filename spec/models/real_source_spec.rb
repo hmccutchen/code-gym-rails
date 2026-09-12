@@ -30,6 +30,20 @@ RSpec.describe RealSource do
     end
   end
 
+  # In this process Prism is always already loaded — irb, debug and the lint
+  # tooling all require it — which is exactly how the missing require in this
+  # file went unnoticed until a production boot. So the check has to happen
+  # in a process with none of that: a production-only bundle, no Rails, just
+  # this one file. The class references Rails only inside method bodies, so
+  # the bare require succeeds either way; only Prism's presence differs.
+  it "loads Prism itself rather than relying on tooling to have done so" do
+    output = Bundler.with_unbundled_env do
+      `cd #{Rails.root} && BUNDLE_WITHOUT=development:test bundle exec ruby -e 'require "./app/models/real_source"; print defined?(Prism)' 2>&1`
+    end
+
+    expect(output).to eq("constant")
+  end
+
   describe RealSource::Method do
     let(:excerpt) { described_class.new("app/services/weighted_roll.rb", "pick") }
 
