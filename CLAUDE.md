@@ -783,6 +783,14 @@ CLI (cached on `spec/playwright/package-lock.json`), while the `test` job runs
 everything else via `--exclude-pattern "system/**/*_spec.rb"` — the two halves
 run in parallel so unit/request feedback isn't gated behind browser setup.
 
+`spec/support/real_source_default.rb` pins `DailyPlan`'s real-source sub-roll
+to `:toy` for every example; a spec that exercises the grounded `code_review`
+path opts out with its own `:real` stub. The mode roll is deliberately *not*
+pinned this way — it only changes the prompt, so a canned response comes back
+through ingest identical either way — but the real-source roll changes what
+ingest stamps onto the set, and without the default every example asserting
+on a delivered set is nondeterministic at the roll's weight.
+
 CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
 
 ## File Map

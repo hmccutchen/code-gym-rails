@@ -1765,7 +1765,6 @@ RSpec.describe AiService do
     it "leaves problem sets without a parsons_problem section untouched" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
       set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => {},
               "architecture" => {}, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
@@ -1819,7 +1818,6 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
     end
@@ -1863,7 +1861,6 @@ RSpec.describe AiService do
       svc = spy_class.new(canned_text: set.to_json)
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       svc.generate_exercise(user, language: "ruby_rails")
 
@@ -1904,7 +1901,6 @@ RSpec.describe AiService do
         svc = spy_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" }).to_json)
         allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: third, fourth: :plan_review)
         allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
-        allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
         svc.generate_exercise(user, language: "ruby_rails")
         captured_prompt
@@ -2000,7 +1996,6 @@ RSpec.describe AiService do
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       logged = []
       allow(Rails.logger).to receive(:info) do |msg|
@@ -2110,7 +2105,6 @@ RSpec.describe AiService do
     it "threads the rolled mode into both the prompt and the diagnostics payload" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
-      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       set = full_problem_set("code_review" => { "concept" => "missing_index" })
       svc = double_class.new(canned_text: set.to_json)
@@ -3651,7 +3645,6 @@ RSpec.describe AiService do
       allow(DailyPlan).to receive(:for).and_call_original
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :ambiguity_hunt)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
 
       svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },

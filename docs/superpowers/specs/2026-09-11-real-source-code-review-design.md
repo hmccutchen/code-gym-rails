@@ -225,6 +225,8 @@ out: one line, nothing structural to plant.
 
 ## Tests
 
+**The suite pins the sub-roll to `:toy` by default** (`spec/support/real_source_default.rb`), and an example that exercises the grounded path opts out with its own `:real` stub. This is not how the mode roll is handled — mode is left random and only the examples that care pin it — and the difference is deliberate: the mode roll changes only the prompt, so a canned provider response comes back through ingest identical either way, whereas the real-source roll changes what ingest *stamps*. Every pre-existing example asserting on a delivered set became nondeterministic at 35% the moment the roll existed; the first full run under it failed one such example, and a 12-run loop reproduced the flake at 5/12. A per-example pin would have been one pin per `generate_exercise` call (thirty in `ai_service_spec` alone) and a trap for the next test author.
+
 - `spec/models/real_source_spec.rb` — every entry resolves and sits inside the
   line bounds (the drift guard); ids are unique; `Method` slices exactly
   `def`..`end`; `Migration` returns the whole file; pick honours never-seen →
