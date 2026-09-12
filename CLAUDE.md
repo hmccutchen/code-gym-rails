@@ -504,14 +504,35 @@ the row was the featured concept, and nil means it never has been.
   opens.** `ConceptReference` has no `user_id` — it's a shared, team-wide cache
   keyed on `(concept, language)`, so the first person to run the backfill pays
   for everyone and every later teammate pays almost nothing. Roughly $0.02 per
-  concept against `claude-sonnet-5`, so roughly $1.50 for one user's
-  ~74-concept slice — estimates from prompt shape, not measurements, and
-  checkable against `ApiUsage` rows under
+  concept against `claude-sonnet-5`, so a couple of dollars for one user's
+  whole slice, growing with it — no count is quoted here on purpose, since the
+  last one went stale the first time a vocabulary grew. The rate is an estimate
+  from prompt shape rather than a measurement, and both it and the slice's size
+  are checkable against `ApiUsage` rows under
   `purpose: "generate_concept_reference"`. The "seen in your sets" marker
   derives from `User#concept_exposure_count` (submitted responses only), never
   from `ConceptMastery`: tier is kept invisible everywhere by design, and a
   marker sourced from it would be exactly the readout the post-hoc difficulty
   rating went to lengths to avoid becoming.
+- **Book citations**: `ConceptBookSources` maps a concept to an ARRAY of
+  reading pointers — title, author, and where the book has one, the term the
+  book itself coined — rendered as "Where this comes from" at the bottom of a
+  `LearnController#show` page and nowhere else. Static and hand-curated, like
+  `Glossary`: **it is never sent to a provider, and that is the whole design.**
+  A generated citation is a hallucinated one, and a `ConceptReference` row is
+  cached forever, so the guarantee has to be that no prompt can reach the data
+  rather than that a prompt is asked to behave — a spec pins that no source
+  title appears in the concept-reference prompt. `CONCEPT_REFERENCE_FIELDS` and
+  `CONCEPT_GUIDE_FIELDS` are deliberately untouched by it, since widening
+  either would silently change `#explain_concept_differently`'s prompt and the
+  required-field check. Array-valued from the first commit rather than promoted
+  later: `shotgun_surgery` carries two sources on day one. A citation is
+  additive metadata — adding one never changes a concept's definition or its
+  grading criteria. The rule nothing mechanical can enforce: a pointer names a
+  term the book coined, never a chapter or page number, because a number
+  recalled rather than checked is a fabrication that reads as authoritative.
+  Audit behind the current entries:
+  `docs/superpowers/specs/2026-09-12-four-book-concept-audit.md`.
 - **The daily featured concept**: one concept surfaced each day, the same one
   for the whole team — `ConceptReference.featured`, read at the top of `/learn`
   and as a small callout on the dashboard. **Global, not per-user**, because
@@ -839,6 +860,9 @@ CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml
 - `app/views/shared/_featured_concept.html.erb` — the daily featured concept's
   one rendering, shared by the Learn tab and the dashboard; its styles live in
   the layout for that reason, like `responses/_answered_sections`
+- `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
+  book pointers a Learn page renders under "Where this comes from". Closed,
+  array-valued, and never read by any prompt — extend it by adding a line
 - `app/models/concept_group.rb` — `ConceptGroup`: which display group a
   concept renders under on the Learn index, and the order groups appear in.
   Display-only, derived from `AiService`'s named vocabulary constants rather

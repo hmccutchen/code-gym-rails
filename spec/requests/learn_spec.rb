@@ -156,6 +156,31 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).to include("PLAIN LANGUAGE", "WORKED EXAMPLE", "PITFALLS")
     end
 
+    it "lists a cited concept's book sources" do
+      full_reference
+      get learn_concept_path(bucket: "ruby_rails", concept: "shotgun_surgery")
+
+      expect(response.body).to include(I18n.t("learn.sources"))
+      ConceptBookSources.for("shotgun_surgery").each do |source|
+        expect(response.body).to include(source[:title], source[:author])
+      end
+    end
+
+    # A citation is static, so it does not wait on a reference the team has
+    # never generated.
+    it "lists the sources even with no reference row at all" do
+      get learn_concept_path(bucket: "ruby_rails", concept: "shotgun_surgery")
+
+      expect(response.body).to include(I18n.t("learn.sources"))
+    end
+
+    it "renders no sources heading for an uncited concept" do
+      full_reference
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.body).not_to include(I18n.t("learn.sources"))
+    end
+
     it "renders a legacy row's reference with a control to write the guide" do
       ConceptReference.create!(
         concept: "n_plus_one", language: "ruby_rails",

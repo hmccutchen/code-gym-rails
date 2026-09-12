@@ -423,6 +423,39 @@ class AiService
     deterministic_ordering
   ].freeze
 
+  # The two words a model can get wrong before any of it runs: what a thing is
+  # CALLED, and which things must change TOGETHER. That is the group's
+  # identity, and it is what separates these from the five groups above — the
+  # code smells name a shape, the design principles a rule, the module-design
+  # concepts an interface's cost, the silent-correctness concepts a broken
+  # invariant, and the language vocabularies a remedy, but nothing named the
+  # model's own vocabulary or its consistency boundaries.
+  #
+  # Shared across both languages rather than split, like the four groups above:
+  # a table named for a word the business does not use is the same defect as a
+  # store slice named for one, and an aggregate boundary is drawn the same way
+  # whether the writes are ActiveRecord or a reducer. Deliberately outside
+  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code — a
+  # naming collision is only convincing when you can see both classes.
+  #
+  # These are disciplines to reach for (name it as the domain names it, make
+  # one object the entry point for a set of writes), so they stay off
+  # ANTI_SHAPE_CONCEPTS, and off TRADEOFF_CONCEPTS because neither has two
+  # defensible sides — their reference gets the failure-mode-then-fix contrast.
+  #
+  # Four neighbours the names sit close to, recorded because a reader will ask.
+  # ubiquitous_language is NOT reading_for_intent: that one is code whose
+  # behavior diverges from its evident purpose, this is code that does exactly
+  # what it says under a word the domain does not use. It is not
+  # primitive_obsession either — a missing type, not a wrong word.
+  # aggregate_boundaries is NOT transaction_safety, which is the mechanics of
+  # wrapping writes; this is WHICH writes belong in one, and which object is
+  # the only legal way in. Nor is it data_ownership, which asks which service
+  # owns data rather than which object.
+  DOMAIN_MODELING_CONCEPTS = %w[
+    ubiquitous_language aggregate_boundaries
+  ].freeze
+
   # The architecture-level causes of complexity, kept as their own constant
   # because ANTI_SHAPE_CONCEPTS below has to name them and ARCHITECTURE_CONCEPTS
   # is defined further down.
@@ -445,7 +478,7 @@ class AiService
     error_handling mass_assignment_protection sql_injection_prevention
     over_mocking testing_implementation_not_behavior
   ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
-    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS).freeze
+    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS + DOMAIN_MODELING_CONCEPTS).freeze
 
   JS_CONCEPTS = (%w[
     callback_hell promise_chaining closures prototype_chain event_loop_blocking
@@ -455,7 +488,7 @@ class AiService
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
     over_mocking testing_implementation_not_behavior
   ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
-    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS).freeze
+    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS + DOMAIN_MODELING_CONCEPTS).freeze
 
   # The exact subset security_review draws from — never the full language
   # vocabulary. Each concept gets reinforced through two reasoning modes on
@@ -1506,6 +1539,7 @@ class AiService
       #{oo_design_violation_guidance}
       #{module_design_depth_guidance}
       #{silent_correctness_guidance}
+      #{domain_modeling_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       #{retention_block}
@@ -1654,6 +1688,34 @@ class AiService
       "exception to the answer shape, since its answer is code: there starter_code carries the defect and the " \
       "question asks for the version that holds the invariant, so writing the correct distribution, key, or " \
       "ordering IS the answer."
+  end
+
+  # Both concepts are judgments about the MODEL rather than about a result, so
+  # this group shares the failure mode the design principles and module-design
+  # concepts have: a section with nothing missable in it. code_review and
+  # challenge carry no section_grading_note and the generic rubric has nothing
+  # to put in "missed". Stated once for every section, like the other five
+  # group rules, because it is a rule about the concept and not about any one
+  # kind.
+  def domain_modeling_guidance
+    "- The domain-modeling concepts (#{DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
+      "which things must change together, not a defect in what the code computes. A section tagged with one must " \
+      "contain exactly one specific, findable instance and be gradeable against it, and the answer is naming the " \
+      "instance and saying which future change it makes wrong or expensive, rather than a rewrite of the model. " \
+      "For ubiquitous_language the scenario must establish the domain's own word before the code contradicts it — " \
+      "a stated booking process whose model is called Order, or one word covering two different things — and the " \
+      "code must otherwise do exactly what its names claim, which is what keeps this apart from reading_for_intent " \
+      "(code diverging from its evident purpose) and from primitive_obsession (a missing type, not a wrong word). " \
+      "For aggregate_boundaries plant one write path that leaves two rows disagreeing because no single object " \
+      "owns the set, or a caller reaching past the owner to update a member directly; it is never about whether a " \
+      "transaction was opened, which is transaction_safety, nor about which service owns the data, which is " \
+      "data_ownership. Express it in the host section's own idiom: a pattern, which shows no code, describes the " \
+      "model in the domain's words and asks which name is overloaded or which writes must not be separable; on a " \
+      "test-file code_review the planted test smell must BE the instance rather than sit beside it — a test whose " \
+      "own setup names the same thing two ways, or one that builds a member row the aggregate's rules forbid on " \
+      "its own. The challenge section is the exception to the answer shape, since its answer is code: there " \
+      "starter_code carries the instance and the question asks for the renamed or re-bounded version, so writing " \
+      "it IS the answer rather than describing it."
   end
 
   # A kind's generation instructions. The vocabulary comes from

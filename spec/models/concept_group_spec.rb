@@ -11,6 +11,7 @@ RSpec.describe ConceptGroup do
       expect(described_class.for("open_closed")).to eq("oo_design")
       expect(described_class.for("shallow_module")).to eq("module_design")
       expect(described_class.for("missing_index")).to eq("data_modeling")
+      expect(described_class.for("ubiquitous_language")).to eq("domain_modeling")
       expect(described_class.for("reading_for_intent")).to eq("meta_skill")
     end
 

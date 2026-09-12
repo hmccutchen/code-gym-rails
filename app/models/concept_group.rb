@@ -14,6 +14,7 @@ class ConceptGroup
   # lookup stays total rather than depending on that staying true.
   NAMED = [
     [ "data_modeling",      AiService::DATA_MODELING_CONCEPTS ],
+    [ "domain_modeling",    AiService::DOMAIN_MODELING_CONCEPTS ],
     [ "silent_correctness", AiService::SILENT_CORRECTNESS_CONCEPTS ],
     [ "meta_skill",         AiService::META_SKILL_CONCEPTS ],
     [ "code_smell",         AiService::CODE_SMELL_CONCEPTS ],
