@@ -58,8 +58,19 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # for it is evidence that it sits on a different axis from the other three
     # (algorithmic rather than invariant-spotting), and the fix is to regroup
     # if that ever matters, not to special-case one consumer.
+    #
+    # The domain-modeling concepts fail on the axis the OO and module-design
+    # groups do. A positional diff measures where lines sit; it cannot measure
+    # whether a name matches the word the domain uses, and a
+    # ubiquitous_language section needs the domain's own wording established
+    # around the code before the collision is visible at all — there is no
+    # room for that in a pile of blocks. aggregate_boundaries fails more
+    # sharply still: its defect is a write path reaching past the object that
+    # owns a set of rows, and every permutation of the same blocks performs
+    # the same writes.
     def excluded_vocabulary_keys
-      [ :data_modeling, :meta_skill, :code_smell, :oo_design, :module_design, :silent_correctness ]
+      [ :data_modeling, :domain_modeling, :meta_skill, :code_smell, :oo_design, :module_design,
+        :silent_correctness ]
     end
 
     # The answer is an ordering, not prose: a draggable, keyboard-reorderable

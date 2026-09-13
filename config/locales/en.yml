@@ -47,6 +47,7 @@ en:
     worked_example: "Worked example"
     pitfalls: "What people get wrong"
     senior_lens: "How a senior sees it"
+    sources: "Where this comes from"
     no_guide: "There's no full guide for this one yet."
     write_guide: "Write this up"
     writing_guide: "Writing it up — this takes a few seconds."
@@ -71,6 +72,7 @@ en:
     groups:
       core: "Core"
       data_modeling: "Data modeling"
+      domain_modeling: "Domain modeling"
       silent_correctness: "Silent correctness"
       meta_skill: "Reading and reasoning"
       code_smell: "Code smells"

@@ -99,10 +99,13 @@ RSpec.describe ExerciseSection do
     # "this class is doing four jobs" — and neither a principle nor a module
     # boundary has a right or wrong block ORDER — nor does a wrong unit, an
     # incomplete cache key, or a missing tiebreak, each of which is one wrong
-    # VALUE rather than a misplaced line. See the comment on ParsonsProblem.
-    it "withholds the data-modeling, meta-skill, code-smell, OO-design, module-design, and silent-correctness groups from parsons_problem" do
+    # VALUE rather than a misplaced line — nor a name the domain does not use,
+    # nor a write path that every permutation performs identically. See the
+    # comment on ParsonsProblem.
+    it "withholds the seven non-sequential groups from parsons_problem" do
       expect(ExerciseSection::ParsonsProblem.excluded_vocabulary_keys)
-        .to eq([ :data_modeling, :meta_skill, :code_smell, :oo_design, :module_design, :silent_correctness ])
+        .to eq([ :data_modeling, :domain_modeling, :meta_skill, :code_smell, :oo_design, :module_design,
+                 :silent_correctness ])
     end
   end
 

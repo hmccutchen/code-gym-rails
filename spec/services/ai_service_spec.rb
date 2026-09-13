@@ -351,8 +351,8 @@ RSpec.describe AiService do
   end
 
   describe "RAILS_CONCEPTS" do
-    it "is a frozen 42-entry vocabulary" do
-      expect(AiService::RAILS_CONCEPTS.size).to eq(42)
+    it "is a frozen 44-entry vocabulary" do
+      expect(AiService::RAILS_CONCEPTS.size).to eq(44)
       expect(AiService::RAILS_CONCEPTS).to be_frozen
       expect(AiService::RAILS_CONCEPTS).to include("n_plus_one", "transaction_safety", "error_handling")
     end
@@ -371,8 +371,8 @@ RSpec.describe AiService do
   end
 
   describe "JS_CONCEPTS" do
-    it "is a frozen 44-entry vocabulary" do
-      expect(AiService::JS_CONCEPTS.size).to eq(44)
+    it "is a frozen 46-entry vocabulary" do
+      expect(AiService::JS_CONCEPTS.size).to eq(46)
       expect(AiService::JS_CONCEPTS).to be_frozen
       expect(AiService::JS_CONCEPTS).to include("closures", "prototype_chain", "hooks_dependencies")
     end
@@ -718,6 +718,123 @@ RSpec.describe AiService do
 
       expect(prompt).to include(service.send(:silent_correctness_guidance))
       expect(prompt.scan("The silent-correctness concepts").size).to eq(1)
+    end
+  end
+
+  describe "DOMAIN_MODELING_CONCEPTS" do
+    it "names the two model-level concepts the four-book audit found uncovered" do
+      expect(AiService::DOMAIN_MODELING_CONCEPTS)
+        .to contain_exactly("ubiquitous_language", "aggregate_boundaries")
+      expect(AiService::DOMAIN_MODELING_CONCEPTS).to be_frozen
+    end
+
+    it "is reachable from both language vocabularies" do
+      expect(AiService::RAILS_CONCEPTS).to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+      expect(AiService::JS_CONCEPTS).to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+    end
+
+    it "stays out of the language-agnostic vocabularies, so its references show real code" do
+      AiService::LANGUAGE_AGNOSTIC_VOCABULARIES.each do |vocabulary|
+        expect(vocabulary).not_to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+      end
+    end
+
+    # Both name a discipline to reach for — name it as the domain names it,
+    # make one object the entry point for a set of writes — so the remedy lens
+    # is the right one, the same call the design principles got.
+    it "stays off the anti-shape list, so its reference keeps the remedy lens" do
+      expect(AiService::ANTI_SHAPE_CONCEPTS).not_to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+    end
+
+    # Neither has two defensible sides, so the reference must contrast a
+    # failure mode with its fix. TRADEOFF_CONCEPTS' own classification gate
+    # only covers ARCHITECTURE_CONCEPTS, so nothing else would catch this —
+    # and a reference is generated once and cached forever.
+    it "takes the failure-mode contrast rather than the tradeoff one" do
+      expect(AiService::TRADEOFF_CONCEPTS).not_to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+
+      config = service.send(:config_for, "ruby_rails")
+      AiService::DOMAIN_MODELING_CONCEPTS.each do |concept|
+        prompt = service.send(:build_concept_reference_prompt, concept, config)
+
+        expect(prompt).to include("corrected version"), "#{concept} got the tradeoff contrast"
+      end
+    end
+
+    it "shares no entry with the fourth-slot or architecture vocabularies" do
+      [ AiService::ARCHITECTURE_CONCEPTS, AiService::PLAN_REVIEW_CONCEPTS,
+        AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::PSEUDOCODE_TO_CODE_CONCEPTS ].each do |vocabulary|
+        expect(vocabulary & AiService::DOMAIN_MODELING_CONCEPTS).to be_empty
+      end
+    end
+
+    it "shares no entry with the other shared language-vocabulary groups" do
+      [ AiService::DATA_MODELING_CONCEPTS, AiService::META_SKILL_CONCEPTS,
+        AiService::CODE_SMELL_CONCEPTS, AiService::OO_DESIGN_CONCEPTS,
+        AiService::MODULE_DESIGN_CONCEPTS, AiService::SILENT_CORRECTNESS_CONCEPTS ].each do |vocabulary|
+        expect(vocabulary & AiService::DOMAIN_MODELING_CONCEPTS).to be_empty
+      end
+    end
+  end
+
+  describe "#domain_modeling_guidance" do
+    let(:user) { User.create!(email: "domain@example.com", name: "Domain") }
+    let(:service) { FakeService.new("fake-key") }
+
+    it "names the group from the constant" do
+      expect(service.send(:domain_modeling_guidance)).to include(*AiService::DOMAIN_MODELING_CONCEPTS)
+    end
+
+    # The failure mode this group shares with the design principles and the
+    # module-design concepts: code_review and challenge carry no
+    # section_grading_note, so the generic rubric has nothing to put in
+    # "missed" unless the section contains something missable.
+    it "requires one specific findable instance rather than a topic to discuss" do
+      guidance = service.send(:domain_modeling_guidance)
+
+      expect(guidance).to match(/exactly one specific, findable instance/i)
+      expect(guidance).to match(/gradeable against it/i)
+    end
+
+    # Without the domain's own word on the page there is nothing for the code
+    # to contradict, and the section degenerates into "rename this variable".
+    it "requires the scenario to establish the domain's word before the code contradicts it" do
+      expect(service.send(:domain_modeling_guidance))
+        .to match(/establish the domain's own word before the code contradicts it/i)
+    end
+
+    # reading_for_intent shares a vocabulary line with ubiquitous_language on
+    # every day either can be tagged, and mastery is keyed on the tag rather
+    # than on what the section contained.
+    it "draws the line between ubiquitous_language and reading_for_intent" do
+      expect(service.send(:domain_modeling_guidance))
+        .to match(/keeps this apart from reading_for_intent/i)
+    end
+
+    it "draws the line between aggregate_boundaries and transaction_safety" do
+      expect(service.send(:domain_modeling_guidance))
+        .to match(/never about whether a transaction was opened, which is transaction_safety/i)
+    end
+
+    it "gives pattern and challenge their own answer shapes" do
+      guidance = service.send(:domain_modeling_guidance)
+
+      expect(guidance).to match(/a pattern, which shows no code/i)
+      expect(guidance).to match(/challenge section is the exception/i)
+    end
+
+    # The test_file code_review mode demands a planted test smell, so a group
+    # rule that does not say what the smell IS reads as a contradiction there.
+    it "gives the test-file code_review mode its own idiom" do
+      expect(service.send(:domain_modeling_guidance))
+        .to match(/on a test-file code_review the planted test smell must BE the instance/i)
+    end
+
+    it "is stated once in the generation prompt, for every section rather than per kind" do
+      prompt = service.send(:build_exercise_prompt, user, "ruby_rails")
+
+      expect(prompt).to include(service.send(:domain_modeling_guidance))
+      expect(prompt.scan("The domain-modeling concepts").size).to eq(1)
     end
   end
 

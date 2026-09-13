@@ -37,6 +37,21 @@
   <p>🔭 <%= @reference.senior_lens %></p>
 <% end %>
 
+<%# Outside the @reference gate on purpose: a citation is hand-curated static
+    data, so it is worth showing on a concept whose reference has never been
+    generated. ConceptBookSources is never sent to a provider — that is the
+    guarantee that a citation here cannot be a hallucinated one. %>
+<% if (sources = ConceptBookSources.for(@concept)).any? %>
+  <h2><%= t("learn.sources") %></h2>
+  <ul class="learn-sources">
+    <% sources.each do |source| %>
+      <li>
+        <em><%= source[:title] %></em> — <%= source[:author] %><%= " — #{source[:pointer]}" if source[:pointer] %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>
+
 <% if @reference&.guide? %>
   <%= render "shared/syntax_highlighting_script" %>
 <% else %>

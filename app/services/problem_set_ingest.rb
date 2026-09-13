@@ -109,6 +109,7 @@ class ProblemSetIngest
     ExerciseSection.for(section_key).excluded_vocabulary_keys.flat_map do |key|
       case key
       when :data_modeling then AiService::DATA_MODELING_CONCEPTS
+      when :domain_modeling then AiService::DOMAIN_MODELING_CONCEPTS
       when :meta_skill    then AiService::META_SKILL_CONCEPTS
       when :code_smell    then AiService::CODE_SMELL_CONCEPTS
       when :oo_design     then AiService::OO_DESIGN_CONCEPTS
