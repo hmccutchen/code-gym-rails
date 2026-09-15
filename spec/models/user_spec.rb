@@ -1339,4 +1339,93 @@ RSpec.describe User, type: :model do
       expect(user.reload.reminders_none?).to be(true)
     end
   end
+
+  describe "section kind preferences" do
+    it "starts with no stated preference at all" do
+      user = create_user_with_key
+
+      expect(user.section_kind_weights).to eq({})
+      expect(user.excluded_section_kinds).to eq([])
+    end
+
+    it "accepts a stated stop for a rotatable kind" do
+      user = create_user_with_key
+      user.section_kind_weights = { "challenge" => 0.25 }
+
+      expect(user).to be_valid
+    end
+
+    it "rejects a weight for a kind that does not compete for a slot" do
+      user = create_user_with_key
+      user.section_kind_weights = { "code_review" => 0.5 }
+
+      expect(user).not_to be_valid
+      expect(user.errors[:section_kind_weights]).to be_present
+    end
+
+    it "rejects a weight that is not one of the stops" do
+      user = create_user_with_key
+      user.section_kind_weights = { "challenge" => 3.0 }
+
+      expect(user).not_to be_valid
+      expect(user.errors[:section_kind_weights]).to be_present
+    end
+
+    it "rejects an exclusion naming an unknown kind" do
+      user = create_user_with_key
+      user.excluded_section_kinds = [ "nonsense" ]
+
+      expect(user).not_to be_valid
+      expect(user.errors[:excluded_section_kinds]).to be_present
+    end
+
+    it "allows excluding all but one kind in a slot" do
+      user = create_user_with_key
+      user.excluded_section_kinds = ExerciseSection.thirds.drop(1).map(&:key)
+
+      expect(user).to be_valid
+    end
+
+    # Excluding is per-kind curation, never a way to delete a whole slot: an
+    # empty slot would render fewer sections than SectionCount asked for, which
+    # lowers the completion mean, which shrinks the set again.
+    # The registry moves — pseudocode_to_code was added to it recently. If a
+    # kind is ever retired, every user still naming it must stay saveable, or
+    # generate_login_code!'s update! raises and login breaks for them.
+    it "still saves unrelated attributes when a stored kind has left the registry" do
+      user = create_user_with_key
+      user.update!(excluded_section_kinds: [ "parsons_problem" ])
+
+      allow(ExerciseSection).to receive(:rotatable)
+        .and_return(ExerciseSection.rotatable - [ ExerciseSection::ParsonsProblem ])
+
+      expect { user.generate_login_code! }.not_to raise_error
+    end
+
+    it "still validates a kind the user is actively changing" do
+      user = create_user_with_key
+
+      allow(ExerciseSection).to receive(:rotatable)
+        .and_return(ExerciseSection.rotatable - [ ExerciseSection::ParsonsProblem ])
+      user.excluded_section_kinds = [ "parsons_problem" ]
+
+      expect(user).not_to be_valid
+    end
+
+    it "refuses an exclusion that would empty a slot" do
+      user = create_user_with_key
+      user.excluded_section_kinds = ExerciseSection.thirds.map(&:key)
+
+      expect(user).not_to be_valid
+      expect(user.errors[:excluded_section_kinds].join).to include("third")
+    end
+
+    it "refuses an exclusion that would empty the fourth slot" do
+      user = create_user_with_key
+      user.excluded_section_kinds = ExerciseSection.fourths.map(&:key)
+
+      expect(user).not_to be_valid
+      expect(user.errors[:excluded_section_kinds].join).to include("fourth")
+    end
+  end
 end

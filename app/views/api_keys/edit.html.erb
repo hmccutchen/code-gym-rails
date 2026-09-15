@@ -10,6 +10,14 @@
   .form-field select { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
   .form-field select:focus { outline: none; border-color: var(--accent); }
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
+  .mix-group { border: 1px solid var(--border); border-radius: 6px; padding: .75rem; margin-bottom: .75rem; }
+  .mix-group legend { font-size: .8rem; color: var(--muted); padding: 0 .35rem; }
+  .mix-row { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; align-items: center; margin-bottom: .6rem; }
+  .mix-row input[type="range"] { grid-column: 1 / -1; width: 100%; }
+  .mix-row output { font-size: .8rem; color: var(--muted); }
+  .mix-row input[type="range"]:disabled { opacity: .4; }
+  .mix-exclude { font-size: .8rem; color: var(--muted); }
+  .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
 </style>
 
 <div class="setup-wrap">
@@ -59,6 +67,48 @@
     <p class="hint">Shorter sets after days you don't finish, back to four as you do. Off means always four sections.</p>
   </div>
 
+  <details class="form-field" id="exercise-mix">
+    <summary><%= t("exercise_mix.summary") %></summary>
+    <p class="hint"><%= t("exercise_mix.intro") %></p>
+
+    <div class="mix-note">
+      <strong><%= t("exercise_mix.exclude_heading") %></strong>
+      <p class="hint"><%= t("exercise_mix.exclude_body_weak") %></p>
+      <p class="hint"><%= t("exercise_mix.exclude_body_strong") %></p>
+      <p class="hint"><%= t("exercise_mix.exclude_body_frequency") %></p>
+    </div>
+
+    <%# Derived from the slot roster, like ExerciseSection.rotatable and the
+        User validations: a slot holding one candidate has nothing to bias, and
+        a future multi-kind slot gets its controls without an edit here. %>
+    <% ExerciseSection.slots.select { |_, kinds| kinds.size > 1 }.each do |slot, kinds| %>
+      <fieldset class="mix-group">
+        <legend><%= t("exercise_mix.#{slot}_group") %></legend>
+
+        <% kinds.each do |kind| %>
+          <%
+            stored   = current_user.section_kind_weights[kind.key]
+            index    = KindPreferences::MULTIPLIERS.index(stored) || KindPreferences::MULTIPLIERS.index(KindPreferences::DEFAULT_MULTIPLIER)
+            excluded = current_user.excluded_section_kinds.include?(kind.key)
+          %>
+          <div class="mix-row" data-kind="<%= kind.key %>">
+            <label for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
+            <input type="range" id="weight-<%= kind.key %>" min="0" max="<%= KindPreferences::MULTIPLIERS.size - 1 %>" step="1"
+                   value="<%= index %>" <%= "disabled" if excluded %>
+                   aria-describedby="weight-label-<%= kind.key %>">
+            <output id="weight-label-<%= kind.key %>"><%= t("exercise_mix.stops")[index] %></output>
+            <label class="mix-exclude" for="exclude-<%= kind.key %>">
+              <input type="checkbox" id="exclude-<%= kind.key %>" <%= "checked" if excluded %>>
+              <%= t("exercise_mix.exclude_label") %>
+            </label>
+          </div>
+        <% end %>
+
+        <p class="hint mix-last-note" hidden><%= t("exercise_mix.last_in_slot") %></p>
+      </fieldset>
+    <% end %>
+  </details>
+
   <script>
     (function () {
       // Optional-chained because Rails renders no csrf meta tag when forgery
@@ -82,6 +132,72 @@
 
       const adaptive = document.getElementById("adaptive-set-size");
       if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }));
+
+      const STOPS  = <%= raw KindPreferences::MULTIPLIERS.to_json %>;
+      const DEFAULT_STOP = <%= raw KindPreferences::DEFAULT_MULTIPLIER.to_json %>;
+      const LABELS = <%= raw t("exercise_mix.stops").to_json %>;
+      const mix    = document.getElementById("exercise-mix");
+
+      if (mix) {
+        const rows = Array.from(mix.querySelectorAll(".mix-row"));
+
+        const state = () => {
+          const weights = {};
+          const excluded = [];
+
+          rows.forEach((row) => {
+            const kind = row.dataset.kind;
+            const slider = row.querySelector("input[type=range]");
+            const box = row.querySelector("input[type=checkbox]");
+            const value = STOPS[Number(slider.value)];
+
+            if (box.checked) excluded.push(kind);
+            // Sparse on purpose: a kind left at the default stores no key, so
+            // "untouched" and "set back to default" are one stored state.
+            if (value !== DEFAULT_STOP) weights[kind] = value;
+          });
+
+          return { section_kind_weights: weights, excluded_section_kinds: excluded };
+        };
+
+        // A group's last remaining kind cannot be excluded. The server
+        // validation is the authority; this only stops the UI offering it.
+        const lockLastInGroup = () => {
+          mix.querySelectorAll(".mix-group").forEach((group) => {
+            const boxes = Array.from(group.querySelectorAll("input[type=checkbox]"));
+            const remaining = boxes.filter((box) => !box.checked);
+            const locked = remaining.length === 1;
+
+            remaining.forEach((box) => { box.disabled = locked; });
+            group.querySelector(".mix-last-note").hidden = !locked;
+          });
+        };
+
+        let pending;
+        const saveMix = () => {
+          clearTimeout(pending);
+          pending = setTimeout(() => save(state()), 400);
+        };
+
+        rows.forEach((row) => {
+          const slider = row.querySelector("input[type=range]");
+          const box = row.querySelector("input[type=checkbox]");
+          const label = row.querySelector("output");
+
+          slider.addEventListener("input", () => {
+            label.textContent = LABELS[Number(slider.value)];
+            saveMix();
+          });
+
+          box.addEventListener("change", () => {
+            slider.disabled = box.checked;
+            lockLastInGroup();
+            saveMix();
+          });
+        });
+
+        lockLastInGroup();
+      }
     })();
   </script>
 </div>

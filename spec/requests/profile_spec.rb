@@ -71,6 +71,108 @@ RSpec.describe "Profile", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       expect(user.reload.time_zone).to eq("America/Chicago")
     end
+
+    def patch_profile(payload)
+      patch profile_path,
+            params: { user: payload }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+    end
+
+    it "stores stated weights and exclusions" do
+      login_as(user)
+
+      patch_profile(section_kind_weights: { "challenge" => 0.25 }, excluded_section_kinds: [ "parsons_problem" ])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.section_kind_weights).to eq("challenge" => 0.25)
+      expect(user.excluded_section_kinds).to eq([ "parsons_problem" ])
+    end
+
+    # Active Record's cast is too forgiving for a request boundary — the same
+    # reasoning as BOOLEAN_VALUES above it.
+    it "rejects a weight sent as a string" do
+      login_as(user)
+
+      patch_profile(section_kind_weights: { "challenge" => "0.25" })
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.section_kind_weights).to eq({})
+    end
+
+    it "rejects a weight that is not one of the stops" do
+      login_as(user)
+
+      patch_profile(section_kind_weights: { "challenge" => 3 })
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.section_kind_weights).to eq({})
+    end
+
+    it "refuses an exclusion that would empty a slot" do
+      login_as(user)
+
+      patch_profile(excluded_section_kinds: ExerciseSection.thirds.map(&:key))
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.excluded_section_kinds).to eq([])
+    end
+
+    # A wrong-shaped value used to read as blank, get dropped by strong
+    # parameters, and come back 200 having applied nothing — a success status
+    # for a write that did not happen.
+    it "rejects a present-but-wrong-shaped preference rather than reporting success" do
+      login_as(user)
+      user.update!(section_kind_weights: { "challenge" => 4.0 }, excluded_section_kinds: [ "parsons_problem" ])
+
+      [ { section_kind_weights: [] }, { section_kind_weights: nil },
+        { excluded_section_kinds: {} }, { excluded_section_kinds: nil } ].each do |payload|
+        patch_profile(payload)
+
+        expect(response).to have_http_status(:unprocessable_content), "expected 422 for #{payload.inspect}"
+      end
+
+      expect(user.reload.section_kind_weights).to eq("challenge" => 4.0)
+      expect(user.excluded_section_kinds).to eq([ "parsons_problem" ])
+    end
+
+    # Writes replace rather than merge, so returning a slider to its default is
+    # expressed by the key being absent — one representation of default, not two.
+    it "replaces the stored preferences rather than merging into them" do
+      login_as(user)
+      user.update!(section_kind_weights: { "challenge" => 0.25, "architecture" => 2.0 })
+
+      patch_profile(section_kind_weights: { "architecture" => 2.0 })
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.section_kind_weights).to eq("architecture" => 2.0)
+    end
+
+    # Every slider back to Default, or the last exclusion unchecked — the full
+    # reset a user actually performs, distinct from the smaller-replaces-larger
+    # case above.
+    it "clears previously-stored preferences on a full reset" do
+      login_as(user)
+      user.update!(section_kind_weights: { "challenge" => 0.25 }, excluded_section_kinds: [ "parsons_problem" ])
+
+      patch_profile(section_kind_weights: {}, excluded_section_kinds: [])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.section_kind_weights).to eq({})
+      expect(user.excluded_section_kinds).to eq([])
+    end
+
+    # permit(excluded_section_kinds: []) silently drops a non-scalar entry
+    # rather than raising, so without this guard the malformed payload below
+    # would arrive as [] and clear the user's existing exclusions with a 200.
+    it "rejects an exclusion list containing a non-string entry" do
+      login_as(user)
+      user.update!(excluded_section_kinds: [ "parsons_problem" ])
+
+      patch_profile(excluded_section_kinds: [ { "a" => 1 } ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.excluded_section_kinds).to eq([ "parsons_problem" ])
+    end
   end
 
   describe "PATCH /profile with the adaptive set size preference" do

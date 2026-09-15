@@ -96,4 +96,54 @@ RSpec.describe "ApiKeys", type: :request do
       expect(user.reload.language).to eq("ruby_rails")
     end
   end
+
+  describe "GET /setup" do
+    it "renders a weight control and an exclude toggle for every rotatable kind" do
+      login_as(user)
+
+      get setup_path
+
+      ExerciseSection.rotatable.each do |kind|
+        expect(response.body).to include(%(id="weight-#{kind.key}"))
+        expect(response.body).to include(%(id="exclude-#{kind.key}"))
+        expect(response.body).to include(I18n.t("sections.#{kind.key}.name"))
+      end
+    end
+
+    it "renders the stops from the constant rather than restating them" do
+      login_as(user)
+
+      get setup_path
+
+      expect(response.body).to include(KindPreferences::MULTIPLIERS.to_json)
+    end
+
+    # The copy is load-bearing: the two controls mean different things, and a
+    # slider at its minimum provably cannot mean "never" while the starvation
+    # guarantee stands.
+    it "says excluding is a different action from a low weight" do
+      login_as(user)
+
+      get setup_path
+
+      expect(response.body).to include("stronger, different action")
+      # Excluding narrows a slot's pool, which also makes that slot fill less
+      # often on short days. Saying only "never appears again" would leave that
+      # to be discovered.
+      expect(response.body).to include("come up less often on shorter days")
+    end
+
+    it "reflects stored preferences in the rendered controls" do
+      login_as(user)
+      user.update!(section_kind_weights: { "challenge" => 4.0 }, excluded_section_kinds: [ "parsons_problem" ])
+
+      get setup_path
+
+      doc = Nokogiri::HTML(response.body)
+
+      expect(doc.at("#weight-challenge")["value"]).to eq("4")
+      expect(doc.at("#exclude-parsons_problem")["checked"]).to be_present
+      expect(doc.at("#weight-parsons_problem")["disabled"]).to be_present
+    end
+  end
 end

@@ -1004,4 +1004,15 @@ RSpec.describe ExerciseSection do
       expect(context).to include("What's wrong?", "User.all.each", "n+1", "too_hard")
     end
   end
+
+  describe ".rotatable" do
+    it "holds every kind that competes for a slot" do
+      expect(described_class.rotatable).to match_array(described_class.thirds + described_class.fourths)
+    end
+
+    it "omits the kinds whose slot offers no choice" do
+      expect(described_class.rotatable)
+        .not_to include(ExerciseSection::CodeReview, ExerciseSection::Pattern)
+    end
+  end
 end

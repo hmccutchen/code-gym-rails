@@ -20,6 +20,15 @@ class User < ApplicationRecord
   validates :provider, inclusion: { in: %w[anthropic gemini fake] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
   validate :time_zone_must_be_loadable
+  # Only on change, because these read a registry that moves. Unconditional,
+  # a kind retired from ExerciseSection would make every user still naming it
+  # unsaveable — and `generate_login_code!` writes through `update!`, so the
+  # first thing that would break is logging in, recoverable only by a data
+  # migration. A stale stored value is already harmless on the read side:
+  # KindPreferences ignores a key it does not recognize.
+  validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
+  validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
+  validate :every_slot_keeps_a_kind,                     if: :excluded_section_kinds_changed?
 
   before_save { email.downcase! }
 
@@ -513,5 +522,39 @@ class User < ApplicationRecord
   def time_zone_must_be_loadable
     return if time_zone.blank? # blank/nil = not yet detected; allowed
     errors.add(:time_zone, "is not a valid time zone") if Time.find_zone(time_zone).nil?
+  end
+
+  def rotatable_keys
+    ExerciseSection.rotatable.map(&:key)
+  end
+
+  def section_kind_weights_name_rotatable_kinds
+    return errors.add(:section_kind_weights, "must be an object") unless section_kind_weights.is_a?(Hash)
+
+    section_kind_weights.each do |key, value|
+      errors.add(:section_kind_weights, "names an unknown section kind: #{key}") if rotatable_keys.exclude?(key)
+      errors.add(:section_kind_weights, "has an unsupported weight for #{key}") if KindPreferences::MULTIPLIERS.exclude?(value)
+    end
+  end
+
+  def excluded_section_kinds_name_rotatable_kinds
+    return errors.add(:excluded_section_kinds, "must be a list") unless excluded_section_kinds.is_a?(Array)
+
+    (excluded_section_kinds - rotatable_keys).each do |key|
+      errors.add(:excluded_section_kinds, "names an unknown section kind: #{key}")
+    end
+  end
+
+  # Derived from the slot roster rather than naming third and fourth, so a
+  # future multi-kind slot is covered without an edit here.
+  def every_slot_keeps_a_kind
+    return unless excluded_section_kinds.is_a?(Array)
+
+    ExerciseSection.slots.each do |slot, kinds|
+      next if kinds.size <= 1
+      next if kinds.any? { |kind| excluded_section_kinds.exclude?(kind.key) }
+
+      errors.add(:excluded_section_kinds, "must leave at least one #{slot} section in rotation")
+    end
   end
 end
