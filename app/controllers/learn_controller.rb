@@ -71,24 +71,10 @@ class LearnController < ApplicationController
 
   private
 
-  # This user's slice: their own language plus every language-independent
-  # bucket. Reads user.language, NEVER User#language_for_today — that resolves
-  # "mixed" to one concrete language for a single day's generation by flipping
-  # off the last exercise, and a library must not change contents depending on
-  # which language tomorrow happens to be. A mixed user is assigned both, so a
-  # mixed user browses both.
+  # This user's slice: their language's buckets plus every language-independent
+  # bucket.
   def learn_buckets
-    language_buckets + ConceptBucket::LANGUAGE_INDEPENDENT
-  end
-
-  # Derived, never a hardcoded pair: LANGUAGE_CONFIG is this app's stated
-  # single source of truth per generation language, and adding one there must
-  # not require hunting down a ternary here. The programming languages are
-  # exactly the config keys that are not language-independent buckets.
-  PROGRAMMING_LANGUAGES = (AiService::LANGUAGE_CONFIG.keys - ConceptBucket::SPECIAL_BUCKETS.keys).freeze
-
-  def language_buckets
-    current_user.language == "mixed" ? PROGRAMMING_LANGUAGES : [ current_user.language ]
+    ConceptBucket.language_buckets_for(current_user.language) + ConceptBucket::LANGUAGE_INDEPENDENT
   end
 
   # One query for every reference the page can render, keyed the way the views
