@@ -119,7 +119,7 @@ class ProfileController < ApplicationController
   # match again.
   def render_stale_preferences
     render json: {
-      errors: [ "Your exercise mix was changed in another tab. This page has been updated to match." ],
+      errors: [ t("exercise_mix.conflict") ],
       current: {
         section_kind_weights:             current_user.section_kind_weights,
         excluded_section_kinds:           current_user.excluded_section_kinds,

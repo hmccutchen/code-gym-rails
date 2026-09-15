@@ -195,22 +195,30 @@
         };
 
         let pending;
+        // This tab's own saves are chained rather than issued in parallel. The
+        // debounce only spaces them by 400ms, so a request slower than that is
+        // still in flight when the next one is sent — and that next one would
+        // post the version the first is about to move, and be refused as a
+        // conflict with itself, snapping the user's latest change back.
+        let inFlight = Promise.resolve();
         const saveMix = () => {
           clearTimeout(pending);
           pending = setTimeout(() => {
-            const payload = Object.assign(state(), { section_kind_preferences_version: version });
+            inFlight = inFlight.then(() => {
+              const payload = Object.assign(state(), { section_kind_preferences_version: version });
 
-            save(payload, "exercise_mix").then((result) => {
-              if (!result) return;
+              return save(payload, "exercise_mix").then((result) => {
+                if (!result) return;
 
-              // Taken from the server rather than incremented here: a save
-              // whose payload already matches what is stored changes nothing,
-              // so the counter does not move, and a local increment would
-              // desync this tab into refusing its own next save.
-              const reported = result.data && result.data.section_kind_preferences_version;
-              if (result.ok && typeof reported === "number") version = reported;
+                // Taken from the server rather than incremented here: a save
+                // whose payload already matches what is stored changes nothing,
+                // so the counter does not move, and a local increment would
+                // desync this tab into refusing its own next save.
+                const reported = result.data && result.data.section_kind_preferences_version;
+                if (result.ok && typeof reported === "number") version = reported;
 
-              if (result.status === 409 && result.data && result.data.current) applyServerState(result.data.current);
+                if (result.status === 409 && result.data && result.data.current) applyServerState(result.data.current);
+              });
             });
           }, 400);
         };
