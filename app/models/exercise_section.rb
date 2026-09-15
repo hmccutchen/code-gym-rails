@@ -66,6 +66,13 @@ class ExerciseSection
     slots.size
   end
 
+  # Which kinds a user can bias or exclude. A slot holding one candidate has no
+  # choice to bias — its roll returns that kind at any weight — so a control
+  # there would be one that provably does nothing.
+  def self.rotatable
+    slots.values.select { |kinds| kinds.size > 1 }.flatten
+  end
+
   # DailyExercise#active_section_keys answers the same question after the fact;
   # this one works from DailyPlan's rolled symbols, before a row exists.
   def self.for_plan(third:, fourth:, pattern: :pattern)
