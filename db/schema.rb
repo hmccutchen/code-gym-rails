@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_14_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -298,6 +298,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_14_000001) do
     t.string "provider"
     t.boolean "push_reminders_enabled", default: false, null: false
     t.integer "reminder_level", default: 0, null: false
+    t.integer "section_kind_preferences_version", default: 0, null: false
     t.jsonb "section_kind_weights", default: {}, null: false
     t.string "skill_level", default: "developing", null: false
     t.string "time_zone"

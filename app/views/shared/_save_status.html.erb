@@ -4,6 +4,13 @@
     worse than the problem this solves — and the banner says the change did not
     reach the server.
 
+    One exception, and it is the caller's to make rather than this file's: a
+    save refused because another tab got there first comes back carrying the
+    state that is actually stored, and /setup puts that on screen. Keeping the
+    user's value there would leave the page showing something the server has
+    refused and will keep refusing, which is the lie this component exists to
+    stop rather than an instance of protecting their input.
+
     The layout's one-shot time-zone detection deliberately does NOT report
     here: nothing the user did triggers it, so a banner would name a failure
     they took no action to cause, and it re-runs on the next page load anyway.
@@ -77,14 +84,20 @@
         },
         body: JSON.stringify(body)
       }).then(async (response) => {
-        if (!current()) return;
+        // Resolves with { ok, status, data } so a caller able to act on a
+        // particular refusal can. Callers that cannot simply ignore it —
+        // reporting the failure has already happened by then either way.
+        if (!current()) return { ok: false };
 
         // fetch follows redirects, so a request made after the session expired
         // arrives here as the login page: 200, and `ok` true, for a save that
         // stored nothing. Neither endpoint redirects on success, so a redirect
         // can only mean the write did not happen.
-        if (response.redirected) return fail(key, SIGNED_OUT);
-        if (response.ok) return succeed(key);
+        if (response.redirected) { fail(key, SIGNED_OUT); return { ok: false }; }
+        if (response.ok) {
+          succeed(key);
+          return { ok: true, data: await response.json().catch(() => null) };
+        }
 
         // A failure can answer with an HTML error page rather than JSON, and
         // parsing that throws — hence the inner catch. Only a message the
@@ -94,8 +107,10 @@
         // and that is a developer's sentence, not one to hand an engineer.
         const data = await response.json().catch(() => null);
         fail(key, (data && data.errors && data.errors[0]) || GENERIC);
+        return { ok: false, status: response.status, data: data };
       }).catch(() => {
         if (current()) fail(key, GENERIC);
+        return { ok: false };
       });
     }
 

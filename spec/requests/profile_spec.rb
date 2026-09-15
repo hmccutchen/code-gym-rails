@@ -135,6 +135,81 @@ RSpec.describe "Profile", type: :request do
       expect(user.excluded_section_kinds).to eq([ "parsons_problem" ])
     end
 
+    describe "the stale-tab precondition" do
+      def version = user.reload.section_kind_preferences_version
+
+      it "accepts two saves in order when each posts the version it last saw" do
+        login_as(user)
+
+        patch_profile(section_kind_weights: { "challenge" => 0.25 },
+                      section_kind_preferences_version: version)
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body["section_kind_preferences_version"]).to eq(version)
+
+        patch_profile(section_kind_weights: { "challenge" => 2.0 },
+                      section_kind_preferences_version: version)
+        expect(response).to have_http_status(:ok)
+        expect(user.reload.section_kind_weights).to eq("challenge" => 2.0)
+      end
+
+      # The two-tab clobber this exists to stop: tab B posts the version it read
+      # before tab A saved, so its write is refused rather than silently
+      # replacing A's.
+      it "refuses a save posting a version that has moved on, and writes nothing" do
+        login_as(user)
+        stale = version
+
+        patch_profile(section_kind_weights: { "challenge" => 4.0 },
+                      section_kind_preferences_version: stale)
+        expect(response).to have_http_status(:ok)
+
+        patch_profile(section_kind_weights: { "architecture" => 0.5 },
+                      section_kind_preferences_version: stale)
+
+        expect(response).to have_http_status(:conflict)
+        expect(user.reload.section_kind_weights).to eq("challenge" => 4.0)
+        expect(response.parsed_body.dig("current", "section_kind_weights")).to eq("challenge" => 4.0)
+        expect(response.parsed_body.dig("current", "section_kind_preferences_version")).to eq(version)
+      end
+
+      # The specific bug a whole-row updated_at would reintroduce: an unrelated
+      # field shares the row, so a coarse stamp would move and refuse a mix save
+      # that nothing had raced.
+      it "does not treat an unrelated field's save as a conflict" do
+        login_as(user)
+        held = version
+
+        patch_profile(time_zone: "America/Los_Angeles")
+        expect(response).to have_http_status(:ok)
+        expect(user.reload.time_zone).to eq("America/Los_Angeles")
+
+        patch_profile(section_kind_weights: { "challenge" => 0.5 },
+                      section_kind_preferences_version: held)
+
+        expect(response).to have_http_status(:ok)
+        expect(user.reload.section_kind_weights).to eq("challenge" => 0.5)
+      end
+
+      # Absent version means no precondition, the way an absent If-Match does.
+      it "applies a save that posts no version at all" do
+        login_as(user)
+        user.update!(section_kind_weights: { "challenge" => 4.0 })
+
+        patch_profile(section_kind_weights: { "architecture" => 2.0 })
+
+        expect(response).to have_http_status(:ok)
+        expect(user.reload.section_kind_weights).to eq("architecture" => 2.0)
+      end
+
+      it "leaves the body untouched for a caller that changes no preferences" do
+        login_as(user)
+
+        patch_profile(name: "Renamed")
+
+        expect(response.parsed_body.keys).to contain_exactly("name", "time_zone", "adaptive_set_size")
+      end
+    end
+
     # Writes replace rather than merge, so returning a slider to its default is
     # expressed by the key being absent — one representation of default, not two.
     it "replaces the stored preferences rather than merging into them" do

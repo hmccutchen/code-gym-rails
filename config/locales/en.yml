@@ -92,6 +92,7 @@ en:
     exclude_body_frequency: "Excluding also makes the whole group come up less often on shorter days. Fewer kinds left means the ones that remain are seen more often and stay fresh, so the group gives way to groups holding something you haven't seen."
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
+    conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
     stops:
       - "Much less"
       - "Less"

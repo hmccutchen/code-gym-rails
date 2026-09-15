@@ -32,6 +32,23 @@ If a check does not apply to a diff, say so and why ("no new class exceeds the
 threshold — the diff adds one 6-line method"). Silence on a check reads as
 unexamined.
 
+**Review the code the diff depends on, not only the code it changes.** For
+every piece of state the diff introduces or starts reading, name the existing
+paths that write it, order it, or race it, and open those files even though
+they carry no `+` lines. The defects that survive an otherwise careful diff
+review live in that seam, because each half is correct alone. A save that
+posts the version it last saw is right on its own terms and wrong once the
+400ms debounce spacing those saves is read beside it — two requests in flight,
+the second posting a version the first is about to move, refused as a conflict
+with its own predecessor.
+
+**Run the claim; don't recall it.** Any statement about framework behavior that
+decides a finding gets verified against this app — `bin/rails runner`, a
+console, a throwaway spec — rather than remembered. "A `before_save` guarded on
+`attribute_changed?` doesn't fire on create when the column has a default" is
+the shape of claim that sounds settled, is right most of the time, and reverses
+a finding when it isn't.
+
 **Blocking vs. nit.** Anything marked BLOCKING must be resolved before approval
 regardless of how small the rest of the diff is. Style nits may be left
 unresolved on an approved PR.
@@ -242,6 +259,23 @@ and describing a behavior the code doesn't implement.
 The patterns this codebase has deliberately adopted are listed under "Standards
 and Authorities" in `CLAUDE.md`. Deviating is allowed; doing it silently is
 not.
+
+**Which specs to run.** Map each changed file to its spec by convention and run
+those, plus whatever `grep -rl <changed constant or method> spec/` turns up.
+For a change local to one controller, model, view, or job that is the whole
+blast radius, and a scoped run beats a full suite that nobody waits for. It is
+**not** the blast radius when the diff touches a shared authority — `AiService`,
+`ExerciseSection`, `ProblemSetIngest`, `DailyPlan`, `ConceptBucket`,
+`DailyResponse`, `RealSource`, or `DailyExercise#active_section_keys`. Those are
+named under "Standards and Authorities" in `CLAUDE.md` because everything
+downstream derives from them, so a diff touching one runs the full suite.
+
+**Say what you did not verify.** A review that ran a subset of the specs, took
+the PR's word on a number, or reasoned about a path instead of exercising it
+says so in those terms. This is what keeps a scoped run honest: the skipped
+scope is on the page where the author can overrule it rather than hidden
+behind an unqualified pass. State it as scope, not as doubt — "I re-ran the
+profile and user specs, not the 2,120 the description cites" is the form.
 
 **Note on CI.** The workflow runs RSpec, system specs, RuboCop, Brakeman, and
 `importmap audit` — but this repository has no branch protection, so none of
