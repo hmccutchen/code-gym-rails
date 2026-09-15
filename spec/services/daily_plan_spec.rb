@@ -1,6 +1,12 @@
 require "rails_helper"
 
 RSpec.describe DailyPlan do
+  # No spec type is inferred here (spec/services isn't a type RSpec
+  # auto-configures), so the shared AuthHelpers module isn't pulled in by
+  # rails_helper's type-scoped config.include — include it directly instead
+  # of redefining create_fake_provider_user locally.
+  include AuthHelpers
+
   describe "FOURTH_BUCKET_FOR" do
     # DailyPlan.fourth_track fetches this, so a fourth kind missing an entry
     # raises at generation rather than silently sharing another kind's history.
@@ -540,6 +546,22 @@ RSpec.describe DailyPlan do
                                    problem_set: { "code_review" => { "source" => first.id } })
 
       expect(plan.code_review_source).to eq(RealSource::APPLICATION_CODE.second)
+    end
+  end
+
+  describe "stated rotation preferences" do
+    it "hands the user's stated preferences to the rotation" do
+      user = create_fake_provider_user
+      user.update!(excluded_section_kinds: [ "parsons_problem" ])
+
+      allow(SectionRotation).to receive(:for).and_call_original
+
+      described_class.for(user, language: "ruby_rails")
+
+      expect(SectionRotation).to have_received(:for) do |_history, count:, preferences:|
+        expect(count).to be_a(Integer)
+        expect(preferences.excluded?(ExerciseSection::ParsonsProblem)).to be(true)
+      end
     end
   end
 end
