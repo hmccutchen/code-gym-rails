@@ -32,6 +32,12 @@ class User < ApplicationRecord
 
   before_save { email.downcase! }
 
+  # Bumped only when the preference columns themselves change. A whole-row
+  # timestamp would move on every save — a rename, a time zone, a login code —
+  # and refuse a mix save that nothing had actually raced.
+  before_save :bump_section_kind_preferences_version,
+              if: -> { section_kind_weights_changed? || excluded_section_kinds_changed? }
+
   scope :active, -> { where(anonymized_at: nil) }
 
   enum :reminder_level, { none: 0, ready: 1, ready_and_nudges: 2 }, prefix: :reminders
@@ -522,6 +528,10 @@ class User < ApplicationRecord
   def time_zone_must_be_loadable
     return if time_zone.blank? # blank/nil = not yet detected; allowed
     errors.add(:time_zone, "is not a valid time zone") if Time.find_zone(time_zone).nil?
+  end
+
+  def bump_section_kind_preferences_version
+    self.section_kind_preferences_version += 1
   end
 
   def rotatable_keys

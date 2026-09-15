@@ -165,10 +165,54 @@
           });
         };
 
+        // The version this tab last saw. Posted with every mix save so a tab
+        // whose controls predate another tab's save is refused rather than
+        // overwriting it, and updated from whatever the server reports back.
+        let version = <%= raw current_user.section_kind_preferences_version.to_json %>;
+
+        // Puts the server's state on screen after a refusal, so the engineer
+        // sees what is actually stored instead of re-applying a change against
+        // a version that can never match again.
+        const applyServerState = (current) => {
+          const weights = current.section_kind_weights || {};
+          const excluded = current.excluded_section_kinds || [];
+
+          rows.forEach((row) => {
+            const kind = row.dataset.kind;
+            const slider = row.querySelector("input[type=range]");
+            const box = row.querySelector("input[type=checkbox]");
+            const stop = Object.prototype.hasOwnProperty.call(weights, kind) ? weights[kind] : DEFAULT_STOP;
+            const index = STOPS.indexOf(stop);
+
+            slider.value = index === -1 ? STOPS.indexOf(DEFAULT_STOP) : index;
+            row.querySelector("output").textContent = LABELS[Number(slider.value)];
+            box.checked = excluded.indexOf(kind) !== -1;
+            slider.disabled = box.checked;
+          });
+
+          lockLastInGroup();
+          version = current.section_kind_preferences_version;
+        };
+
         let pending;
         const saveMix = () => {
           clearTimeout(pending);
-          pending = setTimeout(() => save(state(), "exercise_mix"), 400);
+          pending = setTimeout(() => {
+            const payload = Object.assign(state(), { section_kind_preferences_version: version });
+
+            save(payload, "exercise_mix").then((result) => {
+              if (!result) return;
+
+              // Taken from the server rather than incremented here: a save
+              // whose payload already matches what is stored changes nothing,
+              // so the counter does not move, and a local increment would
+              // desync this tab into refusing its own next save.
+              const reported = result.data && result.data.section_kind_preferences_version;
+              if (result.ok && typeof reported === "number") version = reported;
+
+              if (result.status === 409 && result.data && result.data.current) applyServerState(result.data.current);
+            });
+          }, 400);
         };
 
         rows.forEach((row) => {

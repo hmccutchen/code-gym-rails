@@ -38,6 +38,25 @@ RSpec.describe "Exercise mix", type: :system do
     expect(weights_after_save({ "challenge" => 0.25 })).to eq("challenge" => 0.25)
   end
 
+  # The two-tab clobber from the original report. The second tab's save is a
+  # write against a version this page has not seen, which is what user.update!
+  # produces here — the same bump a real save in another tab makes, without a
+  # second browser window's timing to fight.
+  it "refuses a save from a page whose controls predate another save" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    user.update!(excluded_section_kinds: [ "parsons_problem" ])
+
+    find("#weight-challenge").set(0)
+
+    expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
+    expect(user.reload.section_kind_weights).to eq({})
+    # Re-synced rather than left showing a change the server rejected.
+    expect(find("#exclude-parsons_problem")).to be_checked
+  end
+
   it "locks the last remaining kind in a group rather than letting a slot empty" do
     visit_as(user)
     visit setup_path
