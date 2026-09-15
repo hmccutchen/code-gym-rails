@@ -208,6 +208,32 @@ RSpec.describe "Profile", type: :request do
 
         expect(response.parsed_body.keys).to contain_exactly("name", "time_zone", "adaptive_set_size")
       end
+
+      # Deliberate coupling: weights and difficulty share one version, so a
+      # stale tab is refused whichever half it touched.
+      it "refuses a lock save from a tab that missed another tab's weight save" do
+        login_as(user)
+        stale = version
+
+        patch_profile(section_kind_weights: { "challenge" => 4.0 }, section_kind_preferences_version: stale)
+        expect(response).to have_http_status(:ok)
+
+        patch_profile(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ],
+                      section_kind_preferences_version: stale)
+
+        expect(response).to have_http_status(:conflict)
+        expect(user.reload.locked_section_kinds).to eq([])
+        expect(response.parsed_body["current"]).to include("section_kind_levels" => {}, "locked_section_kinds" => [])
+      end
+
+      it "reports the version after a difficulty-only save" do
+        login_as(user)
+
+        patch_profile(section_kind_levels: { "pattern" => "junior" }, section_kind_preferences_version: version)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body["section_kind_preferences_version"]).to eq(version)
+      end
     end
 
     # Writes replace rather than merge, so returning a slider to its default is
@@ -247,6 +273,62 @@ RSpec.describe "Profile", type: :request do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(user.reload.excluded_section_kinds).to eq([ "parsons_problem" ])
+    end
+
+    it "stores stated levels and locks, including for code_review" do
+      login_as(user)
+
+      patch_profile(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" },
+                    locked_section_kinds: [ "challenge" ])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.section_kind_levels).to eq("code_review" => "senior", "challenge" => "junior")
+      expect(user.locked_section_kinds).to eq([ "challenge" ])
+    end
+
+    it "rejects a level outside the vocabulary" do
+      login_as(user)
+
+      patch_profile(section_kind_levels: { "challenge" => "strong" })
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"].join).to include("junior, senior, principal_engineer")
+      expect(user.reload.section_kind_levels).to eq({})
+    end
+
+    it "rejects a lock with no level" do
+      login_as(user)
+
+      patch_profile(locked_section_kinds: [ "challenge" ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.locked_section_kinds).to eq([])
+    end
+
+    it "rejects a present-but-wrong-shaped difficulty preference rather than reporting success" do
+      login_as(user)
+      user.update!(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ])
+
+      [ { section_kind_levels: [] }, { section_kind_levels: nil }, { section_kind_levels: { "challenge" => 1 } },
+        { locked_section_kinds: {} }, { locked_section_kinds: nil }, { locked_section_kinds: [ { "a" => 1 } ] } ].each do |payload|
+        patch_profile(payload)
+
+        expect(response).to have_http_status(:unprocessable_content), "expected 422 for #{payload.inspect}"
+      end
+
+      expect(user.reload.section_kind_levels).to eq("challenge" => "senior")
+      expect(user.locked_section_kinds).to eq([ "challenge" ])
+    end
+
+    it "clears every level and lock on empty values" do
+      login_as(user)
+      user.update!(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ])
+
+      patch_profile(section_kind_levels: {}, locked_section_kinds: [])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.section_kind_levels).to eq({})
+      expect(user.locked_section_kinds).to eq([])
     end
   end
 
