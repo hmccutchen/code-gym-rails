@@ -5,6 +5,12 @@ RSpec.describe User, type: :model do
     User.create!(email: email, name: name)
   end
 
+  def create_user_with_key(email: "dev-with-key@example.com", name: "Dev")
+    user = create_user(email: email, name: name)
+    user.update!(api_key: "sk-ant-test", provider: "anthropic")
+    user
+  end
+
   describe "validations" do
     it "requires a valid email" do
       user = User.new(email: "not-an-email", name: "Dev")
@@ -1346,6 +1352,63 @@ RSpec.describe User, type: :model do
 
       expect(user.section_kind_weights).to eq({})
       expect(user.excluded_section_kinds).to eq([])
+    end
+
+    it "accepts a stated stop for a rotatable kind" do
+      user = create_user_with_key
+      user.section_kind_weights = { "challenge" => 0.25 }
+
+      expect(user).to be_valid
+    end
+
+    it "rejects a weight for a kind that does not compete for a slot" do
+      user = create_user_with_key
+      user.section_kind_weights = { "code_review" => 0.5 }
+
+      expect(user).not_to be_valid
+      expect(user.errors[:section_kind_weights]).to be_present
+    end
+
+    it "rejects a weight that is not one of the stops" do
+      user = create_user_with_key
+      user.section_kind_weights = { "challenge" => 3.0 }
+
+      expect(user).not_to be_valid
+      expect(user.errors[:section_kind_weights]).to be_present
+    end
+
+    it "rejects an exclusion naming an unknown kind" do
+      user = create_user_with_key
+      user.excluded_section_kinds = [ "nonsense" ]
+
+      expect(user).not_to be_valid
+      expect(user.errors[:excluded_section_kinds]).to be_present
+    end
+
+    it "allows excluding all but one kind in a slot" do
+      user = create_user_with_key
+      user.excluded_section_kinds = ExerciseSection.thirds.drop(1).map(&:key)
+
+      expect(user).to be_valid
+    end
+
+    # Excluding is per-kind curation, never a way to delete a whole slot: an
+    # empty slot would render fewer sections than SectionCount asked for, which
+    # lowers the completion mean, which shrinks the set again.
+    it "refuses an exclusion that would empty a slot" do
+      user = create_user_with_key
+      user.excluded_section_kinds = ExerciseSection.thirds.map(&:key)
+
+      expect(user).not_to be_valid
+      expect(user.errors[:excluded_section_kinds].join).to include("third")
+    end
+
+    it "refuses an exclusion that would empty the fourth slot" do
+      user = create_user_with_key
+      user.excluded_section_kinds = ExerciseSection.fourths.map(&:key)
+
+      expect(user).not_to be_valid
+      expect(user.errors[:excluded_section_kinds].join).to include("fourth")
     end
   end
 end
