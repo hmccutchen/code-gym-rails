@@ -309,10 +309,24 @@ the row was the featured concept, and nil means it never has been.
   1024-token minimum that means the ordinary day caches, not just a
   real-source one; only the shortest sections fall short, and there the
   provider declines to cache rather than billing a write, so they pay nothing
-  for the marker. The write premium is worth it because a duck thread is
-  multi-turn by construction and the merged prompt is byte-identical across
-  its turns: the second turn already clears the cost (1.25x write plus 0.1x
-  read against 2x uncached).
+  for the marker.
+
+  **It is a bet, not a free win, and this is the shape of it.** A thread is
+  multi-turn by design but nothing forces a second turn, and the first turn of
+  every thread pays the write. Writing the prefix costs 1.25x and reading it
+  0.1x, against 1x per uncached turn, so a thread that stops after one turn
+  costs 25% more than it would have, a two-turn thread saves 32.5%, and a
+  three-turn thread saves 52%. Taking the most pessimistic reading — that no
+  multi-turn thread ever runs past two turns — the write still pays for itself
+  unless **more than about 72%** of duck threads are single-turn. The
+  five-minute cache lifetime sits inside that bet: turns seconds apart read the
+  entry, and someone who wanders off and comes back pays a second write.
+
+  **Nothing measures that share yet.** The duck is deliberately unpersisted, so
+  no thread is recorded anywhere; `ApiUsage` rows with
+  `purpose: "duck_thread"` are the only trace a turn leaves, and counting them
+  per user per day is the way to check this assumption once the feature has
+  real traffic. Until then the 72% figure is the argument, not evidence.
 
   Two numbers here have been wrong before, both from estimating at 3.5
   characters per token. Real text in these prompts runs 2.83-2.94, so the

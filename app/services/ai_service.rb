@@ -999,12 +999,12 @@ class AiService
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
       system: "#{DUCK_SYSTEM_PROMPT}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
-      # The merged prompt is the same bytes for every turn of a thread, and a
-      # thread is multi-turn by design, so the write pays for itself on the
-      # second turn (write 1.25x, read 0.1x, against 2x uncached). Below
-      # claude-sonnet-5's 1024-token minimum the provider simply does not
-      # cache — no error, nothing billed as a write — so a short section's
-      # thread is unaffected rather than charged a premium it never earns.
+      # A first turn pays a write premium only a later turn recovers, so this
+      # is a bet that threads continue — not a free win. CLAUDE.md's
+      # "Conversational calls send real turns" holds the measured prompt sizes,
+      # the provider's threshold and prices, and the share of single-turn
+      # threads the bet can absorb; they are external facts that move, so they
+      # live in one place rather than three.
       cache_system: true,
       history: thread,
       prompt: <<~PROMPT

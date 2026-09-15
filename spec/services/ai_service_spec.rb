@@ -3520,10 +3520,9 @@ RSpec.describe AiService do
       expect(kwargs[:prompt]).not_to include("is this N+1?")
     end
 
-    # The merged prompt is byte-identical across a thread's turns, and a thread
-    # is multi-turn by design, so caching pays for itself on the second turn.
-    # Below claude-sonnet-5's 1024-token minimum the provider declines to cache
-    # rather than charging for a write, so this costs a short thread nothing.
+    # Why it is worth the write premium, and what the bet is, live in CLAUDE.md
+    # under "Conversational calls send real turns" — the numbers are the
+    # provider's and they move.
     it "asks for the system prompt to be cached" do
       expect(captured_call(thread: [])[:cache_system]).to be(true)
     end
@@ -3598,10 +3597,9 @@ RSpec.describe AiService do
     end
 
     # Deliberately not cached, and not merely by omission: this prompt carries
-    # the question and a review summary rather than the section's code, which
-    # measures around half of claude-sonnet-5's 1024-token minimum. The duck
-    # caches because its prompt can reach the minimum; this one cannot, so
-    # asking would be a marker the provider ignores.
+    # the question and a review summary rather than the section's code, so it
+    # lands well under the threshold the duck can reach. Measurements in
+    # CLAUDE.md under "Conversational calls send real turns".
     it "does not ask for caching, unlike the duck" do
       expect(captured_call(thread: [])[:cache_system]).to be_falsey
     end
