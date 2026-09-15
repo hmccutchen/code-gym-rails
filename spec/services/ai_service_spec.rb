@@ -3291,6 +3291,7 @@ RSpec.describe AiService do
       expect(svc.last_system).to match(/understanding the problem/i)
       expect(svc.last_system).to match(/answer these directly/i)
       expect(svc.last_system).to match(/analogy/i)
+      expect(svc.last_system).to include(AiService::PLAIN_LANGUAGE_STANDARD)
     end
 
     # The boundary is a judgement the model makes per message, so the prompt
@@ -3636,6 +3637,118 @@ RSpec.describe AiService do
 
     it "raises AiService::Error when the user has no recognized provider" do
       expect { AiService.for(user) }.to raise_error(AiService::Error, /no recognized AI provider/)
+    end
+  end
+
+  # One standard, seven prompts. Each example sends a request down one call
+  # path and counts the standard in what reached the provider: zero means a
+  # site lost it, two means a site both inlined and interpolated it.
+  describe "the shared plain-language standard" do
+    let(:standard) { AiService::PLAIN_LANGUAGE_STANDARD }
+
+    # Class-level, because #review_sections builds a fresh service per thread.
+    let(:recording_class) do
+      Class.new(double_class) do
+        def self.calls
+          @calls ||= []
+        end
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
+          self.class.calls << "#{system}\n#{prompt}"
+          super
+        end
+      end
+    end
+
+    let(:exercise) do
+      DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "Find the N+1", "snippet" => "code", "scenario" => "a billing job" }
+      })
+    end
+
+    let(:reviewed_response) do
+      DailyResponse.new(
+        answers: { "code_review" => "Looks fine to me" },
+        ai_review: { "code_review" => { "missed" => [ "The association is loaded per row" ] } }
+      )
+    end
+
+    let(:reference) do
+      ConceptReference.new(concept: "n_plus_one", language: "ruby_rails",
+                           tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
+    end
+
+    def occurrences_per_call
+      recording_class.calls.map { |sent| sent.scan(standard).size }
+    end
+
+    it "reaches the duck exactly once" do
+      recording_class.new(canned_text: "A guiding question.")
+        .duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
+    it "reaches the concept reference prompt exactly once" do
+      json = { tagline: "t", explanation: "e", code_example: "c", senior_lens: "s" }.to_json
+      recording_class.new(canned_text: json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
+    it "reaches the concept reframing exactly once" do
+      recording_class.new(canned_text: "Another angle.").explain_concept_differently(user, reference)
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
+    it "reaches the feedback reframing exactly once" do
+      recording_class.new(canned_text: "Another angle.")
+        .explain_differently(user, exercise, reviewed_response, section: "code_review", prior_alternates: [])
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
+    it "reaches the review follow-up exactly once" do
+      recording_class.new(canned_text: "Because.")
+        .answer_follow_up(user, exercise, reviewed_response, section: "code_review", question: "Why?", thread: [])
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
+    # The difficulty assessment rides the same fan-out and had no style rule
+    # before, so it is pinned at zero: reaching it would be a new content
+    # requirement rather than consolidation.
+    it "reaches every grading call exactly once, and the difficulty assessment not at all" do
+      saved = DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: {
+          "code_review" => { "question" => "cr?", "snippet" => "code" },
+          "pattern"     => { "title" => "P", "question" => "pat?" }
+        }
+      )
+      response = DailyResponse.create!(
+        user: user, daily_exercise: saved, date: Date.current, submitted_at: Time.current,
+        answers: { "code_review" => "a" * 20, "pattern" => "a" * 20 }
+      )
+
+      recording_class.new(canned_text: { "rating" => "solid" }.to_json)
+        .review_sections(user, saved, response, sections: %w[code_review pattern])
+
+      grading, assessing = recording_class.calls.partition { |sent| sent.include?("giving direct, specific feedback") }
+      expect(grading.map { |sent| sent.scan(standard).size }).to eq([ 1, 1 ])
+      expect(assessing.map { |sent| sent.scan(standard).size }).to eq([ 0 ])
+    end
+
+    it "replaced each site's own wording rather than sitting beside it" do
+      expect(AiService::DUCK_SYSTEM_PROMPT).not_to match(/plain words|no jargon/i)
+
+      recording_class.new(canned_text: "Because.")
+        .answer_follow_up(user, exercise, reviewed_response, section: "code_review", question: "Why?", thread: [])
+      json = { tagline: "t", explanation: "e", code_example: "c", senior_lens: "s" }.to_json
+      recording_class.new(canned_text: json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(recording_class.calls.join).not_to match(/Be direct and concrete|unpack any jargon/)
     end
   end
 

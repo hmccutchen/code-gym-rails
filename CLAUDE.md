@@ -35,7 +35,9 @@ prompt text sent to the provider, and in `FakeService` canned provider output.
 
 **Writing style.** Commit messages, PR descriptions, and code comments follow
 the same plain-language standard the app asks its own generated prose to meet.
-It is one standard applied in two places, not a separate rule for docs.
+It is one standard applied in two places, not a separate rule for docs. The
+app's copy is `AiService::PLAIN_LANGUAGE_STANDARD`, shared by the prompts that
+explain, reframe, answer follow-ups on, or grade an engineer's work.
 
 Avoid, most common first:
 
@@ -298,8 +300,9 @@ the row was the featured concept, and nil means it never has been.
   history serializes to the same body as before at the `#call` boundary, and
   `ai_service_spec`'s "single-shot purposes" group drives the six other public
   entry points and asserts the history each one reaches `#call` with is empty. **This buys no cost reduction on either provider** — the merged duck
-  system prompt runs ~500-600 tokens against `claude-sonnet-5`'s 1024-token
-  cache minimum, so `cache_system` is deliberately not passed. What it buys is
+  system prompt for a typical section stays below `claude-sonnet-5`'s
+  1024-token cache minimum, so `cache_system` is deliberately not passed.
+  What it buys is
   that a user typing `You:` into the duck box can no longer forge an assistant
   turn — but only on the Claude path, where `history` reaches the provider as
   real `messages`. This is the bullet's second Claude/Gemini asymmetry:
