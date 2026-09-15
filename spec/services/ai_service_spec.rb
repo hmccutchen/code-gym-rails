@@ -2928,6 +2928,63 @@ RSpec.describe AiService do
     end
   end
 
+  # The design constraint made mechanical, the same way the essential-vs-
+  # abstraction standard is: one source, two consumers. Two independently
+  # worded copies fail here, and so does a future edit that inlines either one.
+  # The two prompts name their subject differently — one re-teaches a concept,
+  # the other reframes a point — so the shared source takes that noun and the
+  # rule after it is what cannot drift.
+  describe "the shared explain-differently standard" do
+    # Asserting that the rule's TEXT appears would pass just as happily if a
+    # consumer went back to its own inline copy — which is the duplication this
+    # exists to prevent, and the likeliest way it comes back. A sentinel can
+    # only reach a prompt through the shared method, so inlining either
+    # consumer fails here even when the inlined wording is identical.
+    let(:sentinel_class) do
+      Class.new(double_class) do
+        attr_reader :last_prompt
+
+        def self.explain_differently_standard(subject)
+          "<<explain-differently:#{subject}>>"
+        end
+
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
+          @last_prompt = prompt
+          super
+        end
+      end
+    end
+
+    it "reaches both consumers from one source" do
+      reference = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails",
+                                       tagline: "t", explanation: "e",
+                                       code_example: "c", senior_lens: "s")
+      concept_svc = sentinel_class.new(canned_text: "Another angle.")
+      concept_svc.explain_concept_differently(user, reference, prior_alternates: [])
+
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "code_review" => { "question" => "Find the N+1", "snippet" => "code" }
+      })
+      resp = DailyResponse.new(answers: { "code_review" => "Looks fine" },
+                               ai_review: { "code_review" => { "missed" => [ "loaded per row" ] } })
+      point_svc = sentinel_class.new(canned_text: "Another angle.")
+      point_svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
+
+      expect(concept_svc.last_prompt).to include("<<explain-differently:concept>>")
+      expect(point_svc.last_prompt).to include("<<explain-differently:point>>")
+    end
+
+    # The two differ by the subject noun and nothing else. Without this, the
+    # method could grow a second divergence and both assertions above would
+    # still pass.
+    it "differs between the two only by the subject it names" do
+      concept = AiService.explain_differently_standard("concept")
+      point   = AiService.explain_differently_standard("point")
+
+      expect(concept.sub("SAME concept", "SAME point")).to eq(point)
+    end
+  end
+
   describe "#explain_differently" do
     it "sends the section's question, answer, missed points, and prior alternates" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: {

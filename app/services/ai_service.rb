@@ -205,6 +205,20 @@ class AiService
   # every other such field.
   MAX_GENERATED_CODE_LENGTH = 8_000
 
+  # The one statement of what "differently" means, shared by the two prompts
+  # that re-explain something after a first attempt did not land — one
+  # re-teaches a concept, the other reframes a point of feedback. A method
+  # rather than a constant because those two name their subject differently and
+  # always have; the rule is everything after that noun, and it is this
+  # method's whole reason to exist that the rule cannot be edited in one prompt
+  # without the other. Shaped like ExerciseSection::PseudocodeToCode.gap_standard,
+  # which solves the same one-rule-two-consumers problem.
+  def self.explain_differently_standard(subject)
+    "Explain the SAME #{subject} again using a genuinely different approach — a\n" \
+      "different analogy, a different level of abstraction, or a concrete worked\n" \
+      "scenario instead of a principle. Do not repeat the original wording."
+  end
+
   # The one statement of how the app's generated prose should read, shared by
   # the prompts that explain, reframe, answer follow-ups on, or grade an
   # engineer's work. CLAUDE.md's Writing style section carries the same list
@@ -899,9 +913,7 @@ class AiService
 
         #{prior_framings(prior_alternates)}
 
-        Explain the SAME concept again using a genuinely different approach — a
-        different analogy, a different level of abstraction, or a concrete worked
-        scenario instead of a principle. Do not repeat the original wording.
+        #{self.class.explain_differently_standard("concept")}
         #{CONCEPT_REFERENCE_SCOPE} Teach the concept itself; never solve, hint at,
         or refer to any particular exercise. Two short paragraphs at most.
 
@@ -932,9 +944,7 @@ class AiService
 
         #{prior_framings(prior_alternates)}
 
-        Explain the SAME point again using a genuinely different approach — a
-        different analogy, a different level of abstraction, or a concrete worked
-        scenario instead of a principle. Do not repeat the original wording.
+        #{self.class.explain_differently_standard("point")}
         Two short paragraphs at most.
 
         #{PLAIN_LANGUAGE_STANDARD}
