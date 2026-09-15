@@ -80,12 +80,13 @@ en:
       module_design: "Module design"
   exercise_mix:
     summary: "Exercise mix"
-    intro: "Bias how often each rotating section appears. This changes which kind fills a slot, not how many sections a day holds."
+    intro: "Bias how often each rotating section appears. This changes which kind fills a slot, not how many sections a day holds — that's the setting above."
     third_group: "Rotating third section"
     fourth_group: "Rotating fourth section"
     exclude_heading: "Excluding is a stronger, different action than turning a slider down."
     exclude_body_weak: "A slider at Much less means rarely — the section can still come up, and it will if you haven't seen it in a long while, so nothing disappears from your rotation permanently."
     exclude_body_strong: "Exclude means never. The section is removed from rotation entirely and will not appear again until you turn it back on."
+    exclude_body_frequency: "Excluding also makes the whole group come up less often on shorter days. Fewer kinds left means the ones that remain are seen more often and stay fresh, so the group gives way to groups holding something you haven't seen."
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
     stops:

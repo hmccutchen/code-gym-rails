@@ -127,6 +127,10 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
 
       expect(response.body).to include("stronger, different action")
+      # Excluding narrows a slot's pool, which also makes that slot fill less
+      # often on short days. Saying only "never appears again" would leave that
+      # to be discovered.
+      expect(response.body).to include("come up less often on shorter days")
     end
 
     it "reflects stored preferences in the rendered controls" do
