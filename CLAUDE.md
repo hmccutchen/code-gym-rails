@@ -33,6 +33,39 @@ When auditing comments mechanically, note that `#{...}` interpolations and `#`
 lines *inside* a heredoc are content, not comments — in `AiService` they are
 prompt text sent to the provider, and in `FakeService` canned provider output.
 
+**Writing style.** Commit messages, PR descriptions, and code comments follow
+the same plain-language standard the app asks its own generated prose to meet.
+It is one standard applied in two places, not a separate rule for docs.
+
+Avoid, most common first:
+
+- Manufactured rhetorical contrast — "not X, but Y" used for punch when a plain
+  sentence says the same thing.
+- Buzzwords and jargon. Use the plain equivalent; if a technical term is
+  genuinely necessary, define it briefly on first use.
+- Placeholder phrases — "please note," "at this time," "it's worth mentioning."
+- Overusing "please" in instructions — state it directly.
+- Starting every sentence with the same construction.
+- Exclamation points, outside genuine, rare emphasis.
+- Forced cleverness or trying to sound entertaining.
+- Both choppy fragments and long-winded run-ons.
+
+Aim for:
+
+- Active voice — make clear who or what is doing the thing.
+- Concrete over abstract — a specific example beats a general description of
+  the same idea.
+- Conditions before instructions, not after.
+- Natural rhythm — if a sentence sounds stilted read aloud, rewrite it.
+
+The app's version also asks for second person, direct address. That item is
+left out here on purpose: a commit message or a code comment has no reader to
+address.
+
+Calibration: too informal ("This is a total game-changer!") and too formal
+("The interface undergoes a paradigmatic transformation") are both wrong; aim
+for the plain middle ("This changes how the interface works").
+
 **Modular, so it's easy to change.** Following pragmatic-programming principles:
 
 - **DRY** — every piece of knowledge has one authoritative home. When a rule
