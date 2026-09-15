@@ -111,27 +111,19 @@
 
   <script>
     (function () {
-      // Optional-chained because Rails renders no csrf meta tag when forgery
-      // protection is off (the test environment), where the empty token is
-      // accepted — without this the listeners below throw and silently stop
-      // saving, which is exactly what a browser spec needs to be able to see.
-      const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content ?? "";
-
-      const save = (payload) => fetch("<%= profile_path %>", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "X-CSRF-Token": csrf()
-        },
-        body: JSON.stringify({ user: payload })
-      });
+      // CodeGymSaveStatus owns the request, the CSRF token, and what happens
+      // when the server refuses — see shared/_save_status.
+      // The key is per control, not per URL: all three of these PATCH the same
+      // path, and a shared key would let one control's success clear another's
+      // warning while the rejected state stayed on screen.
+      const save = (payload, key) =>
+        window.CodeGymSaveStatus.save("PATCH", "<%= profile_path %>", { user: payload }, key);
 
       const tz = document.getElementById("tz-select");
-      if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }));
+      if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
 
       const adaptive = document.getElementById("adaptive-set-size");
-      if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }));
+      if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }, "adaptive_set_size"));
 
       const STOPS  = <%= raw KindPreferences::MULTIPLIERS.to_json %>;
       const DEFAULT_STOP = <%= raw KindPreferences::DEFAULT_MULTIPLIER.to_json %>;
@@ -176,7 +168,7 @@
         let pending;
         const saveMix = () => {
           clearTimeout(pending);
-          pending = setTimeout(() => save(state()), 400);
+          pending = setTimeout(() => save(state(), "exercise_mix"), 400);
         };
 
         rows.forEach((row) => {

@@ -136,16 +136,10 @@
     let saveTimer;
     function autoSave() {
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(async () => {
-        await fetch(form.action, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify(payload())
-        });
+      // Through CodeGymSaveStatus so a refused or dropped save is reported
+      // rather than lost — these are the engineer's answers.
+      saveTimer = setTimeout(() => {
+        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers");
       }, 800);
     }
 

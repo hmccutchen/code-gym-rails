@@ -78,6 +78,9 @@ en:
       code_smell: "Code smells"
       oo_design: "Design principles"
       module_design: "Module design"
+  save_status:
+    generic: "Couldn't save your last change. It hasn't reached the server — check your connection and try again."
+    signed_out: "Couldn't save your last change — you've been signed out. Reload the page and sign in again."
   exercise_mix:
     summary: "Exercise mix"
     intro: "Bias how often each rotating section appears. This changes which kind fills a slot, not how many sections a day holds — that's the setting above."
