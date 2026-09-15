@@ -33,8 +33,10 @@ When auditing comments mechanically, note that `#{...}` interpolations and `#`
 lines *inside* a heredoc are content, not comments — in `AiService` they are
 prompt text sent to the provider, and in `FakeService` canned provider output.
 
-**Writing style.** Commit messages, PR descriptions, and code comments follow
-the same plain-language standard the app asks its own generated prose to meet.
+**Writing style.** Commit messages, PR descriptions, code comments, and any
+technical explanation written for a person — a code review, a design note, a
+debugging write-up, an answer to a question — follow the same plain-language
+standard the app asks its own generated prose to meet.
 The app's copy is `AiService::PLAIN_LANGUAGE_STANDARD`, shared by the prompts
 that explain, reframe, answer follow-ups on, or grade an engineer's work.
 `spec/services/ai_service_spec.rb` fails when the list below drifts from it.
@@ -61,13 +63,21 @@ Aim for:
 - Natural rhythm — if a sentence sounds stilted read aloud, rewrite it.
 
 The app's version also asks for second person, direct address. That item is
-left out here on purpose: a commit message or a code comment has no reader to
-address.
+left off the list on purpose, because it depends on who is reading: an
+explanation written for someone should use it, while a commit message or a code
+comment has no reader to address.
 
 Calibration: too informal ("This is a total game-changer!") and too
 formal/overwrought ("The interface undergoes a paradigmatic transformation")
 are both wrong; aim for the plain middle ("This changes how the interface
 works").
+
+Some developers also install a personal skill carrying this standard for prose
+written outside any repository
+(`~/.claude/skills/plain-communication-style/SKILL.md`). It is per-developer and
+not part of this project, so nothing here depends on it — this section is the
+whole rule for anything written into this repository, and it is the one with a
+spec behind it if the two ever disagree.
 
 **Modular, so it's easy to change.** Following pragmatic-programming principles:
 
