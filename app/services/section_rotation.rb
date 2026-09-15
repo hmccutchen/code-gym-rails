@@ -14,24 +14,34 @@ class SectionRotation
   OPTIONAL_SLOTS       = (ExerciseSection.slots.keys - [ :code_review ]).freeze
   MANDATORY_SLOT_COUNT = ExerciseSection.slot_count - OPTIONAL_SLOTS.size
 
-  def self.for(history, count:)
+  def self.for(history, count:, preferences: KindPreferences.none)
     recent    = history.first(LOOKBACK)
     available = (count - MANDATORY_SLOT_COUNT).clamp(0, OPTIONAL_SLOTS.size)
 
     filled = OPTIONAL_SLOTS
-      .sort_by { |slot| [ -slot_staleness(slot, recent), OPTIONAL_SLOTS.index(slot) ] }
+      .sort_by { |slot| [ -slot_staleness(slot, recent, preferences), OPTIONAL_SLOTS.index(slot) ] }
       .first(available)
 
-    OPTIONAL_SLOTS.index_with { |slot| filled.include?(slot) ? pick_kind(slot, recent) : nil }
+    OPTIONAL_SLOTS.index_with { |slot| filled.include?(slot) ? pick_kind(slot, recent, preferences) : nil }
   end
 
-  def self.eligible(slot)
-    ExerciseSection.slots.fetch(slot)
+  # Exclusion removes a kind from the pool everywhere the pool is read — the
+  # roll, the starvation check, and the slot's own staleness. A weight never
+  # does; it only leans the roll. That asymmetry is the point: a slot ranked on
+  # a kind that can never fill it would win a scarce spot on false strength.
+  #
+  # User validation refuses an exclusion that would empty a slot, so the
+  # fallback below is for a row that got past it. Ignoring an impossible
+  # preference beats a day that silently drops a section.
+  def self.eligible(slot, preferences)
+    kinds = ExerciseSection.slots.fetch(slot)
+
+    kinds.reject { |kind| preferences.excluded?(kind) }.presence || kinds
   end
   private_class_method :eligible
 
-  def self.slot_staleness(slot, recent)
-    eligible(slot).map { |kind| staleness(kind, recent) }.max
+  def self.slot_staleness(slot, recent, preferences)
+    eligible(slot, preferences).map { |kind| staleness(kind, recent) }.max
   end
   private_class_method :slot_staleness
 
@@ -48,17 +58,22 @@ class SectionRotation
   # worst-case wait at the pool size, which a coin flip among equals would not.
   # Below starvation, equally stale kinds get equal weight and the tie breaks
   # randomly — see the weighted-roll comment below.
-  def self.pick_kind(slot, recent)
-    kinds   = eligible(slot)
+  #
+  # The user's multiplier reaches the roll and nothing else. Starvation returns
+  # above it, so no weight can hold a kind out of rotation indefinitely — the
+  # failure mode staleness-weighting replaced.
+  def self.pick_kind(slot, recent, preferences)
+    kinds   = eligible(slot, preferences)
     starved = kinds.select { |kind| staleness(kind, recent) > STARVATION_LIMIT }
 
     return most_stale(starved, recent).key.to_sym if starved.any?
 
-    # Weighted purely by staleness — no base-weights table multiplied in. No
-    # kind here is the baseline the others vary from, so recency is the only
-    # thing separating them (DailyPlan's old fixed third/fourth weight tables
-    # were uniform for the same reason, before this replaced them).
-    weights = kinds.index_with { |kind| staleness(kind, recent) }
+    # Weighted by staleness times the user's stated bias — no base-weights table
+    # multiplied in. No kind here is the baseline the others vary from, so
+    # recency and stated preference are the only things separating them
+    # (DailyPlan's old fixed third/fourth weight tables were uniform for the
+    # same reason, before this replaced them).
+    weights = kinds.index_with { |kind| staleness(kind, recent) * preferences.multiplier_for(kind) }
     WeightedRoll.pick(weights).key.to_sym
   end
   private_class_method :pick_kind
