@@ -301,11 +301,32 @@ the row was the featured concept, and nil means it never has been.
   history serializes to the same body as before at the `#call` boundary, and
   `ai_service_spec`'s "single-shot purposes" group drives the six other public
   entry points and asserts the history each one reaches `#call` with is empty.
-  **This buys no cost reduction on either provider** — the merged duck system
-  prompt can exceed `claude-sonnet-5`'s cache minimum for a section grounded
-  in a longer real-source excerpt, and `cache_system` is still not passed;
-  whether to turn it on is an open question. What it buys is that a user
-  typing `You:` into the duck box can no longer forge an assistant
+  **`duck_response` passes `cache_system: true`; the other conversational
+  caller does not.** Counted with `count_tokens` against `claude-sonnet-5`
+  rather than estimated from characters, the merged duck prompt runs 993-1,182
+  tokens across the stored `code_review` exercises — median 1,059 — and 1,364
+  for the largest excerpt `RealSource` can actually produce. Against a
+  1024-token minimum that means the ordinary day caches, not just a
+  real-source one; only the shortest sections fall short, and there the
+  provider declines to cache rather than billing a write, so they pay nothing
+  for the marker. The write premium is worth it because a duck thread is
+  multi-turn by construction and the merged prompt is byte-identical across
+  its turns: the second turn already clears the cost (1.25x write plus 0.1x
+  read against 2x uncached).
+
+  Two numbers here have been wrong before, both from estimating at 3.5
+  characters per token. Real text in these prompts runs 2.83-2.94, so the
+  estimates read about 20% low, which is what made the median look like it sat
+  below the minimum when it does not. Re-measure rather than re-derive.
+
+  **`answer_follow_up` stays uncached, and that is checked rather than
+  inherited.** Its system prompt carries the question and a review summary
+  instead of the section's code, measuring 533-604 tokens — roughly half the
+  minimum, a margin no tokenization error closes. Asking there would set a
+  marker the provider ignores.
+
+  What the turn conversion itself buys is that a user typing `You:` into the
+  duck box can no longer forge an assistant
   turn — but only on the Claude path, where `history` reaches the provider as
   real `messages`. This is the bullet's second Claude/Gemini asymmetry:
   `GeminiService` still goes through `#flatten_history`, which re-renders the
