@@ -78,6 +78,22 @@ en:
       code_smell: "Code smells"
       oo_design: "Design principles"
       module_design: "Module design"
+  exercise_mix:
+    summary: "Exercise mix"
+    intro: "Bias how often each rotating section appears. This changes which kind fills a slot, not how many sections a day holds."
+    third_group: "Rotating third section"
+    fourth_group: "Rotating fourth section"
+    exclude_heading: "Excluding is a stronger, different action than turning a slider down."
+    exclude_body_weak: "A slider at Much less means rarely — the section can still come up, and it will if you haven't seen it in a long while, so nothing disappears from your rotation permanently."
+    exclude_body_strong: "Exclude means never. The section is removed from rotation entirely and will not appear again until you turn it back on."
+    exclude_label: "Exclude"
+    last_in_slot: "At least one section in this group has to stay in rotation."
+    stops:
+      - "Much less"
+      - "Less"
+      - "Default"
+      - "More"
+      - "Much more"
   sections:
     code_review:
       name: "Code Review"
