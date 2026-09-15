@@ -35,8 +35,8 @@ class LearnController < ApplicationController
 
   # POST /learn/:bucket/:concept/prepare — write up this one concept now.
   #
-  # `refresh_guide: true` is what lets this rewrite a row that predates guides.
-  # Confining that to a concept someone deliberately opened is why the
+  # `refresh: true` is what lets this rewrite a row missing its guide or its
+  # ladder. Confining that to a concept someone deliberately opened is why the
   # backfill below refuses to do it.
   #
   # JSON, since only script calls it: the page posts and polls rather than
@@ -46,7 +46,7 @@ class LearnController < ApplicationController
     concept = validated_concept(bucket)
 
     GenerateConceptReferenceJob.perform_later(
-      concept: concept, language: bucket, user_id: current_user.id, refresh_guide: true
+      concept: concept, language: bucket, user_id: current_user.id, refresh: true
     )
 
     render json: { status: "queued" }

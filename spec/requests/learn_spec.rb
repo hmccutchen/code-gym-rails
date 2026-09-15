@@ -270,7 +270,7 @@ RSpec.describe "Learn", type: :request do
       expect {
         post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
       }.to have_enqueued_job(GenerateConceptReferenceJob)
-        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh_guide: true)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["status"]).to eq("queued")
@@ -323,7 +323,7 @@ RSpec.describe "Learn", type: :request do
       expect {
         post prepare_learn_path
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
-        .with(hash_including(refresh_guide: true))
+        .with(hash_including(refresh: true))
     end
 
     it "enqueues nothing once every concept has a row" do

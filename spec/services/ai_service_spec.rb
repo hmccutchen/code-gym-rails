@@ -4245,7 +4245,8 @@ RSpec.describe AiService do
       {
         "tagline" => "t", "explanation" => "e", "code_example" => "c", "senior_lens" => "s",
         "guide_plain_language" => "plain", "guide_worked_example" => "worked",
-        "guide_pitfalls" => "pitfalls"
+        "guide_pitfalls" => "pitfalls",
+        "ladder_junior" => "j", "ladder_senior" => "s", "ladder_principal_engineer" => "p"
       }
     end
 
@@ -4330,6 +4331,33 @@ RSpec.describe AiService do
       expect(result["guide_worked_example"]).to eq("worked")
       expect(result["guide_pitfalls"]).to eq("pitfalls")
     end
+
+    it "asks for the ladder in the same request, with its grain example" do
+      service = double_class.new(canned_text: full_reference.to_json)
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      AiService::CONCEPT_LADDER_FIELDS.each { |field| expect(service.last_prompt).to include(field) }
+      expect(service.last_prompt).to include("composite index column order")
+    end
+
+    it "still succeeds when the provider omits the ladder" do
+      result = double_class.new(canned_text: full_reference.except(*AiService::CONCEPT_LADDER_FIELDS).to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result.values_at(*AiService::CONCEPT_LADDER_FIELDS)).to all(be_nil)
+    end
+
+    # Matches the guide normalizer: a runaway rung is a flubbed ladder, not a
+    # rung to cut short. The read side truncates separately.
+    it "normalizes an unusable rung to nil" do
+      [ [ "a list" ], "   ", "x" * (AiService::MAX_LADDER_RUNG_LENGTH + 1) ].each do |junk|
+        result = double_class.new(canned_text: full_reference.merge("ladder_senior" => junk).to_json)
+                             .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+        expect(result["ladder_senior"]).to be_nil
+        expect(result["ladder_junior"]).to eq("j")
+      end
+    end
   end
 
   # CONCEPT_REFERENCE_FIELDS is what #explain_concept_differently sends as
@@ -4353,6 +4381,18 @@ RSpec.describe AiService do
       service.explain_concept_differently(user, reference)
 
       expect(service.last_prompt).not_to include("PLAIN_MARKER", "WORKED_MARKER", "PITFALLS_MARKER")
+    end
+
+    it "does not send the ladder to the alternate-framing prompt" do
+      reference = ConceptReference.create!(
+        concept: "caching", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+        ladder_junior: "JUNIOR_MARKER", ladder_senior: "SENIOR_MARKER", ladder_principal_engineer: "PRINCIPAL_MARKER"
+      )
+      service = double_class.new(canned_text: "Another angle.")
+      service.explain_concept_differently(user, reference)
+
+      expect(service.last_prompt).not_to include("JUNIOR_MARKER", "SENIOR_MARKER", "PRINCIPAL_MARKER")
     end
   end
 end

@@ -201,7 +201,10 @@ class FakeService < AiService
     EXAMPLE
     "guide_pitfalls" =>
       "The appealing wrong idea is that this only matters at scale, so it can wait. It matters as soon as the code is " \
-      "read by someone who did not write it, which is usually sooner."
+      "read by someone who did not write it, which is usually sooner.",
+    "ladder_junior" => "One obvious instance in a short method, where the fix is a single change.",
+    "ladder_senior" => "The instance hides behind a helper or a callback, so finding it means tracing a call path.",
+    "ladder_principal_engineer" => "The fix has a real cost elsewhere, and the answer weighs that cost against leaving it."
   }.freeze
 
   # The concept-reference reframing. Deliberately a different angle from

@@ -884,7 +884,7 @@ class AiService
       raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
     end
 
-    normalize_concept_guide_fields!(reference)
+    normalize_optional_reference_fields!(reference)
 
     reference
   end
@@ -1088,20 +1088,20 @@ class AiService
 
   private
 
-  # Guide fields are optional (see CONCEPT_GUIDE_FIELDS), but anything present
-  # is prose rendered straight into the Learn tab, so it gets the same
-  # boundary treatment as every other provider field this app trusts into a
-  # page: only a String survives, stripped, and bounded to
-  # MAX_CONCEPT_GUIDE_LENGTH. Anything else — an array, an object, a
-  # whitespace-only string, a runaway one — normalizes to nil rather than
-  # raising: an unusable guide is still a legacy row, not a failed generation.
-  def normalize_concept_guide_fields!(reference)
-    CONCEPT_GUIDE_FIELDS.each do |field|
-      value = reference[field]
-      value = value.is_a?(String) ? value.strip : nil
-      value = nil if value.blank? || value.length > MAX_CONCEPT_GUIDE_LENGTH
-      reference[field] = value
-    end
+  # Guide and ladder fields are optional (see CONCEPT_GUIDE_FIELDS and
+  # CONCEPT_LADDER_FIELDS). Guide text is rendered into the Learn tab and rungs
+  # into a generation prompt, so both get boundary treatment: only a String
+  # survives, stripped and within its bound. Anything else normalizes to nil
+  # rather than raising — an unusable optional field is still a usable reference.
+  def normalize_optional_reference_fields!(reference)
+    CONCEPT_GUIDE_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_CONCEPT_GUIDE_LENGTH) }
+    CONCEPT_LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_LADDER_RUNG_LENGTH) }
+  end
+
+  def usable_optional_text(value, max_length)
+    text = value.is_a?(String) ? value.strip : nil
+
+    text.blank? || text.length > max_length ? nil : text
   end
 
   # A provider that cannot represent a real turn array renders the conversation
@@ -2111,6 +2111,13 @@ class AiService
       This standard applies to the guide fields only:
       #{PLAIN_LANGUAGE_STANDARD}
 
+      Then write a difficulty ladder: for each of #{KindDifficulty::LEVELS.join(', ')}, what a
+      problem about THIS concept looks like at that level. Name its concrete form, never a
+      description of the level in general. For missing_index, for example: junior is an
+      unindexed foreign key, senior is composite index column order, principal_engineer is
+      the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
+      #{MAX_LADDER_RUNG_LENGTH} characters.
+
       Return JSON matching this schema exactly:
       {
         "tagline":      "string — bold one-liner",
@@ -2119,7 +2126,10 @@ class AiService
         "senior_lens":  "string — #{senior_lens_desc}",
         "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
         "guide_worked_example": "#{worked_example_description(concept, medium)}",
-        "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing"
+        "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
+        "ladder_junior":             "string — a junior-level problem about this concept",
+        "ladder_senior":             "string — a senior-level problem about this concept",
+        "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept"
       }
     PROMPT
   end
