@@ -35,16 +35,16 @@ prompt text sent to the provider, and in `FakeService` canned provider output.
 
 **Writing style.** Commit messages, PR descriptions, and code comments follow
 the same plain-language standard the app asks its own generated prose to meet.
-It is one standard applied in two places, not a separate rule for docs. The
-app's copy is `AiService::PLAIN_LANGUAGE_STANDARD`, shared by the prompts that
+The same standard covers these docs and the app's generated prose. The app's
+copy is `AiService::PLAIN_LANGUAGE_STANDARD`, shared by the prompts that
 explain, reframe, answer follow-ups on, or grade an engineer's work.
 
-Avoid, most common first:
+Avoid, in order of how often these actually show up:
 
-- Manufactured rhetorical contrast — "not X, but Y" used for punch when a plain
-  sentence says the same thing.
-- Buzzwords and jargon. Use the plain equivalent; if a technical term is
-  genuinely necessary, define it briefly on first use.
+- Manufactured rhetorical contrast — "not X, but Y" used purely for punch when
+  a plain sentence says the same thing.
+- Buzzwords and jargon. Use the plain-language equivalent; if a technical term
+  is genuinely necessary, define it briefly on first use.
 - Placeholder phrases — "please note," "at this time," "it's worth mentioning."
 - Overusing "please" in instructions — state it directly.
 - Starting every sentence with the same construction.
@@ -64,9 +64,10 @@ The app's version also asks for second person, direct address. That item is
 left out here on purpose: a commit message or a code comment has no reader to
 address.
 
-Calibration: too informal ("This is a total game-changer!") and too formal
-("The interface undergoes a paradigmatic transformation") are both wrong; aim
-for the plain middle ("This changes how the interface works").
+Calibration: too informal ("This is a total game-changer!") and too
+formal/overwrought ("The interface undergoes a paradigmatic transformation")
+are both wrong; aim for the plain middle ("This changes how the interface
+works").
 
 **Modular, so it's easy to change.** Following pragmatic-programming principles:
 
@@ -299,11 +300,12 @@ the row was the featured concept, and nil means it never has been.
   `spec/services/provider_request_characterization_spec.rb` pins that an empty
   history serializes to the same body as before at the `#call` boundary, and
   `ai_service_spec`'s "single-shot purposes" group drives the six other public
-  entry points and asserts the history each one reaches `#call` with is empty. **This buys no cost reduction on either provider** — the merged duck
-  system prompt for a typical section stays below `claude-sonnet-5`'s
-  1024-token cache minimum, so `cache_system` is deliberately not passed.
-  What it buys is
-  that a user typing `You:` into the duck box can no longer forge an assistant
+  entry points and asserts the history each one reaches `#call` with is empty.
+  **This buys no cost reduction on either provider** — the merged duck system
+  prompt can exceed `claude-sonnet-5`'s cache minimum for a section grounded
+  in a longer real-source excerpt, and `cache_system` is still not passed;
+  whether to turn it on is an open question. What it buys is that a user
+  typing `You:` into the duck box can no longer forge an assistant
   turn — but only on the Claude path, where `history` reaches the provider as
   real `messages`. This is the bullet's second Claude/Gemini asymmetry:
   `GeminiService` still goes through `#flatten_history`, which re-renders the

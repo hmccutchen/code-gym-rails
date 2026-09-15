@@ -211,8 +211,8 @@ class AiService
   # for commits and comments, so a change here belongs there too. Defined
   # above DUCK_SYSTEM_PROMPT because that constant interpolates it at load
   # time.
-  PLAIN_LANGUAGE_STANDARD = <<~STANDARD.chomp
-    Write prose for the engineer this way.
+  PLAIN_LANGUAGE_STANDARD = <<~STANDARD.chomp.freeze
+    Write prose for the engineer this way:
 
     Avoid, in order of how often these actually show up:
     - Manufactured rhetorical contrast — "not X, but Y" used purely for punch when a plain sentence says the same thing.
@@ -964,7 +964,7 @@ class AiService
       # the one piece of free-form text they authored, and this method exists
       # because a role boundary that a user can write across is not a boundary.
       # Re-sending it each round costs nothing that `system` would have saved —
-      # the prompt is far below the provider's minimum cacheable prefix either
+      # the prompt is below the provider's minimum cacheable prefix either
       # way (see CLAUDE.md's "Conversational calls send real turns").
       system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.

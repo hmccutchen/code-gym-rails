@@ -3648,10 +3648,9 @@ RSpec.describe AiService do
 
     # Class-level, because #review_sections builds a fresh service per thread.
     let(:recording_class) do
+      calls = []
       Class.new(double_class) do
-        def self.calls
-          @calls ||= []
-        end
+        define_singleton_method(:calls) { calls }
 
         def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           self.class.calls << "#{system}\n#{prompt}"
