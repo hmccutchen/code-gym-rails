@@ -564,4 +564,24 @@ RSpec.describe DailyPlan do
       end
     end
   end
+
+  # A difficulty target changes prompt text only. Planning must not consult it,
+  # whether the kind is untargeted, targeted, or locked.
+  describe "difficulty targets" do
+    it "never reads KindDifficulty and plans the same day regardless" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(WeightedRoll).to receive(:pick).and_return(:application_code)
+      expect(KindDifficulty).not_to receive(:for)
+      expect(KindDifficulty).not_to receive(:new)
+
+      untargeted = DailyPlan.for(user, language: "ruby_rails")
+      user.update!(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
+      targeted = DailyPlan.for(user.reload, language: "ruby_rails")
+      user.update!(locked_section_kinds: [ "code_review", "challenge" ])
+      locked = DailyPlan.for(user.reload, language: "ruby_rails")
+
+      expect(targeted).to eq(untargeted)
+      expect(locked).to eq(untargeted)
+    end
+  end
 end

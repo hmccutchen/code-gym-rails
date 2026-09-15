@@ -1660,6 +1660,126 @@ RSpec.describe AiService do
     end
   end
 
+  describe "difficulty targets in the generation prompt" do
+    def render(difficulty:, ladders: {}, third: :challenge, fourth: :plan_review, mode: :application_code)
+      service.send(:build_exercise_prompt, user, "ruby_rails",
+                   third: third, fourth: fourth, code_review_mode: mode,
+                   reinforcement: [], due_checks: [], established: [], history: [],
+                   difficulty: difficulty, ladders: ladders)
+    end
+
+    let(:untargeted) { render(difficulty: KindDifficulty.none) }
+
+    it "renders nothing new for a user with no targets" do
+      expect(render(difficulty: KindDifficulty.new(levels: {}, locked: []))).to eq(untargeted)
+      expect(untargeted).not_to include("Difficulty targets")
+    end
+
+    it "renders nothing new when the targeted kinds are not on today's plan" do
+      difficulty = KindDifficulty.new(levels: { "architecture" => "senior", "ambiguity_hunt" => "junior" },
+                                      locked: [ "architecture" ])
+
+      expect(render(difficulty: difficulty, ladders: { "senior" => { "n_plus_one" => "rung" } })).to eq(untargeted)
+    end
+
+    it "lists one concept once for sections sharing a level" do
+      difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "senior" }, locked: [])
+      prompt = render(difficulty: difficulty, ladders: { "senior" => { "n_plus_one" => "hidden behind a helper" } })
+
+      expect(prompt).to include("Sections at senior: code_review, challenge")
+      expect(prompt.scan("- n_plus_one: hidden behind a helper").size).to eq(1)
+      expect(prompt).to include("For a concept not listed, a senior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['senior']}")
+    end
+
+    it "falls back to the definition alone when nothing at a level is grounded" do
+      difficulty = KindDifficulty.new(levels: { "pattern" => "junior" }, locked: [])
+
+      expect(render(difficulty: difficulty)).to include("A junior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}")
+    end
+
+    it "defines full difficulty for retention checks in targeted sections" do
+      difficulty = KindDifficulty.new(levels: { "challenge" => "principal_engineer" }, locked: [])
+
+      expect(render(difficulty: difficulty))
+        .to include("A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.")
+    end
+
+    it "names unlocked and locked sections on their own lines" do
+      difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "principal_engineer" },
+                                      locked: [ "challenge" ])
+      prompt = render(difficulty: difficulty)
+
+      expect(prompt).to include("Unlocked (code_review): tier annotations and rating adjustments above still apply")
+      expect(prompt).to include("Locked (challenge): for these sections, ignore the `(reduced)` easing rule")
+      expect(prompt).to include("including a concept the engineer has never seen")
+    end
+
+    it "omits the lock line when nothing is locked, and the unlocked line when everything is" do
+      unlocked = render(difficulty: KindDifficulty.new(levels: { "challenge" => "senior" }, locked: []))
+      locked   = render(difficulty: KindDifficulty.new(levels: { "challenge" => "senior" }, locked: [ "challenge" ]))
+
+      expect(unlocked).not_to include("Locked (")
+      expect(locked).not_to include("Unlocked (")
+    end
+
+    # The read-side half of the invariant, end to end: a lock with no level must
+    # never reach the prompt.
+    it "renders no lock for an orphaned lock written past validation" do
+      user.save!
+      user.update_columns(locked_section_kinds: [ "challenge" ])
+
+      expect(render(difficulty: KindDifficulty.for(user.reload))).to eq(untargeted)
+    end
+
+    describe "#ladders_for" do
+      it "loads each targeted kind's rungs for the day's mode and merges them by level" do
+        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                 ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+        schema_concept = AiService::DATA_MODELING_CONCEPTS.first
+        ConceptReference.create!(concept: schema_concept, language: "ruby_rails",
+                                 ladder_junior: "j2", ladder_senior: "s2", ladder_principal_engineer: "p2")
+        kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
+        difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "senior" }, locked: [])
+
+        ladders = service.send(:ladders_for, kinds, difficulty, "ruby_rails", :schema_review)
+
+        expect(ladders.keys).to eq([ "senior" ])
+        expect(ladders["senior"]).to include("n_plus_one" => "s", schema_concept => "s2")
+      end
+    end
+
+    describe "MAX_LADDER_GUIDANCE_CHARS" do
+      # For each day shape, the level assignment whose distinct concepts cost the
+      # most, rendered for real with every rung at its maximum length and every
+      # section locked. Fails when a vocabulary grows past the budget, so the
+      # decision to shorten rungs or change delivery is made on purpose.
+      def largest_block_for(language, mode, third, fourth)
+        kinds = ExerciseSection.for_plan(pattern: :pattern, third: third, fourth: fourth)
+        vocab = kinds.to_h { |kind| [ kind, ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) ] }
+        assignment = KindDifficulty::LEVELS.repeated_permutation(kinds.size).max_by do |levels|
+          kinds.zip(levels).group_by(&:last).sum do |_, pairs|
+            pairs.flat_map { |kind, _| vocab[kind] }.uniq.sum { |concept| concept.size + AiService::MAX_LADDER_RUNG_LENGTH }
+          end
+        end
+        placed = kinds.zip(assignment)
+        difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
+        ladders = placed.each_with_object({}) do |(kind, level), acc|
+          (acc[level] ||= {}).merge!(vocab[kind].index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+        end
+
+        service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+      end
+
+      it "holds the largest block any day can render" do
+        shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys,
+                                                  ExerciseSection.thirds.map { |kind| kind.key.to_sym },
+                                                  ExerciseSection.fourths.map { |kind| kind.key.to_sym })
+
+        expect(shapes.map { |shape| largest_block_for(*shape) }.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
+      end
+    end
+  end
+
   describe "diagram instructions in the generation prompt" do
     # The syntax rules used to live in the architecture-only branch. They now
     # govern code_review and pattern, which are present every single day.

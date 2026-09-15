@@ -733,6 +733,11 @@ class AiService
   # one generation prompt, so this is tighter than MAX_CONCEPT_GUIDE_LENGTH.
   MAX_LADDER_RUNG_LENGTH = 300
 
+  # Ceiling on the difficulty block's characters. A spec renders the worst case
+  # from the live vocabularies, so this fails when a vocabulary grows past it
+  # rather than letting the prompt grow unnoticed.
+  MAX_LADDER_GUIDANCE_CHARS = 48_000
+
   # Bounds provider prose rendered straight into a page, the same reason
   # ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH bounds a scaffold label. Not
   # derived from a schema — the prompt asks for at most two short paragraphs per
@@ -798,6 +803,10 @@ class AiService
     # anything changed for this user during the provider call.
     history = user.recent_performance
 
+    difficulty = KindDifficulty.for(user)
+    kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
+    ladders    = ladders_for(kinds, difficulty, language, plan.code_review_mode)
+
     result = call_and_log(
       user, purpose: "generate_exercise",
       read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
@@ -808,14 +817,14 @@ class AiService
                                     fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
                                     fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
                                     code_review_mode: plan.code_review_mode,
-                                    code_review_source: plan.code_review_source)
+                                    code_review_source: plan.code_review_source,
+                                    difficulty: difficulty, ladders: ladders)
     )
 
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set"),
       language: language,
-      expected_keys: ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth,
-                                              pattern: plan.pattern).map(&:key),
+      expected_keys: kinds.map(&:key),
       code_review_source: plan.code_review_source
     )
     problem_set = ingested.problem_set
@@ -1444,7 +1453,8 @@ class AiService
                             reinforcement: nil, due_checks: [],
                             established: [], history: user.recent_performance,
                             fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
-                            code_review_mode: :application_code, code_review_source: nil)
+                            code_review_mode: :application_code, code_review_source: nil,
+                            difficulty: KindDifficulty.none, ladders: {})
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -1609,7 +1619,7 @@ class AiService
       #{retention_block}
       #{established_block}
       #{fourth_retention_block}
-      #{fourth_established_block}
+      #{fourth_established_block}#{kind_difficulty_guidance(kinds, difficulty, ladders)}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
@@ -1780,6 +1790,71 @@ class AiService
       "its own. The challenge section is the exception to the answer shape, since its answer is code: there " \
       "starter_code carries the instance and the question asks for the renamed or re-bounded version, so writing " \
       "it IS the answer rather than describing it."
+  end
+
+  # { level => { concept => rung } } for today's targeted kinds, in the day's
+  # mode. Merging by concept name is safe because a day's buckets never share a
+  # concept name (spec/models/concept_reference_spec.rb holds that).
+  def ladders_for(kinds, difficulty, language, code_review_mode)
+    (kinds & difficulty.targeted_kinds).each_with_object({}) do |kind, ladders|
+      level = difficulty.level_for(kind)
+      rungs = ConceptReference.ladder_rungs(
+        bucket:   ConceptBucket.for(kind.key, language),
+        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode),
+        level:    level
+      )
+      (ladders[level] ||= {}).merge!(rungs)
+    end
+  end
+
+  # Appended last, so it is the final instruction before the schema. Grouped by
+  # level so a concept shared by same-level sections is listed once. Empty when
+  # nothing on today's plan is targeted, which keeps every other prompt
+  # byte-identical.
+  def kind_difficulty_guidance(kinds, difficulty, ladders)
+    targeted = kinds & difficulty.targeted_kinds
+    return "" if targeted.empty?
+
+    locked, unlocked = targeted.partition { |kind| difficulty.locked?(kind) }
+    paragraphs = KindDifficulty::LEVELS.filter_map do |level|
+      at_level = targeted.select { |kind| difficulty.level_for(kind) == level }
+      level_difficulty_paragraph(level, at_level, ladders.fetch(level, {})) if at_level.any?
+    end
+
+    [ "", "Difficulty targets. For each section named below, its level replaces the skill level in the " \
+          "engineer profile above, for that section only.",
+      *paragraphs, "",
+      "A retention check or established concept placed in one of these sections is pitched at that " \
+      "section's level, with no easing.",
+      unlocked_difficulty_line(unlocked), locked_difficulty_line(locked) ].compact.join("\n")
+  end
+
+  def level_difficulty_paragraph(level, kinds, rungs)
+    definition = KindDifficulty::LEVEL_DEFINITIONS.fetch(level)
+    lines = [ "", "Sections at #{level}: #{kinds.map(&:key).join(', ')}" ]
+    return (lines << "Pitch these problems at this level. A #{level} problem is: #{definition}").join("\n") if rungs.empty?
+
+    lines << "Pitch these problems at this level for whichever concept you choose:"
+    lines.concat(rungs.sort.map { |concept, rung| "- #{concept}: #{rung}" })
+    (lines << "For a concept not listed, a #{level} problem is: #{definition}").join("\n")
+  end
+
+  def unlocked_difficulty_line(kinds)
+    return if kinds.empty?
+
+    "Unlocked (#{kinds.map(&:key).join(', ')}): tier annotations and rating adjustments above still apply to " \
+      "these sections, eased or raised from the section's level rather than from the profile's skill level."
+  end
+
+  # Names each rule it overrides. An easing rule added to the prompt later must
+  # be added here on purpose; nothing covers it by implication.
+  def locked_difficulty_line(kinds)
+    return if kinds.empty?
+
+    "Locked (#{kinds.map(&:key).join(', ')}): for these sections, ignore the `(reduced)` easing rule and both " \
+      "the \"too easy\" and \"too hard\" rating adjustments above, whichever concept they carry — including a " \
+      "concept the engineer has never seen. Where a locked section has an answer scaffold or starter code, " \
+      "write it at its level, not easier."
   end
 
   # A kind's generation instructions. The vocabulary comes from
