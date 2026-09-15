@@ -1339,4 +1339,13 @@ RSpec.describe User, type: :model do
       expect(user.reload.reminders_none?).to be(true)
     end
   end
+
+  describe "section kind preferences" do
+    it "starts with no stated preference at all" do
+      user = create_user_with_key
+
+      expect(user.section_kind_weights).to eq({})
+      expect(user.excluded_section_kinds).to eq([])
+    end
+  end
 end
