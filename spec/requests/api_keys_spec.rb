@@ -146,4 +146,28 @@ RSpec.describe "ApiKeys", type: :request do
       expect(doc.at("#weight-parsons_problem")["disabled"]).to be_present
     end
   end
+
+  describe "GET /setup exercise mix difficulty" do
+    let(:user) { create_user_with_key }
+
+    before { login_as(user) }
+
+    it "renders difficulty controls for every section kind, fixed ones without a slider" do
+      get setup_path
+
+      ExerciseSection.all.each { |kind| expect(response.body).to include(%(data-kind="#{kind.key}")) }
+      expect(response.body).to include(%(id="lock-code_review"))
+      expect(response.body).not_to include(%(id="weight-code_review"))
+      expect(response.body).not_to include(%(id="exclude-code_review"))
+    end
+
+    it "shows a bulk button only while a targeted kind has gaps" do
+      get setup_path
+      expect(response.body).not_to include("prepare_ladders")
+
+      user.update!(section_kind_levels: { "security_review" => "senior" })
+      get setup_path
+      expect(response.body).to include(prepare_learn_ladders_path)
+    end
+  end
 end

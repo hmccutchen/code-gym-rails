@@ -1,0 +1,26 @@
+<%# app/views/api_keys/_difficulty_controls.html.erb
+    Required locals: kind (an ExerciseSection class), excluded (Boolean). %>
+<% difficulty = KindDifficulty.for(current_user) %>
+<% level      = difficulty.level_for(kind) %>
+<% entry      = ladder_coverage.for_kind(kind) %>
+<fieldset class="mix-difficulty" data-kind="<%= kind.key %>">
+  <legend><%= t("exercise_mix.difficulty_legend") %></legend>
+  <label>
+    <input type="radio" name="level-<%= kind.key %>" value="" <%= "checked" if level.nil? %> <%= "disabled" if excluded %>>
+    <%= t("exercise_mix.level_default", skill_level: current_user.skill_level) %>
+  </label>
+  <% KindDifficulty::LEVELS.each do |option| %>
+    <label>
+      <input type="radio" name="level-<%= kind.key %>" value="<%= option %>" <%= "checked" if level == option %> <%= "disabled" if excluded %>>
+      <%= t("exercise_mix.levels.#{option}") %>
+    </label>
+  <% end %>
+  <label class="mix-lock" for="lock-<%= kind.key %>">
+    <input type="checkbox" class="mix-lock-box" id="lock-<%= kind.key %>"
+           <%= "checked" if difficulty.locked?(kind) %> <%= "disabled" if excluded || level.nil? %>>
+    <%= t("exercise_mix.lock_label") %>
+  </label>
+  <p class="hint mix-coverage" <%= "hidden" if level.nil? %>>
+    <%= t("exercise_mix.coverage", grounded: entry.grounded.size, total: entry.pairs.size) %>
+  </p>
+</fieldset>

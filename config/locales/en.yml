@@ -86,7 +86,8 @@ en:
     signed_out: "Couldn't save your last change — you've been signed out. Reload the page and sign in again."
   exercise_mix:
     summary: "Exercise mix"
-    intro: "Bias how often each rotating section appears. This changes which kind fills a slot, not how many sections a day holds — that's the setting above."
+    intro: "Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that's the setting above."
+    fixed_group: "Sections that don't rotate"
     third_group: "Rotating third section"
     fourth_group: "Rotating fourth section"
     exclude_heading: "Excluding is a stronger, different action than turning a slider down."
@@ -96,6 +97,20 @@ en:
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
+    difficulty_legend: "Difficulty target"
+    level_default: "Your skill level (%{skill_level})"
+    levels:
+      junior: "Junior"
+      senior: "Senior"
+      principal_engineer: "Principal engineer"
+    lock_label: "Lock at this level"
+    lock_heading: "Locking a difficulty target"
+    lock_body: "Lock means this section is always pitched at the level you chose. Easing for concepts you're finding hard, and adjustments from your difficulty ratings, stop applying to it — including the first time you meet a concept. Your progress is still tracked, and unlocking uses it again straight away."
+    coverage: "%{grounded} of %{total} concepts have difficulty notes."
+    ladders_button:
+      one: "Add difficulty notes for 1 concept"
+      other: "Add difficulty notes for %{count} concepts"
+    ladders_cost: "One provider call per concept, on your API key. What it writes is shared with everyone on the team, and rewrites those concepts' references, so their wording may change."
     ladders_preparing:
       one: "Writing one difficulty note now — it'll appear once it finishes."
       other: "Writing %{count} difficulty notes now — they'll appear as each one finishes."

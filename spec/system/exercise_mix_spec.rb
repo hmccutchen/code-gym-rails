@@ -114,4 +114,80 @@ RSpec.describe "Exercise mix", type: :system do
     # also saved — so without this the example passes with the autosave deleted.
     expect(exclusions_after_save(excluded.map(&:key))).to contain_exactly(*excluded.map(&:key))
   end
+
+  def difficulty_after_save(levels, locked, timeout: 5)
+    wait_for(timeout) { user.reload.section_kind_levels == levels && user.locked_section_kinds.sort == locked.sort }
+    [ user.reload.section_kind_levels, user.locked_section_kinds ]
+  end
+
+  it "gives fixed sections difficulty controls and no slider or exclude" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    within(".mix-difficulty[data-kind='code_review']") do
+      expect(page).to have_field("level-code_review", type: "radio", count: KindDifficulty::LEVELS.size + 1)
+    end
+    expect(page).not_to have_css("#weight-code_review")
+    expect(page).not_to have_css("#exclude-code_review")
+  end
+
+  it "saves a level and a lock, and keeps them across a reload" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    expect(find("#lock-code_review")).to be_disabled
+    find(".mix-difficulty[data-kind='code_review'] input[value='principal_engineer']").click
+    expect(find("#lock-code_review")).not_to be_disabled
+    find("#lock-code_review").click
+
+    expect(difficulty_after_save({ "code_review" => "principal_engineer" }, [ "code_review" ]))
+      .to eq([ { "code_review" => "principal_engineer" }, [ "code_review" ] ])
+
+    visit setup_path
+    find("#exercise-mix summary").click
+    expect(find(".mix-difficulty[data-kind='code_review'] input[value='principal_engineer']")).to be_checked
+    expect(find("#lock-code_review")).to be_checked
+  end
+
+  it "clears the lock when the level goes back to the default, and hides coverage" do
+    user.update!(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ])
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    expect(find(".mix-difficulty[data-kind='challenge'] .mix-coverage", visible: :all)).to be_visible
+    find(".mix-difficulty[data-kind='challenge'] input[value='']").click
+
+    expect(find("#lock-challenge")).not_to be_checked
+    expect(find("#lock-challenge")).to be_disabled
+    expect(page).to have_css(".mix-difficulty[data-kind='challenge'] .mix-coverage", visible: :hidden)
+    expect(difficulty_after_save({}, [])).to eq([ {}, [] ])
+  end
+
+  it "shows coverage as soon as a target is picked, without a reload" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    find(".mix-difficulty[data-kind='pattern'] input[value='junior']").click
+
+    expect(find(".mix-difficulty[data-kind='pattern'] .mix-coverage")).to have_text(/of \d+ concepts have difficulty notes/)
+  end
+
+  it "restores levels and locks from the server after a refused save" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    user.update!(section_kind_levels: { "pattern" => "senior" }, locked_section_kinds: [ "pattern" ])
+
+    find(".mix-difficulty[data-kind='code_review'] input[value='junior']").click
+
+    expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
+    expect(find(".mix-difficulty[data-kind='pattern'] input[value='senior']")).to be_checked
+    expect(find("#lock-pattern")).to be_checked
+    expect(find(".mix-difficulty[data-kind='code_review'] input[value='']")).to be_checked
+  end
 end
