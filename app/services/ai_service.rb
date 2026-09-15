@@ -836,7 +836,7 @@ class AiService
       log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
                     problem_set, plan.code_review_mode)
     end
-    log_difficulty_diagnostics(user, language, plan, problem_set, history)
+    log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds: kinds, difficulty: difficulty, ladders: ladders)
     problem_set
   end
 
@@ -1360,29 +1360,51 @@ class AiService
   # ResponsesController#log_review_diagnostics (correlated by user_id + date).
   # Safe to remove once that question is settled. See
   # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
-  def log_difficulty_diagnostics(user, language, plan, problem_set, history)
+  def log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds:, difficulty:, ladders:)
+    requested = {
+      skill_level: user.skill_level,
+      code_review_mode: plan.code_review_mode,
+      code_review_source: plan.code_review_source&.id,
+      pattern: plan.pattern,
+      third: plan.third,
+      fourth: plan.fourth,
+      section_count: kinds.size,
+      reinforcement: plan.reinforcement,
+      due_checks: plan.due_checks.map(&:concept),
+      established: plan.established.map(&:concept),
+      recent_performance: history
+    }
+    requested.merge!(kind_difficulty_diagnostics(kinds, difficulty, ladders, language, plan.code_review_mode, problem_set))
+
     payload = {
       event: "generation",
       user_id: user.id,
       date: Date.current.to_s,
       language: language,
-      requested: {
-        skill_level: user.skill_level,
-        code_review_mode: plan.code_review_mode,
-        code_review_source: plan.code_review_source&.id,
-        pattern: plan.pattern,
-        third: plan.third,
-        fourth: plan.fourth,
-        section_count: ExerciseSection.for_plan(pattern: plan.pattern, third: plan.third, fourth: plan.fourth).size,
-        reinforcement: plan.reinforcement,
-        due_checks: plan.due_checks.map(&:concept),
-        established: plan.established.map(&:concept),
-        recent_performance: history
-      },
+      requested: requested,
       delivered: without_answer_key(problem_set)
     }
 
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
+  end
+
+  # Coverage says whether material was available; chosen_grounded says whether
+  # the model picked a concept it had a rung for. Whether the problem was
+  # actually pitched at the rung is deliberately not measured here.
+  def kind_difficulty_diagnostics(kinds, difficulty, ladders, language, mode, problem_set)
+    targeted = kinds & difficulty.targeted_kinds
+    return {} if targeted.empty?
+
+    per_kind = targeted.to_h do |kind|
+      vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode)
+      grounded   = vocabulary & ladders.fetch(difficulty.level_for(kind), {}).keys
+      chosen     = problem_set.dig(kind.key, "concept")
+      [ kind.key, { level: difficulty.level_for(kind), locked: difficulty.locked?(kind),
+                    ladder_coverage: "#{grounded.size}/#{vocabulary.size}",
+                    chosen_concept: chosen, chosen_grounded: grounded.include?(chosen) } ]
+    end
+
+    { kind_difficulty: per_kind, kind_difficulty_chars: kind_difficulty_guidance(kinds, difficulty, ladders).length }
   end
 
   # Log storage is not one of the places the ambiguity hunt's answer key is

@@ -2246,6 +2246,15 @@ RSpec.describe AiService do
   end
 
   describe "difficulty diagnostics instrumentation" do
+    def diagnostics_payload(svc)
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+      svc.generate_exercise(user, language: "ruby_rails")
+      JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+    end
+
     it "logs what was requested and what was delivered on every generation" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       set = full_problem_set("code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" })
@@ -2388,6 +2397,38 @@ RSpec.describe AiService do
 
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
       expect(payload["requested"]["code_review_source"]).to eq(excerpt.id)
+    end
+
+    it "omits difficulty fields when nothing targeted is on the plan" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      user.update!(section_kind_levels: { "architecture" => "senior" })
+
+      payload = diagnostics_payload(double_class.new(canned_text: full_problem_set.to_json))
+
+      expect(payload["requested"]).not_to have_key("kind_difficulty")
+      expect(payload["requested"]).not_to have_key("kind_difficulty_chars")
+    end
+
+    it "logs level, lock, coverage, the chosen concept, and the block's length" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(WeightedRoll).to receive(:pick).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      user.update!(section_kind_levels: { "challenge" => "principal_engineer" }, locked_section_kinds: [ "challenge" ])
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+      set = full_problem_set("challenge" => { "concept" => "n_plus_one" })
+
+      payload = diagnostics_payload(double_class.new(canned_text: set.to_json))
+      vocabulary = ProblemSetIngest.selectable_vocabulary_for("challenge", "ruby_rails", mode: :application_code)
+
+      expect(payload["requested"]["kind_difficulty"]).to eq(
+        "challenge" => { "level" => "principal_engineer", "locked" => true,
+                         "ladder_coverage" => "1/#{vocabulary.size}",
+                         "chosen_concept" => "n_plus_one", "chosen_grounded" => true }
+      )
+      expect(payload["requested"]["kind_difficulty_chars"]).to be > 0
     end
   end
 
