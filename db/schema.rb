@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_15_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_15_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -53,6 +53,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_15_000002) do
     t.text "guide_pitfalls"
     t.text "guide_plain_language"
     t.text "guide_worked_example"
+    t.text "ladder_junior"
+    t.text "ladder_principal_engineer"
+    t.text "ladder_senior"
     t.string "language", null: false
     t.text "senior_lens"
     t.text "tagline"

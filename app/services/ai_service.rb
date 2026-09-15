@@ -723,6 +723,16 @@ class AiService
 
   CONCEPT_GUIDE_FIELDS = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
 
+  # Prompt-only content that grounds a difficulty target (see KindDifficulty).
+  # Outside the required-field check for the reason the guide is: a provider that
+  # flubs the ladder still leaves a usable reference.
+  LADDER_FIELD_FOR      = KindDifficulty::LEVELS.index_with { |level| "ladder_#{level}" }.freeze
+  CONCEPT_LADDER_FIELDS = LADDER_FIELD_FOR.values.freeze
+
+  # An honest one-or-two-sentence rung runs 100-200 characters. Many rungs share
+  # one generation prompt, so this is tighter than MAX_CONCEPT_GUIDE_LENGTH.
+  MAX_LADDER_RUNG_LENGTH = 300
+
   # Bounds provider prose rendered straight into a page, the same reason
   # ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH bounds a scaffold label. Not
   # derived from a schema — the prompt asks for at most two short paragraphs per
