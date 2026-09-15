@@ -126,14 +126,14 @@ RSpec.describe SectionRotation do
       expect(with[:third]).to eq(without[:third])
     end
 
+    # KindPreferences.none is the kwarg's own default, so calling #for with and
+    # without it can never diverge — pinned literal values are what makes an
+    # untouched user's unweighted behaviour an assertion instead of a tautology.
     it "matches the unweighted rotation when nothing is stated" do
       allow(WeightedRoll).to receive(:rand).and_return(0.42)
-      recent = all_thirds_fresh
 
-      [ 2, 3, 4 ].each do |count|
-        expect(described_class.for(recent, count: count, preferences: KindPreferences.none))
-          .to eq(described_class.for(recent, count: count))
-      end
+      expect(described_class.for(all_thirds_fresh, count: 4))
+        .to eq(pattern: :pattern, third: :security_review, fourth: :plan_review)
     end
   end
 

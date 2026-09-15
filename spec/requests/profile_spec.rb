@@ -128,6 +128,33 @@ RSpec.describe "Profile", type: :request do
       expect(response).to have_http_status(:ok)
       expect(user.reload.section_kind_weights).to eq("architecture" => 2.0)
     end
+
+    # Every slider back to Default, or the last exclusion unchecked — the full
+    # reset a user actually performs, distinct from the smaller-replaces-larger
+    # case above.
+    it "clears previously-stored preferences on a full reset" do
+      login_as(user)
+      user.update!(section_kind_weights: { "challenge" => 0.25 }, excluded_section_kinds: [ "parsons_problem" ])
+
+      patch_profile(section_kind_weights: {}, excluded_section_kinds: [])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.section_kind_weights).to eq({})
+      expect(user.excluded_section_kinds).to eq([])
+    end
+
+    # permit(excluded_section_kinds: []) silently drops a non-scalar entry
+    # rather than raising, so without this guard the malformed payload below
+    # would arrive as [] and clear the user's existing exclusions with a 200.
+    it "rejects an exclusion list containing a non-string entry" do
+      login_as(user)
+      user.update!(excluded_section_kinds: [ "parsons_problem" ])
+
+      patch_profile(excluded_section_kinds: [ { "a" => 1 } ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(user.reload.excluded_section_kinds).to eq([ "parsons_problem" ])
+    end
   end
 
   describe "PATCH /profile with the adaptive set size preference" do

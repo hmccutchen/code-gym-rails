@@ -5,8 +5,9 @@ class ProfileController < ApplicationController
 
   # PATCH /profile — inline name autosave (JSON)
   def update
-    return render_invalid_boolean if invalid_adaptive_set_size?
-    return render_invalid_weight  if invalid_section_kind_weights?
+    return render_invalid_boolean   if invalid_adaptive_set_size?
+    return render_invalid_weight    if invalid_section_kind_weights?
+    return render_invalid_exclusion if invalid_excluded_section_kinds?
 
     if current_user.update(profile_params)
       render json: { name: current_user.name, time_zone: current_user.time_zone,
@@ -40,8 +41,11 @@ class ProfileController < ApplicationController
 
   # A weight arrives from a range input indexing a server-rendered list, so a
   # non-numeric or off-stop value means a malformed request rather than a user
-  # action. Rejected here for the same reason as BOOLEAN_VALUES above: the
-  # column's cast would quietly turn "0.25" into 0.0.
+  # action. jsonb stores whatever it is handed, so a stray string would persist
+  # as a string rather than being coerced — the model validation would also
+  # catch it, but this boundary guard is deliberate defence-in-depth, and it
+  # fails with a message naming the allowed stops rather than a generic
+  # object-shape error.
   def invalid_section_kind_weights?
     weights = params.require(:user)[:section_kind_weights]
     return false if weights.blank?
@@ -52,6 +56,24 @@ class ProfileController < ApplicationController
 
   def render_invalid_weight
     render json: { errors: [ "Section weight must be one of #{KindPreferences::MULTIPLIERS.join(', ')}" ] },
+           status: :unprocessable_content
+  end
+
+  # permit(excluded_section_kinds: []) silently drops any non-scalar entry
+  # rather than rejecting the request, so a malformed payload like [{"a":1}]
+  # would otherwise arrive as [] and clear the user's existing exclusions with
+  # a 200. Checked against the raw param, before permit has already thrown the
+  # bad entries away.
+  def invalid_excluded_section_kinds?
+    excluded = params.require(:user)[:excluded_section_kinds]
+    return false if excluded.blank?
+    return true  unless excluded.is_a?(Array)
+
+    excluded.any? { |entry| !entry.is_a?(String) }
+  end
+
+  def render_invalid_exclusion
+    render json: { errors: [ "Excluded section kinds must be a list of strings" ] },
            status: :unprocessable_content
   end
 

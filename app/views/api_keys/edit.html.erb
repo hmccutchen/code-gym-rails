@@ -87,7 +87,7 @@
             index    = KindPreferences::MULTIPLIERS.index(stored) || KindPreferences::MULTIPLIERS.index(KindPreferences::DEFAULT_MULTIPLIER)
             excluded = current_user.excluded_section_kinds.include?(kind.key)
           %>
-          <div class="mix-row" data-slot="<%= slot %>" data-kind="<%= kind.key %>">
+          <div class="mix-row" data-kind="<%= kind.key %>">
             <label for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
             <input type="range" id="weight-<%= kind.key %>" min="0" max="4" step="1"
                    value="<%= index %>" <%= "disabled" if excluded %>
@@ -130,6 +130,7 @@
       if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }));
 
       const STOPS  = <%= raw KindPreferences::MULTIPLIERS.to_json %>;
+      const DEFAULT_STOP = <%= raw KindPreferences::DEFAULT_MULTIPLIER.to_json %>;
       const LABELS = <%= raw t("exercise_mix.stops").to_json %>;
       const mix    = document.getElementById("exercise-mix");
 
@@ -149,7 +150,7 @@
             if (box.checked) excluded.push(kind);
             // Sparse on purpose: a kind left at the default stores no key, so
             // "untouched" and "set back to default" are one stored state.
-            if (value !== 1) weights[kind] = value;
+            if (value !== DEFAULT_STOP) weights[kind] = value;
           });
 
           return { section_kind_weights: weights, excluded_section_kinds: excluded };

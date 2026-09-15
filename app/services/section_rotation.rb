@@ -1,5 +1,5 @@
 # Which optional slots today's set fills, and with which kind. Pure: takes
-# history and a count, returns rolled symbols.
+# history, a count, and the user's preferences, and returns rolled symbols.
 #
 # The count is a hard cap decided by SectionCount. Starvation chooses which
 # slots fill it, never how many — a starved kind whose slot did not make the
@@ -56,8 +56,8 @@ class SectionRotation
   # equally stale starved kinds drain in registry order: scheduling one resets
   # its staleness, so a fixed order empties the pool one per day and bounds the
   # worst-case wait at the pool size, which a coin flip among equals would not.
-  # Below starvation, equally stale kinds get equal weight and the tie breaks
-  # randomly — see the weighted-roll comment below.
+  # Below starvation, equally stale kinds are separated only by the user's
+  # stated multiplier, and an unbiased tie still breaks randomly.
   #
   # The user's multiplier reaches the roll and nothing else. Starvation returns
   # above it, so no weight can hold a kind out of rotation indefinitely — the
