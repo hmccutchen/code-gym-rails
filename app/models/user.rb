@@ -30,14 +30,18 @@ class User < ApplicationRecord
   validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
   validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
   validate :every_slot_keeps_a_kind,                     if: :excluded_section_kinds_changed?
+  validate :section_kind_levels_name_section_kinds,      if: :section_kind_levels_changed?
+  validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
+  validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
 
   before_save { email.downcase! }
 
   # Bumped only when the preference columns themselves change. A whole-row
   # timestamp would move on every save — a rename, a time zone, a login code —
-  # and refuse a mix save that nothing had actually raced.
-  before_save :bump_section_kind_preferences_version,
-              if: -> { section_kind_weights_changed? || excluded_section_kinds_changed? }
+  # and refuse a mix save that nothing had actually raced. Weights, exclusions,
+  # levels and locks share one version on purpose: the Exercise mix is one save
+  # boundary, so a stale tab is refused whichever half it touched.
+  before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -553,6 +557,38 @@ class User < ApplicationRecord
 
     (excluded_section_kinds - rotatable_keys).each do |key|
       errors.add(:excluded_section_kinds, "names an unknown section kind: #{key}")
+    end
+  end
+
+  def section_kind_preferences_changed?
+    section_kind_weights_changed? || excluded_section_kinds_changed? ||
+      section_kind_levels_changed? || locked_section_kinds_changed?
+  end
+
+  def section_kind_levels_name_section_kinds
+    return errors.add(:section_kind_levels, "must be an object") unless section_kind_levels.is_a?(Hash)
+
+    section_kind_levels.each do |key, value|
+      errors.add(:section_kind_levels, "names an unknown section kind: #{key}") if ExerciseSection.keys.exclude?(key)
+      errors.add(:section_kind_levels, "has an unsupported level for #{key}") if KindDifficulty::LEVELS.exclude?(value)
+    end
+  end
+
+  def locked_section_kinds_name_section_kinds
+    return errors.add(:locked_section_kinds, "must be a list") unless locked_section_kinds.is_a?(Array)
+
+    (locked_section_kinds - ExerciseSection.keys).each do |key|
+      errors.add(:locked_section_kinds, "names an unknown section kind: #{key}")
+    end
+  end
+
+  # Not expressible as a database CHECK: Postgres CHECK constraints cannot run
+  # subqueries. KindDifficulty#locked? makes a lock that slips past this inert.
+  def locks_have_levels
+    return unless locked_section_kinds.is_a?(Array) && section_kind_levels.is_a?(Hash)
+
+    (locked_section_kinds - section_kind_levels.keys).each do |key|
+      errors.add(:locked_section_kinds, "locks #{key} without a difficulty target")
     end
   end
 
