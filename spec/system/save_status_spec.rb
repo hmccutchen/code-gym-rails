@@ -48,6 +48,43 @@ RSpec.describe "Save status", type: :system do
     expect(user.reload.excluded_section_kinds).not_to match_array(ExerciseSection.fourths.map(&:key))
   end
 
+  # fetch follows redirects, so a save made after the session ended arrives as
+  # the login page: 200, and `ok` true. Taken at face value that reads as a
+  # successful write of something the server never stored — the failure this
+  # file exists to stop, wearing a success.
+  it "reports a save made after the session ended" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    user.anonymize!
+    find("#weight-challenge").set(0)
+
+    expect(page).to have_css("#save-status", text: /signed out/i, wait: 5)
+  end
+
+  # One banner, but a failure belongs to the control that earned it: these
+  # three PATCH the same path, so an unkeyed status would let the time zone's
+  # success speak for the exercise mix.
+  it "keeps one control's warning when a different control saves" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    exclude_every_fourth_kind
+    expect(page).to have_css("#save-status", wait: 5)
+
+    find("#tz-select").select("Pacific")
+
+    # Waits on the write rather than the DOM: the fetch resolves independently
+    # of Capybara, and the point is that this save really did succeed.
+    deadline = Time.current + 5
+    sleep 0.1 until user.reload.time_zone == "America/Los_Angeles" || Time.current > deadline
+
+    expect(user.reload.time_zone).to eq("America/Los_Angeles")
+    expect(page).to have_css("#save-status", text: /at least one fourth section/i)
+  end
+
   it "clears the report once a later save succeeds" do
     visit_as(user)
     visit setup_path

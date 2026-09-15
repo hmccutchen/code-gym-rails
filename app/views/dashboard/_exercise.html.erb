@@ -139,7 +139,7 @@
       // Through CodeGymSaveStatus so a refused or dropped save is reported
       // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
-        window.CodeGymSaveStatus.save("POST", form.action, payload());
+        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers");
       }, 800);
     }
 

@@ -1,8 +1,12 @@
-<%# Every background save on this app goes through here, so a rejected write
-    tells the engineer instead of vanishing. The page's control keeps whatever
-    the user set — snapping a slider back under their hand is worse than the
-    problem this solves — and the banner says the change did not reach the
-    server.
+<%# The autosaves on the dashboard and /setup report through here, so a
+    rejected write tells the engineer instead of vanishing. The page's control
+    keeps whatever the user set — snapping a slider back under their hand is
+    worse than the problem this solves — and the banner says the change did not
+    reach the server.
+
+    The layout's one-shot time-zone detection deliberately does NOT report
+    here: nothing the user did triggers it, so a banner would name a failure
+    they took no action to cause, and it re-runs on the next page load anyway.
 
     Rendered from the layout ahead of `yield :page_scripts`, the same way
     shared/_push_script is, so a page's own script can rely on
@@ -12,19 +16,45 @@
 <script>
   window.CodeGymSaveStatus = (function () {
     const GENERIC = <%= t("save_status.generic").to_json.html_safe %>;
+    const SIGNED_OUT = <%= t("save_status.signed_out").to_json.html_safe %>;
     const banner = document.getElementById("save-status");
 
-    function show(message) {
-      banner.textContent = message;
+    // Keyed by control rather than held as one flag: /setup saves three
+    // different things to one URL, and without a key a successful time-zone
+    // save would clear a warning the exercise-mix save had just earned, while
+    // the rejected checkbox sat there still looking saved.
+    const failures = new Map();
+    // Guards against two saves of the SAME control finishing out of order,
+    // where a slow failure would otherwise overwrite the result of the newer
+    // save that succeeded after it.
+    const issued = new Map();
+    let counter = 0;
+
+    function render() {
+      const messages = Array.from(failures.values());
+
+      if (messages.length === 0) {
+        banner.hidden = true;
+        banner.textContent = "";
+        return;
+      }
+
+      banner.textContent = messages[messages.length - 1];
       banner.hidden = false;
     }
 
-    function clear() {
-      banner.hidden = true;
-      banner.textContent = "";
+    function fail(key, message) {
+      failures.delete(key);
+      failures.set(key, message);
+      render();
     }
 
-    // Optional-chained for the same reason api_keys/edit's script is: with
+    function succeed(key) {
+      failures.delete(key);
+      render();
+    }
+
+    // Optional-chained for the same reason api_keys/edit's script was: with
     // forgery protection off, Rails renders no csrf meta tag at all, and a
     // throw here would stop the save silently — the exact failure this file
     // exists to surface.
@@ -32,7 +62,12 @@
       return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
     }
 
-    function save(method, url, body) {
+    function save(method, url, body, key) {
+      const ticket = ++counter;
+      issued.set(key, ticket);
+
+      const current = () => issued.get(key) === ticket;
+
       return fetch(url, {
         method: method,
         headers: {
@@ -42,7 +77,14 @@
         },
         body: JSON.stringify(body)
       }).then(async (response) => {
-        if (response.ok) return clear();
+        if (!current()) return;
+
+        // fetch follows redirects, so a request made after the session expired
+        // arrives here as the login page: 200, and `ok` true, for a save that
+        // stored nothing. Neither endpoint redirects on success, so a redirect
+        // can only mean the write did not happen.
+        if (response.redirected) return fail(key, SIGNED_OUT);
+        if (response.ok) return succeed(key);
 
         // A failure can answer with an HTML error page rather than JSON, and
         // parsing that throws — hence the inner catch. Only a message the
@@ -51,10 +93,12 @@
         // dropped connection rejects with a browser string ("Failed to fetch"),
         // and that is a developer's sentence, not one to hand an engineer.
         const data = await response.json().catch(() => null);
-        show((data && data.errors && data.errors[0]) || GENERIC);
-      }).catch(() => show(GENERIC));
+        fail(key, (data && data.errors && data.errors[0]) || GENERIC);
+      }).catch(() => {
+        if (current()) fail(key, GENERIC);
+      });
     }
 
-    return { save: save, clear: clear };
+    return { save: save };
   })();
 </script>
