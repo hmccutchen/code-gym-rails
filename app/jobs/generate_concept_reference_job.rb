@@ -13,8 +13,11 @@ class GenerateConceptReferenceJob < ApplicationJob
   # to come from one response to be consistent by construction. That is why
   # only a deliberate click asks for it.
   def perform(concept:, language:, user_id:, refresh: false)
+    # "other" is the off-vocabulary catch-all from ProblemSetIngest#normalize_concepts!,
+    # not a real concept worth a reference.
     return if concept == "other"
 
+    # Another job may have generated it in the enqueue/run gap.
     existing = ConceptReference.find_by(concept: concept, language: language)
     return if existing && (existing.complete? || !refresh)
 

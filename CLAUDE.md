@@ -617,14 +617,19 @@ authority for "does this row carry the difficulty ladder"; `#complete?` is
   because it serves first exposure. This is the one guide field past the
   two-paragraph cap, and it carries a stated bound of its own
   (`WORKED_EXAMPLE_BOUND`) rather than none, since an unbounded field drifts
-  into the essay the guide exists not to be. Two triggers, not one: a
+  into the essay the guide exists not to be. Three triggers, not one: a
   user-initiated backfill for
-  concepts with no row at all, and on-demand regeneration — only when someone
+  concepts with no row at all, on-demand regeneration — only when someone
   opens that concept's Learn entry — for a legacy row that has a reference but
-  no guide. Bulk-rewriting legacy rows would change inline reference wording
-  nobody asked to change; confining it to on-demand accepts that **an inline
-  reference's wording can change once, for a concept someone deliberately
-  opens.** `ConceptReference` has no `user_id` — it's a shared, team-wide cache
+  no guide, and `POST /learn/prepare_ladders`, which rewrites the ungrounded
+  concepts behind a user's difficulty targets (see "Difficulty targets and
+  locks" below). Bulk-rewriting legacy rows would change inline reference
+  wording nobody asked to change; confining the first two to on-demand accepts
+  that **an inline reference's wording can change once, for a concept someone
+  deliberately opens.** `prepare_ladders` is the one scoped exception to that
+  rule: it rewrites rows on demand, but only for concepts behind a target the
+  user set, from a click whose own copy says the wording may change.
+  `ConceptReference` has no `user_id` — it's a shared, team-wide cache
   keyed on `(concept, language)`, so the first person to run the backfill pays
   for everyone and every later teammate pays almost nothing. Roughly $0.02 per
   concept against `claude-sonnet-5`, so a couple of dollars for one user's
@@ -983,10 +988,11 @@ always pull in the full suite — is stated once, in
 - `app/services/fake_service.rb` — deterministic, zero-cost AiService provider for tests (`provider: "fake"`); overrides only `#call`/`#build_connection`, so every other AiService code path runs for real against its canned output. `AiService.for` refuses it outside a local environment.
 - `app/controllers/learn_controller.rb` — the `/learn` library: lists every
   concept in the user's slice (assigned or not), the per-concept detail page,
-  and the two generation triggers (a one-concept `#prepare_concept` and a
-  slice-wide `#prepare` backfill). Validates `:bucket`/`:concept` against the
-  closed vocabulary at the boundary, same as everywhere else provider-adjacent
-  input arrives from a URL.
+  and three generation triggers: a one-concept `#prepare_concept`, a
+  slice-wide `#prepare` backfill, and `#prepare_ladders`, which rewrites
+  existing rows for the concepts behind a user's difficulty targets. Validates
+  `:bucket`/`:concept` against the closed vocabulary at the boundary, same as
+  everywhere else provider-adjacent input arrives from a URL.
 - `app/views/shared/_featured_concept.html.erb` — the daily featured concept's
   one rendering, shared by the Learn tab and the dashboard; its styles live in
   the layout for that reason, like `responses/_answered_sections`

@@ -112,8 +112,9 @@ en:
       other: "Add difficulty notes for %{count} concepts"
     ladders_cost: "One provider call per concept, on your API key. What it writes is shared with everyone on the team, and rewrites those concepts' references, so their wording may change."
     ladders_preparing:
-      one: "Writing one difficulty note now — it'll appear once it finishes."
-      other: "Writing %{count} difficulty notes now — they'll appear as each one finishes."
+      zero: "No difficulty notes to write — every targeted concept already has one."
+      one: "Writing one difficulty note now — the coverage count below will update once it finishes."
+      other: "Writing %{count} difficulty notes now — the coverage count below will update as each one finishes."
     stops:
       - "Much less"
       - "Less"
