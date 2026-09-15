@@ -105,6 +105,12 @@ fetch cap now does — or add a spec that fails when the vocabulary grows past
 what the reasoning assumed. A comment that merely restates a fresh number is
 not a fix; it is the same defect with a later expiry date.
 
+Growing a vocabulary has one more consequence to check for: the
+`MAX_LADDER_GUIDANCE_CHARS` spec in `spec/services/ai_service_spec.rb` renders
+the largest difficulty block any day can produce. A diff that raises the
+constant to make it pass must say in the PR description what that costs per
+generation.
+
 **Does any new class or method exceed the size threshold?** A method over **25
 lines** (excluding heredoc bodies) or a new file in `app/` over **300 lines**
 must be justified in the PR description or split. These numbers are drawn from
