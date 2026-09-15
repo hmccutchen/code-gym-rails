@@ -10,13 +10,14 @@ class User < ApplicationRecord
   encrypts :api_key
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
+  SKILL_LEVELS = %w[beginner developing solid strong].freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
-  validates :skill_level, inclusion: { in: %w[beginner developing solid strong] }
+  validates :skill_level, inclusion: { in: SKILL_LEVELS }
   validates :provider, inclusion: { in: %w[anthropic gemini fake] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
   validate :time_zone_must_be_loadable
