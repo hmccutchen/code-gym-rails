@@ -2935,19 +2935,31 @@ RSpec.describe AiService do
   # the other reframes a point — so the shared source takes that noun and the
   # rule after it is what cannot drift.
   describe "the shared explain-differently standard" do
-    it "reaches both consumers from one source" do
-      spy_class = Class.new(double_class) do
+    # Asserting that the rule's TEXT appears would pass just as happily if a
+    # consumer went back to its own inline copy — which is the duplication this
+    # exists to prevent, and the likeliest way it comes back. A sentinel can
+    # only reach a prompt through the shared method, so inlining either
+    # consumer fails here even when the inlined wording is identical.
+    let(:sentinel_class) do
+      Class.new(double_class) do
         attr_reader :last_prompt
+
+        def self.explain_differently_standard(subject)
+          "<<explain-differently:#{subject}>>"
+        end
+
         def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [])
           @last_prompt = prompt
           super
         end
       end
+    end
 
+    it "reaches both consumers from one source" do
       reference = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails",
                                        tagline: "t", explanation: "e",
                                        code_example: "c", senior_lens: "s")
-      concept_svc = spy_class.new(canned_text: "Another angle.")
+      concept_svc = sentinel_class.new(canned_text: "Another angle.")
       concept_svc.explain_concept_differently(user, reference, prior_alternates: [])
 
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
@@ -2955,11 +2967,11 @@ RSpec.describe AiService do
       })
       resp = DailyResponse.new(answers: { "code_review" => "Looks fine" },
                                ai_review: { "code_review" => { "missed" => [ "loaded per row" ] } })
-      point_svc = spy_class.new(canned_text: "Another angle.")
+      point_svc = sentinel_class.new(canned_text: "Another angle.")
       point_svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
 
-      expect(concept_svc.last_prompt).to include(AiService.explain_differently_standard("concept"))
-      expect(point_svc.last_prompt).to include(AiService.explain_differently_standard("point"))
+      expect(concept_svc.last_prompt).to include("<<explain-differently:concept>>")
+      expect(point_svc.last_prompt).to include("<<explain-differently:point>>")
     end
 
     # The two differ by the subject noun and nothing else. Without this, the
