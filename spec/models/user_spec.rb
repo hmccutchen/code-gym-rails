@@ -5,12 +5,6 @@ RSpec.describe User, type: :model do
     User.create!(email: email, name: name)
   end
 
-  def create_user_with_key(email: "dev-with-key@example.com", name: "Dev")
-    user = create_user(email: email, name: name)
-    user.update!(api_key: "sk-ant-test", provider: "anthropic")
-    user
-  end
-
   describe "validations" do
     it "requires a valid email" do
       user = User.new(email: "not-an-email", name: "Dev")
