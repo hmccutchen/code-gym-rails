@@ -3749,6 +3749,19 @@ RSpec.describe AiService do
 
       expect(recording_class.calls.join).not_to match(/Be direct and concrete|unpack any jargon/)
     end
+
+    # Nothing can interpolate into a Markdown file, so CLAUDE.md holds a second
+    # copy of the list; this is what keeps the two from drifting apart.
+    it "matches CLAUDE.md's Writing style section except for the second-person item" do
+      section = Rails.root.join("CLAUDE.md").read[/^\*\*Writing style\.\*\*.*?(?=^\*\*Modular)/m]
+      doc_bullets = section.scan(/^- (.+?)(?=\n\n|\n- )/m).map { |(bullet)| bullet.squish }
+      standard_lines = standard.lines.map(&:strip)
+
+      expect(doc_bullets).to eq(standard_lines.grep(/\A- /).map { |line| line.delete_prefix("- ") } - [ "Second person, direct address." ])
+      standard_lines.grep(/\A(Avoid|Aim for|Calibration)/).each do |line|
+        expect(section.squish).to include(line)
+      end
+    end
   end
 
   describe "#generate_concept_reference" do

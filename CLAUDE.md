@@ -35,9 +35,9 @@ prompt text sent to the provider, and in `FakeService` canned provider output.
 
 **Writing style.** Commit messages, PR descriptions, and code comments follow
 the same plain-language standard the app asks its own generated prose to meet.
-The same standard covers these docs and the app's generated prose. The app's
-copy is `AiService::PLAIN_LANGUAGE_STANDARD`, shared by the prompts that
-explain, reframe, answer follow-ups on, or grade an engineer's work.
+The app's copy is `AiService::PLAIN_LANGUAGE_STANDARD`, shared by the prompts
+that explain, reframe, answer follow-ups on, or grade an engineer's work.
+`spec/services/ai_service_spec.rb` fails when the list below drifts from it.
 
 Avoid, in order of how often these actually show up:
 

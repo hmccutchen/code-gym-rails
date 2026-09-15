@@ -207,10 +207,10 @@ class AiService
 
   # The one statement of how the app's generated prose should read, shared by
   # the prompts that explain, reframe, answer follow-ups on, or grade an
-  # engineer's work. CLAUDE.md's Writing style section condenses the same list
-  # for commits and comments, so a change here belongs there too. Defined
-  # above DUCK_SYSTEM_PROMPT because that constant interpolates it at load
-  # time.
+  # engineer's work. CLAUDE.md's Writing style section carries the same list
+  # for commits and comments, minus the second-person item, and a spec fails
+  # when the two drift apart. Defined above DUCK_SYSTEM_PROMPT because that
+  # constant interpolates it at load time.
   PLAIN_LANGUAGE_STANDARD = <<~STANDARD.chomp.freeze
     Write prose for the engineer this way:
 
@@ -963,9 +963,9 @@ class AiService
       # engineer's own answer, which stays in the user turn deliberately: it is
       # the one piece of free-form text they authored, and this method exists
       # because a role boundary that a user can write across is not a boundary.
-      # Re-sending it each round costs nothing that `system` would have saved —
-      # the prompt is below the provider's minimum cacheable prefix either
-      # way (see CLAUDE.md's "Conversational calls send real turns").
+      # Re-sending it each round costs nothing a cache would have saved, since
+      # this call passes no `cache_system` (see CLAUDE.md's "Conversational
+      # calls send real turns").
       system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
 
