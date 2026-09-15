@@ -999,6 +999,13 @@ class AiService
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
       system: "#{DUCK_SYSTEM_PROMPT}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
+      # A first turn pays a write premium only a later turn recovers, so this
+      # is a bet that threads continue — not a free win. CLAUDE.md's
+      # "Conversational calls send real turns" holds the measured prompt sizes,
+      # the provider's threshold and prices, and the share of single-turn
+      # threads the bet can absorb; they are external facts that move, so they
+      # live in one place rather than three.
+      cache_system: true,
       history: thread,
       prompt: <<~PROMPT
         Their new message: #{message}

@@ -3520,6 +3520,13 @@ RSpec.describe AiService do
       expect(kwargs[:prompt]).not_to include("is this N+1?")
     end
 
+    # Why it is worth the write premium, and what the bet is, live in CLAUDE.md
+    # under "Conversational calls send real turns" — the numbers are the
+    # provider's and they move.
+    it "asks for the system prompt to be cached" do
+      expect(captured_call(thread: [])[:cache_system]).to be(true)
+    end
+
     it "moves the section context into system, where it is sent once" do
       kwargs = captured_call(thread: [])
 
@@ -3535,11 +3542,11 @@ RSpec.describe AiService do
       expect(kwargs[:prompt]).to include("Respond as their Socratic thinking partner")
     end
 
-    it "keeps its output ceiling and claims no caching" do
-      kwargs = captured_call(thread: [])
-
-      expect(kwargs[:max_tokens]).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
-      expect(kwargs[:cache_system]).to be(false)
+    # Caching moved from "no" to "yes" here deliberately (issue #151); the
+    # assertion lives in its own example above rather than riding along with
+    # the output ceiling, which is a separate guarantee.
+    it "keeps its output ceiling" do
+      expect(captured_call(thread: [])[:max_tokens]).to eq(AiService::DUCK_RESPONSE_MAX_TOKENS)
     end
 
     # FakeService routes on the system prompt, and this change appends section
@@ -3587,6 +3594,14 @@ RSpec.describe AiService do
       expect(kwargs[:history]).to eq(thread)
       expect(kwargs[:prompt]).not_to include("Conversation so far:")
       expect(kwargs[:prompt]).not_to include("what did I miss?")
+    end
+
+    # Deliberately not cached, and not merely by omission: this prompt carries
+    # the question and a review summary rather than the section's code, so it
+    # lands well under the threshold the duck can reach. Measurements in
+    # CLAUDE.md under "Conversational calls send real turns".
+    it "does not ask for caching, unlike the duck" do
+      expect(captured_call(thread: [])[:cache_system]).to be_falsey
     end
 
     it "moves the provider-authored question and review into system" do
