@@ -117,6 +117,24 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.excluded_section_kinds).to eq([])
     end
 
+    # A wrong-shaped value used to read as blank, get dropped by strong
+    # parameters, and come back 200 having applied nothing — a success status
+    # for a write that did not happen.
+    it "rejects a present-but-wrong-shaped preference rather than reporting success" do
+      login_as(user)
+      user.update!(section_kind_weights: { "challenge" => 4.0 }, excluded_section_kinds: [ "parsons_problem" ])
+
+      [ { section_kind_weights: [] }, { section_kind_weights: nil },
+        { excluded_section_kinds: {} }, { excluded_section_kinds: nil } ].each do |payload|
+        patch_profile(payload)
+
+        expect(response).to have_http_status(:unprocessable_content), "expected 422 for #{payload.inspect}"
+      end
+
+      expect(user.reload.section_kind_weights).to eq("challenge" => 4.0)
+      expect(user.excluded_section_kinds).to eq([ "parsons_problem" ])
+    end
+
     # Writes replace rather than merge, so returning a slider to its default is
     # expressed by the key being absent — one representation of default, not two.
     it "replaces the stored preferences rather than merging into them" do

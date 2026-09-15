@@ -89,7 +89,7 @@
           %>
           <div class="mix-row" data-kind="<%= kind.key %>">
             <label for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
-            <input type="range" id="weight-<%= kind.key %>" min="0" max="4" step="1"
+            <input type="range" id="weight-<%= kind.key %>" min="0" max="<%= KindPreferences::MULTIPLIERS.size - 1 %>" step="1"
                    value="<%= index %>" <%= "disabled" if excluded %>
                    aria-describedby="weight-label-<%= kind.key %>">
             <output id="weight-label-<%= kind.key %>"><%= t("exercise_mix.stops")[index] %></output>
