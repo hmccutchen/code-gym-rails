@@ -52,6 +52,9 @@ en:
     write_guide: "Write this up"
     writing_guide: "Writing it up — this takes a few seconds."
     write_guide_failed: "Still working on it. Reload this page in a minute to check."
+    ladder_offer: "Add difficulty notes for this concept. They ground your %{targets} difficulty target. This rewrites the reference, so its wording may change."
+    write_ladder: "Add difficulty notes"
+    ladder_missing: "The reference was rewritten, but the difficulty notes didn't come back. You can try again."
     featured:
       label: "Today's concept"
     filter_placeholder: "Filter concepts"
@@ -93,6 +96,9 @@ en:
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
+    ladders_preparing:
+      one: "Writing one difficulty note now — it'll appear once it finishes."
+      other: "Writing %{count} difficulty notes now — they'll appear as each one finishes."
     stops:
       - "Much less"
       - "Less"

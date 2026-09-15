@@ -54,76 +54,18 @@
 
 <% if @reference&.guide? %>
   <%= render "shared/syntax_highlighting_script" %>
-<% else %>
+<% end %>
+
+<% if !@reference&.guide? %>
   <%# Neither state is an error: the library is browsable from the first page
       load, before anything has been generated. %>
-  <div id="learn-guide"
-       data-url="<%= prepare_learn_concept_path(bucket: @bucket, concept: @concept) %>"
-       data-status-url="<%= learn_concept_status_path(bucket: @bucket, concept: @concept) %>">
-    <p class="learn-no-guide"><%= t("learn.no_guide") %></p>
-    <button type="button" class="btn btn-sm" id="write-guide"><%= t("learn.write_guide") %></button>
-    <span class="learn-status" aria-live="polite"></span>
-  </div>
-
-  <%# Inline script, matching the working convention here: the layout emits no
-      importmap tags, so nothing else would run. Polls rather than holding the
-      request, since this generation runs with extended thinking on. %>
-  <%# The 2s interval is the one place that number lives; MAX_ATTEMPTS derives
-      from it and from AiService.call_budget_seconds(CONCEPT_REFERENCE_READ_TIMEOUT)
-      — the worst-case time a concept-reference call can take across every
-      retry it's allowed, at the timeout #generate_concept_reference actually
-      calls with — matching dashboard/_generating.html.erb's pattern for the
-      same reason: a hardcoded attempt count bore no relationship to how long
-      the job could actually run, so a healthy call could still be in flight
-      when the poller gave up. %>
-  <% poll_interval_s = 2.0 %>
-  <script>
-    (function () {
-      const box    = document.getElementById("learn-guide");
-      const button = document.getElementById("write-guide");
-      const status = box.querySelector(".learn-status");
-
-      const INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
-      const MAX_ATTEMPTS = <%= (AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil %>;
-      let attempts = 0;
-
-      <%# The bulk backfill and this per-concept job share the default queue
-          against 3 worker threads, so a slow batch can leave this one still
-          queued when the budget above runs out — the likeliest state, not a
-          dead job. The button stays disabled; a genuine failure is recovered
-          by reloading, which re-renders it enabled. %>
-      function poll() {
-        attempts++;
-        if (attempts > MAX_ATTEMPTS) {
-          status.textContent = "<%= j t("learn.write_guide_failed") %>";
-          return;
-        }
-
-        fetch(box.dataset.statusUrl, { headers: { "Accept": "application/json" } })
-          .then((response) => response.json())
-          .then((data) => (data.ready ? window.location.reload() : setTimeout(poll, INTERVAL_MS)))
-          .catch(() => setTimeout(poll, INTERVAL_MS));
-      }
-
-      button.addEventListener("click", async () => {
-        button.disabled = true;
-        status.textContent = "<%= j t("learn.writing_guide") %>";
-
-        try {
-          const response = await fetch(box.dataset.url, {
-            method: "POST",
-            headers: {
-              "Accept": "application/json",
-              "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-            }
-          });
-          if (!response.ok) throw new Error("request failed");
-          poll();
-        } catch {
-          button.disabled = false;
-          status.textContent = "<%= j t("learn.write_guide_failed") %>";
-        }
-      });
-    })();
-  </script>
+  <%= render "learn/write_up_control", awaiting: "guide", digest: nil,
+             message: t("learn.no_guide"), button: t("learn.write_guide") %>
+<% elsif @ladder_targets.any? %>
+  <% if @ladder_missing %>
+    <p class="learn-ladder-missing"><%= t("learn.ladder_missing") %></p>
+  <% end %>
+  <%= render "learn/write_up_control", awaiting: "ladder", digest: @reference.content_digest,
+             message: t("learn.ladder_offer", targets: @ladder_targets.to_sentence),
+             button: t("learn.write_ladder") %>
 <% end %>

@@ -230,36 +230,120 @@ RSpec.describe "Learn", type: :request do
 
       expect(response).to have_http_status(:ok)
     end
+
+    describe "the ladder control" do
+      before { user.update!(language: "ruby_rails") }
+
+      let!(:guided) do
+        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                 tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+                                 guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
+      end
+
+      it "is not offered to a user with no targets" do
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(response.body).not_to include(I18n.t("learn.write_ladder"))
+      end
+
+      it "is offered, naming the target, when the concept grounds one" do
+        user.update!(section_kind_levels: { "challenge" => "senior" })
+
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(response.body).to include(I18n.t("learn.write_ladder"))
+        expect(response.body).to include(I18n.t("sections.challenge.name"))
+        expect(response.body).to include(guided.content_digest)
+      end
+
+      it "is not offered when the concept grounds no target" do
+        user.update!(section_kind_levels: { "architecture" => "senior" })
+
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(response.body).not_to include(I18n.t("learn.write_ladder"))
+      end
+
+      it "explains a rewrite that landed without its ladder, and ignores other values" do
+        user.update!(section_kind_levels: { "challenge" => "senior" })
+
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one", ladder: "missing")
+        expect(response.body).to include(ERB::Util.html_escape(I18n.t("learn.ladder_missing")))
+
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one", ladder: "anything")
+        expect(response.body).not_to include(ERB::Util.html_escape(I18n.t("learn.ladder_missing")))
+      end
+
+      it "never enqueues a job on a plain visit" do
+        user.update!(section_kind_levels: { "challenge" => "senior" })
+
+        expect {
+          get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+        }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+      end
+    end
   end
 
   describe "GET /learn/:bucket/:concept/status" do
     before { user.update!(language: "ruby_rails") }
 
+    def reference(**attrs)
+      ConceptReference.create!({ concept: "n_plus_one", language: "ruby_rails",
+                                 tagline: "t", explanation: "e", code_example: "c", senior_lens: "s" }.merge(attrs))
+    end
+
+    let(:guide)  { { guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x" } }
+    let(:ladder) { { ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "q" } }
+
+    def status(**params)
+      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one", **params)
+    end
+
     it "is not ready when no row exists" do
-      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one")
-
+      status(awaiting: "guide")
       expect(response.parsed_body["ready"]).to be(false)
     end
 
-    it "is not ready for a row that has no guide" do
-      ConceptReference.create!(
-        concept: "n_plus_one", language: "ruby_rails",
-        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
-      )
-      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one")
-
-      expect(response.parsed_body["ready"]).to be(false)
-    end
-
-    it "is ready once the guide is written" do
-      ConceptReference.create!(
-        concept: "n_plus_one", language: "ruby_rails",
-        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
-        guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x"
-      )
-      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one")
+    it "reads a missing awaiting as guide, the only value pages sent before" do
+      reference(**guide)
+      status
 
       expect(response.parsed_body["ready"]).to be(true)
+    end
+
+    it "is ready for guide once the guide lands, even when the ladder flubbed" do
+      reference(**guide)
+      status(awaiting: "guide")
+
+      expect(response.parsed_body["ready"]).to be(true)
+    end
+
+    it "is not ready for ladder until the row is complete" do
+      row = reference(**guide)
+      status(awaiting: "ladder", digest: row.content_digest)
+      expect(response.parsed_body).to eq("ready" => false, "rewritten" => false)
+
+      row.update!(**ladder)
+      status(awaiting: "ladder", digest: row.content_digest)
+      expect(response.parsed_body["ready"]).to be(true)
+    end
+
+    it "reports a rewrite that landed without a ladder" do
+      row = reference(**guide)
+      digest = row.content_digest
+      row.update!(explanation: "rewritten")
+
+      status(awaiting: "ladder", digest: digest)
+
+      expect(response.parsed_body).to eq("ready" => false, "rewritten" => true)
+    end
+
+    it "400s on an unknown awaiting value or a malformed digest" do
+      status(awaiting: "everything")
+      expect(response).to have_http_status(:bad_request)
+
+      status(awaiting: "ladder", digest: "not-a-digest")
+      expect(response).to have_http_status(:bad_request)
     end
   end
 
@@ -337,6 +421,38 @@ RSpec.describe "Learn", type: :request do
       end
 
       expect { post prepare_learn_path }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+    end
+  end
+
+  describe "POST /learn/prepare_ladders" do
+    before { user.update!(language: "ruby_rails") }
+
+    it "enqueues nothing for a user with no targets" do
+      expect { post prepare_learn_ladders_path }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+      expect(response).to redirect_to(setup_path(anchor: "exercise-mix"))
+    end
+
+    it "enqueues one refreshing job per gap across targeted kinds, deduplicated" do
+      user.update!(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
+      expected = LadderCoverage.for(user).gaps_for([ ExerciseSection::CodeReview, ExerciseSection::Challenge ])
+
+      expect {
+        post prepare_learn_ladders_path
+      }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(expected.size).times
+
+      expect(GenerateConceptReferenceJob).to have_been_enqueued
+        .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true)
+    end
+
+    it "enqueues only what remains after a partial run" do
+      user.update!(section_kind_levels: { "security_review" => "senior" })
+      vocabulary = ProblemSetIngest.selectable_vocabulary_for("security_review", "ruby_rails")
+      ConceptReference.create!(concept: vocabulary.first, language: "ruby_rails",
+                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+
+      expect {
+        post prepare_learn_ladders_path
+      }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(vocabulary.size - 1).times
     end
   end
 end

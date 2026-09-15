@@ -17,9 +17,18 @@ class LearnController < ApplicationController
     @bucket    = validated_bucket
     @concept   = validated_concept(@bucket)
     @reference = ConceptReference.find_by(concept: @concept, language: @bucket)
+    @ladder_targets = ladder_targets_for(@reference)
+    @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
   end
 
-  # GET /learn/:bucket/:concept/status — is the guide written yet?
+  # Which check the polling page is waiting on. The page states it because the
+  # row's current state cannot: once a no-guide page's guide lands, the row looks
+  # like a ladder candidate, and a flubbed ladder would then never read ready.
+  # Absent reads as guide, the only value pages sent before this existed.
+  AWAITING = { "guide" => :guide?, "ladder" => :complete? }.freeze
+  DIGEST_FORMAT = /\A\h{64}\z/
+
+  # GET /learn/:bucket/:concept/status — is the write-up the page asked for done?
   #
   # Same shape and same reason as DashboardController#status. A fixed client
   # timeout would have to guess how long a provider call takes, and this one
@@ -27,10 +36,18 @@ class LearnController < ApplicationController
   # directions — reloading onto an unfinished page, or waiting long after it
   # finished.
   def status
-    bucket  = validated_bucket
-    concept = validated_concept(bucket)
+    bucket    = validated_bucket
+    concept   = validated_concept(bucket)
+    awaiting  = params.fetch(:awaiting, "guide").to_s
+    predicate = AWAITING[awaiting]
+    return head :bad_request if predicate.nil?
+    return head :bad_request if awaiting == "ladder" && !params[:digest].to_s.match?(DIGEST_FORMAT)
 
-    render json: { ready: ConceptReference.find_by(concept: concept, language: bucket)&.guide? || false }
+    reference = ConceptReference.find_by(concept: concept, language: bucket)
+    body = { ready: reference&.public_send(predicate) || false }
+    body[:rewritten] = reference.present? && reference.content_digest != params[:digest] if awaiting == "ladder"
+
+    render json: body
   end
 
   # POST /learn/:bucket/:concept/prepare — write up this one concept now.
@@ -69,7 +86,36 @@ class LearnController < ApplicationController
     redirect_to learn_path, notice: t("learn.preparing")
   end
 
+  # POST /learn/prepare_ladders — ground every targeted kind's concepts.
+  #
+  # Unlike #prepare, this rewrites existing rows, which is the scoped exception
+  # to the no-bulk-rewrite rule: only concepts behind a target this user set, and
+  # only from a click whose copy says wording may change. Rows are shared, so
+  # the rewrite reaches every teammate. Idempotent: gaps are re-derived each
+  # press and every job re-checks complete? before calling.
+  def prepare_ladders
+    gaps = LadderCoverage.for(current_user).gaps_for(KindDifficulty.for(current_user).targeted_kinds)
+
+    gaps.each do |concept, bucket|
+      GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
+    end
+
+    redirect_to setup_path(anchor: "exercise-mix"), notice: t("exercise_mix.ladders_preparing", count: gaps.size)
+  end
+
   private
+
+  # Names of the targeted kinds a guided, ladderless row would ground. Empty
+  # means no rewrite is offered: the ladder would ground nothing for this user.
+  def ladder_targets_for(reference)
+    return [] unless reference&.guide? && !reference.ladder?
+
+    kinds = KindDifficulty.for(current_user).targeted_kinds
+    return [] if kinds.empty?
+
+    LadderCoverage.for(current_user).grounding_kinds(kinds, reference.concept, reference.language)
+                  .map { |kind| t("sections.#{kind.key}.name") }
+  end
 
   # This user's slice: their language's buckets plus every language-independent
   # bucket.

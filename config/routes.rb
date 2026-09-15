@@ -59,6 +59,7 @@ Rails.application.routes.draw do
   # belongs to the vocabulary, not to a user or to a day.
   get  "learn", to: "learn#index"
   post "learn/prepare", to: "learn#prepare", as: :prepare_learn
+  post "learn/prepare_ladders", to: "learn#prepare_ladders", as: :prepare_learn_ladders
   get  "learn/:bucket/:concept", to: "learn#show", as: :learn_concept
   post "learn/:bucket/:concept/prepare", to: "learn#prepare_concept", as: :prepare_learn_concept
   # Polled while a guide is being written, the way the dashboard polls for a
