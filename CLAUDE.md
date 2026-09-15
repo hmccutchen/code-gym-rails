@@ -918,6 +918,10 @@ on a delivered set is nondeterministic at the roll's weight.
 
 CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
 
+When a scoped run is enough and when it isn't — the shared authorities that
+always pull in the full suite — is stated once, in
+`.github/copilot-instructions.md` under "Reviewing the pull request itself".
+
 ## File Map
 
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read

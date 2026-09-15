@@ -57,6 +57,46 @@ RSpec.describe "Exercise mix", type: :system do
     expect(find("#exclude-parsons_problem")).to be_checked
   end
 
+  # The precondition's own hazard: this tab racing itself. The debounce only
+  # spaces saves by 400ms, so a request slower than that is still in flight
+  # when the next one is sent, and that next one posts a version the first is
+  # about to move. Holding every response past the debounce reproduces it
+  # without needing a slow network.
+  #
+  # Unchained, the first save commits and bumps, the second is refused as a
+  # conflict with its own predecessor, and applyServerState snaps the slider
+  # back — leaving 0.25 stored, the value the engineer had already moved off.
+  it "does not refuse a second save issued while this tab's first is in flight" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    hold_profile_saves(2500)
+
+    find("#weight-challenge").set(0)
+    sleep 0.8
+    find("#weight-challenge").set(4)
+
+    expect(weights_after_save({ "challenge" => 4.0 }, timeout: 15)).to eq("challenge" => 4.0)
+  end
+
+  # Delays the page's handling of its own save responses, which is what "slower
+  # than the debounce" means from the script's side. Delaying the request
+  # instead would reorder arrivals at the server and stop reproducing this.
+  def hold_profile_saves(millis)
+    page.execute_script(<<~JS)
+      (function () {
+        const original = window.fetch;
+        window.fetch = function (url, options) {
+          const response = original.apply(this, arguments);
+          if (String(url).indexOf("/profile") === -1) return response;
+
+          return response.then((r) => new Promise((resolve) => setTimeout(() => resolve(r), #{millis})));
+        };
+      })();
+    JS
+  end
+
   it "locks the last remaining kind in a group rather than letting a slot empty" do
     visit_as(user)
     visit setup_path
