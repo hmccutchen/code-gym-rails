@@ -1389,6 +1389,29 @@ RSpec.describe User, type: :model do
     # Excluding is per-kind curation, never a way to delete a whole slot: an
     # empty slot would render fewer sections than SectionCount asked for, which
     # lowers the completion mean, which shrinks the set again.
+    # The registry moves — pseudocode_to_code was added to it recently. If a
+    # kind is ever retired, every user still naming it must stay saveable, or
+    # generate_login_code!'s update! raises and login breaks for them.
+    it "still saves unrelated attributes when a stored kind has left the registry" do
+      user = create_user_with_key
+      user.update!(excluded_section_kinds: [ "parsons_problem" ])
+
+      allow(ExerciseSection).to receive(:rotatable)
+        .and_return(ExerciseSection.rotatable - [ ExerciseSection::ParsonsProblem ])
+
+      expect { user.generate_login_code! }.not_to raise_error
+    end
+
+    it "still validates a kind the user is actively changing" do
+      user = create_user_with_key
+
+      allow(ExerciseSection).to receive(:rotatable)
+        .and_return(ExerciseSection.rotatable - [ ExerciseSection::ParsonsProblem ])
+      user.excluded_section_kinds = [ "parsons_problem" ]
+
+      expect(user).not_to be_valid
+    end
+
     it "refuses an exclusion that would empty a slot" do
       user = create_user_with_key
       user.excluded_section_kinds = ExerciseSection.thirds.map(&:key)

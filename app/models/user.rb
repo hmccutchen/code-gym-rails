@@ -20,9 +20,15 @@ class User < ApplicationRecord
   validates :provider, inclusion: { in: %w[anthropic gemini fake] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
   validate :time_zone_must_be_loadable
-  validate :section_kind_weights_name_rotatable_kinds
-  validate :excluded_section_kinds_name_rotatable_kinds
-  validate :every_slot_keeps_a_kind
+  # Only on change, because these read a registry that moves. Unconditional,
+  # a kind retired from ExerciseSection would make every user still naming it
+  # unsaveable — and `generate_login_code!` writes through `update!`, so the
+  # first thing that would break is logging in, recoverable only by a data
+  # migration. A stale stored value is already harmless on the read side:
+  # KindPreferences ignores a key it does not recognize.
+  validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
+  validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
+  validate :every_slot_keeps_a_kind,                     if: :excluded_section_kinds_changed?
 
   before_save { email.downcase! }
 

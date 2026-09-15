@@ -77,11 +77,14 @@
       <p class="hint"><%= t("exercise_mix.exclude_body_strong") %></p>
     </div>
 
-    <% { third: t("exercise_mix.third_group"), fourth: t("exercise_mix.fourth_group") }.each do |slot, group_label| %>
+    <%# Derived from the slot roster, like ExerciseSection.rotatable and the
+        User validations: a slot holding one candidate has nothing to bias, and
+        a future multi-kind slot gets its controls without an edit here. %>
+    <% ExerciseSection.slots.select { |_, kinds| kinds.size > 1 }.each do |slot, kinds| %>
       <fieldset class="mix-group">
-        <legend><%= group_label %></legend>
+        <legend><%= t("exercise_mix.#{slot}_group") %></legend>
 
-        <% ExerciseSection.slots.fetch(slot).each do |kind| %>
+        <% kinds.each do |kind| %>
           <%
             stored   = current_user.section_kind_weights[kind.key]
             index    = KindPreferences::MULTIPLIERS.index(stored) || KindPreferences::MULTIPLIERS.index(KindPreferences::DEFAULT_MULTIPLIER)
