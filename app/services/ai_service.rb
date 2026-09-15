@@ -205,6 +205,35 @@ class AiService
   # every other such field.
   MAX_GENERATED_CODE_LENGTH = 8_000
 
+  # The one statement of how the app's generated prose should read, shared by
+  # the prompts that explain, reframe, answer follow-ups on, or grade an
+  # engineer's work. CLAUDE.md's Writing style section carries the same list
+  # for commits and comments, minus the second-person item, and a spec fails
+  # when the two drift apart. Defined above DUCK_SYSTEM_PROMPT because that
+  # constant interpolates it at load time.
+  PLAIN_LANGUAGE_STANDARD = <<~STANDARD.chomp.freeze
+    Write prose for the engineer this way:
+
+    Avoid, in order of how often these actually show up:
+    - Manufactured rhetorical contrast — "not X, but Y" used purely for punch when a plain sentence says the same thing.
+    - Buzzwords and jargon. Use the plain-language equivalent; if a technical term is genuinely necessary, define it briefly on first use.
+    - Placeholder phrases — "please note," "at this time," "it's worth mentioning."
+    - Overusing "please" in instructions — state it directly.
+    - Starting every sentence with the same construction.
+    - Exclamation points, outside genuine, rare emphasis.
+    - Forced cleverness or trying to sound entertaining.
+    - Both choppy fragments and long-winded run-ons.
+
+    Aim for:
+    - Active voice — make clear who or what is doing the thing.
+    - Second person, direct address.
+    - Concrete over abstract — a specific example beats a general description of the same idea.
+    - Conditions before instructions, not after.
+    - Natural rhythm — if a sentence sounds stilted read aloud, rewrite it.
+
+    Calibration: too informal ("This is a total game-changer!") and too formal/overwrought ("The interface undergoes a paradigmatic transformation") are both wrong; aim for the plain middle ("This changes how the interface works").
+  STANDARD
+
   PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT = <<~PROMPT.chomp
     You are reviewing an engineer's PSEUDOCODE plan before any code exists. They
     have not submitted or been graded. Your job is to point out genuine gaps in
@@ -261,8 +290,8 @@ class AiService
        a term or a piece of the snippet does, or for a plainer restatement of the
        question. Examples: "what is this even asking?", "what does memoization
        mean?", "explain this scenario simply", "what does this line do?"
-       Answer these DIRECTLY and simply: plain words, one concrete everyday
-       analogy if it helps, no jargon. Describe only what is already on their
+       Answer these DIRECTLY, with one concrete everyday analogy if it helps.
+       Describe only what is already on their
        screen — the situation as written, the vocabulary, the shape of the
        question. Explaining what a problem IS is always allowed.
 
@@ -280,6 +309,8 @@ class AiService
 
     Keep it short: 1-3 sentences for a guiding question, up to 4 for an
     explanation. No preamble.
+
+    #{PLAIN_LANGUAGE_STANDARD}
   PROMPT
 
   # Fixed concept vocabularies, one per generation language. Embedded in the
@@ -873,6 +904,8 @@ class AiService
         scenario instead of a principle. Do not repeat the original wording.
         #{CONCEPT_REFERENCE_SCOPE} Teach the concept itself; never solve, hint at,
         or refer to any particular exercise. Two short paragraphs at most.
+
+        #{PLAIN_LANGUAGE_STANDARD}
       PROMPT
     )
 
@@ -903,6 +936,8 @@ class AiService
         different analogy, a different level of abstraction, or a concrete worked
         scenario instead of a principle. Do not repeat the original wording.
         Two short paragraphs at most.
+
+        #{PLAIN_LANGUAGE_STANDARD}
       PROMPT
     )
 
@@ -928,11 +963,13 @@ class AiService
       # engineer's own answer, which stays in the user turn deliberately: it is
       # the one piece of free-form text they authored, and this method exists
       # because a role boundary that a user can write across is not a boundary.
-      # Re-sending it each round costs nothing that `system` would have saved —
-      # the prompt is far below the provider's minimum cacheable prefix either
-      # way (see CLAUDE.md's "Conversational calls send real turns").
+      # Re-sending it each round costs nothing a cache would have saved, since
+      # this call passes no `cache_system` (see CLAUDE.md's "Conversational
+      # calls send real turns").
       system: <<~SYSTEM,
-        You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Be direct and concrete. Return plain prose — no JSON, no markdown fences.
+        You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
+
+        #{PLAIN_LANGUAGE_STANDARD}
 
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
 
@@ -1769,6 +1806,8 @@ class AiService
     <<~CONTEXT
       You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
 
+      #{PLAIN_LANGUAGE_STANDARD}
+
       #{sections.join("\n\n")}
     CONTEXT
   end
@@ -2042,13 +2081,16 @@ class AiService
       at most two short paragraphs, except guide_worked_example, which carries
       its own bound below.
 
+      This standard applies to the guide fields only:
+      #{PLAIN_LANGUAGE_STANDARD}
+
       Return JSON matching this schema exactly:
       {
         "tagline":      "string — bold one-liner",
         "explanation":  "string — 2-3 sentences",
         "code_example": "string — #{code_example_description(medium)}",
         "senior_lens":  "string — #{senior_lens_desc}",
-        "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term; unpack any jargon in place rather than assuming it",
+        "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
         "guide_worked_example": "#{worked_example_description(concept, medium)}",
         "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing"
       }
