@@ -320,6 +320,14 @@
     .featured-compact { margin-top: 2rem; }
     .featured-compact .featured-concept { padding: .9rem 1rem; margin-bottom: 0; }
     .featured-compact .featured-title { font-size: 1rem; }
+    /* Fixed rather than inline: the dashboard's autosave fires while the
+       engineer is typing far down a long page, and a message rendered at the
+       top would report the failure somewhere they cannot see. */
+    .save-status { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
+                   z-index: 50; max-width: min(90vw, 32rem); margin: 0; padding: .7rem 1rem;
+                   background: var(--surface); border: 1px solid #a33; border-left: 3px solid #a33;
+                   border-radius: 6px; color: var(--text); font-size: .85rem;
+                   box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
   </style>
 </head>
 <body>
@@ -544,6 +552,10 @@
       re-subscribes this browser on launch. Ahead of :page_scripts on purpose —
       the Account page's enable button binds against the global defined here. %>
   <%= render "shared/push_script" if logged_in? && WebPushCredentials.configured? %>
+  <%# Defines window.CodeGymSaveStatus, which every background save routes
+      through. Ahead of :page_scripts for the same reason as the partial above:
+      the dashboard's and /setup's own scripts bind against the global. %>
+  <%= render "shared/save_status" if logged_in? %>
   <%= yield :page_scripts %>
 </body>
 </html>

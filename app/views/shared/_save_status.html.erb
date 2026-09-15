@@ -1,0 +1,60 @@
+<%# Every background save on this app goes through here, so a rejected write
+    tells the engineer instead of vanishing. The page's control keeps whatever
+    the user set — snapping a slider back under their hand is worse than the
+    problem this solves — and the banner says the change did not reach the
+    server.
+
+    Rendered from the layout ahead of `yield :page_scripts`, the same way
+    shared/_push_script is, so a page's own script can rely on
+    window.CodeGymSaveStatus existing by the time it runs. %>
+<p id="save-status" class="save-status" role="status" aria-live="polite" hidden></p>
+
+<script>
+  window.CodeGymSaveStatus = (function () {
+    const GENERIC = <%= t("save_status.generic").to_json.html_safe %>;
+    const banner = document.getElementById("save-status");
+
+    function show(message) {
+      banner.textContent = message;
+      banner.hidden = false;
+    }
+
+    function clear() {
+      banner.hidden = true;
+      banner.textContent = "";
+    }
+
+    // Optional-chained for the same reason api_keys/edit's script is: with
+    // forgery protection off, Rails renders no csrf meta tag at all, and a
+    // throw here would stop the save silently — the exact failure this file
+    // exists to surface.
+    function csrf() {
+      return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
+    }
+
+    function save(method, url, body) {
+      return fetch(url, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-CSRF-Token": csrf()
+        },
+        body: JSON.stringify(body)
+      }).then(async (response) => {
+        if (response.ok) return clear();
+
+        // A failure can answer with an HTML error page rather than JSON, and
+        // parsing that throws — hence the inner catch. Only a message the
+        // server actually wrote is shown; anything else falls back to GENERIC,
+        // which is why the rejection path below ignores its own error. A
+        // dropped connection rejects with a browser string ("Failed to fetch"),
+        // and that is a developer's sentence, not one to hand an engineer.
+        const data = await response.json().catch(() => null);
+        show((data && data.errors && data.errors[0]) || GENERIC);
+      }).catch(() => show(GENERIC));
+    }
+
+    return { save: save, clear: clear };
+  })();
+</script>

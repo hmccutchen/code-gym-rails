@@ -111,21 +111,10 @@
 
   <script>
     (function () {
-      // Optional-chained because Rails renders no csrf meta tag when forgery
-      // protection is off (the test environment), where the empty token is
-      // accepted — without this the listeners below throw and silently stop
-      // saving, which is exactly what a browser spec needs to be able to see.
-      const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content ?? "";
-
-      const save = (payload) => fetch("<%= profile_path %>", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "X-CSRF-Token": csrf()
-        },
-        body: JSON.stringify({ user: payload })
-      });
+      // CodeGymSaveStatus owns the request, the CSRF token, and what happens
+      // when the server refuses — see shared/_save_status.
+      const save = (payload) =>
+        window.CodeGymSaveStatus.save("PATCH", "<%= profile_path %>", { user: payload });
 
       const tz = document.getElementById("tz-select");
       if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }));
