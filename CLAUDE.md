@@ -317,6 +317,14 @@ an interrupted worker. That lease includes queue time; it does not guarantee
 deduplication beyond its expiry. The existing row lock still guards writes
 after expiry or for direct `perform_now` calls, which bypass queue controls.
 
+Exercise mix autosaves update the open form without navigating.
+`ExerciseMixLadders` supplies the same guidance counts and labels to the initial
+Setup render and preference-save responses, including stale-tab corrections.
+The client applies the response for its latest edit and keeps guidance
+preparation disabled until pending saves finish. Preparing guidance is
+optional: difficulty targets already apply without it, and the action writes
+concept-specific difficulty descriptions for future generation, not a new set.
+
 ## Key Design Decisions
 
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.

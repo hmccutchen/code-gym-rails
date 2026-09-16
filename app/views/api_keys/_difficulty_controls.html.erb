@@ -2,7 +2,6 @@
     Required locals: kind (an ExerciseSection class), excluded (Boolean). %>
 <% difficulty = KindDifficulty.for(current_user) %>
 <% level      = difficulty.level_for(kind) %>
-<% entry      = ladder_coverage.for_kind(kind) %>
 <fieldset class="mix-difficulty" data-kind="<%= kind.key %>">
   <legend><%= t("exercise_mix.difficulty_legend") %></legend>
   <label>
@@ -21,6 +20,6 @@
     <%= t("exercise_mix.lock_label") %>
   </label>
   <p class="hint mix-coverage" <%= "hidden" if level.nil? %>>
-    <%= t("exercise_mix.coverage", grounded: entry.grounded.size, total: entry.pairs.size) %>
+    <%= ladder_coverage_label(kind) %>
   </p>
 </fieldset>

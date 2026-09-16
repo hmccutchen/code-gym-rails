@@ -1,6 +1,7 @@
 class ApiKeysController < ApplicationController
+  include ExerciseMixLadders
+
   skip_before_action :require_api_key
-  helper_method :ladder_coverage, :ladder_gap_count
 
   # Gemini keys: Google is transitioning from the legacy "AIza..." format to
   # a new "AQ...." format (rolling out through 2026, with AIza rejected
@@ -52,13 +53,5 @@ class ApiKeysController < ApplicationController
 
     current_user.update!(language: params[:language])
     redirect_to root_path, notice: "Preferences saved!"
-  end
-
-  def ladder_coverage
-    @ladder_coverage ||= LadderCoverage.for(current_user)
-  end
-
-  def ladder_gap_count
-    ladder_coverage.gaps_for(KindDifficulty.for(current_user).targeted_kinds).size
   end
 end

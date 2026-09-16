@@ -1,9 +1,11 @@
 class ProfileController < ApplicationController
+  include ExerciseMixLadders
+
   # Name editing needs a logged-in user but not an API key, so this endpoint
   # stays a clean JSON surface regardless of key state.
   skip_before_action :require_api_key
 
-  # PATCH /profile — inline name autosave (JSON)
+  # PATCH /profile — inline profile autosave (JSON)
   def update
     return render_invalid_boolean   if invalid_adaptive_set_size?
     return render_invalid_weight    if invalid_section_kind_weights?
@@ -156,7 +158,8 @@ class ProfileController < ApplicationController
         excluded_section_kinds:           current_user.excluded_section_kinds,
         section_kind_levels:              current_user.section_kind_levels,
         locked_section_kinds:             current_user.locked_section_kinds,
-        section_kind_preferences_version: current_user.section_kind_preferences_version
+        section_kind_preferences_version: current_user.section_kind_preferences_version,
+        ladder_preparation:               ladder_preparation
       }
     }, status: :conflict
   end
@@ -168,7 +171,8 @@ class ProfileController < ApplicationController
              adaptive_set_size: current_user.adaptive_set_size }
     return body unless preference_update?
 
-    body.merge(section_kind_preferences_version: current_user.section_kind_preferences_version)
+    body.merge(section_kind_preferences_version: current_user.section_kind_preferences_version,
+               ladder_preparation: ladder_preparation)
   end
 
   def preference_update?

@@ -163,11 +163,13 @@ RSpec.describe "ApiKeys", type: :request do
 
     it "shows a bulk button only while a targeted kind has gaps" do
       get setup_path
-      expect(response.body).not_to include("prepare_ladders")
+      expect(Nokogiri::HTML(response.body).at_css("#mix-ladder-preparation[hidden]")).to be_present
 
       user.update!(section_kind_levels: { "security_review" => "senior" })
       get setup_path
       expect(response.body).to include(prepare_learn_ladders_path)
+      expect(Nokogiri::HTML(response.body).at_css("#mix-ladder-preparation[hidden]")).to be_nil
+      expect(response.body).to include(I18n.t("exercise_mix.ladders_explanation"))
     end
   end
 end
