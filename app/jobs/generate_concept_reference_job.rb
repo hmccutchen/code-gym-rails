@@ -38,10 +38,10 @@ class GenerateConceptReferenceJob < ApplicationJob
       existing.with_lock do
         next if existing.complete?
 
-        existing.update!(attributes)
+        existing.update!(attributes.merge(generation_version: existing.generation_version + 1))
       end
     else
-      ConceptReference.create!(attributes.merge("concept" => concept, "language" => language))
+      ConceptReference.create!(attributes.merge("concept" => concept, "language" => language, "generation_version" => 1))
     end
 
     Rails.logger.info("Generated concept reference for #{concept}/#{language}")

@@ -87,13 +87,6 @@ class ConceptReference < ApplicationRecord
     guide? && ladder?
   end
 
-  # Lets the Learn page tell a finished rewrite from a queued one. Covers only
-  # the text a rewrite replaces; featured_on and the ladder must not move it.
-  def content_digest
-    text = (AiService::CONCEPT_REFERENCE_FIELDS + AiService::CONCEPT_GUIDE_FIELDS).map { |field| public_send(field).to_s }
-    Digest::SHA256.hexdigest(text.to_json)
-  end
-
   # Truncated on read as well as bounded on write, the way
   # DailyResponse.usable_difficulty is applied both ways. No LIMIT: the unique
   # (concept, language) index and the vocabulary filter already bound the rows.

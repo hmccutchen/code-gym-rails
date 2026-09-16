@@ -299,6 +299,13 @@ present, derived from the field list the same way `#guide?` is — is the
 authority for "does this row carry the difficulty ladder"; `#complete?` is
 `guide? && ladder?`.
 
+`generation_version` advances on each successful generation write, even when
+the provider returns unchanged text or an incomplete ladder. Learn polls that
+counter to distinguish a completed rewrite from queued work; `updated_at` and
+content equality cannot do that because featuring changes the timestamp and
+a valid generation may leave the prose unchanged. Failed calls and skipped
+rewrites do not advance it.
+
 ## Key Design Decisions
 
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.

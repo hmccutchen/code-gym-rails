@@ -230,4 +230,96 @@ RSpec.describe "Exercise mix", type: :system do
     expect(find("#lock-pattern")).to be_checked
     expect(find(".mix-difficulty[data-kind='code_review'] input[value='']")).to be_checked
   end
+
+  def defer_mix_responses(fail_second: false)
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      const originalTimeout = window.setTimeout;
+      window.mixResponses = [];
+      window.mixDebounces = 0;
+      let requests = 0;
+      window.setTimeout = function (callback, delay, ...args) {
+        return originalTimeout(() => {
+          if (delay === 400) window.mixDebounces++;
+          callback(...args);
+        }, delay);
+      };
+      window.fetch = function (url, options) {
+        if (!String(url).includes("/profile")) return originalFetch(url, options);
+        requests++;
+        const response = #{fail_second} && requests === 2
+          ? Promise.resolve(new Response("", { status: 503 }))
+          : originalFetch(url, options);
+        return response.then((result) => new Promise((resolve) => {
+          window.mixResponses.push(() => resolve(result));
+        }));
+      };
+    JS
+  end
+
+  def wait_for_mix_responses(count)
+    wait_for(5) { page.evaluate_script("window.mixResponses?.length") == count }
+    expect(page.evaluate_script("window.mixResponses?.length")).to eq(count)
+  end
+
+  [ "pending", "queued" ].each do |phase|
+    it "flushes a #{phase} lock and weight edit before reloading for a saved target" do
+      visit_as(user)
+      visit setup_path
+      find("#exercise-mix summary").click
+      defer_mix_responses
+
+      find(".mix-difficulty[data-kind='code_review'] input[value='junior']").click
+      wait_for_mix_responses(1)
+      page.execute_script(<<~JS)
+        document.querySelector("#lock-code_review").click();
+        const slider = document.querySelector("#weight-challenge");
+        slider.value = 0;
+        slider.dispatchEvent(new Event("input"));
+        #{'window.mixResponses[0]();' if phase == "pending"}
+      JS
+      if phase == "queued"
+        wait_for(5) { page.evaluate_script("window.mixDebounces") == 2 }
+        expect(page.evaluate_script("window.mixDebounces")).to eq(2)
+        page.execute_script("window.mixResponses[0]()")
+      end
+
+      wait_for_mix_responses(2)
+      expect(page).not_to have_css(".mix-ladders", visible: :all)
+      page.execute_script("window.mixResponses[1]()")
+
+      expect(page).to have_css(".mix-ladders", visible: :all)
+      find("#exercise-mix summary").click
+      expect(find("#lock-code_review")).to be_checked
+      expect(find("#weight-label-challenge")).to have_text("Much less")
+      expect(user.reload.locked_section_kinds).to eq([ "code_review" ])
+      expect(user.section_kind_weights).to eq("challenge" => 0.25)
+    end
+  end
+
+  it "keeps a failed pending edit visible until a later successful save can reload" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+    defer_mix_responses(fail_second: true)
+
+    find(".mix-difficulty[data-kind='code_review'] input[value='junior']").click
+    wait_for_mix_responses(1)
+    page.execute_script('document.querySelector("#lock-code_review").click(); window.mixResponses[0]()')
+    wait_for_mix_responses(2)
+    page.execute_script("window.mixResponses[1]()")
+
+    expect(page).to have_css("#save-status", visible: true)
+    expect(find("#lock-code_review")).to be_checked
+    expect(user.reload.locked_section_kinds).to eq([])
+    expect(page).not_to have_css(".mix-ladders", visible: :all)
+
+    find("#weight-challenge").set(0)
+    wait_for_mix_responses(3)
+    page.execute_script("window.mixResponses[2]()")
+
+    expect(page).to have_css(".mix-ladders", visible: :all)
+    expect(user.reload.locked_section_kinds).to eq([ "code_review" ])
+    expect(user.section_kind_weights).to eq("challenge" => 0.25)
+  end
 end

@@ -253,7 +253,9 @@ RSpec.describe "Learn", type: :request do
 
         expect(response.body).to include(I18n.t("learn.write_ladder"))
         expect(response.body).to include(I18n.t("sections.challenge.name"))
-        expect(response.body).to include(guided.content_digest)
+        status_url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-status-url"]
+        expect(Rack::Utils.parse_query(URI.parse(status_url).query))
+          .to include("generation_version" => guided.generation_version.to_s)
       end
 
       it "is not offered when the concept grounds no target" do
@@ -320,30 +322,63 @@ RSpec.describe "Learn", type: :request do
 
     it "is not ready for ladder until the row is complete" do
       row = reference(**guide)
-      status(awaiting: "ladder", digest: row.content_digest)
+      status(awaiting: "ladder", generation_version: row.generation_version)
       expect(response.parsed_body).to eq("ready" => false, "rewritten" => false)
 
       row.update!(**ladder)
-      status(awaiting: "ladder", digest: row.content_digest)
+      status(awaiting: "ladder", generation_version: row.generation_version)
       expect(response.parsed_body["ready"]).to be(true)
     end
 
     it "reports a rewrite that landed without a ladder" do
       row = reference(**guide)
-      digest = row.content_digest
-      row.update!(explanation: "rewritten")
+      version = row.generation_version
+      row.update!(explanation: "rewritten", generation_version: version + 1)
 
-      status(awaiting: "ladder", digest: digest)
+      status(awaiting: "ladder", generation_version: version)
 
       expect(response.parsed_body).to eq("ready" => false, "rewritten" => true)
     end
 
-    it "400s on an unknown awaiting value or a malformed digest" do
+    [ {}, { ladder_junior: "j", ladder_senior: "s" } ].each do |partial_ladder|
+      it "reports a completed rewrite with unchanged prose and #{partial_ladder.size} ladder rungs" do
+        row = reference(**guide)
+        version = row.generation_version
+        fields = AiService::CONCEPT_REFERENCE_FIELDS + AiService::CONCEPT_GUIDE_FIELDS
+        generated = row.attributes.slice(*fields).merge(partial_ladder.stringify_keys)
+        service = ClaudeService.new(user.api_key)
+        allow(AiService).to receive(:for).with(user).and_return(service)
+        allow(service).to receive(:call).and_return(text: generated.to_json, input_tokens: 10, output_tokens: 20)
+
+        GenerateConceptReferenceJob.perform_now(
+          concept: row.concept, language: row.language, user_id: user.id, refresh: true
+        )
+        status(awaiting: "ladder", generation_version: version)
+
+        expect(row.reload.attributes.slice(*fields)).to eq(generated.slice(*fields))
+        expect(response.parsed_body).to eq("ready" => false, "rewritten" => true)
+      end
+    end
+
+    it "does not report a completed generation for a feature stamp or other unrelated update" do
+      row = reference(**guide)
+      row.update!(featured_on: Date.current)
+
+      status(awaiting: "ladder", generation_version: row.generation_version)
+
+      expect(response.parsed_body).to eq("ready" => false, "rewritten" => false)
+    end
+
+    it "400s on an unknown awaiting value" do
       status(awaiting: "everything")
       expect(response).to have_http_status(:bad_request)
+    end
 
-      status(awaiting: "ladder", digest: "not-a-digest")
-      expect(response).to have_http_status(:bad_request)
+    [ nil, "", "-1", "1.5", "1x", [] ].each do |version|
+      it "400s on an invalid generation version of #{version.inspect}" do
+        status(awaiting: "ladder", generation_version: version)
+        expect(response).to have_http_status(:bad_request)
+      end
     end
   end
 

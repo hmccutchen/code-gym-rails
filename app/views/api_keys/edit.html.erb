@@ -215,14 +215,15 @@
         // The set of kinds carrying a target, as a stable key for detecting
         // whether a save changed it. Order-independent, since two kinds
         // gaining targets in the same save is still one change.
-        const targetedKinds = () => Object.keys(state().section_kind_levels).sort().join(",");
+        const targetedKinds = (preferences) => Object.keys(preferences.section_kind_levels || {}).sort().join(",");
 
         // The last targeted-kind set this tab knows the server actually has —
         // as rendered at load, and re-synced after every successful save or
         // server-state restore. Comparing against this rather than against
         // the DOM's pre-click state, since by the time a debounced save fires
         // the click has already updated the DOM either way.
-        let lastTargetedKinds = targetedKinds();
+        let lastTargetedKinds = targetedKinds(state());
+        let reloadNeeded = false;
 
         // A group's last remaining kind cannot be excluded. The server
         // validation is the authority; this only stops the UI offering it.
@@ -274,10 +275,34 @@
 
           lockLastInGroup();
           version = current.section_kind_preferences_version;
-          lastTargetedKinds = targetedKinds();
+          lastTargetedKinds = targetedKinds(current);
+          reloadNeeded = false;
         };
 
-        let pending;
+        let pending = null;
+        let queuedSaves = 0;
+        let editRevision = 0;
+        const persistMix = () => {
+          const payload = Object.assign(state(), { section_kind_preferences_version: version });
+          const revision = editRevision;
+
+          return save(payload, "exercise_mix").then((result) => {
+            if (!result) return false;
+
+            // A no-op save does not bump the server's version.
+            const reported = result.data && result.data.section_kind_preferences_version;
+            if (result.ok && typeof reported === "number") version = reported;
+            if (result.status === 409 && result.data && result.data.current) applyServerState(result.data.current);
+
+            if (result.ok) {
+              const current = targetedKinds(payload);
+              reloadNeeded = reloadNeeded || current !== lastTargetedKinds;
+              lastTargetedKinds = current;
+            }
+            return result.ok && revision === editRevision;
+          });
+        };
+
         // This tab's own saves are chained rather than issued in parallel. The
         // debounce only spaces them by 400ms, so a request slower than that is
         // still in flight when the next one is sent — and that next one would
@@ -285,38 +310,16 @@
         // conflict with itself, snapping the user's latest change back.
         let inFlight = Promise.resolve();
         const saveMix = () => {
+          editRevision++;
           clearTimeout(pending);
           pending = setTimeout(() => {
-            inFlight = inFlight.then(() => {
-              const payload = Object.assign(state(), { section_kind_preferences_version: version });
-
-              return save(payload, "exercise_mix").then((result) => {
-                if (!result) return;
-
-                // Taken from the server rather than incremented here: a save
-                // whose payload already matches what is stored changes nothing,
-                // so the counter does not move, and a local increment would
-                // desync this tab into refusing its own next save.
-                const reported = result.data && result.data.section_kind_preferences_version;
-                if (result.ok && typeof reported === "number") version = reported;
-
-                if (result.status === 409 && result.data && result.data.current) applyServerState(result.data.current);
-
-                // The bulk "Add difficulty notes" control's count is computed
-                // server side, deduplicated across kinds — math the client
-                // can't redo on its own. Reloading only when a save actually
-                // changes which kinds carry a target (against the last set the
-                // server confirmed, not the DOM's pre-click state, which the
-                // click has already updated by the time this runs) keeps an
-                // ordinary level change (senior -> principal) from yanking the
-                // page out from under the engineer mid-interaction.
-                if (result.ok) {
-                  const current = targetedKinds();
-                  const changed = current !== lastTargetedKinds;
-                  lastTargetedKinds = current;
-                  if (changed) window.location.reload();
-                }
-              });
+            pending = null;
+            queuedSaves++;
+            inFlight = inFlight.then(persistMix).then((savedLatest) => {
+              queuedSaves--;
+              // Bulk coverage is server-rendered. Refresh it only after every
+              // newer edit has saved, including edits still in the debounce.
+              if (savedLatest && !pending && queuedSaves === 0 && reloadNeeded) window.location.reload();
             });
           }, 400);
         };

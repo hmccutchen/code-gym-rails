@@ -1750,7 +1750,8 @@ RSpec.describe AiService do
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
       # For each day shape, every level assignment is rendered for real, with
-      # every rung at its maximum length and every section locked, and the
+      # every rung at its maximum length, then the largest lock-instruction
+      # overhead is added independently across all lock subsets. The
       # largest rendered length wins. Headings, fallback definitions and
       # section-list overhead differ between assignments, so only rendering
       # every one of them (not a proxy over rung payload alone) can find the
@@ -1768,7 +1769,17 @@ RSpec.describe AiService do
           end
 
           service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
-        end.max
+        end.max + lock_subsets(kinds).map { |locked| lock_instruction_length(kinds, locked) }.max -
+          lock_instruction_length(kinds, kinds)
+      end
+
+      def lock_subsets(kinds)
+        (0..kinds.size).flat_map { |count| kinds.combination(count).to_a }
+      end
+
+      def lock_instruction_length(kinds, locked)
+        [ service.send(:unlocked_difficulty_line, kinds - locked),
+          service.send(:locked_difficulty_line, locked) ].compact.sum { |line| line.length + 1 }
       end
 
       it "holds the largest block any day can render" do
@@ -1777,6 +1788,40 @@ RSpec.describe AiService do
                                                   ExerciseSection.fourths.map { |kind| kind.key.to_sym })
 
         expect(shapes.map { |shape| largest_block_for(*shape) }.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
+      end
+
+      it "includes mixed locks that render more instructions than locking every kind" do
+        kinds = ExerciseSection.for_plan(pattern: :pattern, third: :challenge, fourth: :pseudocode_to_code)
+        levels = { "code_review" => "junior", "pattern" => "senior",
+                   "challenge" => "principal_engineer", "pseudocode_to_code" => "junior" }
+        ladders = kinds.each_with_object({}) do |kind, acc|
+          vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, "javascript", mode: :application_code)
+          (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+        end
+        difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
+        mixed = service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+
+        expect(largest_block_for("javascript", :application_code, :challenge, :pseudocode_to_code)).to be >= mixed
+      end
+
+      it "isolates lock overhead from every level assignment in the rendered block" do
+        kinds = ExerciseSection.for_plan(pattern: :pattern, third: :challenge, fourth: :pseudocode_to_code)
+        rungs = KindDifficulty::LEVELS.index_with { { "example" => "x" * AiService::MAX_LADDER_RUNG_LENGTH } }
+
+        KindDifficulty::LEVELS.repeated_permutation(kinds.size).each do |levels|
+          targets = kinds.map(&:key).zip(levels).to_h
+          [ {}, rungs ].each do |ladders|
+            all_locked = KindDifficulty.new(levels: targets, locked: targets.keys)
+            baseline = service.send(:kind_difficulty_guidance, kinds, all_locked, ladders).length
+            lock_subsets(kinds).each do |locked|
+              difficulty = KindDifficulty.new(levels: targets, locked: locked.map(&:key))
+              actual = service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+              expected = baseline + lock_instruction_length(kinds, locked) - lock_instruction_length(kinds, kinds)
+
+              expect(actual).to eq(expected)
+            end
+          end
+        end
       end
     end
   end
@@ -4017,8 +4062,8 @@ RSpec.describe AiService do
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
     end
 
-    # Now asks for seven fields with extended thinking on, so READ_TIMEOUT (sized
-    # for a single-section review) under-times it — and under-times it silently,
+    # Reference, guide and ladder share one response with extended thinking on,
+    # so READ_TIMEOUT (sized for a single-section review) under-times it silently,
     # since staying under READ_TIMEOUT keeps the call from ever being tagged
     # long_running, letting RETRY_TIMEOUT_GUARD retry a genuine timeout into
     # duplicate billed calls.
@@ -4058,6 +4103,27 @@ RSpec.describe AiService do
       expect {
         service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
       }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+    end
+
+    AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+      [ nil, false, true, 0, 1.5, [], [ "prose" ], {}, { "text" => "prose" }, "", " \n\t " ].each do |invalid|
+        it "rejects #{invalid.inspect} in required reference field #{field}" do
+          payload = JSON.parse(valid_json).merge(field => invalid)
+          service = double_class.new(canned_text: payload.to_json)
+
+          expect {
+            service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+          }.to raise_error(AiService::InvalidResponseError, /#{field}/)
+        end
+      end
+
+      it "preserves valid text verbatim in required reference field #{field}" do
+        text = " \nValid reference prose.\t "
+        payload = JSON.parse(valid_json).merge(field => text)
+        service = double_class.new(canned_text: payload.to_json)
+
+        expect(service.generate_concept_reference(user, "n_plus_one", "ruby_rails").fetch(field)).to eq(text)
+      end
     end
 
     it "does not persist a row when a field is missing (job swallows, retries later)" do

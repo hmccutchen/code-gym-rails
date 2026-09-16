@@ -63,11 +63,10 @@ class AiService
   GENERATION_READ_TIMEOUT      = 300
   SYNC_GENERATION_READ_TIMEOUT = 90
 
-  # #generate_concept_reference now asks for seven fields (the original four
-  # CONCEPT_REFERENCE_FIELDS plus CONCEPT_GUIDE_FIELDS) in one response, with
-  # extended thinking left on (no max_tokens is passed), from the Learn tab's
-  # bulk backfill of 74-118 jobs. READ_TIMEOUT was sized for a single-section
-  # review's much smaller reply, so it under-times this call the same way
+  # #generate_concept_reference asks for the reference, guide and difficulty
+  # ladder together, with extended thinking left on (no max_tokens is passed).
+  # READ_TIMEOUT was sized for a single-section review's much smaller reply,
+  # so it under-times this call the same way
   # GENERATION_READ_TIMEOUT exists because READ_TIMEOUT under-timed generation.
   # SYNC_GENERATION_READ_TIMEOUT is the reference point for magnitude: another
   # blocking, thinking-on call, so this one is sized the same order.
@@ -885,10 +884,10 @@ class AiService
 
     reference = parse_json_object(result[:text], subject: "concept reference")
 
-    # Caching keys off (concept, language), so a row missing any field would
-    # persist a partially-blank reference forever and block regeneration.
-    # Failing here lets the job swallow it and retry on the next submission.
-    missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].to_s.strip.present? }
+    # Caching keys off (concept, language), so an unusable field would
+    # persist a broken reference forever and block regeneration.
+    # Rejecting the response preserves any existing reference for a later retry.
+    missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].is_a?(String) && reference[field].strip.present? }
     if missing.any?
       raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
     end

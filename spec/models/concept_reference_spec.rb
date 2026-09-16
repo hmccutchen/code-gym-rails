@@ -247,16 +247,14 @@ RSpec.describe ConceptReference do
       expect(reference(concept: "memoization", guide_pitfalls: nil, **full_ladder)).not_to be_complete
     end
 
-    it "digests reference and guide text, and nothing else" do
+    it "defaults historical rows to no completed generation and keeps unrelated updates out of the counter" do
       row = reference(**full_ladder)
-      before = row.content_digest
+      expect(row.generation_version).to eq(0)
 
       row.update!(ladder_senior: "changed", featured_on: Date.current)
-      expect(row.content_digest).to eq(before)
-
       row.update!(explanation: "rewritten")
-      expect(row.content_digest).not_to eq(before)
-      expect(row.content_digest).to match(/\A\h{64}\z/)
+
+      expect(row.reload.generation_version).to eq(0)
     end
 
     describe ".ladder_rungs" do

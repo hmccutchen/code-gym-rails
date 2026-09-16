@@ -59,13 +59,13 @@
 <% if !@reference&.guide? %>
   <%# Neither state is an error: the library is browsable from the first page
       load, before anything has been generated. %>
-  <%= render "learn/write_up_control", awaiting: "guide", digest: nil,
+  <%= render "learn/write_up_control", awaiting: "guide", generation_version: nil,
              message: t("learn.no_guide"), button: t("learn.write_guide") %>
 <% elsif @ladder_targets.any? %>
   <% if @ladder_missing %>
     <p class="learn-ladder-missing"><%= t("learn.ladder_missing") %></p>
   <% end %>
-  <%= render "learn/write_up_control", awaiting: "ladder", digest: @reference.content_digest,
+  <%= render "learn/write_up_control", awaiting: "ladder", generation_version: @reference.generation_version,
              message: t("learn.ladder_offer", targets: @ladder_targets.to_sentence),
              button: t("learn.write_ladder") %>
 <% end %>

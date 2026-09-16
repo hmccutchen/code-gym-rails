@@ -26,7 +26,7 @@ class LearnController < ApplicationController
   # like a ladder candidate, and a flubbed ladder would then never read ready.
   # Absent reads as guide, the only value pages sent before this existed.
   AWAITING = { "guide" => :guide?, "ladder" => :complete? }.freeze
-  DIGEST_FORMAT = /\A\h{64}\z/
+  GENERATION_VERSION_FORMAT = /\A\d+\z/
 
   # GET /learn/:bucket/:concept/status — is the write-up the page asked for done?
   #
@@ -41,20 +41,21 @@ class LearnController < ApplicationController
     awaiting  = params.fetch(:awaiting, "guide").to_s
     predicate = AWAITING[awaiting]
     return head :bad_request if predicate.nil?
-    return head :bad_request if awaiting == "ladder" && !params[:digest].to_s.match?(DIGEST_FORMAT)
+    return head :bad_request if awaiting == "ladder" && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
 
     reference = ConceptReference.find_by(concept: concept, language: bucket)
     body = { ready: reference&.public_send(predicate) || false }
-    body[:rewritten] = reference.present? && reference.content_digest != params[:digest] if awaiting == "ladder"
+    if awaiting == "ladder"
+      body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
+    end
 
     render json: body
   end
 
   # POST /learn/:bucket/:concept/prepare — write up this one concept now.
   #
-  # `refresh: true` is what lets this rewrite a row missing its guide or its
-  # ladder. Confining that to a concept someone deliberately opened is why the
-  # backfill below refuses to do it.
+  # `refresh: true` permits a whole-row rewrite for this concept. The backfill
+  # keeps existing rows; #prepare_ladders is the scoped bulk exception.
   #
   # JSON, since only script calls it: the page posts and polls rather than
   # holding a request open for a provider call that runs with thinking on.

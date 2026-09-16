@@ -1,9 +1,9 @@
 <%# Required locals: awaiting ("guide" or "ladder"), message (String),
-    button (String), digest (String or nil — the row's content_digest when
-    awaiting "ladder"). %>
+    button (String), generation_version (Integer or nil — the completed
+    generation counter when awaiting "ladder"). %>
 <div id="learn-guide"
      data-url="<%= prepare_learn_concept_path(bucket: @bucket, concept: @concept) %>"
-     data-status-url="<%= learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, digest: digest) %>">
+     data-status-url="<%= learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, generation_version: generation_version) %>">
   <p class="learn-no-guide"><%= message %></p>
   <button type="button" class="btn btn-sm" id="write-guide"><%= button %></button>
   <span class="learn-status" aria-live="polite"></span>
