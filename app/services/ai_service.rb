@@ -1816,16 +1816,31 @@ class AiService
 
   # { level => { concept => rung } } for today's targeted kinds, in the day's
   # mode. Merging by concept name is safe because a day's buckets never share a
-  # concept name (spec/models/concept_reference_spec.rb holds that).
+  # concept name (spec/models/concept_reference_spec.rb holds that). One query
+  # for every targeted kind's bucket/vocabulary, partitioned by level in
+  # memory afterward — the same shape LadderCoverage.for uses — rather than a
+  # round trip per kind.
   def ladders_for(kinds, difficulty, language, code_review_mode)
-    (kinds & difficulty.targeted_kinds).each_with_object({}) do |kind, ladders|
-      level = difficulty.level_for(kind)
-      rungs = ConceptReference.ladder_rungs(
-        bucket:   ConceptBucket.for(kind.key, language),
-        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode),
-        level:    level
-      )
-      (ladders[level] ||= {}).merge!(rungs)
+    targeted = kinds & difficulty.targeted_kinds
+    return {} if targeted.empty?
+
+    requests = targeted.map do |kind|
+      { level: difficulty.level_for(kind), bucket: ConceptBucket.for(kind.key, language),
+        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode) }
+    end
+    pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
+
+    references = ConceptReference.where(language: pairs.map(&:first).uniq, concept: pairs.map(&:last).uniq)
+                                 .select(&:ladder?)
+                                 .index_by { |reference| [ reference.language, reference.concept ] }
+
+    requests.each_with_object({}) do |request, ladders|
+      field = LADDER_FIELD_FOR.fetch(request[:level])
+      rungs = request[:concepts].filter_map do |concept|
+        reference = references[[ request[:bucket], concept ]]
+        [ concept, reference.public_send(field).truncate(MAX_LADDER_RUNG_LENGTH) ] if reference
+      end.to_h
+      (ladders[request[:level]] ||= {}).merge!(rungs)
     end
   end
 

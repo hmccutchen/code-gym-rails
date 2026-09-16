@@ -1749,25 +1749,26 @@ RSpec.describe AiService do
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
-      # For each day shape, the level assignment whose distinct concepts cost the
-      # most, rendered for real with every rung at its maximum length and every
-      # section locked. Fails when a vocabulary grows past the budget, so the
+      # For each day shape, every level assignment is rendered for real, with
+      # every rung at its maximum length and every section locked, and the
+      # largest rendered length wins. Headings, fallback definitions and
+      # section-list overhead differ between assignments, so only rendering
+      # every one of them (not a proxy over rung payload alone) can find the
+      # true maximum. Fails when a vocabulary grows past the budget, so the
       # decision to shorten rungs or change delivery is made on purpose.
       def largest_block_for(language, mode, third, fourth)
         kinds = ExerciseSection.for_plan(pattern: :pattern, third: third, fourth: fourth)
         vocab = kinds.to_h { |kind| [ kind, ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) ] }
-        assignment = KindDifficulty::LEVELS.repeated_permutation(kinds.size).max_by do |levels|
-          kinds.zip(levels).group_by(&:last).sum do |_, pairs|
-            pairs.flat_map { |kind, _| vocab[kind] }.uniq.sum { |concept| concept.size + AiService::MAX_LADDER_RUNG_LENGTH }
-          end
-        end
-        placed = kinds.zip(assignment)
-        difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
-        ladders = placed.each_with_object({}) do |(kind, level), acc|
-          (acc[level] ||= {}).merge!(vocab[kind].index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
-        end
 
-        service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+        KindDifficulty::LEVELS.repeated_permutation(kinds.size).map do |levels|
+          placed = kinds.zip(levels)
+          difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
+          ladders = placed.each_with_object({}) do |(kind, level), acc|
+            (acc[level] ||= {}).merge!(vocab[kind].index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+          end
+
+          service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+        end.max
       end
 
       it "holds the largest block any day can render" do

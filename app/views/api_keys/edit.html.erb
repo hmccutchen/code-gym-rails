@@ -212,6 +212,18 @@
                    section_kind_levels: levels, locked_section_kinds: locked };
         };
 
+        // The set of kinds carrying a target, as a stable key for detecting
+        // whether a save changed it. Order-independent, since two kinds
+        // gaining targets in the same save is still one change.
+        const targetedKinds = () => Object.keys(state().section_kind_levels).sort().join(",");
+
+        // The last targeted-kind set this tab knows the server actually has —
+        // as rendered at load, and re-synced after every successful save or
+        // server-state restore. Comparing against this rather than against
+        // the DOM's pre-click state, since by the time a debounced save fires
+        // the click has already updated the DOM either way.
+        let lastTargetedKinds = targetedKinds();
+
         // A group's last remaining kind cannot be excluded. The server
         // validation is the authority; this only stops the UI offering it.
         const lockLastInGroup = () => {
@@ -262,6 +274,7 @@
 
           lockLastInGroup();
           version = current.section_kind_preferences_version;
+          lastTargetedKinds = targetedKinds();
         };
 
         let pending;
@@ -288,6 +301,21 @@
                 if (result.ok && typeof reported === "number") version = reported;
 
                 if (result.status === 409 && result.data && result.data.current) applyServerState(result.data.current);
+
+                // The bulk "Add difficulty notes" control's count is computed
+                // server side, deduplicated across kinds — math the client
+                // can't redo on its own. Reloading only when a save actually
+                // changes which kinds carry a target (against the last set the
+                // server confirmed, not the DOM's pre-click state, which the
+                // click has already updated by the time this runs) keeps an
+                // ordinary level change (senior -> principal) from yanking the
+                // page out from under the engineer mid-interaction.
+                if (result.ok) {
+                  const current = targetedKinds();
+                  const changed = current !== lastTargetedKinds;
+                  lastTargetedKinds = current;
+                  if (changed) window.location.reload();
+                }
               });
             });
           }, 400);
