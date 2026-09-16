@@ -1660,6 +1660,172 @@ RSpec.describe AiService do
     end
   end
 
+  describe "difficulty targets in the generation prompt" do
+    def render(difficulty:, ladders: {}, third: :challenge, fourth: :plan_review, mode: :application_code)
+      service.send(:build_exercise_prompt, user, "ruby_rails",
+                   third: third, fourth: fourth, code_review_mode: mode,
+                   reinforcement: [], due_checks: [], established: [], history: [],
+                   difficulty: difficulty, ladders: ladders)
+    end
+
+    let(:untargeted) { render(difficulty: KindDifficulty.none) }
+
+    it "renders nothing new for a user with no targets" do
+      expect(render(difficulty: KindDifficulty.new(levels: {}, locked: []))).to eq(untargeted)
+      expect(untargeted).not_to include("Difficulty targets")
+    end
+
+    it "renders nothing new when the targeted kinds are not on today's plan" do
+      difficulty = KindDifficulty.new(levels: { "architecture" => "senior", "ambiguity_hunt" => "junior" },
+                                      locked: [ "architecture" ])
+
+      expect(render(difficulty: difficulty, ladders: { "senior" => { "n_plus_one" => "rung" } })).to eq(untargeted)
+    end
+
+    it "lists one concept once for sections sharing a level" do
+      difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "senior" }, locked: [])
+      prompt = render(difficulty: difficulty, ladders: { "senior" => { "n_plus_one" => "hidden behind a helper" } })
+
+      expect(prompt).to include("Sections at senior: code_review, challenge")
+      expect(prompt.scan("- n_plus_one: hidden behind a helper").size).to eq(1)
+      expect(prompt).to include("For a concept not listed, a senior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['senior']}")
+    end
+
+    it "falls back to the definition alone when nothing at a level is grounded" do
+      difficulty = KindDifficulty.new(levels: { "pattern" => "junior" }, locked: [])
+
+      expect(render(difficulty: difficulty)).to include("A junior problem is: #{KindDifficulty::LEVEL_DEFINITIONS['junior']}")
+    end
+
+    it "defines full difficulty for retention checks in targeted sections" do
+      difficulty = KindDifficulty.new(levels: { "challenge" => "principal_engineer" }, locked: [])
+
+      expect(render(difficulty: difficulty))
+        .to include("A retention check or established concept placed in one of these sections is pitched at that section's level, with no easing.")
+    end
+
+    it "names unlocked and locked sections on their own lines" do
+      difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "principal_engineer" },
+                                      locked: [ "challenge" ])
+      prompt = render(difficulty: difficulty)
+
+      expect(prompt).to include("Unlocked (code_review): tier annotations and rating adjustments above still apply")
+      expect(prompt).to include("Locked (challenge): for these sections, ignore the `(reduced)` easing rule")
+      expect(prompt).to include("including a concept the engineer has never seen")
+    end
+
+    it "omits the lock line when nothing is locked, and the unlocked line when everything is" do
+      unlocked = render(difficulty: KindDifficulty.new(levels: { "challenge" => "senior" }, locked: []))
+      locked   = render(difficulty: KindDifficulty.new(levels: { "challenge" => "senior" }, locked: [ "challenge" ]))
+
+      expect(unlocked).not_to include("Locked (")
+      expect(locked).not_to include("Unlocked (")
+    end
+
+    # The read-side half of the invariant, end to end: a lock with no level must
+    # never reach the prompt.
+    it "renders no lock for an orphaned lock written past validation" do
+      user.save!
+      user.update_columns(locked_section_kinds: [ "challenge" ])
+
+      expect(render(difficulty: KindDifficulty.for(user.reload))).to eq(untargeted)
+    end
+
+    describe "#ladders_for" do
+      it "loads each targeted kind's rungs for the day's mode and merges them by level" do
+        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                 ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+        schema_concept = AiService::DATA_MODELING_CONCEPTS.first
+        ConceptReference.create!(concept: schema_concept, language: "ruby_rails",
+                                 ladder_junior: "j2", ladder_senior: "s2", ladder_principal_engineer: "p2")
+        kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
+        difficulty = KindDifficulty.new(levels: { "code_review" => "senior", "challenge" => "senior" }, locked: [])
+
+        ladders = service.send(:ladders_for, kinds, difficulty, "ruby_rails", :schema_review)
+
+        expect(ladders.keys).to eq([ "senior" ])
+        expect(ladders["senior"]).to include("n_plus_one" => "s", schema_concept => "s2")
+      end
+    end
+
+    describe "MAX_LADDER_GUIDANCE_CHARS" do
+      # For each day shape, every level assignment is rendered for real, with
+      # every rung at its maximum length, then the largest lock-instruction
+      # overhead is added independently across all lock subsets. The
+      # largest rendered length wins. Headings, fallback definitions and
+      # section-list overhead differ between assignments, so only rendering
+      # every one of them (not a proxy over rung payload alone) can find the
+      # true maximum. Fails when a vocabulary grows past the budget, so the
+      # decision to shorten rungs or change delivery is made on purpose.
+      def largest_block_for(language, mode, third, fourth)
+        kinds = ExerciseSection.for_plan(pattern: :pattern, third: third, fourth: fourth)
+        vocab = kinds.to_h { |kind| [ kind, ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) ] }
+
+        KindDifficulty::LEVELS.repeated_permutation(kinds.size).map do |levels|
+          placed = kinds.zip(levels)
+          difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
+          ladders = placed.each_with_object({}) do |(kind, level), acc|
+            (acc[level] ||= {}).merge!(vocab[kind].index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+          end
+
+          service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+        end.max + lock_subsets(kinds).map { |locked| lock_instruction_length(kinds, locked) }.max -
+          lock_instruction_length(kinds, kinds)
+      end
+
+      def lock_subsets(kinds)
+        (0..kinds.size).flat_map { |count| kinds.combination(count).to_a }
+      end
+
+      def lock_instruction_length(kinds, locked)
+        [ service.send(:unlocked_difficulty_line, kinds - locked),
+          service.send(:locked_difficulty_line, locked) ].compact.sum { |line| line.length + 1 }
+      end
+
+      it "holds the largest block any day can render" do
+        shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys,
+                                                  ExerciseSection.thirds.map { |kind| kind.key.to_sym },
+                                                  ExerciseSection.fourths.map { |kind| kind.key.to_sym })
+
+        expect(shapes.map { |shape| largest_block_for(*shape) }.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
+      end
+
+      it "includes mixed locks that render more instructions than locking every kind" do
+        kinds = ExerciseSection.for_plan(pattern: :pattern, third: :challenge, fourth: :pseudocode_to_code)
+        levels = { "code_review" => "junior", "pattern" => "senior",
+                   "challenge" => "principal_engineer", "pseudocode_to_code" => "junior" }
+        ladders = kinds.each_with_object({}) do |kind, acc|
+          vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, "javascript", mode: :application_code)
+          (acc[levels.fetch(kind.key)] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+        end
+        difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
+        mixed = service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+
+        expect(largest_block_for("javascript", :application_code, :challenge, :pseudocode_to_code)).to be >= mixed
+      end
+
+      it "isolates lock overhead from every level assignment in the rendered block" do
+        kinds = ExerciseSection.for_plan(pattern: :pattern, third: :challenge, fourth: :pseudocode_to_code)
+        rungs = KindDifficulty::LEVELS.index_with { { "example" => "x" * AiService::MAX_LADDER_RUNG_LENGTH } }
+
+        KindDifficulty::LEVELS.repeated_permutation(kinds.size).each do |levels|
+          targets = kinds.map(&:key).zip(levels).to_h
+          [ {}, rungs ].each do |ladders|
+            all_locked = KindDifficulty.new(levels: targets, locked: targets.keys)
+            baseline = service.send(:kind_difficulty_guidance, kinds, all_locked, ladders).length
+            lock_subsets(kinds).each do |locked|
+              difficulty = KindDifficulty.new(levels: targets, locked: locked.map(&:key))
+              actual = service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
+              expected = baseline + lock_instruction_length(kinds, locked) - lock_instruction_length(kinds, kinds)
+
+              expect(actual).to eq(expected)
+            end
+          end
+        end
+      end
+    end
+  end
+
   describe "diagram instructions in the generation prompt" do
     # The syntax rules used to live in the architecture-only branch. They now
     # govern code_review and pattern, which are present every single day.
@@ -2126,6 +2292,15 @@ RSpec.describe AiService do
   end
 
   describe "difficulty diagnostics instrumentation" do
+    def diagnostics_payload(svc)
+      logged = nil
+      allow(Rails.logger).to receive(:info) do |msg|
+        logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+      end
+      svc.generate_exercise(user, language: "ruby_rails")
+      JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+    end
+
     it "logs what was requested and what was delivered on every generation" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       set = full_problem_set("code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" })
@@ -2268,6 +2443,38 @@ RSpec.describe AiService do
 
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
       expect(payload["requested"]["code_review_source"]).to eq(excerpt.id)
+    end
+
+    it "omits difficulty fields when nothing targeted is on the plan" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      user.update!(section_kind_levels: { "architecture" => "senior" })
+
+      payload = diagnostics_payload(double_class.new(canned_text: full_problem_set.to_json))
+
+      expect(payload["requested"]).not_to have_key("kind_difficulty")
+      expect(payload["requested"]).not_to have_key("kind_difficulty_chars")
+    end
+
+    it "logs level, lock, coverage, the chosen concept, and the block's length" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(WeightedRoll).to receive(:pick).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      user.update!(section_kind_levels: { "challenge" => "principal_engineer" }, locked_section_kinds: [ "challenge" ])
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+      set = full_problem_set("challenge" => { "concept" => "n_plus_one" })
+
+      payload = diagnostics_payload(double_class.new(canned_text: set.to_json))
+      vocabulary = ProblemSetIngest.selectable_vocabulary_for("challenge", "ruby_rails", mode: :application_code)
+
+      expect(payload["requested"]["kind_difficulty"]).to eq(
+        "challenge" => { "level" => "principal_engineer", "locked" => true,
+                         "ladder_coverage" => "1/#{vocabulary.size}",
+                         "chosen_concept" => "n_plus_one", "chosen_grounded" => true }
+      )
+      expect(payload["requested"]["kind_difficulty_chars"]).to be > 0
     end
   end
 
@@ -3855,8 +4062,8 @@ RSpec.describe AiService do
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
     end
 
-    # Now asks for seven fields with extended thinking on, so READ_TIMEOUT (sized
-    # for a single-section review) under-times it — and under-times it silently,
+    # Reference, guide and ladder share one response with extended thinking on,
+    # so READ_TIMEOUT (sized for a single-section review) under-times it silently,
     # since staying under READ_TIMEOUT keeps the call from ever being tagged
     # long_running, letting RETRY_TIMEOUT_GUARD retry a genuine timeout into
     # duplicate billed calls.
@@ -3896,6 +4103,27 @@ RSpec.describe AiService do
       expect {
         service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
       }.to raise_error(AiService::InvalidResponseError, /senior_lens/)
+    end
+
+    AiService::CONCEPT_REFERENCE_FIELDS.each do |field|
+      [ nil, false, true, 0, 1.5, [], [ "prose" ], {}, { "text" => "prose" }, "", " \n\t " ].each do |invalid|
+        it "rejects #{invalid.inspect} in required reference field #{field}" do
+          payload = JSON.parse(valid_json).merge(field => invalid)
+          service = double_class.new(canned_text: payload.to_json)
+
+          expect {
+            service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+          }.to raise_error(AiService::InvalidResponseError, /#{field}/)
+        end
+      end
+
+      it "preserves valid text verbatim in required reference field #{field}" do
+        text = " \nValid reference prose.\t "
+        payload = JSON.parse(valid_json).merge(field => text)
+        service = double_class.new(canned_text: payload.to_json)
+
+        expect(service.generate_concept_reference(user, "n_plus_one", "ruby_rails").fetch(field)).to eq(text)
+      end
     end
 
     it "does not persist a row when a field is missing (job swallows, retries later)" do
@@ -4245,7 +4473,8 @@ RSpec.describe AiService do
       {
         "tagline" => "t", "explanation" => "e", "code_example" => "c", "senior_lens" => "s",
         "guide_plain_language" => "plain", "guide_worked_example" => "worked",
-        "guide_pitfalls" => "pitfalls"
+        "guide_pitfalls" => "pitfalls",
+        "ladder_junior" => "j", "ladder_senior" => "s", "ladder_principal_engineer" => "p"
       }
     end
 
@@ -4330,6 +4559,33 @@ RSpec.describe AiService do
       expect(result["guide_worked_example"]).to eq("worked")
       expect(result["guide_pitfalls"]).to eq("pitfalls")
     end
+
+    it "asks for the ladder in the same request, with its grain example" do
+      service = double_class.new(canned_text: full_reference.to_json)
+      service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      AiService::CONCEPT_LADDER_FIELDS.each { |field| expect(service.last_prompt).to include(field) }
+      expect(service.last_prompt).to include("composite index column order")
+    end
+
+    it "still succeeds when the provider omits the ladder" do
+      result = double_class.new(canned_text: full_reference.except(*AiService::CONCEPT_LADDER_FIELDS).to_json)
+                           .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(result.values_at(*AiService::CONCEPT_LADDER_FIELDS)).to all(be_nil)
+    end
+
+    # Matches the guide normalizer: a runaway rung is a flubbed ladder, not a
+    # rung to cut short. The read side truncates separately.
+    it "normalizes an unusable rung to nil" do
+      [ [ "a list" ], "   ", "x" * (AiService::MAX_LADDER_RUNG_LENGTH + 1) ].each do |junk|
+        result = double_class.new(canned_text: full_reference.merge("ladder_senior" => junk).to_json)
+                             .generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+        expect(result["ladder_senior"]).to be_nil
+        expect(result["ladder_junior"]).to eq("j")
+      end
+    end
   end
 
   # CONCEPT_REFERENCE_FIELDS is what #explain_concept_differently sends as
@@ -4353,6 +4609,18 @@ RSpec.describe AiService do
       service.explain_concept_differently(user, reference)
 
       expect(service.last_prompt).not_to include("PLAIN_MARKER", "WORKED_MARKER", "PITFALLS_MARKER")
+    end
+
+    it "does not send the ladder to the alternate-framing prompt" do
+      reference = ConceptReference.create!(
+        concept: "caching", language: "ruby_rails",
+        tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+        ladder_junior: "JUNIOR_MARKER", ladder_senior: "SENIOR_MARKER", ladder_principal_engineer: "PRINCIPAL_MARKER"
+      )
+      service = double_class.new(canned_text: "Another angle.")
+      service.explain_concept_differently(user, reference)
+
+      expect(service.last_prompt).not_to include("JUNIOR_MARKER", "SENIOR_MARKER", "PRINCIPAL_MARKER")
     end
   end
 end

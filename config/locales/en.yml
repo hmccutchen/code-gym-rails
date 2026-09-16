@@ -52,6 +52,9 @@ en:
     write_guide: "Write this up"
     writing_guide: "Writing it up — this takes a few seconds."
     write_guide_failed: "Still working on it. Reload this page in a minute to check."
+    ladder_offer: "Optional: prepare concept-specific guidance to help the AI apply your %{targets} difficulty target. Your target works without it. This uses your API key and may change the shared reference's wording."
+    write_ladder: "Prepare AI guidance"
+    ladder_missing: "The reference was rewritten, but the AI difficulty guidance didn't come back. You can try again."
     featured:
       label: "Today's concept"
     filter_placeholder: "Filter concepts"
@@ -83,7 +86,8 @@ en:
     signed_out: "Couldn't save your last change — you've been signed out. Reload the page and sign in again."
   exercise_mix:
     summary: "Exercise mix"
-    intro: "Bias how often each rotating section appears. This changes which kind fills a slot, not how many sections a day holds — that's the setting above."
+    intro: "Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that's the setting above. Changes save automatically."
+    fixed_group: "Sections that don't rotate"
     third_group: "Rotating third section"
     fourth_group: "Rotating fourth section"
     exclude_heading: "Excluding is a stronger, different action than turning a slider down."
@@ -93,6 +97,25 @@ en:
     exclude_label: "Exclude"
     last_in_slot: "At least one section in this group has to stay in rotation."
     conflict: "Your exercise mix was changed in another tab. This page has been updated to match."
+    difficulty_legend: "Difficulty target"
+    level_default: "Your skill level (%{skill_level})"
+    levels:
+      junior: "Junior"
+      senior: "Senior"
+      principal_engineer: "Principal engineer"
+    lock_label: "Lock at this level"
+    lock_heading: "Locking a difficulty target"
+    lock_body: "Lock means this section is always pitched at the level you chose. Easing for concepts you're finding hard, and adjustments from your difficulty ratings, stop applying to it — including the first time you meet a concept. Your progress is still tracked, and unlocking uses it again straight away."
+    coverage: "%{grounded} of %{total} concepts have AI difficulty guidance."
+    ladders_button:
+      one: "Prepare AI guidance for 1 concept"
+      other: "Prepare AI guidance for %{count} concepts"
+    ladders_explanation: "Optional: prepare concept-specific guidance that tells the AI what problems at each difficulty level should look like. Your targets work without it. The count is the concepts behind your targets that still need guidance; this does not generate a new exercise set."
+    ladders_cost: "One provider call per concept, on your API key. What it writes is shared with everyone on the team, and rewrites those concepts' references, so their wording may change."
+    ladders_preparing:
+      zero: "AI difficulty guidance is already prepared for your targeted concepts."
+      one: "Preparing AI guidance for one concept. Reload this page later to see updated coverage."
+      other: "Preparing AI guidance for %{count} concepts. Reload this page later to see updated coverage."
     stops:
       - "Much less"
       - "Less"

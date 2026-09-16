@@ -11,7 +11,10 @@ RSpec.describe GenerateConceptReferenceJob do
       "senior_lens"  => "Reach for includes when iterating.",
       "guide_plain_language" => "Plain-language guide.",
       "guide_worked_example" => "A worked example.",
-      "guide_pitfalls"       => "What people get wrong."
+      "guide_pitfalls"       => "What people get wrong.",
+      "ladder_junior"             => "j",
+      "ladder_senior"             => "s",
+      "ladder_principal_engineer" => "p"
     }
   end
 
@@ -33,6 +36,7 @@ RSpec.describe GenerateConceptReferenceJob do
     expect(ref.concept).to eq("n_plus_one")
     expect(ref.language).to eq("ruby_rails")
     expect(ref.tagline).to eq("Avoid N+1 by eager loading.")
+    expect(ref.generation_version).to eq(1)
   end
 
   it "is a no-op when a reference already exists (does not call the provider)" do
@@ -132,9 +136,16 @@ RSpec.describe GenerateConceptReferenceJob do
       expect(ref.tagline).to eq("Avoid N+1 by eager loading.")
       expect(ref).not_to be_guide
     end
+
+    it "writes the ladder with the rest of the row" do
+      stub_service
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+
+      expect(ConceptReference.last).to be_complete
+    end
   end
 
-  describe "refresh_guide" do
+  describe "refresh" do
     def legacy_row
       ConceptReference.create!(
         concept: "n_plus_one", language: "ruby_rails",
@@ -159,48 +170,112 @@ RSpec.describe GenerateConceptReferenceJob do
 
       expect {
         described_class.perform_now(
-          concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh_guide: true
+          concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true
         )
       }.not_to change(ConceptReference, :count)
 
       row.reload
       expect(row.tagline).to eq("Avoid N+1 by eager loading.")
       expect(row).to be_guide
+      expect(row.generation_version).to eq(1)
     end
 
-    it "is still a no-op for a row that already has a guide" do
-      legacy_row.update!(
-        guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x"
+    it "advances the completion counter on every successful refresh even when nothing else changes" do
+      attributes = reference_hash.except(*AiService::CONCEPT_LADDER_FIELDS)
+      row = ConceptReference.create!(attributes.merge(concept: "n_plus_one", language: "ruby_rails"))
+      stub_service(returning: attributes)
+
+      freeze_time do
+        2.times do
+          expect {
+            described_class.perform_now(concept: row.concept, language: row.language, user_id: user.id, refresh: true)
+          }.to change { row.reload.generation_version }.by(1)
+        end
+      end
+
+      expect(row.attributes.slice(*attributes.keys)).to eq(attributes)
+    end
+
+    it "advances from the locked counter when another incomplete refresh finishes during the provider call" do
+      row = legacy_row
+      service = stub_service
+      allow(service).to receive(:generate_concept_reference) do
+        row.update!(generation_version: 1, ladder_junior: "another attempt")
+        reference_hash.except(*AiService::CONCEPT_LADDER_FIELDS)
+      end
+
+      described_class.perform_now(concept: row.concept, language: row.language, user_id: user.id, refresh: true)
+
+      expect(row.reload.generation_version).to eq(2)
+      expect(row).not_to be_ladder
+    end
+
+    it "rewrites a guided row that has no ladder when asked to refresh" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old",
+                               guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
+      stub_service
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+
+      expect(ConceptReference.last.tagline).to eq("Avoid N+1 by eager loading.")
+      expect(ConceptReference.last).to be_ladder
+    end
+
+    it "keeps a valid shared reference when a ladder refresh returns malformed required prose" do
+      row = ConceptReference.create!(
+        reference_hash.except(*AiService::CONCEPT_LADDER_FIELDS).merge(concept: "n_plus_one", language: "ruby_rails")
       )
+      before = row.attributes
+      service = ClaudeService.new(user.api_key)
+      allow(AiService).to receive(:for).with(user).and_return(service)
+      allow(service).to receive(:call).and_return(
+        text: reference_hash.merge("explanation" => false).to_json, input_tokens: 10, output_tokens: 20
+      )
+      expect(Rails.logger).to receive(:warn).with(/Failed to generate concept reference/)
+
+      described_class.perform_now(concept: row.concept, language: row.language, user_id: user.id, refresh: true)
+
+      expect(row.reload.attributes).to eq(before)
+      expect(row).not_to be_complete
+    end
+
+    it "leaves a complete row alone even when asked to refresh" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept",
+                               guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
+                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
       expect(AiService).not_to receive(:for)
 
-      described_class.perform_now(
-        concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh_guide: true
-      )
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+
+      expect(ConceptReference.last.tagline).to eq("kept")
+      expect(ConceptReference.last.generation_version).to eq(0)
     end
 
-    # Two jobs can both pass the initial existing.guide? check before either
+    # Two jobs can both pass the initial existing.complete? check before either
     # writes. The second one to reach the write must discard its result rather
-    # than clobber the winner's guide.
-    it "does not overwrite a guide that appeared between the check and the write" do
+    # than clobber the winner's write.
+    it "does not overwrite a row that became complete between the check and the write" do
       row = legacy_row
       stub_service
 
       allow_any_instance_of(ConceptReference).to receive(:with_lock) do |record, &block|
         record.update!(
           guide_plain_language: "winner plain", guide_worked_example: "winner worked",
-          guide_pitfalls: "winner pitfalls"
+          guide_pitfalls: "winner pitfalls",
+          ladder_junior: "winner j", ladder_senior: "winner s", ladder_principal_engineer: "winner p",
+          generation_version: 1
         )
         block.call
       end
 
       described_class.perform_now(
-        concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh_guide: true
+        concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true
       )
 
       row.reload
       expect(row.guide_plain_language).to eq("winner plain")
       expect(row.tagline).to eq("old tagline")
+      expect(row.generation_version).to eq(1)
     end
   end
 end

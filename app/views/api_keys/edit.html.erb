@@ -18,6 +18,10 @@
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
+  .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .25rem .75rem; font-size: .8rem; }
+  .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
+  .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
+  .mix-coverage { flex-basis: 100%; margin-top: 0; }
 </style>
 
 <div class="setup-wrap">
@@ -78,11 +82,28 @@
       <p class="hint"><%= t("exercise_mix.exclude_body_frequency") %></p>
     </div>
 
+    <div class="mix-note">
+      <strong><%= t("exercise_mix.lock_heading") %></strong>
+      <p class="hint"><%= t("exercise_mix.lock_body") %></p>
+    </div>
+
+    <%# The complement of the rotating loop below: a slot holding one candidate
+        has nothing to weigh or exclude, but its difficulty can still be set. %>
+    <fieldset class="mix-group">
+      <legend><%= t("exercise_mix.fixed_group") %></legend>
+      <% ExerciseSection.slots.select { |_, kinds| kinds.size == 1 }.values.flatten.each do |kind| %>
+        <div class="mix-row mix-row-fixed">
+          <span><%= t("sections.#{kind.key}.name") %></span>
+          <%= render "api_keys/difficulty_controls", kind: kind, excluded: false %>
+        </div>
+      <% end %>
+    </fieldset>
+
     <%# Derived from the slot roster, like ExerciseSection.rotatable and the
         User validations: a slot holding one candidate has nothing to bias, and
         a future multi-kind slot gets its controls without an edit here. %>
     <% ExerciseSection.slots.select { |_, kinds| kinds.size > 1 }.each do |slot, kinds| %>
-      <fieldset class="mix-group">
+      <fieldset class="mix-group mix-group-rotating">
         <legend><%= t("exercise_mix.#{slot}_group") %></legend>
 
         <% kinds.each do |kind| %>
@@ -91,22 +112,32 @@
             index    = KindPreferences::MULTIPLIERS.index(stored) || KindPreferences::MULTIPLIERS.index(KindPreferences::DEFAULT_MULTIPLIER)
             excluded = current_user.excluded_section_kinds.include?(kind.key)
           %>
-          <div class="mix-row" data-kind="<%= kind.key %>">
+          <div class="mix-row" data-kind="<%= kind.key %>" data-weighted>
             <label for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
             <input type="range" id="weight-<%= kind.key %>" min="0" max="<%= KindPreferences::MULTIPLIERS.size - 1 %>" step="1"
                    value="<%= index %>" <%= "disabled" if excluded %>
                    aria-describedby="weight-label-<%= kind.key %>">
             <output id="weight-label-<%= kind.key %>"><%= t("exercise_mix.stops")[index] %></output>
             <label class="mix-exclude" for="exclude-<%= kind.key %>">
-              <input type="checkbox" id="exclude-<%= kind.key %>" <%= "checked" if excluded %>>
+              <input type="checkbox" id="exclude-<%= kind.key %>" class="mix-exclude-box" <%= "checked" if excluded %>>
               <%= t("exercise_mix.exclude_label") %>
             </label>
+            <%= render "api_keys/difficulty_controls", kind: kind, excluded: excluded %>
           </div>
         <% end %>
 
         <p class="hint mix-last-note" hidden><%= t("exercise_mix.last_in_slot") %></p>
       </fieldset>
     <% end %>
+
+    <% preparation = ladder_preparation %>
+    <div id="mix-ladder-preparation" <%= "hidden" if preparation[:count].zero? %>>
+      <p class="hint" id="mix-ladder-explanation"><%= t("exercise_mix.ladders_explanation") %></p>
+      <%= button_to preparation[:button_label], prepare_learn_ladders_path,
+                    class: "btn btn-sm", id: "prepare-ladders", form: { class: "mix-ladders" },
+                    aria: { describedby: "mix-ladder-explanation mix-ladder-cost" } %>
+      <p class="hint" id="mix-ladder-cost"><%= t("exercise_mix.ladders_cost") %></p>
+    </div>
   </details>
 
   <script>
@@ -131,7 +162,29 @@
       const mix    = document.getElementById("exercise-mix");
 
       if (mix) {
-        const rows = Array.from(mix.querySelectorAll(".mix-row"));
+        const rows = Array.from(mix.querySelectorAll(".mix-row[data-weighted]"));
+
+        const difficulties = Array.from(mix.querySelectorAll(".mix-difficulty"));
+        const difficultyFor = (kind) => mix.querySelector('.mix-difficulty[data-kind="' + kind + '"]');
+        const chosenLevel = (box) => (box.querySelector("input[type=radio]:checked") || { value: "" }).value;
+
+        // A lock is only meaningful with a level, so choosing the default clears
+        // it here rather than posting a lock the server would refuse. Coverage
+        // does not depend on the level, so it can show as soon as one is chosen.
+        const syncDifficulty = (box) => {
+          const targeted = chosenLevel(box) !== "";
+          const lock = box.querySelector(".mix-lock-box");
+          const excluded = box.querySelector("input[type=radio]").disabled;
+
+          if (!targeted) lock.checked = false;
+          lock.disabled = excluded || !targeted;
+          box.querySelector(".mix-coverage").hidden = !targeted;
+        };
+
+        const setDifficultyDisabled = (box, disabled) => {
+          box.querySelectorAll("input[type=radio]").forEach((radio) => { radio.disabled = disabled; });
+          syncDifficulty(box);
+        };
 
         const state = () => {
           const weights = {};
@@ -140,7 +193,7 @@
           rows.forEach((row) => {
             const kind = row.dataset.kind;
             const slider = row.querySelector("input[type=range]");
-            const box = row.querySelector("input[type=checkbox]");
+            const box = row.querySelector(".mix-exclude-box");
             const value = STOPS[Number(slider.value)];
 
             if (box.checked) excluded.push(kind);
@@ -149,14 +202,34 @@
             if (value !== DEFAULT_STOP) weights[kind] = value;
           });
 
-          return { section_kind_weights: weights, excluded_section_kinds: excluded };
+          const levels = {};
+          const locked = [];
+          difficulties.forEach((box) => {
+            const level = chosenLevel(box);
+            if (level === "") return;
+            levels[box.dataset.kind] = level;
+            if (box.querySelector(".mix-lock-box").checked) locked.push(box.dataset.kind);
+          });
+
+          return { section_kind_weights: weights, excluded_section_kinds: excluded,
+                   section_kind_levels: levels, locked_section_kinds: locked };
+        };
+
+        const preparation = document.getElementById("mix-ladder-preparation");
+        const prepareButton = document.getElementById("prepare-ladders");
+        const applyLadderPreparation = (data) => {
+          preparation.hidden = data.count === 0;
+          prepareButton.textContent = data.button_label;
+          difficulties.forEach((box) => {
+            box.querySelector(".mix-coverage").textContent = data.coverage[box.dataset.kind];
+          });
         };
 
         // A group's last remaining kind cannot be excluded. The server
         // validation is the authority; this only stops the UI offering it.
         const lockLastInGroup = () => {
-          mix.querySelectorAll(".mix-group").forEach((group) => {
-            const boxes = Array.from(group.querySelectorAll("input[type=checkbox]"));
+          mix.querySelectorAll(".mix-group-rotating").forEach((group) => {
+            const boxes = Array.from(group.querySelectorAll(".mix-exclude-box"));
             const remaining = boxes.filter((box) => !box.checked);
             const locked = remaining.length === 1;
 
@@ -180,7 +253,7 @@
           rows.forEach((row) => {
             const kind = row.dataset.kind;
             const slider = row.querySelector("input[type=range]");
-            const box = row.querySelector("input[type=checkbox]");
+            const box = row.querySelector(".mix-exclude-box");
             const stop = Object.prototype.hasOwnProperty.call(weights, kind) ? weights[kind] : DEFAULT_STOP;
             const index = STOPS.indexOf(stop);
 
@@ -190,11 +263,47 @@
             slider.disabled = box.checked;
           });
 
+          const levels = current.section_kind_levels || {};
+          const lockedKinds = current.locked_section_kinds || [];
+          difficulties.forEach((box) => {
+            const kind = box.dataset.kind;
+            const level = Object.prototype.hasOwnProperty.call(levels, kind) ? levels[kind] : "";
+            box.querySelectorAll("input[type=radio]").forEach((radio) => { radio.checked = radio.value === level; });
+            box.querySelector(".mix-lock-box").checked = lockedKinds.indexOf(kind) !== -1;
+            setDifficultyDisabled(box, excluded.indexOf(kind) !== -1);
+          });
+
           lockLastInGroup();
           version = current.section_kind_preferences_version;
+          applyLadderPreparation(current.ladder_preparation);
         };
 
-        let pending;
+        let pending = null;
+        let queuedSaves = 0;
+        let editRevision = 0;
+        const persistMix = () => {
+          const payload = Object.assign(state(), { section_kind_preferences_version: version });
+          const revision = editRevision;
+
+          return save(payload, "exercise_mix").then((result) => {
+            if (!result) return false;
+
+            // A no-op save does not bump the server's version.
+            const reported = result.data && result.data.section_kind_preferences_version;
+            if (result.ok && typeof reported === "number") version = reported;
+            if (result.status === 409 && result.data && result.data.current) {
+              applyServerState(result.data.current);
+              return revision === editRevision;
+            }
+
+            if (result.ok && revision === editRevision) {
+              applyLadderPreparation(result.data.ladder_preparation);
+              return true;
+            }
+            return false;
+          });
+        };
+
         // This tab's own saves are chained rather than issued in parallel. The
         // debounce only spaces them by 400ms, so a request slower than that is
         // still in flight when the next one is sent — and that next one would
@@ -202,30 +311,22 @@
         // conflict with itself, snapping the user's latest change back.
         let inFlight = Promise.resolve();
         const saveMix = () => {
+          editRevision++;
+          prepareButton.disabled = true;
           clearTimeout(pending);
           pending = setTimeout(() => {
-            inFlight = inFlight.then(() => {
-              const payload = Object.assign(state(), { section_kind_preferences_version: version });
-
-              return save(payload, "exercise_mix").then((result) => {
-                if (!result) return;
-
-                // Taken from the server rather than incremented here: a save
-                // whose payload already matches what is stored changes nothing,
-                // so the counter does not move, and a local increment would
-                // desync this tab into refusing its own next save.
-                const reported = result.data && result.data.section_kind_preferences_version;
-                if (result.ok && typeof reported === "number") version = reported;
-
-                if (result.status === 409 && result.data && result.data.current) applyServerState(result.data.current);
-              });
+            pending = null;
+            queuedSaves++;
+            inFlight = inFlight.then(persistMix).then((savedLatest) => {
+              queuedSaves--;
+              prepareButton.disabled = !savedLatest || pending !== null || queuedSaves > 0;
             });
           }, 400);
         };
 
         rows.forEach((row) => {
           const slider = row.querySelector("input[type=range]");
-          const box = row.querySelector("input[type=checkbox]");
+          const box = row.querySelector(".mix-exclude-box");
           const label = row.querySelector("output");
 
           slider.addEventListener("input", () => {
@@ -236,8 +337,16 @@
           box.addEventListener("change", () => {
             slider.disabled = box.checked;
             lockLastInGroup();
+            setDifficultyDisabled(difficultyFor(row.dataset.kind), box.checked);
             saveMix();
           });
+        });
+
+        difficulties.forEach((box) => {
+          box.querySelectorAll("input[type=radio]").forEach((radio) => {
+            radio.addEventListener("change", () => { syncDifficulty(box); saveMix(); });
+          });
+          box.querySelector(".mix-lock-box").addEventListener("change", saveMix);
         });
 
         lockLastInGroup();

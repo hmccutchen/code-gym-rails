@@ -63,11 +63,10 @@ class AiService
   GENERATION_READ_TIMEOUT      = 300
   SYNC_GENERATION_READ_TIMEOUT = 90
 
-  # #generate_concept_reference now asks for seven fields (the original four
-  # CONCEPT_REFERENCE_FIELDS plus CONCEPT_GUIDE_FIELDS) in one response, with
-  # extended thinking left on (no max_tokens is passed), from the Learn tab's
-  # bulk backfill of 74-118 jobs. READ_TIMEOUT was sized for a single-section
-  # review's much smaller reply, so it under-times this call the same way
+  # #generate_concept_reference asks for the reference, guide and difficulty
+  # ladder together, with extended thinking left on (no max_tokens is passed).
+  # READ_TIMEOUT was sized for a single-section review's much smaller reply,
+  # so it under-times this call the same way
   # GENERATION_READ_TIMEOUT exists because READ_TIMEOUT under-timed generation.
   # SYNC_GENERATION_READ_TIMEOUT is the reference point for magnitude: another
   # blocking, thinking-on call, so this one is sized the same order.
@@ -723,6 +722,21 @@ class AiService
 
   CONCEPT_GUIDE_FIELDS = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
 
+  # Prompt-only content that grounds a difficulty target (see KindDifficulty).
+  # Outside the required-field check for the reason the guide is: a provider that
+  # flubs the ladder still leaves a usable reference.
+  LADDER_FIELD_FOR      = KindDifficulty::LEVELS.index_with { |level| "ladder_#{level}" }.freeze
+  CONCEPT_LADDER_FIELDS = LADDER_FIELD_FOR.values.freeze
+
+  # An honest one-or-two-sentence rung runs 100-200 characters. Many rungs share
+  # one generation prompt, so this is tighter than MAX_CONCEPT_GUIDE_LENGTH.
+  MAX_LADDER_RUNG_LENGTH = 300
+
+  # Ceiling on the difficulty block's characters. A spec renders the worst case
+  # from the live vocabularies, so this fails when a vocabulary grows past it
+  # rather than letting the prompt grow unnoticed.
+  MAX_LADDER_GUIDANCE_CHARS = 48_000
+
   # Bounds provider prose rendered straight into a page, the same reason
   # ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH bounds a scaffold label. Not
   # derived from a schema — the prompt asks for at most two short paragraphs per
@@ -788,6 +802,10 @@ class AiService
     # anything changed for this user during the provider call.
     history = user.recent_performance
 
+    difficulty = KindDifficulty.for(user)
+    kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
+    ladders    = ladders_for(kinds, difficulty, language, plan.code_review_mode)
+
     result = call_and_log(
       user, purpose: "generate_exercise",
       read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
@@ -798,14 +816,14 @@ class AiService
                                     fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
                                     fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
                                     code_review_mode: plan.code_review_mode,
-                                    code_review_source: plan.code_review_source)
+                                    code_review_source: plan.code_review_source,
+                                    difficulty: difficulty, ladders: ladders)
     )
 
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set"),
       language: language,
-      expected_keys: ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth,
-                                              pattern: plan.pattern).map(&:key),
+      expected_keys: kinds.map(&:key),
       code_review_source: plan.code_review_source
     )
     problem_set = ingested.problem_set
@@ -817,7 +835,7 @@ class AiService
       log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
                     problem_set, plan.code_review_mode)
     end
-    log_difficulty_diagnostics(user, language, plan, problem_set, history)
+    log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds: kinds, difficulty: difficulty, ladders: ladders)
     problem_set
   end
 
@@ -866,15 +884,15 @@ class AiService
 
     reference = parse_json_object(result[:text], subject: "concept reference")
 
-    # Caching keys off (concept, language), so a row missing any field would
-    # persist a partially-blank reference forever and block regeneration.
-    # Failing here lets the job swallow it and retry on the next submission.
-    missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].to_s.strip.present? }
+    # Caching keys off (concept, language), so an unusable field would
+    # persist a broken reference forever and block regeneration.
+    # Rejecting the response preserves any existing reference for a later retry.
+    missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].is_a?(String) && reference[field].strip.present? }
     if missing.any?
       raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
     end
 
-    normalize_concept_guide_fields!(reference)
+    normalize_optional_reference_fields!(reference)
 
     reference
   end
@@ -1078,20 +1096,20 @@ class AiService
 
   private
 
-  # Guide fields are optional (see CONCEPT_GUIDE_FIELDS), but anything present
-  # is prose rendered straight into the Learn tab, so it gets the same
-  # boundary treatment as every other provider field this app trusts into a
-  # page: only a String survives, stripped, and bounded to
-  # MAX_CONCEPT_GUIDE_LENGTH. Anything else — an array, an object, a
-  # whitespace-only string, a runaway one — normalizes to nil rather than
-  # raising: an unusable guide is still a legacy row, not a failed generation.
-  def normalize_concept_guide_fields!(reference)
-    CONCEPT_GUIDE_FIELDS.each do |field|
-      value = reference[field]
-      value = value.is_a?(String) ? value.strip : nil
-      value = nil if value.blank? || value.length > MAX_CONCEPT_GUIDE_LENGTH
-      reference[field] = value
-    end
+  # Guide and ladder fields are optional (see CONCEPT_GUIDE_FIELDS and
+  # CONCEPT_LADDER_FIELDS). Guide text is rendered into the Learn tab and rungs
+  # into a generation prompt, so both get boundary treatment: only a String
+  # survives, stripped and within its bound. Anything else normalizes to nil
+  # rather than raising — an unusable optional field is still a usable reference.
+  def normalize_optional_reference_fields!(reference)
+    CONCEPT_GUIDE_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_CONCEPT_GUIDE_LENGTH) }
+    CONCEPT_LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_LADDER_RUNG_LENGTH) }
+  end
+
+  def usable_optional_text(value, max_length)
+    text = value.is_a?(String) ? value.strip : nil
+
+    text.blank? || text.length > max_length ? nil : text
   end
 
   # A provider that cannot represent a real turn array renders the conversation
@@ -1341,29 +1359,51 @@ class AiService
   # ResponsesController#log_review_diagnostics (correlated by user_id + date).
   # Safe to remove once that question is settled. See
   # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
-  def log_difficulty_diagnostics(user, language, plan, problem_set, history)
+  def log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds:, difficulty:, ladders:)
+    requested = {
+      skill_level: user.skill_level,
+      code_review_mode: plan.code_review_mode,
+      code_review_source: plan.code_review_source&.id,
+      pattern: plan.pattern,
+      third: plan.third,
+      fourth: plan.fourth,
+      section_count: kinds.size,
+      reinforcement: plan.reinforcement,
+      due_checks: plan.due_checks.map(&:concept),
+      established: plan.established.map(&:concept),
+      recent_performance: history
+    }
+    requested.merge!(kind_difficulty_diagnostics(kinds, difficulty, ladders, language, plan.code_review_mode, problem_set))
+
     payload = {
       event: "generation",
       user_id: user.id,
       date: Date.current.to_s,
       language: language,
-      requested: {
-        skill_level: user.skill_level,
-        code_review_mode: plan.code_review_mode,
-        code_review_source: plan.code_review_source&.id,
-        pattern: plan.pattern,
-        third: plan.third,
-        fourth: plan.fourth,
-        section_count: ExerciseSection.for_plan(pattern: plan.pattern, third: plan.third, fourth: plan.fourth).size,
-        reinforcement: plan.reinforcement,
-        due_checks: plan.due_checks.map(&:concept),
-        established: plan.established.map(&:concept),
-        recent_performance: history
-      },
+      requested: requested,
       delivered: without_answer_key(problem_set)
     }
 
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
+  end
+
+  # Coverage says whether material was available; chosen_grounded says whether
+  # the model picked a concept it had a rung for. Whether the problem was
+  # actually pitched at the rung is deliberately not measured here.
+  def kind_difficulty_diagnostics(kinds, difficulty, ladders, language, mode, problem_set)
+    targeted = kinds & difficulty.targeted_kinds
+    return {} if targeted.empty?
+
+    per_kind = targeted.to_h do |kind|
+      vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode)
+      grounded   = vocabulary & ladders.fetch(difficulty.level_for(kind), {}).keys
+      chosen     = problem_set.dig(kind.key, "concept")
+      [ kind.key, { level: difficulty.level_for(kind), locked: difficulty.locked?(kind),
+                    ladder_coverage: "#{grounded.size}/#{vocabulary.size}",
+                    chosen_concept: chosen, chosen_grounded: grounded.include?(chosen) } ]
+    end
+
+    { kind_difficulty: per_kind, kind_difficulty_chars: kind_difficulty_guidance(kinds, difficulty, ladders).length }
   end
 
   # Log storage is not one of the places the ambiguity hunt's answer key is
@@ -1434,7 +1474,8 @@ class AiService
                             reinforcement: nil, due_checks: [],
                             established: [], history: user.recent_performance,
                             fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
-                            code_review_mode: :application_code, code_review_source: nil)
+                            code_review_mode: :application_code, code_review_source: nil,
+                            difficulty: KindDifficulty.none, ladders: {})
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -1599,7 +1640,7 @@ class AiService
       #{retention_block}
       #{established_block}
       #{fourth_retention_block}
-      #{fourth_established_block}
+      #{fourth_established_block}#{kind_difficulty_guidance(kinds, difficulty, ladders)}
       - Concepts most recently rated "too easy" must not repeat within the same week.
       - Concepts most recently rated "right level" have no special weighting.
 
@@ -1770,6 +1811,86 @@ class AiService
       "its own. The challenge section is the exception to the answer shape, since its answer is code: there " \
       "starter_code carries the instance and the question asks for the renamed or re-bounded version, so writing " \
       "it IS the answer rather than describing it."
+  end
+
+  # { level => { concept => rung } } for today's targeted kinds, in the day's
+  # mode. Merging by concept name is safe because a day's buckets never share a
+  # concept name (spec/models/concept_reference_spec.rb holds that). One query
+  # for every targeted kind's bucket/vocabulary, partitioned by level in
+  # memory afterward — the same shape LadderCoverage.for uses — rather than a
+  # round trip per kind.
+  def ladders_for(kinds, difficulty, language, code_review_mode)
+    targeted = kinds & difficulty.targeted_kinds
+    return {} if targeted.empty?
+
+    requests = targeted.map do |kind|
+      { level: difficulty.level_for(kind), bucket: ConceptBucket.for(kind.key, language),
+        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode) }
+    end
+    pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
+
+    references = ConceptReference.where(language: pairs.map(&:first).uniq, concept: pairs.map(&:last).uniq)
+                                 .select(&:ladder?)
+                                 .index_by { |reference| [ reference.language, reference.concept ] }
+
+    requests.each_with_object({}) do |request, ladders|
+      field = LADDER_FIELD_FOR.fetch(request[:level])
+      rungs = request[:concepts].filter_map do |concept|
+        reference = references[[ request[:bucket], concept ]]
+        [ concept, reference.public_send(field).truncate(MAX_LADDER_RUNG_LENGTH) ] if reference
+      end.to_h
+      (ladders[request[:level]] ||= {}).merge!(rungs)
+    end
+  end
+
+  # Appended last, so it is the final instruction before the schema. Grouped by
+  # level so a concept shared by same-level sections is listed once. Empty when
+  # nothing on today's plan is targeted, which keeps every other prompt
+  # byte-identical.
+  def kind_difficulty_guidance(kinds, difficulty, ladders)
+    targeted = kinds & difficulty.targeted_kinds
+    return "" if targeted.empty?
+
+    locked, unlocked = targeted.partition { |kind| difficulty.locked?(kind) }
+    paragraphs = KindDifficulty::LEVELS.filter_map do |level|
+      at_level = targeted.select { |kind| difficulty.level_for(kind) == level }
+      level_difficulty_paragraph(level, at_level, ladders.fetch(level, {})) if at_level.any?
+    end
+
+    [ "", "Difficulty targets. For each section named below, its level replaces the skill level in the " \
+          "engineer profile above, for that section only.",
+      *paragraphs, "",
+      "A retention check or established concept placed in one of these sections is pitched at that " \
+      "section's level, with no easing.",
+      unlocked_difficulty_line(unlocked), locked_difficulty_line(locked) ].compact.join("\n")
+  end
+
+  def level_difficulty_paragraph(level, kinds, rungs)
+    definition = KindDifficulty::LEVEL_DEFINITIONS.fetch(level)
+    lines = [ "", "Sections at #{level}: #{kinds.map(&:key).join(', ')}" ]
+    return (lines << "Pitch these problems at this level. A #{level} problem is: #{definition}").join("\n") if rungs.empty?
+
+    lines << "Pitch these problems at this level for whichever concept you choose:"
+    lines.concat(rungs.sort.map { |concept, rung| "- #{concept}: #{rung}" })
+    (lines << "For a concept not listed, a #{level} problem is: #{definition}").join("\n")
+  end
+
+  def unlocked_difficulty_line(kinds)
+    return if kinds.empty?
+
+    "Unlocked (#{kinds.map(&:key).join(', ')}): tier annotations and rating adjustments above still apply to " \
+      "these sections, eased or raised from the section's level rather than from the profile's skill level."
+  end
+
+  # Names each rule it overrides. An easing rule added to the prompt later must
+  # be added here on purpose; nothing covers it by implication.
+  def locked_difficulty_line(kinds)
+    return if kinds.empty?
+
+    "Locked (#{kinds.map(&:key).join(', ')}): for these sections, ignore the `(reduced)` easing rule and both " \
+      "the \"too easy\" and \"too hard\" rating adjustments above, whichever concept they carry — including a " \
+      "concept the engineer has never seen. Where a locked section has an answer scaffold or starter code, " \
+      "write it at its level, not easier."
   end
 
   # A kind's generation instructions. The vocabulary comes from
@@ -2101,6 +2222,13 @@ class AiService
       This standard applies to the guide fields only:
       #{PLAIN_LANGUAGE_STANDARD}
 
+      Then write a difficulty ladder: for each of #{KindDifficulty::LEVELS.join(', ')}, what a
+      problem about THIS concept looks like at that level. Name its concrete form, never a
+      description of the level in general. For missing_index, for example: junior is an
+      unindexed foreign key, senior is composite index column order, principal_engineer is
+      the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
+      #{MAX_LADDER_RUNG_LENGTH} characters.
+
       Return JSON matching this schema exactly:
       {
         "tagline":      "string — bold one-liner",
@@ -2109,7 +2237,10 @@ class AiService
         "senior_lens":  "string — #{senior_lens_desc}",
         "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
         "guide_worked_example": "#{worked_example_description(concept, medium)}",
-        "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing"
+        "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
+        "ladder_junior":             "string — a junior-level problem about this concept",
+        "ladder_senior":             "string — a senior-level problem about this concept",
+        "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept"
       }
     PROMPT
   end

@@ -89,4 +89,14 @@ RSpec.describe ConceptBucket do
       expect { described_class.vocabulary_for("not_a_bucket") }.to raise_error(KeyError)
     end
   end
+
+  describe ".language_buckets_for" do
+    it "is the language itself for a single-language user" do
+      expect(described_class.language_buckets_for("javascript")).to eq([ "javascript" ])
+    end
+
+    it "is every programming language for a mixed user" do
+      expect(described_class.language_buckets_for("mixed")).to match_array(DailyExercise::LANGUAGES)
+    end
+  end
 end

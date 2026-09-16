@@ -17,9 +17,18 @@ class LearnController < ApplicationController
     @bucket    = validated_bucket
     @concept   = validated_concept(@bucket)
     @reference = ConceptReference.find_by(concept: @concept, language: @bucket)
+    @ladder_targets = ladder_targets_for(@reference)
+    @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
   end
 
-  # GET /learn/:bucket/:concept/status — is the guide written yet?
+  # Which check the polling page is waiting on. The page states it because the
+  # row's current state cannot: once a no-guide page's guide lands, the row looks
+  # like a ladder candidate, and a flubbed ladder would then never read ready.
+  # Absent reads as guide, the only value pages sent before this existed.
+  AWAITING = { "guide" => :guide?, "ladder" => :complete? }.freeze
+  GENERATION_VERSION_FORMAT = /\A\d+\z/
+
+  # GET /learn/:bucket/:concept/status — is the write-up the page asked for done?
   #
   # Same shape and same reason as DashboardController#status. A fixed client
   # timeout would have to guess how long a provider call takes, and this one
@@ -27,17 +36,26 @@ class LearnController < ApplicationController
   # directions — reloading onto an unfinished page, or waiting long after it
   # finished.
   def status
-    bucket  = validated_bucket
-    concept = validated_concept(bucket)
+    bucket    = validated_bucket
+    concept   = validated_concept(bucket)
+    awaiting  = params.fetch(:awaiting, "guide").to_s
+    predicate = AWAITING[awaiting]
+    return head :bad_request if predicate.nil?
+    return head :bad_request if awaiting == "ladder" && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
 
-    render json: { ready: ConceptReference.find_by(concept: concept, language: bucket)&.guide? || false }
+    reference = ConceptReference.find_by(concept: concept, language: bucket)
+    body = { ready: reference&.public_send(predicate) || false }
+    if awaiting == "ladder"
+      body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
+    end
+
+    render json: body
   end
 
   # POST /learn/:bucket/:concept/prepare — write up this one concept now.
   #
-  # `refresh_guide: true` is what lets this rewrite a row that predates guides.
-  # Confining that to a concept someone deliberately opened is why the
-  # backfill below refuses to do it.
+  # `refresh: true` permits a whole-row rewrite for this concept. The backfill
+  # keeps existing rows; #prepare_ladders is the scoped bulk exception.
   #
   # JSON, since only script calls it: the page posts and polls rather than
   # holding a request open for a provider call that runs with thinking on.
@@ -46,7 +64,7 @@ class LearnController < ApplicationController
     concept = validated_concept(bucket)
 
     GenerateConceptReferenceJob.perform_later(
-      concept: concept, language: bucket, user_id: current_user.id, refresh_guide: true
+      concept: concept, language: bucket, user_id: current_user.id, refresh: true
     )
 
     render json: { status: "queued" }
@@ -69,26 +87,41 @@ class LearnController < ApplicationController
     redirect_to learn_path, notice: t("learn.preparing")
   end
 
-  private
+  # POST /learn/prepare_ladders — ground every targeted kind's concepts.
+  #
+  # Unlike #prepare, this rewrites existing rows, which is the scoped exception
+  # to the no-bulk-rewrite rule: only concepts behind a target this user set, and
+  # only from a click whose copy says wording may change. Rows are shared, so
+  # the rewrite reaches every teammate. Gaps are re-derived each press; the
+  # job's queue permit discards overlaps and complete? skips finished rows.
+  def prepare_ladders
+    gaps = LadderCoverage.for(current_user).gaps_for(KindDifficulty.for(current_user).targeted_kinds)
 
-  # This user's slice: their own language plus every language-independent
-  # bucket. Reads user.language, NEVER User#language_for_today — that resolves
-  # "mixed" to one concrete language for a single day's generation by flipping
-  # off the last exercise, and a library must not change contents depending on
-  # which language tomorrow happens to be. A mixed user is assigned both, so a
-  # mixed user browses both.
-  def learn_buckets
-    language_buckets + ConceptBucket::LANGUAGE_INDEPENDENT
+    gaps.each do |concept, bucket|
+      GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
+    end
+
+    redirect_to setup_path(anchor: "exercise-mix"), notice: t("exercise_mix.ladders_preparing", count: gaps.size)
   end
 
-  # Derived, never a hardcoded pair: LANGUAGE_CONFIG is this app's stated
-  # single source of truth per generation language, and adding one there must
-  # not require hunting down a ternary here. The programming languages are
-  # exactly the config keys that are not language-independent buckets.
-  PROGRAMMING_LANGUAGES = (AiService::LANGUAGE_CONFIG.keys - ConceptBucket::SPECIAL_BUCKETS.keys).freeze
+  private
 
-  def language_buckets
-    current_user.language == "mixed" ? PROGRAMMING_LANGUAGES : [ current_user.language ]
+  # Names of the targeted kinds a guided, ladderless row would ground. Empty
+  # means no rewrite is offered: the ladder would ground nothing for this user.
+  def ladder_targets_for(reference)
+    return [] unless reference&.guide? && !reference.ladder?
+
+    kinds = KindDifficulty.for(current_user).targeted_kinds
+    return [] if kinds.empty?
+
+    LadderCoverage.for(current_user).grounding_kinds(kinds, reference.concept, reference.language)
+                  .map { |kind| t("sections.#{kind.key}.name") }
+  end
+
+  # This user's slice: their language's buckets plus every language-independent
+  # bucket.
+  def learn_buckets
+    ConceptBucket.language_buckets_for(current_user.language) + ConceptBucket::LANGUAGE_INDEPENDENT
   end
 
   # One query for every reference the page can render, keyed the way the views

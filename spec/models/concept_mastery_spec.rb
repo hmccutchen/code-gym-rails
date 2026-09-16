@@ -258,4 +258,17 @@ RSpec.describe ConceptMastery, type: :model do
       expect(paused.reload.cooldown_remaining).to eq(1)
     end
   end
+
+  describe "difficulty targets" do
+    it "never reads KindDifficulty and moves tier the same way for a locked kind" do
+      expect(KindDifficulty).not_to receive(:for)
+      expect(KindDifficulty).not_to receive(:new)
+      user.update!(section_kind_levels: { "code_review" => "principal_engineer" }, locked_section_kinds: [ "code_review" ])
+
+      4.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (4 - i)) }
+
+      expect(user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails").tier).to eq("reduced")
+      expect(user.concepts_needing_reinforcement).to include(concept: "n_plus_one", tier: "reduced")
+    end
+  end
 end

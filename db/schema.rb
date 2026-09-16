@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_15_000004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -50,9 +50,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
     t.datetime "created_at", null: false
     t.text "explanation"
     t.date "featured_on"
+    t.bigint "generation_version", default: 0, null: false
     t.text "guide_pitfalls"
     t.text "guide_plain_language"
     t.text "guide_worked_example"
+    t.text "ladder_junior"
+    t.text "ladder_principal_engineer"
+    t.text "ladder_senior"
     t.string "language", null: false
     t.text "senior_lens"
     t.text "tagline"
@@ -290,6 +294,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
     t.string "language", default: "ruby_rails", null: false
     t.string "last_generation_error"
     t.date "last_generation_error_date"
+    t.jsonb "locked_section_kinds", default: [], null: false
     t.integer "login_code_attempts", default: 0, null: false
     t.string "login_code_digest"
     t.datetime "login_code_sent_at"
@@ -298,6 +303,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_15_000001) do
     t.string "provider"
     t.boolean "push_reminders_enabled", default: false, null: false
     t.integer "reminder_level", default: 0, null: false
+    t.jsonb "section_kind_levels", default: {}, null: false
     t.integer "section_kind_preferences_version", default: 0, null: false
     t.jsonb "section_kind_weights", default: {}, null: false
     t.string "skill_level", default: "developing", null: false

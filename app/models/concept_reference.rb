@@ -77,4 +77,24 @@ class ConceptReference < ApplicationRecord
   def guide?
     AiService::CONCEPT_GUIDE_FIELDS.all? { |field| public_send(field).present? }
   end
+
+  # Derived from the field list the same way #guide? is.
+  def ladder?
+    AiService::CONCEPT_LADDER_FIELDS.all? { |field| public_send(field).present? }
+  end
+
+  def complete?
+    guide? && ladder?
+  end
+
+  # Truncated on read as well as bounded on write, the way
+  # DailyResponse.usable_difficulty is applied both ways. No LIMIT: the unique
+  # (concept, language) index and the vocabulary filter already bound the rows.
+  def self.ladder_rungs(bucket:, concepts:, level:)
+    field = AiService::LADDER_FIELD_FOR.fetch(level)
+
+    where(language: bucket, concept: concepts).select(&:ladder?).to_h do |reference|
+      [ reference.concept, reference.public_send(field).truncate(AiService::MAX_LADDER_RUNG_LENGTH) ]
+    end
+  end
 end

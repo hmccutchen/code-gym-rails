@@ -221,4 +221,81 @@ RSpec.describe ConceptReference do
       ).to be_guide
     end
   end
+
+  describe "difficulty ladder" do
+    def reference(**attrs)
+      ConceptReference.create!({ concept: "n_plus_one", language: "ruby_rails",
+                                 tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
+                                 guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x" }.merge(attrs))
+    end
+
+    let(:full_ladder) { { ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p" } }
+
+    it "names one migrated column per level" do
+      expect(AiService::CONCEPT_LADDER_FIELDS).to eq(KindDifficulty::LEVELS.map { |level| "ladder_#{level}" })
+      expect(ConceptReference.column_names).to include(*AiService::CONCEPT_LADDER_FIELDS)
+    end
+
+    it "carries a ladder only when every rung is present" do
+      expect(reference(**full_ladder)).to be_ladder
+      expect(reference(concept: "caching", **full_ladder.merge(ladder_senior: nil))).not_to be_ladder
+    end
+
+    it "is complete only with both guide and ladder" do
+      expect(reference(**full_ladder)).to be_complete
+      expect(reference(concept: "caching")).not_to be_complete
+      expect(reference(concept: "memoization", guide_pitfalls: nil, **full_ladder)).not_to be_complete
+    end
+
+    it "defaults historical rows to no completed generation and keeps unrelated updates out of the counter" do
+      row = reference(**full_ladder)
+      expect(row.generation_version).to eq(0)
+
+      row.update!(ladder_senior: "changed", featured_on: Date.current)
+      row.update!(explanation: "rewritten")
+
+      expect(row.reload.generation_version).to eq(0)
+    end
+
+    describe ".ladder_rungs" do
+      it "returns the level's rung for laddered rows in the bucket and vocabulary" do
+        reference(**full_ladder)
+        reference(concept: "caching")                                          # no ladder
+        reference(concept: "memoization", **full_ladder)                       # not asked for
+        reference(concept: "n_plus_one", language: "javascript", **full_ladder) # other bucket
+
+        rungs = ConceptReference.ladder_rungs(bucket: "ruby_rails", concepts: %w[n_plus_one caching], level: "senior")
+
+        expect(rungs).to eq("n_plus_one" => "s")
+      end
+
+      it "truncates a rung on read" do
+        reference(**full_ladder.merge(ladder_junior: "x" * 500))
+
+        rung = ConceptReference.ladder_rungs(bucket: "ruby_rails", concepts: %w[n_plus_one], level: "junior")["n_plus_one"]
+
+        expect(rung.length).to eq(AiService::MAX_LADDER_RUNG_LENGTH)
+      end
+
+      it "refuses a level outside the vocabulary" do
+        expect { ConceptReference.ladder_rungs(bucket: "ruby_rails", concepts: [], level: "strong") }
+          .to raise_error(KeyError)
+      end
+    end
+
+    # The prompt merges rungs by concept name across a day's buckets. That is
+    # only safe while no concept name lives in two buckets a day can hold.
+    it "keeps every language-independent vocabulary disjoint from the others" do
+      independent = ConceptBucket::LANGUAGE_INDEPENDENT
+
+      DailyExercise::LANGUAGES.each do |language|
+        independent.each do |bucket|
+          expect(ConceptBucket.vocabulary_for(language) & ConceptBucket.vocabulary_for(bucket)).to be_empty
+        end
+      end
+      independent.combination(2).each do |a, b|
+        expect(ConceptBucket.vocabulary_for(a) & ConceptBucket.vocabulary_for(b)).to be_empty
+      end
+    end
+  end
 end

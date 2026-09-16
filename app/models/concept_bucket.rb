@@ -35,6 +35,13 @@ class ConceptBucket
   # from the map above so a fifth special bucket joins it without an edit.
   LANGUAGE_INDEPENDENT = SPECIAL_BUCKETS.values.freeze
 
+  # The programming-language buckets a user's language setting covers. Reads
+  # the setting, never User#language_for_today: a library and its coverage must
+  # not change with tomorrow's roll, so "mixed" means both.
+  def self.language_buckets_for(language)
+    language == "mixed" ? DailyExercise::LANGUAGES : [ language ]
+  end
+
   def self.for(sections, language)
     Array(sections).each do |section|
       special = SPECIAL_BUCKETS[section.to_s]

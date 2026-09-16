@@ -1427,5 +1427,82 @@ RSpec.describe User, type: :model do
       expect(user).not_to be_valid
       expect(user.errors[:excluded_section_kinds].join).to include("fourth")
     end
+
+    describe "difficulty targets" do
+      it "starts with no stated target or lock" do
+        user = create_user_with_key
+
+        expect(user.section_kind_levels).to eq({})
+        expect(user.locked_section_kinds).to eq([])
+      end
+
+      it "accepts a level for a kind that does not rotate" do
+        user = create_user_with_key
+        user.section_kind_levels = { "code_review" => "principal_engineer" }
+
+        expect(user).to be_valid
+      end
+
+      it "rejects a level for an unknown kind" do
+        user = create_user_with_key
+        user.section_kind_levels = { "nonsense" => "senior" }
+
+        expect(user).not_to be_valid
+        expect(user.errors[:section_kind_levels]).to be_present
+      end
+
+      it "rejects a level outside the vocabulary" do
+        user = create_user_with_key
+        user.section_kind_levels = { "challenge" => "strong" }
+
+        expect(user).not_to be_valid
+        expect(user.errors[:section_kind_levels]).to be_present
+      end
+
+      it "rejects a lock naming an unknown kind" do
+        user = create_user_with_key
+        user.section_kind_levels = { "challenge" => "senior" }
+        user.locked_section_kinds = [ "nonsense" ]
+
+        expect(user).not_to be_valid
+        expect(user.errors[:locked_section_kinds]).to be_present
+      end
+
+      it "rejects a lock with no level" do
+        user = create_user_with_key
+        user.locked_section_kinds = [ "challenge" ]
+
+        expect(user).not_to be_valid
+        expect(user.errors[:locked_section_kinds].join).to include("challenge")
+      end
+
+      # Clearing the level strands the lock as surely as adding a lock alone,
+      # which is why the check runs when either column changes.
+      it "rejects clearing a level that a lock still depends on" do
+        user = create_user_with_key
+        user.update!(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ])
+
+        user.section_kind_levels = {}
+
+        expect(user).not_to be_valid
+        expect(user.errors[:locked_section_kinds]).to be_present
+      end
+
+      it "bumps the preferences version when a level or lock changes" do
+        user = create_user_with_key
+
+        expect { user.update!(section_kind_levels: { "pattern" => "junior" }) }
+          .to change { user.reload.section_kind_preferences_version }.by(1)
+        expect { user.update!(locked_section_kinds: [ "pattern" ]) }
+          .to change { user.reload.section_kind_preferences_version }.by(1)
+      end
+
+      it "still saves unrelated attributes when a stored level names a retired kind" do
+        user = create_user_with_key
+        user.update_columns(section_kind_levels: { "retired_kind" => "senior" })
+
+        expect { user.generate_login_code! }.not_to raise_error
+      end
+    end
   end
 end

@@ -1,4 +1,6 @@
 class ApiKeysController < ApplicationController
+  include ExerciseMixLadders
+
   skip_before_action :require_api_key
 
   # Gemini keys: Google is transitioning from the legacy "AIza..." format to

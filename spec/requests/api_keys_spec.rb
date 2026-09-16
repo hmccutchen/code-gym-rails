@@ -146,4 +146,30 @@ RSpec.describe "ApiKeys", type: :request do
       expect(doc.at("#weight-parsons_problem")["disabled"]).to be_present
     end
   end
+
+  describe "GET /setup exercise mix difficulty" do
+    let(:user) { create_user_with_key }
+
+    before { login_as(user) }
+
+    it "renders difficulty controls for every section kind, fixed ones without a slider" do
+      get setup_path
+
+      ExerciseSection.all.each { |kind| expect(response.body).to include(%(data-kind="#{kind.key}")) }
+      expect(response.body).to include(%(id="lock-code_review"))
+      expect(response.body).not_to include(%(id="weight-code_review"))
+      expect(response.body).not_to include(%(id="exclude-code_review"))
+    end
+
+    it "shows a bulk button only while a targeted kind has gaps" do
+      get setup_path
+      expect(Nokogiri::HTML(response.body).at_css("#mix-ladder-preparation[hidden]")).to be_present
+
+      user.update!(section_kind_levels: { "security_review" => "senior" })
+      get setup_path
+      expect(response.body).to include(prepare_learn_ladders_path)
+      expect(Nokogiri::HTML(response.body).at_css("#mix-ladder-preparation[hidden]")).to be_nil
+      expect(response.body).to include(I18n.t("exercise_mix.ladders_explanation"))
+    end
+  end
 end
