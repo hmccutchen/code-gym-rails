@@ -34,7 +34,9 @@ RSpec.describe "Exercise mix", type: :system do
   # timing.
   def wait_for_reload(timeout: 5)
     page.execute_script("window.__reloadMarker = true")
+    yield
     wait_for(timeout) { !marker_present? }
+    expect(marker_present?).to be(false), "Expected a fresh document after autosave, but the reload marker is still present"
   end
 
   def marker_present?
@@ -153,17 +155,16 @@ RSpec.describe "Exercise mix", type: :system do
     visit setup_path
     find("#exercise-mix summary").click
 
-    expect(find("#lock-code_review")).to be_disabled
-    find(".mix-difficulty[data-kind='code_review'] input[value='principal_engineer']").click
-    expect(find("#lock-code_review")).not_to be_disabled
-    find("#lock-code_review").click
+    wait_for_reload do
+      expect(find("#lock-code_review")).to be_disabled
+      find(".mix-difficulty[data-kind='code_review'] input[value='principal_engineer']").click
+      expect(find("#lock-code_review")).not_to be_disabled
+      find("#lock-code_review").click
 
-    expect(difficulty_after_save({ "code_review" => "principal_engineer" }, [ "code_review" ]))
-      .to eq([ { "code_review" => "principal_engineer" }, [ "code_review" ] ])
+      expect(difficulty_after_save({ "code_review" => "principal_engineer" }, [ "code_review" ]))
+        .to eq([ { "code_review" => "principal_engineer" }, [ "code_review" ] ])
+    end
 
-    # code_review just went from untargeted to targeted, which reloads the
-    # page on its own -- wait for that instead of visiting again and racing it.
-    wait_for_reload
     find("#exercise-mix summary").click
     expect(find(".mix-difficulty[data-kind='code_review'] input[value='principal_engineer']")).to be_checked
     expect(find("#lock-code_review")).to be_checked

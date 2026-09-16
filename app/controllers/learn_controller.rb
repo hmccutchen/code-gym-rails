@@ -92,8 +92,8 @@ class LearnController < ApplicationController
   # Unlike #prepare, this rewrites existing rows, which is the scoped exception
   # to the no-bulk-rewrite rule: only concepts behind a target this user set, and
   # only from a click whose copy says wording may change. Rows are shared, so
-  # the rewrite reaches every teammate. Idempotent: gaps are re-derived each
-  # press and every job re-checks complete? before calling.
+  # the rewrite reaches every teammate. Gaps are re-derived each press; the
+  # job's queue permit discards overlaps and complete? skips finished rows.
   def prepare_ladders
     gaps = LadderCoverage.for(current_user).gaps_for(KindDifficulty.for(current_user).targeted_kinds)
 

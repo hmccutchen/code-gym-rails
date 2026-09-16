@@ -1,6 +1,12 @@
 class GenerateConceptReferenceJob < ApplicationJob
   queue_as :default
 
+  # The cache is shared across users and refresh modes. Discard overlaps so an
+  # incomplete result cannot immediately trigger another queued, billed attempt.
+  limits_concurrency key: ->(args) { "#{args.fetch(:language)}/#{args.fetch(:concept)}" },
+                     to: 1, on_conflict: :discard,
+                     duration: AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
+
   # Best-effort: any failure is logged and swallowed, so a missing reference
   # renders as nothing and is retried the next time anyone submits the concept.
   #
@@ -29,12 +35,8 @@ class GenerateConceptReferenceJob < ApplicationJob
                    .index_with { |field| reference[field] }
 
     if existing
-      # The provider call runs unlocked (it can take up to READ_TIMEOUT
-      # seconds); only the write is guarded. A second job racing this one may
-      # have written a guide or ladder in the gap, so the row is re-read under
-      # lock and re-checked before writing — the loser discards its result
-      # rather than overwriting the winner's, the same shape
-      # User#resume_generation! uses to settle its own race.
+      # Keep the write guard even with queue concurrency control: an expired
+      # permit or a direct perform_now caller can bypass that control.
       existing.with_lock do
         next if existing.complete?
 

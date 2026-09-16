@@ -306,6 +306,17 @@ content equality cannot do that because featuring changes the timestamp and
 a valid generation may leave the prose unchanged. Failed calls and skipped
 rewrites do not advance it.
 
+`GenerateConceptReferenceJob` uses Solid Queue's per-concept/language
+concurrency permit with `on_conflict: :discard`. Users and refresh modes share
+the permit because they share the cached reference. Overlapping jobs are
+discarded rather than blocked: a blocked job could make another billed call
+immediately after an incomplete result. Finishing or failing releases the
+permit, so a later explicit retry remains possible. Its expiry derives from
+the reference call budget, and the dispatcher recovers expired permits after
+an interrupted worker. That lease includes queue time; it does not guarantee
+deduplication beyond its expiry. The existing row lock still guards writes
+after expiry or for direct `perform_now` calls, which bypass queue controls.
+
 ## Key Design Decisions
 
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
