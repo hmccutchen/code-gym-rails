@@ -1178,6 +1178,19 @@ RSpec.describe AiService do
       expect(prompt.downcase).to include("never the full answer")
     end
 
+    # The label bound is enforced by ExerciseSection.normalize_scaffold, which
+    # truncates rather than rejects, so a kind the rule leaves out has its
+    # labels cut mid-word (issue #164). The scope has to come from the registry.
+    it "states the answer_scaffold rule for every kind that scaffolds, and no other" do
+      prompt     = service.send(:build_exercise_prompt, user)
+      rule       = prompt.lines.find { |line| line.include?("- answer_scaffold (") }
+      scope      = rule[/answer_scaffold \(([^)]*) only\)/, 1]
+      scaffolded = ExerciseSection.all.select(&:scaffolded?).map(&:key)
+
+      expect(scaffolded).to include("plan_review")
+      expect(scope.scan(/\w+/)).to match_array(scaffolded + [ "and" ])
+    end
+
     it "instructs that pattern's question must be self-contained, with no code reference" do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include(
