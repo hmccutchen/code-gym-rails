@@ -232,8 +232,8 @@ RSpec.describe GeminiService do
       service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS)
     end
 
-    # MODEL thinks at medium effort by default and bills thinking into the same
-    # output budget the cap applies to, so a cap sent on its own can be spent
+    # Gemini's default model thinks at medium effort unless told otherwise, and
+    # bills thinking into the same output budget the cap applies to, so a cap sent on its own can be spent
     # reasoning before any reply text is emitted. ClaudeService pairs a cap with
     # `thinking: disabled` for exactly this reason; this is the Gemini half of
     # that rule, and it is the whole point of the cap being honoured at all.

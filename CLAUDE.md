@@ -125,8 +125,10 @@ why in the PR description rather than quietly diverging.
 decisions, not defaults that drifted into place:
 
 - **Template method for providers** — `AiService` owns prompts, vocabularies,
-  parsing, and usage logging; subclasses implement only `#call` and
-  `#build_connection`. Adding a provider is adding a subclass.
+  parsing, and usage logging; subclasses implement `#call` and
+  `#build_connection`, and own the model each purpose routes to
+  (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). Adding a provider is adding a
+  subclass.
 - **Registry for section kinds** — `ExerciseSection` and its subclasses answer
   every per-kind question (which are thirds, which scaffold, what the prompt
   says). Adding a kind is adding a class.
@@ -328,7 +330,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
 ## Key Design Decisions
 
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
-- **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement only `#call` and `#build_connection`. Adding a provider means adding a subclass, not editing the base.
+- **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass, not editing the base.
 - **Per-purpose model routing**: each provider picks its model from its own
   `MODEL_FOR_PURPOSE`, keyed by the same `purpose` string `ApiUsage` records,
   and falls back to its `DEFAULT_ROUTE` for any purpose not listed. The tables
