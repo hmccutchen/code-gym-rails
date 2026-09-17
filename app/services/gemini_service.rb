@@ -2,12 +2,16 @@ require "faraday"
 require "faraday/retry"
 
 class GeminiService < AiService
-  MODEL   = "gemini-3.5-flash"
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
-  # MODEL thinks at "medium" effort unless told otherwise, and thinking tokens
-  # are generated into — and billed as — the same output budget max_output_tokens
-  # caps. So a tight cap shared with default-effort thinking risks the model
+  # Keyed by the ApiUsage purpose string, like ClaudeService's. No purpose is
+  # routed off the default yet.
+  DEFAULT_ROUTE = { model: "gemini-3.5-flash" }.freeze
+  MODEL_FOR_PURPOSE = {}.freeze
+
+  # The default model thinks at "medium" effort unless told otherwise, and
+  # thinking tokens are generated into — and billed as — the same output budget
+  # max_output_tokens caps. So a tight cap shared with default-effort thinking risks the model
   # spending the budget reasoning and returning little or no reply text, which
   # surfaces here as a truncated response rather than as anything diagnosable.
   # Every capped caller asks for a short, shape-constrained answer, so minimal
@@ -45,9 +49,9 @@ class GeminiService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
     body = {
-      model:              MODEL,
+      model:              MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model],
       system_instruction: system,
       input:              flatten_history(history, prompt),
       store:              false

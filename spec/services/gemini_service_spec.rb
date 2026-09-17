@@ -176,7 +176,7 @@ RSpec.describe GeminiService do
       expect(fake_conn).to receive(:post) do |url, body|
         expect(url).to eq(GeminiService::API_URL)
         parsed = JSON.parse(body)
-        expect(parsed["model"]).to eq(GeminiService::MODEL)
+        expect(parsed["model"]).to eq(GeminiService::DEFAULT_ROUTE[:model])
         expect(parsed["system_instruction"]).to eq("sys")
         expect(parsed["input"]).to eq("prompt text")
         expect(parsed["store"]).to eq(false)

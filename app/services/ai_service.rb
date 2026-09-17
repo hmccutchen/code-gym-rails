@@ -1426,7 +1426,9 @@ class AiService
   # only (see AiService::DUCK_RESPONSE_MAX_TOKENS). `history` carries the prior
   # turns of a conversation; `prompt` is always the new final user turn, so an
   # empty `history` is the single-shot case every non-conversational caller uses.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
+  # `purpose` is the ApiUsage purpose; each provider looks it up in its own
+  # MODEL_FOR_PURPOSE, falling back to its DEFAULT_ROUTE.
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -2397,7 +2399,7 @@ class AiService
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
                    read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
     result = call(system: system, prompt: prompt, cache_system: cache_system,
-                  read_timeout: read_timeout, max_tokens: max_tokens, history: history)
+                  read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
     ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
 
     if result[:truncated]
