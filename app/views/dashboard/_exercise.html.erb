@@ -61,9 +61,7 @@
       <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
     </div>
 
-    <% rated_sections = response.section_ratings.keys %>
-    <% section_keys   = exercise.active_section_keys %>
-    <% all_rated      = (section_keys - rated_sections).empty? %>
+    <% all_rated = response.fully_rated? %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
       <%= f.button "Submit answers →", type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: !all_rated %>

@@ -321,7 +321,7 @@ RSpec.describe GenerateDailyExercisesJob do
     end
   end
 
-  describe "the unstarted nudge on a later tick" do
+  describe "the unfinished-set nudge on a later tick" do
     it "nudges when the set exists and nothing has been answered" do
       user.update!(reminder_level: :ready_and_nudges)
 
@@ -338,7 +338,30 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
 
-    it "goes quiet once any section has been answered" do
+    # Starting the set is no longer the stopping rule — a half-answered day is
+    # exactly what the nudge exists to reach.
+    it "nudges a day that was answered in part and then left alone" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      Time.use_zone("UTC") do
+        travel_to(Time.zone.local(2026, 9, 8, 11, 0)) do
+          exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                           language: "ruby_rails",
+                                           problem_set: { "code_review" => { "question" => "q" },
+                                                          "pattern"     => { "question" => "p" } })
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                answers: { "code_review" => "a genuinely substantive answer here" })
+        end
+
+        travel_to(Time.zone.local(2026, 9, 8, 14, 0)) do
+          expect(SendPushReminderJob).to receive(:perform_later).with(user_id: user.id, kind: :nudge)
+
+          described_class.new.perform
+        end
+      end
+    end
+
+    it "goes quiet while the answers are still being saved" do
       user.update!(reminder_level: :ready_and_nudges)
 
       Time.use_zone("UTC") do
@@ -349,6 +372,27 @@ RSpec.describe GenerateDailyExercisesJob do
           DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                 answers: { "code_review" => "a genuinely substantive answer here" })
 
+          expect(SendPushReminderJob).not_to receive(:perform_later)
+
+          described_class.new.perform
+        end
+      end
+    end
+
+    it "goes quiet once the day is submitted" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      Time.use_zone("UTC") do
+        travel_to(Time.zone.local(2026, 9, 8, 11, 0)) do
+          exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                           language: "ruby_rails",
+                                           problem_set: { "code_review" => { "question" => "q" } })
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                answers: { "code_review" => "a genuinely substantive answer here" },
+                                submitted_at: Time.current)
+        end
+
+        travel_to(Time.zone.local(2026, 9, 8, 14, 0)) do
           expect(SendPushReminderJob).not_to receive(:perform_later)
 
           described_class.new.perform
