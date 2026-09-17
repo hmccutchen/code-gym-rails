@@ -29,7 +29,7 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   # The exists? check is a fork, not a bail-out. On the tick that finds no set
   # it generates and sends the ready push; on every later tick that day it is
-  # the nudge's turn. What stops the nudge repeating is the user starting the
+  # the nudge's turn. What stops the nudge repeating is the user finishing the
   # day, not the hour having passed once — PushNudgePlan owns that rule.
   def generate_if_due(user)
     return unless Date.current.on_weekday?
@@ -49,10 +49,10 @@ class GenerateDailyExercisesJob < ApplicationJob
     response = user.daily_responses.find_by(daily_exercise: exercise)
 
     return unless PushNudgePlan.due?(
-      level:     user.reminder_level,
-      hour:      Time.current.hour,
-      started:   response&.answered_sections.present?,
-      submitted: response&.submitted_at.present?
+      level:            user.reminder_level,
+      hour:             Time.current.hour,
+      submitted:        response&.submitted?,
+      last_activity_at: response&.updated_at
     )
 
     SendPushReminderJob.perform_later(user_id: user.id, kind: :nudge)

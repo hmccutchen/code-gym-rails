@@ -1,8 +1,8 @@
 require "rails_helper"
 
 RSpec.describe PushNudgePlan do
-  def due(level: "ready_and_nudges", hour: 14, started: false, submitted: false)
-    described_class.due?(level: level, hour: hour, started: started, submitted: submitted)
+  def due(level: "ready_and_nudges", hour: 14, submitted: false, last_activity_at: nil)
+    described_class.due?(level: level, hour: hour, submitted: submitted, last_activity_at: last_activity_at)
   end
 
   it "nudges an untouched day inside the window" do
@@ -24,12 +24,34 @@ RSpec.describe PushNudgePlan do
     expect(due(hour: described_class::NUDGE_HOURS.max)).to be(true)
   end
 
-  it "stops once the day is started, which is the whole stopping rule" do
-    expect(due(started: true)).to be(false)
+  it "stops once the day is submitted, which is the whole stopping rule" do
+    expect(due(submitted: true)).to be(false)
   end
 
-  it "stops once the day is submitted" do
-    expect(due(submitted: true)).to be(false)
+  # The point of the feature: a day someone started and walked away from is
+  # exactly what needs reaching, so having touched it is no longer an answer.
+  it "still nudges a day that was started long enough ago" do
+    expect(due(last_activity_at: (described_class::QUIET_PERIOD + 1.minute).ago)).to be(true)
+  end
+
+  it "holds off while the answers are still being saved" do
+    expect(due(last_activity_at: 1.minute.ago)).to be(false)
+    expect(due(last_activity_at: (described_class::QUIET_PERIOD - 1.minute).ago)).to be(false)
+  end
+
+  it "nudges at the quiet period's own edge" do
+    expect(due(last_activity_at: described_class::QUIET_PERIOD.ago)).to be(true)
+  end
+
+  # The quiet period only delays; it never silences a day for good. Nothing
+  # here holds a per-day dedupe, so a set abandoned at noon qualifies on every
+  # tick of the window.
+  it "keeps nudging an abandoned day for the rest of the window" do
+    abandoned_at = 3.hours.ago
+
+    described_class::NUDGE_HOURS.each do |hour|
+      expect(due(hour: hour, last_activity_at: abandoned_at)).to be(true)
+    end
   end
 
   it "accepts a symbol level, since the enum reader returns a string" do
@@ -50,9 +72,16 @@ RSpec.describe PushNudgePlan do
       [ "none", "ready", "ready_and_nudges" ].product((0..23).to_a).each do |level, hour|
         next if described_class.possible?(level: level, hour: hour)
 
-        expect(described_class.due?(level: level, hour: hour, started: false, submitted: false)).to be(false)
+        expect(due(level: level, hour: hour)).to be(false)
       end
     end
+  end
+
+  # Anything shorter than the cron's interval would suppress no tick at all,
+  # since ticks are already an hour apart — the constant's comment says so, and
+  # this is what stops it being quietly lowered into having no effect.
+  it "holds a quiet period no shorter than the cron's interval" do
+    expect(described_class::QUIET_PERIOD).to be >= 1.hour
   end
 
   it "describes its window for the opt-in label, derived from the constant" do

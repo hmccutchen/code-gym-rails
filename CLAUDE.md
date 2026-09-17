@@ -830,11 +830,32 @@ concept-specific difficulty descriptions for future generation, not a new set.
   /service-worker.js` serves it from the root path, since a worker's scope is
   the directory it is served from.
 - **Push reminders**: an optional notification each weekday when the day's set
-  is ready, and an optional afternoon nudge on days it goes untouched, turned
-  on and off on the Account page.
+  is ready, and an optional afternoon nudge on days it is left unfinished,
+  turned on and off on the Account page.
   The nudge window is `PushNudgePlan::NUDGE_HOURS` (13-17 local, inclusive), so
-  an untouched day sends at most five on the hourly cron — a bound that belongs
+  an unfinished day sends at most five on the hourly cron — a bound that belongs
   to the schedule, not to the plan object, which holds no dedupe.
+
+  **Submission is the whole stopping rule, and starting is not.** An untouched
+  day, a half-answered one, and one answered in full but never submitted all
+  qualify — a set someone got two sections into and walked away from is exactly
+  what a reminder exists to reach, so going silent the moment anything was
+  typed left the commonest abandonment unreachable. `SendPushReminderJob` picks
+  the copy from how far through the day is
+  (`SendPushReminderJob::NUDGE_TITLES`), since "still waiting" reads as not
+  having noticed the half that was done.
+
+  **`PushNudgePlan::QUIET_PERIOD` is what keeps that from nagging.** With
+  starting no longer silencing the day, an hourly tick would otherwise tell
+  someone mid-answer that they have sections left. A nudge holds off until the
+  day's `DailyResponse` has been untouched for an hour — its `updated_at`,
+  which moves only when a save actually changes something, so an idempotent
+  autosave of unchanged answers doesn't reset it. One hour is also the floor
+  worth setting: ticks are an hour apart, so anything shorter suppresses
+  nothing. It delays rather than silences — an abandoned day still qualifies on
+  every later tick of the window, which is where the five-per-day bound above
+  still comes from. A day with no response row at all has no activity to be
+  quiet since, so it nudges from the window's first tick exactly as before.
   `WebPushCredentials` is the
   single authority for "is push configured here at all" — with no VAPID pair in
   ENV the control doesn't render, the layout emits no script, `POST
@@ -869,7 +890,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   That branch's `exists?` check is therefore a fork rather than a gate: the
   tick that finds no set generates and sends `:ready`, and later ticks consult
   `PushNudgePlan` and may send `:nudge`. What stops the nudge repeating all
-  day is the user starting the set, not the hour having passed once. The
+  day is the user finishing the set, not the hour having passed once. The
   on-demand branch still enqueues neither — a user who triggered generation by
   opening the dashboard is already looking at the set.
 
@@ -999,8 +1020,8 @@ always pull in the full suite — is stated once, in
 - `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
-- `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately
-- `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, and the not-started/not-submitted stopping rule. Pure, so its specs need no database
+- `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately. Owns the nudge's copy, which varies with how far through the day is — untouched, partway, or answered and unsubmitted
+- `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, the not-submitted stopping rule, and the quiet period that keeps a half-finished day from being nudged while it is still being worked on. Pure, so its specs need no database
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives

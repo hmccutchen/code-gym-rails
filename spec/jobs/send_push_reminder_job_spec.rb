@@ -29,6 +29,10 @@ RSpec.describe SendPushReminderJob do
     PushSubscription.register!(user: for_user, endpoint: endpoint, p256dh_key: "p", auth_key: "a")
   end
 
+  def answer(exercise, answers)
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: answers)
+  end
+
   it "notifies every endpoint the user has registered" do
     create_exercise
     subscribe
@@ -80,7 +84,7 @@ RSpec.describe SendPushReminderJob do
 
   # Generation and delivery are separate jobs, so a fast user can finish the set
   # before the reminder about it runs.
-  it "does not nudge someone who has already submitted" do
+  it "does not remind someone who has already submitted" do
     exercise = create_exercise
     subscribe
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -101,7 +105,7 @@ RSpec.describe SendPushReminderJob do
     described_class.new.perform(user_id: user.id)
   end
 
-  describe "the unstarted nudge" do
+  describe "the unfinished-set nudge" do
     it "carries the section count and the hours left in the local day" do
       user.update!(reminder_level: :ready_and_nudges)
 
@@ -171,7 +175,59 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
-    it "sends nothing once the user has started the set" do
+    # The whole point of the feature: a set someone got halfway through and
+    # walked away from is what needs reaching, and telling them it is "still
+    # waiting" would read as not having noticed the half they did.
+    it "names how much is left when the set was only partly answered" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "You're partway through today's set",
+                                 body:  "1 of 2 sections still to go · about 10h left today.")
+      ).and_return(true)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 11, 0) do
+          exercise = create_exercise
+          subscribe
+          answer(exercise, "code_review" => "a genuinely substantive answer here")
+        end
+
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    # Answered in full but never submitted is the state closest to done and the
+    # one a "still waiting" nudge would describe worst.
+    it "asks for the submit once every section is answered" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "Today's set is ready to submit",
+                                 body:  "All 2 sections answered · about 10h left today.")
+      ).and_return(true)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 11, 0) do
+          exercise = create_exercise
+          subscribe
+          answer(exercise,
+                 "code_review" => "a genuinely substantive answer here",
+                 "pattern"     => "another genuinely substantive answer")
+        end
+
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    # Without this the hourly tick tells someone mid-answer that they have
+    # sections left, which is the nag the stopping rule used to prevent by
+    # going silent the moment anything was typed.
+    it "holds off while the user is still saving answers" do
       user.update!(reminder_level: :ready_and_nudges)
 
       expect(PushDelivery).not_to receive(:deliver)
@@ -180,8 +236,7 @@ RSpec.describe SendPushReminderJob do
         travel_to Time.zone.local(2026, 9, 8, 13, 30) do
           exercise = create_exercise
           subscribe
-          DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
-                                answers: { "code_review" => "a genuinely substantive answer here" })
+          answer(exercise, "code_review" => "a genuinely substantive answer here")
 
           described_class.new.perform(user_id: user.id, kind: :nudge)
         end
