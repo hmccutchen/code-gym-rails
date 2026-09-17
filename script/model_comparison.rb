@@ -27,7 +27,11 @@ class ModelComparison
     plan     = DailyPlan.for(user, language: language)
 
     compare("generate", heading: "user #{user.id}, #{language}") do |service|
-      with_fixed_plan(plan) { service.generate_exercise(user, language: language) }
+      problem_set = with_fixed_plan(plan) { service.generate_exercise(user, language: language) }
+      # Printed output is read in a terminal and pasted around, which is the
+      # storage AiService#without_answer_key exists to keep the ambiguity-hunt
+      # key out of.
+      service.send(:without_answer_key, problem_set)
     end
   end
 
@@ -73,7 +77,7 @@ class ModelComparison
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     output  = begin
       yield service
-    rescue AiService::Error => e
+    rescue AiService::Error, JSON::ParserError => e
       "#{e.class}: #{e.message}"
     end
 

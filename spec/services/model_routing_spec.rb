@@ -45,6 +45,29 @@ RSpec.describe "per-purpose model routing" do
     end
   end
 
+  # Everything above drives #call directly, so none of it would notice
+  # call_and_log dropping the purpose on the way down — the real generation
+  # call would quietly fall back to the default model.
+  it "routes the generation call made through call_and_log, not only a direct #call" do
+    user     = User.create!(email: "routing@example.com", name: "Routing")
+    bodies   = []
+    service  = ClaudeService.new("sk-ant-test")
+    connection = Faraday.new do |f|
+      f.adapter :test do |stub|
+        stub.post(ClaudeService::API_URL) do |env|
+          bodies << JSON.parse(env.body)
+          [ 200, {}, { "content" => [ { "type" => "text", "text" => FakeService::EXERCISE_PROBLEM_SET.to_json } ],
+                       "usage" => { "input_tokens" => 1, "output_tokens" => 1 } }.to_json ]
+        end
+      end
+    end
+    service.instance_variable_set(:@conn, connection)
+
+    service.generate_exercise(user, language: "ruby_rails")
+
+    expect(bodies.sole["model"]).to eq(ClaudeService::MODEL_FOR_PURPOSE.fetch("generate_exercise")[:model])
+  end
+
   describe ClaudeService do
     it "sends generation to Opus at medium effort" do
       body = posted_body(ClaudeService, purpose: "generate_exercise")

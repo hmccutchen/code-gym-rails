@@ -6,13 +6,9 @@ class ClaudeService < AiService
 
   # Keyed by the ApiUsage purpose string, so usage rows and routes name calls
   # the same way. script/compare_models.rb is how a candidate route gets read
-  # before it is added here.
-  #
-  # Before routing a capped purpose (one passing max_tokens) to claude-opus-5:
-  # #call disables thinking for capped calls, and on Opus 5 that can leak
-  # thinking tags into the reply. Before routing duck_thread to Haiku 4.5: its
-  # minimum cacheable prompt is 4096 tokens, above the duck's system prompt, so
-  # the cache_system bet in CLAUDE.md stops applying.
+  # before it is added here. CLAUDE.md's "Per-purpose model routing" holds what
+  # to check before moving a purpose — the provider facts behind those checks
+  # move, so they live in one place rather than two.
   DEFAULT_ROUTE = { model: "claude-sonnet-5" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "claude-opus-5", effort: "medium" }

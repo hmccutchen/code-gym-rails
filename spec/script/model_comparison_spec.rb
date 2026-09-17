@@ -56,6 +56,22 @@ RSpec.describe ModelComparison do
       .to eq(ModelComparison::CANDIDATES.fetch("generate").map { |route| route[:effort] && { "effort" => route[:effort] } })
   end
 
+  it "never prints the ambiguity hunt's answer key" do
+    comparison.generate(user.id)
+
+    expect(out.string).to include("ambiguity_hunt")
+    expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
+  end
+
+  it "prints a malformed provider response as that model's result rather than losing both" do
+    allow_any_instance_of(ClaudeService).to receive(:call).and_raise(JSON::ParserError, "unexpected token")
+    exercise = create_exercise
+
+    comparison.duck(exercise.id, section: "code_review")
+
+    expect(out.string.scan("JSON::ParserError: unexpected token").size).to eq(2)
+  end
+
   # Each DailyPlan.for rolls the day's shape afresh, so without a shared plan
   # the two candidates would be answering different requests.
   it "sends both generation candidates the same prompt" do
