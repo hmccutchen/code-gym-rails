@@ -2,17 +2,26 @@ require "faraday"
 require "faraday/retry"
 
 class ClaudeService < AiService
-  MODEL   = "claude-sonnet-5"
   API_URL = "https://api.anthropic.com/v1/messages"
+
+  # Keyed by the ApiUsage purpose string, so usage rows and routes name calls
+  # the same way. script/compare_models.rb is how a candidate route gets read
+  # before it is added here. CLAUDE.md's "Per-purpose model routing" holds what
+  # to check before moving a purpose — the provider facts behind those checks
+  # move, so they live in one place rather than two.
+  DEFAULT_ROUTE = { model: "claude-sonnet-5" }.freeze
+  MODEL_FOR_PURPOSE = {
+    "generate_exercise" => { model: "claude-opus-5", effort: "medium" }
+  }.freeze
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
   # headroom-heavy cap costs nothing on the common case. It has to clear the
   # largest response we ask for: a full-day review, each section carrying
   # prose arrays plus a structural `improved_code` block. The original 2500
   # predated those fields and silently truncated reviews mid-string, which
-  # surfaced as a JSON parse error. claude-sonnet-5 thinks by default and
-  # max_tokens caps thinking + response text together, so this also has to
-  # clear whatever the model spends on unrequested thinking.
+  # surfaced as a JSON parse error. claude-sonnet-5 and claude-opus-5 both
+  # think by default and max_tokens caps thinking + response text together, so
+  # this also has to clear whatever the model spends on unrequested thinking.
   MAX_TOKENS = 16_000
 
   # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
@@ -38,9 +47,10 @@ class ClaudeService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+    route = route_for(purpose)
     body = {
-      model:      MODEL,
+      model:      route[:model],
       max_tokens: max_tokens || MAX_TOKENS,
       system:     cache_system ? [ { type: "text", text: system, cache_control: { type: "ephemeral" } } ] : system,
       messages:   history.map { |turn| { role: turn[:role], content: turn[:content] } } +
@@ -54,6 +64,7 @@ class ClaudeService < AiService
     # Disabling thinking outright avoids having to guess a split that
     # reserves enough tokens for both.
     body[:thinking] = { type: "disabled" } if max_tokens
+    body[:output_config] = { effort: route[:effort] } if route[:effort]
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
@@ -87,6 +98,10 @@ class ClaudeService < AiService
   rescue Faraday::Error => e
     error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
     raise error_class, "Network error calling Claude: #{e.message}"
+  end
+
+  def route_for(purpose)
+    MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
   end
 
   def build_connection

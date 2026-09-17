@@ -38,7 +38,8 @@ RSpec.describe "provider request characterization" do
     "plain"                 => {},
     "cache_system"          => { cache_system: true },
     "long_read_timeout"     => { read_timeout: AiService::GENERATION_READ_TIMEOUT },
-    "capped_max_tokens"     => { max_tokens: 250 }
+    "capped_max_tokens"     => { max_tokens: 250 },
+    "routed_generation"     => { purpose: "generate_exercise", read_timeout: AiService::GENERATION_READ_TIMEOUT }
   }.freeze
 
   # Captures the posted body without a network call. Returns [service, bodies].

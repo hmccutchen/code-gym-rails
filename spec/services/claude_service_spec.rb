@@ -182,7 +182,7 @@ RSpec.describe ClaudeService do
       expect(fake_conn).to receive(:post) do |url, body|
         expect(url).to eq(ClaudeService::API_URL)
         parsed = JSON.parse(body)
-        expect(parsed["model"]).to eq(ClaudeService::MODEL)
+        expect(parsed["model"]).to eq(ClaudeService::DEFAULT_ROUTE[:model])
         expect(parsed["system"]).to eq("sys")
         expect(parsed["messages"]).to eq([ { "role" => "user", "content" => "prompt text" } ])
         fake_response

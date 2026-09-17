@@ -125,8 +125,10 @@ why in the PR description rather than quietly diverging.
 decisions, not defaults that drifted into place:
 
 - **Template method for providers** — `AiService` owns prompts, vocabularies,
-  parsing, and usage logging; subclasses implement only `#call` and
-  `#build_connection`. Adding a provider is adding a subclass.
+  parsing, and usage logging; subclasses implement `#call` and
+  `#build_connection`, and own the model each purpose routes to
+  (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). Adding a provider is adding a
+  subclass.
 - **Registry for section kinds** — `ExerciseSection` and its subclasses answer
   every per-kind question (which are thirds, which scaffold, what the prompt
   says). Adding a kind is adding a class.
@@ -328,7 +330,34 @@ concept-specific difficulty descriptions for future generation, not a new set.
 ## Key Design Decisions
 
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
-- **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement only `#call` and `#build_connection`. Adding a provider means adding a subclass, not editing the base.
+- **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass, not editing the base.
+- **Per-purpose model routing**: each provider picks its model from its own
+  `MODEL_FOR_PURPOSE`, keyed by the same `purpose` string `ApiUsage` records,
+  and falls back to its `DEFAULT_ROUTE` for any purpose not listed. The tables
+  are per provider because the two share no model names and turn thinking down
+  differently (`effort` on Claude, `thinking_level` on Gemini). `call_and_log`
+  hands `purpose:` to `#call` for this. Because an unlisted purpose falls back
+  silently, `spec/services/model_routing_spec.rb` fails on a key that no call
+  site logs, so a typo cannot quietly route nothing.
+
+  Only `generate_exercise` is routed today: `claude-opus-5` at `medium` effort,
+  not `low`, because nothing measures whether `low` holds quality. Generation
+  keeps thinking on and the 16,000-token `MAX_TOKENS`, and Opus 5 shares Sonnet
+  5's tokenizer, so that cap covers the same output. What changes is latency, which
+  matters less than it would on a request: every generation runs in a job
+  under the 300-second `GENERATION_READ_TIMEOUT`, so a slower model makes a
+  user who opened an empty dashboard wait longer but does not fail sooner.
+
+  Review stays on `claude-sonnet-5` pending a comparison with `claude-opus-5`,
+  and `duck_thread` and `pseudocode_translate` pending one with
+  `claude-haiku-4-5`. `script/compare_models.rb` runs a stored day through both
+  models of a pair and prints the results with tokens and time for a person to
+  judge. Two constraints apply before routing any of them, both noted beside
+  the table. `#call` disables thinking whenever a caller passes `max_tokens`,
+  which on Opus 5 can leak thinking tags into the reply, so a capped purpose
+  should not move to Opus without revisiting that. And Haiku 4.5 caches only a
+  prompt of 4,096 tokens or more, above the duck's system prompt, so moving
+  `duck_thread` there ends the caching bet described below.
 - **Conversational calls send real turns**: `AiService#duck_response` and
   `#answer_follow_up` pass prior turns as `history:` — an ordered
   `{ role:, content: }` array — while `prompt` carries only the new user turn,
@@ -1015,7 +1044,8 @@ always pull in the full suite — is stated once, in
 - `app/models/ladder_coverage.rb` — `LadderCoverage`: which concepts can ground each section kind's difficulty target and which of those already carry a ladder rung, for every kind whether or not it is targeted — callers filter for targets themselves
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt); one class per kind answers which are thirds, which are fourths, which vocabulary they draw from, which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns the language config; it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
-- `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call + connection only
+- `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
+- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
 - `app/views/responses/_sections.html.erb` / `_section.html.erb` (+ `bodies/`, `answers/`) — the one loop over `DailyExercise#active_section_keys` and the one wrapper every section renders through, in both the answer-form and read-only states. Only the body and the answer area vary per kind, and each kind names its own partial for those (`ExerciseSection.body_partial` / `.answer_partial`), so adding a ninth kind is a body partial, an answer partial if it needs one, two `sections.<key>` locale strings, and whichever facets differ from the defaults — never a new branch in a template.
