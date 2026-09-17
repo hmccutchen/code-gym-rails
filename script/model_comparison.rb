@@ -36,7 +36,9 @@ class ModelComparison
     exercise = response.daily_exercise
 
     response.section_keys.select { |section| response.answered?(section) }.each do |section|
-      compare("review", heading: section) { |service| review_section(service, response, exercise, section) }
+      compare("review", heading: review_heading(response, section)) do |service|
+        review_section(service, response, exercise, section)
+      end
     end
   end
 
@@ -102,6 +104,15 @@ class ModelComparison
     result[:ok] ? result[:review].slice(*REVIEW_FIELDS) : "#{result[:error_code]}: #{result[:message]}"
   end
 
+  # A real review translates pseudocode before grading it and saves the result.
+  # This one grades without writing anything, so an untranslated plan is
+  # graded as written.
+  def review_heading(response, section)
+    return section unless ExerciseSection.for(section).translated_before_grading? && !response.translated?(section)
+
+    "#{section} (no saved translation, so graded as written)"
+  end
+
   # DailyPlan.for rolls the day's shape at random on every call, so each
   # candidate would otherwise be sent a different request.
   def with_fixed_plan(plan)
@@ -116,16 +127,16 @@ class ModelComparison
     @out.puts "=== #{mode}: #{heading} ==="
     runs.each do |run|
       @out.puts "--- #{run.route[:model]}#{" (effort: #{run.route[:effort]})" if run.route[:effort]} · " \
-                "#{format("%.1f", run.seconds)}s#{over_dashboard_timeout(mode, run)} · " \
+                "#{format("%.1f", run.seconds)}s#{over_generation_timeout(mode, run)} · " \
                 "#{run.tokens_in} in / #{run.tokens_out} out ---"
       @out.puts run.output.is_a?(String) ? run.output : JSON.pretty_generate(run.output)
     end
     @out.puts
   end
 
-  def over_dashboard_timeout(mode, run)
-    return "" unless mode == "generate" && run.seconds > AiService::SYNC_GENERATION_READ_TIMEOUT
+  def over_generation_timeout(mode, run)
+    return "" unless mode == "generate" && run.seconds > AiService::GENERATION_READ_TIMEOUT
 
-    " (over the #{AiService::SYNC_GENERATION_READ_TIMEOUT}s on-demand generation timeout)"
+    " (over the #{AiService::GENERATION_READ_TIMEOUT}s generation read timeout)"
   end
 end

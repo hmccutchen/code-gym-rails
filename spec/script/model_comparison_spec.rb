@@ -84,6 +84,17 @@ RSpec.describe ModelComparison do
     expect(out.string).not_to include("\"improved_code\"")
   end
 
+  it "says when a pseudocode section is graded without a saved translation" do
+    exercise = create_exercise(FakeService::EXERCISE_PROBLEM_SET.slice("code_review", "pseudocode_to_code"))
+    response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                     answers: { "pseudocode_to_code" => "for each item, keep it unless seen" },
+                                     submitted_at: Time.current)
+
+    comparison.review(response.id)
+
+    expect(out.string).to include("review: pseudocode_to_code (no saved translation, so graded as written)")
+  end
+
   it "translates the stored pseudocode answer with each candidate" do
     exercise = create_exercise
     response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,

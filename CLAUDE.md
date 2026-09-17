@@ -341,9 +341,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Only `generate_exercise` is routed today: `claude-opus-5` at `medium` effort,
   not `low`, because nothing measures whether `low` holds quality. Generation
   keeps thinking on and the 16,000-token `MAX_TOKENS`, and Opus 5 shares Sonnet
-  5's tokenizer, so that cap covers the same output. What changes is latency:
-  the dashboard's on-demand generation gives up at
-  `SYNC_GENERATION_READ_TIMEOUT`, and a slower model moves closer to it.
+  5's tokenizer, so that cap covers the same output. What changes is latency, which
+  matters less than it would on a request: every generation runs in a job
+  under the 300-second `GENERATION_READ_TIMEOUT`, so a slower model makes a
+  user who opened an empty dashboard wait longer but does not fail sooner.
 
   Review stays on `claude-sonnet-5` pending a comparison with `claude-opus-5`,
   and `duck_thread` and `pseudocode_translate` pending one with
