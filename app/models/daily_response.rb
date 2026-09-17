@@ -256,6 +256,15 @@ class DailyResponse < ApplicationRecord
     section_keys.select { |section| answered?(section) }
   end
 
+  # Every section the day presents carries a self-rating. This is what the
+  # dashboard gates Submit on, and what stops a push nudge calling a set ready
+  # to submit when the button is still disabled. Derived from #section_keys the
+  # same way #answered_sections is, so the two can't count against different
+  # denominators.
+  def fully_rated?
+    (section_keys - section_ratings.keys).empty?
+  end
+
   # Zero-guarded: a payload whose every section key holds a non-Hash presents no
   # answerable sections, and dividing by it yields NaN, which #round raises on.
   def completeness

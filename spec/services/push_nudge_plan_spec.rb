@@ -5,6 +5,11 @@ RSpec.describe PushNudgePlan do
     described_class.due?(level: level, hour: hour, submitted: submitted, last_activity_at: last_activity_at)
   end
 
+  def production_schedule
+    YAML.load_file(Rails.root.join("config/recurring.yml"))
+        .fetch("production").fetch("generate_daily_exercises").fetch("schedule")
+  end
+
   it "nudges an untouched day inside the window" do
     expect(due).to be(true)
   end
@@ -77,11 +82,18 @@ RSpec.describe PushNudgePlan do
     end
   end
 
-  # Anything shorter than the cron's interval would suppress no tick at all,
-  # since ticks are already an hour apart — the constant's comment says so, and
-  # this is what stops it being quietly lowered into having no effect.
-  it "holds a quiet period no shorter than the cron's interval" do
-    expect(described_class::QUIET_PERIOD).to be >= 1.hour
+  # QUIET_PERIOD is justified by the production schedule — it covers one whole
+  # tick, so a save always silences the next nudge. Reading the schedule here is
+  # what keeps that true: shorten the cron and this fails, which is a decision
+  # to make rather than a number to raise. Development ticks every five minutes
+  # and is deliberately not pinned, since a quiet period that covers several of
+  # its ticks breaks nothing.
+  it "covers one whole tick of the production cron schedule" do
+    minute, hour = production_schedule.split
+
+    expect(hour).to eq("*")
+    expect(minute).to match(/\A\d+\z/)
+    expect(described_class::QUIET_PERIOD).to eq(1.hour)
   end
 
   it "describes its window for the opt-in label, derived from the constant" do

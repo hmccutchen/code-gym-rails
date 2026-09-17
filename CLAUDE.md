@@ -843,16 +843,26 @@ concept-specific difficulty descriptions for future generation, not a new set.
   typed left the commonest abandonment unreachable. `SendPushReminderJob` picks
   the copy from how far through the day is
   (`SendPushReminderJob::NUDGE_TITLES`), since "still waiting" reads as not
-  having noticed the half that was done.
+  having noticed the half that was done. Answered-in-full splits into two of
+  those states, because Submit stays disabled until every section is rated:
+  `DailyResponse#fully_rated?` is the one authority for that gate, read by the
+  dashboard's submit button and by the nudge, so a notification can never name
+  a button the user cannot press.
 
   **`PushNudgePlan::QUIET_PERIOD` is what keeps that from nagging.** With
   starting no longer silencing the day, an hourly tick would otherwise tell
   someone mid-answer that they have sections left. A nudge holds off until the
   day's `DailyResponse` has been untouched for an hour — its `updated_at`,
   which moves only when a save actually changes something, so an idempotent
-  autosave of unchanged answers doesn't reset it. One hour is also the floor
-  worth setting: ticks are an hour apart, so anything shorter suppresses
-  nothing. It delays rather than silences — an abandoned day still qualifies on
+  autosave of unchanged answers doesn't reset it. One hour is what covers a
+  whole tick of the production schedule, so a save silences the next nudge
+  whatever minute it landed on; a shorter period would let a save early in the
+  gap between two ticks be past it by the time the later one ran.
+  `push_nudge_plan_spec` reads `config/recurring.yml` and fails if that
+  schedule shortens, rather than leaving the justification to a comment.
+  Development's five-minute schedule is deliberately not pinned, since a quiet
+  period spanning several of its ticks breaks nothing.
+  It delays rather than silences — an abandoned day still qualifies on
   every later tick of the window, which is where the five-per-day bound above
   still comes from. A day with no response row at all has no activity to be
   quiet since, so it nudges from the window's first tick exactly as before.
@@ -1020,7 +1030,7 @@ always pull in the full suite — is stated once, in
 - `app/services/web_push_credentials.rb` — `WebPushCredentials`: the VAPID pair from ENV, and the single authority for whether push is configured at all
 - `app/services/push_delivery.rb` — sends one notification to one endpoint, and deletes the endpoint when the push service reports it gone; the pruning is what keeps the job honest as iOS drops subscriptions
 - `app/models/push_subscription.rb` — one browser install's endpoint. `.register!` upserts by endpoint, because the client re-subscribes on every launch
-- `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately. Owns the nudge's copy, which varies with how far through the day is — untouched, partway, or answered and unsubmitted
+- `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately. Owns the nudge's copy, which varies with how far through the day is — untouched, partway, answered but unrated, or ready to submit
 - `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, the not-submitted stopping rule, and the quiet period that keeps a half-finished day from being nudged while it is still being worked on. Pure, so its specs need no database
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`

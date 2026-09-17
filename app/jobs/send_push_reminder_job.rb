@@ -10,13 +10,17 @@
 class SendPushReminderJob < ApplicationJob
   queue_as :default
 
-  # How a nudge addresses each of the three unfinished states. The copy has to
-  # be right for someone two-thirds through, not only for someone who never
-  # opened the set — telling them it is "still waiting" is how a reminder
-  # starts reading as something that hasn't noticed the work.
+  # How a nudge addresses each unfinished state. The copy has to be right for
+  # someone two-thirds through, not only for someone who never opened the set —
+  # telling them it is "still waiting" is how a reminder starts reading as
+  # something that hasn't noticed the work. :unrated is its own state rather
+  # than part of :unsubmitted because the dashboard keeps Submit disabled until
+  # every section is rated, so calling that set ready to submit would name a
+  # button the user cannot press.
   NUDGE_TITLES = {
     untouched:   "Today's set is still waiting",
     partway:     "You're partway through today's set",
+    unrated:     "Today's set just needs its difficulty ratings",
     unsubmitted: "Today's set is ready to submit"
   }.freeze
 
@@ -79,16 +83,18 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
-  # How far through an unfinished day the user is. Reached only once
-  # submission has been ruled out, so :unsubmitted means every section is
-  # answered and the Submit button is all that is left.
+  # How far through an unfinished day the user is. Reached only once submission
+  # has been ruled out, so :unsubmitted means every section is answered and
+  # rated and the Submit button is all that is left. A non-zero answered count
+  # guarantees a response row, so #fully_rated? is only ever asked of one.
   def stage_for(exercise, response)
     answered = answered_count(response)
 
-    return :untouched   if answered.zero?
-    return :unsubmitted if answered >= section_count(exercise)
+    return :untouched if answered.zero?
+    return :partway   if answered < section_count(exercise)
+    return :unrated   unless response.fully_rated?
 
-    :partway
+    :unsubmitted
   end
 
   def title_for(kind, stage)
@@ -107,9 +113,9 @@ class SendPushReminderJob < ApplicationJob
     total = section_count(exercise)
 
     case stage
-    when :untouched   then sections_phrase(exercise)
-    when :unsubmitted then "All #{total} #{'section'.pluralize(total)} answered"
-    else                   "#{total - answered_count(response)} of #{total} #{'section'.pluralize(total)} still to go"
+    when :untouched then sections_phrase(exercise)
+    when :partway   then "#{total - answered_count(response)} of #{total} #{'section'.pluralize(total)} still to go"
+    else                 "All #{total} #{'section'.pluralize(total)} answered"
     end
   end
 

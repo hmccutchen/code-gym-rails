@@ -29,9 +29,14 @@ RSpec.describe SendPushReminderJob do
     PushSubscription.register!(user: for_user, endpoint: endpoint, p256dh_key: "p", auth_key: "a")
   end
 
-  def answer(exercise, answers)
-    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: answers)
+  def answer(exercise, answers, ratings = {})
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          answers: answers, section_ratings: ratings)
   end
+
+  ANSWER = "a genuinely substantive answer here".freeze
+  BOTH_ANSWERED = { "code_review" => ANSWER, "pattern" => ANSWER }.freeze
+  BOTH_RATED = { "code_review" => "right_level", "pattern" => "right_level" }.freeze
 
   it "notifies every endpoint the user has registered" do
     create_exercise
@@ -190,7 +195,7 @@ RSpec.describe SendPushReminderJob do
         travel_to Time.zone.local(2026, 9, 8, 11, 0) do
           exercise = create_exercise
           subscribe
-          answer(exercise, "code_review" => "a genuinely substantive answer here")
+          answer(exercise, "code_review" => ANSWER)
         end
 
         travel_to Time.zone.local(2026, 9, 8, 13, 30) do
@@ -201,7 +206,7 @@ RSpec.describe SendPushReminderJob do
 
     # Answered in full but never submitted is the state closest to done and the
     # one a "still waiting" nudge would describe worst.
-    it "asks for the submit once every section is answered" do
+    it "asks for the submit once every section is answered and rated" do
       user.update!(reminder_level: :ready_and_nudges)
 
       expect(PushDelivery).to receive(:deliver).with(
@@ -213,9 +218,30 @@ RSpec.describe SendPushReminderJob do
         travel_to Time.zone.local(2026, 9, 8, 11, 0) do
           exercise = create_exercise
           subscribe
-          answer(exercise,
-                 "code_review" => "a genuinely substantive answer here",
-                 "pattern"     => "another genuinely substantive answer")
+          answer(exercise, BOTH_ANSWERED, BOTH_RATED)
+        end
+
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
+    # The dashboard keeps Submit disabled until every section is rated, so a
+    # fully answered but unrated set must not be told to press it.
+    it "names the ratings when they are what is left" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "Today's set just needs its difficulty ratings",
+                                 body:  "All 2 sections answered · about 10h left today.")
+      ).and_return(true)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 11, 0) do
+          exercise = create_exercise
+          subscribe
+          answer(exercise, BOTH_ANSWERED, "code_review" => "right_level")
         end
 
         travel_to Time.zone.local(2026, 9, 8, 13, 30) do
@@ -236,7 +262,7 @@ RSpec.describe SendPushReminderJob do
         travel_to Time.zone.local(2026, 9, 8, 13, 30) do
           exercise = create_exercise
           subscribe
-          answer(exercise, "code_review" => "a genuinely substantive answer here")
+          answer(exercise, "code_review" => ANSWER)
 
           described_class.new.perform(user_id: user.id, kind: :nudge)
         end

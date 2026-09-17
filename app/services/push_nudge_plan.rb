@@ -19,8 +19,13 @@ class PushNudgePlan
   # so a half-answered set goes on qualifying all afternoon — which without
   # this would tell someone still typing that they haven't finished. Compared
   # against an absolute timestamp rather than the local hour the window uses,
-  # so it needs no zone of its own. Shorter than the cron's interval would
-  # suppress nothing, since ticks are already an hour apart.
+  # so it needs no zone of its own.
+  #
+  # One hour covers a whole tick of the production schedule, so a save silences
+  # the next nudge whatever minute it landed on. A shorter period would not:
+  # a save early in the gap between two ticks would still be past it by the
+  # time the later one ran. push_nudge_plan_spec pins that against
+  # config/recurring.yml rather than leaving it to this comment.
   QUIET_PERIOD = 1.hour
 
   # The half of the decision that needs no response row. Callers use it to
