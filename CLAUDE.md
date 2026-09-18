@@ -475,6 +475,22 @@ concept-specific difficulty descriptions for future generation, not a new set.
   generation; a spec holds every entry resolvable and inside
   `MIN_LINES..MAX_LINES`. Design:
   `docs/superpowers/specs/2026-09-11-real-source-code-review-design.md`.
+
+  **Self-reference here is deliberate, and the pool leans into it.** Code Gym
+  is a working learning app, so its own pause-and-resume, spaced-repetition,
+  mastery-cooldown, adaptive-sizing and reminder methods are the one place an
+  education-domain exercise can be grounded without a fictional scenario the
+  engineer would first have to learn — their lived context in this app
+  supplies that fluency. Teaching new concepts from a personal-interest domain
+  was tried and rejected for exactly the missing-prerequisite problem (see
+  "Scenario flavor" below); grounding in real source is the education-domain
+  answer to it. There is no rule against Code Gym framing to relax: the
+  registry's own safeguards — curated list, one planted flaw in a modified
+  copy, a scenario that says so — are the whole guardrail. Entries are
+  appended, never inserted, because list order is the never-seen drain order,
+  and a method at exactly `MAX_LINES` is left out since the next edit would
+  evict it. Selection and rationale:
+  `docs/superpowers/specs/2026-09-18-scenario-source-expansion-design.md`.
 - **Meta-skill concepts**: `AiService::META_SKILL_CONCEPTS` (`reading_for_intent`, `spotting_unstated_assumptions`, `separating_symptom_from_cause`) name reasoning skills rather than technical topics, so `ConceptReference` delivers "how to think about this" on a real problem instead of on a tips page. They sit in both `RAILS_CONCEPTS` and `JS_CONCEPTS` like the data-modeling concepts, and for a structural reason rather than a preference: `ConceptBucket` dispatches on section key and never on concept, so a bucket of their own would require a section kind. Per-language mastery is the accepted cost; being outside `LANGUAGE_AGNOSTIC_VOCABULARIES` is the gain, since their reference then shows real code. Their hosts are `code_review` (non-schema modes), `pattern`, and `challenge` — every other kind draws a disjoint vocabulary and is excluded without an exclusion being written, and `parsons_problem` excludes them explicitly (`excluded_vocabulary_keys`) because a sequencing format has nothing to read. Because these are fuzzier than `n_plus_one`, `AiService#meta_skill_framing_guidance` adds one prompt line — stated once for all sections, named from the constant — requiring the section to still contain one findable issue that the concept only *frames*. No grading note changed; the generic rubric grades these, and it needs something missable to have been there. `AiService#can_host?` (given the concept, section key, and the day's generation language) derives third-slot retention hosting from `ProblemSetIngest.selectable_vocabulary_for` rather than restating it, so this exclusion — and the data-modeling one — is correct by construction rather than by coincidence.
 - **Alternate framings of a concept reference**: `ConceptReference` auto-expands
   on a concept's true first exposure so a beginner has a foothold before
