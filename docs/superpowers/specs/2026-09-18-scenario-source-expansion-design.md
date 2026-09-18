@@ -242,17 +242,22 @@ GAME_AND_ANIMATION_SCENARIO_DOMAINS = %w[
   achievement_unlock_tracking
   replay_recording_and_playback
   in_game_marketplace_and_trading
-  animation_render_export_queue
+  animation_export_job_queue
 ].freeze
 
-# Keyed by flavor; DailyPlan::SCENARIO_FLAVOR_WEIGHTS rolls over the same keys
-# and a spec holds the two key sets equal, so a flavor cannot be rolled that
-# has no pool or listed that is never rolled.
+# What the scenario bullet says under each flavor: the pool, how it is
+# introduced, one stack-adaptation example, and any rule the flavor needs
+# stated. Keyed by the flavor DailyPlan::SCENARIO_FLAVOR_WEIGHTS rolls; a
+# spec holds the two key sets equal. Data rather than a branch, so a third
+# flavor is an entry.
 SCENARIO_POOLS = {
-  general:            SCENARIO_DOMAINS,
-  game_and_animation: GAME_AND_ANIMATION_SCENARIO_DOMAINS
+  general:            { domains: SCENARIO_DOMAINS, intro: "real, job-adjacent flavors", adaptation: "...", rule: nil },
+  game_and_animation: { domains: GAME_AND_ANIMATION_SCENARIO_DOMAINS, intro: "game-development and animation-tooling settings", adaptation: "...", rule: "The setting supplies names and story only: ..." }
 }.freeze
 ```
+
+The legacy GraphQL clause is its own constant (`LEGACY_GRAPHQL_SCENARIO_GUIDANCE`) and
+renders unchanged under either flavor.
 
 Entry criteria: concrete, backend-or-state shaped, adaptable to either stack (a Rails
 day builds the save-state store; a JS day builds the editor's state), and free of
@@ -282,10 +287,13 @@ In `.for`: `scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS)` on the
 - Add `scenario_flavor: :general` to the kwarg list. Fifth instance of the
   additive-kwarg pattern after `cache_system:`, `max_tokens:`, `history:` and
   `code_review_source:` — every existing caller and all 72 snapshots render byte-identical.
-- Replace the inline `scenario_domain_list` local and the prompt line with one private method, `scenario_flavor_guidance(flavor)`, that returns the
-  whole bullet. `SCENARIO_POOLS.fetch(flavor)` so an unknown flavor fails loudly at the
-  boundary rather than rendering an empty list.
-  - `:general` returns today's line, byte for byte, including the legacy GraphQL clause.
+- Replace the inline `scenario_domain_list` local and the prompt line with one private
+  method, `scenario_flavor_guidance(flavor)`, that renders the bullet from the pool's
+  entry — one template, no branch on flavor. `SCENARIO_POOLS.fetch(flavor)` so an
+  unknown flavor fails loudly at the boundary rather than rendering an empty list.
+  - `:general` returns the previous line, byte for byte, including the legacy GraphQL
+    clause; the characterization suite proved this before the snapshots were touched
+    (24 ambiguity_hunt failures, zero elsewhere).
   - `:game_and_animation` returns: "Prefer drawing each section's business-domain
     scenario from game-development and animation-tooling settings like: <pool,
     underscores to spaces> (adapt any flavor to fit the day's stack — e.g. a Rails day's

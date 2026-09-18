@@ -936,6 +936,40 @@ RSpec.describe AiService do
     end
   end
 
+  describe "GAME_AND_ANIMATION_SCENARIO_DOMAINS" do
+    let(:vocabularies) do
+      [ AiService::RAILS_CONCEPTS, AiService::JS_CONCEPTS, AiService::ARCHITECTURE_CONCEPTS,
+        AiService::PLAN_REVIEW_CONCEPTS, AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::PSEUDOCODE_TO_CODE_CONCEPTS ]
+    end
+
+    it "is a frozen, non-empty pool disjoint from the general pool and every concept vocabulary" do
+      expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS).to be_frozen
+      expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS).not_to be_empty
+      expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS & AiService::SCENARIO_DOMAINS).to be_empty
+      vocabularies.each do |vocabulary|
+        expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS & vocabulary).to be_empty
+      end
+    end
+
+    # A setting is names and story. One that names the mechanics of games or
+    # animation hands the section a domain fact the engineer has to already
+    # know — the frame-rate velocity that failed the first trial. The
+    # criterion is held here so the pool cannot drift past it quietly.
+    it "names systems to build, never game or animation internals" do
+      internals = %w[frame physics render shader collision netcode tick velocity]
+
+      AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS.each do |domain|
+        expect(domain.split("_") & internals).to be_empty, "#{domain} names an internal"
+      end
+    end
+
+    it "is rolled under exactly the flavors DailyPlan weights" do
+      expect(AiService::SCENARIO_POOLS.keys).to match_array(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.keys)
+      expect(AiService::SCENARIO_POOLS.dig(:general, :domains)).to equal(AiService::SCENARIO_DOMAINS)
+      expect(AiService::SCENARIO_POOLS.dig(:game_and_animation, :domains)).to equal(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS)
+    end
+  end
+
   describe "#build_concept_reference_prompt (architecture)" do
     it "frames code_example as language-agnostic pseudocode for the architecture config" do
       config = service.send(:config_for, "architecture")
@@ -1443,6 +1477,55 @@ RSpec.describe AiService do
       %w[ruby_rails javascript].each do |language|
         prompt = service.send(:build_exercise_prompt, user, language)
         expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
+      end
+    end
+
+    describe "scenario flavor" do
+      # The fifth additive kwarg after cache_system:, max_tokens:, history: and
+      # code_review_source:. The default is the general pool, and the
+      # characterization suite holds every snapshot byte-identical under it;
+      # this pins the one line that method rewrote.
+      it "renders the general pool exactly as before when no flavor is given" do
+        prompt = service.send(:build_exercise_prompt, user)
+
+        expect(prompt).to include(
+          "- Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: " \
+          "background job processing, api versioning and deprecation, activerecord query construction, " \
+          "component state management, data export and reporting, webhook delivery, rate limiting, " \
+          "multi tenant data isolation (adapt any flavor to fit the day's stack — e.g. a Rails day's " \
+          "\"component state management\" becomes a service/controller state concern instead). " \
+          "Use a legacy GraphQL maintenance scenario"
+        )
+        expect(prompt).not_to include("platformer save state system")
+        expect(prompt).not_to include("names and story only")
+      end
+
+      it "offers the game and animation pool, with the no-internals rule, on a game_and_animation day" do
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: :game_and_animation)
+
+        AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS.each do |domain|
+          expect(prompt).to include(domain.tr("_", " "))
+        end
+        expect(prompt).to include("game-development and animation-tooling settings like:")
+        expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
+        expect(prompt).to include("The setting supplies names and story only")
+        expect(prompt).to include("never require knowing how games or animation work inside")
+        expect(prompt).not_to include("background job processing")
+      end
+
+      it "keeps the legacy GraphQL clause rare and concept-free under either flavor" do
+        AiService::SCENARIO_POOLS.each_key do |flavor|
+          prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: flavor)
+
+          expect(prompt).to match(/1 in every 8-10/)
+          expect(prompt.downcase).to include("never as the tagged concept")
+          expect(prompt).not_to include("legacy graphql maintenance,")
+        end
+      end
+
+      it "refuses a flavor with no pool rather than rendering an empty list" do
+        expect { service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: :nope) }
+          .to raise_error(KeyError)
       end
     end
   end
@@ -2456,6 +2539,21 @@ RSpec.describe AiService do
 
       payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
       expect(payload["requested"]["code_review_source"]).to eq(excerpt.id)
+    end
+
+    # Rolled in DailyPlan, read by the prompt, recorded here: one example
+    # proves the flavor reaches both ends, since every other flavor example
+    # drives build_exercise_prompt directly.
+    it "threads the day's scenario flavor into the prompt and the diagnostics payload" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:game_and_animation)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+      svc = double_class.new(canned_text: full_problem_set.to_json)
+
+      payload = diagnostics_payload(svc)
+
+      expect(svc.last_prompt).to include("game-development and animation-tooling settings like:")
+      expect(payload["requested"]["scenario_flavor"]).to eq("game_and_animation")
     end
 
     it "omits difficulty fields when nothing targeted is on the plan" do

@@ -396,6 +396,32 @@ RSpec.describe DailyPlan do
     end
   end
 
+  describe "SCENARIO_FLAVOR_WEIGHTS" do
+    it "leans to the game and animation pool with a general floor, summing to 1.0" do
+      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.keys).to eq(%i[game_and_animation general])
+      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS[:game_and_animation]).to be > DailyPlan::SCENARIO_FLAVOR_WEIGHTS[:general]
+      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
+    end
+
+    it "reaches both flavors" do
+      { 0.0 => :game_and_animation, 0.7 => :general }.each do |value, expected|
+        allow(WeightedRoll).to receive(:rand).and_return(value)
+        expect(WeightedRoll.pick(DailyPlan::SCENARIO_FLAVOR_WEIGHTS)).to eq(expected)
+      end
+    end
+  end
+
+  describe "#scenario_flavor on the plan" do
+    let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+
+    it "is carried on the Result from its own roll, on any language" do
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
+
+      expect(DailyPlan.for(user, language: "ruby_rails").scenario_flavor).to eq(:general)
+      expect(DailyPlan.for(user, language: "javascript").scenario_flavor).to eq(:general)
+    end
+  end
+
   describe ".for with a variable-length day" do
     let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
 

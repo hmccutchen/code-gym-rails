@@ -647,6 +647,53 @@ class AiService
     multi_tenant_data_isolation legacy_graphql_maintenance
   ].freeze
 
+  # Game-development and animation-tooling SETTINGS for the scenario field,
+  # used the same way SCENARIO_DOMAINS is: prompt-level framing only, never a
+  # concept, never read by ProblemSetIngest or any mastery bucket. Each names
+  # a system an ordinary web engineer would build — a save-state store, an
+  # undo stack, a leaderboard — never one whose defect needs game or
+  # animation internals to see. A frame-rate-coupled velocity was tried and
+  # failed for exactly that reason: the fix needed a domain fact rather than
+  # reasoning from the code, and ConceptReference explains only the tagged
+  # concept, so nothing could have supplied it.
+  GAME_AND_ANIMATION_SCENARIO_DOMAINS = %w[
+    platformer_save_state_system game_inventory_and_crafting
+    level_editor_undo_redo_stack animation_timeline_keyframe_editor
+    leaderboard_and_season_rankings matchmaking_lobby_queue
+    sprite_and_audio_asset_pipeline achievement_unlock_tracking
+    replay_recording_and_playback in_game_marketplace_and_trading
+    animation_export_job_queue
+  ].freeze
+
+  # Legacy GraphQL is scenario dressing at a stated rarity, the same under
+  # either flavor — a studio has a legacy layer as readily as a SaaS does.
+  LEGACY_GRAPHQL_SCENARIO_GUIDANCE =
+    "Use a legacy GraphQL maintenance scenario (e.g. \"a legacy GraphQL layer needs a fix\") only rarely — " \
+    "at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.".freeze
+
+  # What the scenario bullet says under each flavor: which pool, how the pool
+  # is introduced, one example of adapting a setting to the day's stack, and
+  # any rule the flavor needs stated. Keyed by the flavor
+  # DailyPlan::SCENARIO_FLAVOR_WEIGHTS rolls; a spec holds the two key sets
+  # equal, so a flavor cannot be rolled that has no pool or listed that is
+  # never rolled. Data rather than a branch, so a third flavor is an entry.
+  SCENARIO_POOLS = {
+    general: {
+      domains:    SCENARIO_DOMAINS,
+      intro:      "real, job-adjacent flavors",
+      adaptation: "a Rails day's \"component state management\" becomes a service/controller state concern instead",
+      rule:       nil
+    },
+    game_and_animation: {
+      domains:    GAME_AND_ANIMATION_SCENARIO_DOMAINS,
+      intro:      "game-development and animation-tooling settings",
+      adaptation: "a Rails day's \"platformer save-state system\" is the service that stores, versions and restores saves",
+      rule:       "The setting supplies names and story only: the tagged concept and the one planted issue come from " \
+                  "each section's own vocabulary as always, and solving a section must never require knowing how " \
+                  "games or animation work inside — no frame timing, physics, rendering, engine or netcode detail."
+    }
+  }.freeze
+
   # Single source of truth per concrete generation language ("mixed" is a
   # user-level meta-preference that always resolves to one of these before it
   # reaches AiService — see User#language_for_today). Adding a language means
@@ -817,6 +864,7 @@ class AiService
                                     fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
                                     code_review_mode: plan.code_review_mode,
                                     code_review_source: plan.code_review_source,
+                                    scenario_flavor: plan.scenario_flavor,
                                     difficulty: difficulty, ladders: ladders)
     )
 
@@ -1364,6 +1412,7 @@ class AiService
       skill_level: user.skill_level,
       code_review_mode: plan.code_review_mode,
       code_review_source: plan.code_review_source&.id,
+      scenario_flavor: plan.scenario_flavor,
       pattern: plan.pattern,
       third: plan.third,
       fourth: plan.fourth,
@@ -1477,6 +1526,7 @@ class AiService
                             established: [], history: user.recent_performance,
                             fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
                             code_review_mode: :application_code, code_review_source: nil,
+                            scenario_flavor: :general,
                             difficulty: KindDifficulty.none, ladders: {})
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
@@ -1584,8 +1634,6 @@ class AiService
         ""
       end
 
-    scenario_domain_list = (SCENARIO_DOMAINS - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
-
     config = config_for(language)
     label  = config[:label]
     focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
@@ -1622,7 +1670,7 @@ class AiService
       - Rotate between topics across sessions — avoid the same pattern two days in a row.
       - Vary the concrete business-domain scenario and code structure across sessions, not just the concept — do not reuse the class/method names or narrative framing shown in the "framings:" notes above.
       #{ts_guidance}
-      - Prefer drawing each section's business-domain scenario from real, job-adjacent flavors like: #{scenario_domain_list} (adapt any flavor to fit the day's stack — e.g. a Rails day's "component state management" becomes a service/controller state concern instead). Use a legacy GraphQL maintenance scenario (e.g. "a legacy GraphQL layer needs a fix") only rarely — at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.
+      #{scenario_flavor_guidance(scenario_flavor)}
       - Each teaching_note must point toward how to think about the problem or the right question to ask — one or two sentences, never the full answer.
       - answer_scaffold (#{scaffolded_kinds_clause} only): #{ExerciseSection::MAX_SCAFFOLD_LABELS} labels at most, #{ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH} characters at most each, ending in a colon. These pre-fill the answer box, so write them for THIS question specifically — name the parts a complete answer to it must cover, in the order someone should think them through (e.g. for a caching decision: "Which option, and why:", "How you'd handle a stale entry:"). Generic prompts that would fit any question of this kind are a wasted scaffold. Each is a heading the engineer writes UNDER, so it must ask for something, never state or hint at the answer — the teaching_note rules apply here too.
       - Every "diagram" field is Mermaid source using ONLY `flowchart TD` or `graph LR`. Maximum 8 nodes. No styling directives, no subgraphs, no click handlers, no classDef — narrow syntax parses reliably, clever syntax does not. Node labels must be short (a few words); use quoted labels like A["Order service"] when a label contains spaces or punctuation.
@@ -1649,6 +1697,23 @@ class AiService
       Return JSON matching this schema exactly:
       #{exercise_schema_for(language, third: third, fourth: fourth, pattern: pattern)}
     PROMPT
+  end
+
+  # One bullet, whichever pool today rolled. The general flavor renders the
+  # line exactly as it read before flavors existed; legacy_graphql_maintenance
+  # is dropped from every listed pool because its clause states it separately.
+  # SCENARIO_POOLS.fetch, so an unknown flavor fails here rather than
+  # rendering an empty list the model would fill with generic SaaS.
+  def scenario_flavor_guidance(flavor)
+    pool    = SCENARIO_POOLS.fetch(flavor)
+    flavors = (pool[:domains] - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
+
+    [
+      "- Prefer drawing each section's business-domain scenario from #{pool[:intro]} like: #{flavors} " \
+        "(adapt any flavor to fit the day's stack — e.g. #{pool[:adaptation]}).",
+      pool[:rule],
+      LEGACY_GRAPHQL_SCENARIO_GUIDANCE
+    ].compact.join(" ")
   end
 
   # Data-modeling concepts sit in both language vocabularies, so pattern — and

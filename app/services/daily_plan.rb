@@ -13,7 +13,7 @@
 class DailyPlan
   Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode, :code_review_source)
+                        :code_review_mode, :code_review_source, :scenario_flavor)
 
   # Which content mode code_review takes. Equal thirds, as close as float
   # weights get — application_code keeps a 1% edge rather than the split
@@ -26,6 +26,16 @@ class DailyPlan
   CODE_REVIEW_MODE_WEIGHTS = {
     application_code: 0.34, test_file: 0.33, schema_review: 0.33
   }.freeze
+
+  # Which scenario pool today's prompt offers (AiService::SCENARIO_POOLS).
+  # Leaned hard toward the setting the engineer asked for, with a floor for
+  # the general pool rather than none: an exclusive pool relocates the
+  # staleness this exists to fix into a smaller fixed pool, and a familiar
+  # setting starts to predict the bug. Rolled once per day, not per section,
+  # the same shape as CODE_REVIEW_MODE_WEIGHTS and for the same reason a
+  # prompt-stated "roughly 7 in 10" was rejected: nothing would decide or
+  # record it. Not gated on language or kinds — every day has a scenario.
+  SCENARIO_FLAVOR_WEIGHTS = { game_and_animation: 0.7, general: 0.3 }.freeze
 
   # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket
   # per kind (not a single shared bucket), matching how ARCHITECTURE already
@@ -124,6 +134,7 @@ class DailyPlan
                reinforcement: reinforcement, due_checks: due_checks, established: established,
                code_review_mode: code_review_mode,
                code_review_source: code_review_source_for(user, language, code_review_mode),
+               scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS),
                **fourth_track(user, rotation.fetch(:fourth)))
   end
 
