@@ -1513,6 +1513,19 @@ RSpec.describe AiService do
         expect(prompt).not_to include("background job processing")
       end
 
+      # The one kind that opts out. The characterization suite renders only the
+      # default flavor, so the flavor that could reach this schema is checked
+      # here: the day's line offers the game pool and the fragment still turns
+      # it down.
+      it "leaves ambiguity_hunt's own Code Gym framing in place on a game_and_animation day" do
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails",
+                              fourth: :ambiguity_hunt, scenario_flavor: :game_and_animation)
+
+        expect(prompt).to include("game-development and animation-tooling settings like:")
+        expect(prompt).to include("drawn from Code Gym-style feature requests (a daily-practice app's own features) " \
+                                  "and NOT from the scenario flavors listed above")
+      end
+
       it "keeps the legacy GraphQL clause rare and concept-free under either flavor" do
         AiService::SCENARIO_POOLS.each_key do |flavor|
           prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: flavor)

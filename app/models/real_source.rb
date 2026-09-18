@@ -28,9 +28,10 @@ class RealSource
 
   # The real-vs-toy sub-roll inside an eligible mode. One constant for both
   # modes: they have no reason to differ, and two would be a second rule that
-  # can disagree. Sized so a grounded day lands roughly weekly per mode and a
-  # given excerpt resurfaces about every two months under the pick below —
-  # the pool is what should grow first, not this.
+  # can disagree. Sized so a grounded day lands roughly weekly per mode. How
+  # soon a given excerpt comes back is the pool's size divided into that, so
+  # growing a pool is what spaces its entries out — the pool is what should
+  # grow first, not this.
   WEIGHTS = { real: 0.35, toy: 0.65 }.freeze
 
   # A one-line migration has no room to plant a flaw; a sixty-line method is

@@ -397,10 +397,11 @@ RSpec.describe DailyPlan do
   end
 
   describe "SCENARIO_FLAVOR_WEIGHTS" do
-    it "leans to the game and animation pool with a general floor, summing to 1.0" do
-      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.keys).to eq(%i[game_and_animation general])
-      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS[:game_and_animation]).to be > DailyPlan::SCENARIO_FLAVOR_WEIGHTS[:general]
-      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.values.sum).to be_within(0.001).of(1.0)
+    # Exact, not merely ordered: 70/30 is the decision. Full exclusivity was
+    # considered and rejected, so a drift toward 1.0 is a regression, and a
+    # drift toward even is a different decision nobody made.
+    it "is exactly 70% game and animation with a 30% general floor" do
+      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).to eq(game_and_animation: 0.7, general: 0.3)
     end
 
     it "reaches both flavors" do
