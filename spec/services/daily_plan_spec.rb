@@ -396,6 +396,33 @@ RSpec.describe DailyPlan do
     end
   end
 
+  describe "SCENARIO_FLAVOR_WEIGHTS" do
+    # Exact, not merely ordered: 70/30 is the decision. Full exclusivity was
+    # considered and rejected, so a drift toward 1.0 is a regression, and a
+    # drift toward even is a different decision nobody made.
+    it "is exactly 70% game and animation with a 30% general floor" do
+      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).to eq(game_and_animation: 0.7, general: 0.3)
+    end
+
+    it "reaches both flavors" do
+      { 0.0 => :game_and_animation, 0.7 => :general }.each do |value, expected|
+        allow(WeightedRoll).to receive(:rand).and_return(value)
+        expect(WeightedRoll.pick(DailyPlan::SCENARIO_FLAVOR_WEIGHTS)).to eq(expected)
+      end
+    end
+  end
+
+  describe "#scenario_flavor on the plan" do
+    let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+
+    it "is carried on the Result from its own roll, on any language" do
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
+
+      expect(DailyPlan.for(user, language: "ruby_rails").scenario_flavor).to eq(:general)
+      expect(DailyPlan.for(user, language: "javascript").scenario_flavor).to eq(:general)
+    end
+  end
+
   describe ".for with a variable-length day" do
     let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
 

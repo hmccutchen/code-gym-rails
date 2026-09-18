@@ -10,7 +10,15 @@ require "prism"
 # kind of excerpt, and nothing eligible unless deliberately added here. The
 # lists exist for exercise QUALITY — not every file makes focused, one-sitting
 # material — not for safety: nothing in this source is a per-instance secret,
-# and every file is eligible. Design:
+# and every file is eligible.
+#
+# Grounding an exercise in this app's own code is the point, not a leak into
+# an otherwise generic scenario. Code Gym is a working learning app, and the
+# engineer's lived context in it — pausing and resuming a set, a concept coming
+# back for a retention check — is what supplies the domain fluency a fictional
+# education-app scenario cannot. The safeguards are the ones below: a curated
+# list, one planted flaw in a modified copy, a scenario that says the copy is
+# altered, never the unmodified original. Design:
 # docs/superpowers/specs/2026-09-11-real-source-code-review-design.md
 class RealSource
   # Code Gym is written in Ruby, so the pool can only serve a day generating
@@ -20,9 +28,10 @@ class RealSource
 
   # The real-vs-toy sub-roll inside an eligible mode. One constant for both
   # modes: they have no reason to differ, and two would be a second rule that
-  # can disagree. Sized so a grounded day lands roughly weekly per mode and a
-  # given excerpt resurfaces about every two months under the pick below —
-  # the pool is what should grow first, not this.
+  # can disagree. Sized so a grounded day lands roughly weekly per mode. How
+  # soon a given excerpt comes back is the pool's size divided into that, so
+  # growing a pool is what spaces its entries out — the pool is what should
+  # grow first, not this.
   WEIGHTS = { real: 0.35, toy: 0.65 }.freeze
 
   # A one-line migration has no room to plant a flaw; a sixty-line method is
@@ -164,7 +173,11 @@ class RealSource
 
   # Each a real decision with something to get wrong, across several files so
   # no one file dominates. Order matters: ties among never-seen entries drain
-  # in this order (see .pick).
+  # in this order (see .pick), so new entries are appended, never inserted.
+  # The entries from resume_generation! on are the learning-app material —
+  # pausing and resuming, spaced repetition, mastery cooldowns, adaptive
+  # sizing, gated reveals, reminders — chosen because each reads as any
+  # education app's decision, not as Code Gym trivia.
   APPLICATION_CODE = [
     Method.new("app/services/weighted_roll.rb", "pick"),
     Method.new("app/services/section_rotation.rb", "pick_kind"),
@@ -176,7 +189,17 @@ class RealSource
     Method.new("app/models/push_subscription.rb", "register!"),
     Method.new("app/controllers/sessions_controller.rb", "verify_code"),
     Method.new("app/services/ai_service.rb", "flatten_history"),
-    Method.new("app/services/ai_service.rb", "annotate_retention_concept")
+    Method.new("app/services/ai_service.rb", "annotate_retention_concept"),
+    Method.new("app/models/user.rb", "resume_generation!"),
+    Method.new("app/models/user.rb", "held_exercise"),
+    Method.new("app/models/concept_mastery.rb", "retention_schedule_for"),
+    Method.new("app/models/concept_mastery.rb", "record_review!"),
+    Method.new("app/services/section_count.rb", "capped_window"),
+    Method.new("app/services/daily_plan.rb", "retention_checks_for"),
+    Method.new("app/models/daily_response.rb", "improved_code_visible?"),
+    Method.new("app/jobs/generate_daily_exercises_job.rb", "generate_if_due"),
+    Method.new("app/jobs/send_push_reminder_job.rb", "stage_for"),
+    Method.new("app/controllers/daily_exercises_controller.rb", "claim_regeneration!")
   ].freeze
 
   # Chosen for having structure to get wrong: references, constraints, an
@@ -185,7 +208,11 @@ class RealSource
     Migration.new("db/migrate/20260905120000_create_push_subscriptions.rb"),
     Migration.new("db/migrate/20260908120000_add_reminder_level_to_users.rb"),
     Migration.new("db/migrate/20260911000001_add_featured_on_to_concept_references.rb"),
-    Migration.new("db/migrate/20260819153107_add_pseudocode_rounds_to_daily_responses.rb")
+    Migration.new("db/migrate/20260819153107_add_pseudocode_rounds_to_daily_responses.rb"),
+    Migration.new("db/migrate/20260723010000_create_concept_masteries.rb"),
+    Migration.new("db/migrate/20260101000003_create_daily_responses.rb"),
+    Migration.new("db/migrate/20260723000000_add_section_ratings_to_daily_responses.rb"),
+    Migration.new("db/migrate/20260728000004_add_retention_schedule_to_concept_masteries.rb")
   ].freeze
 
   # test_file has no pool by construction, which is what keeps it untouched.

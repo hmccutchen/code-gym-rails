@@ -3,6 +3,12 @@
 # scaffold would hint at the shape or count of the planted ambiguities (see
 # PLANTED_COUNT). improved_code? is false — there's no "corrected code" for a
 # clarifying-questions exercise.
+#
+# The one kind that opts out of the day's scenario flavor
+# (AiService::SCENARIO_POOLS): its scenario stays a Code Gym-style feature
+# request, stated in its own schema fragment. Reasoning about what a request
+# leaves unsaid is the whole exercise, and an unfamiliar business setting
+# would add a second thing to work out first — the burden this kind removes.
 class ExerciseSection::AmbiguityHunt < ExerciseSection
   # Fixed, not a range: the review prompt must always know exactly how many
   # ambiguities were planted to grade coverage against. 4 sits at the
@@ -44,7 +50,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     <<~SCHEMA.chomp
       "ambiguity_hunt": {
           "title":    "string",
-          "scenario": "string — the concrete business-domain framing, drawn from Code Gym-style feature requests (e.g. a daily-practice app's own features)",
+          "scenario": "string — the concrete business-domain framing, drawn from Code Gym-style feature requests (a daily-practice app's own features) and NOT from the scenario flavors listed above — the engineer reasons about ambiguity in a domain they already know",
           "request":  "string — a vague feature request, 2-4 sentences, phrased the way a stakeholder or PM would ask for it, not an engineer",
           "planted_ambiguities": ["string — one specific ambiguity deliberately left in \\"request\\"", "... (exactly #{PLANTED_COUNT} total)"],
           "question": "string — e.g. 'What would you need clarified before writing a spec for this?'",
