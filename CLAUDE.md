@@ -489,8 +489,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   copy, a scenario that says so — are the whole guardrail. Entries are
   appended, never inserted, because list order is the never-seen drain order,
   and a method at exactly `MAX_LINES` is left out since the next edit would
-  evict it. Selection and rationale:
-  `docs/specs/2026-09-18-scenario-source-expansion-design.md`.
+  evict it.
 - **Scenario flavor**: the business setting every section's `scenario` is dressed
   in comes from one prompt line, and that line now offers one of two pools
   (`AiService::SCENARIO_POOLS`): the general, job-adjacent `SCENARIO_DOMAINS`
@@ -520,7 +519,6 @@ concept-specific difficulty descriptions for future generation, not a new set.
   a second thing to work out before the ambiguity, the burden that kind exists
   to remove. On a `RealSource` day `ProblemSetIngest` stamps the server's
   scenario over `code_review`, so flavor never touches a grounded section.
-  Design: `docs/specs/2026-09-18-scenario-source-expansion-design.md`.
 - **Meta-skill concepts**: `AiService::META_SKILL_CONCEPTS` (`reading_for_intent`, `spotting_unstated_assumptions`, `separating_symptom_from_cause`) name reasoning skills rather than technical topics, so `ConceptReference` delivers "how to think about this" on a real problem instead of on a tips page. They sit in both `RAILS_CONCEPTS` and `JS_CONCEPTS` like the data-modeling concepts, and for a structural reason rather than a preference: `ConceptBucket` dispatches on section key and never on concept, so a bucket of their own would require a section kind. Per-language mastery is the accepted cost; being outside `LANGUAGE_AGNOSTIC_VOCABULARIES` is the gain, since their reference then shows real code. Their hosts are `code_review` (non-schema modes), `pattern`, and `challenge` — every other kind draws a disjoint vocabulary and is excluded without an exclusion being written, and `parsons_problem` excludes them explicitly (`excluded_vocabulary_keys`) because a sequencing format has nothing to read. Because these are fuzzier than `n_plus_one`, `AiService#meta_skill_framing_guidance` adds one prompt line — stated once for all sections, named from the constant — requiring the section to still contain one findable issue that the concept only *frames*. No grading note changed; the generic rubric grades these, and it needs something missable to have been there. `AiService#can_host?` (given the concept, section key, and the day's generation language) derives third-slot retention hosting from `ProblemSetIngest.selectable_vocabulary_for` rather than restating it, so this exclusion — and the data-modeling one — is correct by construction rather than by coincidence.
 - **Alternate framings of a concept reference**: `ConceptReference` auto-expands
   on a concept's true first exposure so a beginner has a foothold before

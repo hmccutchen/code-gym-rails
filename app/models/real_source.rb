@@ -18,9 +18,8 @@ require "prism"
 # back for a retention check — is what supplies the domain fluency a fictional
 # education-app scenario cannot. The safeguards are the ones below: a curated
 # list, one planted flaw in a modified copy, a scenario that says the copy is
-# altered, never the unmodified original. Designs:
+# altered, never the unmodified original. Design:
 # docs/superpowers/specs/2026-09-11-real-source-code-review-design.md
-# docs/specs/2026-09-18-scenario-source-expansion-design.md
 class RealSource
   # Code Gym is written in Ruby, so the pool can only serve a day generating
   # in that language — a javascript day asks for JS/React code or a Prisma
