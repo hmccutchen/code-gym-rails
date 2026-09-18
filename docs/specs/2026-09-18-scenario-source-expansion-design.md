@@ -203,7 +203,7 @@ re-derive them:
 ### Files (Part 1)
 
 - `app/models/real_source.rb` — new entries appended to both lists, header paragraph.
-- `docs/superpowers/specs/2026-09-18-scenario-source-expansion-design.md` — this document.
+- `docs/specs/2026-09-18-scenario-source-expansion-design.md` — this document.
 - `CLAUDE.md` — in the "code_review content modes" bullet, one sentence on the
   education-domain pool and why self-reference is deliberate there.
 

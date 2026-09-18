@@ -20,7 +20,7 @@ require "prism"
 # list, one planted flaw in a modified copy, a scenario that says the copy is
 # altered, never the unmodified original. Designs:
 # docs/superpowers/specs/2026-09-11-real-source-code-review-design.md
-# docs/superpowers/specs/2026-09-18-scenario-source-expansion-design.md
+# docs/specs/2026-09-18-scenario-source-expansion-design.md
 class RealSource
   # Code Gym is written in Ruby, so the pool can only serve a day generating
   # in that language — a javascript day asks for JS/React code or a Prisma
