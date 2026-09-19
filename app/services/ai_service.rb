@@ -73,9 +73,10 @@ class AiService
   #
   # Measured on 2026-09-19 with script/calibrate_concept_references.rb on the
   # deployed routes. 36 claude-sonnet-5 calls ran 19-43 seconds, median 30,
-  # six of them concurrently. 17 gemini-3.5-flash calls ran 20-70 seconds,
-  # median 25, and one of them hit this timeout; the key's daily quota ended
-  # the run before that call could be repeated. So Claude has twice the room
+  # six of them concurrently. Of 17 measured gemini-3.5-flash calls, 16
+  # completed in 20-70 seconds and one hit the 90-second timeout; the median
+  # across all 17 was 25 seconds. The key's daily quota ended the run before
+  # that call could be repeated. So Claude has twice the room
   # it needs, and Gemini's tail is the open question. The value stays until a
   # Gemini run under the harness's --timeout shows how long a call that
   # outlasts 90 seconds takes to finish: a value raised without that number

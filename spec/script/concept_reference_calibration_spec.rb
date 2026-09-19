@@ -130,6 +130,60 @@ RSpec.describe ConceptReferenceCalibration do
       expect(calibration.summary(records)[:sequential]).to include(failures: 1, timeouts: 0)
     end
 
+    shared_examples "a measured response failure" do |outcome|
+      it "includes the failed generation in the latency spread and over-budget count" do
+        stub_provider(ClaudeService) { provider_reply }
+        elapsed = AiService::CONCEPT_REFERENCE_READ_TIMEOUT + 1
+        record = calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ] ]).sole.with(seconds: elapsed)
+
+        expect(record.outcome).to eq(outcome)
+        expect(calibration.summary([ record ])[:sequential]).to eq(
+          n: 1, measured: 1, min: elapsed, median: elapsed, p90: elapsed, max: elapsed,
+          timeouts: 0, failures: 1, over_deployed: 1
+        )
+      end
+    end
+
+    context "when the generated reference is malformed JSON" do
+      let(:provider_reply) { claude_reply("not json at all") }
+
+      include_examples "a measured response failure", "AiService::InvalidResponseError"
+    end
+
+    context "when the generated reference is missing required fields" do
+      let(:provider_reply) { claude_reply("{}") }
+
+      include_examples "a measured response failure", "AiService::InvalidResponseError"
+    end
+
+    context "when generation stops at the output token limit" do
+      let(:provider_reply) do
+        status, headers, body = claude_reply
+        [ status, headers, JSON.parse(body).merge("stop_reason" => "max_tokens").to_json ]
+      end
+
+      include_examples "a measured response failure", "AiService::TruncatedResponseError"
+    end
+
+    context "when the provider envelope is malformed JSON" do
+      let(:provider_reply) { [ 200, {}, "not json at all" ] }
+
+      include_examples "a measured response failure", "JSON::ParserError"
+    end
+
+    it "excludes refused and transport-failed calls from the latency spread" do
+      replies = [ [ 401, {}, "{}" ] ]
+      stub_provider(ClaudeService) { replies.shift or raise Faraday::ConnectionFailed, "connection failed" }
+
+      records = calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ], [ "javascript", js_concept ] ])
+
+      expect(records.map(&:outcome)).to eq([ "AiService::AuthenticationError", "AiService::Error" ])
+      expect(calibration.summary(records)[:sequential]).to eq(
+        n: 2, measured: 0, min: nil, median: nil, p90: nil, max: nil,
+        timeouts: 0, failures: 2, over_deployed: 0
+      )
+    end
+
     it "sends the deployed read timeout unless told otherwise, and keeps an override long-running" do
       stub_claude
       calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ] ])
@@ -198,7 +252,8 @@ RSpec.describe ConceptReferenceCalibration do
   describe "#summary" do
     def record(seconds, outcome, mode: :sequential)
       described_class::Record.new(provider: "claude", model: "m", bucket: "ruby_rails", concept: "n_plus_one", mode: mode,
-                                  seconds: seconds, outcome: outcome, tokens_in: 1, tokens_out: 1, attempts: 1)
+                                  seconds: seconds, outcome: outcome, measured: %i[ok timeout].include?(outcome),
+                                  tokens_in: 1, tokens_out: 1, attempts: 1)
     end
 
     # A refused call returns in well under a second, so counting its time in

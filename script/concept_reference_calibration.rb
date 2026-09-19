@@ -16,7 +16,7 @@ class ConceptReferenceCalibration
   BUCKETS = (ConceptBucket.language_buckets_for("mixed") + ConceptBucket::LANGUAGE_INDEPENDENT).freeze
   CONCEPTS_PER_BUCKET = 2
 
-  Record = Data.define(:provider, :model, :bucket, :concept, :mode, :seconds, :outcome, :tokens_in, :tokens_out, :attempts)
+  Record = Data.define(:provider, :model, :bucket, :concept, :mode, :seconds, :outcome, :measured, :tokens_in, :tokens_out, :attempts)
 
   # What one call's requests looked like on the wire. The counter sits inside
   # faraday-retry, so a retried call reports every attempt the provider saw.
@@ -77,7 +77,8 @@ class ConceptReferenceCalibration
   def run(sample = self.class.default_sample)
     validate!(sample)
     @out.puts "Timing covers the provider call only, including faraday retries and their backoff. " \
-              "Queue wait and persistence are excluded, because the service is called directly."
+              "Queue wait and persistence are excluded, because the service is called directly. " \
+              "Post-response validation failures count in both measured and failures."
     records = sequential_phase(sample) + concurrent_phase(sample)
     print_summary(records)
     records
@@ -129,22 +130,24 @@ class ConceptReferenceCalibration
     usage   = []
     service = pinned_service(probe, usage)
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    outcome = call_outcome { service.generate_concept_reference(User.new, concept, bucket) }
+    outcome, measured = call_outcome { service.generate_concept_reference(User.new, concept, bucket) }
     seconds = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
 
     Record.new(provider: @provider, model: probe.model, bucket: bucket, concept: concept, mode: mode,
-               seconds: seconds, outcome: outcome, attempts: probe.attempts,
+               seconds: seconds, outcome: outcome, measured: measured, attempts: probe.attempts,
                tokens_in: usage.sum { |row| row[:tokens_in] }, tokens_out: usage.sum { |row| row[:tokens_out] })
       .tap { |record| print_record(record) }
   end
 
   def call_outcome
     yield
-    :ok
+    [ :ok, true ]
   rescue AiService::TimeoutError
-    :timeout
-  rescue AiService::Error, JSON::ParserError => e
-    e.class.name
+    [ :timeout, true ]
+  rescue AiService::InvalidResponseError, JSON::ParserError => e
+    [ e.class.name, true ]
+  rescue AiService::Error => e
+    [ e.class.name, false ]
   end
 
   # One subclass per call, like ModelComparison#pinned_service, with the route
@@ -185,10 +188,11 @@ class ConceptReferenceCalibration
     end
   end
 
-  # A refused call returns in under a second, so its time says nothing about
-  # how long a reference takes; the spread covers calls the provider worked on.
+  # Refusal and transport failures do not measure generation time.
+  # An invalid reply still took time to generate,
+  # so it belongs in both the spread and the failure count.
   def mode_summary(records)
-    measured = records.select { |record| record.outcome == :ok || record.outcome == :timeout }
+    measured = records.select(&:measured)
     seconds  = measured.map(&:seconds).sort
 
     { n:             records.size,
