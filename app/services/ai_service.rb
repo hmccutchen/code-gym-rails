@@ -68,8 +68,19 @@ class AiService
   # READ_TIMEOUT is sized for calls with short replies, so it under-times this
   # call the same way GENERATION_READ_TIMEOUT exists because READ_TIMEOUT
   # under-timed generation.
-  # SYNC_GENERATION_READ_TIMEOUT is the reference point for magnitude: another
-  # blocking, thinking-on call, so this one is sized the same order.
+  # SYNC_GENERATION_READ_TIMEOUT was the reference point for magnitude: another
+  # blocking, thinking-on call, so this one was sized the same order.
+  #
+  # Measured on 2026-09-19 with script/calibrate_concept_references.rb on the
+  # deployed routes. 36 claude-sonnet-5 calls ran 19-43 seconds, median 30,
+  # six of them concurrently. 17 gemini-3.5-flash calls ran 20-70 seconds,
+  # median 25, and one of them hit this timeout; the key's daily quota ended
+  # the run before that call could be repeated. So Claude has twice the room
+  # it needs, and Gemini's tail is the open question. The value stays until a
+  # Gemini run under the harness's --timeout shows how long a call that
+  # outlasts 90 seconds takes to finish: a value raised without that number
+  # would be sized by guess again. No ordering against REVIEW_READ_TIMEOUT is
+  # claimed; a longer visible reply is not evidence it takes longer to produce.
   #
   # The second thing this buys: RETRY_TIMEOUT_GUARD only marks a timeout final
   # (rather than retryable) when the call is tagged `long_running`, and that
