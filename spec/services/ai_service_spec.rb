@@ -24,25 +24,37 @@ RSpec.describe AiService do
     # timeout on every attempt.
     TRANSLATIONS_BEFORE_GRADING = 1
 
+    # Provider time excludes usage writes, translation persistence, parsing,
+    # thread scheduling, and the controller's final lock/save. Reserve a minute
+    # for that work; this is headroom, not a deadline on database waits.
+    REVIEW_OVERHEAD_SECONDS = 1.minute.to_i
+
     def worst_case_call_seconds(read_timeout)
       AiService.call_budget_seconds(read_timeout) + ((AiService::RETRY_MAX + 1) * AiService::OPEN_TIMEOUT)
     end
 
-    def worst_case_review_seconds
+    def provider_review_budget_seconds
       (TRANSLATIONS_BEFORE_GRADING * worst_case_call_seconds(AiService::READ_TIMEOUT)) +
         worst_case_call_seconds(AiService::REVIEW_READ_TIMEOUT) +
         AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS
     end
 
-    it "cannot exceed the review claim window even when every attempt of every sequential call runs out its time" do
-      expect(worst_case_review_seconds).to be < DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i
+    it "keeps the provider budget below the review claim window" do
+      expect(provider_review_budget_seconds).to be < DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i
     end
 
-    # A window much longer than the worst case locks the row after a crashed
-    # review for no reason, so the window is the smallest whole number of
-    # minutes that clears it.
-    it "keeps the review claim window within a minute of the worst case" do
-      expect(DailyResponse::REVIEW_CLAIM_STALE_AFTER).to eq(((worst_case_review_seconds / 60) + 1).minutes)
+    it "reserves non-provider time before a review claim can be reclaimed" do
+      remaining = DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i - provider_review_budget_seconds
+
+      expect(remaining).to be >= REVIEW_OVERHEAD_SECONDS
+    end
+
+    # Round up only after reserving overhead, so minute rounding cannot consume
+    # the margin or leave a crashed review locked longer than necessary.
+    it "rounds the provider budget plus overhead up to the next whole minute" do
+      minimum_claim_seconds = provider_review_budget_seconds + REVIEW_OVERHEAD_SECONDS
+
+      expect(DailyResponse::REVIEW_CLAIM_STALE_AFTER).to eq(((minimum_claim_seconds / 60) + 1).minutes)
     end
 
     # The provider retry options are what call_budget_seconds describes, so the

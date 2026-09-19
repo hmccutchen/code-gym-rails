@@ -93,15 +93,16 @@ class DailyResponse < ApplicationRecord
   # The longest review is a pseudocode_to_code day's: the translation on
   # AiService::READ_TIMEOUT, then the grade on AiService::REVIEW_READ_TIMEOUT
   # (see AiService#translate_before_grading), each able to spend every retry
-  # attempt, then the difficulty note's grace period. This window is the
-  # smallest whole number of minutes above that worst case. ai_service_spec
-  # derives the worst case from those constants and fails if this window falls
-  # below it or sits more than a minute above it.
+  # attempt, then the difficulty note's grace period. Provider time alone omits
+  # usage writes, translation persistence, parsing, scheduling, and the final
+  # lock/save. ai_service_spec reserves a non-provider margin before rounding
+  # the combined budget up to the next whole minute. That margin is headroom,
+  # not a deadline on database waits.
   #
   # A literal rather than a derivation because AiService's own constants read
   # DailyResponse while it loads, so computing this from AiService here would
   # make the two classes' load order matter.
-  REVIEW_CLAIM_STALE_AFTER = 10.minutes
+  REVIEW_CLAIM_STALE_AFTER = 11.minutes
 
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
