@@ -74,12 +74,11 @@ module SystemTimeHelper
   end
 end
 
-# The dashboard's Submit button is gated on every section on the page having a
-# rating (app/views/dashboard/_exercise.html.erb's allRated(), keyed off every
-# `textarea[data-field]` present) — not on a fixed count of three. Specs that
-# hardcode which fields to rate silently drift out of sync whenever a section
-# slot is added or a fixture resolves to a different kind, so this reads the
-# fields that are actually on the page instead of naming them.
+# These read the rated fields from the page rather than hardcoding which ones
+# to rate, since the day's section count and kinds vary. What the gate itself
+# requires — an answered section needs a rating, an unanswered one doesn't —
+# lives in DailyResponse#submit_blocker and the dashboard script's
+# submitBlocker() (app/views/dashboard/_exercise.html.erb).
 module RatingHelper
   def rating_row_fields
     all(".rating-row[data-rating-for]", visible: :all).map { |row| row["data-rating-for"] }.uniq

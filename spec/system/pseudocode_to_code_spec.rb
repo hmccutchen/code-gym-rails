@@ -3,8 +3,9 @@ require "rails_helper"
 # The critique round is inline JavaScript talking to a JSON endpoint, so request
 # specs execute none of it. These cover the parts that only exist in the
 # browser: the round button, its one-shot disabling, and — since the translate
-# button that used to gate this section is gone — that submit is now gated on
-# nothing but the ratings, exactly like every other kind.
+# button that used to gate this section is gone — that submit is gated the
+# same way it is for every other kind: an answered section needs a rating, an
+# unanswered one doesn't, and this section has no step of its own in the way.
 RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
   # The inline script reads the CSRF meta tag before every fetch, and
   # allow_forgery_protection off (config/environments/test.rb) blanks it.
@@ -51,10 +52,11 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
   end
 
   # The section offers nothing to press before submitting except the critique,
-  # so a written plan is submittable the moment every section is rated — the
-  # translate gate this used to assert in both directions is gone with the
-  # button, and the translation happens inside the review instead.
-  it "gates submit on the ratings alone, written plan or not" do
+  # so a written plan is submittable once it's rated, with no translate or
+  # critique step standing in the way — the translate gate this used to assert
+  # is gone with the button, and the translation happens inside the review
+  # instead.
+  it "enables submit once the written plan is rated, with no translate or critique step in the way" do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
@@ -63,10 +65,10 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
       expect(page).to have_button("Submit answers →", disabled: true)
       expect(page).not_to have_button("Translate to code")
 
-      all("button.rating-btn[data-rating='right_level']").each(&:click)
-      expect(page).to have_button("Submit answers →", disabled: false)
-
       write_plan(PLAN)
+      expect(page).to have_button("Submit answers →", disabled: true)
+
+      rate_section("pseudocode_to_code")
       expect(page).to have_button("Submit answers →", disabled: false)
     end
   end

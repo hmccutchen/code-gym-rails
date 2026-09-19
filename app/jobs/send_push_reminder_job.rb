@@ -15,8 +15,8 @@ class SendPushReminderJob < ApplicationJob
   # telling them it is "still waiting" is how a reminder starts reading as
   # something that hasn't noticed the work. :unrated is its own state rather
   # than part of :unsubmitted because the dashboard keeps Submit disabled until
-  # every section is rated, so calling that set ready to submit would name a
-  # button the user cannot press.
+  # every answered section is rated (DailyResponse#submittable?), so calling
+  # that set ready to submit would name a button the user cannot press.
   NUDGE_TITLES = {
     untouched:   "Today's set is still waiting",
     partway:     "You're partway through today's set",
