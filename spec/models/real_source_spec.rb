@@ -134,6 +134,24 @@ RSpec.describe RealSource do
     end
   end
 
+  describe "source instruction precedence" do
+    RealSource::POOLS.each do |mode, pool|
+      it "keeps #{mode} grounded when variety or retention asks for new names" do
+        instruction = pool.first.instruction
+
+        expect(instruction).to include(
+          "These source-specific instructions take precedence over the general variety, mastery-loop, " \
+          "and retention requests for new domains, names, or framing"
+        )
+        expect(instruction).to include("A retention check may use this excerpt")
+        expect(instruction).to include("make the planted flaw a fresh application of the chosen concept")
+        expect(instruction).to include("Keep the required source names and setting even if this excerpt appears in prior framings")
+        expect(instruction).to include("This exception changes neither concept selection nor difficulty")
+        expect(instruction).to include("all other sections still follow the general freshness rules")
+      end
+    end
+  end
+
   describe ".pick" do
     let(:pool) { RealSource::APPLICATION_CODE }
 

@@ -88,15 +88,19 @@ class RealSource
       [ "```#{language}", text.strip_heredoc.chomp, "```" ].join("\n")
     end
 
-    # Shared by every excerpt kind's #instruction: the day's scenario-flavor
-    # line (AiService#scenario_flavor_guidance) is built without the day's
-    # excerpt, so it offers its pool to every section including this one.
-    # Without this line a game_and_animation day described a real Code Gym
-    # table as serving game players (#171).
+    # General flavor and freshness rules would otherwise rename real source
+    # or move it into a fictional domain, including on retention checks.
     def setting_rule
       "The business-domain settings suggested for each section do not apply to this one: its setting is " \
       "Code Gym itself, a learning app for engineers, so its comments, names, and any other prose describe " \
-      "Code Gym, never a game or other fictional domain."
+      "Code Gym, never a game or other fictional domain. " \
+      "These source-specific instructions take precedence over the general variety, mastery-loop, " \
+      "and retention requests for new domains, names, or framing. " \
+      "Keep the required source names and setting even if this excerpt appears in prior framings. " \
+      "A retention check may use this excerpt: make the planted flaw a fresh application of the chosen concept, " \
+      "rather than relying on renamed identifiers or a new business story for novelty. " \
+      "This exception changes neither concept selection nor difficulty; " \
+      "all other sections still follow the general freshness rules."
     end
   end
 

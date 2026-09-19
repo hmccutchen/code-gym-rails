@@ -163,6 +163,16 @@ Superseded wording: that ban now lives in `RealSource::Excerpt#setting_rule`,
 shared by both excerpt kinds, after a migration day picked up the
 game-and-animation scenario flavor (#171).
 
+The same rule now makes the source-specific instructions take precedence
+over general variety, mastery-loop, and retention requests for new domains,
+names, or framing (#175). Grounded sections remain eligible retention hosts:
+freshness is requested in the planted flaw's application of the concept,
+without changing the required source names, setting, concept eligibility, or
+difficulty. Other sections keep the general freshness rules. The picker
+prefers unseen excerpts but can repeat one; history supplies scenarios, not
+prior planted flaws, so fresh application remains prompt guidance rather
+than a verified retention property.
+
 ## Decision 4 — migrations are reference material, not mutated in place
 
 Confirmed as the brief anticipated. Real migrations here are short and clean
