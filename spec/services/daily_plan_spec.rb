@@ -37,7 +37,7 @@ RSpec.describe DailyPlan do
   end
 
   describe "retention check selection" do
-    it "releases the fourth slot on day three after the same check was skipped twice" do
+    it "releases the fourth slot after a skipped due check and leaves a not-yet-due repeat unchanged" do
       user.update!(adaptive_set_size: false)
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       first, second = AiService::PLAN_REVIEW_CONCEPTS.first(2)

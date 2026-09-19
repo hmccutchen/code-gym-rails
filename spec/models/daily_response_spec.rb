@@ -243,6 +243,28 @@ RSpec.describe DailyResponse, type: :model do
       expect(response.answer_for("pattern")).to eq("My approach:\nUse a bounded cache")
     end
 
+    describe "positional answer completion" do
+      [ 1, 2, 3 ].each do |count|
+        it "counts an explicit #{count}-block arrangement without applying the prose floor" do
+          exercise = DailyExercise.new(problem_set: { "parsons_problem" => { "blocks" => Array.new(count, "block") } })
+          order = "order:#{(0...count).to_a.join(',')}"
+          response = described_class.new(daily_exercise: exercise, answers: { "parsons_problem" => order })
+
+          expect(response.answered?("parsons_problem")).to be(true)
+          expect(response.answered_sections).to eq([ "parsons_problem" ])
+          expect(response.answer_for("parsons_problem")).to eq(order)
+        end
+      end
+
+      [ nil, "", "order:", "order:0", "order:0,0", "order:-1,9", "order:0,1,2" ].each do |value|
+        it "does not count an untouched or incomplete two-block arrangement #{value.inspect}" do
+          exercise = DailyExercise.new(problem_set: { "parsons_problem" => { "blocks" => %w[first second] } })
+          response = described_class.new(daily_exercise: exercise, answers: { "parsons_problem" => value })
+          expect(response.answered?("parsons_problem")).to be(false)
+        end
+      end
+    end
+
     it "reads legacy rows without a scaffold and preserves valid Parsons orders" do
       response = described_class.new(answers: { "parsons_problem" => "order:2,0,4,1,3" })
       expect(response.answer_for("parsons_problem")).to eq("order:2,0,4,1,3")

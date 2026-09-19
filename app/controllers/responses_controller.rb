@@ -46,7 +46,6 @@ class ResponsesController < ApplicationController
         assign_draft_response(exercise)
         newly_submitted = @response.submitted?
       end
-      @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
       @response.save
     end
 
@@ -369,6 +368,7 @@ class ResponsesController < ApplicationController
       .slice(*exercise.active_section_keys)
       .select { |_, value| DailyResponse::SELF_RATINGS.include?(value) }
     @response.section_ratings = @response.section_ratings.merge(incoming_ratings)
+    @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
   end
 
   def render_save_result(saved)

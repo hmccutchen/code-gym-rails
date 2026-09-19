@@ -2732,6 +2732,22 @@ RSpec.describe AiService do
   end
 
   describe "#build_review_day_context" do
+    [ 1, 2, 3 ].each do |count|
+      it "grades an exact #{count}-block positional answer as strong" do
+        exercise = DailyExercise.new(language: "ruby_rails",
+          problem_set: { "parsons_problem" => { "blocks" => Array.new(count) { |i| "block #{i}" } } })
+        response = DailyResponse.new(daily_exercise: exercise,
+          answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
+        review = { "rating" => "beginner" }
+
+        service.send(:override_parsons_section_rating!, review, exercise, response)
+
+        expect(review["rating"]).to eq("strong")
+        expect(service.send(:section_grading_note, exercise, response, "parsons_problem"))
+          .to include("0 block(s) out of place")
+      end
+    end
+
     [ "add index", "Approach:\nWhy:" ].each do |answer|
       it "treats #{answer.inspect} as skipped in grading and re-explanation" do
         exercise = DailyExercise.new(language: "ruby_rails", problem_set: {

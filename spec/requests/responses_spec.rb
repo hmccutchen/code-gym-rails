@@ -14,7 +14,7 @@ RSpec.describe "Responses", type: :request do
         answers: { "code_review" => "My original answer", "pattern" => "" },
         section_ratings: { "code_review" => "right_level" },
         concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
-        submitted_at: 1.minute.ago)
+        feedback_text: "The feedback submitted with my answers", submitted_at: 1.minute.ago)
     end
     let(:stale_payload) do
       { response: { answers: { code_review: "", pattern: "A newly invented answer" },
@@ -22,14 +22,19 @@ RSpec.describe "Responses", type: :request do
                     feedback_text: "Keep this feedback" } }
     end
 
-    it "ignores stale answers and ratings after submission but keeps feedback" do
-      evidence = saved_response.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at")
+    it "ignores every stale submitted field, including feedback" do
+      evidence = saved_response.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at", "feedback_text")
       post responses_path, params: stale_payload, as: :json
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["submitted"]).to be(true)
       expect(saved_response.reload.attributes.slice(*evidence.keys)).to eq(evidence)
-      expect(saved_response.feedback_text).to eq("Keep this feedback")
+      expect(saved_response.feedback_text).to eq("The feedback submitted with my answers")
+    end
+
+    it "does not erase submitted feedback with an empty late autosave" do
+      post responses_path, params: stale_payload.deep_merge(response: { feedback_text: "" }), as: :json
+      expect(saved_response.reload.feedback_text).to eq("The feedback submitted with my answers")
     end
 
     it "keeps retries idempotent and supplies the original review URL" do

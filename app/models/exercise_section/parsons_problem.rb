@@ -79,6 +79,17 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       "responses/answers/parsons_problem"
     end
 
+    def answered?(value, section_data = nil)
+      blocks = Array(section_data&.dig("blocks"))
+      submitted_order(value, blocks.size).any?
+    end
+
+    # Incomplete/corrupt attempts still need the existing strict grade and
+    # lenient replay; they do not count as completed work.
+    def answer_for(value, _section_data = nil)
+      value.presence
+    end
+
     def generation_guidance(vocabulary:, label:, **)
       <<~GUIDANCE.chomp
         - The third section is a PARSONS PROBLEM: return "blocks" as 5 to 8 short code blocks IN THE CORRECT FINAL ORDER — the app shuffles them for display, you must never shuffle them yourself. Each block should be one coherent unit (a full line, or a short logically-grouped set of lines) — never a single token or a bare punctuation mark, since reordering individual tokens is busywork rather than the exercise.
