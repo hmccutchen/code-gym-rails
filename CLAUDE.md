@@ -628,8 +628,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   section as the engineer sees it", so it inherits that method's answer-key
   exclusion rather than restating it. Cost is one extra provider call per
   review *attempt* (not per section), billed as `assess_difficulty` and capped
-  by `AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS` — which is derived from the
-  largest valid reply and, by being passed at all, is what turns off the
+  by `AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS` — which is sized from the
+  largest valid reply plus an allowance for the model overrunning the
+  requested length, and, by being passed at all, is what turns off the
   extended thinking `ClaudeService` would otherwise leave on. It runs as one
   more thread in the existing fan-out, and once grading finishes it gets only
   `DIFFICULTY_ASSESSMENT_GRACE_SECONDS` to land before the review goes out

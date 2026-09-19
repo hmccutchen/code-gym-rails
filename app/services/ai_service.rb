@@ -130,9 +130,9 @@ class AiService
 
   # Cost and length control for #explain_concept_differently. Sized the way
   # DUCK_RESPONSE_MAX_TOKENS is — a budget, not an enforcement mechanism —
-  # rather than derived from a schema the way DIFFICULTY_ASSESSMENT_MAX_TOKENS
-  # is, because a reframing is free prose and has no largest valid reply to
-  # derive from. 500 is the two short paragraphs the prompt asks for with room
+  # rather than sized from a bounded reply the way
+  # DIFFICULTY_ASSESSMENT_MAX_TOKENS is, because a reframing is free prose and
+  # has no largest valid reply to derive from. 500 is the two short paragraphs the prompt asks for with room
   # for a worked scenario, which is one of the three approaches it offers.
   #
   # Passing it at all is the second thing this buys: ClaudeService leaves
@@ -164,33 +164,34 @@ class AiService
       ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
     PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
 
-  # Derived from the largest VALID response rather than guessed, the same way
-  # PSEUDOCODE_CRITIQUE_MAX_TOKENS above is: one entry per section the day can
+  # Sized from the largest valid response (one entry per section the day can
   # hold, each a level name plus a reason of at most
-  # DailyResponse::MAX_DIFFICULTY_REASON_LENGTH characters. Three characters per
-  # token is deliberately conservative for prose, and the overhead covers the
-  # JSON envelope and key names. Getting this too tight costs the note silently
-  # rather than loudly — a truncated response raises TruncatedResponseError,
-  # which this pass swallows by design.
+  # DailyResponse::MAX_DIFFICULTY_REASON_LENGTH characters), then doubled,
+  # because the model can write past the length it was asked for. Both margins
+  # are chosen, not measured. In #168 all four four-section calls truncated
+  # under the old cap. The only direct measurement was a two-section reply
+  # (319 output tokens, about 160 per section); four sections at that rate
+  # would be about 640, which was not measured. A cap that is too tight loses
+  # the whole note without any error, while a loose one costs nothing unless
+  # the tokens are actually generated, so both margins err on the loose side.
   #
   # Passing any max_tokens at all is half the point: ClaudeService disables
   # extended thinking whenever a caller supplies one, and a reply of one
   # sentence per section has nothing to think about. Without it the assessment
   # runs with thinking on and ClaudeService::MAX_TOKENS to spend, billed to the
-  # engineer's own key for a note that renders in two lines.
-  #
-  # GeminiService pairs the same cap with its own least-thinking setting, so
-  # neither provider spends this budget reasoning. The two are not identical
-  # though: Claude turns thinking off outright, while Gemini 3 Flash has no off
-  # switch and only reaches "minimal" (see GeminiService::MINIMAL_THINKING_LEVEL).
-  # So a Gemini call still spends a little before it answers, which is one
-  # reason this stays sized from the largest valid reply rather than trimmed
-  # to the expected one — and why a truncation, swallowed here like any other
-  # failure, is likelier on that provider than on Claude.
+  # engineer's own key for a note that renders in two lines. GeminiService
+  # pairs the same cap with its own least-thinking setting, but Gemini 3 Flash
+  # has no off switch and only reaches "minimal" (see
+  # GeminiService::MINIMAL_THINKING_LEVEL), so a Gemini call still spends a
+  # little before it answers, and that spend counts against this same cap.
   DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
+  DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN = 2.5
+  DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM = 2
   DIFFICULTY_ASSESSMENT_MAX_TOKENS =
-    (ExerciseSection.slot_count * (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / 3)) +
-    DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS
+    ((ExerciseSection.slot_count *
+      (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN) *
+      DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM) +
+      DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS).ceil
 
   # How long the review may keep waiting for the difficulty note once every
   # section has been graded. The note is optional context; the grades are what
@@ -2236,7 +2237,7 @@ class AiService
       {
         "<section name>": {
           "level": #{DailyResponse::DIFFICULTY_LEVELS.map(&:inspect).join(' | ')},
-          "reason": "string — one sentence naming what makes it that, written for the engineer to read after their review"
+          "reason": "string — one sentence of at most #{DailyResponse::MAX_DIFFICULTY_REASON_LENGTH} characters naming what makes it that, written for the engineer to read after their review"
         }
       }
 

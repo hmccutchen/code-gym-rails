@@ -4530,13 +4530,32 @@ RSpec.describe AiService do
       expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
     end
 
-    # Sized from the largest response the schema permits, not guessed — a cap
-    # below that truncates, and a truncated assessment is swallowed, so the note
-    # would simply never appear on a full day.
-    it "budgets enough for a reason of the maximum length in every section a day can hold" do
-      worst_case = ExerciseSection.slot_count * (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / 3)
+    # Regression floor for #168: four-section calls hit the old cap on all four
+    # runs, and truncation is swallowed, so the note vanished without an error.
+    # 160 is the rounded per-section output observed there (319 tokens across
+    # two sections).
+    it "budgets at least 160 tokens per section a day can hold" do
+      floor = ExerciseSection.slot_count * 160
 
-      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be > worst_case
+      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= floor
+    end
+
+    it "grows with the reason length a day's sections may use" do
+      longest_valid_reasons = ExerciseSection.slot_count * DailyResponse::MAX_DIFFICULTY_REASON_LENGTH /
+                              AiService::DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN
+
+      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= longest_valid_reasons
+    end
+
+    it "is an Integer, since both providers serialize it straight into the request" do
+      expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be_an(Integer)
+    end
+
+    it "tells the model the reason's character limit" do
+      exercise, = loaded_day
+      prompt = difficulty_prompt(exercise)
+
+      expect(prompt).to include("#{DailyResponse::MAX_DIFFICULTY_REASON_LENGTH} characters")
     end
 
     # Blocked on a queue rather than a sleep, so the example is deterministic and
