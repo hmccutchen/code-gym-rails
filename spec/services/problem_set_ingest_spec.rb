@@ -64,6 +64,37 @@ RSpec.describe ProblemSetIngest do
 
       expect(set["code_review"]).not_to have_key("source")
     end
+
+    describe "the current schema" do
+      # A double rather than a pool entry, since a real Migration reads
+      # db/schema.rb and this file stays disk-free.
+      let(:migration) do
+        instance_double(RealSource::Migration, scenario: "Modelled on Code Gym's own migration",
+                                               id: "db/migrate/1_create_things.rb",
+                                               current_schema: %(create_table "things" do |t|\nend\n))
+      end
+
+      it "stamps the server's own on a grounded migration day" do
+        set = grounded({ "code_review" => { "concept" => "wrong_cardinality", "current_schema" => "invented" } },
+                       source: migration)
+
+        expect(set["code_review"]["current_schema"]).to eq(migration.current_schema)
+      end
+
+      # The page renders it as the real table, so only the server may supply it.
+      it "strips a provider-supplied one on a toy day" do
+        set = grounded({ "code_review" => { "concept" => "memoization", "current_schema" => "invented" } }, source: nil)
+
+        expect(set["code_review"]).not_to have_key("current_schema")
+      end
+
+      it "strips a provider-supplied one on a method day, which has no table" do
+        set = grounded({ "code_review" => { "concept" => "memoization", "current_schema" => "invented" } },
+                       source: excerpt)
+
+        expect(set["code_review"]).not_to have_key("current_schema")
+      end
+    end
   end
 
   describe ".call" do

@@ -318,10 +318,12 @@ class ProblemSetIngest
   # only record of what was grounded — so only the server may write it. A toy
   # day deletes whatever the provider put there rather than leaving it, or a
   # model that happened to emit a `source` key would mint a trace for an
-  # excerpt this set never showed. In production code_review is always
-  # present — ExerciseSection.for_plan never omits it — but ingest is also
-  # called on partial sets, and a set with no code_review has no trace to
-  # strip or stamp.
+  # excerpt this set never showed. `current_schema` is server-owned the same
+  # way: the page and the grader both treat it as the real table, so it is
+  # stamped from the source when the source has one and deleted otherwise.
+  # In production code_review is always present — ExerciseSection.for_plan
+  # never omits it — but ingest is also called on partial sets, and a set
+  # with no code_review has no trace to strip or stamp.
   def ground_code_review!
     return unless ExerciseSection.present?(@problem_set, "code_review")
 
@@ -333,6 +335,9 @@ class ProblemSetIngest
       section["scenario"] = @code_review_source.scenario
       section["source"]   = @code_review_source.id
     end
+
+    schema = @code_review_source&.current_schema
+    schema ? section["current_schema"] = schema : section.delete("current_schema")
   end
 
   # The provider returns "blocks" already in correct order, so the scramble is
