@@ -471,9 +471,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `SectionRotation` uses. Gated to `RealSource::LANGUAGE` because this
   codebase is Ruby; a `javascript` day stays toy. A migration is reference
   material, never mutated in place — a one-line `add_column` has no room for
-  a flaw. A stale entry is skipped with a warning rather than failing
-  generation; a spec holds every entry resolvable and inside
-  `MIN_LINES..MAX_LINES`. Design:
+  a flaw — so the model writes a next migration for the same table. The file
+  is older than its table, so `RealSource::Migration#current_schema` also
+  slices each table the migration touches out of `db/schema.rb`, found and
+  sliced with Prism the way a `Method` is, and the instruction asks for a
+  snippet that applies cleanly to it: no column the table already has, and no
+  index whose default name already exists. A modified copy of the original is
+  not offered, because the current table beside it would show the fix.
+  `ProblemSetIngest` stamps that definition into the section as
+  `current_schema`, server-owned like `scenario`, and deletes one a provider
+  returns on any other day. The page shows it collapsed under the snippet, and
+  the grader and the duck both read it, so a review cannot ask for an index
+  the table already has. A stale entry, including a migration whose table has
+  left the schema, is skipped with a warning rather than failing generation; a
+  spec holds every entry resolvable and inside `MIN_LINES..MAX_LINES`. Design:
   `docs/superpowers/specs/2026-09-11-real-source-code-review-design.md`.
 
   **Self-reference here is deliberate, and the pool leans into it.** Code Gym
