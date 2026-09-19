@@ -1142,6 +1142,48 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  describe "a grounded migration's current schema" do
+    let(:schema) { %(create_table "push_subscriptions", force: :cascade do |t|\n  t.string "endpoint"\nend\n) }
+    let(:label)  { I18n.t("sections.code_review.current_schema") }
+
+    def exercise_with_schema
+      ps = base_problem_set
+      ps["code_review"]["current_schema"] = schema
+      create_exercise(problem_set: ps)
+    end
+
+    it "renders collapsed beneath the snippet while the set is being answered" do
+      exercise_with_schema
+      login_as(user)
+
+      get root_path
+
+      expect(response.body).to match(
+        %r{<pre class="snippet"><code[^>]*>def a; end</code></pre>\s*<details class="ref">\s*<summary>#{Regexp.escape(label)}</summary>}m
+      )
+      expect(response.body).to include("create_table &quot;push_subscriptions&quot;")
+    end
+
+    it "renders in the read-only view once the set is submitted" do
+      create_response(exercise_with_schema)
+      login_as(user)
+
+      get root_path
+
+      expect(response.body).to include("<summary>#{label}</summary>")
+      expect(response.body).to include("create_table &quot;push_subscriptions&quot;")
+    end
+
+    it "renders nothing for a day without one" do
+      create_exercise
+      login_as(user)
+
+      get root_path
+
+      expect(response.body).not_to include(label)
+    end
+  end
+
   describe "structure diagrams" do
     # Visible BEFORE answering, unlike improved_code — the whole point is
     # understanding what is being asked.

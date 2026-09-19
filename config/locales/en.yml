@@ -126,6 +126,7 @@ en:
     code_review:
       name: "Code Review"
       placeholder: "What's the issue and how would you fix it?"
+      current_schema: "The table as it stands today"
     pattern:
       name: "Pattern of the Month"
       placeholder: "Your answer…"
