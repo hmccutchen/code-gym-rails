@@ -316,7 +316,7 @@ RSpec.describe DailyPlan do
       exercise = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current,
                                        problem_set: { "plan_review" => { "concept" => "scope_creep" } })
       DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
-                            answers: { "plan_review" => "an answer" },
+                            answers: { "plan_review" => "x" * 20 },
                             section_ratings: { "plan_review" => "too_hard" },
                             concept_tags: { "plan_review" => "scope_creep" },
                             ai_review: { "plan_review" => { "rating" => "developing" } })

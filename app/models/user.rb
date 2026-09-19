@@ -235,7 +235,7 @@ class User < ApplicationRecord
       scenarios = ExerciseSection.keys.filter_map do |section|
         problem_set.dig(section, "scenario").presence
       end
-      ai_ratings = r.concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
+      ai_ratings = r.answered_concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
       {
         date:              r.date.to_s,
         feedback:          r.feedback_text,
@@ -268,8 +268,8 @@ class User < ApplicationRecord
   end
 
   # Concepts still needing reinforcement, resolved on each concept's single
-  # most-recent occurrence — not cumulative history, so a concept mastered
-  # weeks ago never resurfaces because of an old bad day. Mastery requires
+  # most-recent answered occurrence — not cumulative history, so a concept
+  # mastered weeks ago never resurfaces because of an old bad day. Mastery requires
   # both signals to explicitly agree the user is solid; an absent signal
   # never counts toward mastery (uncertain data defaults to reinforcement).
   # Total absence of both signals is out of scope, same as an unrated
@@ -303,7 +303,7 @@ class User < ApplicationRecord
     result   = []
 
     recent_daily_responses(limit).each do |r|
-      r.concept_tags.each do |section, concept|
+      r.answered_concept_tags.each do |section, concept|
         next if concept.blank? || concept == "other"
 
         tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)

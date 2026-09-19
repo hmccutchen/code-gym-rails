@@ -304,6 +304,21 @@ RSpec.describe User, type: :model do
 
       expect(user.recent_performance.first[:ai_ratings]).to eq({})
     end
+
+    it "leaves a skipped section's AI grade out of ai_ratings while still listing its concept" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20, "pattern" => "" },
+                            concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+                            ai_review: { "code_review" => { "rating" => "developing" },
+                                         "pattern"     => { "rating" => "beginner" } })
+
+      entry = user.recent_performance.first
+      expect(entry[:ai_ratings]).to eq("code_review" => "developing")
+      expect(entry[:concepts]).to eq("code_review" => "n_plus_one", "pattern" => "memoization")
+    end
   end
 
   describe "#recent_performance per-section ratings" do
@@ -496,6 +511,35 @@ RSpec.describe User, type: :model do
 
       expect(user.concepts_needing_reinforcement).to eq([])
     end
+
+    it "does not flag a concept whose only occurrence was a skipped section" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "" },
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
+
+    # Resolution is on each concept's most recent occurrence, so a skipped
+    # newer one must not claim that slot and hide the real attempt behind it.
+    it "lets an older answered occurrence decide when the newer one was skipped" do
+      user = create_user
+      older = DailyExercise.create!(user: user, date: Date.current - 2, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 2,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "strong" } })
+      newer = DailyExercise.create!(user: user, date: Date.current - 1, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current - 1,
+                            answers: { "code_review" => "" },
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
   end
 
   describe "#concepts_needing_reinforcement with tiers" do
@@ -544,7 +588,7 @@ RSpec.describe User, type: :model do
       )
       DailyResponse.create!(
         user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
-        answers: { section => "an answer" },
+        answers: { section => "x" * 20 },
         section_ratings: { section => self_rating },
         concept_tags: { section => concept },
         ai_review: { section => { "rating" => ai_rating } }
