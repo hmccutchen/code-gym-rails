@@ -2732,6 +2732,36 @@ RSpec.describe AiService do
   end
 
   describe "#build_review_day_context" do
+    [ "add index", "Approach:\nWhy:" ].each do |answer|
+      it "treats #{answer.inspect} as skipped in grading and re-explanation" do
+        exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
+          "pattern" => { "question" => "Why?", "answer_scaffold" => [ "Approach:", "Why:" ] }
+        })
+        resp = DailyResponse.new(daily_exercise: exercise,
+          answers: { "pattern" => answer }, ai_review: { "pattern" => {} })
+        svc = double_class.new(canned_text: "A different explanation")
+
+        context = svc.send(:build_review_day_context, "Rails", exercise, resp)
+        expect(context).to include("Their answer: (skipped)")
+        expect(context).not_to include(answer)
+        expect(svc).to receive(:call).with(hash_including(prompt: include("Their answer: (skipped)"))).and_call_original
+        svc.explain_differently(user, exercise, resp, section: "pattern")
+        expect(svc).to receive(:call).with(hash_including(prompt: include("Their answer was: (skipped)"))).and_call_original
+        svc.answer_follow_up(user, exercise, resp, section: "pattern", question: "Why?", thread: [])
+      end
+    end
+
+    it "treats short pseudocode as skipped without changing substantive pseudocode" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "pseudocode_to_code" => {} })
+      resp = DailyResponse.new(daily_exercise: exercise, answers: { "pseudocode_to_code" => "add index" })
+      expect(service.send(:build_review_day_context, "Rails", exercise, resp))
+        .to include("Their final pseudocode: (skipped)")
+
+      resp.answers["pseudocode_to_code"] = "For each item, collect its unique identifier"
+      expect(service.send(:build_review_day_context, "Rails", exercise, resp))
+        .to include("Their final pseudocode: For each item, collect its unique identifier")
+    end
+
     def exercise_with_third(third_key, third_section)
       DailyExercise.new(language: "ruby_rails", problem_set: {
         "code_review" => { "question" => "cr?", "snippet" => "code" },

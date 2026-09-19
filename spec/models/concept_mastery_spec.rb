@@ -291,10 +291,11 @@ RSpec.describe ConceptMastery, type: :model do
 
     # Before this, a skipped check counted as a failed one: the schedule was
     # wiped and the concept dropped back into reinforcement.
-    it "keeps a due retention check scheduled when that section was skipped" do
+    it "defers a skipped due retention check one unchanged interval without changing knowledge" do
       due_on = Date.current - 1
+      mastered_at = 30.days.ago.change(usec: 0)
       cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard,
-                                          last_rating: "strong", mastered_at: 30.days.ago,
+                                          streak: 2, last_rating: "strong", mastered_at: mastered_at,
                                           retention_interval_days: 7, next_retention_check_on: due_on)
       response = reviewed_day(answers: { "code_review" => "" },
                               concept_tags: { "code_review" => "n_plus_one" },
@@ -302,7 +303,83 @@ RSpec.describe ConceptMastery, type: :model do
 
       described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
 
-      expect(cm.reload).to have_attributes(next_retention_check_on: due_on, retention_interval_days: 7)
+      expect(cm.reload).to have_attributes(next_retention_check_on: Date.current + 7, retention_interval_days: 7,
+        tier: "standard", streak: 2, last_rating: "strong", mastered_at: mastered_at)
+    end
+
+    it "does not defer again when a skipped batch is retried after its deferred date" do
+      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+        retention_interval_days: 7, next_retention_check_on: Date.current)
+      response = reviewed_day(answers: {}, concept_tags: { "code_review" => "n_plus_one" },
+        ai_review: { "code_review" => { "rating" => "beginner" } })
+      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+      deferred_date = Date.current + 7
+      travel_to(20.days.from_now) do
+        described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+        expect(cm.reload.next_retention_check_on).to eq(deferred_date)
+      end
+    end
+
+    it "uses the work date for eligibility and the user's current date for the next check" do
+      user.update!(time_zone: "Pacific/Honolulu")
+      travel_to(Time.utc(2026, 9, 19, 4)) do
+        cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+          retention_interval_days: 7, next_retention_check_on: Date.new(2026, 9, 10))
+        response = reviewed_day(answers: {}, concept_tags: { "code_review" => "n_plus_one" },
+          ai_review: { "code_review" => { "rating" => "beginner" } })
+        response.update!(date: Date.new(2026, 9, 12))
+
+        described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+
+        expect(cm.reload.next_retention_check_on).to eq(Date.new(2026, 9, 25))
+      end
+    end
+
+    it "does not defer a skipped duplicate while its answered section awaits a later batch" do
+      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+        retention_interval_days: 7, next_retention_check_on: Date.current)
+      response = reviewed_day(answers: { "pattern" => "A substantive attempt" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" },
+        section_ratings: { "pattern" => "right_level" },
+        ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: false)
+      expect(cm.reload.next_retention_check_on).to eq(Date.current)
+      response.ai_review["pattern"] = { "rating" => "strong" }
+      described_class.record_review!(response, sections: %w[pattern], apply_session_countdown: false)
+      expect(cm.reload.retention_interval_days).to eq(14)
+    end
+
+    it "only defers submitted successfully reviewed active tags in the current batch" do
+      tagged = %w[n_plus_one memoization service_objects]
+      masteries = tagged.map do |concept|
+        user.concept_masteries.create!(concept: concept, language: "ruby_rails",
+          retention_interval_days: 7, next_retention_check_on: Date.current)
+      end
+      response = reviewed_day(answers: {},
+        concept_tags: { "code_review" => tagged[0], "pattern" => tagged[1], "challenge" => tagged[2] },
+        ai_review: { "code_review" => { "rating" => "beginner" }, "challenge" => { "rating" => "beginner" } })
+      response.update!(submitted_at: nil)
+      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
+      expect(masteries.map { |cm| cm.reload.next_retention_check_on }).to all(eq(Date.current))
+
+      response.update!(submitted_at: Time.current)
+      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
+      expect(masteries.map { |cm| cm.reload.next_retention_check_on }).to eq([ Date.current + 7, Date.current, Date.current ])
+    end
+
+    it "leaves not-yet-due, invalid-vocabulary and unscheduled concepts unchanged" do
+      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+        retention_interval_days: 7, next_retention_check_on: Date.current + 1)
+      retired = user.concept_masteries.create!(concept: "retired_concept", language: "ruby_rails",
+        retention_interval_days: 7, next_retention_check_on: Date.current)
+      response = reviewed_day(answers: {}, concept_tags: { "code_review" => "n_plus_one", "pattern" => "retired_concept" },
+        ai_review: { "code_review" => {}, "pattern" => {} })
+      before = [ cm.attributes, retired.attributes ]
+
+      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: false)
+
+      expect([ cm.reload.attributes, retired.reload.attributes ]).to eq(before)
     end
 
     it "evaluates a concept on its answered section alone when it was also tagged on a skipped one" do

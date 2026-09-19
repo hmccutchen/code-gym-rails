@@ -249,6 +249,10 @@ class DailyResponse < ApplicationRecord
     self.class.answered?(section, answers[section.to_s], section_data(section))
   end
 
+  def answer_for(section)
+    answers[section.to_s] if answered?(section)
+  end
+
   # The sections this response is measured against — the exercise's own, never
   # `answers.keys`. A row can hold an answer for a section its exercise no
   # longer presents (a regenerated day whose third changed), and counting it

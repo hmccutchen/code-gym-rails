@@ -57,16 +57,8 @@ class ConceptMastery < ApplicationRecord
   def self.record_review!(response, sections:, apply_session_countdown:)
     user = response.user
 
-    if apply_session_countdown
-      user.concept_masteries.tier_paused.each do |cm|
-        remaining = cm.cooldown_remaining - 1
-        if remaining <= 0
-          cm.update!(tier: :reduced, streak: 0, cooldown_remaining: 0)
-        else
-          cm.update!(cooldown_remaining: remaining)
-        end
-      end
-    end
+    count_down_paused_concepts!(user) if apply_session_countdown
+    defer_skipped_checks!(response, sections)
 
     sections_by_concept = Hash.new { |h, k| h[k] = [] }
     response.answered_concept_tags.slice(*sections).each do |section, concept|
@@ -79,6 +71,46 @@ class ConceptMastery < ApplicationRecord
       evaluate_concept!(user, concept, bucket, response, secs)
     end
   end
+
+  def self.count_down_paused_concepts!(user)
+    user.concept_masteries.tier_paused.each do |cm|
+      remaining = cm.cooldown_remaining - 1
+      if remaining <= 0
+        cm.update!(tier: :reduced, streak: 0, cooldown_remaining: 0)
+      else
+        cm.update!(cooldown_remaining: remaining)
+      end
+    end
+  end
+  private_class_method :count_down_paused_concepts!
+
+  def self.defer_skipped_checks!(response, sections)
+    return unless response.submitted?
+
+    scopes = skipped_check_scopes(response, sections)
+    return if scopes.empty?
+
+    Time.use_zone(response.user.effective_time_zone) do
+      transaction do
+        scopes.reduce(:or).where(next_retention_check_on: ..response.date)
+          .where("retention_interval_days > 0").lock.each do |cm|
+          cm.update!(next_retention_check_on: [ Date.current, response.date ].max + cm.retention_interval_days)
+        end
+      end
+    end
+  end
+  private_class_method :defer_skipped_checks!
+
+  def self.skipped_check_scopes(response, sections)
+    answered = response.answered_concept_tags.values
+    tags = response.concept_tags.slice(*(sections & response.section_keys))
+      .reject { |section, concept| answered.include?(concept) || !response.section_reviewed?(section) }
+    tags.group_by { |section, _| ConceptBucket.for(section, response.daily_exercise.language) }
+      .map do |bucket, pairs|
+        response.user.concept_masteries.in_bucket(bucket).where(concept: pairs.map(&:last))
+      end
+  end
+  private_class_method :skipped_check_scopes
 
   # Least-favorable-section-wins: the day's representative AI rating is the
   # lowest-ranked across the concept's sections; self is favorable only if
