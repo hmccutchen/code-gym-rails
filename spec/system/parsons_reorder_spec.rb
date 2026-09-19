@@ -61,6 +61,43 @@ RSpec.describe "Parsons reorder controls", type: :system do
     find("textarea[data-field='parsons_problem']", visible: :all).value
   end
 
+  [ 1, 2, 3 ].each do |count|
+    it "counts an explicitly chosen #{count}-block arrangement, but not an untouched one" do
+      travel_to(weekday) do
+        exercise = seed_parsons_exercise
+        exercise.problem_set["parsons_problem"].merge!(
+          "blocks" => Array.new(count) { |i| "block #{i}" }, "display_order" => (0...count).to_a
+        )
+        exercise.save!
+        stub_sortable_cdn(:loaded)
+        visit_as(user)
+
+        expect(page).to have_content("0 of 3 answered")
+        expect(hidden_answer).to be_empty
+        click_button "Use this order"
+
+        expect(page).to have_content("1 of 3 answered")
+        expect(page).to have_no_css('details.hint[data-hint-for="parsons_problem"].locked')
+      end
+    end
+
+    it "counts a saved #{count}-block arrangement when the form loads" do
+      travel_to(weekday) do
+        exercise = seed_parsons_exercise
+        exercise.problem_set["parsons_problem"].merge!(
+          "blocks" => Array.new(count) { |i| "block #{i}" }, "display_order" => (0...count).to_a
+        )
+        exercise.save!
+        user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+          answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
+        stub_sortable_cdn(:loaded)
+        visit_as(user)
+
+        expect(page).to have_content("1 of 3 answered")
+      end
+    end
+  end
+
   it "shows no arrow buttons once drag is available" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)

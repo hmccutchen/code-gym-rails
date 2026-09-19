@@ -39,60 +39,18 @@ class ResponsesController < ApplicationController
     exercise = current_user.daily_exercises.for_date.first
     return head :not_found unless exercise
 
-    @response = current_user.daily_responses.find_or_initialize_by(
-      daily_exercise: exercise,
-      date: Date.current
-    )
-
-    # Only persist answers for sections this exercise actually presents. Strong
-    # params permit every third-slot key (`challenge`, `architecture`,
-    # `security_review`, `parsons_problem`) and every fourth-slot key
-    # (`plan_review`, `ambiguity_hunt`), so without this a crafted request could
-    # store keys this exercise never rendered and push
-    # DailyResponse#answered_sections / #completeness past this exercise's actual
-    # section count / 100%. Sliced against #active_section_keys rather than the
-    # raw payload keys, since those are the same sections #completeness counts
-    # against — a payload holding two third-shaped keys renders only one.
-    submitted_answers = response_params[:answers]&.slice(*exercise.active_section_keys)
-    submitted_answers = DailyResponse.normalize_answers(submitted_answers, exercise) if submitted_answers
-
-    @response.assign_attributes(
-      answers:      submitted_answers.presence || @response.answers,
-      submitted_at: response_params[:submit] == "1" ? Time.current : @response.submitted_at,
-      concept_tags: exercise_concept_tags(exercise)
-    )
-
-    incoming_ratings = (response_params[:section_ratings] || {})
-                         .slice(*exercise.active_section_keys)
-                         .select { |_, value| DailyResponse::SELF_RATINGS.include?(value) }
-    @response.section_ratings = @response.section_ratings.merge(incoming_ratings)
-    @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
-
-    saved = @response.save
-
-    enqueue_concept_references(exercise) if saved && response_params[:submit] == "1"
-
-    respond_to do |format|
-      format.json do
-        if saved
-          payload = { status: "saved", completeness: @response.completeness }
-          # The dashboard fires #review with this the moment a submit lands, so
-          # one click does both. The two stay separate actions — only the id
-          # this hands back is new, and until the save above there was none.
-          payload[:review_url] = review_response_path(@response) if response_params[:submit] == "1"
-          render json: payload
-        else
-          render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_content
-        end
+    @response = persisted_response_for(exercise)
+    newly_submitted = false
+    saved = @response.with_lock do
+      unless @response.submitted?
+        assign_draft_response(exercise)
+        newly_submitted = @response.submitted?
       end
-      format.html do
-        if saved
-          redirect_to root_path
-        else
-          redirect_to root_path, alert: "Couldn't save your answers."
-        end
-      end
+      @response.save
     end
+
+    enqueue_concept_references(exercise) if saved && newly_submitted
+    render_save_result(saved)
   end
 
   # POST /responses/:id/review — trigger the inline AI review. Synchronous: the
@@ -172,7 +130,7 @@ class ResponsesController < ApplicationController
   # DELETE /responses/:id/start_over — abandon today's saved answers, ratings,
   # and feedback so the same problem set can be re-attempted from a blank
   # state. Destroys the row outright rather than clearing fields in place —
-  # #create's find_or_initialize_by already handles a missing row cleanly, so
+  # #create's persisted-response lookup handles a missing row cleanly, so
   # the next autosave just creates a fresh one with no special-casing needed
   # anywhere else. Hard-blocked once any section has been reviewed: from that
   # point ConceptMastery.record_review! has already moved real tier/streak
@@ -397,6 +355,42 @@ class ResponsesController < ApplicationController
   end
 
   private
+
+  def assign_draft_response(exercise)
+    submitted_answers = response_params[:answers]&.slice(*exercise.active_section_keys)
+    submitted_answers = DailyResponse.normalize_answers(submitted_answers, exercise) if submitted_answers
+    @response.assign_attributes(
+      answers: submitted_answers.presence || @response.answers,
+      submitted_at: response_params[:submit] == "1" ? Time.current : nil,
+      concept_tags: exercise_concept_tags(exercise)
+    )
+    incoming_ratings = (response_params[:section_ratings] || {})
+      .slice(*exercise.active_section_keys)
+      .select { |_, value| DailyResponse::SELF_RATINGS.include?(value) }
+    @response.section_ratings = @response.section_ratings.merge(incoming_ratings)
+    @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
+  end
+
+  def render_save_result(saved)
+    respond_to do |format|
+      format.json do
+        if saved
+          payload = { status: "saved", completeness: @response.completeness, submitted: @response.submitted? }
+          payload[:review_url] = review_response_path(@response) if response_params[:submit] == "1"
+          render json: payload
+        else
+          render json: { status: "error", errors: @response.errors.full_messages }, status: :unprocessable_content
+        end
+      end
+      format.html do
+        if saved
+          redirect_to root_path
+        else
+          redirect_to root_path, alert: "Couldn't save your answers."
+        end
+      end
+    end
+  end
 
   # A non-Hash-like element (e.g. thread: ["oops"] or thread: "not-an-array",
   # which Array() wraps as a one-element array) would otherwise raise

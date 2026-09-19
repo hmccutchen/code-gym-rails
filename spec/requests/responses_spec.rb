@@ -5,6 +5,83 @@ RSpec.describe "Responses", type: :request do
 
   before { login_as(user) }
 
+  describe "submitted evidence" do
+    let!(:exercise) do
+      create_exercise("code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" })
+    end
+    let!(:saved_response) do
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "My original answer", "pattern" => "" },
+        section_ratings: { "code_review" => "right_level" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+        feedback_text: "The feedback submitted with my answers", submitted_at: 1.minute.ago)
+    end
+    let(:stale_payload) do
+      { response: { answers: { code_review: "", pattern: "A newly invented answer" },
+                    section_ratings: { code_review: "too_hard", pattern: "too_easy" },
+                    feedback_text: "Keep this feedback" } }
+    end
+
+    it "ignores every stale submitted field, including feedback" do
+      evidence = saved_response.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at", "feedback_text")
+      post responses_path, params: stale_payload, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["submitted"]).to be(true)
+      expect(saved_response.reload.attributes.slice(*evidence.keys)).to eq(evidence)
+      expect(saved_response.feedback_text).to eq("The feedback submitted with my answers")
+    end
+
+    it "does not erase submitted feedback with an empty late autosave" do
+      post responses_path, params: stale_payload.deep_merge(response: { feedback_text: "" }), as: :json
+      expect(saved_response.reload.feedback_text).to eq("The feedback submitted with my answers")
+    end
+
+    it "keeps retries idempotent and supplies the original review URL" do
+      submitted_at = saved_response.submitted_at
+      post responses_path, params: stale_payload.deep_merge(response: { submit: "1" }), as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["review_url"]).to eq(review_response_path(saved_response))
+      expect(saved_response.reload.submitted_at).to eq(submitted_at)
+      expect(saved_response.answers["pattern"]).to eq("")
+    end
+
+    it "reloads a stale draft under the lock before accepting an autosave" do
+      saved_response.update!(submitted_at: nil)
+      allow_any_instance_of(ResponsesController).to receive(:persisted_response_for).and_wrap_original do |method, *args|
+        draft = method.call(*args)
+        DailyResponse.find(draft.id).update!(submitted_at: Time.current)
+        draft
+      end
+
+      post responses_path, params: stale_payload, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(saved_response.reload.answers["code_review"]).to eq("My original answer")
+      expect(saved_response.answers["pattern"]).to eq("")
+    end
+
+    it "does not change evidence while a review is in flight" do
+      saved_response.update!(reviewing_since: Time.current)
+      post responses_path, params: stale_payload, as: :json
+      expect(saved_response.reload.answers["pattern"]).to eq("")
+      expect(saved_response.section_ratings).to eq("code_review" => "right_level")
+    end
+
+    it "cannot make history disagree with mastery after review" do
+      saved_response.update!(ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "beginner" } })
+      ConceptMastery.record_review!(saved_response, sections: %w[code_review pattern], apply_session_countdown: true)
+      evidence = user.concept_masteries.map(&:attributes)
+
+      post responses_path, params: stale_payload, as: :json
+
+      expect(user.concept_masteries.reload.map(&:attributes)).to eq(evidence)
+      expect(user.recent_performance.first[:answered_sections]).to eq([ "code_review" ])
+      expect(user.concepts_needing_reinforcement).to be_empty
+    end
+  end
+
   def create_exercise(problem_set)
     DailyExercise.create!(user: user, date: Date.current,
                           problem_set: problem_set, generated_at: Time.current)

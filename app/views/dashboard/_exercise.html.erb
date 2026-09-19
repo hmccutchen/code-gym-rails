@@ -98,9 +98,8 @@
       ratingNudge.hidden = rated;
     }
 
-    // The client-side half of DailyResponse.answered? — same rule, same
-    // threshold, but the label list comes from the server (data-scaffold-labels)
-    // rather than a second copy of the scaffold living here.
+    // Non-prose controls supply their own completion state. Prose shares the
+    // server's threshold and scaffold labels rather than restating either.
     const ANSWER_MIN_LENGTH = <%= DailyResponse::ANSWER_MIN_LENGTH %>;
 
     function substantive(textarea) {
@@ -110,6 +109,7 @@
     }
 
     function answered(textarea) {
+      if (textarea.dataset.answerComplete !== undefined) return textarea.dataset.answerComplete === "true";
       return substantive(textarea).length > ANSWER_MIN_LENGTH;
     }
 
@@ -137,7 +137,9 @@
       // Through CodeGymSaveStatus so a refused or dropped save is reported
       // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
-        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers");
+        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, data }) => {
+          if (ok && data?.submitted && !submitting && !reviewRequested) window.location.reload();
+        });
       }, 800);
     }
 
@@ -167,6 +169,7 @@
     // two clicks: submit is saved and confirmed before review is asked for.
     const GENERATING_REVIEW = <%= t("review.generating_label").to_json.html_safe %>;
     let reviewRequested = false;
+    let submitting = false;
 
     function requestReview(url) {
       const reviewForm = document.createElement("form");
@@ -184,6 +187,7 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       clearTimeout(saveTimer);
+      submitting = true;
 
       submitButton.disabled = true;
       submitButton.classList.add("btn-loading");
@@ -206,12 +210,14 @@
           submitButton.textContent = GENERATING_REVIEW;
           requestReview(data.review_url);
         } else {
+          submitting = false;
           submitButton.disabled = false;
           submitButton.classList.remove("btn-loading");
           submitButton.textContent = "Submit answers →";
           alert("Couldn't submit your answers — please try again.");
         }
       } catch (error) {
+        submitting = false;
         submitButton.disabled = false;
         submitButton.classList.remove("btn-loading");
         submitButton.textContent = "Submit answers →";

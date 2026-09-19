@@ -313,6 +313,14 @@ class ExerciseSection
       labels.join("\n\n\n") + "\n"
     end
 
+    def answered?(value, section_data = nil)
+      substantive_answer(value, section_data).length > DailyResponse::ANSWER_MIN_LENGTH
+    end
+
+    def answer_for(value, section_data = nil)
+      value if answered?(value, section_data)
+    end
+
     # The answer with this day's scaffold labels removed, so "how much did the
     # user actually write" never counts the scaffolding we gave them. Matching
     # whole stripped lines (not substrings) is what makes partial edits degrade

@@ -220,6 +220,57 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#answered_concept_tags" do
+    it "keeps only the tags of sections that were answered" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "short" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization", "challenge" => "caching" }
+      )
+
+      expect(response.answered_concept_tags).to eq("code_review" => "n_plus_one")
+      expect(response.concept_tags.keys).to contain_exactly("code_review", "pattern", "challenge")
+    end
+  end
+
+  describe "#answer_for" do
+    it "uses the answered rule while preserving the original substantive answer" do
+      response = described_class.new(daily_exercise: exercise,
+        answers: { "code_review" => "add index", "pattern" => "My approach:\nUse a bounded cache" })
+
+      expect(response.answer_for("code_review")).to be_nil
+      expect(response.answer_for("challenge")).to be_nil
+      expect(response.answer_for("pattern")).to eq("My approach:\nUse a bounded cache")
+    end
+
+    describe "positional answer completion" do
+      [ 1, 2, 3 ].each do |count|
+        it "counts an explicit #{count}-block arrangement without applying the prose floor" do
+          exercise = DailyExercise.new(problem_set: { "parsons_problem" => { "blocks" => Array.new(count, "block") } })
+          order = "order:#{(0...count).to_a.join(',')}"
+          response = described_class.new(daily_exercise: exercise, answers: { "parsons_problem" => order })
+
+          expect(response.answered?("parsons_problem")).to be(true)
+          expect(response.answered_sections).to eq([ "parsons_problem" ])
+          expect(response.answer_for("parsons_problem")).to eq(order)
+        end
+      end
+
+      [ nil, "", "order:", "order:0", "order:0,0", "order:-1,9", "order:0,1,2" ].each do |value|
+        it "does not count an untouched or incomplete two-block arrangement #{value.inspect}" do
+          exercise = DailyExercise.new(problem_set: { "parsons_problem" => { "blocks" => %w[first second] } })
+          response = described_class.new(daily_exercise: exercise, answers: { "parsons_problem" => value })
+          expect(response.answered?("parsons_problem")).to be(false)
+        end
+      end
+    end
+
+    it "reads legacy rows without a scaffold and preserves valid Parsons orders" do
+      response = described_class.new(answers: { "parsons_problem" => "order:2,0,4,1,3" })
+      expect(response.answer_for("parsons_problem")).to eq("order:2,0,4,1,3")
+    end
+  end
+
   describe ".normalize_answers" do
     let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
 

@@ -163,6 +163,39 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to include("You rated this")
   end
 
+  [ "", "add index", "Approach:\nWhy:" ].each do |answer|
+    it "hides skipped answer text and calibration for #{answer.inspect}" do
+      exercise = create_exercise(problem_set: base_problem_set.deep_merge(
+        "pattern" => { "answer_scaffold" => [ "Approach:", "Why:" ] }
+      ))
+      create_response(exercise, ai_review: sample_review).update!(
+        answers: { "pattern" => answer }, section_ratings: { "pattern" => "right_level" }
+      )
+
+      get root_path
+
+      expect(response.body).not_to include("You rated this")
+      expect(Nokogiri::HTML(response.body).css(".answer-display").map(&:text)).to all(eq("(skipped)"))
+    end
+  end
+
+  it "renders short submitted pseudocode as skipped" do
+      exercise = create_exercise(problem_set: { "pseudocode_to_code" => { "question" => "Plan it" } })
+      create_response(exercise).update!(answers: { "pseudocode_to_code" => "add index" })
+      get root_path
+      expect(Nokogiri::HTML(response.body).css(".answer-display").map(&:text)).to eq([ "(skipped)" ])
+    end
+
+  [ 1, 2, 3 ].each do |count|
+    it "replays an explicit #{count}-block Parsons answer" do
+      blocks = Array.new(count) { |i| "block #{i}" }
+      exercise = create_exercise(problem_set: { "parsons_problem" => { "blocks" => blocks } })
+      create_response(exercise).update!(answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
+      get root_path
+      expect(Nokogiri::HTML(response.body).css(".parsons-list-readonly code").map(&:text)).to eq(blocks)
+    end
+  end
+
   it "does not show the calibration note when self-rating is too_hard, even if a section was rated poorly" do
     resp = create_response(create_exercise, ai_review: sample_review)
     resp.update!(section_ratings: {

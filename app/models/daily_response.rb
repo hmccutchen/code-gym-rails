@@ -209,10 +209,9 @@ class DailyResponse < ApplicationRecord
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 
-  # Answer keys with substantive content. The threshold is a heuristic, but it
-  # is THE heuristic — the dashboard progress bar, the teaching-hint lock, and
-  # the generation prompt all derive from #answered? rather than re-deriving a
-  # length check, so there is one definition of "answered" to change.
+  # Prose answer keys with substantive content. Non-prose kinds own their
+  # completion rule through ExerciseSection.answered?; every consumer still
+  # asks this response's #answered? rather than testing the representation.
   #
   # Length is measured against the answer minus the day's scaffold labels (see
   # ExerciseSection.substantive_answer), so a scaffolded section isn't counted
@@ -225,7 +224,7 @@ class DailyResponse < ApplicationRecord
   end
 
   def self.answered?(section, value, section_data = nil)
-    substantive_answer(section, value, section_data).length > ANSWER_MIN_LENGTH
+    (ExerciseSection.find(section) || ExerciseSection).answered?(value, section_data)
   end
 
   # Scaffold labels the user never typed into aren't an answer, so they are not
@@ -249,6 +248,10 @@ class DailyResponse < ApplicationRecord
     self.class.answered?(section, answers[section.to_s], section_data(section))
   end
 
+  def answer_for(section)
+    (ExerciseSection.find(section) || ExerciseSection).answer_for(answers[section.to_s], section_data(section))
+  end
+
   # The sections this response is measured against — the exercise's own, never
   # `answers.keys`. A row can hold an answer for a section its exercise no
   # longer presents (a regenerated day whose third changed), and counting it
@@ -260,6 +263,14 @@ class DailyResponse < ApplicationRecord
 
   def answered_sections
     section_keys.select { |section| answered?(section) }
+  end
+
+  # The tags that count as evidence of skill. A skipped section is still
+  # reviewed, but a grade on an empty answer measures nothing — exposure
+  # readers keep the full #concept_tags instead, because a skipped section
+  # was still shown (see CLAUDE.md's "Personalization loop" for which is which).
+  def answered_concept_tags
+    concept_tags.slice(*answered_sections)
   end
 
   # Every section the day presents carries a self-rating. This is what the
