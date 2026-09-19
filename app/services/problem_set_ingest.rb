@@ -154,6 +154,7 @@ class ProblemSetIngest
     normalize_answer_scaffolds!
     normalize_diagrams!
     shuffle_parsons_blocks!
+    strip_current_schemas!
     ground_code_review!
 
     Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts)
@@ -308,6 +309,16 @@ class ProblemSetIngest
     end
   end
 
+  # The page, the grader, the duck and the difficulty assessment all read
+  # `current_schema` as the real table, and the last two read it from
+  # whichever section they are handed. So no section keeps a provider's
+  # version; ground_code_review! stamps the server's afterward.
+  def strip_current_schemas!
+    @problem_set.each_value do |section_data|
+      section_data.delete("current_schema") if section_data.is_a?(Hash)
+    end
+  end
+
   # On a grounded day the scenario is a fact the server knows — which file,
   # which method, and that the copy is altered — not creative output, so it is
   # stamped here regardless of what the provider wrote. The prompt asks for the
@@ -319,8 +330,8 @@ class ProblemSetIngest
   # day deletes whatever the provider put there rather than leaving it, or a
   # model that happened to emit a `source` key would mint a trace for an
   # excerpt this set never showed. `current_schema` is server-owned the same
-  # way: the page and the grader both treat it as the real table, so it is
-  # stamped from the source when the source has one and deleted otherwise.
+  # way, so it is stamped only from a source that has one; every provider copy
+  # is already gone by now (see strip_current_schemas!).
   # In production code_review is always present — ExerciseSection.for_plan
   # never omits it — but ingest is also called on partial sets, and a set
   # with no code_review has no trace to strip or stamp.
@@ -337,7 +348,7 @@ class ProblemSetIngest
     end
 
     schema = @code_review_source&.current_schema
-    schema ? section["current_schema"] = schema : section.delete("current_schema")
+    section["current_schema"] = schema if schema
   end
 
   # The provider returns "blocks" already in correct order, so the scramble is

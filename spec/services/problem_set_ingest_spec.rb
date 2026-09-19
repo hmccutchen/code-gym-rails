@@ -94,6 +94,17 @@ RSpec.describe ProblemSetIngest do
 
         expect(set["code_review"]).not_to have_key("current_schema")
       end
+
+      # The duck and the difficulty assessment read it from whichever section
+      # they are handed, so no other section may carry a provider's version.
+      it "strips a provider-supplied one from every other section, leaving the stamp alone" do
+        set = grounded({ "code_review" => { "concept" => "wrong_cardinality" },
+                         "pattern" => { "concept" => "memoization", "current_schema" => "invented" } },
+                       source: migration)
+
+        expect(set["pattern"]).not_to have_key("current_schema")
+        expect(set["code_review"]["current_schema"]).to eq(migration.current_schema)
+      end
     end
   end
 
