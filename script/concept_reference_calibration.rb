@@ -178,31 +178,37 @@ class ConceptReferenceCalibration
 
   def print_summary(records)
     summary(records).each do |mode, stats|
-      @out.puts "#{mode}: n=#{stats[:n]} min=#{format_seconds(stats[:min])} median=#{format_seconds(stats[:median])} " \
+      @out.puts "#{mode}: n=#{stats[:n]} measured=#{stats[:measured]} min=#{format_seconds(stats[:min])} median=#{format_seconds(stats[:median])} " \
                 "p90=#{format_seconds(stats[:p90])} max=#{format_seconds(stats[:max])} " \
                 "timeouts=#{stats[:timeouts]} failures=#{stats[:failures]} " \
                 "over #{AiService::CONCEPT_REFERENCE_READ_TIMEOUT}s (CONCEPT_REFERENCE_READ_TIMEOUT)=#{stats[:over_deployed]}"
     end
   end
 
+  # A refused call returns in under a second, so its time says nothing about
+  # how long a reference takes; the spread covers calls the provider worked on.
   def mode_summary(records)
-    seconds = records.map(&:seconds).sort
+    measured = records.select { |record| record.outcome == :ok || record.outcome == :timeout }
+    seconds  = measured.map(&:seconds).sort
 
     { n:             records.size,
+      measured:      measured.size,
       min:           seconds.first,
       median:        percentile(seconds, 50),
       p90:           percentile(seconds, 90),
       max:           seconds.last,
       timeouts:      records.count { |record| record.outcome == :timeout },
       failures:      records.count { |record| record.outcome.is_a?(String) },
-      over_deployed: records.count { |record| record.seconds > AiService::CONCEPT_REFERENCE_READ_TIMEOUT } }
+      over_deployed: measured.count { |record| record.seconds > AiService::CONCEPT_REFERENCE_READ_TIMEOUT } }
   end
 
   def percentile(sorted, pct)
+    return if sorted.empty?
+
     sorted[((sorted.size * pct / 100.0).ceil - 1).clamp(0, sorted.size - 1)]
   end
 
   def format_seconds(seconds)
-    "#{format('%.1f', seconds)}s"
+    seconds ? "#{format('%.1f', seconds)}s" : "n/a"
   end
 end

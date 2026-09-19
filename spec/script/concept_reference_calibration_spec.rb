@@ -196,16 +196,31 @@ RSpec.describe ConceptReferenceCalibration do
   end
 
   describe "#summary" do
-    it "reports n, spread, timeouts, failures and how many ran past the deployed timeout per mode" do
+    def record(seconds, outcome, mode: :sequential)
+      described_class::Record.new(provider: "claude", model: "m", bucket: "ruby_rails", concept: "n_plus_one", mode: mode,
+                                  seconds: seconds, outcome: outcome, tokens_in: 1, tokens_out: 1, attempts: 1)
+    end
+
+    # A refused call returns in well under a second, so counting its time in
+    # the spread would pull the minimum and median toward zero.
+    it "reports the spread over the calls the provider worked on, and counts failures beside it" do
       over = AiService::CONCEPT_REFERENCE_READ_TIMEOUT + 1
-      records = [ 10, 20, over, 40, 50 ].map do |seconds|
-        described_class::Record.new(provider: "claude", model: "m", bucket: "ruby_rails", concept: "n_plus_one", mode: :sequential,
-                                    seconds: seconds, outcome: seconds == 40 ? :timeout : :ok, tokens_in: 1, tokens_out: 1, attempts: 1)
-      end
+      records = [ record(10, :ok), record(20, :ok), record(over, :ok), record(40, :timeout), record(50, :ok),
+                  record(0.3, "AiService::RateLimitError") ]
 
       expect(calibration.summary(records)).to eq(
-        sequential: { n: 5, min: 10, median: 40, p90: over, max: over, timeouts: 1, failures: 0, over_deployed: 1 }
+        sequential: { n: 6, measured: 5, min: 10, median: 40, p90: over, max: over, timeouts: 1, failures: 1, over_deployed: 1 }
       )
+    end
+
+    it "reports no spread for a mode in which every call failed" do
+      records = [ record(0.3, "AiService::RateLimitError", mode: :concurrent) ]
+
+      expect(calibration.summary(records)).to eq(
+        concurrent: { n: 1, measured: 0, min: nil, median: nil, p90: nil, max: nil, timeouts: 0, failures: 1, over_deployed: 0 }
+      )
+      expect { calibration.send(:print_summary, records) }.not_to raise_error
+      expect(out.string).to match(/^concurrent: n=1 measured=0 min=n\/a /)
     end
   end
 end
