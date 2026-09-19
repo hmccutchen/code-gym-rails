@@ -69,7 +69,7 @@ RSpec.describe AiService do
     # before it answers, so nothing arrives on the socket for far longer than a
     # per-section review takes. Sharing READ_TIMEOUT with the review path made
     # every morning's generation die on Net::ReadTimeout.
-    it "gives generation a budget far larger than the per-review one" do
+    it "gives generation a budget far larger than the short-call one" do
       expect(AiService::GENERATION_READ_TIMEOUT).to be > AiService::READ_TIMEOUT * 4
     end
   end
@@ -2929,9 +2929,9 @@ RSpec.describe AiService do
       expect(svc.last_read_timeout).to eq(AiService::GENERATION_READ_TIMEOUT)
     end
 
-    # DailyExercisesController#regenerate still generates inline, so this call
-    # holds a Puma thread with a user waiting on the response. It needs more
-    # room than a section review and much less than the worker's.
+    # A blocking generation holds a Puma thread with a user waiting on the
+    # response (no caller makes one today; see SYNC_GENERATION_READ_TIMEOUT).
+    # It needs more room than a short call and much less than the worker's.
     it "tightens the budget when a request thread is blocked on the call" do
       svc = double_class.new(canned_text: full_problem_set.to_json)
       svc.generate_exercise(user, blocking: true)
@@ -2939,7 +2939,7 @@ RSpec.describe AiService do
       expect(svc.last_read_timeout).to eq(AiService::SYNC_GENERATION_READ_TIMEOUT)
     end
 
-    it "keeps the blocking budget between the review and worker budgets" do
+    it "keeps the blocking budget between the short-call and worker budgets" do
       expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be > AiService::READ_TIMEOUT
       expect(AiService::SYNC_GENERATION_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
     end
@@ -4223,7 +4223,7 @@ RSpec.describe AiService do
     end
 
     # Reference, guide and ladder share one response with extended thinking on,
-    # so READ_TIMEOUT (sized for a single-section review) under-times it silently,
+    # so READ_TIMEOUT (sized for short replies) under-times it silently,
     # since staying under READ_TIMEOUT keeps the call from ever being tagged
     # long_running, letting RETRY_TIMEOUT_GUARD retry a genuine timeout into
     # duplicate billed calls.

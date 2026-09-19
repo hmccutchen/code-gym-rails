@@ -44,9 +44,9 @@ class AiService
   # Generation asks for the single largest response we ever request — one
   # non-streaming call carrying every section, including the full reference
   # blocks — from a model that thinks before it answers, so the socket stays
-  # silent until the whole thing is built. READ_TIMEOUT was sized for a
-  # per-section review, and imposing it here made generation fail on
-  # Net::ReadTimeout once ClaudeService::MAX_TOKENS grew.
+  # silent until the whole thing is built. READ_TIMEOUT is far too short for
+  # that, and imposing it here made generation fail on Net::ReadTimeout once
+  # ClaudeService::MAX_TOKENS grew.
   #
   # Two budgets, because generation runs from two places with different costs
   # for waiting:
@@ -65,9 +65,9 @@ class AiService
 
   # #generate_concept_reference asks for the reference, guide and difficulty
   # ladder together, with extended thinking left on (no max_tokens is passed).
-  # READ_TIMEOUT was sized for a single-section review's much smaller reply,
-  # so it under-times this call the same way
-  # GENERATION_READ_TIMEOUT exists because READ_TIMEOUT under-timed generation.
+  # READ_TIMEOUT is sized for calls with short replies, so it under-times this
+  # call the same way GENERATION_READ_TIMEOUT exists because READ_TIMEOUT
+  # under-timed generation.
   # SYNC_GENERATION_READ_TIMEOUT is the reference point for magnitude: another
   # blocking, thinking-on call, so this one is sized the same order.
   #
