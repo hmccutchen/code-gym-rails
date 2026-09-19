@@ -83,8 +83,8 @@ class AiService
 
   # #grade_section grades one section with extended thinking left on, and a
   # section that returns an improved_code rewrite runs well past READ_TIMEOUT:
-  # measured grades on full-length answers took 24-77 seconds, and 6 of 16
-  # timed out at 45. Sized from that slowest call, with room above it.
+  # on full-length answers the slowest grades measured took about 80 seconds.
+  # Sized with room above that.
   #
   # Exceeding READ_TIMEOUT also makes the call long_running to
   # RETRY_TIMEOUT_GUARD, so a timeout is final. At READ_TIMEOUT faraday-retry

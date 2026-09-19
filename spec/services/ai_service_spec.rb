@@ -53,6 +53,19 @@ RSpec.describe AiService do
       end
     end
 
+    # faraday-retry caps the computed backoff at max_interval and only then
+    # adds its random jitter, so a sleep can exceed RETRY_MAX_INTERVAL unless
+    # the largest computed backoff plus that jitter stays under it.
+    it "keeps every computed backoff sleep within RETRY_MAX_INTERVAL" do
+      [ ClaudeService, GeminiService ].each do |provider|
+        options = provider::RETRY_OPTIONS
+        largest = options[:interval] * (options[:backoff_factor]**(AiService::RETRY_MAX - 1))
+        jitter  = options[:interval_randomness] * options[:interval]
+
+        expect([ largest, options[:max_interval] ].min + jitter).to be <= AiService::RETRY_MAX_INTERVAL
+      end
+    end
+
     # The translation count above is a claim about the app, not a free
     # parameter: exactly one kind translates before it is graded, so a second
     # one appearing has to come back here and to the claim window rather than
@@ -67,8 +80,8 @@ RSpec.describe AiService do
     # no claim. It is also the single largest response we ever ask for — one
     # non-streaming call carrying every section — against a model that thinks
     # before it answers, so nothing arrives on the socket for far longer than a
-    # per-section review takes. Sharing READ_TIMEOUT with the review path made
-    # every morning's generation die on Net::ReadTimeout.
+    # per-section review takes. Sharing READ_TIMEOUT made every morning's
+    # generation die on Net::ReadTimeout.
     it "gives generation a budget far larger than the short-call one" do
       expect(AiService::GENERATION_READ_TIMEOUT).to be > AiService::READ_TIMEOUT * 4
     end
