@@ -14,7 +14,7 @@ RSpec.describe "Responses", type: :request do
         answers: { "code_review" => "My original answer", "pattern" => "" },
         section_ratings: { "code_review" => "right_level" },
         concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
-        submitted_at: 1.minute.ago)
+        feedback_text: "The feedback submitted with my answers", submitted_at: 1.minute.ago)
     end
     let(:stale_payload) do
       { response: { answers: { code_review: "", pattern: "A newly invented answer" },
@@ -22,14 +22,19 @@ RSpec.describe "Responses", type: :request do
                     feedback_text: "Keep this feedback" } }
     end
 
-    it "ignores stale answers and ratings after submission but keeps feedback" do
-      evidence = saved_response.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at")
+    it "ignores every stale submitted field, including feedback" do
+      evidence = saved_response.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at", "feedback_text")
       post responses_path, params: stale_payload, as: :json
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["submitted"]).to be(true)
       expect(saved_response.reload.attributes.slice(*evidence.keys)).to eq(evidence)
-      expect(saved_response.feedback_text).to eq("Keep this feedback")
+      expect(saved_response.feedback_text).to eq("The feedback submitted with my answers")
+    end
+
+    it "does not erase submitted feedback with an empty late autosave" do
+      post responses_path, params: stale_payload.deep_merge(response: { feedback_text: "" }), as: :json
+      expect(saved_response.reload.feedback_text).to eq("The feedback submitted with my answers")
     end
 
     it "keeps retries idempotent and supplies the original review URL" do
@@ -83,17 +88,21 @@ RSpec.describe "Responses", type: :request do
     end
     let(:draft_payload) do
       { response: { answers: { code_review: "An answer to keep", pattern: "An answer to discard" },
-                    section_ratings: { code_review: "right_level", pattern: "too_hard" } } }
+                    section_ratings: { code_review: "right_level", pattern: "too_hard" },
+                    feedback_text: "A draft preference" } }
     end
 
     before { post responses_path, params: draft_payload, as: :json }
 
     it "finalizes merged answers once and cannot restore discarded evidence with a stale save or retry" do
-      post responses_path, params: { response: { answers: { pattern: "" }, submit: "1" } }, as: :json
+      post responses_path, params: { response: {
+        answers: { pattern: "" }, feedback_text: "The submitted preference", submit: "1"
+      } }, as: :json
       saved = user.daily_responses.sole
       expect(saved.answers).to eq("code_review" => "An answer to keep", "pattern" => "")
       expect(saved.section_ratings).to eq("code_review" => "right_level")
-      evidence = saved.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at")
+      expect(saved.feedback_text).to eq("The submitted preference")
+      evidence = saved.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at", "feedback_text")
 
       post responses_path, params: draft_payload, as: :json
       expect(response.parsed_body).to include("submitted" => true, "status" => "saved")

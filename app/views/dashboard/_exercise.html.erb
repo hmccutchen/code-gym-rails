@@ -107,9 +107,8 @@
       if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
     }
 
-    // The client-side half of DailyResponse.answered? — same rule, same
-    // threshold, but the label list comes from the server (data-scaffold-labels)
-    // rather than a second copy of the scaffold living here.
+    // Non-prose controls supply their own completion state. Prose shares the
+    // server's threshold and scaffold labels rather than restating either.
     const ANSWER_MIN_LENGTH = <%= DailyResponse::ANSWER_MIN_LENGTH %>;
 
     function substantive(textarea) {
@@ -119,6 +118,7 @@
     }
 
     function answered(textarea) {
+      if (textarea.dataset.answerComplete !== undefined) return textarea.dataset.answerComplete === "true";
       return [...substantive(textarea)].length > ANSWER_MIN_LENGTH;
     }
 

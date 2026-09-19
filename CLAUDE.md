@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline AI review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections, rate difficulty, and leave feedback before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
 
 ## Git Workflow
 
@@ -666,7 +666,27 @@ concept-specific difficulty descriptions for future generation, not a new set.
   explicitly requested as retention or incidentally repeated. It cannot
   infer an unhonored offer and never reschedules unrepresented concepts.
   No backfill repairs mastery changed by historical skips.
-- **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule). `DailyResponse#answer_for` returns the original answer only when that rule passes. Grading context, grading notes, re-explanations, follow-ups and read-only displays use it; a nine-character answer such as "add index" is shown as skipped, while the stored draft remains intact. Parsons still replays blocks and pseudocode still renders its original text when answered. Calibration mismatch notes require an answered section too.
+- **One "answered" authority**: `DailyResponse.answered?` delegates completion
+  to the section kind. Prose still needs more than 10 characters after
+  untouched scaffold labels are removed; `ANSWER_MIN_LENGTH` is unchanged.
+  Parsons instead needs an explicitly saved complete permutation of its
+  stored blocks, regardless of encoded length. One- and two-block exercises
+  are supported; the generation prompt's five-to-eight target is not an
+  ingest bound. An untouched control stays unanswered. Moving blocks or
+  clicking "Use this order" records the arrangement, including a one-block
+  exercise with nothing to move. The kind's control supplies
+  `data-answer-complete`, initially computed by the server and updated on
+  interaction; the shared browser gate reads that state without knowing the
+  kind. Prose controls still share the server's threshold and scaffold labels.
+  Progress, hint gating, history, mastery and generation all ask the same
+  completion authority.
+
+  `DailyResponse#answer_for` delegates review/display representation to the
+  kind too. Prose below the floor, including "add index", appears as skipped
+  without deleting the stored draft. Parsons preserves malformed attempts
+  for its strict local grading and lenient read-only replay, so a corrupt id
+  cannot hide the other blocks the engineer arranged; it does not count as
+  completed work. Calibration mismatch notes require completion.
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` as described above.
 - **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, restated by the inline script against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing and recomputes the gate. The progress label reports answers only; the nudge and button report readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unsubmittable submit because the UI cannot produce one.
   A submitted self-rating now describes a counted answer. This deliberately
@@ -897,12 +917,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   shares `persisted_response_for` with pseudocode rounds, recovering an
   initial-create race through the existing unique date constraint. Every
   answer save reloads under the response row lock. Once submitted, answers,
-  section ratings, concept tags and the submission timestamp are immutable
+  section ratings, concept tags, feedback and the submission timestamp are immutable
   through this endpoint, including while a review is running or retrying.
   Ratings freeze too because they decide mastery alongside the AI grade.
   Draft answer merging and submit-only rating pruning both run inside that
   lock, before the first submission freezes the record.
-  Feedback remains editable; it is preference input, not recorded mastery.
+  Feedback freezes too: there is no post-submit editor, and a late autosave
+  otherwise overwrites the submitted feedback with an older or empty draft.
   Stale autosaves receive a successful acknowledgement with `submitted: true`,
   without changing evidence, and the stale form reloads to the submitted
   page. Repeated submits return the existing review URL, preserving automatic

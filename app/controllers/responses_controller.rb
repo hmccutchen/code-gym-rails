@@ -46,7 +46,6 @@ class ResponsesController < ApplicationController
         assign_draft_response(exercise)
         newly_submitted = @response.submitted?
       end
-      @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
       @response.save
     end
 
@@ -372,6 +371,7 @@ class ResponsesController < ApplicationController
     if response_params[:submit] == "1"
       @response.section_ratings = @response.section_ratings.slice(*@response.answered_sections)
     end
+    @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
   end
 
   def render_save_result(saved)

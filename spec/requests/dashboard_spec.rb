@@ -91,6 +91,29 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to match(/id="rating-nudge"[^>]*hidden/)
   end
 
+  [ 1, 2, 3 ].each do |count|
+    it "renders a rated #{count}-block Parsons gate from completion rather than encoded length" do
+      exercise = create_exercise(problem_set: {
+        "code_review" => { "question" => "Find the bug", "snippet" => "code" },
+        "parsons_problem" => { "blocks" => Array.new(count) { |i| "block #{i}" },
+                               "display_order" => (0...count).to_a }
+      })
+      draft = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+        section_ratings: { "parsons_problem" => "right_level" })
+
+      get root_path
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css("#submit-answers")["disabled"]).not_to be_nil
+      expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("false")
+
+      draft.update!(answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
+      get root_path
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css("#submit-answers")["disabled"]).to be_nil
+      expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("true")
+    end
+  end
+
   it "enables the submit button and marks the active rating when the draft is already rated" do
     exercise = create_exercise
     create_response(exercise, submitted: false).update!(section_ratings: {
@@ -209,13 +232,15 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(Nokogiri::HTML(response.body).css(".answer-display").map(&:text)).to eq([ "(skipped)" ])
     end
 
-    it "does not replay a below-threshold Parsons order as an answer" do
-      exercise = create_exercise(problem_set: { "parsons_problem" => { "blocks" => %w[first second third fourth fifth] } })
-      create_response(exercise).update!(answers: { "parsons_problem" => "order:0,1" })
+  [ 1, 2, 3 ].each do |count|
+    it "replays an explicit #{count}-block Parsons answer" do
+      blocks = Array.new(count) { |i| "block #{i}" }
+      exercise = create_exercise(problem_set: { "parsons_problem" => { "blocks" => blocks } })
+      create_response(exercise).update!(answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
       get root_path
-      expect(Nokogiri::HTML(response.body).css(".parsons-list-readonly code").map(&:text))
-        .to eq(Array.new(5, "(skipped)"))
+      expect(Nokogiri::HTML(response.body).css(".parsons-list-readonly code").map(&:text)).to eq(blocks)
     end
+  end
 
   it "does not show the calibration note when self-rating is too_hard, even if a section was rated poorly" do
     resp = create_response(create_exercise, ai_review: sample_review)

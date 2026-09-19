@@ -209,10 +209,9 @@ class DailyResponse < ApplicationRecord
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 
-  # Answer keys with substantive content. The threshold is a heuristic, but it
-  # is THE heuristic — the dashboard progress bar, the teaching-hint lock, and
-  # the generation prompt all derive from #answered? rather than re-deriving a
-  # length check, so there is one definition of "answered" to change.
+  # Prose answer keys with substantive content. Non-prose kinds own their
+  # completion rule through ExerciseSection.answered?; every consumer still
+  # asks this response's #answered? rather than testing the representation.
   #
   # Length is measured against the answer minus the day's scaffold labels (see
   # ExerciseSection.substantive_answer), so a scaffolded section isn't counted
@@ -225,7 +224,7 @@ class DailyResponse < ApplicationRecord
   end
 
   def self.answered?(section, value, section_data = nil)
-    substantive_answer(section, value, section_data).length > ANSWER_MIN_LENGTH
+    (ExerciseSection.find(section) || ExerciseSection).answered?(value, section_data)
   end
 
   # Scaffold-only drafts store as blank so reloading can offer the scaffold
@@ -247,7 +246,7 @@ class DailyResponse < ApplicationRecord
   end
 
   def answer_for(section)
-    answers[section.to_s] if answered?(section)
+    (ExerciseSection.find(section) || ExerciseSection).answer_for(answers[section.to_s], section_data(section))
   end
 
   # The sections this response is measured against — the exercise's own, never

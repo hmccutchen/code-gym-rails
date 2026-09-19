@@ -39,12 +39,13 @@
       </li>
     <% end %>
   </ol>
+  <button type="button" class="btn btn-ghost btn-sm" data-parsons-confirm>Use this order</button>
   <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
       not using a mouse. The hint is clipped until a block takes focus, which
       keeps it out of the way of the people who will never need it. %>
   <p class="parsons-keyhint">Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks.</p>
   <p class="parsons-status" aria-live="polite"></p>
-  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" style="display:none"><%= response.answers[key] %></textarea>
+  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= response.answers[key] %></textarea>
 <% end %>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>
@@ -53,13 +54,14 @@
     // Drag (SortableJS, imported below) is the primary way to reorder. The
     // up/down buttons are a recovery path, injected only when that import
     // fails or never resolves. Neither path syncs the hidden field on wire-up
-    // — only on an actual move — so the section reads as unanswered until the
-    // learner does something, matching every other section.
+    // — only on a move or explicit confirmation — so the section reads as
+    // unanswered until the learner does something, matching every other section.
     (() => {
       function syncHiddenField(list) {
         const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
         const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
         textarea.value = "order:" + ids.join(",");
+        textarea.dataset.answerComplete = String(ids.length > 0);
         textarea.dispatchEvent(new Event("input", { bubbles: true }));
       }
 
@@ -131,6 +133,10 @@
         list.parsonsSync = () => syncHiddenField(list);
         list.parsonsAddControls = () => addControls(list);
         list.addEventListener("keydown", event => handleKey(list, event));
+        list.parentElement.querySelector("[data-parsons-confirm]").addEventListener("click", () => {
+          syncHiddenField(list);
+          list.parentElement.querySelector(".parsons-status").textContent = "Order recorded.";
+        });
         // A CDN that hangs rather than errors never rejects the import below,
         // so its catch never runs. Without this the section would stay
         // unanswerable for as long as the request is stalled.
