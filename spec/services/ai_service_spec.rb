@@ -1332,6 +1332,72 @@ RSpec.describe AiService do
 
         expect(prompt).to include("must be realistic Ruby/Rails code")
         expect(prompt).not_to include("Code Gym's own source")
+        expect(prompt).not_to include("These source-specific instructions take precedence")
+      end
+
+      # Regression for #171: the day's scenario-flavor line and the grounded
+      # excerpt's own instruction both land in the same prompt, and the
+      # excerpt's instruction is the one place that tells the model the
+      # flavor doesn't apply to it. Without that line a game_and_animation day described a real
+      # Code Gym table as serving game players.
+      it "tells a grounded schema-review section to ignore the day's scenario flavor" do
+        excerpt = RealSource::SCHEMA_REVIEW.first
+        prompt  = service.send(:build_exercise_prompt, user, "ruby_rails",
+                               code_review_mode: :schema_review, code_review_source: excerpt,
+                               scenario_flavor: :game_and_animation)
+
+        expect(prompt).to include("platformer save state system")
+        expect(prompt).to include("business-domain settings suggested for each section do not apply to this one")
+        expect(prompt).to include("never a game or other fictional domain")
+      end
+
+      { application_code: "memoization", schema_review: "missing_index" }.each do |mode, concept|
+        AiService::SCENARIO_POOLS.each_key do |flavor|
+          context "#{mode} with #{flavor} flavor" do
+            let(:excerpt) { RealSource.pool(mode).first }
+
+            before do
+              exercise = user.daily_exercises.create!(
+                date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                problem_set: { "code_review" => { "scenario" => excerpt.scenario, "source" => excerpt.id } }
+              )
+              user.daily_responses.create!(
+                daily_exercise: exercise, date: exercise.date, answers: { "code_review" => "x" * 20 }
+              )
+            end
+
+            it "lets a repeated excerpt keep its setting and names despite the variety rule" do
+              prompt = service.send(:build_exercise_prompt, user, "ruby_rails",
+                                    code_review_mode: mode, code_review_source: excerpt, scenario_flavor: flavor)
+
+              expect(prompt).to include("framings: #{excerpt.scenario}")
+              expect(prompt).to include('do not reuse the class/method names or narrative framing shown in the "framings:"')
+              expect(prompt).to include(
+                "These source-specific instructions take precedence over the general variety, mastery-loop, " \
+                "and retention requests for new domains, names, or framing"
+              )
+              expect(prompt).to include("Keep the required source names and setting even if this excerpt appears in prior framings")
+              expect(prompt).to include("all other sections still follow the general freshness rules")
+            end
+
+            it "keeps grounded retention eligible with a fresh flaw and full difficulty" do
+              due = user.concept_masteries.create!(
+                concept: concept, language: "ruby_rails", tier: :standard,
+                mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 2
+              )
+              prompt = service.send(:build_exercise_prompt, user, "ruby_rails",
+                                    code_review_mode: mode, code_review_source: excerpt, scenario_flavor: flavor,
+                                    reinforcement: [], due_checks: [ due ])
+
+              expect(prompt).to include("Retention checks due today: #{concept} (code_review, pattern, or challenge)")
+              expect(prompt).to include("new business domain, new class and method names")
+              expect(prompt).to include("A retention check may use this excerpt")
+              expect(prompt).to include("make the planted flaw a fresh application of the chosen concept")
+              expect(prompt).to include("This exception changes neither concept selection nor difficulty")
+              expect(prompt).to include("Pitch these at FULL difficulty")
+            end
+          end
+        end
       end
     end
 

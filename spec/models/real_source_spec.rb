@@ -84,16 +84,22 @@ RSpec.describe RealSource do
       expect(excerpt.scenario).to include("`app/services/weighted_roll.rb`, `#pick`")
     end
 
-    it "instructs exactly one flaw in a modified copy, never unchanged, never a fictional domain" do
+    it "instructs exactly one flaw in a modified copy, never unchanged" do
       instruction = excerpt.instruction
 
       expect(instruction).to include("MODIFIED COPY")
       expect(instruction).to include("EXACTLY ONE flaw")
       expect(instruction).to include("Never return it unchanged")
       expect(instruction).to include("never introduce a second flaw")
-      expect(instruction).to include("do not rewrite it into a fictional domain")
       expect(instruction).to include(%(The scenario field must be exactly: "#{excerpt.scenario}"))
       expect(instruction).to include("```ruby\ndef self.pick(weights)")
+    end
+
+    it "keeps the section's setting Code Gym itself, regardless of the day's scenario flavor" do
+      instruction = excerpt.instruction
+
+      expect(instruction).to include("business-domain settings suggested for each section do not apply to this one")
+      expect(instruction).to include("never a game or other fictional domain")
     end
   end
 
@@ -181,6 +187,13 @@ RSpec.describe RealSource do
       expect(instruction).to include("index_<table>_on_<columns>")
       expect(instruction).to include("never a migration that fails to run")
     end
+
+    it "keeps the section's setting Code Gym itself, regardless of the day's scenario flavor" do
+      instruction = excerpt.instruction
+
+      expect(instruction).to include("business-domain settings suggested for each section do not apply to this one")
+      expect(instruction).to include("never a game or other fictional domain")
+    end
   end
 
   describe ".pool" do
@@ -190,6 +203,24 @@ RSpec.describe RealSource do
 
     it "is empty for an unknown mode rather than raising" do
       expect(RealSource.pool(:nope)).to be_empty
+    end
+  end
+
+  describe "source instruction precedence" do
+    RealSource::POOLS.each do |mode, pool|
+      it "keeps #{mode} grounded when variety or retention asks for new names" do
+        instruction = pool.first.instruction
+
+        expect(instruction).to include(
+          "These source-specific instructions take precedence over the general variety, mastery-loop, " \
+          "and retention requests for new domains, names, or framing"
+        )
+        expect(instruction).to include("A retention check may use this excerpt")
+        expect(instruction).to include("make the planted flaw a fresh application of the chosen concept")
+        expect(instruction).to include("Keep the required source names and setting even if this excerpt appears in prior framings")
+        expect(instruction).to include("This exception changes neither concept selection nor difficulty")
+        expect(instruction).to include("all other sections still follow the general freshness rules")
+      end
     end
   end
 

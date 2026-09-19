@@ -107,6 +107,21 @@ class RealSource
       node.compact_child_nodes.each { |child| receiverless_calls(child, found) }
       found
     end
+
+    # General flavor and freshness rules would otherwise rename real source
+    # or move it into a fictional domain, including on retention checks.
+    def setting_rule
+      "The business-domain settings suggested for each section do not apply to this one: its setting is " \
+      "Code Gym itself, a learning app for engineers, so its comments, names, and any other prose describe " \
+      "Code Gym, never a game or other fictional domain. " \
+      "These source-specific instructions take precedence over the general variety, mastery-loop, " \
+      "and retention requests for new domains, names, or framing. " \
+      "Keep the required source names and setting even if this excerpt appears in prior framings. " \
+      "A retention check may use this excerpt: make the planted flaw a fresh application of the chosen concept, " \
+      "rather than relying on renamed identifiers or a new business story for novelty. " \
+      "This exception changes neither concept selection nor difficulty; " \
+      "all other sections still follow the general freshness rules."
+    end
   end
 
   # A single method, scoped by name and sliced out with Prism. Line ranges
@@ -142,7 +157,7 @@ class RealSource
 
     def instruction
       <<~INSTRUCTION.chomp
-        - The code_review snippet is a MODIFIED COPY of this real method from Code Gym's own source (`#{id}`). Reproduce its shape, names, and structure as the starting point, then introduce EXACTLY ONE flaw that expresses the chosen concept. Never return it unchanged — there would be nothing to find — and never introduce a second flaw, since grading assumes exactly one. Keep the real class, method, and variable names; do not rewrite it into a fictional domain. The scenario field must be exactly: "#{scenario}"
+        - The code_review snippet is a MODIFIED COPY of this real method from Code Gym's own source (`#{id}`). Reproduce its shape, names, and structure as the starting point, then introduce EXACTLY ONE flaw that expresses the chosen concept. Never return it unchanged — there would be nothing to find — and never introduce a second flaw, since grading assumes exactly one. Keep the real class, method, and variable names. #{setting_rule} The scenario field must be exactly: "#{scenario}"
 
         #{fenced("ruby")}
       INSTRUCTION
@@ -223,7 +238,7 @@ class RealSource
 
     def instruction
       <<~INSTRUCTION.chomp
-        - The code_review snippet is a Rails migration MODELLED ON this real one from Code Gym's own schema history (`#{id}`) — same conventions, same style: a plausible next migration for the same table(s). ~10-15 lines, containing EXACTLY ONE planted data-modeling flaw; never zero, never two. The scenario field must be exactly: "#{scenario}"
+        - The code_review snippet is a Rails migration MODELLED ON this real one from Code Gym's own schema history (`#{id}`) — same conventions, same style: a plausible next migration for the same table(s). ~10-15 lines, containing EXACTLY ONE planted data-modeling flaw; never zero, never two. #{setting_rule} The scenario field must be exactly: "#{scenario}"
 
         #{fenced("ruby")}
 
