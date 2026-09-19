@@ -61,13 +61,16 @@
       <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
     </div>
 
-    <% all_rated = response.submittable? %>
+    <% submit_blocker = response.submit_blocker %>
+    <% submit_nudges = { unanswered: "Answer at least one section to finish up.",
+                         unrated:    "Rate each section you answered to finish up." } %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
-      <%= f.button "Submit answers →", type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: !all_rated %>
+      <%= f.button "Submit answers →", type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: submit_blocker.present? %>
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
-    <p class="progress-label" id="rating-nudge"<%= " hidden".html_safe if all_rated %>>Rate every section's difficulty to finish up.</p>
+    <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge",
+              hidden: submit_blocker.nil?, data: submit_nudges %>
   <% end %>
 
   <script>
@@ -88,14 +91,20 @@
     const ratings = {};
     form.querySelectorAll("button.rating-btn.active").forEach(b => { ratings[b.dataset.ratingFor] = b.dataset.rating; });
 
-    function allRated() {
-      return sectionFields.every(section => ratings[section]);
+    // The client-side half of DailyResponse#submit_blocker, read against the
+    // live form so typing into a section re-locks Submit until it is rated.
+    function submitBlocker() {
+      const answeredFields = [...textareas].filter(answered).map(t => t.dataset.field);
+      if (answeredFields.length === 0) return "unanswered";
+      if (answeredFields.some(section => !ratings[section])) return "unrated";
+      return null;
     }
 
     function refreshSubmit() {
-      const rated = allRated();
-      submitButton.disabled = !rated;
-      ratingNudge.hidden = rated;
+      const blocker = submitBlocker();
+      submitButton.disabled = blocker !== null;
+      ratingNudge.hidden = blocker === null;
+      if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
     }
 
     // The client-side half of DailyResponse.answered? — same rule, same
@@ -142,7 +151,7 @@
     }
 
     textareas.forEach(t => {
-      t.addEventListener("input", () => { updateProgress(); autoSave(); });
+      t.addEventListener("input", () => { updateProgress(); refreshSubmit(); autoSave(); });
     });
 
     ratingButtons.forEach(btn => {

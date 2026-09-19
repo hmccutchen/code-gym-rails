@@ -57,7 +57,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-rating="too_hard"')
   end
 
-  it "disables the submit button and explains why when the draft has no rating" do
+  it "disables the submit button and asks for ratings on answered sections that have none" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
 
@@ -65,7 +65,30 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
-    expect(response.body).to include("Rate every section's difficulty to finish up.")
+    expect(response.body).to include("Rate each section you answered to finish up.")
+  end
+
+  it "disables the submit button and asks for an answer when nothing is answered yet" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false).update!(answers: {})
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
+    expect(response.body).to include("Answer at least one section to finish up.")
+  end
+
+  it "enables the submit button when the only answered section is rated" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false).update!(
+      answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "" },
+      section_ratings: { "code_review" => "right_level" }
+    )
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(response.body).to match(/id="rating-nudge"[^>]*hidden/)
   end
 
   it "enables the submit button and marks the active rating when the draft is already rated" do
