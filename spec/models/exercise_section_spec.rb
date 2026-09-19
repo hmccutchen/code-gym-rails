@@ -1003,6 +1003,33 @@ RSpec.describe ExerciseSection do
 
       expect(context).to include("What's wrong?", "User.all.each", "n+1", "too_hard")
     end
+
+    # A grounded schema_review migration is written against a real table. The
+    # grader has to see that table, or it marks an answer down for not adding
+    # an index the table already has.
+    it "carries a grounded migration's current schema, labelled as the real table" do
+      context = ExerciseSection::CodeReview.review_context(
+        section: { "question" => "What's wrong?", "snippet" => "add_index :things, :user_id",
+                   "current_schema" => %(create_table "things" do |t|\nend) },
+        answer: "a", rating: nil
+      )
+
+      expect(context).to include(%(create_table "things" do |t|))
+      expect(context).to include("the real table(s) as they stand today")
+    end
+
+    it "is unchanged for code_review when the section carries no current schema" do
+      context = ExerciseSection::CodeReview.review_context(
+        section: { "question" => "What's wrong?", "snippet" => "User.all.each" },
+        answer: "n+1", rating: "too_hard"
+      )
+
+      expect(context).to eq(<<~CONTEXT.chomp)
+        Code Review question: What's wrong?
+        Code snippet: User.all.each
+        #{ExerciseSection.answer_lines("n+1", "too_hard")}
+      CONTEXT
+    end
   end
 
   describe ".rotatable" do
