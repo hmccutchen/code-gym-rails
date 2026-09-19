@@ -242,6 +242,37 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
+  it "replays valid blocks of an incomplete Parsons order without completed evidence or a rating obligation" do
+    blocks = %w[first second third fourth fifth]
+    exercise = create_exercise(problem_set: {
+      "code_review" => { "question" => "Find the bug", "snippet" => "code" },
+      "parsons_problem" => { "blocks" => blocks }
+    })
+    draft = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+      answers: { "code_review" => "A substantive answer to the code review.", "parsons_problem" => "order:0,1" },
+      section_ratings: { "code_review" => "right_level" },
+      concept_tags: { "code_review" => "n_plus_one", "parsons_problem" => "n_plus_one" })
+
+    get root_path
+
+    document = Nokogiri::HTML(response.body)
+    expect(draft.answered_sections).to eq([ "code_review" ])
+    expect(draft.answered_concept_tags).to eq("code_review" => "n_plus_one")
+    expect(draft).to be_submittable
+    expect(document.at_css("#submit-answers")["disabled"]).to be_nil
+    expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("false")
+
+    draft.update!(submitted_at: Time.current)
+    get root_path
+
+    replay = Nokogiri::HTML(response.body).at_css(".parsons-list-readonly")
+    expect(replay.css("code").map(&:text)).to eq([ "first", "second", "(skipped)", "(skipped)", "(skipped)" ])
+    expect(replay.css(".parsons-correct code").map(&:text)).to eq(blocks.first(2))
+    kind = ExerciseSection::ParsonsProblem
+    expect(kind.grade(kind.parse_order(draft.answer_for("parsons_problem")), blocks.size))
+      .to eq(mismatches: blocks.size, rating: "beginner")
+  end
+
   it "does not show the calibration note when self-rating is too_hard, even if a section was rated poorly" do
     resp = create_response(create_exercise, ai_review: sample_review)
     resp.update!(section_ratings: {
