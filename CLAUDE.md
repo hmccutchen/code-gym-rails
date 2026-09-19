@@ -487,8 +487,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   definition into the section as `current_schema`, server-owned like
   `scenario`, and deletes one a provider returns on any other day or in any
   other section. The page shows it collapsed under the snippet, and the
-  grader, the duck and the difficulty assessment all read it, so a review
-  cannot ask for an index the table already has. A stale entry, including a
+  grader, the duck and the difficulty assessment all read it. That gives the
+  model what it needs to avoid a column or index the table already has; it
+  does not enforce it, and nothing checks the output. A stale entry, including a
   migration whose table has left the schema, is skipped with a warning rather
   than failing generation; a spec holds every entry resolvable and inside
   `MIN_LINES..MAX_LINES`. Design:
