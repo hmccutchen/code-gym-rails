@@ -102,7 +102,7 @@
 
     function refreshSubmit() {
       const blocker = submitBlocker();
-      submitButton.disabled = blocker !== null;
+      submitButton.disabled = form.inert || blocker !== null;
       ratingNudge.hidden = blocker === null;
       if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
     }
@@ -119,13 +119,13 @@
     }
 
     function answered(textarea) {
-      return substantive(textarea).length > ANSWER_MIN_LENGTH;
+      return [...substantive(textarea)].length > ANSWER_MIN_LENGTH;
     }
 
     function updateProgress() {
       const filled = [...textareas].filter(answered).length;
       progressFill.style.width = (filled / sectionFields.length * 100) + "%";
-      progressLabel.textContent = filled === sectionFields.length ? "✓ All answered — ready to submit!" : `${filled} of ${sectionFields.length} answered`;
+      progressLabel.textContent = filled === sectionFields.length ? "✓ All answered" : `${filled} of ${sectionFields.length} answered`;
       document.querySelectorAll("details.hint[data-hint-for]").forEach(d => {
         const t = form.querySelector(`textarea[data-field="${d.dataset.hintFor}"]`);
         if (t) d.classList.toggle("locked", !answered(t));
@@ -143,6 +143,7 @@
     let saveTimer;
     function autoSave() {
       clearTimeout(saveTimer);
+      if (form.inert) return;
       // Through CodeGymSaveStatus so a refused or dropped save is reported
       // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
@@ -192,8 +193,10 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (form.inert || submitBlocker()) return;
       clearTimeout(saveTimer);
 
+      form.inert = true;
       submitButton.disabled = true;
       submitButton.classList.add("btn-loading");
       submitButton.textContent = "Submitting…";
@@ -215,16 +218,17 @@
           submitButton.textContent = GENERATING_REVIEW;
           requestReview(data.review_url);
         } else {
-          submitButton.disabled = false;
-          submitButton.classList.remove("btn-loading");
-          submitButton.textContent = "Submit answers →";
           alert("Couldn't submit your answers — please try again.");
         }
       } catch (error) {
-        submitButton.disabled = false;
-        submitButton.classList.remove("btn-loading");
-        submitButton.textContent = "Submit answers →";
         alert("Couldn't submit your answers — please try again.");
+      } finally {
+        if (!reviewRequested) {
+          form.inert = false;
+          submitButton.classList.remove("btn-loading");
+          submitButton.textContent = "Submit answers →";
+          refreshSubmit();
+        }
       }
     });
 

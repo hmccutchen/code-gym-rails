@@ -89,12 +89,15 @@ RSpec.describe "Parsons reorder controls", type: :system do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
       expect(block_ids).to eq([ "2", "0", "1" ])
+      rate_section("parsons_problem")
+      expect(page).to have_button("Submit answers →", disabled: true)
 
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
 
       expect(block_ids).to eq([ "0", "2", "1" ])
       expect(page).to have_css(".parsons-status", text: "position 2 of 3", visible: :all)
       expect(hidden_answer).to eq("order:0,2,1")
+      expect(page).to have_button("Submit answers →", disabled: false)
     end
   end
 

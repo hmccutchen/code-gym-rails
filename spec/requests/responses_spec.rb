@@ -217,6 +217,57 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.last.answers["code_review"]).to eq("b" * 20)
       expect(DailyResponse.last.submitted_at).to be_present
     end
+
+    describe "POST /responses submitted ratings" do
+      let!(:exercise) do
+        create_exercise(
+          "code_review" => { "question" => "q" },
+          "pattern" => { "question" => "q", "answer_scaffold" => [ "Reason:", "Tradeoff:" ] }
+        )
+      end
+
+      before do
+        post responses_path, params: { response: {
+          answers: { code_review: "A substantive answer", pattern: "Another substantive answer" },
+          section_ratings: { code_review: "right_level", pattern: "too_hard" }
+        } }, as: :json
+      end
+
+      [ "", "N+1 query", "Reason:\nTradeoff:" ].each do |cleared_answer|
+        it "prunes the rating at submission when an answer becomes #{cleared_answer.inspect}" do
+          post responses_path, params: { response: {
+            answers: { code_review: "A substantive answer", pattern: cleared_answer }
+          } }, as: :json
+          expect(user.daily_responses.sole.section_ratings).to include("pattern" => "too_hard")
+
+          post responses_path, params: { response: { submit: "1" } }, as: :json
+
+          expect(response).to have_http_status(:ok)
+          expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level")
+        end
+      end
+
+      it "uses the merged answers and ratings when submitting a partial payload" do
+        post responses_path, params: { response: {
+          answers: { pattern: "" }, section_ratings: { code_review: "too_easy" }, submit: "1"
+        } }, as: :json
+
+        saved = user.daily_responses.sole
+        expect(saved.answers).to eq("code_review" => "A substantive answer", "pattern" => "")
+        expect(saved.section_ratings).to eq("code_review" => "too_easy")
+      end
+
+      it "removes a stored rating and answer for an inactive section on submission" do
+        draft = user.daily_responses.sole
+        draft.update!(answers: draft.answers.merge("challenge" => "An old substantive answer"),
+                      section_ratings: draft.section_ratings.merge("challenge" => "too_hard"))
+
+        post responses_path, params: { response: { submit: "1" } }, as: :json
+
+        expect(draft.reload.section_ratings.keys).to match_array(exercise.active_section_keys)
+        expect(draft.answers.keys).to match_array(exercise.active_section_keys)
+      end
+    end
   end
 
   describe "POST /responses format handling" do

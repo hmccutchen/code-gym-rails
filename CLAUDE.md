@@ -647,7 +647,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory.
 - **One "answered" rule**: a section counts as answered when its text — minus any scaffold label lines the user never typed into — exceeds 10 characters. `DailyResponse.answered?` is the single source of truth: the progress bar, the teaching-hint lock, history, and the generation prompt all derive from it (the dashboard's inline script reads `ANSWER_MIN_LENGTH` and the labels from the server rather than restating the rule).
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so every `answers[section].presence` reader — review prompt, history, `recent_performance` — sees what it saw before scaffolds existed.
-- **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, restated by the inline script against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unsubmittable submit because the UI cannot produce one.
+- **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, restated by the inline script against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing and recomputes the gate. The progress label reports answers only; the nudge and button report readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unsubmittable submit because the UI cannot produce one.
 - **Post-hoc difficulty rating**: once a section is reviewed, its review block
   also shows how hard the PROBLEM was — `straightforward` / `moderate` /
   `demanding` (`DailyResponse::DIFFICULTY_LEVELS`) plus a one-sentence reason —
@@ -961,11 +961,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   typed left the commonest abandonment unreachable. `SendPushReminderJob` picks
   the copy from how far through the day is
   (`SendPushReminderJob::NUDGE_TITLES`), since "still waiting" reads as not
-  having noticed the half that was done. Answered-in-full splits into two of
-  those states, because Submit stays disabled until every answered section is
-  rated: `DailyResponse#submit_blocker` is the one authority for that gate, read
-  by the dashboard's submit button and, through `#submittable?`, by the nudge,
-  so a notification can never name a button the user cannot press.
+  having noticed the half that was done. A partly answered day whose answered
+  sections are rated gets the ready-to-submit nudge, explicitly naming the
+  remaining sections as optional. A partly answered, unrated day still gets
+  the partway nudge; a fully answered, unrated day asks for ratings.
+  `DailyResponse#submit_blocker` is the one authority for that gate, read by
+  the dashboard's submit button and, through `#submittable?`, by the nudge,
+  so a notification can never name a button the user cannot press. Readiness
+  does not stop nudges: submission and `PushNudgePlan`'s quiet period still do.
 
   **`PushNudgePlan::QUIET_PERIOD` is what keeps that from nagging.** With
   starting no longer silencing the day, an hourly tick would otherwise tell

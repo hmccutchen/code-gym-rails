@@ -83,18 +83,14 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
-  # How far through an unfinished day the user is. Reached only once submission
-  # has been ruled out, so :unsubmitted means every section is answered and
-  # rated and the Submit button is all that is left. A non-zero answered count
-  # guarantees a response row, so #submittable? is only ever asked of one.
   def stage_for(exercise, response)
     answered = answered_count(response)
 
     return :untouched if answered.zero?
+    return :unsubmitted if response.submittable?
     return :partway   if answered < section_count(exercise)
-    return :unrated   unless response.submittable?
 
-    :unsubmitted
+    :unrated
   end
 
   def title_for(kind, stage)
@@ -111,6 +107,10 @@ class SendPushReminderJob < ApplicationJob
 
   def progress_phrase(exercise, response, stage)
     total = section_count(exercise)
+    remaining = total - answered_count(response)
+    if stage == :unsubmitted && remaining.positive?
+      return "Submit your answers; the remaining #{remaining} #{'section'.pluralize(remaining)} #{remaining == 1 ? 'is' : 'are'} optional"
+    end
 
     case stage
     when :untouched then sections_phrase(exercise)

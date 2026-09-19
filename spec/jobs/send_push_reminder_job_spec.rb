@@ -204,6 +204,27 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
+    it "offers Submit for a partly answered and rated set, with the rest optional" do
+      user.update!(reminder_level: :ready_and_nudges)
+
+      expect(PushDelivery).to receive(:deliver).with(
+        anything, hash_including(title: "Today's set is ready to submit",
+                                 body: "Submit your answers; the remaining 1 section is optional · about 10h left today.")
+      ).and_return(true)
+
+      Time.use_zone("UTC") do
+        travel_to Time.zone.local(2026, 9, 8, 11, 0) do
+          exercise = create_exercise
+          subscribe
+          answer(exercise, { "code_review" => ANSWER }, "code_review" => "right_level")
+        end
+
+        travel_to Time.zone.local(2026, 9, 8, 13, 30) do
+          described_class.new.perform(user_id: user.id, kind: :nudge)
+        end
+      end
+    end
+
     # Answered in full but never submitted is the state closest to done and the
     # one a "still waiting" nudge would describe worst.
     it "asks for the submit once every section is answered and rated" do
