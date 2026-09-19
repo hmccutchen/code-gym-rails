@@ -581,7 +581,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     it "reclaims the review after the in-flight marker goes stale" do
-      resp = submitted_response(reviewing_since: 10.minutes.ago)
+      resp = submitted_response(reviewing_since: (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago)
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: true, review: { "rating" => "solid" } })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)

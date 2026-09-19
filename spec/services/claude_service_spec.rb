@@ -78,7 +78,22 @@ RSpec.describe ClaudeService do
       expect(attempts.size).to eq(1)
     end
 
-    it "still retries a short review call that times out" do
+    # Grading has the same billed-work problem at a smaller scale: a timed-out
+    # grade has usually been produced and charged, and a retry pays for the
+    # section again. Its budget exceeds READ_TIMEOUT so the guard treats it as
+    # long_running.
+    it "does not retry a grading call that times out" do
+      attempts = []
+      service.instance_variable_set(:@conn, recording_connection(attempts))
+
+      expect {
+        service.send(:call, system: "sys", prompt: "p", read_timeout: AiService::REVIEW_READ_TIMEOUT)
+      }.to raise_error(AiService::TimeoutError, /Network error calling Claude/)
+
+      expect(attempts).to eq([ AiService::REVIEW_READ_TIMEOUT ])
+    end
+
+    it "still retries a short call that times out" do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
