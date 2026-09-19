@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. After submitting answers they can request an inline AI review, rate difficulty, and leave feedback — all of which feeds into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections, rate difficulty, and leave feedback before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
 
 ## Git Workflow
 
@@ -231,9 +231,11 @@ User opens dashboard:
 
 User interacts:
   └→ ResponsesController#create      → auto-saves answers + difficulty rating +
-       feedback text in one debounced fetch (idempotent). The rating renders at
-       the end of the problem set and gates the Submit button — a set cannot be
-       submitted unrated. A successful submit chains straight into #review from
+       feedback text in one debounced fetch (idempotent). Each section's
+       difficulty rating renders with that section and gates the Submit
+       button — every answered
+       section must be rated, and at least one must be answered; a skipped
+       section owes no rating. A successful submit chains straight into #review from
        the same click — the dashboard posts the review URL #create hands back —
        which lands back on the submitted-state dashboard either way, with the
        finished review rendered in place when it completed.
@@ -642,7 +644,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
 - **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, deliberately disjoint from `skill_level`). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched.
 - **Adaptive sizing toggle**: `User#adaptive_set_size` (default true) is a hard override of the count only, not a reset to a default — `SectionCount.for` takes an early return to `ExerciseSection.slot_count` before any sizing logic runs when it's off, so there is no path from that logic to the output for that user regardless of how the sizing rule changes later. `SectionRotation`'s starvation-weighted kind selection still runs either way: it is not sizing, and it improves a full 4-section day too, so turning the toggle off does not skip the exercise-history query — only the sizing computation. A boolean is the right shape for a single-user-per-account app; if this app ever needed several floors per user, a floor preference would express the intent better than a single on/off switch.
 - **Pausing generation**: `User#paused_generation_at` (nullable timestamp; nil is active) suppresses only generation the user didn't ask for — the cron batch (`GenerateDailyExercisesJob`'s no-arg branch) and `DashboardController#show`'s auto-trigger. It never gates submitting or reviewing: `ResponsesController` has no pause check, so once a row exists for today the submit → review chain runs regardless of pause state or weekday. The toggle is `PATCH /account/toggle_generation` on the Account page — the one control for this column; a second one anywhere else would be a second pause mechanism. Each button posts the state it wants (`paused=0`/`1`) rather than asking for a flip, so a double-tapped Resume stays a resume instead of the second request re-reading an already-unpaused user and pausing it again; with no param posted the endpoint still flips, keeping its original contract. Days fully inside a pause create no `DailyExercise` row at all, so they are non-events to `User#recent_exercise_history` and `#current_streak` rather than skips. The one day that *does* leave a row is the day the pause began (or an explicit `/generate` while paused), and `User#resume_generation!` is what stops that row counting against the user: on resume it re-dates the held, still-unsubmitted exercise — and the draft `DailyResponse` autosave left on it, which must move too or `#create` would build a second response for the same exercise — to `Date.current`. The row lock also settles the race against a concurrent generation, and does it through the foreign key rather than directly: inserting today's exercise needs a FOR KEY SHARE lock on the same `users` row that `with_lock` holds FOR UPDATE, so a generator either committed before the lock (and the `exists?` check sees it) or blocks until after it and loses its own set to the unique index, which `GenerateDailyExercisesJob` already treats as "generated concurrently". Resume wins, which is the right way round — the held set carries the user's draft answers and a fresh one would not. The move still sits in a SAVEPOINT catching both `RecordNotUnique` and a `date`-taken `RecordInvalid` (uniqueness is enforced twice, and the model validation raises first), so that were it ever to fail it rolls back only itself and the pause still lifts. Recovering the set also clears a same-day `last_generation_error`, since `/generate` is not pause-gated and a failed attempt while the held set sat at an earlier date would otherwise leave "Couldn't generate a new set" rendered above it — the banner `persist_failure` exists to avoid. The whole method runs in the user's own zone rather than the caller's, unlike the read-only history and streak readers, since it writes a date that has to be the user's today. That single move both makes the set reachable again (every "today's exercise" lookup is `for_date`, so at its original date it renders nowhere and `#create` 404s) and drops it out of both signals at once, since `recent_exercise_history` filters `date: ...Date.current` and `#current_streak` exempts today — no separate "exclude paused days" rule exists or is needed. Scoped to exercises dated on or after the pause, so a day abandoned *before* pausing stays abandoned; skipped entirely if an exercise already exists for today, so an explicit `/generate` while paused is never overwritten. Both regeneration columns clear on the move, because they describe the row's *day* rather than the set: `regenerated_at` would hide the Generate-new-set button behind a claim the dashboard states outright and that is no longer true ("You've already generated a new set today"), and a leftover `regenerating_since` is worse than cosmetic — `RegenerateExerciseJob` gates only on `exercise&.regenerating_since` after resolving `for_date`, so a retry stranded from the pause day would replace the carried-forward `problem_set` and destroy the draft response the move preserved. **At most one set can ever be carried forward**, because `[user_id, date]` is unique — so a user who stranded several (paused Monday, clicked `/generate` on Tuesday, resumed Wednesday) gets the newest one back and the older ones stay where they are — **still breaking `#current_streak`**, not merely counting as skips: a past weekday holding an unsubmitted exercise hits that method's `exercised.include?(day)` break. Recovering one set does not repair a streak an older stray still zeroes. That is a limit of re-dating rather than a gap to close: two sets cannot both be today. Re-pausing does not move the floor `#held_exercise` searches from — `AccountsController` stamps a pause only when one isn't already running — so a second Pause cannot walk that floor past the set the first pause stranded. The same limit is why the move is skipped outright when today already holds an exercise. **Accepted consequence:** finishing a carried-forward set counts toward the completion-window signal and the streak for the resume day, not the day it was generated.
-- **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `self_ratings`, and `User#concept_exposure_index`, keep the full set — a skipped section was still shown, and a self-rating is the engineer's own statement.
+- **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `User#concept_exposure_index` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule under "One finish action."
 
   **Skipped retention checks defer without changing knowledge.** When a
   submitted, successfully reviewed skipped section tags a vocabulary-valid
@@ -685,8 +687,24 @@ concept-specific difficulty descriptions for future generation, not a new set.
   for its strict local grading and lenient read-only replay, so a corrupt id
   cannot hide the other blocks the engineer arranged; it does not count as
   completed work. Calibration mismatch notes require completion.
-- **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so every `answers[section].presence` reader — review prompt, history, `recent_performance` — sees what it saw before scaffolds existed.
-- **One finish action**: the difficulty rating lives at the end of the problem set and autosaves on click, which enables the Submit button — disabled, with a visible nudge, until a rating exists. Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. A rating is set-only: `#create` assigns it only on a valid enum value, so a stale autosave can never clear one. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unrated submit because the UI cannot produce one.
+- **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` as described above.
+- **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, restated by the inline script against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing and recomputes the gate. The progress label reports answers only; the nudge and button report readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unsubmittable submit because the UI cannot produce one.
+  A refused or dropped submission restarts the draft autosave it canceled, so
+  the last edit survives without another keystroke. If submission succeeds but
+  the browser cannot start the review POST, the page explains that the answers
+  were saved and reloads the submitted state with its manual review button.
+  It never restores an editable draft after an acknowledged submission.
+
+  **Partial submission still incurs a full-day review.** The existing review
+  fan-out grades every active section, including skipped ones, and also calls
+  the difficulty assessment. Skipping a section does not remove its grading
+  call or the assessment. Skipped grades stay outside skill evidence; review
+  scheduling and provider fan-out are unchanged.
+
+  A submitted self-rating now describes a counted answer. This deliberately
+  replaces the earlier policy that retained intentional ratings on skipped
+  sections: the final record cannot distinguish those from ratings left behind
+  by clearing an answer. Historical submitted rows are not rewritten.
 - **Post-hoc difficulty rating**: once a section is reviewed, its review block
   also shows how hard the PROBLEM was — `straightforward` / `moderate` /
   `demanding` (`DailyResponse::DIFFICULTY_LEVELS`) plus a one-sentence reason —
@@ -914,13 +932,15 @@ concept-specific difficulty descriptions for future generation, not a new set.
   section ratings, concept tags, feedback and the submission timestamp are immutable
   through this endpoint, including while a review is running or retrying.
   Ratings freeze too because they decide mastery alongside the AI grade.
+  Draft answer merging and submit-only rating pruning both run inside that
+  lock, before the first submission freezes the record.
   Feedback freezes too: there is no post-submit editor, and a late autosave
   otherwise overwrites the submitted feedback with an older or empty draft.
   Stale autosaves receive a successful acknowledgement with `submitted: true`,
   without changing evidence, and the stale form reloads to the submitted
   page. Repeated submits return the existing review URL, preserving automatic
-  review retries. A submit already in flight suppresses that reload so a
-  late autosave cannot interrupt its review request. Start over and
+  review retries. The form's inert state suppresses that reload during submit,
+  so a late autosave cannot interrupt its review request. Start over and
   regeneration retain their existing reviewed/reviewing guards.
 - **Preview apps**: a Railway PR environment starts with an empty database and
   needs no configuration. `railway.toml`'s `[environments.pr.deploy]` block
@@ -1014,11 +1034,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   typed left the commonest abandonment unreachable. `SendPushReminderJob` picks
   the copy from how far through the day is
   (`SendPushReminderJob::NUDGE_TITLES`), since "still waiting" reads as not
-  having noticed the half that was done. Answered-in-full splits into two of
-  those states, because Submit stays disabled until every section is rated:
-  `DailyResponse#fully_rated?` is the one authority for that gate, read by the
-  dashboard's submit button and by the nudge, so a notification can never name
-  a button the user cannot press.
+  having noticed the half that was done. A partly answered day whose answered
+  sections are rated gets the ready-to-submit nudge, explicitly naming the
+  remaining sections as optional. A partly answered, unrated day still gets
+  the partway nudge; a fully answered, unrated day asks for ratings.
+  `DailyResponse#submit_blocker` is the one authority for that gate, read by
+  the dashboard's submit button and, through `#submittable?`, by the nudge,
+  so a notification can never name a button the user cannot press. Readiness
+  does not stop nudges: submission and `PushNudgePlan`'s quiet period still do.
 
   **`PushNudgePlan::QUIET_PERIOD` is what keeps that from nagging.** With
   starting no longer silencing the day, an hourly tick would otherwise tell

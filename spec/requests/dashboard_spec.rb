@@ -57,7 +57,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-rating="too_hard"')
   end
 
-  it "disables the submit button and explains why when the draft has no rating" do
+  it "disables the submit button and asks for ratings on answered sections that have none" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
 
@@ -65,7 +65,53 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
-    expect(response.body).to include("Rate every section's difficulty to finish up.")
+    expect(response.body).to include("Rate each section you answered to finish up.")
+  end
+
+  it "disables the submit button and asks for an answer when nothing is answered yet" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false).update!(answers: {})
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-answers"[^>]*disabled/)
+    expect(response.body).to include("Answer at least one section to finish up.")
+  end
+
+  it "enables the submit button when the only answered section is rated" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false).update!(
+      answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "" },
+      section_ratings: { "code_review" => "right_level" }
+    )
+
+    get root_path
+
+    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(response.body).to match(/id="rating-nudge"[^>]*hidden/)
+  end
+
+  [ 1, 2, 3 ].each do |count|
+    it "renders a rated #{count}-block Parsons gate from completion rather than encoded length" do
+      exercise = create_exercise(problem_set: {
+        "code_review" => { "question" => "Find the bug", "snippet" => "code" },
+        "parsons_problem" => { "blocks" => Array.new(count) { |i| "block #{i}" },
+                               "display_order" => (0...count).to_a }
+      })
+      draft = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+        section_ratings: { "parsons_problem" => "right_level" })
+
+      get root_path
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css("#submit-answers")["disabled"]).not_to be_nil
+      expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("false")
+
+      draft.update!(answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
+      get root_path
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css("#submit-answers")["disabled"]).to be_nil
+      expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("true")
+    end
   end
 
   it "enables the submit button and marks the active rating when the draft is already rated" do
@@ -194,6 +240,37 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
       expect(Nokogiri::HTML(response.body).css(".parsons-list-readonly code").map(&:text)).to eq(blocks)
     end
+  end
+
+  it "replays valid blocks of an incomplete Parsons order without completed evidence or a rating obligation" do
+    blocks = %w[first second third fourth fifth]
+    exercise = create_exercise(problem_set: {
+      "code_review" => { "question" => "Find the bug", "snippet" => "code" },
+      "parsons_problem" => { "blocks" => blocks }
+    })
+    draft = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+      answers: { "code_review" => "A substantive answer to the code review.", "parsons_problem" => "order:0,1" },
+      section_ratings: { "code_review" => "right_level" },
+      concept_tags: { "code_review" => "n_plus_one", "parsons_problem" => "n_plus_one" })
+
+    get root_path
+
+    document = Nokogiri::HTML(response.body)
+    expect(draft.answered_sections).to eq([ "code_review" ])
+    expect(draft.answered_concept_tags).to eq("code_review" => "n_plus_one")
+    expect(draft).to be_submittable
+    expect(document.at_css("#submit-answers")["disabled"]).to be_nil
+    expect(document.at_css('textarea[data-field="parsons_problem"]')["data-answer-complete"]).to eq("false")
+
+    draft.update!(submitted_at: Time.current)
+    get root_path
+
+    replay = Nokogiri::HTML(response.body).at_css(".parsons-list-readonly")
+    expect(replay.css("code").map(&:text)).to eq([ "first", "second", "(skipped)", "(skipped)", "(skipped)" ])
+    expect(replay.css(".parsons-correct code").map(&:text)).to eq(blocks.first(2))
+    kind = ExerciseSection::ParsonsProblem
+    expect(kind.grade(kind.parse_order(draft.answer_for("parsons_problem")), blocks.size))
+      .to eq(mismatches: blocks.size, rating: "beginner")
   end
 
   it "does not show the calibration note when self-rating is too_hard, even if a section was rated poorly" do

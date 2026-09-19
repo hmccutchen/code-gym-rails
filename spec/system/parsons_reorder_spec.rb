@@ -62,7 +62,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
   end
 
   [ 1, 2, 3 ].each do |count|
-    it "counts an explicitly chosen #{count}-block arrangement, but not an untouched one" do
+    it "counts an explicitly chosen #{count}-block arrangement, but not an untouched one", with_csrf: true do
       travel_to(weekday) do
         exercise = seed_parsons_exercise
         exercise.problem_set["parsons_problem"].merge!(
@@ -74,10 +74,23 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
         expect(page).to have_content("0 of 3 answered")
         expect(hidden_answer).to be_empty
+        expect(page).to have_button("Submit answers →", disabled: true)
+        rate_section("parsons_problem")
+        expect(page).to have_button("Submit answers →", disabled: true)
         click_button "Use this order"
 
         expect(page).to have_content("1 of 3 answered")
         expect(page).to have_no_css('details.hint[data-hint-for="parsons_problem"].locked')
+        expect(page).to have_button("Submit answers →", disabled: false)
+        Timeout.timeout(10) do
+          sleep 0.05 until user.daily_responses.reload.first&.answered?("parsons_problem")
+        end
+        visit root_path
+        expect(page).to have_content("1 of 3 answered")
+        expect(page).to have_button("Submit answers →", disabled: false)
+        click_button "Submit answers →"
+        expect(page).to have_content("Review ready!", wait: 10)
+        expect(user.daily_responses.reload.sole.section_ratings).to eq("parsons_problem" => "right_level")
       end
     end
 
@@ -94,6 +107,9 @@ RSpec.describe "Parsons reorder controls", type: :system do
         visit_as(user)
 
         expect(page).to have_content("1 of 3 answered")
+        expect(page).to have_button("Submit answers →", disabled: true)
+        rate_section("parsons_problem")
+        expect(page).to have_button("Submit answers →", disabled: false)
       end
     end
   end
@@ -126,12 +142,15 @@ RSpec.describe "Parsons reorder controls", type: :system do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
       expect(block_ids).to eq([ "2", "0", "1" ])
+      rate_section("parsons_problem")
+      expect(page).to have_button("Submit answers →", disabled: true)
 
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
 
       expect(block_ids).to eq([ "0", "2", "1" ])
       expect(page).to have_css(".parsons-status", text: "position 2 of 3", visible: :all)
       expect(hidden_answer).to eq("order:0,2,1")
+      expect(page).to have_button("Submit answers →", disabled: false)
     end
   end
 

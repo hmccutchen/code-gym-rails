@@ -227,12 +227,9 @@ class DailyResponse < ApplicationRecord
     (ExerciseSection.find(section) || ExerciseSection).answered?(value, section_data)
   end
 
-  # Scaffold labels the user never typed into aren't an answer, so they are not
-  # stored as one. Normalizing on write (rather than at each of the several
-  # read sites that render or send `answers[section]` verbatim) keeps the AI
-  # review prompt, the history display, and recent_performance seeing exactly
-  # what they saw before scaffolds existed: a blank answer, or the user's own
-  # words. A blanked section simply re-renders its scaffold on the next load.
+  # Scaffold-only drafts store as blank so reloading can offer the scaffold
+  # again without storing its labels as the user's work. Other draft text stays
+  # intact; #answered? decides whether it counts.
   def self.normalize_answers(answers, exercise)
     answers.to_h.transform_values(&:to_s).each_with_object({}) do |(section, value), normalized|
       section_data = exercise&.problem_set&.dig(section.to_s)
@@ -273,13 +270,22 @@ class DailyResponse < ApplicationRecord
     concept_tags.slice(*answered_sections)
   end
 
-  # Every section the day presents carries a self-rating. This is what the
-  # dashboard gates Submit on, and what stops a push nudge calling a set ready
-  # to submit when the button is still disabled. Derived from #section_keys the
-  # same way #answered_sections is, so the two can't count against different
-  # denominators.
-  def fully_rated?
-    (section_keys - section_ratings.keys).empty?
+  # Why Submit is still disabled, or nil when it isn't. A rating is owed only
+  # for a section that was answered — rating a skipped one would record a
+  # difficulty for a problem never attempted — but a day with nothing answered
+  # owes none, and that must not read as ready to submit. The dashboard's
+  # script restates these two checks against the live form.
+  def submit_blocker
+    answered = answered_sections
+    if answered.empty?
+      :unanswered
+    elsif (answered - section_ratings.keys).any?
+      :unrated
+    end
+  end
+
+  def submittable?
+    submit_blocker.nil?
   end
 
   # Zero-guarded: a payload whose every section key holds a non-Hash presents no

@@ -360,7 +360,7 @@ class ResponsesController < ApplicationController
     submitted_answers = response_params[:answers]&.slice(*exercise.active_section_keys)
     submitted_answers = DailyResponse.normalize_answers(submitted_answers, exercise) if submitted_answers
     @response.assign_attributes(
-      answers: submitted_answers.presence || @response.answers,
+      answers: @response.answers.merge(submitted_answers || {}).slice(*exercise.active_section_keys),
       submitted_at: response_params[:submit] == "1" ? Time.current : nil,
       concept_tags: exercise_concept_tags(exercise)
     )
@@ -368,6 +368,9 @@ class ResponsesController < ApplicationController
       .slice(*exercise.active_section_keys)
       .select { |_, value| DailyResponse::SELF_RATINGS.include?(value) }
     @response.section_ratings = @response.section_ratings.merge(incoming_ratings)
+    if response_params[:submit] == "1"
+      @response.section_ratings = @response.section_ratings.slice(*@response.answered_sections)
+    end
     @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
   end
 

@@ -82,6 +82,76 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
+  describe "partial submission finalization" do
+    let!(:exercise) do
+      create_exercise("code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" })
+    end
+    let(:draft_payload) do
+      { response: { answers: { code_review: "An answer to keep", pattern: "An answer to discard" },
+                    section_ratings: { code_review: "right_level", pattern: "too_hard" },
+                    feedback_text: "A draft preference" } }
+    end
+
+    before { post responses_path, params: draft_payload, as: :json }
+
+    it "finalizes merged answers once and cannot restore discarded evidence with a stale save or retry" do
+      post responses_path, params: { response: {
+        answers: { pattern: "" }, feedback_text: "The submitted preference", submit: "1"
+      } }, as: :json
+      saved = user.daily_responses.sole
+      expect(saved.answers).to eq("code_review" => "An answer to keep", "pattern" => "")
+      expect(saved.section_ratings).to eq("code_review" => "right_level")
+      expect(saved.feedback_text).to eq("The submitted preference")
+      evidence = saved.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at", "feedback_text")
+
+      post responses_path, params: draft_payload, as: :json
+      expect(response.parsed_body).to include("submitted" => true, "status" => "saved")
+      expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
+
+      expect {
+        post responses_path, params: draft_payload.deep_merge(response: { submit: "1" }), as: :json
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+      expect(response.parsed_body).to include("submitted" => true, "review_url" => review_response_path(saved))
+      expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
+    end
+
+    it "keeps finalized ratings pruned when a submit wins after an autosave has loaded its draft" do
+      allow_any_instance_of(ResponsesController).to receive(:persisted_response_for).and_wrap_original do |method, *args|
+        draft = method.call(*args)
+        DailyResponse.find(draft.id).update!(
+          answers: { "code_review" => "An answer to keep", "pattern" => "" },
+          section_ratings: { "code_review" => "right_level" }, submitted_at: Time.current)
+        draft
+      end
+
+      post responses_path, params: draft_payload, as: :json
+
+      expect(response.parsed_body["submitted"]).to be(true)
+      expect(user.daily_responses.sole.answers["pattern"]).to eq("")
+      expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level")
+    end
+
+    it "defers a cleared due check without treating its discarded rating as knowledge" do
+      skipped = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails",
+        tier: :standard, streak: 2, last_rating: "strong", mastered_at: 30.days.ago,
+        retention_interval_days: 7, next_retention_check_on: Date.current)
+      knowledge = skipped.attributes.except("next_retention_check_on", "updated_at")
+      post responses_path, params: { response: { answers: { pattern: "" }, submit: "1" } }, as: :json
+      saved = user.daily_responses.sole
+      saved.update!(ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "beginner" } })
+
+      ConceptMastery.record_review!(saved, sections: saved.section_keys, apply_session_countdown: true)
+
+      expect(skipped.reload.next_retention_check_on).to eq(Date.current + skipped.retention_interval_days)
+      expect(skipped.attributes.except("next_retention_check_on", "updated_at")).to eq(knowledge)
+      expect(user.concept_masteries.find_by(concept: "n_plus_one")).to have_attributes(last_rating: "strong")
+      expect(saved.answered_concept_tags).to eq("code_review" => "n_plus_one")
+      expect(saved.concept_tags).to include("pattern" => "memoization")
+      expect(user.recent_performance.first).to include(
+        self_ratings: { "code_review" => "right_level" }, ai_ratings: { "code_review" => "strong" })
+    end
+  end
+
   def create_exercise(problem_set)
     DailyExercise.create!(user: user, date: Date.current,
                           problem_set: problem_set, generated_at: Time.current)
@@ -293,6 +363,57 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.count).to eq(1)
       expect(DailyResponse.last.answers["code_review"]).to eq("b" * 20)
       expect(DailyResponse.last.submitted_at).to be_present
+    end
+
+    describe "POST /responses submitted ratings" do
+      let!(:exercise) do
+        create_exercise(
+          "code_review" => { "question" => "q" },
+          "pattern" => { "question" => "q", "answer_scaffold" => [ "Reason:", "Tradeoff:" ] }
+        )
+      end
+
+      before do
+        post responses_path, params: { response: {
+          answers: { code_review: "A substantive answer", pattern: "Another substantive answer" },
+          section_ratings: { code_review: "right_level", pattern: "too_hard" }
+        } }, as: :json
+      end
+
+      [ "", "N+1 query", "Reason:\nTradeoff:" ].each do |cleared_answer|
+        it "prunes the rating at submission when an answer becomes #{cleared_answer.inspect}" do
+          post responses_path, params: { response: {
+            answers: { code_review: "A substantive answer", pattern: cleared_answer }
+          } }, as: :json
+          expect(user.daily_responses.sole.section_ratings).to include("pattern" => "too_hard")
+
+          post responses_path, params: { response: { submit: "1" } }, as: :json
+
+          expect(response).to have_http_status(:ok)
+          expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level")
+        end
+      end
+
+      it "uses the merged answers and ratings when submitting a partial payload" do
+        post responses_path, params: { response: {
+          answers: { pattern: "" }, section_ratings: { code_review: "too_easy" }, submit: "1"
+        } }, as: :json
+
+        saved = user.daily_responses.sole
+        expect(saved.answers).to eq("code_review" => "A substantive answer", "pattern" => "")
+        expect(saved.section_ratings).to eq("code_review" => "too_easy")
+      end
+
+      it "removes a stored rating and answer for an inactive section on submission" do
+        draft = user.daily_responses.sole
+        draft.update!(answers: draft.answers.merge("challenge" => "An old substantive answer"),
+                      section_ratings: draft.section_ratings.merge("challenge" => "too_hard"))
+
+        post responses_path, params: { response: { submit: "1" } }, as: :json
+
+        expect(draft.reload.section_ratings.keys).to match_array(exercise.active_section_keys)
+        expect(draft.answers.keys).to match_array(exercise.active_section_keys)
+      end
     end
   end
 
