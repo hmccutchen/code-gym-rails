@@ -274,6 +274,35 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#answered_concept_tags" do
+    it "keeps only the tags of sections that were answered" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "short" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization", "challenge" => "caching" }
+      )
+
+      expect(response.answered_concept_tags).to eq("code_review" => "n_plus_one")
+      expect(response.concept_tags.keys).to contain_exactly("code_review", "pattern", "challenge")
+    end
+  end
+
+  describe "#answer_for" do
+    it "uses the answered rule while preserving the original substantive answer" do
+      response = described_class.new(daily_exercise: exercise,
+        answers: { "code_review" => "add index", "pattern" => "My approach:\nUse a bounded cache" })
+
+      expect(response.answer_for("code_review")).to be_nil
+      expect(response.answer_for("challenge")).to be_nil
+      expect(response.answer_for("pattern")).to eq("My approach:\nUse a bounded cache")
+    end
+
+    it "reads legacy rows without a scaffold and preserves valid Parsons orders" do
+      response = described_class.new(answers: { "parsons_problem" => "order:2,0,4,1,3" })
+      expect(response.answer_for("parsons_problem")).to eq("order:2,0,4,1,3")
+    end
+  end
+
   describe ".normalize_answers" do
     let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
 

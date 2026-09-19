@@ -228,12 +228,9 @@ class DailyResponse < ApplicationRecord
     substantive_answer(section, value, section_data).length > ANSWER_MIN_LENGTH
   end
 
-  # Scaffold labels the user never typed into aren't an answer, so they are not
-  # stored as one. Normalizing on write (rather than at each of the several
-  # read sites that render or send `answers[section]` verbatim) keeps the AI
-  # review prompt, the history display, and recent_performance seeing exactly
-  # what they saw before scaffolds existed: a blank answer, or the user's own
-  # words. A blanked section simply re-renders its scaffold on the next load.
+  # Scaffold-only drafts store as blank so reloading can offer the scaffold
+  # again without storing its labels as the user's work. Other draft text stays
+  # intact; #answered? decides whether it counts.
   def self.normalize_answers(answers, exercise)
     answers.to_h.transform_values(&:to_s).each_with_object({}) do |(section, value), normalized|
       section_data = exercise&.problem_set&.dig(section.to_s)
@@ -249,6 +246,10 @@ class DailyResponse < ApplicationRecord
     self.class.answered?(section, answers[section.to_s], section_data(section))
   end
 
+  def answer_for(section)
+    answers[section.to_s] if answered?(section)
+  end
+
   # The sections this response is measured against — the exercise's own, never
   # `answers.keys`. A row can hold an answer for a section its exercise no
   # longer presents (a regenerated day whose third changed), and counting it
@@ -260,6 +261,14 @@ class DailyResponse < ApplicationRecord
 
   def answered_sections
     section_keys.select { |section| answered?(section) }
+  end
+
+  # The tags that count as evidence of skill. A skipped section is still
+  # reviewed, but a grade on an empty answer measures nothing — exposure
+  # readers keep the full #concept_tags instead, because a skipped section
+  # was still shown (see CLAUDE.md's "Personalization loop" for which is which).
+  def answered_concept_tags
+    concept_tags.slice(*answered_sections)
   end
 
   # Why Submit is still disabled, or nil when it isn't. A rating is owed only

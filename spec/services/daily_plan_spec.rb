@@ -37,6 +37,34 @@ RSpec.describe DailyPlan do
   end
 
   describe "retention check selection" do
+    it "releases the fourth slot on day three after the same check was skipped twice" do
+      user.update!(adaptive_set_size: false)
+      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      first, second = AiService::PLAN_REVIEW_CONCEPTS.first(2)
+      held = user.concept_masteries.create!(concept: first, language: "plan_review",
+        mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20)
+      other = user.concept_masteries.create!(concept: second, language: "plan_review",
+        mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 1)
+      expect(DailyPlan.for(user, language: "ruby_rails").fourth_due_checks.map(&:concept)).to eq([ first ])
+
+      2.times do |offset|
+        travel_to((Date.current + offset).noon) do
+          exercise = user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
+            generated_at: Time.current, problem_set: { "plan_review" => { "concept" => first } })
+          response = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+            submitted_at: Time.current, answers: {}, concept_tags: { "plan_review" => first },
+            ai_review: { "plan_review" => { "rating" => "beginner" } })
+          ConceptMastery.record_review!(response, sections: %w[plan_review], apply_session_countdown: false)
+        end
+      end
+
+      travel_to(2.days.from_now) do
+        plan = DailyPlan.for(user, language: "ruby_rails")
+        expect(plan.fourth_due_checks.map(&:concept)).to eq([ other.concept ])
+        expect(held.reload.retention_interval_days).to eq(7)
+      end
+    end
+
     def mastery(concept:, bucket:, due_on:)
       user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
@@ -316,7 +344,7 @@ RSpec.describe DailyPlan do
       exercise = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current,
                                        problem_set: { "plan_review" => { "concept" => "scope_creep" } })
       DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
-                            answers: { "plan_review" => "an answer" },
+                            answers: { "plan_review" => "x" * 20 },
                             section_ratings: { "plan_review" => "too_hard" },
                             concept_tags: { "plan_review" => "scope_creep" },
                             ai_review: { "plan_review" => { "rating" => "developing" } })

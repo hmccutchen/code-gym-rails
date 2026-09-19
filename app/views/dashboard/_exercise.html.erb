@@ -51,8 +51,8 @@
     <div class="progress-label" id="progress-label">0 of <%= exercise.active_section_keys.size %> answered</div>
   </div>
 
-  <%# Always POST, never PATCH — ResponsesController#create is idempotent via
-      find_or_initialize_by. The script below submits it via fetch. %>
+  <%# Always POST, never PATCH — ResponsesController#create serializes saves
+      and repeated submits under the response lock. The script uses fetch. %>
   <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
     <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
 
@@ -147,7 +147,9 @@
       // Through CodeGymSaveStatus so a refused or dropped save is reported
       // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
-        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers");
+        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, data }) => {
+          if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
+        });
       }, 800);
     }
 

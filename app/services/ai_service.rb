@@ -1015,7 +1015,7 @@ class AiService
       system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.",
       prompt: <<~PROMPT
         The engineer was asked: #{exercise.problem_set.dig(section, "question")}
-        Their answer: #{daily_response.answers[section].presence || "(skipped)"}
+        Their answer: #{daily_response.answer_for(section) || "(skipped)"}
 
         What they missed:
         #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
@@ -1066,7 +1066,7 @@ class AiService
       SYSTEM
       history: thread,
       prompt: <<~PROMPT
-        Their answer was: #{daily_response.answers[section].presence || "(skipped)"}
+        Their answer was: #{daily_response.answer_for(section) || "(skipped)"}
 
         Their new question: #{question}
 
@@ -1547,8 +1547,9 @@ class AiService
       history.map { |h|
         pairs = h[:concepts].respond_to?(:each_pair) ? h[:concepts].each_pair.filter_map { |section, concept|
           next if concept.blank?
-          self_r = h[:self_ratings][section].presence || "unrated"
-          ai_r   = h[:ai_ratings][section].presence  || "unreviewed"
+          self_r  = h[:self_ratings][section].presence || "unrated"
+          skipped = h[:answered_sections] && !h[:answered_sections].include?(section)
+          ai_r    = skipped ? "skipped" : (h[:ai_ratings][section].presence || "unreviewed")
           "#{section}→#{concept} (self: #{self_r}, ai: #{ai_r})"
         } : []
         concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""
@@ -2007,7 +2008,6 @@ class AiService
 
   def build_review_day_context(coach, exercise, daily_response)
     keys    = exercise.active_section_keys
-    answers = daily_response.answers
     ratings = daily_response.section_ratings
 
     # "rounds" is merged in for every key, not just the one kind that reads it:
@@ -2017,7 +2017,7 @@ class AiService
     sections = keys.map do |key|
       ExerciseSection.for(key).review_context(
         section: (exercise.problem_set[key] || {}).merge("rounds" => daily_response.pseudocode_round(key)),
-        answer: answers[key], rating: ratings[key]
+        answer: daily_response.answer_for(key), rating: ratings[key]
       )
     end
 
@@ -2068,7 +2068,7 @@ class AiService
 
   def section_grading_note(exercise, daily_response, section)
     ExerciseSection.for(section).grading_note(
-      section: exercise.problem_set[section] || {}, answer: daily_response.answers[section]
+      section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
     )
   end
 
@@ -2422,7 +2422,7 @@ class AiService
     blocks = Array(parsons["blocks"])
     return review if blocks.empty?
 
-    submitted = ExerciseSection::ParsonsProblem.submitted_order(daily_response.answers["parsons_problem"], blocks.size)
+    submitted = ExerciseSection::ParsonsProblem.submitted_order(daily_response.answer_for("parsons_problem"), blocks.size)
     review["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
     review
   end

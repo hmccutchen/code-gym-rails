@@ -7,7 +7,7 @@
 <% points = ExerciseSection::PseudocodeToCode.normalize_critique(round["critique"]) %>
 
 <% if submitted %>
-  <div class="answer-display"><%= response.answers[key].presence || "(skipped)" %></div>
+  <div class="answer-display"><%= response.answer_for(key) || "(skipped)" %></div>
 <% else %>
   <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>"
             placeholder="<%= t("sections.#{key}.placeholder") %>" data-field="<%= key %>"

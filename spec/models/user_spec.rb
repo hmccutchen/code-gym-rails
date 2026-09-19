@@ -184,6 +184,20 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#recent_performance answered_sections" do
+    it "carries the day's answered sections so the prompt can label a skipped one" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
+      daily_response = DailyResponse.create!(
+        user: user, daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "Found the N+1 in the loop", "pattern" => "" }
+      )
+
+      expect(user.recent_performance.first[:answered_sections]).to eq(daily_response.answered_sections)
+    end
+  end
+
   describe "#recent_performance sections_total" do
     it "reports the historical exercise's own section count" do
       user = User.create!(email: "sections-total@example.com", name: "Total")
@@ -304,6 +318,21 @@ RSpec.describe User, type: :model do
 
       expect(user.recent_performance.first[:ai_ratings]).to eq({})
     end
+
+    it "leaves a skipped section's AI grade out of ai_ratings while still listing its concept" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20, "pattern" => "" },
+                            concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+                            ai_review: { "code_review" => { "rating" => "developing" },
+                                         "pattern"     => { "rating" => "beginner" } })
+
+      entry = user.recent_performance.first
+      expect(entry[:ai_ratings]).to eq("code_review" => "developing")
+      expect(entry[:concepts]).to eq("code_review" => "n_plus_one", "pattern" => "memoization")
+    end
   end
 
   describe "#recent_performance per-section ratings" do
@@ -321,6 +350,23 @@ RSpec.describe User, type: :model do
       expect(entry).not_to have_key(:rating)
       expect(entry[:self_ratings]).to eq("code_review" => "right_level")
       expect(entry[:ai_ratings]).to eq("code_review" => "developing")
+    end
+
+    # A self-rating is the engineer's own statement about a section they saw,
+    # not a grade on their answer, so a skipped section's self-rating still
+    # surfaces — unlike ai_ratings, which reads answered_concept_tags.
+    it "keeps a skipped section's self-rating in self_ratings" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20, "pattern" => "" },
+                            section_ratings: { "code_review" => "right_level", "pattern" => "too_easy" },
+                            concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
+
+      expect(user.recent_performance.first[:self_ratings]).to eq(
+        "code_review" => "right_level", "pattern" => "too_easy"
+      )
     end
   end
 
@@ -496,6 +542,35 @@ RSpec.describe User, type: :model do
 
       expect(user.concepts_needing_reinforcement).to eq([])
     end
+
+    it "does not flag a concept whose only occurrence was a skipped section" do
+      user = create_user
+      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "" },
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
+
+    # Resolution is on each concept's most recent occurrence, so a skipped
+    # newer one must not claim that slot and hide the real attempt behind it.
+    it "lets an older answered occurrence decide when the newer one was skipped" do
+      user = create_user
+      older = DailyExercise.create!(user: user, date: Date.current - 2, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: older, date: Date.current - 2,
+                            answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" },
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "strong" } })
+      newer = DailyExercise.create!(user: user, date: Date.current - 1, problem_set: { "code_review" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: newer, date: Date.current - 1,
+                            answers: { "code_review" => "" },
+                            concept_tags: { "code_review" => "n_plus_one" },
+                            ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      expect(user.concepts_needing_reinforcement).to eq([])
+    end
   end
 
   describe "#concepts_needing_reinforcement with tiers" do
@@ -544,7 +619,7 @@ RSpec.describe User, type: :model do
       )
       DailyResponse.create!(
         user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
-        answers: { section => "an answer" },
+        answers: { section => "x" * 20 },
         section_ratings: { section => self_rating },
         concept_tags: { section => concept },
         ai_review: { section => { "rating" => ai_rating } }
@@ -1185,6 +1260,18 @@ RSpec.describe User, type: :model do
       user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
         answers: { "code_review" => "x" * 20, "pattern" => "x" * 20 },
         concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" })
+
+      expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
+    end
+
+    # A skipped section was still shown, so exposure counts it: exposure reads
+    # the full concept_tags, deliberately not answered_concept_tags.
+    it "counts a submitted response's skipped section as an exposure" do
+      date = Date.current
+      exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+      user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+        answers: { "code_review" => "" }, concept_tags: { "code_review" => "n_plus_one" })
 
       expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
     end

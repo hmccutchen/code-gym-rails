@@ -37,6 +37,43 @@ RSpec.describe "Save status", type: :system do
     end
   end
 
+  it "replaces a stale answer form when another tab has submitted the day" do
+    travel_to(a_weekday) do
+      perform_enqueued_jobs { visit_as(user) }
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      exercise = user.daily_exercises.sole
+      saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+        submitted_at: Time.current, answers: { "code_review" => "The answer already submitted" })
+
+      find(%(textarea[data-field="code_review"])).fill_in(with: "This late edit must not replace the submission")
+
+      expect(page).to have_no_css("#gym-form", wait: 10)
+      expect(page).to have_content("The answer already submitted")
+      expect(saved.reload.answers["code_review"]).to eq("The answer already submitted")
+    end
+  end
+
+  it "reloads a stale rated form without restoring a skipped section's discarded rating" do
+    travel_to(a_weekday) do
+      perform_enqueued_jobs { visit_as(user) }
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      exercise = user.daily_exercises.sole
+      saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+        submitted_at: Time.current,
+        answers: { "code_review" => "The final submitted answer", "pattern" => "" },
+        section_ratings: { "code_review" => "right_level" })
+
+      find('textarea[data-field="pattern"]').fill_in(with: "An answer from the stale tab")
+      rate_section("pattern", value: "too_hard")
+
+      expect(page).to have_no_css("#gym-form", wait: 10)
+      expect(page).to have_content("The final submitted answer")
+      expect(page).not_to have_selector(".history-pill", text: "Pattern: too hard")
+      expect(saved.reload.answers["pattern"]).to eq("")
+      expect(saved.section_ratings).to eq("code_review" => "right_level")
+    end
+  end
+
   it "reports the server's own reason when a stale page is refused" do
     visit_as(user)
     visit setup_path

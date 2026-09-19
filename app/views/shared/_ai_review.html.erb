@@ -14,7 +14,7 @@
         <%= difficulty["reason"] %>
       </p>
     <% end %>
-    <% if response.self_rating_favorable?(section) && response.ai_rating_unfavorable?(section) %>
+    <% if response.answered?(section) && response.self_rating_favorable?(section) && response.ai_rating_unfavorable?(section) %>
       <p class="calibration-note"><%= t("review.calibration_note", rating: response.self_rating_label(section)) %></p>
     <% end %>
     <% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| %>

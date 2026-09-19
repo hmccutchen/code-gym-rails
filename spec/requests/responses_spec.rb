@@ -5,6 +5,144 @@ RSpec.describe "Responses", type: :request do
 
   before { login_as(user) }
 
+  describe "submitted evidence" do
+    let!(:exercise) do
+      create_exercise("code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" })
+    end
+    let!(:saved_response) do
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "My original answer", "pattern" => "" },
+        section_ratings: { "code_review" => "right_level" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" },
+        submitted_at: 1.minute.ago)
+    end
+    let(:stale_payload) do
+      { response: { answers: { code_review: "", pattern: "A newly invented answer" },
+                    section_ratings: { code_review: "too_hard", pattern: "too_easy" },
+                    feedback_text: "Keep this feedback" } }
+    end
+
+    it "ignores stale answers and ratings after submission but keeps feedback" do
+      evidence = saved_response.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at")
+      post responses_path, params: stale_payload, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["submitted"]).to be(true)
+      expect(saved_response.reload.attributes.slice(*evidence.keys)).to eq(evidence)
+      expect(saved_response.feedback_text).to eq("Keep this feedback")
+    end
+
+    it "keeps retries idempotent and supplies the original review URL" do
+      submitted_at = saved_response.submitted_at
+      post responses_path, params: stale_payload.deep_merge(response: { submit: "1" }), as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["review_url"]).to eq(review_response_path(saved_response))
+      expect(saved_response.reload.submitted_at).to eq(submitted_at)
+      expect(saved_response.answers["pattern"]).to eq("")
+    end
+
+    it "reloads a stale draft under the lock before accepting an autosave" do
+      saved_response.update!(submitted_at: nil)
+      allow_any_instance_of(ResponsesController).to receive(:persisted_response_for).and_wrap_original do |method, *args|
+        draft = method.call(*args)
+        DailyResponse.find(draft.id).update!(submitted_at: Time.current)
+        draft
+      end
+
+      post responses_path, params: stale_payload, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(saved_response.reload.answers["code_review"]).to eq("My original answer")
+      expect(saved_response.answers["pattern"]).to eq("")
+    end
+
+    it "does not change evidence while a review is in flight" do
+      saved_response.update!(reviewing_since: Time.current)
+      post responses_path, params: stale_payload, as: :json
+      expect(saved_response.reload.answers["pattern"]).to eq("")
+      expect(saved_response.section_ratings).to eq("code_review" => "right_level")
+    end
+
+    it "cannot make history disagree with mastery after review" do
+      saved_response.update!(ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "beginner" } })
+      ConceptMastery.record_review!(saved_response, sections: %w[code_review pattern], apply_session_countdown: true)
+      evidence = user.concept_masteries.map(&:attributes)
+
+      post responses_path, params: stale_payload, as: :json
+
+      expect(user.concept_masteries.reload.map(&:attributes)).to eq(evidence)
+      expect(user.recent_performance.first[:answered_sections]).to eq([ "code_review" ])
+      expect(user.concepts_needing_reinforcement).to be_empty
+    end
+  end
+
+  describe "partial submission finalization" do
+    let!(:exercise) do
+      create_exercise("code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" })
+    end
+    let(:draft_payload) do
+      { response: { answers: { code_review: "An answer to keep", pattern: "An answer to discard" },
+                    section_ratings: { code_review: "right_level", pattern: "too_hard" } } }
+    end
+
+    before { post responses_path, params: draft_payload, as: :json }
+
+    it "finalizes merged answers once and cannot restore discarded evidence with a stale save or retry" do
+      post responses_path, params: { response: { answers: { pattern: "" }, submit: "1" } }, as: :json
+      saved = user.daily_responses.sole
+      expect(saved.answers).to eq("code_review" => "An answer to keep", "pattern" => "")
+      expect(saved.section_ratings).to eq("code_review" => "right_level")
+      evidence = saved.attributes.slice("answers", "section_ratings", "concept_tags", "submitted_at")
+
+      post responses_path, params: draft_payload, as: :json
+      expect(response.parsed_body).to include("submitted" => true, "status" => "saved")
+      expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
+
+      expect {
+        post responses_path, params: draft_payload.deep_merge(response: { submit: "1" }), as: :json
+      }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+      expect(response.parsed_body).to include("submitted" => true, "review_url" => review_response_path(saved))
+      expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
+    end
+
+    it "keeps finalized ratings pruned when a submit wins after an autosave has loaded its draft" do
+      allow_any_instance_of(ResponsesController).to receive(:persisted_response_for).and_wrap_original do |method, *args|
+        draft = method.call(*args)
+        DailyResponse.find(draft.id).update!(
+          answers: { "code_review" => "An answer to keep", "pattern" => "" },
+          section_ratings: { "code_review" => "right_level" }, submitted_at: Time.current)
+        draft
+      end
+
+      post responses_path, params: draft_payload, as: :json
+
+      expect(response.parsed_body["submitted"]).to be(true)
+      expect(user.daily_responses.sole.answers["pattern"]).to eq("")
+      expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level")
+    end
+
+    it "defers a cleared due check without treating its discarded rating as knowledge" do
+      skipped = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails",
+        tier: :standard, streak: 2, last_rating: "strong", mastered_at: 30.days.ago,
+        retention_interval_days: 7, next_retention_check_on: Date.current)
+      knowledge = skipped.attributes.except("next_retention_check_on", "updated_at")
+      post responses_path, params: { response: { answers: { pattern: "" }, submit: "1" } }, as: :json
+      saved = user.daily_responses.sole
+      saved.update!(ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "beginner" } })
+
+      ConceptMastery.record_review!(saved, sections: saved.section_keys, apply_session_countdown: true)
+
+      expect(skipped.reload.next_retention_check_on).to eq(Date.current + skipped.retention_interval_days)
+      expect(skipped.attributes.except("next_retention_check_on", "updated_at")).to eq(knowledge)
+      expect(user.concept_masteries.find_by(concept: "n_plus_one")).to have_attributes(last_rating: "strong")
+      expect(saved.answered_concept_tags).to eq("code_review" => "n_plus_one")
+      expect(saved.concept_tags).to include("pattern" => "memoization")
+      expect(user.recent_performance.first).to include(
+        self_ratings: { "code_review" => "right_level" }, ai_ratings: { "code_review" => "strong" })
+    end
+  end
+
   def create_exercise(problem_set)
     DailyExercise.create!(user: user, date: Date.current,
                           problem_set: problem_set, generated_at: Time.current)

@@ -112,8 +112,10 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       page.execute_script(<<~JS)
         const originalFetch = window.fetch;
         window.alert = () => {};
+        window.submitRequests = 0;
         window.fetch = (url, options) => {
           if (options?.body && JSON.parse(options.body).response?.submit === "1") {
+            window.submitRequests += 1;
             return new Promise((resolve) => { window.finishSubmit = () => resolve({ ok: false }); });
           }
           return originalFetch(url, options);
@@ -124,6 +126,8 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       page.execute_script('document.querySelector("textarea[data-field]").dispatchEvent(new Event("input"))')
       expect(page).to have_button("Submitting…", disabled: true)
       expect(page).to have_selector("#gym-form[inert]")
+      page.execute_script('document.querySelector("#gym-form").dispatchEvent(new Event("submit", { cancelable: true }))')
+      expect(page.evaluate_script("window.submitRequests")).to eq(1)
 
       page.execute_script("window.finishSubmit()")
       expect(page).to have_no_selector("#gym-form[inert]")
@@ -150,6 +154,60 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_content("Review ready!", wait: 10)
       expect(user.daily_responses.sole.answered_sections).to eq([ "code_review" ])
     end
+  end
+
+  it "ignores a late autosave acknowledgement during partial submit and still requests the review" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      perform_enqueued_jobs { visit_as(user) }
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      hold_response_requests
+      fill_in_answer("code_review", "The substantive answer to keep.")
+      rate_section("code_review")
+      fill_in_answer("pattern", "The substantive answer to clear.")
+      rate_section("pattern", value: "too_hard")
+      expect(page).to have_selector("#gym-form[data-autosave-queued]")
+
+      fill_in_answer("pattern", "")
+      click_button "Submit answers →"
+      expect(page).to have_selector("#gym-form[data-submit-stored]")
+      page.execute_script("window.releaseAutosave()")
+      expect(page).to have_selector('#gym-form[data-autosave-returned="true"]')
+      page.driver.with_playwright_page { |browser| browser.wait_for_load_state(state: "networkidle") }
+      expect(page).to have_button("Submitting…", disabled: true)
+      expect(page).to have_selector("#gym-form[inert]")
+
+      page.execute_script("window.releaseSubmission()")
+      expect(page).to have_content("Review ready!", wait: 10)
+      saved = user.daily_responses.reload.sole
+      expect(saved.answers["pattern"]).to eq("")
+      expect(saved.section_ratings).to eq("code_review" => "right_level")
+    end
+  end
+
+  def hold_response_requests
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      const originalSave = window.CodeGymSaveStatus.save;
+      window.CodeGymSaveStatus.save = (...args) => originalSave(...args).then(result => {
+        document.querySelector("#gym-form").dataset.autosaveReturned = String(result.data?.submitted);
+        return result;
+      });
+      window.fetch = (url, options) => {
+        if (new URL(url, location.href).pathname !== "/responses") return originalFetch(url, options);
+        if (JSON.parse(options.body).response.submit === "1") {
+          return originalFetch(url, options).then(response => {
+            document.querySelector("#gym-form").dataset.submitStored = "true";
+            return new Promise(resolve => { window.releaseSubmission = () => resolve(response); });
+          });
+        }
+        document.querySelector("#gym-form").dataset.autosaveQueued = "true";
+        return new Promise(resolve => {
+          window.releaseAutosave = () => originalFetch(url, options).then(resolve);
+        });
+      };
+    JS
   end
 
   def fill_in_answer(field, text)
