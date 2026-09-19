@@ -25,9 +25,8 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       fields = rating_row_fields
       fields.each { |field| fill_in_answer(field, "A substantive answer for #{field} that clears the length floor.") }
 
-      # Rate every section but the last: whatever sections the page actually
-      # holds (rate_all_sections reads that from the DOM, see system_test_helper),
-      # the gate must still be blocked with one left unrated.
+      # Rate every section but the last: with one answered section left
+      # unrated, the gate must still be blocked.
       fields[0..-2].each { |field| rate_section(field) }
       expect(page).to have_button("Submit answers →", disabled: true)
       rate_section(fields.last)
