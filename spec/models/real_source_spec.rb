@@ -24,6 +24,17 @@ RSpec.describe RealSource do
       expect(ids.uniq.size).to eq(ids.size)
     end
 
+    # The model writes a next migration against the table as it stands, so an
+    # entry whose table has left the schema has nothing to write against.
+    it "shows every migration's tables as they stand today, and no method any schema" do
+      RealSource::SCHEMA_REVIEW.each do |excerpt|
+        expect(excerpt.current_schema).to be_present, "#{excerpt.id} has no current schema"
+      end
+      RealSource::APPLICATION_CODE.each do |excerpt|
+        expect(excerpt.current_schema).to be_nil, "#{excerpt.id} should carry no schema"
+      end
+    end
+
     it "is one of the two excerpt kinds" do
       expect(RealSource::APPLICATION_CODE).to all(be_a(RealSource::Method))
       expect(RealSource::SCHEMA_REVIEW).to all(be_a(RealSource::Migration))
@@ -114,6 +125,67 @@ RSpec.describe RealSource do
       expect(instruction).to include("MODELLED ON this real one")
       expect(instruction).to include("EXACTLY ONE planted data-modeling flaw")
       expect(instruction).to include("create_table :push_subscriptions")
+      expect(instruction).not_to include("modified copy")
+    end
+
+    # The migration never names the index `t.references` gives it, and the
+    # grader never saw the migration at all. The live run that found this
+    # planted `add_index :push_subscriptions, :user_id`, which the table
+    # already had, so the snippet failed on the index name before its flaw
+    # mattered.
+    describe "#current_schema" do
+      it "is the table as db/schema.rb has it today, indexes and foreign keys included" do
+        schema = excerpt.current_schema
+
+        expect(schema).to start_with(%(create_table "push_subscriptions"))
+        expect(schema).to include("index_push_subscriptions_on_user_id")
+        expect(schema).to include("index_push_subscriptions_on_endpoint")
+        expect(schema).to include(%(add_foreign_key "push_subscriptions", "users"))
+      end
+
+      it "carries nothing from any other table" do
+        schema = excerpt.current_schema
+
+        expect(schema.scan(/create_table "(\w+)"/).flatten).to eq([ "push_subscriptions" ])
+        expect(schema.scan(/add_foreign_key "(\w+)"/).flatten.uniq).to eq([ "push_subscriptions" ])
+      end
+
+      it "finds the table through add_column and add_index as well as create_table" do
+        schema = described_class.new("db/migrate/20260728000004_add_retention_schedule_to_concept_masteries.rb").current_schema
+
+        expect(schema).to start_with(%(create_table "concept_masteries"))
+        expect(schema).to include("next_retention_check_on")
+      end
+
+      it "reads a raw SQL string as SQL, never as a table name" do
+        schema = described_class.new("db/migrate/20260908120000_add_reminder_level_to_users.rb").current_schema
+
+        expect(schema.scan(/create_table "(\w+)"/).flatten).to eq([ "users" ])
+      end
+
+      it "is nil, and the entry unusable, once a table it touches has left the schema" do
+        stub_const("RealSource::Migration::SCHEMA_PATH", "spec/fixtures/files/schema_without_push_subscriptions.rb")
+
+        expect(excerpt.current_schema).to be_nil
+        expect(excerpt).not_to be_resolvable
+      end
+
+      it "is nil, and the entry unusable, when there is no schema file to read" do
+        stub_const("RealSource::Migration::SCHEMA_PATH", "spec/fixtures/files/no_such_schema.rb")
+
+        expect(excerpt.current_schema).to be_nil
+        expect(excerpt).not_to be_resolvable
+      end
+    end
+
+    it "shows the table as it stands and asks for a next migration that applies cleanly to it" do
+      instruction = excerpt.instruction
+
+      expect(instruction).to include(%(create_table "push_subscriptions"))
+      expect(instruction).to include("index_push_subscriptions_on_user_id")
+      expect(instruction).to include("no column that already exists")
+      expect(instruction).to include("index_<table>_on_<columns>")
+      expect(instruction).to include("never a migration that fails to run")
     end
 
     it "keeps the section's setting Code Gym itself, regardless of the day's scenario flavor" do

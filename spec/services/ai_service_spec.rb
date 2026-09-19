@@ -3778,6 +3778,16 @@ RSpec.describe AiService do
       expect(svc.last_prompt).not_to include("What's slow here?")
     end
 
+    # It is on the engineer's screen, so the duck may talk about it.
+    it "sends a grounded migration's current schema along with the snippet" do
+      exercise.problem_set["code_review"]["current_schema"] = %(create_table "things" do |t|\nend)
+      svc = duck_spy_class.new(canned_text: "A guiding question.")
+
+      svc.duck_response(user, exercise, section: "code_review", message: "help", thread: [])
+
+      expect(svc.last_system).to include(%(create_table "things" do |t|))
+    end
+
     it "never sends a draft answer — the method has no daily_response argument to read one from" do
       expect(AiService.instance_method(:duck_response).parameters).not_to include([ :req, :daily_response ])
 

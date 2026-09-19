@@ -17,8 +17,9 @@ require "prism"
 # engineer's lived context in it — pausing and resuming a set, a concept coming
 # back for a retention check — is what supplies the domain fluency a fictional
 # education-app scenario cannot. The safeguards are the ones below: a curated
-# list, one planted flaw in a modified copy, a scenario that says the copy is
-# altered, never the unmodified original. Design:
+# list, exactly one planted flaw — in a modified copy of a method, or in a new
+# migration modelled on a real one — a scenario that says so, and never the
+# unmodified original. Design:
 # docs/superpowers/specs/2026-09-11-real-source-code-review-design.md
 class RealSource
   # Code Gym is written in Ruby, so the pool can only serve a day generating
@@ -41,8 +42,10 @@ class RealSource
   MAX_LINES = 40
 
   # One excerpt: what its text is, whether it still resolves against the
-  # deployed source, what the scenario line says, and what the generation
-  # prompt says about it. Subclasses answer the last three; the read is
+  # deployed source, what the scenario line says, what the generation prompt
+  # says about it, and the current schema the snippet is written against, if
+  # any. Subclasses answer the text, the scenario and the prompt, and override
+  # the schema only when their snippet is written against a table. The read is
   # always off local disk, so the text is exactly what is currently deployed.
   class Excerpt
     attr_reader :path
@@ -78,14 +81,31 @@ class RealSource
       text&.lines&.size
     end
 
+    # Stamped by ProblemSetIngest, shown beside the snippet, and read by the
+    # grader, the duck, and the difficulty assessment. Nil for a kind whose
+    # snippet is not written against a table.
+    def current_schema
+      nil
+    end
+
     private
 
     def absolute_path
       Rails.root.join(path)
     end
 
-    def fenced(language)
-      [ "```#{language}", text.strip_heredoc.chomp, "```" ].join("\n")
+    def fenced(language, body = text)
+      [ "```#{language}", body.strip_heredoc.chomp, "```" ].join("\n")
+    end
+
+    def lines_spanning(source, node)
+      source.lines[(node.location.start_line - 1)...node.location.end_line].join
+    end
+
+    def receiverless_calls(node, found = [])
+      found << node if node.is_a?(Prism::CallNode) && node.receiver.nil?
+      node.compact_child_nodes.each { |child| receiverless_calls(child, found) }
+      found
     end
 
     # General flavor and freshness rules would otherwise rename real source
@@ -125,9 +145,7 @@ class RealSource
 
       source = File.read(absolute_path)
       node   = find_def(Prism.parse(source).value)
-      return nil if node.nil?
-
-      source.lines[(node.location.start_line - 1)...node.location.end_line].join
+      node && lines_spanning(source, node)
     end
 
     # Says the copy is altered, not just where it came from: without that an
@@ -163,9 +181,50 @@ class RealSource
   # add_column has no room for a data-modeling flaw, and the interesting kind
   # is a NEW migration on a real table that gets cardinality or an index
   # wrong. The scenario says "modelled on" for the same reason.
+  #
+  # A migration file never states everything its table has — `t.references`
+  # creates an index it never names, and later migrations can change the table
+  # — so the model and the grader also get each table as db/schema.rb has it
+  # today. Without that a planted migration can add an index the table already
+  # has and fail on the name before its flaw matters. A modified copy of the
+  # original is no longer offered: the current table would sit beside it on
+  # the page and show the fix.
   class Migration < Excerpt
+    SCHEMA_PATH = "db/schema.rb".freeze
+
+    # Schema statements whose first argument is the table they change.
+    # `execute` is left out on purpose: its first argument is SQL. So are
+    # drop_table and rename_table: the table they name is no longer in the
+    # schema, so listing them would make any entry that uses them unresolvable.
+    TABLE_STATEMENTS = %i[
+      create_table change_table
+      add_column remove_column rename_column change_column change_column_default change_column_null
+      add_index remove_index rename_index add_reference remove_reference add_belongs_to
+      add_timestamps remove_timestamps add_foreign_key remove_foreign_key
+      add_check_constraint remove_check_constraint
+    ].freeze
+
     def text
       File.exist?(absolute_path) ? File.read(absolute_path) : nil
+    end
+
+    def resolvable?
+      super && !current_schema.nil?
+    end
+
+    # Each touched table's create_table block and its add_foreign_key lines.
+    # Nil when a touched table is gone from the schema, or the schema file
+    # itself is, which makes the entry unresolvable: there is nothing left to
+    # write the next migration against.
+    def current_schema
+      tables = touched_tables
+      schema_path = Rails.root.join(SCHEMA_PATH)
+      return nil if tables.empty? || !File.exist?(schema_path)
+
+      schema      = File.read(schema_path)
+      statements  = receiverless_calls(Prism.parse(schema).value)
+      definitions = tables.map { |table| table_definition(schema, statements, table) }
+      definitions.all? ? definitions.join("\n") : nil
     end
 
     def name
@@ -179,10 +238,38 @@ class RealSource
 
     def instruction
       <<~INSTRUCTION.chomp
-        - The code_review snippet is a Rails migration MODELLED ON this real one from Code Gym's own schema history (`#{id}`) — same conventions, same style, on the same table(s): either a modified copy of it or a plausible next migration for that table, whichever gives the flaw room. ~10-15 lines, containing EXACTLY ONE planted data-modeling flaw; never zero, never two. #{setting_rule} The scenario field must be exactly: "#{scenario}"
+        - The code_review snippet is a Rails migration MODELLED ON this real one from Code Gym's own schema history (`#{id}`) — same conventions, same style: a plausible next migration for the same table(s). ~10-15 lines, containing EXACTLY ONE planted data-modeling flaw; never zero, never two. #{setting_rule} The scenario field must be exactly: "#{scenario}"
 
         #{fenced("ruby")}
+
+        - This is how those table(s) stand today in `db/schema.rb`, and the engineer sees it beside the snippet. The snippet must apply cleanly to it: no column that already exists, and no index whose default name (`index_<table>_on_<columns>`) already exists. The planted flaw is a data-modeling flaw, never a migration that fails to run.
+
+        #{fenced("ruby", current_schema)}
       INSTRUCTION
+    end
+
+    private
+
+    def touched_tables
+      return [] if text.nil?
+
+      receiverless_calls(Prism.parse(text).value)
+        .select { |call| TABLE_STATEMENTS.include?(call.name) }
+        .filter_map { |call| table_argument(call) }
+        .uniq
+    end
+
+    def table_definition(schema, statements, table)
+      create = statements.find { |call| call.name == :create_table && table_argument(call) == table }
+      return nil if create.nil?
+
+      foreign_keys = statements.select { |call| call.name == :add_foreign_key && table_argument(call) == table }
+      [ create, *foreign_keys ].map { |call| lines_spanning(schema, call).strip_heredoc }.join
+    end
+
+    def table_argument(call)
+      first = call.arguments&.arguments&.first
+      first.unescaped if first.is_a?(Prism::SymbolNode) || first.is_a?(Prism::StringNode)
     end
   end
 

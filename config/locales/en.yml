@@ -126,6 +126,7 @@ en:
     code_review:
       name: "Code Review"
       placeholder: "What's the issue and how would you fix it?"
+      current_schema: "Current schema (db/schema.rb)"
     pattern:
       name: "Pattern of the Month"
       placeholder: "Your answer…"

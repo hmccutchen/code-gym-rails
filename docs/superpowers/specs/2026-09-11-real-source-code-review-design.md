@@ -195,6 +195,17 @@ asks for a structurally similar one:
 The scenario string says "modelled on" and "this is not that migration"
 (Decision 2), so the two framings cannot drift apart.
 
+**Superseded in part (issue #172).** A migration file never states
+everything its table has (`t.references` adds an index it never names, and
+later migrations can change the table), so a live run planted an index the
+table already had, and the grader, which never saw the original at all, could
+not tell. The instruction now also shows each touched table as
+`db/schema.rb` has it today (`RealSource::Migration#current_schema`), asks
+for a next migration that applies cleanly to it, and no longer offers "a
+modified copy of it", since the current table on the page would show the fix. The same definition is stamped
+into the section and read by the grader, the duck and the difficulty
+assessment.
+
 ## Starter pool
 
 `APPLICATION_CODE` — eleven methods across seven files, each a real decision

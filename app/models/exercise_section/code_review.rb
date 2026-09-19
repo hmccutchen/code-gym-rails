@@ -51,10 +51,21 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
 
   def self.review_context(section:, answer:, rating:)
-    <<~CONTEXT.chomp
-      Code Review question: #{section["question"]}
-      Code snippet: #{section["snippet"]}
-      #{answer_lines(answer, rating)}
-    CONTEXT
+    [
+      "Code Review question: #{section["question"]}",
+      "Code snippet: #{section["snippet"]}",
+      current_schema_lines(section["current_schema"]),
+      answer_lines(answer, rating)
+    ].compact.join("\n")
   end
+
+  def self.current_schema_lines(schema)
+    return if schema.blank?
+
+    <<~SCHEMA.chomp
+      Current schema — the real table(s) as they stand today in db/schema.rb. The snippet is a new migration proposed against them, so a column or index already here is not part of the flaw and the answer does not need to add it:
+      #{schema}
+    SCHEMA
+  end
+  private_class_method :current_schema_lines
 end

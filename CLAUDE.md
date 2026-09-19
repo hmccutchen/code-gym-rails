@@ -378,8 +378,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   caller does not.** Counted with `count_tokens` against `claude-sonnet-5`
   rather than estimated from characters, the merged duck prompt runs 993-1,182
   tokens across the stored `code_review` exercises — median 1,059 — and 1,364
-  for the largest excerpt `RealSource` can actually produce. Against a
-  1024-token minimum that means the ordinary day caches, not just a
+  for the largest excerpt `RealSource` can actually produce. That last figure
+  predates the current-schema block a grounded migration day now adds, so
+  those prompts run larger, which only strengthens the case for caching.
+  Against a 1024-token minimum that means the ordinary day caches, not just a
   real-source one; only the shortest sections fall short, and there the
   provider declines to cache rather than billing a write, so they pay nothing
   for the marker.
@@ -452,8 +454,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Two of the three modes can be grounded in Code Gym's own source.** On a
   `ruby_rails` day whose mode is `application_code` or `schema_review`, a
   second roll (`RealSource::WEIGHTS`, 35% real) may hand the model a real
-  excerpt from this codebase instead of asking for a toy scenario — a planted
-  flaw in a modified copy, through the same ingest and grading as any other
+  excerpt from this codebase instead of asking for a toy scenario — one
+  planted flaw, in a modified copy of a method or in a new migration modelled
+  on a real one, through the same ingest and grading as any other
   `code_review`. `test_file` is untouched by construction: it has no pool.
   `RealSource` (`app/models/real_source.rb`) is the curated registry, in
   `ExerciseSection`'s shape — closed lists, one class per kind of excerpt
@@ -471,8 +474,24 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `SectionRotation` uses. Gated to `RealSource::LANGUAGE` because this
   codebase is Ruby; a `javascript` day stays toy. A migration is reference
   material, never mutated in place — a one-line `add_column` has no room for
-  a flaw. A stale entry is skipped with a warning rather than failing
-  generation; a spec holds every entry resolvable and inside
+  a flaw — so the model writes a next migration for the same table. A
+  migration file never states everything its table has (`t.references` adds
+  an index it never names, and later migrations can change the table), and
+  the grader never sees the original, so
+  `RealSource::Migration#current_schema` also slices each table the migration
+  touches out of `db/schema.rb`, found and sliced with Prism the way a
+  `Method` is, and the instruction asks for a snippet that applies cleanly to
+  it: no column the table already has, and no index whose default name
+  already exists. A modified copy of the original is not offered, because the
+  current table beside it would show the fix. `ProblemSetIngest` stamps that
+  definition into the section as `current_schema`, server-owned like
+  `scenario`, and deletes one a provider returns on any other day or in any
+  other section. The page shows it collapsed under the snippet, and the
+  grader, the duck and the difficulty assessment all read it. That gives the
+  model what it needs to avoid a column or index the table already has; it
+  does not enforce it, and nothing checks the output. A stale entry, including a
+  migration whose table has left the schema, is skipped with a warning rather
+  than failing generation; a spec holds every entry resolvable and inside
   `MIN_LINES..MAX_LINES`. Design:
   `docs/superpowers/specs/2026-09-11-real-source-code-review-design.md`.
 
@@ -486,10 +505,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   "Scenario flavor" below); grounding in real source is the education-domain
   answer to it. There is no rule against Code Gym framing to relax: the
   registry's own safeguards — curated list, one planted flaw in a modified
-  copy, a scenario that says so — are the whole guardrail. Entries are
-  appended, never inserted, because list order is the never-seen drain order,
-  and a method at exactly `MAX_LINES` is left out since the next edit would
-  evict it.
+  copy of a method or a new migration modelled on a real one, a scenario that
+  says so — are the whole guardrail. Entries are appended, never inserted,
+  because list order is the never-seen drain order, and a method at exactly
+  `MAX_LINES` is left out since the next edit would evict it.
 - **Scenario flavor**: the business setting every section's `scenario` is dressed
   in comes from one prompt line, and that line now offers one of two pools
   (`AiService::SCENARIO_POOLS`): the general, job-adjacent `SCENARIO_DOMAINS`
