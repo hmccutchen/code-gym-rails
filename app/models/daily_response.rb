@@ -262,6 +262,15 @@ class DailyResponse < ApplicationRecord
     section_keys.select { |section| answered?(section) }
   end
 
+  # The tags that count as evidence of skill. A skipped section is still
+  # reviewed, but a grade on an empty answer measures nothing, so mastery,
+  # reinforcement and the generation prompt's ratings read this. Exposure
+  # (User#concept_exposure_index, recent_performance's concepts:) reads the
+  # full #concept_tags, because a skipped section was still shown.
+  def answered_concept_tags
+    concept_tags.slice(*answered_sections)
+  end
+
   # Every section the day presents carries a self-rating. This is what the
   # dashboard gates Submit on, and what stops a push nudge calling a set ready
   # to submit when the button is still disabled. Derived from #section_keys the

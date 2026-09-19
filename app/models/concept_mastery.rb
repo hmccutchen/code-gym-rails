@@ -69,7 +69,7 @@ class ConceptMastery < ApplicationRecord
     end
 
     sections_by_concept = Hash.new { |h, k| h[k] = [] }
-    response.concept_tags.slice(*sections).each do |section, concept|
+    response.answered_concept_tags.slice(*sections).each do |section, concept|
       next if concept.blank? || concept == "other"
       sections_by_concept[concept] << section
     end

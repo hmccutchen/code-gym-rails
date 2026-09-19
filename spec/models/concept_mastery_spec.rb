@@ -259,6 +259,67 @@ RSpec.describe ConceptMastery, type: :model do
     end
   end
 
+  describe ".record_review! — unanswered sections" do
+    def reviewed_day(answers:, concept_tags:, ai_review:, section_ratings: {})
+      exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: concept_tags.transform_values { |concept| { "concept" => concept } })
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+        answers: answers, section_ratings: section_ratings, concept_tags: concept_tags, ai_review: ai_review)
+    end
+
+    it "records nothing for a concept whose only section was skipped" do
+      response = reviewed_day(answers: { "code_review" => "" },
+                              concept_tags: { "code_review" => "n_plus_one" },
+                              ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+
+      expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_nil
+    end
+
+    it "leaves an existing mastery row untouched when its section was skipped" do
+      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails",
+                                          tier: :standard, streak: 2, last_rating: "solid")
+      response = reviewed_day(answers: { "code_review" => "" },
+                              concept_tags: { "code_review" => "n_plus_one" },
+                              ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+
+      expect(cm.reload).to have_attributes(tier: "standard", streak: 2, last_rating: "solid")
+    end
+
+    # Before this, a skipped check counted as a failed one: the schedule was
+    # wiped and the concept dropped back into reinforcement.
+    it "keeps a due retention check scheduled when that section was skipped" do
+      due_on = Date.current - 1
+      cm = user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard,
+                                          last_rating: "strong", mastered_at: 30.days.ago,
+                                          retention_interval_days: 7, next_retention_check_on: due_on)
+      response = reviewed_day(answers: { "code_review" => "" },
+                              concept_tags: { "code_review" => "n_plus_one" },
+                              ai_review: { "code_review" => { "rating" => "beginner" } })
+
+      described_class.record_review!(response, sections: %w[code_review], apply_session_countdown: true)
+
+      expect(cm.reload).to have_attributes(next_retention_check_on: due_on, retention_interval_days: 7)
+    end
+
+    it "evaluates a concept on its answered section alone when it was also tagged on a skipped one" do
+      response = reviewed_day(answers: { "code_review" => "x" * 20, "pattern" => "" },
+                              concept_tags: { "code_review" => "n_plus_one", "pattern" => "n_plus_one" },
+                              section_ratings: { "code_review" => "right_level" },
+                              ai_review: { "code_review" => { "rating" => "strong" },
+                                           "pattern"     => { "rating" => "beginner" } })
+
+      described_class.record_review!(response, sections: %w[code_review pattern], apply_session_countdown: true)
+
+      cm = user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")
+      expect(cm.last_rating).to eq("strong")
+      expect(cm.mastered_at).to be_present
+    end
+  end
+
   describe "difficulty targets" do
     it "never reads KindDifficulty and moves tier the same way for a locked kind" do
       expect(KindDifficulty).not_to receive(:for)

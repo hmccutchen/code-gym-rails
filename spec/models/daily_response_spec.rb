@@ -220,6 +220,19 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#answered_concept_tags" do
+    it "keeps only the tags of sections that were answered" do
+      response = user.daily_responses.create!(
+        daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "short" },
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization", "challenge" => "caching" }
+      )
+
+      expect(response.answered_concept_tags).to eq("code_review" => "n_plus_one")
+      expect(response.concept_tags.keys).to contain_exactly("code_review", "pattern", "challenge")
+    end
+  end
+
   describe ".normalize_answers" do
     let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
 
