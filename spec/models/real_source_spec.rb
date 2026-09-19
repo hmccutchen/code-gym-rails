@@ -73,16 +73,22 @@ RSpec.describe RealSource do
       expect(excerpt.scenario).to include("`app/services/weighted_roll.rb`, `#pick`")
     end
 
-    it "instructs exactly one flaw in a modified copy, never unchanged, never a fictional domain" do
+    it "instructs exactly one flaw in a modified copy, never unchanged" do
       instruction = excerpt.instruction
 
       expect(instruction).to include("MODIFIED COPY")
       expect(instruction).to include("EXACTLY ONE flaw")
       expect(instruction).to include("Never return it unchanged")
       expect(instruction).to include("never introduce a second flaw")
-      expect(instruction).to include("do not rewrite it into a fictional domain")
       expect(instruction).to include(%(The scenario field must be exactly: "#{excerpt.scenario}"))
       expect(instruction).to include("```ruby\ndef self.pick(weights)")
+    end
+
+    it "keeps the section's setting Code Gym itself, regardless of the day's scenario flavor" do
+      instruction = excerpt.instruction
+
+      expect(instruction).to include("business-domain settings suggested for each section do not apply to this one")
+      expect(instruction).to include("never a game or other fictional domain")
     end
   end
 
@@ -108,6 +114,13 @@ RSpec.describe RealSource do
       expect(instruction).to include("MODELLED ON this real one")
       expect(instruction).to include("EXACTLY ONE planted data-modeling flaw")
       expect(instruction).to include("create_table :push_subscriptions")
+    end
+
+    it "keeps the section's setting Code Gym itself, regardless of the day's scenario flavor" do
+      instruction = excerpt.instruction
+
+      expect(instruction).to include("business-domain settings suggested for each section do not apply to this one")
+      expect(instruction).to include("never a game or other fictional domain")
     end
   end
 

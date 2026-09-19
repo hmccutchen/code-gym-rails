@@ -159,6 +159,10 @@ the fictional-domain rewrite is forbidden explicitly, since that is the
 model's default behaviour for this section and the thing the whole feature
 exists to replace.
 
+Superseded wording: that ban now lives in `RealSource::Excerpt#setting_rule`,
+shared by both excerpt kinds, after a migration day picked up the
+game-and-animation scenario flavor (#171).
+
 ## Decision 4 — migrations are reference material, not mutated in place
 
 Confirmed as the brief anticipated. Real migrations here are short and clean

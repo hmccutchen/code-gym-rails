@@ -1283,6 +1283,22 @@ RSpec.describe AiService do
         expect(prompt).to include("must be realistic Ruby/Rails code")
         expect(prompt).not_to include("Code Gym's own source")
       end
+
+      # Regression for #171: the day's scenario-flavor line and the grounded
+      # excerpt's own instruction both land in the same prompt, and the
+      # excerpt's instruction is the one place that tells the model the
+      # flavor doesn't apply to it. Without that line a game_and_animation day described a real
+      # Code Gym table as serving game players.
+      it "tells a grounded schema-review section to ignore the day's scenario flavor" do
+        excerpt = RealSource::SCHEMA_REVIEW.first
+        prompt  = service.send(:build_exercise_prompt, user, "ruby_rails",
+                               code_review_mode: :schema_review, code_review_source: excerpt,
+                               scenario_flavor: :game_and_animation)
+
+        expect(prompt).to include("platformer save state system")
+        expect(prompt).to include("business-domain settings suggested for each section do not apply to this one")
+        expect(prompt).to include("never a game or other fictional domain")
+      end
     end
 
     it "asks for realistic application code by default" do

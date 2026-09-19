@@ -87,6 +87,17 @@ class RealSource
     def fenced(language)
       [ "```#{language}", text.strip_heredoc.chomp, "```" ].join("\n")
     end
+
+    # Shared by every excerpt kind's #instruction: the day's scenario-flavor
+    # line (AiService#scenario_flavor_guidance) is built without the day's
+    # excerpt, so it offers its pool to every section including this one.
+    # Without this line a game_and_animation day described a real Code Gym
+    # table as serving game players (#171).
+    def setting_rule
+      "The business-domain settings suggested for each section do not apply to this one: its setting is " \
+      "Code Gym itself, a learning app for engineers, so its comments, names, and any other prose describe " \
+      "Code Gym, never a game or other fictional domain."
+    end
   end
 
   # A single method, scoped by name and sliced out with Prism. Line ranges
@@ -124,7 +135,7 @@ class RealSource
 
     def instruction
       <<~INSTRUCTION.chomp
-        - The code_review snippet is a MODIFIED COPY of this real method from Code Gym's own source (`#{id}`). Reproduce its shape, names, and structure as the starting point, then introduce EXACTLY ONE flaw that expresses the chosen concept. Never return it unchanged — there would be nothing to find — and never introduce a second flaw, since grading assumes exactly one. Keep the real class, method, and variable names; do not rewrite it into a fictional domain. The scenario field must be exactly: "#{scenario}"
+        - The code_review snippet is a MODIFIED COPY of this real method from Code Gym's own source (`#{id}`). Reproduce its shape, names, and structure as the starting point, then introduce EXACTLY ONE flaw that expresses the chosen concept. Never return it unchanged — there would be nothing to find — and never introduce a second flaw, since grading assumes exactly one. Keep the real class, method, and variable names. #{setting_rule} The scenario field must be exactly: "#{scenario}"
 
         #{fenced("ruby")}
       INSTRUCTION
@@ -164,7 +175,7 @@ class RealSource
 
     def instruction
       <<~INSTRUCTION.chomp
-        - The code_review snippet is a Rails migration MODELLED ON this real one from Code Gym's own schema history (`#{id}`) — same conventions, same style, on the same table(s): either a modified copy of it or a plausible next migration for that table, whichever gives the flaw room. ~10-15 lines, containing EXACTLY ONE planted data-modeling flaw; never zero, never two. The scenario field must be exactly: "#{scenario}"
+        - The code_review snippet is a Rails migration MODELLED ON this real one from Code Gym's own schema history (`#{id}`) — same conventions, same style, on the same table(s): either a modified copy of it or a plausible next migration for that table, whichever gives the flaw room. ~10-15 lines, containing EXACTLY ONE planted data-modeling flaw; never zero, never two. #{setting_rule} The scenario field must be exactly: "#{scenario}"
 
         #{fenced("ruby")}
       INSTRUCTION
