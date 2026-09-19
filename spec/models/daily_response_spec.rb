@@ -220,6 +220,60 @@ RSpec.describe DailyResponse, type: :model do
     end
   end
 
+  describe "#submit_blocker" do
+    def draft(answers:, ratings: {})
+      user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+                                   answers: answers, section_ratings: ratings)
+    end
+
+    it "blocks on having nothing answered, even when every section is rated" do
+      response = draft(answers: {}, ratings: {
+        "code_review" => "right_level", "pattern" => "right_level", "challenge" => "right_level"
+      })
+
+      expect(response.submit_blocker).to eq(:unanswered)
+      expect(response).not_to be_submittable
+    end
+
+    it "blocks on an answered section that has no rating" do
+      response = draft(answers: { "code_review" => "a" * 20 })
+
+      expect(response.submit_blocker).to eq(:unrated)
+      expect(response).not_to be_submittable
+    end
+
+    it "does not ask for a rating on a section that was skipped" do
+      response = draft(answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "" },
+                       ratings: { "code_review" => "too_hard" })
+
+      expect(response.submit_blocker).to be_nil
+      expect(response).to be_submittable
+    end
+
+    it "still blocks when one of several answered sections is unrated" do
+      response = draft(answers: { "code_review" => "a" * 20, "pattern" => "b" * 20 },
+                       ratings: { "code_review" => "right_level" })
+
+      expect(response.submit_blocker).to eq(:unrated)
+    end
+
+    # A rating left behind on a section whose answer was later cleared is not
+    # owed, and must not count as paying for a different section either.
+    it "ignores a rating on an unanswered section when checking an answered one" do
+      response = draft(answers: { "code_review" => "a" * 20, "pattern" => "" },
+                       ratings: { "pattern" => "too_easy" })
+
+      expect(response.submit_blocker).to eq(:unrated)
+    end
+
+    it "is submittable when every section is answered and rated" do
+      response = draft(answers: { "code_review" => "a" * 20, "pattern" => "b" * 20, "challenge" => "c" * 20 },
+                       ratings: { "code_review" => "too_easy", "pattern" => "right_level", "challenge" => "too_hard" })
+
+      expect(response).to be_submittable
+    end
+  end
+
   describe ".normalize_answers" do
     let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
 

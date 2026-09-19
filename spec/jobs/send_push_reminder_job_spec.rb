@@ -227,8 +227,8 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
-    # The dashboard keeps Submit disabled until every section is rated, so a
-    # fully answered but unrated set must not be told to press it.
+    # The dashboard keeps Submit disabled until every answered section is rated,
+    # so a fully answered but unrated set must not be told to press it.
     it "names the ratings when they are what is left" do
       user.update!(reminder_level: :ready_and_nudges)
 

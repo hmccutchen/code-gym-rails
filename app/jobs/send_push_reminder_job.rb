@@ -86,13 +86,13 @@ class SendPushReminderJob < ApplicationJob
   # How far through an unfinished day the user is. Reached only once submission
   # has been ruled out, so :unsubmitted means every section is answered and
   # rated and the Submit button is all that is left. A non-zero answered count
-  # guarantees a response row, so #fully_rated? is only ever asked of one.
+  # guarantees a response row, so #submittable? is only ever asked of one.
   def stage_for(exercise, response)
     answered = answered_count(response)
 
     return :untouched if answered.zero?
     return :partway   if answered < section_count(exercise)
-    return :unrated   unless response.fully_rated?
+    return :unrated   unless response.submittable?
 
     :unsubmitted
   end

@@ -960,10 +960,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the copy from how far through the day is
   (`SendPushReminderJob::NUDGE_TITLES`), since "still waiting" reads as not
   having noticed the half that was done. Answered-in-full splits into two of
-  those states, because Submit stays disabled until every section is rated:
-  `DailyResponse#fully_rated?` is the one authority for that gate, read by the
-  dashboard's submit button and by the nudge, so a notification can never name
-  a button the user cannot press.
+  those states, because Submit stays disabled until every answered section is
+  rated: `DailyResponse#submit_blocker` is the one authority for that gate, read
+  by the dashboard's submit button and, through `#submittable?`, by the nudge,
+  so a notification can never name a button the user cannot press.
 
   **`PushNudgePlan::QUIET_PERIOD` is what keeps that from nagging.** With
   starting no longer silencing the day, an hourly tick would otherwise tell
