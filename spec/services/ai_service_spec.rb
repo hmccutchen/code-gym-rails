@@ -1501,6 +1501,19 @@ RSpec.describe AiService do
       expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: developing)")
     end
 
+    it "labels a skipped section's history line 'skipped' rather than 'unreviewed'" do
+      exercise = DailyExercise.create!(user: user, date: Date.current,
+                                       problem_set: { "code_review" => {}, "pattern" => {} }, generated_at: Time.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "code_review" => "x" * 20, "pattern" => "" },
+                            section_ratings: { "code_review" => "right_level" },
+                            concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
+
+      prompt = service.send(:build_exercise_prompt, user)
+      expect(prompt).to include("code_review→n_plus_one (self: right_level, ai: unreviewed)")
+      expect(prompt).to include("pattern→memoization (self: unrated, ai: skipped)")
+    end
+
     it "reports no concepts needing reinforcement when history is empty" do
       prompt = service.send(:build_exercise_prompt, user)
       expect(prompt).to include("Concepts needing reinforcement right now: none")

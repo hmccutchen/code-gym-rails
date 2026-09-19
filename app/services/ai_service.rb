@@ -1547,8 +1547,9 @@ class AiService
       history.map { |h|
         pairs = h[:concepts].respond_to?(:each_pair) ? h[:concepts].each_pair.filter_map { |section, concept|
           next if concept.blank?
-          self_r = h[:self_ratings][section].presence || "unrated"
-          ai_r   = h[:ai_ratings][section].presence  || "unreviewed"
+          self_r  = h[:self_ratings][section].presence || "unrated"
+          skipped = h[:answered_sections] && !h[:answered_sections].include?(section)
+          ai_r    = skipped ? "skipped" : (h[:ai_ratings][section].presence || "unreviewed")
           "#{section}→#{concept} (self: #{self_r}, ai: #{ai_r})"
         } : []
         concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""

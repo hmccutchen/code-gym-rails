@@ -244,7 +244,8 @@ class User < ApplicationRecord
         sections_answered: r.answered_sections.size,
         sections_total:    r.section_keys.size,
         self_ratings:      r.section_ratings,
-        ai_ratings:        ai_ratings
+        ai_ratings:        ai_ratings,
+        answered_sections: r.answered_sections
       }
     end
   end
