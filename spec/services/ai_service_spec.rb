@@ -4395,6 +4395,29 @@ RSpec.describe AiService do
       expect(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).to be > AiService::READ_TIMEOUT
     end
 
+    # The double above records what AiService asked for. These run each real
+    # provider against a test adapter, so the request the retry guard sees is
+    # what is asserted: the budget reaches the request, marks it long_running,
+    # and a timeout is therefore final rather than retried into a second bill.
+    { ClaudeService => ClaudeService::API_URL, GeminiService => GeminiService::API_URL }.each do |provider_class, url|
+      it "takes a timed-out #{provider_class} call as final, on the dedicated budget, with one attempt" do
+        attempts = []
+        service  = provider_class.new("key")
+        service.instance_variable_set(:@conn, Faraday.new do |f|
+          f.request :retry, provider_class::RETRY_OPTIONS.merge(interval: 0, max_interval: 0)
+          f.adapter :test do |stub|
+            stub.post(url) do |env|
+              attempts << [ env.request.timeout, env.request.context[:long_running] ]
+              raise Faraday::TimeoutError, "Net::ReadTimeout"
+            end
+          end
+        end)
+
+        expect { service.generate_concept_reference(user, "n_plus_one", "ruby_rails") }.to raise_error(AiService::TimeoutError)
+        expect(attempts).to eq([ [ AiService::CONCEPT_REFERENCE_READ_TIMEOUT, true ] ])
+      end
+    end
+
     it "logs usage with the generate_concept_reference purpose" do
       service = double_class.new(canned_text: valid_json)
       expect {
