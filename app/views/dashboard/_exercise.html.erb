@@ -203,6 +203,7 @@
       submitButton.classList.add("btn-loading");
       submitButton.textContent = "Submitting…";
 
+      let submissionSaved = false;
       try {
         const res = await fetch(form.action, {
           method: "POST",
@@ -216,20 +217,27 @@
 
         if (res.ok) {
           const data = await res.json();
-          reviewRequested = true;
+          submissionSaved = true;
           submitButton.textContent = GENERATING_REVIEW;
           requestReview(data.review_url);
+          reviewRequested = true;
         } else {
           alert("Couldn't submit your answers — please try again.");
         }
       } catch (error) {
-        alert("Couldn't submit your answers — please try again.");
+        if (submissionSaved) {
+          alert("Your answers were saved, but the review couldn't start. Reloading so you can try the review again.");
+          window.location.reload();
+        } else {
+          alert("Couldn't submit your answers — please try again.");
+        }
       } finally {
-        if (!reviewRequested) {
+        if (!reviewRequested && !submissionSaved) {
           form.inert = false;
           submitButton.classList.remove("btn-loading");
           submitButton.textContent = "Submit answers →";
           refreshSubmit();
+          autoSave();
         }
       }
     });

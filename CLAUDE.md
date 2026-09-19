@@ -689,6 +689,18 @@ concept-specific difficulty descriptions for future generation, not a new set.
   completed work. Calibration mismatch notes require completion.
 - **Answer scaffolds**: `pattern` and `architecture` ask for multi-part reasoning, so the generator returns an `answer_scaffold` — a short list of labels written for that specific question — inside the section's `problem_set` entry. A fresh textarea starts pre-filled with them; they are plain text in the same plain-string answer, so the user can delete or ignore them. Bounded on ingest (`ExerciseSection::MAX_SCAFFOLD_LABELS` / `MAX_SCAFFOLD_LABEL_LENGTH`) since it is provider output rendered into a form, and absent/unusable values fall back to the kind's `DEFAULT_SCAFFOLD`, so pre-scaffold rows render identically. `ResponsesController` normalizes on write: an answer that is nothing but labels stores as `""`, so reloading offers the scaffold again without storing its labels as the user's work. Other draft text remains intact; grading and read-only displays use `answer_for` as described above.
 - **One finish action**: each section's difficulty rating autosaves on click, which enables the Submit button — disabled, with a visible nudge, until at least one section is answered and every answered section is rated (`DailyResponse#submit_blocker`, restated by the inline script against the live form). Answers and rating land in one `ResponsesController#create` call, and a successful submit fires the review from that same click — still a separate request, still exactly one review per day, just no second click to reach it. Draft ratings are set-only: `#create` accepts only valid enum values and preserves ratings while answers are edited or cleared. At submission it slices ratings to `answered_sections`, so a cleared, too-short, or scaffold-only answer leaves no self-assessment behind. Partial answer payloads merge into the draft before this slice; omitted answers remain unchanged, and explicit empty strings clear them. The form stays inert during submission and the review handoff, keeping its visible answers and ratings at the submitted snapshot; a failed submission restores editing and recomputes the gate. The progress label reports answers only; the nudge and button report readiness. The dashboard requires JavaScript; rating, autosave, progress, and submit are all driven by the inline script, and there is no server-side rejection of an unsubmittable submit because the UI cannot produce one.
+  A refused or dropped submission restarts the draft autosave it canceled, so
+  the last edit survives without another keystroke. If submission succeeds but
+  the browser cannot start the review POST, the page explains that the answers
+  were saved and reloads the submitted state with its manual review button.
+  It never restores an editable draft after an acknowledged submission.
+
+  **Partial submission still incurs a full-day review.** The existing review
+  fan-out grades every active section, including skipped ones, and also calls
+  the difficulty assessment. Skipping a section does not remove its grading
+  call or the assessment. Skipped grades stay outside skill evidence; review
+  scheduling and provider fan-out are unchanged.
+
   A submitted self-rating now describes a counted answer. This deliberately
   replaces the earlier policy that retained intentional ratings on skipped
   sections: the final record cannot distinguish those from ratings left behind
