@@ -17,8 +17,9 @@ require "prism"
 # engineer's lived context in it — pausing and resuming a set, a concept coming
 # back for a retention check — is what supplies the domain fluency a fictional
 # education-app scenario cannot. The safeguards are the ones below: a curated
-# list, one planted flaw in a modified copy, a scenario that says the copy is
-# altered, never the unmodified original. Design:
+# list, exactly one planted flaw — in a modified copy of a method, or in a new
+# migration modelled on a real one — a scenario that says so, and never the
+# unmodified original. Design:
 # docs/superpowers/specs/2026-09-11-real-source-code-review-design.md
 class RealSource
   # Code Gym is written in Ruby, so the pool can only serve a day generating
@@ -43,8 +44,8 @@ class RealSource
   # One excerpt: what its text is, whether it still resolves against the
   # deployed source, what the scenario line says, what the generation prompt
   # says about it, and the current schema the snippet is written against, if
-  # any. Subclasses answer the scenario and the prompt, and override the
-  # schema only when their snippet is written against a table. The read is
+  # any. Subclasses answer the text, the scenario and the prompt, and override
+  # the schema only when their snippet is written against a table. The read is
   # always off local disk, so the text is exactly what is currently deployed.
   class Excerpt
     attr_reader :path
@@ -81,8 +82,8 @@ class RealSource
     end
 
     # Stamped by ProblemSetIngest, shown beside the snippet, and read by the
-    # grader and the duck. Nil for a kind whose snippet is not written against
-    # a table.
+    # grader, the duck, and the difficulty assessment. Nil for a kind whose
+    # snippet is not written against a table.
     def current_schema
       nil
     end
@@ -166,18 +167,22 @@ class RealSource
   # is a NEW migration on a real table that gets cardinality or an index
   # wrong. The scenario says "modelled on" for the same reason.
   #
-  # The file is older than its tables, so the model and the grader also get
-  # each table as db/schema.rb has it today. Without that a planted migration
-  # can add an index the table already has and fail on the name before its
-  # flaw matters. A modified copy of the original is no longer offered: the
-  # current table would sit beside it on the page and show the fix.
+  # A migration file never states everything its table has — `t.references`
+  # creates an index it never names, and later migrations can change the table
+  # — so the model and the grader also get each table as db/schema.rb has it
+  # today. Without that a planted migration can add an index the table already
+  # has and fail on the name before its flaw matters. A modified copy of the
+  # original is no longer offered: the current table would sit beside it on
+  # the page and show the fix.
   class Migration < Excerpt
     SCHEMA_PATH = "db/schema.rb".freeze
 
     # Schema statements whose first argument is the table they change.
-    # `execute` is left out on purpose: its first argument is SQL.
+    # `execute` is left out on purpose: its first argument is SQL. So are
+    # drop_table and rename_table: the table they name is no longer in the
+    # schema, so listing them would make any entry that uses them unresolvable.
     TABLE_STATEMENTS = %i[
-      create_table change_table drop_table rename_table
+      create_table change_table
       add_column remove_column rename_column change_column change_column_default change_column_null
       add_index remove_index rename_index add_reference remove_reference add_belongs_to
       add_timestamps remove_timestamps add_foreign_key remove_foreign_key
@@ -193,13 +198,15 @@ class RealSource
     end
 
     # Each touched table's create_table block and its add_foreign_key lines.
-    # Nil when a touched table is gone from the schema, which makes the entry
-    # unresolvable: there is nothing left to write the next migration against.
+    # Nil when a touched table is gone from the schema, or the schema file
+    # itself is, which makes the entry unresolvable: there is nothing left to
+    # write the next migration against.
     def current_schema
       tables = touched_tables
-      return nil if tables.empty?
+      schema_path = Rails.root.join(SCHEMA_PATH)
+      return nil if tables.empty? || !File.exist?(schema_path)
 
-      schema      = File.read(Rails.root.join(SCHEMA_PATH))
+      schema      = File.read(schema_path)
       statements  = receiverless_calls(Prism.parse(schema).value)
       definitions = tables.map { |table| table_definition(schema, statements, table) }
       definitions.all? ? definitions.join("\n") : nil

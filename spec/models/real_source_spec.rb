@@ -119,12 +119,14 @@ RSpec.describe RealSource do
       expect(instruction).to include("MODELLED ON this real one")
       expect(instruction).to include("EXACTLY ONE planted data-modeling flaw")
       expect(instruction).to include("create_table :push_subscriptions")
+      expect(instruction).not_to include("modified copy")
     end
 
-    # The original migration is months older than the table. The live run that
-    # found this planted `add_index :push_subscriptions, :user_id`, which the
-    # table already had, so the snippet failed on the index name before its
-    # flaw mattered.
+    # The migration never names the index `t.references` gives it, and the
+    # grader never saw the migration at all. The live run that found this
+    # planted `add_index :push_subscriptions, :user_id`, which the table
+    # already had, so the snippet failed on the index name before its flaw
+    # mattered.
     describe "#current_schema" do
       it "is the table as db/schema.rb has it today, indexes and foreign keys included" do
         schema = excerpt.current_schema
@@ -157,6 +159,13 @@ RSpec.describe RealSource do
 
       it "is nil, and the entry unusable, once a table it touches has left the schema" do
         stub_const("RealSource::Migration::SCHEMA_PATH", "spec/fixtures/files/schema_without_push_subscriptions.rb")
+
+        expect(excerpt.current_schema).to be_nil
+        expect(excerpt).not_to be_resolvable
+      end
+
+      it "is nil, and the entry unusable, when there is no schema file to read" do
+        stub_const("RealSource::Migration::SCHEMA_PATH", "spec/fixtures/files/no_such_schema.rb")
 
         expect(excerpt.current_schema).to be_nil
         expect(excerpt).not_to be_resolvable
