@@ -43,8 +43,9 @@ class RealSource
   # One excerpt: what its text is, whether it still resolves against the
   # deployed source, what the scenario line says, what the generation prompt
   # says about it, and the current schema the snippet is written against, if
-  # any. Subclasses answer the last three; the read is always off local disk,
-  # so the text is exactly what is currently deployed.
+  # any. Subclasses answer the scenario and the prompt, and override the
+  # schema only when their snippet is written against a table. The read is
+  # always off local disk, so the text is exactly what is currently deployed.
   class Excerpt
     attr_reader :path
 
@@ -79,8 +80,9 @@ class RealSource
       text&.lines&.size
     end
 
-    # Shown beside the snippet, stamped by ProblemSetIngest, and read by the
-    # grader. Nil for a kind whose snippet is not written against a table.
+    # Stamped by ProblemSetIngest, shown beside the snippet, and read by the
+    # grader and the duck. Nil for a kind whose snippet is not written against
+    # a table.
     def current_schema
       nil
     end
