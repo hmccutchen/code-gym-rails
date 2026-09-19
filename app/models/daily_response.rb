@@ -90,13 +90,18 @@ class DailyResponse < ApplicationRecord
   # same question from a controller and a job, and a second statement of the
   # window could disagree with this one.
   #
-  # Six minutes rather than three because a pseudocode_to_code day spends two
-  # provider calls in sequence (the translation, then the grade — see
-  # AiService#translate_before_grading), and each of those can spend the whole
-  # of AiService.call_budget_seconds(READ_TIMEOUT) before it gives up.
-  # ai_service_spec asserts the two constants stay in that relationship rather
-  # than drifting apart.
-  REVIEW_CLAIM_STALE_AFTER = 6.minutes
+  # The longest review is a pseudocode_to_code day's: the translation on
+  # AiService::READ_TIMEOUT, then the grade on AiService::REVIEW_READ_TIMEOUT
+  # (see AiService#translate_before_grading), each able to spend every retry
+  # attempt, then the difficulty note's grace period. This window is the
+  # smallest whole number of minutes above that worst case. ai_service_spec
+  # derives the worst case from those constants and fails if this window falls
+  # below it or sits more than a minute above it.
+  #
+  # A literal rather than a derivation because AiService's own constants read
+  # DailyResponse while it loads, so computing this from AiService here would
+  # make the two classes' load order matter.
+  REVIEW_CLAIM_STALE_AFTER = 10.minutes
 
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?

@@ -29,15 +29,15 @@ class AiService
   # it's unfinished.
   class TruncatedResponseError < InvalidResponseError; end
 
-  # Every provider call is made from a request thread (#review and the
-  # on-demand generation path both block on it), so an unbounded call ties up
-  # a Puma thread indefinitely and outlives ResponsesController's review claim,
-  # letting a second review start while the first is still in flight. Faraday
-  # sets no timeout by default. The read budget is generous because a full
-  # section review legitimately takes tens of seconds; the ceiling that matters
-  # is (attempts × (open + read)) + retry backoff staying under
-  # DailyResponse::REVIEW_CLAIM_STALE_AFTER, which ai_service_spec
-  # asserts so the two cannot drift apart.
+  # Faraday sets no timeout by default, so without one a call made from a
+  # request thread would tie up a Puma thread indefinitely and outlive
+  # ResponsesController#review's claim on the row, letting a second review
+  # start while the first is still in flight. READ_TIMEOUT is the budget for
+  # every call that doesn't pass a larger one. The ceiling that matters is the
+  # longest #review request: a pre-grading translation on this budget, then a
+  # grade on REVIEW_READ_TIMEOUT, each allowed every retry attempt. That chain
+  # has to stay under DailyResponse::REVIEW_CLAIM_STALE_AFTER, which
+  # ai_service_spec asserts so the two cannot drift apart.
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
 
@@ -80,6 +80,17 @@ class AiService
   # a call that actually needs this long is recognized as long_running instead
   # of retried into duplicate spend.
   CONCEPT_REFERENCE_READ_TIMEOUT = SYNC_GENERATION_READ_TIMEOUT
+
+  # #grade_section grades one section with extended thinking left on, and a
+  # section that returns an improved_code rewrite runs well past READ_TIMEOUT:
+  # measured grades on full-length answers took 24-77 seconds, and 6 of 16
+  # timed out at 45. Sized from that slowest call, with room above it.
+  #
+  # Exceeding READ_TIMEOUT also makes the call long_running to
+  # RETRY_TIMEOUT_GUARD, so a timeout is final. At READ_TIMEOUT faraday-retry
+  # retried a timed-out grade twice more, billing the section up to three
+  # times for a grade the provider had usually already produced.
+  REVIEW_READ_TIMEOUT = 120
 
   # Both providers configure the same retry policy (see ClaudeService::RETRY_OPTIONS /
   # GeminiService::RETRY_OPTIONS), so how many attempts and how long the backoff
@@ -895,7 +906,7 @@ class AiService
   # the caller.
   #
   # No pooled DB connection is held for the duration of a thread — only the
-  # provider HTTP call happens here, and that can run up to READ_TIMEOUT
+  # provider HTTP call happens here, and that can run up to REVIEW_READ_TIMEOUT
   # seconds. The one bit of real DB work (ApiUsage.create! inside #log_usage)
   # checks out a connection for itself, scoped narrowly in #call_and_log, so
   # a multi-section review never pins (section count) pooled connections for
@@ -2177,7 +2188,7 @@ class AiService
     result  = service.send(
       :call_and_log, user, purpose: "review_response",
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
-      cache_system: true
+      cache_system: true, read_timeout: REVIEW_READ_TIMEOUT
     )
     review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
     review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
