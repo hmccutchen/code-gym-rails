@@ -304,8 +304,12 @@ class User < ApplicationRecord
   # to what today can host and order is priority. A drilled concept the
   # history would also list appears once, in the drilled position; a drilled
   # concept in the paused tier waits out its cooldown like any other.
-  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [])
-    result   = drilled_reinforcement(bucket, exclude_buckets)
+  # `drilled_in:` names the buckets today's sections can host, because a
+  # drill persists until mastered — unlike a history entry, which ages out —
+  # so one no section could carry would otherwise claim a slot every day.
+  # nil leaves the bucket filters above as the only restriction.
+  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], drilled_in: nil)
+    result   = drilled_reinforcement(bucket, exclude_buckets, drilled_in)
     resolved = result.to_h { |h| [ h[:concept], true ] }
 
     recent_daily_responses(limit).each do |r|
@@ -339,9 +343,10 @@ class User < ApplicationRecord
   # same first few — the same order SectionRotation and RealSource.pick use.
   # Read from the exposure index rather than stored, since which drill was
   # offered is never recorded, like every other offer.
-  def drilled_reinforcement(bucket, exclude_buckets)
+  def drilled_reinforcement(bucket, exclude_buckets, drilled_in)
     rows = concept_masteries.drilling.where.not(tier: :paused)
     rows = rows.where(language: bucket) if bucket
+    rows = rows.where(language: drilled_in) if drilled_in
     rows = rows.where.not(language: exclude_buckets) if exclude_buckets.any?
 
     rows.select { |cm| still_in_vocabulary?(cm.concept, cm.language) }

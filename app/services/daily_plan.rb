@@ -94,7 +94,8 @@ class DailyPlan
                                         count: SectionCount.for(history, adaptive: user.adaptive_set_size?),
                                         preferences: KindPreferences.for(user))
     kinds         = ExerciseSection.for_plan(**rotation)
-    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS)
+    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
+                                                        drilled_in: hostable_buckets(language, kinds: kinds))
     # Only the non-fourth kinds present today can ever host a language or
     # architecture concept, so capacity follows the chosen set rather than a
     # literal 3 — a short day (pattern chosen but no third) has fewer hosts,
@@ -118,13 +119,13 @@ class DailyPlan
     capacity      = kinds.count { |kind| !kind.fourth? }
     reinforcement = reinforcement.first(capacity)
     slots         = capacity - reinforcement.size
-    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds)
+    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
     # Truncated to what today can actually host, and again when a retention
     # check takes a slot back: the prompt's mastery instruction demands every
     # concept listed here be reintroduced, so an entry past capacity is an
     # instruction no section is left to satisfy.
     reinforcement = reinforcement.first(capacity - slots)
-    due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots)
+    due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
     established   = established_concepts_for(user, language, kinds: kinds,
                                              reinforcement: reinforcement, due_checks: due_checks)
 
@@ -171,8 +172,9 @@ class DailyPlan
     # An overdue retention check doesn't share the slot, it takes it — leaving
     # reinforcement in place alongside would put two mutually exclusive
     # concepts in the same prompt.
-    reinforcement = [] if reinforcement.any? && overdue_retention_check_pending_for_bucket?(user, bucket)
-    due_checks    = retention_checks_for_bucket(user, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size)
+    reinforcement = [] if reinforcement.any? && overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement)
+    due_checks    = retention_checks_for_bucket(user, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size,
+                                                reinforcement: reinforcement)
 
     { fourth: fourth, fourth_reinforcement: reinforcement, fourth_due_checks: due_checks,
       fourth_established: established_concepts_for_bucket(user, bucket, reinforcement: reinforcement,
@@ -184,13 +186,12 @@ class DailyPlan
   # version: the fourth slot's bucket is always exactly one fixed value
   # (today's rolled kind), never a multi-bucket set the way hostable_buckets
   # can return for the third slot.
-  def self.retention_checks_for_bucket(user, bucket, slots:)
+  def self.retention_checks_for_bucket(user, bucket, slots:, reinforcement: [])
     return [] if slots.zero?
 
-    user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP)
-        .to_a
-        .sort_by { |cm| -(overdue_ratio(cm)) }
-        .first(slots)
+    unclaimed_by(reinforcement, user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a)
+      .sort_by { |cm| -(overdue_ratio(cm)) }
+      .first(slots)
   end
   private_class_method :retention_checks_for_bucket
 
@@ -209,8 +210,9 @@ class DailyPlan
   # permanently (the fourth slot has exactly one slot total, unlike the
   # non-fourth pool's several, so a single reinforcement concept blocks 100%
   # of its retention capacity rather than a fraction of it).
-  def self.overdue_retention_check_pending_for_bucket?(user, bucket)
-    user.concepts_overdue_for_retention_check(bucket: bucket).exists?
+  def self.overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: [])
+    user.concepts_overdue_for_retention_check(bucket: bucket)
+        .where.not(concept: reinforcement.map { |h| h[:concept] }).exists?
   end
   private_class_method :overdue_retention_check_pending_for_bucket?
 
@@ -237,15 +239,27 @@ class DailyPlan
   # The per-bucket query is fetched WITHOUT truncating to `slots` — passing
   # `limit: slots` there would let SQL's raw-date ORDER BY throw away the very
   # concept this ranking exists to surface before overdue_ratio ever saw it.
-  def self.retention_checks_for(user, language, kinds:, slots:)
+  def self.retention_checks_for(user, language, kinds:, slots:, reinforcement: [])
     return [] if slots.zero?
 
-    hostable_buckets(language, kinds: kinds)
+    due = hostable_buckets(language, kinds: kinds)
       .flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a }
-      .sort_by { |cm| -(overdue_ratio(cm)) }
-      .first(slots)
+
+    unclaimed_by(reinforcement, due).sort_by { |cm| -(overdue_ratio(cm)) }.first(slots)
   end
   private_class_method :retention_checks_for
+
+  # A drill can put a mastered concept back in reinforcement, and its due
+  # check would otherwise list the same concept twice in one prompt with two
+  # different instructions. Reinforcement already asks for it fresh, so the
+  # check stands down — the same "claimed" rule established_concepts_for uses
+  # — and the overdue tests above ignore it too, so it cannot reserve or take
+  # a slot for a concept the list already carries.
+  def self.unclaimed_by(reinforcement, due_checks)
+    claimed = reinforcement.map { |h| h[:concept] }
+    due_checks.reject { |cm| claimed.include?(cm.concept) }
+  end
+  private_class_method :unclaimed_by
 
   # Days overdue divided by the concept's own retention_interval_days — the same
   # normalization concepts_overdue_for_retention_check applies in SQL, computed
@@ -294,9 +308,9 @@ class DailyPlan
   # Sharing hostable_buckets with retention_checks_for is what stops an
   # architecture-only overdue concept from forcing a slot on a challenge day it
   # could never occupy.
-  def self.overdue_retention_check_pending?(user, language, kinds:)
+  def self.overdue_retention_check_pending?(user, language, kinds:, reinforcement: [])
     hostable_buckets(language, kinds: kinds)
-      .any? { |bucket| user.concepts_overdue_for_retention_check(bucket: bucket).exists? }
+      .any? { |bucket| overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement) }
   end
   private_class_method :overdue_retention_check_pending?
 end

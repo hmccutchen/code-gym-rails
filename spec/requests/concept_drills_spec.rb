@@ -92,6 +92,17 @@ RSpec.describe "Concept drills", type: :request do
       expect(response.body).not_to include(">Drill this<")
     end
 
+    it "names the group a member is drilled under and stops the whole group" do
+      ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
+
+      get learn_concept_path(bucket: "ruby_rails", concept: "shallow_module")
+
+      expect(response.body).to include("as part of Module design")
+      expect(response.body).to include("Stop drilling Module design")
+      expect(response.body).to include(learn_group_drill_path(bucket: "ruby_rails", group: "module_design"))
+      expect(response.body).not_to include(">Stop drilling<")
+    end
+
     it "states the tradeoff before a paused concept is drilled" do
       user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
 

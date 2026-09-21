@@ -133,7 +133,8 @@ class ConceptMastery < ApplicationRecord
     improving = prev.present? && AI_RATING_RANK.fetch(rep_ai, -1) > AI_RATING_RANK.fetch(prev, -1)
 
     if mastered
-      cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0, drilled_at: nil, drill_group: nil)
+      cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0)
+      cm.clear_drill
       cm.assign_attributes(**retention_schedule_for(cm, response.date))
     elsif improving || prev.blank?
       cm.streak = 0
@@ -196,5 +197,15 @@ class ConceptMastery < ApplicationRecord
   # leave the row here, so a drill cannot invent a second way out.
   def end_pause
     assign_attributes(tier: :reduced, streak: 0, cooldown_remaining: 0)
+  end
+
+  # Where a drill ends: mastery and the user's own stop both come through here.
+  def clear_drill
+    assign_attributes(drilled_at: nil, drill_group: nil)
+  end
+
+  def clear_drill!
+    clear_drill
+    save!
   end
 end

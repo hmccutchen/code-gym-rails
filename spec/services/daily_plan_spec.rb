@@ -500,7 +500,7 @@ RSpec.describe DailyPlan do
     # reintroduced, so an entry the day has no section left to carry is an
     # instruction that cannot be honored.
     it "truncates the reinforcement list itself to what the day can host" do
-      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything).and_return(
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, drilled_in: anything).and_return(
         [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" },
           { concept: "idempotency", tier: "standard" } ]
       )
@@ -513,7 +513,7 @@ RSpec.describe DailyPlan do
     end
 
     it "gives a reinforcement entry up when an overdue check takes the slot back" do
-      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything).and_return(
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, drilled_in: anything).and_return(
         [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" } ]
       )
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
@@ -666,6 +666,29 @@ RSpec.describe DailyPlan, "drilled concepts" do
     ])
   end
 
+  it "offers a drilled architecture concept only on a day with an architecture section" do
+    ConceptDrills.start!(user, concept: "sync_vs_async", bucket: "architecture")
+
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement).to eq([])
+
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: nil)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[sync_vs_async])
+  end
+
+  it "lists a drilled concept whose retention check is due once, as reinforcement" do
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    user.concept_masteries.find_by(concept: "memoization").update!(
+      mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20
+    )
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization])
+    expect(plan.due_checks).to eq([])
+  end
+
   it "gives a drilled fourth-bucket concept the fourth slot" do
     submit("scope_creep", section: "plan_review", date: Date.current - 1)
     ConceptDrills.start!(user, concept: "unjustified_constant", bucket: "plan_review")
@@ -675,5 +698,18 @@ RSpec.describe DailyPlan, "drilled concepts" do
 
     expect(plan.fourth_reinforcement).to eq([ { concept: "unjustified_constant", tier: "standard", drilled: true } ])
     expect(plan.reinforcement).to eq([])
+  end
+
+  it "keeps a drilled fourth concept out of the fourth retention checks" do
+    ConceptDrills.start!(user, concept: "unjustified_constant", bucket: "plan_review")
+    user.concept_masteries.find_by(concept: "unjustified_constant").update!(
+      mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20
+    )
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.fourth_reinforcement.map { |h| h[:concept] }).to eq(%w[unjustified_constant])
+    expect(plan.fourth_due_checks).to eq([])
   end
 end

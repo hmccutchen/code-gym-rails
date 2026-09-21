@@ -58,6 +58,16 @@ RSpec.describe ConceptDrills do
       expect(row("transaction_safety")).to be_nil
     end
 
+    it "leaves a concept drilled under a group in that group" do
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      described_class.start!(user, concept: "memoization", bucket: "ruby_rails")
+
+      described_class.start!(user, concept: "shallow_module", bucket: "ruby_rails")
+
+      expect(row("shallow_module").drill_group).to eq("module_design")
+      expect(described_class.for(user).count).to eq(2)
+    end
+
     it "re-drilling an already drilled concept does not count against the cap" do
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
@@ -106,6 +116,13 @@ RSpec.describe ConceptDrills do
     end
   end
 
+  describe "MAX_CONCURRENT" do
+    it "leaves one non-fourth host free on the fullest day" do
+      expect(described_class::MAX_CONCURRENT).to eq(ExerciseSection.slot_count - 2)
+      expect(described_class::MAX_CONCURRENT).to eq(2)
+    end
+  end
+
   describe ".for" do
     it "lists a group once with the concepts still under it, and a lone concept by itself" do
       described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
@@ -120,6 +137,8 @@ RSpec.describe ConceptDrills do
       expect(group.concepts).to match_array(AiService::MODULE_DESIGN_CONCEPTS.drop(1))
       expect(group.bucket).to eq("ruby_rails")
       expect(drills.drilling?("n_plus_one", "ruby_rails")).to be(true)
+      expect(drills.group_for("n_plus_one", "ruby_rails")).to be_nil
+      expect(drills.group_for(AiService::MODULE_DESIGN_CONCEPTS.last, "ruby_rails")).to eq("module_design")
       expect(drills.group_drilling?("module_design", "ruby_rails")).to be(true)
       expect(drills.group_drilling?("oo_design", "ruby_rails")).to be(false)
     end

@@ -1645,6 +1645,15 @@ RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model
     expect(user.concepts_needing_reinforcement).to eq([])
   end
 
+  it "with drilled_in:, offers only drills from buckets today can host" do
+    ConceptDrills.start!(user, concept: "sync_vs_async", bucket: "architecture")
+    ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+
+    expect(user.concepts_needing_reinforcement(drilled_in: %w[ruby_rails]).map { |h| h[:concept] }).to eq(%w[n_plus_one])
+    expect(user.concepts_needing_reinforcement(drilled_in: %w[ruby_rails architecture]).map { |h| h[:concept] })
+      .to match_array(%w[n_plus_one sync_vs_async])
+  end
+
   it "applies the bucket filters to drilled concepts" do
     ConceptDrills.start!(user, concept: "scope_creep", bucket: "plan_review")
     ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")

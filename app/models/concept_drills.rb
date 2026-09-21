@@ -9,15 +9,12 @@
 # drill clears on the same co-favorable rating that marks the concept
 # mastered (ConceptMastery.evaluate_concept!). Nothing here decides difficulty.
 class ConceptDrills
-  # Two, counted in drills rather than concepts, where a whole group is one.
-  # A day has one to three non-fourth hosts and every drilled concept competes
-  # for them, so two single-concept drills still leave a host on a full day for
-  # evidence-driven reinforcement or an overdue retention check; three would
-  # let drills alone fill the largest day and crowd evidence out of the
-  # commoner two-host days entirely. A group counts once because "I'm weak at
-  # data modeling" is one self-noticed gap, and the groups run to five
-  # concepts, so a cap counted in concepts would refuse the largest outright.
-  MAX_CONCURRENT = 2
+  # Counted in drills rather than concepts, where a whole group is one: a
+  # group is one self-noticed gap, and a cap counted in concepts would refuse
+  # a large group outright. Sized so that on the fullest day — every slot but
+  # the fourth can host a drilled concept — single-concept drills still leave
+  # one host for evidence-driven reinforcement or an overdue retention check.
+  MAX_CONCURRENT = ExerciseSection.slot_count - 2
 
   LimitReached = Class.new(StandardError)
 
@@ -30,9 +27,10 @@ class ConceptDrills
   def self.start!(user, concept:, bucket:)
     raise ArgumentError, "#{concept} is not in #{bucket}" unless ConceptBucket.vocabulary_for(bucket).include?(concept)
 
-    user.transaction do
+    user.with_lock do
       drills = self.for(user)
-      raise LimitReached if drills.full? && !drills.drilling?(concept, bucket)
+      next if drills.drilling?(concept, bucket)
+      raise LimitReached if drills.full?
 
       mark!(user, concept, bucket, group: nil)
     end
@@ -42,7 +40,7 @@ class ConceptDrills
     concepts = concepts_in(group, bucket)
     raise ArgumentError, "#{bucket} holds nothing from #{group}" if concepts.empty?
 
-    user.transaction do
+    user.with_lock do
       drills = self.for(user)
       raise LimitReached if drills.full? && !drills.group_drilling?(group, bucket)
 
@@ -51,13 +49,11 @@ class ConceptDrills
   end
 
   def self.stop!(user, concept:, bucket:)
-    user.concept_masteries.drilling.where(concept: concept, language: bucket)
-        .each { |cm| cm.update!(drilled_at: nil, drill_group: nil) }
+    user.concept_masteries.drilling.where(concept: concept, language: bucket).each(&:clear_drill!)
   end
 
   def self.stop_group!(user, group:, bucket:)
-    user.concept_masteries.drilling.where(drill_group: group, language: bucket)
-        .each { |cm| cm.update!(drilled_at: nil, drill_group: nil) }
+    user.concept_masteries.drilling.where(drill_group: group, language: bucket).each(&:clear_drill!)
   end
 
   def self.concepts_in(group, bucket)
@@ -84,6 +80,10 @@ class ConceptDrills
 
   def drilling?(concept, bucket)
     @rows.any? { |cm| cm.concept == concept && cm.language == bucket }
+  end
+
+  def group_for(concept, bucket)
+    @rows.find { |cm| cm.concept == concept && cm.language == bucket }&.drill_group
   end
 
   def group_drilling?(group, bucket)

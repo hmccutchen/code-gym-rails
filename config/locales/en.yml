@@ -63,6 +63,7 @@ en:
       stop_named: "Stop drilling %{name}"
       marker: "drilling"
       offer: "Drilling puts this at the front of the line whenever a section that can host it comes up. It clears on its own once you rate a problem on it right level or easier and the review rates it solid or better. It never changes how hard the problems are — that's the difficulty setting on Setup."
+      drilling_in_group: "You're drilling this as part of %{group}."
       drilling: "You're drilling this. It clears on its own once you rate a problem on it right level or easier and the review rates it solid or better."
       waiting: "Drilling, but waiting: this went badly several sessions running, so your sets are resting it for a couple of sessions. The drill picks it back up after that."
       paused_note: "This concept is set aside right now: it went badly several sessions running, so your sets are resting it for a couple of sessions. Drilling it brings it back straight away, eased as it was before the rest, until you master it."
