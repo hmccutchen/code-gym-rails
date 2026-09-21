@@ -121,7 +121,7 @@ GEM
     erubi (1.13.1)
     et-orbi (1.4.1)
       tzinfo
-    faraday (2.14.3)
+    faraday (2.14.4)
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
@@ -153,7 +153,7 @@ GEM
     jbuilder (2.15.1)
       actionview (>= 7.0.0)
       activesupport (>= 7.0.0)
-    json (2.21.2)
+    json (3.0.2)
     jwt (3.2.0)
       base64
     kamal (2.12.0)
@@ -337,8 +337,8 @@ GEM
       rspec-mocks (>= 3.13.0, < 5.0.0)
       rspec-support (>= 3.13.0, < 5.0.0)
     rspec-support (3.13.7)
-    rubocop (1.88.1)
-      json (~> 2.3)
+    rubocop (1.91.0)
+      json (>= 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
       parallel (>= 1.10)
@@ -445,7 +445,7 @@ DEPENDENCIES
   capybara
   capybara-playwright-driver (~> 0.5.10)
   debug
-  faraday (~> 2.0)
+  faraday (~> 2.14)
   faraday-retry
   importmap-rails
   jbuilder
