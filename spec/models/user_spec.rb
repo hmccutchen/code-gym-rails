@@ -418,7 +418,7 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" }, legacy_rating: "too_hard",
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
     end
 
     it "flags a concept the AI rated beginner/developing even when the self-rating was favorable (the core gap this fix closes)" do
@@ -429,7 +429,7 @@ RSpec.describe User, type: :model do
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "developing" } })
 
-      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
     end
 
     # concept_tags is persisted provider output, so it keeps the name a section
@@ -469,7 +469,7 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_easy" }, legacy_rating: "too_easy",
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
     end
 
     it "keeps reinforcing when self-rating is unfavorable even if the AI review was favorable" do
@@ -480,7 +480,7 @@ RSpec.describe User, type: :model do
                             concept_tags: { "code_review" => "n_plus_one" },
                             ai_review: { "code_review" => { "rating" => "solid" } })
 
-      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
     end
 
     it "excludes a concept once both self-rating and AI review explicitly agree it's solid" do
@@ -501,7 +501,7 @@ RSpec.describe User, type: :model do
                             answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
                             concept_tags: { "code_review" => "n_plus_one" })
 
-      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", tier: "standard" } ])
+      expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
     end
 
     it "excludes a concept with no self-rating and no AI review at all, same as an unrated concept today" do
@@ -592,7 +592,7 @@ RSpec.describe User, type: :model do
       reinforce_response(concept: "memoization", self_rating: "right_level", ai_rating: "strong", date: Date.current - 1)
 
       result = user.concepts_needing_reinforcement
-      expect(result).to include(concept: "n_plus_one", tier: "standard")
+      expect(result).to include(concept: "n_plus_one", bucket: "ruby_rails", tier: "standard")
       expect(result.map { |h| h[:concept] }).not_to include("memoization") # mastered
     end
 
@@ -1610,8 +1610,8 @@ RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model
     ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
 
     expect(user.concepts_needing_reinforcement).to eq([
-      { concept: "memoization", tier: "standard", drilled: true },
-      { concept: "n_plus_one", tier: "standard" }
+      { concept: "memoization", bucket: "ruby_rails", tier: "standard", drilled: true },
+      { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }
     ])
   end
 
@@ -1622,7 +1622,7 @@ RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model
     user.concept_masteries.find_by(concept: "memoization").update!(tier: :reduced)
 
     result = user.concepts_needing_reinforcement
-    expect(result.first).to eq(concept: "memoization", tier: "reduced", drilled: true)
+    expect(result.first).to eq(concept: "memoization", bucket: "ruby_rails", tier: "reduced", drilled: true)
     expect(result.count { |h| h[:concept] == "memoization" }).to eq(1)
   end
 
@@ -1661,5 +1661,35 @@ RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model
 
     expect(user.concepts_needing_reinforcement(bucket: "plan_review").map { |h| h[:concept] }).to eq(%w[scope_creep])
     expect(user.concepts_needing_reinforcement(exclude_buckets: %w[plan_review]).map { |h| h[:concept] }).to eq(%w[n_plus_one])
+  end
+end
+
+RSpec.describe User, "#concepts_needing_reinforcement across language buckets", type: :model do
+  let(:user) { User.create!(email: "mixed-reinf@example.com", name: "Mixed", language: "mixed") }
+
+  def submit_response(concept:, language:, date:, self_rating: "too_hard", ai_rating: "developing")
+    exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: language,
+      problem_set: { "code_review" => { "concept" => concept } })
+    user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+      answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => self_rating },
+      concept_tags: { "code_review" => concept }, ai_review: { "code_review" => { "rating" => ai_rating } })
+  end
+
+  it "carries each entry's bucket and keeps a same-named concept from both languages" do
+    submit_response(concept: "over_mocking", language: "javascript", date: Date.current)
+    submit_response(concept: "over_mocking", language: "ruby_rails", date: Date.current - 1)
+
+    expect(user.concepts_needing_reinforcement).to eq([
+      { concept: "over_mocking", bucket: "javascript", tier: "standard" },
+      { concept: "over_mocking", bucket: "ruby_rails", tier: "standard" }
+    ])
+  end
+
+  it "resolves mastery per bucket, so a mastered javascript occurrence does not hide a struggling ruby one" do
+    submit_response(concept: "over_mocking", language: "javascript", date: Date.current,
+                    self_rating: "right_level", ai_rating: "strong")
+    submit_response(concept: "over_mocking", language: "ruby_rails", date: Date.current - 1)
+
+    expect(user.concepts_needing_reinforcement).to eq([ { concept: "over_mocking", bucket: "ruby_rails", tier: "standard" } ])
   end
 end
