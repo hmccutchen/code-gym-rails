@@ -1394,3 +1394,47 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 end
+
+RSpec.describe "Dashboard section folding", type: :request do
+  let(:user) { create_user_with_key }
+
+  before { login_as(user) }
+
+  def exercise_with_sections
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, problem_set: {
+      "code_review" => { "question" => "Find the bug", "snippet" => "def a; end" },
+      "pattern" => { "title" => "Service Objects", "why" => "Because", "question" => "When?" }
+    })
+  end
+
+  it "renders every section open inside a disclosure whose summary carries the label" do
+    exercise_with_sections
+    get root_path
+
+    body = response.body
+    expect(body.scan(/<details class="section"[^>]*\bopen\b/).size).to eq(2)
+    expect(body).to match(%r{<summary[^>]*>.*?1 — Code Review.*?</summary>}m)
+    expect(body).to match(%r{data-status-for="code_review"})
+  end
+
+  it "shows a done marker and the self-rating for a section answered and rated" do
+    exercise = exercise_with_sections
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          answers: { "code_review" => "a" * 20, "pattern" => "b" * 20 },
+                          section_ratings: { "code_review" => "right_level" })
+    get root_path
+
+    expect(response.body).to match(%r{data-status-for="code_review"[^>]*>✓ just right<})
+    expect(response.body).to match(%r{data-status-for="pattern"[^>]*>in progress<})
+  end
+
+  it "keeps the read-only render as plain sections" do
+    exercise = exercise_with_sections
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                          answers: { "code_review" => "a" * 20, "pattern" => "b" * 20 })
+    get root_path
+
+    expect(response.body).not_to include('<details class="section"')
+    expect(response.body).to include('<div class="section">')
+  end
+end

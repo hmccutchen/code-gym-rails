@@ -153,8 +153,32 @@
       }, 800);
     }
 
+    // The client half of SectionStatusHelper#section_status, read against the
+    // live form so a folded section's summary never shows a stale state.
+    const RATING_LABELS = <%= DailyResponse::SELF_RATING_LABELS.to_json.html_safe %>;
+    const IN_PROGRESS   = <%= SectionStatusHelper::IN_PROGRESS.to_json.html_safe %>;
+
+    function refreshStatus(section) {
+      const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
+      const t = form.querySelector(`textarea[data-field="${section}"]`);
+      if (!status || !t) return;
+      if (!answered(t)) status.textContent = "";
+      else status.textContent = ratings[section] ? `✓ ${RATING_LABELS[ratings[section]]}` : IN_PROGRESS;
+    }
+
+    // A folded section claims "this is settled". Editing its answer after
+    // rating it breaks that claim, so the fold opens rather than keep a
+    // stale rating beside changed text. Folding itself is only ever manual.
+    function reopenIfRated(section) {
+      const fold = form.querySelector(`details.section[data-section-fold="${section}"]`);
+      if (fold && !fold.open && ratings[section]) fold.open = true;
+    }
+
     textareas.forEach(t => {
-      t.addEventListener("input", () => { updateProgress(); refreshSubmit(); autoSave(); });
+      t.addEventListener("input", () => {
+        reopenIfRated(t.dataset.field);
+        updateProgress(); refreshSubmit(); refreshStatus(t.dataset.field); autoSave();
+      });
     });
 
     ratingButtons.forEach(btn => {
@@ -164,6 +188,7 @@
         form.querySelectorAll(`button[data-rating-for="${section}"]`)
             .forEach(b => b.classList.toggle("active", b === btn));
         refreshSubmit();
+        refreshStatus(section);
         autoSave();
       });
     });

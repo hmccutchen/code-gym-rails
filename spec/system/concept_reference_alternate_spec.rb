@@ -26,8 +26,9 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     box = first(".concept-alternates")
     # The first-exposure auto-expand may already have opened this one; only
     # click the summary when it hasn't.
-    details = box.find(:xpath, "ancestor::details")
-    details.find("summary").click unless details["open"]
+    # The nearest one: the section that holds the reference is a <details> too.
+    details = box.find(:xpath, "ancestor::details[1]")
+    details.find(":scope > summary").click unless details["open"]
     box
   end
 
@@ -111,8 +112,8 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
       perform_enqueued_jobs { visit_as(user) }
       expect(page).to have_content(/Code Review/i, wait: 10)
 
-      details = first(".concept-alternates").find(:xpath, "ancestor::details")
-      details.find("summary").click if details["open"]
+      details = first(".concept-alternates").find(:xpath, "ancestor::details[1]")
+      details.find(":scope > summary").click if details["open"]
 
       expect(details).to have_no_css(".explain-concept-differently", visible: true)
     end
