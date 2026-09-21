@@ -84,6 +84,7 @@ group :test do
   gem "capybara-playwright-driver", "~> 0.5.10"
 end
 
-gem "faraday", "~> 2.0"
+gem "faraday", "~> 2.14"
+gem "json", "~> 2.0"
 gem "faraday-retry"
 gem "letter_opener", group: :development
