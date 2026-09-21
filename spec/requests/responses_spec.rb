@@ -1765,3 +1765,14 @@ RSpec.describe "Responses", type: :request do
     end
   end
 end
+
+RSpec.describe ResponsesController, "duck thread byte allowance" do
+  # A reply the cap allows must fit its own per-turn allowance, whatever the
+  # cap is set to; a flat number outgrew the cap once.
+  it "gives a full-length reply room" do
+    allowance = described_class::DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE
+
+    expect(allowance).to be >= AiService::DUCK_RESPONSE_MAX_TOKENS * described_class::DUCK_REPLY_BYTES_PER_TOKEN
+    expect(described_class::MAX_DUCK_THREAD_BYTES).to be > allowance * described_class::MAX_DUCK_TURNS_PER_SECTION
+  end
+end

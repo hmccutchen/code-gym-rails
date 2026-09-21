@@ -27,10 +27,14 @@ class ResponsesController < ApplicationController
   # language, is already 6 * 2_000 * 4 = 48_000 bytes, well past a flat
   # 20_000. That falsely rejected a cap-respecting conversation typed in a
   # multi-byte language after only 2-3 exchanges instead of the full 6.
-  # Assistant replies aren't character-bounded (only by
-  # AiService::DUCK_RESPONSE_MAX_TOKENS tokens), so they get a generous
-  # per-turn byte allowance instead of a precise token->byte conversion.
-  DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = 1_200
+  # Assistant replies aren't character-bounded, only token-bounded by
+  # AiService::DUCK_RESPONSE_MAX_TOKENS, so their allowance derives from that
+  # cap at a generous bytes-per-token figure rather than being a flat number
+  # that a raised cap would silently outgrow — as 1_200 did when the cap moved
+  # from 250 to 400. English prose runs about four bytes a token; code and
+  # multi-byte text run higher, which the aggregate cap's slack absorbs.
+  DUCK_REPLY_BYTES_PER_TOKEN = 4
+  DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = AiService::DUCK_RESPONSE_MAX_TOKENS * DUCK_REPLY_BYTES_PER_TOKEN
   MAX_DUCK_THREAD_BYTES = MAX_DUCK_TURNS_PER_SECTION *
     (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)
 
