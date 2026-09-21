@@ -3801,6 +3801,25 @@ RSpec.describe AiService do
       })
     end
 
+    # A duck reply is prose, so one that stops early is still worth reading;
+    # the JSON entry points keep raising because a cut-off body is unusable.
+    it "returns a reply the cap cut short with an ellipsis, and still records usage" do
+      svc = double_class.new(canned_text: "Stubbing replaces the method so the test", truncated: true)
+
+      answer = nil
+      expect {
+        answer = svc.duck_response(user, exercise, section: "code_review", message: "what is stubbing?")
+      }.to change { ApiUsage.where(purpose: "duck_thread").count }.by(1)
+
+      expect(answer).to eq("Stubbing replaces the method so the test…")
+    end
+
+    it "leaves a complete reply without an ellipsis" do
+      svc = double_class.new(canned_text: "What does the stub return?", truncated: false)
+
+      expect(svc.duck_response(user, exercise, section: "code_review", message: "hm")).to eq("What does the stub return?")
+    end
+
     # Local spy: the shared `double_class`'s `#call` doesn't expose `system:`
     # or `history:`, and #duck_response has no `daily_response` argument to
     # read a draft answer from in the first place — this class exists purely
@@ -3901,11 +3920,12 @@ RSpec.describe AiService do
       expect(AiService::DUCK_EXPLAIN_REQUEST).not_to match(/answer|fix|solve/i)
     end
 
-    # An explanation plus a concrete analogy does not fit in 150 tokens. The
-    # ceiling stays a budget, not an enforcement mechanism — the prompt is
-    # what actually withholds the answer.
+    # An explanation plus a concrete analogy did not fit in 150 tokens, and an
+    # explanation plus a guiding question, the prompt's answer to a mixed
+    # message, did not fit in 250. The ceiling stays a budget, not an
+    # enforcement mechanism — the prompt is what actually withholds the answer.
     it "gives a reply room for an explanation while staying far below a review's ceiling" do
-      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to eq(250)
+      expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to eq(400)
       expect(AiService::DUCK_RESPONSE_MAX_TOKENS).to be < ClaudeService::MAX_TOKENS
     end
 

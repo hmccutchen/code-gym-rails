@@ -135,12 +135,16 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
-  # Cost and length control for #duck_response. 250 tokens fits both shapes the
-  # system prompt asks for: a 1-3 sentence guiding question, and a plain-language
-  # explanation with a concrete analogy — the latter does not fit in the 150 this
-  # started at. It remains a budget, not an enforcement mechanism: a short fix
-  # fits in 250 tokens too, so DUCK_SYSTEM_PROMPT's rules are still the only
-  # thing actually asking the model not to give answers.
+  # Cost and length control for #duck_response. 400 tokens fits every shape the
+  # system prompt asks for, including the longest: a mixed message that earns
+  # a plain-language explanation with an analogy AND a guiding question. That
+  # shape overran the 250 this sat at (a real question about RSpec stubbing
+  # and whether a test exercised its error path), and 150 before that. It
+  # remains a budget, not an enforcement mechanism: a short fix fits in 400
+  # tokens too, so DUCK_SYSTEM_PROMPT's rules are still the only thing
+  # actually asking the model not to give answers. A reply that still overruns
+  # is shown cut short rather than discarded, since prose that stops a
+  # sentence early is worth more than a 503 — see #duck_response.
   #
   # Deliberately one ceiling for every duck reply rather than a higher one for
   # explain-requests. The server cannot know which kind a message is until the
@@ -149,7 +153,7 @@ class AiService
   # does not hold is worse than one honest number.
   # Deliberately distinct from ClaudeService::MAX_TOKENS, which is sized for
   # full review generation.
-  DUCK_RESPONSE_MAX_TOKENS = 250
+  DUCK_RESPONSE_MAX_TOKENS = 400
 
   # Cost and length control for #explain_concept_differently. Sized the way
   # DUCK_RESPONSE_MAX_TOKENS is — a budget, not an enforcement mechanism —
@@ -1097,7 +1101,7 @@ class AiService
   # real turns, never written anywhere.
   def duck_response(user, exercise, section:, message:, thread: [])
     result = call_and_log(
-      user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS,
+      user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS, allow_truncated: true,
       system: "#{DUCK_SYSTEM_PROMPT}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
       # A first turn pays a write premium only a later turn recovers, so this
       # is a bet that threads continue — not a free win. CLAUDE.md's
@@ -1114,7 +1118,8 @@ class AiService
       PROMPT
     )
 
-    text_or_raise(result, subject: "duck response")
+    text = text_or_raise(result, subject: "duck response")
+    result[:truncated] ? "#{text}…" : text
   end
 
   # ── The pseudocode_to_code rounds ────────────────────────────────────────
@@ -2496,13 +2501,17 @@ class AiService
   # sees a harmless no-op here: ActiveRecord's with_connection reuses a
   # connection already leased to the current thread rather than checking out
   # a second one.
+  #
+  # `allow_truncated:` hands a cut-off reply back with its `truncated` flag
+  # instead of raising. Only a prose caller may ask for it: a JSON body that
+  # stops early is unusable, but prose that stops a sentence early still is.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
-                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [])
+                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], allow_truncated: false)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
                   read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
     ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
 
-    if result[:truncated]
+    if result[:truncated] && !allow_truncated
       raise TruncatedResponseError,
             "Provider stopped generating at its output token limit (#{result[:output_tokens].to_i} tokens)"
     end
