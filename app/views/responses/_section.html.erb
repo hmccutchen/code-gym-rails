@@ -20,7 +20,7 @@
   <div class="section-label"><%= label %></div>
 <% else %>
 <details class="section" open data-section-fold="<%= key %>">
-  <summary class="section-label"><%= label %>
+  <summary class="section-label"><span class="section-title"><%= label %></span>
     <span class="section-status" data-status-for="<%= key %>"><%= section_status(response, key) %></span>
   </summary>
 <% end %>

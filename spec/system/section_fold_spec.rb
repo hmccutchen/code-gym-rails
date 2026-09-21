@@ -40,6 +40,26 @@ RSpec.describe "Section folding", type: :system do
     end
   end
 
+  # A titled section's summary carries glossary terms, and a term is only
+  # reachable by tap on a phone; that tap must open the definition, not fold
+  # the section around it.
+  it "opens a glossary term in the summary without folding the section" do
+    user = create_fake_provider_user
+
+    travel_to(a_weekday) do
+      perform_enqueued_jobs { visit_as(user) }
+      expect(page).to have_content(/Code Review/i, wait: 10)
+
+      section = find(%(details.section[data-section-fold="pattern"]))
+      term = section.find(":scope > summary .gloss-term", match: :first)
+      term.click
+
+      expect(term[:class]).to include("gloss-open")
+      expect(section[:open]).to be_truthy
+      expect(section).to have_selector(%(textarea[data-field="pattern"]), visible: :visible)
+    end
+  end
+
   def rating_row_fields
     all(".rating-row[data-rating-for]", visible: :all).map { |row| row["data-rating-for"] }.uniq
   end
