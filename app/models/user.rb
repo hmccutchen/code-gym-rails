@@ -345,12 +345,10 @@ class User < ApplicationRecord
   # Read from the exposure index rather than stored, since which drill was
   # offered is never recorded, like every other offer.
   def drilled_reinforcement(bucket, exclude_buckets, hostable)
-    rows = concept_masteries.drilling.where.not(tier: :paused)
-    rows = rows.where(language: bucket) if bucket
-    rows = rows.where.not(language: exclude_buckets) if exclude_buckets.any?
+    buckets = bucket ? [ bucket ] : ConceptBucket.slice_for(language) - exclude_buckets
+    rows    = concept_masteries.drilling.in_buckets(buckets).where.not(tier: :paused)
 
-    rows.select { |cm| still_in_vocabulary?(cm.concept, cm.language) }
-        .select { |cm| hostable.nil? || hostable.call(cm.concept, cm.language) }
+    rows.select { |cm| hostable.nil? || hostable.call(cm.concept, cm.language) }
         .sort_by { |cm| drill_order(cm) }
         .map { |cm| { concept: cm.concept, tier: cm.tier, drilled: true } }
   end

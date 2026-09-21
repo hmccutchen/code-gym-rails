@@ -161,13 +161,12 @@ class DailyPlan
   # that way. The bucket check keeps a mixed user's same-named concept in the
   # other language out.
   def self.drill_host_test(language, kinds:, mode:)
-    buckets = hostable_buckets(language, kinds: kinds)
-    hosts   = kinds.reject(&:fourth?)
+    buckets  = hostable_buckets(language, kinds: kinds)
+    taggable = kinds.reject(&:fourth?)
+                    .flat_map { |kind| ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) }
+                    .to_set
 
-    lambda do |concept, bucket|
-      buckets.include?(bucket) &&
-        hosts.any? { |kind| ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode).include?(concept) }
-    end
+    ->(concept, bucket) { buckets.include?(bucket) && taggable.include?(concept) }
   end
   private_class_method :drill_host_test
 

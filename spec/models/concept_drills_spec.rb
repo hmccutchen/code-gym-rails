@@ -118,13 +118,63 @@ RSpec.describe ConceptDrills do
       expect(described_class.for(user).count).to eq(1)
     end
 
+    it "counts drills in other buckets against the cap" do
+      described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+      described_class.start!(user, concept: "sync_vs_async", bucket: "architecture")
+
+      expect { described_class.start_group!(user, group: "module_design", bucket: "ruby_rails") }
+        .to raise_error(ConceptDrills::LimitReached)
+    end
+
+    it "returns false and leaves every member untouched when the group is already drilled" do
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      row("shallow_module").clear_drill!
+      stamps = user.concept_masteries.drilling.pluck(:concept, :drilled_at)
+
+      expect(described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")).to be(false)
+      expect(user.concept_masteries.drilling.pluck(:concept, :drilled_at)).to match_array(stamps)
+      expect(row("shallow_module").drilled_at).to be_nil
+    end
+
     it "refuses a group the bucket does not hold" do
       expect { described_class.start_group!(user, group: "module_design", bucket: "architecture") }
         .to raise_error(ArgumentError)
     end
   end
 
+  describe "#can_start? and #can_start_group?" do
+    it "follows what start! and start_group! would accept, cap included" do
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      described_class.start!(user, concept: "memoization", bucket: "ruby_rails")
+      row("shallow_module").clear_drill!
+
+      drills = described_class.for(user)
+
+      expect(drills).to be_full
+      expect(drills.can_start?("shallow_module", "ruby_rails")).to be(true)
+      expect(drills.can_start?("n_plus_one", "ruby_rails")).to be(false)
+      expect(drills.can_start?("memoization", "ruby_rails")).to be(false)
+      expect(drills.can_start_group?("module_design", "ruby_rails")).to be(false)
+      expect(drills.can_start_group?("oo_design", "ruby_rails")).to be(false)
+    end
+
+    it "lets a group start that absorbs the lone drills filling the cap" do
+      described_class.start!(user, concept: "shallow_module", bucket: "ruby_rails")
+      described_class.start!(user, concept: "pass_through_method", bucket: "ruby_rails")
+
+      expect(described_class.for(user).can_start_group?("module_design", "ruby_rails")).to be(true)
+    end
+  end
+
   describe ".stop! and .stop_group!" do
+    it "stops the whole group when the concept is drilled as a member" do
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+
+      described_class.stop!(user, concept: "shallow_module", bucket: "ruby_rails")
+
+      expect(user.concept_masteries.drilling).to be_empty
+    end
+
     it "clears one concept's drill" do
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
       described_class.stop!(user, concept: "n_plus_one", bucket: "ruby_rails")

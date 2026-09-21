@@ -11,10 +11,12 @@
 class ConceptDrills
   # Counted in drills rather than concepts, where a whole group is one: a
   # group is one self-noticed gap, and a cap counted in concepts would refuse
-  # a large group outright. One fewer than the slots that can host a drilled
-  # concept — every slot but the fourth — so on the fullest day single-concept
-  # drills still leave one host for evidence-driven reinforcement or an
-  # overdue retention check.
+  # a large group outright. One fewer than the non-fourth slots, which is
+  # where every drill but a fourth-bucket one competes, so on the fullest day
+  # single-concept drills still leave one host for evidence-driven
+  # reinforcement or an overdue retention check. A fourth-bucket drill counts
+  # against the same cap while occupying only the fourth: the cap bounds how
+  # many gaps are worked at once, not how many hosts they take.
   MAX_CONCURRENT = ExerciseSection.slots.count { |_slot, kinds| kinds.none?(&:fourth?) } - 1
 
   LimitReached = Class.new(StandardError)
@@ -26,8 +28,7 @@ class ConceptDrills
   # the cap nor can be reached to stop, so it is simply inert until the slice
   # holds it again.
   def self.for(user)
-    scopes = ConceptBucket.slice_for(user.language).map { |bucket| ConceptMastery.in_bucket(bucket) }
-    new(user.concept_masteries.drilling.merge(scopes.reduce(:or)).order(:drilled_at, :id).to_a)
+    new(user.concept_masteries.drilling.in_buckets(ConceptBucket.slice_for(user.language)).order(:drilled_at, :id).to_a)
   end
 
   # Returns false when the concept was already drilled and nothing changed. A
@@ -39,32 +40,37 @@ class ConceptDrills
     user.with_lock do
       drills = self.for(user)
       next false if drills.drilling?(concept, bucket)
+      raise LimitReached unless drills.can_start?(concept, bucket)
 
-      group = ConceptGroup.for(concept)
-      group = nil unless drills.group_drilling?(group, bucket)
-      raise LimitReached if group.nil? && drills.full?
-
-      mark!(user, concept, bucket, group: group)
+      mark!(user, concept, bucket, group: drills.joinable_group(concept, bucket))
       true
     end
   end
 
-  # Lone drills of the group's own members fold into it, so they are not
-  # counted against the cap the group would then replace them under.
+  # Returns false when the group is already drilled: a repeat press must not
+  # re-add a member mastery has cleared or restamp the rotation order. Lone
+  # drills of the group's own members fold into it rather than counting
+  # against the cap the group replaces them under.
   def self.start_group!(user, group:, bucket:)
     concepts = concepts_in(group, bucket)
     raise ArgumentError, "#{bucket} holds nothing from #{group}" if concepts.empty?
 
     user.with_lock do
       drills = self.for(user)
-      raise LimitReached if drills.count_without(bucket, group, concepts) >= MAX_CONCURRENT
+      next false if drills.group_drilling?(group, bucket)
+      raise LimitReached unless drills.can_start_group?(group, bucket)
 
       concepts.each { |concept| mark!(user, concept, bucket, group: group) }
+      true
     end
   end
 
+  # A member is drilled as its group and stops as its group, so stopping one
+  # concept never leaves a group the index still labels whole.
   def self.stop!(user, concept:, bucket:)
-    user.concept_masteries.drilling.where(concept: concept, language: bucket).each(&:clear_drill!)
+    user.concept_masteries.drilling.where(concept: concept, language: bucket).each do |cm|
+      cm.drill_group ? stop_group!(user, group: cm.drill_group, bucket: bucket) : cm.clear_drill!
+    end
   end
 
   def self.stop_group!(user, group:, bucket:)
@@ -97,14 +103,29 @@ class ConceptDrills
     @rows.any? { |cm| cm.concept == concept && cm.language == bucket }
   end
 
-  # How many drills would remain if this group and lone drills of these
-  # concepts were set aside.
-  def count_without(bucket, group, concepts)
-    entries.count do |entry|
-      next false if entry.bucket != bucket
-      next false if entry.group == group
-      !(entry.group.nil? && concepts.include?(entry.concepts.first))
-    end
+  # The one statement of what the cap allows, read by start! and by the
+  # pages that offer the button, so the two cannot disagree.
+  def can_start?(concept, bucket)
+    return false if drilling?(concept, bucket)
+
+    !full? || joinable_group(concept, bucket).present?
+  end
+
+  # The group's own lone members fold into it, so they are not counted
+  # against the cap the group replaces them under. Drills in other buckets
+  # count as they are.
+  def can_start_group?(group, bucket)
+    return false if group_drilling?(group, bucket)
+
+    members  = ConceptDrills.concepts_in(group, bucket)
+    absorbed = entries.count { |entry| entry.bucket == bucket && entry.group.nil? && members.include?(entry.concepts.first) }
+    count - absorbed < MAX_CONCURRENT
+  end
+
+  # The drilled group this concept would join, if its group is drilled here.
+  def joinable_group(concept, bucket)
+    group = ConceptGroup.for(concept)
+    group if group_drilling?(group, bucket)
   end
 
   def group_for(concept, bucket)

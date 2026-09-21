@@ -1579,9 +1579,9 @@ class AiService
       }.join("\n")
     end
 
-    reinforcement_list = reinforcement ||
-      user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS,
-                                          hostable: ->(_concept, bucket) { bucket == language })
+    # Direct callers only; #generate_exercise always passes the plan's list,
+    # which is where the per-section hosting test for drills lives.
+    reinforcement_list = reinforcement || user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS)
     reinforcement_text = reinforcement_list.any? ?
       reinforcement_list.map { |h| annotate_reinforcement(h) }.join(", ") : "none"
 

@@ -120,6 +120,16 @@ RSpec.describe "Concept drills", type: :request do
       expect(response.body).to include("set aside")
     end
 
+    it "still offers to rejoin a cleared member of a drilled group when the cap is full" do
+      ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+      row("shallow_module").clear_drill!
+
+      get learn_concept_path(bucket: "ruby_rails", concept: "shallow_module")
+
+      expect(response.body).to include(">Drill this<")
+    end
+
     it "explains the cap instead of offering the drill when it is full" do
       ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
       ConceptDrills.start!(user, concept: "transaction_safety", bucket: "ruby_rails")

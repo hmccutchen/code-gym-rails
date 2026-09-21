@@ -674,11 +674,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   mastered concept.
 
   **The cap is `ConceptDrills::MAX_CONCURRENT`, counted in drills where a
-  group is one.** It derives from `ExerciseSection.slot_count`: on the fullest
-  day every slot but the fourth can host a drilled concept, and the cap is one
-  fewer than that, so single-concept drills always leave a host for
-  evidence-driven reinforcement or an overdue retention check. The reasoning
-  sits beside the constant, and a spec pins the value.
+  group is one.** It is one fewer than the non-fourth slots in
+  `ExerciseSection.slots`, where every drill but a fourth-bucket one competes,
+  so single-concept drills always leave a host for evidence-driven
+  reinforcement or an overdue retention check. A fourth-bucket drill counts
+  against the same cap while occupying only the fourth: the cap bounds how
+  many gaps are worked at once, not how many hosts they take. The reasoning
+  sits beside the constant, a spec pins the value, and
+  `ConceptDrills#can_start?` / `#can_start_group?` are the one statement of
+  what it allows, read by the start methods and by the pages that offer the
+  button.
 
   **Drills are scoped to what today can tag, and stand a retention check
   down.** `DailyPlan` hands `concepts_needing_reinforcement` a `hostable:`
@@ -697,8 +702,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   (`ConceptBucket.slice_for`, shared with the Learn tab), so a drill stranded
   by a language change or a renamed concept neither counts against the cap
   nor sits unreachable behind a stop control the slice would 404. A concept
-  whose group is drilled joins that group when drilled alone, and a group
-  absorbs lone drills of its own members, so one gap is never two entries.
+  whose group is drilled joins that group when drilled alone, a group absorbs
+  lone drills of its own members, and a member stops as its group, so one gap
+  is never two entries and a group is never half-labelled.
 
   **Drilling a paused concept ends the pause**, through the same exit an
   expired cooldown takes (`ConceptMastery#end_pause`), and the concept page

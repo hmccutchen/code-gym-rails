@@ -64,7 +64,7 @@
               <% if @drills.group_drilling?(group_key, bucket[:key]) %>
                 <%= button_to t("learn.drill.stop_group"), learn_group_drill_path(bucket: bucket[:key], group: group_key),
                               method: :delete, class: "btn btn-sm" %>
-              <% elsif !@drills.full? %>
+              <% elsif @drills.can_start_group?(group_key, bucket[:key]) %>
                 <%= button_to t("learn.drill.button_group"), learn_group_drill_path(bucket: bucket[:key], group: group_key),
                               class: "btn btn-sm", title: t("learn.drill.offer") %>
               <% end %>
