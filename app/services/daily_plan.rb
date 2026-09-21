@@ -95,8 +95,15 @@ class DailyPlan
                                         preferences: KindPreferences.for(user))
     kinds         = ExerciseSection.for_plan(**rotation)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
+    # Held to the buckets today can host, like retention and established
+    # concepts: a mixed user's javascript entry on a ruby_rails day could
+    # otherwise sit beside the ruby_rails retention check for the same name,
+    # and the prompt, which names concepts without their bucket, would ask for
+    # one name under two instructions.
+    hostable      = hostable_buckets(language, kinds: kinds)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
                                                         hostable: drill_host_test(language, kinds: kinds, mode: code_review_mode))
+                        .select { |h| hostable.include?(h[:bucket]) }
     # Only the non-fourth kinds present today can ever host a language or
     # architecture concept, so capacity follows the chosen set rather than a
     # literal 3 — a short day (pattern chosen but no third) has fewer hosts,

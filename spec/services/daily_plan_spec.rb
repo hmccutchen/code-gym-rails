@@ -780,7 +780,12 @@ RSpec.describe DailyPlan, "same-named concepts across language buckets" do
 
     plan = described_class.for(user, language: "ruby_rails")
 
-    expect(plan.reinforcement).to include(concept: "over_mocking", bucket: "javascript", tier: "standard")
+    expect(plan.reinforcement).to eq([])
     expect(plan.due_checks.map { |cm| [ cm.concept, cm.language ] }).to eq([ [ "over_mocking", "ruby_rails" ] ])
+
+    on_javascript_day = described_class.for(user, language: "javascript")
+
+    expect(on_javascript_day.reinforcement).to eq([ { concept: "over_mocking", bucket: "javascript", tier: "standard" } ])
+    expect(on_javascript_day.due_checks).to eq([])
   end
 end
