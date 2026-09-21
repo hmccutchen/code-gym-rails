@@ -63,6 +63,16 @@ RSpec.describe "Concept drills", type: :request do
     end
   end
 
+  describe "DELETE on a group member" do
+    it "names the group that stopped" do
+      ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
+
+      delete learn_concept_drill_path(bucket: "ruby_rails", concept: "shallow_module")
+
+      expect(flash[:notice]).to include("Module design")
+    end
+  end
+
   describe "POST and DELETE /learn/:bucket/groups/:group/drill" do
     it "starts and stops a group drill from the index" do
       post learn_group_drill_path(bucket: "ruby_rails", group: "module_design")
@@ -170,6 +180,16 @@ RSpec.describe "Concept drills", type: :request do
       get learn_path
 
       expect(response.body).to include("Stop drilling this group")
+    end
+
+    it "says the cap is full instead of silently dropping every group control" do
+      ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+      ConceptDrills.start!(user, concept: "transaction_safety", bucket: "ruby_rails")
+
+      get learn_path
+
+      expect(response.body).not_to include("Drill this group")
+      expect(response.body).to include("the most at once")
     end
 
     it "offers no group drill on a bucket with a single flat group" do

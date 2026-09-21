@@ -118,7 +118,7 @@ class DailyPlan
     # conditions. AiService#log_retention already records offered-versus-
     # honored per bucket, so if this matters it will show up there first.
     capacity      = kinds.count { |kind| !kind.fourth? }
-    reinforcement = reinforcement.first(capacity)
+    reinforcement = share_hosts(reinforcement, capacity)
     slots         = capacity - reinforcement.size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
     # Truncated to what today can actually host, and again when a retention
@@ -152,6 +152,20 @@ class DailyPlan
     RealSource.pick(mode, last_seen: RealSource.last_seen_for(user))
   end
   private_class_method :code_review_source_for
+
+  # Drills lead, but a group drill with more members than hosts would
+  # otherwise fill every slot every day until all of them cleared, and the
+  # concept the ratings flagged would never come back. When evidence-driven
+  # reinforcement is waiting, drills keep all but one host; a one-host day
+  # still goes to the drill, since the cap's guarantee is about the fullest
+  # day and a drill is the user's own request.
+  def self.share_hosts(reinforcement, capacity)
+    drilled, evidence = reinforcement.partition { |h| h[:drilled] }
+    return reinforcement.first(capacity) if evidence.empty?
+
+    (drilled.first([ capacity - 1, 1 ].max) + evidence).first(capacity)
+  end
+  private_class_method :share_hosts
 
   # Whether some non-fourth section today can tag a drilled concept, from the
   # same per-section vocabulary the prompt offers (AiService#can_host? reads

@@ -29,7 +29,8 @@
 
 <% if @drills.any? %>
   <div class="learn-drills">
-    <p><%= t("learn.drill.current", drills: drill_names(@drills)) %> <%= t("learn.drill.current_note") %></p>
+    <p><%= t("learn.drill.current", drills: drill_names(@drills)) %> <%= t("learn.drill.current_note") %>
+      <% if @drills.full? %><%= t("learn.drill.at_cap") %><% end %></p>
     <% @drills.entries.each do |entry| %>
       <%= button_to t("learn.drill.stop_named", name: drill_label(entry)), drill_stop_path(entry),
                     method: :delete, class: "btn btn-sm" %>

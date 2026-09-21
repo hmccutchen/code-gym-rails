@@ -455,3 +455,9 @@ RSpec.describe ConceptMastery, "drills", type: :model do
     expect(cm.drilled_at).to be_present
   end
 end
+
+RSpec.describe ConceptMastery, ".in_buckets", type: :model do
+  it "is an empty relation for no buckets rather than nil" do
+    expect(described_class.in_buckets([]).drilling.to_a).to eq([])
+  end
+end

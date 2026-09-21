@@ -688,6 +688,45 @@ RSpec.describe DailyPlan, "drilled concepts" do
     expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[wrong_cardinality])
   end
 
+  it "leaves one host for evidence-driven reinforcement when a group drill could fill the day" do
+    submit("n_plus_one", date: Date.current - 1)
+    ConceptDrills.start_group!(user, group: "data_modeling", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.size).to eq(3)
+    expect(plan.reinforcement.count { |h| h[:drilled] }).to eq(2)
+    expect(plan.reinforcement.last).to eq(concept: "n_plus_one", tier: "standard")
+  end
+
+  it "still offers a drill on a one-host day with evidence waiting" do
+    submit("n_plus_one", date: Date.current - 1)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization])
+  end
+
+  it "does not let a drilled concept's own overdue check take the slot back from it" do
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    user.concept_masteries.find_by(concept: "memoization").update!(
+      mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20
+    )
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization])
+    expect(plan.due_checks).to eq([])
+  end
+
   it "lists a drilled concept whose retention check is due once, as reinforcement" do
     ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
     user.concept_masteries.find_by(concept: "memoization").update!(

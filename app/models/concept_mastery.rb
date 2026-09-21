@@ -13,7 +13,7 @@ class ConceptMastery < ApplicationRecord
   # Filtering on `language:` alone is exactly that bug. Every selection query
   # goes through here so a new one cannot reintroduce it by omission.
   scope :in_bucket, ->(bucket) { where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket)) }
-  scope :in_buckets, ->(buckets) { buckets.map { |bucket| in_bucket(bucket) }.reduce(:or) }
+  scope :in_buckets, ->(buckets) { buckets.map { |bucket| in_bucket(bucket) }.reduce(none, :or) }
   scope :drilling, -> { where.not(drilled_at: nil) }
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze

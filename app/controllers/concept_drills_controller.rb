@@ -18,8 +18,9 @@ class ConceptDrillsController < ApplicationController
     bucket  = validated_bucket
     concept = validated_concept(bucket)
 
-    ConceptDrills.stop!(current_user, concept: concept, bucket: bucket)
-    redirect_to learn_concept_path(bucket: bucket, concept: concept), notice: t("learn.drill.stopped", name: concept.humanize)
+    group = ConceptDrills.stop!(current_user, concept: concept, bucket: bucket)
+    name  = group ? t("learn.groups.#{group}") : concept.humanize
+    redirect_to learn_concept_path(bucket: bucket, concept: concept), notice: t("learn.drill.stopped", name: name)
   end
 
   # POST /learn/:bucket/groups/:group/drill

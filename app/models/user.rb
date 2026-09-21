@@ -278,10 +278,9 @@ class User < ApplicationRecord
   #
   # `bucket:`/`exclude_buckets:` scope the result by ConceptBucket — added for
   # the fourth slot's independent reinforcement track, which must never mix
-  # with the three-slot vocabulary. Both default to a no-op filter, so every
-  # caller that doesn't pass them (every
-  # caller as of this comment) sees identical behavior to before either
-  # keyword existed. Marking a concept resolved happens before either filter
+  # with the three-slot vocabulary. Both default to a no-op filter, so a
+  # caller that passes neither sees the behavior from before either keyword
+  # existed; DailyPlan passes one on each track. Marking a concept resolved happens before either filter
   # runs; that's safe for the special ConceptBucket vocabularies (architecture,
   # plan_review, ambiguity_hunt, pseudocode_to_code) because each is disjoint from every other
   # vocabulary, including both language vocabularies — a filtered-out

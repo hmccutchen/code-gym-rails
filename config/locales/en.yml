@@ -70,6 +70,7 @@ en:
       full: "You're already drilling %{drills}. Stop one of those to drill this."
       current: "You're drilling %{drills}."
       current_note: "Each one clears on its own once you master it."
+      at_cap: "That's the most at once — stop one to drill something else."
       started: "Drilling %{name} from your next set on."
       already: "You're already drilling %{name}."
       stopped: "Stopped drilling %{name}."

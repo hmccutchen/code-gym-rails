@@ -136,6 +136,15 @@ RSpec.describe ConceptDrills do
       expect(row("shallow_module").drilled_at).to be_nil
     end
 
+    it "leaves a paused member paused, since no page stated the tradeoff for it" do
+      user.concept_masteries.create!(concept: "shallow_module", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+
+      expect(row("shallow_module").tier).to eq("paused")
+      expect(row("shallow_module").drilled_at).to be_present
+    end
+
     it "refuses a group the bucket does not hold" do
       expect { described_class.start_group!(user, group: "module_design", bucket: "architecture") }
         .to raise_error(ArgumentError)
@@ -167,12 +176,17 @@ RSpec.describe ConceptDrills do
   end
 
   describe ".stop! and .stop_group!" do
-    it "stops the whole group when the concept is drilled as a member" do
+    it "stops the whole group when the concept is drilled as a member, and says which" do
       described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
 
-      described_class.stop!(user, concept: "shallow_module", bucket: "ruby_rails")
-
+      expect(described_class.stop!(user, concept: "shallow_module", bucket: "ruby_rails")).to eq("module_design")
       expect(user.concept_masteries.drilling).to be_empty
+    end
+
+    it "returns nil when stopping a lone drill" do
+      described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+
+      expect(described_class.stop!(user, concept: "n_plus_one", bucket: "ruby_rails")).to be_nil
     end
 
     it "clears one concept's drill" do

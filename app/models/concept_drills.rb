@@ -42,7 +42,7 @@ class ConceptDrills
       next false if drills.drilling?(concept, bucket)
       raise LimitReached unless drills.can_start?(concept, bucket)
 
-      mark!(user, concept, bucket, group: drills.joinable_group(concept, bucket))
+      mark!(user, concept, bucket, group: drills.joinable_group(concept, bucket), end_pause: true)
       true
     end
   end
@@ -50,7 +50,9 @@ class ConceptDrills
   # Returns false when the group is already drilled: a repeat press must not
   # re-add a member mastery has cleared or restamp the rotation order. Lone
   # drills of the group's own members fold into it rather than counting
-  # against the cap the group replaces them under.
+  # against the cap the group replaces them under. A paused member stays
+  # paused — only the concept page states that tradeoff before the click —
+  # and the drill picks it up when the cooldown ends.
   def self.start_group!(user, group:, bucket:)
     concepts = concepts_in(group, bucket)
     raise ArgumentError, "#{bucket} holds nothing from #{group}" if concepts.empty?
@@ -60,17 +62,21 @@ class ConceptDrills
       next false if drills.group_drilling?(group, bucket)
       raise LimitReached unless drills.can_start_group?(group, bucket)
 
-      concepts.each { |concept| mark!(user, concept, bucket, group: group) }
+      concepts.each { |concept| mark!(user, concept, bucket, group: group, end_pause: false) }
       true
     end
   end
 
   # A member is drilled as its group and stops as its group, so stopping one
-  # concept never leaves a group the index still labels whole.
+  # concept never leaves a group the index still labels whole. Returns the
+  # group that stopped, or nil for a lone drill, so the caller can say which.
   def self.stop!(user, concept:, bucket:)
-    user.concept_masteries.drilling.where(concept: concept, language: bucket).each do |cm|
-      cm.drill_group ? stop_group!(user, group: cm.drill_group, bucket: bucket) : cm.clear_drill!
-    end
+    cm = user.concept_masteries.drilling.find_by(concept: concept, language: bucket)
+    return nil if cm.nil?
+    return cm.clear_drill! && nil if cm.drill_group.nil?
+
+    stop_group!(user, group: cm.drill_group, bucket: bucket)
+    cm.drill_group
   end
 
   def self.stop_group!(user, group:, bucket:)
@@ -81,9 +87,9 @@ class ConceptDrills
     ConceptGroup.concepts(group) & ConceptBucket.vocabulary_for(bucket)
   end
 
-  def self.mark!(user, concept, bucket, group:)
+  def self.mark!(user, concept, bucket, group:, end_pause:)
     cm = user.concept_masteries.find_or_initialize_by(concept: concept, language: bucket)
-    cm.end_pause if cm.tier_paused?
+    cm.end_pause if end_pause && cm.tier_paused?
     cm.update!(drilled_at: Time.current, drill_group: group)
   end
   private_class_method :mark!
