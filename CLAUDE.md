@@ -680,14 +680,25 @@ concept-specific difficulty descriptions for future generation, not a new set.
   evidence-driven reinforcement or an overdue retention check. The reasoning
   sits beside the constant, and a spec pins the value.
 
-  **Drills are scoped to what today can host, and stand a retention check
-  down.** `DailyPlan` passes `hostable_buckets` as `drilled_in:` so a drilled
-  architecture concept is offered only on an architecture day — a history
-  entry ages out, but a drill persists until mastered and would otherwise
-  claim a slot every day no section could carry it. A drilled concept whose
-  retention check is due is listed once, as reinforcement: the check would
-  have asked for the same concept under a second instruction in the same
-  prompt.
+  **Drills are scoped to what today can tag, and stand a retention check
+  down.** `DailyPlan` hands `concepts_needing_reinforcement` a `hostable:`
+  test built from the day's non-fourth kinds and `code_review` mode through
+  `ProblemSetIngest.selectable_vocabulary_for`, the same authority
+  `AiService#can_host?` reads for retention checks — so a drilled
+  architecture concept is offered only on an architecture day and a drilled
+  data-modeling concept only when some section can tag it. A history entry
+  ages out, but a drill persists until mastered and would otherwise claim a
+  slot every day no section could carry it. A drilled concept whose retention
+  check is due is listed once, as reinforcement, and its overdue check
+  neither reserves nor takes a slot: the check would have asked for the same
+  concept under a second instruction in the same prompt.
+
+  **`ConceptDrills.for` reads only the user's current slice**
+  (`ConceptBucket.slice_for`, shared with the Learn tab), so a drill stranded
+  by a language change or a renamed concept neither counts against the cap
+  nor sits unreachable behind a stop control the slice would 404. A concept
+  whose group is drilled joins that group when drilled alone, and a group
+  absorbs lone drills of its own members, so one gap is never two entries.
 
   **Drilling a paused concept ends the pause**, through the same exit an
   expired cooldown takes (`ConceptMastery#end_pause`), and the concept page

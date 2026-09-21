@@ -94,8 +94,9 @@ class DailyPlan
                                         count: SectionCount.for(history, adaptive: user.adaptive_set_size?),
                                         preferences: KindPreferences.for(user))
     kinds         = ExerciseSection.for_plan(**rotation)
+    code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
-                                                        drilled_in: hostable_buckets(language, kinds: kinds))
+                                                        hostable: drill_host_test(language, kinds: kinds, mode: code_review_mode))
     # Only the non-fourth kinds present today can ever host a language or
     # architecture concept, so capacity follows the chosen set rather than a
     # literal 3 — a short day (pattern chosen but no third) has fewer hosts,
@@ -129,8 +130,6 @@ class DailyPlan
     established   = established_concepts_for(user, language, kinds: kinds,
                                              reinforcement: reinforcement, due_checks: due_checks)
 
-    code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
-
     Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third),
                reinforcement: reinforcement, due_checks: due_checks, established: established,
                code_review_mode: code_review_mode,
@@ -153,6 +152,24 @@ class DailyPlan
     RealSource.pick(mode, last_seen: RealSource.last_seen_for(user))
   end
   private_class_method :code_review_source_for
+
+  # Whether some non-fourth section today can tag a drilled concept, from the
+  # same per-section vocabulary the prompt offers (AiService#can_host? reads
+  # it for retention checks). Bucket-level hosting is not enough: an
+  # application_code code_review cannot tag a data-modeling concept, and a
+  # drill would otherwise claim that day's slot every time the mode rolled
+  # that way. The bucket check keeps a mixed user's same-named concept in the
+  # other language out.
+  def self.drill_host_test(language, kinds:, mode:)
+    buckets = hostable_buckets(language, kinds: kinds)
+    hosts   = kinds.reject(&:fourth?)
+
+    lambda do |concept, bucket|
+      buckets.include?(bucket) &&
+        hosts.any? { |kind| ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode).include?(concept) }
+    end
+  end
+  private_class_method :drill_host_test
 
   # The fourth slot's own independent track — a parallel state machine rather
   # than a generalization of the non-fourth pool above, because the two
@@ -197,7 +214,7 @@ class DailyPlan
 
   # Single-bucket analog of established_concepts_for.
   def self.established_concepts_for_bucket(user, bucket, reinforcement:, due_checks:)
-    claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
+    claimed = claimed_concepts(reinforcement, due_checks)
 
     established_in_buckets(user, [ bucket ]).reject { |cm| claimed.include?(cm.concept) }
   end
@@ -212,7 +229,7 @@ class DailyPlan
   # of its retention capacity rather than a fraction of it).
   def self.overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: [])
     user.concepts_overdue_for_retention_check(bucket: bucket)
-        .where.not(concept: reinforcement.map { |h| h[:concept] }).exists?
+        .where.not(concept: claimed_concepts(reinforcement)).exists?
   end
   private_class_method :overdue_retention_check_pending_for_bucket?
 
@@ -256,10 +273,17 @@ class DailyPlan
   # — and the overdue tests above ignore it too, so it cannot reserve or take
   # a slot for a concept the list already carries.
   def self.unclaimed_by(reinforcement, due_checks)
-    claimed = reinforcement.map { |h| h[:concept] }
+    claimed = claimed_concepts(reinforcement)
     due_checks.reject { |cm| claimed.include?(cm.concept) }
   end
   private_class_method :unclaimed_by
+
+  # The concepts a prompt already asks for by name. Matched on name alone,
+  # as reinforcement entries carry no bucket.
+  def self.claimed_concepts(reinforcement, due_checks = [])
+    reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
+  end
+  private_class_method :claimed_concepts
 
   # Days overdue divided by the concept's own retention_interval_days — the same
   # normalization concepts_overdue_for_retention_check applies in SQL, computed
@@ -277,7 +301,7 @@ class DailyPlan
   # re-tested. Reinforcement and due checks carry their own, stronger prompt
   # annotation, so anything they claim is excluded here.
   def self.established_concepts_for(user, language, kinds:, reinforcement:, due_checks:)
-    claimed = reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
+    claimed = claimed_concepts(reinforcement, due_checks)
 
     established_in_buckets(user, hostable_buckets(language, kinds: kinds))
       .reject { |cm| claimed.include?(cm.concept) }

@@ -500,7 +500,7 @@ RSpec.describe DailyPlan do
     # reintroduced, so an entry the day has no section left to carry is an
     # instruction that cannot be honored.
     it "truncates the reinforcement list itself to what the day can host" do
-      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, drilled_in: anything).and_return(
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
         [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" },
           { concept: "idempotency", tier: "standard" } ]
       )
@@ -513,7 +513,7 @@ RSpec.describe DailyPlan do
     end
 
     it "gives a reinforcement entry up when an overdue check takes the slot back" do
-      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, drilled_in: anything).and_return(
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
         [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" } ]
       )
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
@@ -674,6 +674,18 @@ RSpec.describe DailyPlan, "drilled concepts" do
 
     allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: nil)
     expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[sync_vs_async])
+  end
+
+  it "offers a drilled data-modeling concept only when a section today can tag it" do
+    ConceptDrills.start!(user, concept: "wrong_cardinality", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
+
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement).to eq([])
+
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[wrong_cardinality])
   end
 
   it "lists a drilled concept whose retention check is due once, as reinforcement" do

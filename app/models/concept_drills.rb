@@ -11,38 +11,53 @@
 class ConceptDrills
   # Counted in drills rather than concepts, where a whole group is one: a
   # group is one self-noticed gap, and a cap counted in concepts would refuse
-  # a large group outright. Sized so that on the fullest day — every slot but
-  # the fourth can host a drilled concept — single-concept drills still leave
-  # one host for evidence-driven reinforcement or an overdue retention check.
-  MAX_CONCURRENT = ExerciseSection.slot_count - 2
+  # a large group outright. One fewer than the slots that can host a drilled
+  # concept — every slot but the fourth — so on the fullest day single-concept
+  # drills still leave one host for evidence-driven reinforcement or an
+  # overdue retention check.
+  MAX_CONCURRENT = ExerciseSection.slots.count { |_slot, kinds| kinds.none?(&:fourth?) } - 1
 
   LimitReached = Class.new(StandardError)
 
   Entry = Data.define(:bucket, :group, :concepts)
 
+  # Only rows in the user's current slice and its vocabularies: a drill left
+  # behind by a language change or a renamed concept neither counts against
+  # the cap nor can be reached to stop, so it is simply inert until the slice
+  # holds it again.
   def self.for(user)
-    new(user.concept_masteries.drilling.order(:drilled_at, :id).to_a)
+    scopes = ConceptBucket.slice_for(user.language).map { |bucket| ConceptMastery.in_bucket(bucket) }
+    new(user.concept_masteries.drilling.merge(scopes.reduce(:or)).order(:drilled_at, :id).to_a)
   end
 
+  # Returns false when the concept was already drilled and nothing changed. A
+  # concept whose group is drilled joins that group, so a member that mastery
+  # cleared comes back as a member and not as a second entry for the same gap.
   def self.start!(user, concept:, bucket:)
     raise ArgumentError, "#{concept} is not in #{bucket}" unless ConceptBucket.vocabulary_for(bucket).include?(concept)
 
     user.with_lock do
       drills = self.for(user)
-      next if drills.drilling?(concept, bucket)
-      raise LimitReached if drills.full?
+      next false if drills.drilling?(concept, bucket)
 
-      mark!(user, concept, bucket, group: nil)
+      group = ConceptGroup.for(concept)
+      group = nil unless drills.group_drilling?(group, bucket)
+      raise LimitReached if group.nil? && drills.full?
+
+      mark!(user, concept, bucket, group: group)
+      true
     end
   end
 
+  # Lone drills of the group's own members fold into it, so they are not
+  # counted against the cap the group would then replace them under.
   def self.start_group!(user, group:, bucket:)
     concepts = concepts_in(group, bucket)
     raise ArgumentError, "#{bucket} holds nothing from #{group}" if concepts.empty?
 
     user.with_lock do
       drills = self.for(user)
-      raise LimitReached if drills.full? && !drills.group_drilling?(group, bucket)
+      raise LimitReached if drills.count_without(bucket, group, concepts) >= MAX_CONCURRENT
 
       concepts.each { |concept| mark!(user, concept, bucket, group: group) }
     end
@@ -80,6 +95,16 @@ class ConceptDrills
 
   def drilling?(concept, bucket)
     @rows.any? { |cm| cm.concept == concept && cm.language == bucket }
+  end
+
+  # How many drills would remain if this group and lone drills of these
+  # concepts were set aside.
+  def count_without(bucket, group, concepts)
+    entries.count do |entry|
+      next false if entry.bucket != bucket
+      next false if entry.group == group
+      !(entry.group.nil? && concepts.include?(entry.concepts.first))
+    end
   end
 
   def group_for(concept, bucket)

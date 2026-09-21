@@ -68,6 +68,22 @@ RSpec.describe ConceptDrills do
       expect(described_class.for(user).count).to eq(2)
     end
 
+    it "rejoins a member to its group when the group is drilled" do
+      described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
+      row("shallow_module").clear_drill!
+
+      described_class.start!(user, concept: "shallow_module", bucket: "ruby_rails")
+
+      expect(row("shallow_module").drill_group).to eq("module_design")
+      expect(described_class.for(user).count).to eq(1)
+    end
+
+    it "returns false and changes nothing for a concept already drilled" do
+      described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+
+      expect(described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")).to be(false)
+    end
+
     it "re-drilling an already drilled concept does not count against the cap" do
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
@@ -94,6 +110,14 @@ RSpec.describe ConceptDrills do
         .to raise_error(ConceptDrills::LimitReached)
     end
 
+    it "absorbs lone drills of its own members rather than counting them against the cap" do
+      described_class.start!(user, concept: "shallow_module", bucket: "ruby_rails")
+      described_class.start!(user, concept: "pass_through_method", bucket: "ruby_rails")
+
+      expect { described_class.start_group!(user, group: "module_design", bucket: "ruby_rails") }.not_to raise_error
+      expect(described_class.for(user).count).to eq(1)
+    end
+
     it "refuses a group the bucket does not hold" do
       expect { described_class.start_group!(user, group: "module_design", bucket: "architecture") }
         .to raise_error(ArgumentError)
@@ -117,8 +141,10 @@ RSpec.describe ConceptDrills do
   end
 
   describe "MAX_CONCURRENT" do
-    it "leaves one non-fourth host free on the fullest day" do
-      expect(described_class::MAX_CONCURRENT).to eq(ExerciseSection.slot_count - 2)
+    it "is one fewer than the slots that can host a drilled concept" do
+      hosting_slots = ExerciseSection.slots.count { |_slot, kinds| kinds.none?(&:fourth?) }
+
+      expect(described_class::MAX_CONCURRENT).to eq(hosting_slots - 1)
       expect(described_class::MAX_CONCURRENT).to eq(2)
     end
   end
@@ -141,6 +167,17 @@ RSpec.describe ConceptDrills do
       expect(drills.group_for(AiService::MODULE_DESIGN_CONCEPTS.last, "ruby_rails")).to eq("module_design")
       expect(drills.group_drilling?("module_design", "ruby_rails")).to be(true)
       expect(drills.group_drilling?("oo_design", "ruby_rails")).to be(false)
+    end
+
+    it "ignores a drill outside the user's current slice, so it neither counts nor strands a slot" do
+      user.update!(language: "mixed")
+      described_class.start!(user, concept: "prototype_chain", bucket: "javascript")
+      user.update!(language: "ruby_rails")
+
+      drills = described_class.for(user)
+
+      expect(drills.entries).to eq([])
+      expect(drills.drilling?("prototype_chain", "javascript")).to be(false)
     end
 
     it "is empty and not full for a user who has never drilled" do

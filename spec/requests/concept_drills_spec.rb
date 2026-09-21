@@ -20,6 +20,14 @@ RSpec.describe "Concept drills", type: :request do
       expect(row("n_plus_one").drilled_at).to be_present
     end
 
+    it "says so when the concept is already drilled" do
+      ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+
+      post learn_concept_drill_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(flash[:notice]).to include("already")
+    end
+
     it "refuses a drill past the cap and says what is already drilled" do
       ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
       ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")

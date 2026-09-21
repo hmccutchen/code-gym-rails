@@ -304,12 +304,13 @@ class User < ApplicationRecord
   # to what today can host and order is priority. A drilled concept the
   # history would also list appears once, in the drilled position; a drilled
   # concept in the paused tier waits out its cooldown like any other.
-  # `drilled_in:` names the buckets today's sections can host, because a
-  # drill persists until mastered — unlike a history entry, which ages out —
-  # so one no section could carry would otherwise claim a slot every day.
-  # nil leaves the bucket filters above as the only restriction.
-  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], drilled_in: nil)
-    result   = drilled_reinforcement(bucket, exclude_buckets, drilled_in)
+  # `hostable:` answers whether today's sections can carry a drilled concept
+  # (given the concept and its bucket), because a drill persists until
+  # mastered — unlike a history entry, which ages out — so one no section
+  # could tag would otherwise claim a slot every day. nil leaves the bucket
+  # filters above as the only restriction.
+  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], hostable: nil)
+    result   = drilled_reinforcement(bucket, exclude_buckets, hostable)
     resolved = result.to_h { |h| [ h[:concept], true ] }
 
     recent_daily_responses(limit).each do |r|
@@ -343,22 +344,23 @@ class User < ApplicationRecord
   # same first few — the same order SectionRotation and RealSource.pick use.
   # Read from the exposure index rather than stored, since which drill was
   # offered is never recorded, like every other offer.
-  def drilled_reinforcement(bucket, exclude_buckets, drilled_in)
+  def drilled_reinforcement(bucket, exclude_buckets, hostable)
     rows = concept_masteries.drilling.where.not(tier: :paused)
     rows = rows.where(language: bucket) if bucket
-    rows = rows.where(language: drilled_in) if drilled_in
     rows = rows.where.not(language: exclude_buckets) if exclude_buckets.any?
 
     rows.select { |cm| still_in_vocabulary?(cm.concept, cm.language) }
-        .sort_by { |cm| [ last_seen(cm) ? 1 : 0, last_seen(cm) || Date.new, cm.drilled_at ] }
+        .select { |cm| hostable.nil? || hostable.call(cm.concept, cm.language) }
+        .sort_by { |cm| drill_order(cm) }
         .map { |cm| { concept: cm.concept, tier: cm.tier, drilled: true } }
   end
   private :drilled_reinforcement
 
-  def last_seen(cm)
-    concept_exposure_index.fetch([ cm.concept, cm.language ], []).max
+  def drill_order(cm)
+    seen = concept_exposure_index.fetch([ cm.concept, cm.language ], []).max
+    [ seen ? 1 : 0, seen || Date.new, cm.drilled_at ]
   end
-  private :last_seen
+  private :drill_order
 
   # Mastered concepts whose scheduled re-check has come due, most overdue first.
   # Bucket-scoped by the caller: an architecture concept has no valid home outside

@@ -1579,7 +1579,9 @@ class AiService
       }.join("\n")
     end
 
-    reinforcement_list = reinforcement || user.concepts_needing_reinforcement
+    reinforcement_list = reinforcement ||
+      user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS,
+                                          hostable: ->(_concept, bucket) { bucket == language })
     reinforcement_text = reinforcement_list.any? ?
       reinforcement_list.map { |h| annotate_reinforcement(h) }.join(", ") : "none"
 

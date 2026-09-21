@@ -12,10 +12,8 @@ module LearnScope
 
   private
 
-  # This user's slice: their language's buckets plus every language-independent
-  # bucket.
   def learn_buckets
-    ConceptBucket.language_buckets_for(current_user.language) + ConceptBucket::LANGUAGE_INDEPENDENT
+    ConceptBucket.slice_for(current_user.language)
   end
 
   def validated_bucket

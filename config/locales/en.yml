@@ -71,6 +71,7 @@ en:
       current: "You're drilling %{drills}."
       current_note: "Each one clears on its own once you master it."
       started: "Drilling %{name} from your next set on."
+      already: "You're already drilling %{name}."
       stopped: "Stopped drilling %{name}."
     featured:
       label: "Today's concept"

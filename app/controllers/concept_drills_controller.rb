@@ -44,8 +44,8 @@ class ConceptDrillsController < ApplicationController
   private
 
   def start(name)
-    yield
-    flash[:notice] = t("learn.drill.started", name: name)
+    started = yield
+    flash[:notice] = t(started ? "learn.drill.started" : "learn.drill.already", name: name)
   rescue ConceptDrills::LimitReached
     flash[:alert] = t("learn.drill.full", drills: helpers.drill_names(ConceptDrills.for(current_user)))
   end
