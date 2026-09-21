@@ -85,10 +85,6 @@ group :test do
 end
 
 gem "faraday", "~> 2.14"
-# Not a direct dependency. Held under 3 because Rails 8.1.3.1's
-# ActiveSupport::JSON.decode passes its options hash positionally, and json 3
-# takes keyword arguments only, so every jsonb read raises. Drop the pin once
-# Rails calls JSON.parse with keywords.
 gem "json", "~> 2.0"
 gem "faraday-retry"
 gem "letter_opener", group: :development
