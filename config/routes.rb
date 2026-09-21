@@ -66,6 +66,11 @@ Rails.application.routes.draw do
   # finished generation: this app loads no Turbo/ActionCable, so a page learns
   # that background work finished by checking in.
   get  "learn/:bucket/:concept/status", to: "learn#status", as: :learn_concept_status
+  # Drills: a concept or a whole display group the user asked to practise.
+  post   "learn/:bucket/:concept/drill",      to: "concept_drills#create",        as: :learn_concept_drill
+  delete "learn/:bucket/:concept/drill",      to: "concept_drills#destroy"
+  post   "learn/:bucket/groups/:group/drill", to: "concept_drills#create_group",  as: :learn_group_drill
+  delete "learn/:bucket/groups/:group/drill", to: "concept_drills#destroy_group"
 
   # Inline name autosave (JSON)
   patch "profile", to: "profile#update", as: :profile

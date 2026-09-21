@@ -299,9 +299,14 @@ class User < ApplicationRecord
   # concept that has left its own bucket's vocabulary is not an occurrence of a
   # live concept at all, and must not consume the dedup slot that an older
   # occurrence in a bucket where the name is still valid would fill.
+  #
+  # Drilled concepts (ConceptDrills) lead the list, since callers truncate it
+  # to what today can host and order is priority. A drilled concept the
+  # history would also list appears once, in the drilled position; a drilled
+  # concept in the paused tier waits out its cooldown like any other.
   def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [])
-    resolved = {}
-    result   = []
+    result   = drilled_reinforcement(bucket, exclude_buckets)
+    resolved = result.to_h { |h| [ h[:concept], true ] }
 
     recent_daily_responses(limit).each do |r|
       r.answered_concept_tags.each do |section, concept|
@@ -328,6 +333,27 @@ class User < ApplicationRecord
 
     result
   end
+
+  # Never-seen drills first, then least recently seen, so a group drilled past
+  # today's capacity rotates through its concepts rather than repeating the
+  # same first few — the same order SectionRotation and RealSource.pick use.
+  # Read from the exposure index rather than stored, since which drill was
+  # offered is never recorded, like every other offer.
+  def drilled_reinforcement(bucket, exclude_buckets)
+    rows = concept_masteries.drilling.where.not(tier: :paused)
+    rows = rows.where(language: bucket) if bucket
+    rows = rows.where.not(language: exclude_buckets) if exclude_buckets.any?
+
+    rows.select { |cm| still_in_vocabulary?(cm.concept, cm.language) }
+        .sort_by { |cm| [ last_seen(cm) ? 1 : 0, last_seen(cm) || Date.new, cm.drilled_at ] }
+        .map { |cm| { concept: cm.concept, tier: cm.tier, drilled: true } }
+  end
+  private :drilled_reinforcement
+
+  def last_seen(cm)
+    concept_exposure_index.fetch([ cm.concept, cm.language ], []).max
+  end
+  private :last_seen
 
   # Mastered concepts whose scheduled re-check has come due, most overdue first.
   # Bucket-scoped by the caller: an architecture concept has no valid home outside

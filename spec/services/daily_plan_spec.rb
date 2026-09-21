@@ -640,3 +640,40 @@ RSpec.describe DailyPlan do
     end
   end
 end
+
+RSpec.describe DailyPlan, "drilled concepts" do
+  let(:user) { User.create!(email: "plan-drill@example.com", name: "Plan") }
+
+  def submit(concept, section: "code_review", date:)
+    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { section => { "concept" => concept } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+                          answers: { section => "x" * 20 }, section_ratings: { section => "too_hard" },
+                          concept_tags: { section => concept }, ai_review: { section => { "rating" => "developing" } })
+  end
+
+  it "keeps drilled concepts when truncating reinforcement to today's hosts" do
+    submit("n_plus_one", date: Date.current - 1)
+    submit("transaction_safety", date: Date.current - 2)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement).to eq([
+      { concept: "memoization", tier: "standard", drilled: true },
+      { concept: "n_plus_one", tier: "standard" }
+    ])
+  end
+
+  it "gives a drilled fourth-bucket concept the fourth slot" do
+    submit("scope_creep", section: "plan_review", date: Date.current - 1)
+    ConceptDrills.start!(user, concept: "unjustified_constant", bucket: "plan_review")
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.fourth_reinforcement).to eq([ { concept: "unjustified_constant", tier: "standard", drilled: true } ])
+    expect(plan.reinforcement).to eq([])
+  end
+end

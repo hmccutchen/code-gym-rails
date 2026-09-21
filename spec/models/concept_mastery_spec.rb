@@ -410,3 +410,48 @@ RSpec.describe ConceptMastery, type: :model do
     end
   end
 end
+
+RSpec.describe ConceptMastery, "drills", type: :model do
+  let(:user) { User.create!(email: "cm-drill@example.com", name: "CM") }
+
+  def review!(concept:, self_rating:, ai_rating:, date:)
+    exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { "code_review" => { "concept" => concept } })
+    response = user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+      answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => self_rating },
+      concept_tags: { "code_review" => concept }, ai_review: { "code_review" => { "rating" => ai_rating } })
+    described_class.record_review!(response, sections: response.concept_tags.keys, apply_session_countdown: true)
+    user.concept_masteries.find_by(concept: concept, language: "ruby_rails")
+  end
+
+  before { ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails") }
+
+  it "clears the drill on the same co-favorable rating that marks the concept mastered" do
+    cm = review!(concept: "shallow_module", self_rating: "right_level", ai_rating: "solid", date: Date.current)
+
+    expect(cm.tier).to eq("standard")
+    expect(cm.drilled_at).to be_nil
+    expect(cm.drill_group).to be_nil
+  end
+
+  it "keeps the drill while the rating only improves" do
+    review!(concept: "shallow_module", self_rating: "too_hard", ai_rating: "beginner", date: Date.current - 1)
+    cm = review!(concept: "shallow_module", self_rating: "too_hard", ai_rating: "solid", date: Date.current)
+
+    expect(cm.drilled_at).to be_present
+  end
+
+  it "keeps the drill when a favorable AI rating meets an unfavorable self-rating" do
+    cm = review!(concept: "shallow_module", self_rating: "too_hard", ai_rating: "strong", date: Date.current)
+
+    expect(cm.drilled_at).to be_present
+  end
+
+  it "leaves a drill in place on a concept that reaches the paused tier" do
+    6.times { |i| review!(concept: "shallow_module", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (6 - i)) }
+    cm = user.concept_masteries.find_by(concept: "shallow_module", language: "ruby_rails")
+
+    expect(cm.tier).to eq("paused")
+    expect(cm.drilled_at).to be_present
+  end
+end

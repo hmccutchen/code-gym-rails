@@ -1,0 +1,20 @@
+<%# The one place a concept's drill is started or stopped. Reads @drills,
+    @paused, @bucket and @concept from LearnController#show. %>
+<div class="learn-drill">
+  <% if @drills.drilling?(@concept, @bucket) %>
+    <p class="hint"><%= @paused ? t("learn.drill.waiting") : t("learn.drill.drilling") %></p>
+    <%= button_to t("learn.drill.stop"), learn_concept_drill_path(bucket: @bucket, concept: @concept),
+                  method: :delete, class: "btn btn-sm" %>
+  <% elsif @drills.full? %>
+    <p class="hint"><%= t("learn.drill.full", drills: drill_names(@drills)) %></p>
+  <% else %>
+    <p class="hint"><%= t("learn.drill.offer") %></p>
+    <%# The one deliberate look at tier state on this tab: a pause is the
+        system's decision to rest the concept, and overriding it silently
+        would be worse than naming it. %>
+    <% if @paused %>
+      <p class="hint learn-drill-paused"><%= t("learn.drill.paused_note") %></p>
+    <% end %>
+    <%= button_to t("learn.drill.button"), learn_concept_drill_path(bucket: @bucket, concept: @concept), class: "btn btn-sm" %>
+  <% end %>
+</div>

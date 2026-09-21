@@ -24,6 +24,10 @@ class ConceptGroup
 
   ORDER = ([ CORE ] + NAMED.map(&:first)).freeze
 
+  def self.concepts(group)
+    NAMED.to_h.fetch(group, [])
+  end
+
   def self.for(concept)
     match = NAMED.find { |_key, concepts| concepts.include?(concept) }
     match ? match.first : CORE

@@ -1593,3 +1593,63 @@ RSpec.describe User, type: :model do
     end
   end
 end
+
+RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model do
+  let(:user) { User.create!(email: "drill-reinf@example.com", name: "Drill") }
+
+  def submit_response(concept:, section: "code_review", self_rating: "too_hard", ai_rating: "developing", date:)
+    exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { section => { "concept" => concept } })
+    user.daily_responses.create!(daily_exercise: exercise, date: date, submitted_at: Time.current,
+      answers: { section => "x" * 20 }, section_ratings: { section => self_rating },
+      concept_tags: { section => concept }, ai_review: { section => { "rating" => ai_rating } })
+  end
+
+  it "leads with drilled concepts, flagged, ahead of history-derived entries" do
+    submit_response(concept: "n_plus_one", date: Date.current)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+
+    expect(user.concepts_needing_reinforcement).to eq([
+      { concept: "memoization", tier: "standard", drilled: true },
+      { concept: "n_plus_one", tier: "standard" }
+    ])
+  end
+
+  it "lists a concept that is both drilled and in history once, in the drilled position with its tier" do
+    submit_response(concept: "n_plus_one", date: Date.current)
+    submit_response(concept: "memoization", date: Date.current - 1)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    user.concept_masteries.find_by(concept: "memoization").update!(tier: :reduced)
+
+    result = user.concepts_needing_reinforcement
+    expect(result.first).to eq(concept: "memoization", tier: "reduced", drilled: true)
+    expect(result.count { |h| h[:concept] == "memoization" }).to eq(1)
+  end
+
+  it "orders drilled concepts never-seen first, then least recently seen" do
+    submit_response(concept: "n_plus_one", date: Date.current - 1)
+    submit_response(concept: "memoization", date: Date.current - 5)
+    ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+    ConceptDrills.start_group!(user, group: "module_design", bucket: "ruby_rails")
+    user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", drilled_at: Time.current)
+
+    drilled = user.concepts_needing_reinforcement.select { |h| h[:drilled] }.map { |h| h[:concept] }
+    expect(drilled.last(2)).to eq(%w[memoization n_plus_one])
+    expect(drilled.first(3)).to match_array(AiService::MODULE_DESIGN_CONCEPTS)
+  end
+
+  it "holds a drilled concept back while it is paused" do
+    ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+    user.concept_masteries.find_by(concept: "n_plus_one").update!(tier: :paused, cooldown_remaining: 2)
+
+    expect(user.concepts_needing_reinforcement).to eq([])
+  end
+
+  it "applies the bucket filters to drilled concepts" do
+    ConceptDrills.start!(user, concept: "scope_creep", bucket: "plan_review")
+    ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
+
+    expect(user.concepts_needing_reinforcement(bucket: "plan_review").map { |h| h[:concept] }).to eq(%w[scope_creep])
+    expect(user.concepts_needing_reinforcement(exclude_buckets: %w[plan_review]).map { |h| h[:concept] }).to eq(%w[n_plus_one])
+  end
+end

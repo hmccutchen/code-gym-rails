@@ -13,6 +13,7 @@ class ConceptMastery < ApplicationRecord
   # Filtering on `language:` alone is exactly that bug. Every selection query
   # goes through here so a new one cannot reintroduce it by omission.
   scope :in_bucket, ->(bucket) { where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket)) }
+  scope :drilling, -> { where.not(drilled_at: nil) }
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
 
@@ -76,7 +77,8 @@ class ConceptMastery < ApplicationRecord
     user.concept_masteries.tier_paused.each do |cm|
       remaining = cm.cooldown_remaining - 1
       if remaining <= 0
-        cm.update!(tier: :reduced, streak: 0, cooldown_remaining: 0)
+        cm.end_pause
+        cm.save!
       else
         cm.update!(cooldown_remaining: remaining)
       end
@@ -131,7 +133,7 @@ class ConceptMastery < ApplicationRecord
     improving = prev.present? && AI_RATING_RANK.fetch(rep_ai, -1) > AI_RATING_RANK.fetch(prev, -1)
 
     if mastered
-      cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0)
+      cm.assign_attributes(tier: :standard, streak: 0, cooldown_remaining: 0, drilled_at: nil, drill_group: nil)
       cm.assign_attributes(**retention_schedule_for(cm, response.date))
     elsif improving || prev.blank?
       cm.streak = 0
@@ -189,4 +191,10 @@ class ConceptMastery < ApplicationRecord
     }
   end
   private_class_method :retention_schedule_for
+
+  # Where a pause lets go: an expired cooldown and ConceptDrills.start! both
+  # leave the row here, so a drill cannot invent a second way out.
+  def end_pause
+    assign_attributes(tier: :reduced, streak: 0, cooldown_remaining: 0)
+  end
 end
