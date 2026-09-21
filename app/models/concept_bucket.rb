@@ -42,6 +42,12 @@ class ConceptBucket
     language == "mixed" ? DailyExercise::LANGUAGES : [ language ]
   end
 
+  # Every bucket a user with this language can see: their language's buckets
+  # plus the language-independent ones. The Learn tab and drills both read it.
+  def self.slice_for(language)
+    language_buckets_for(language) + LANGUAGE_INDEPENDENT
+  end
+
   def self.for(sections, language)
     Array(sections).each do |section|
       special = SPECIAL_BUCKETS[section.to_s]

@@ -1461,6 +1461,13 @@ class AiService
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
   end
 
+  # The tier is the system's reading of the evidence and `drilled` the
+  # engineer's own request, so a drilled entry shows both rather than folding
+  # one into the other — a log line can then tell them apart too.
+  def annotate_reinforcement(entry)
+    "#{entry[:concept]} (#{[ entry[:tier], ("drilled" if entry[:drilled]) ].compact.join(', ')})"
+  end
+
   # Coverage says whether material was available; chosen_grounded says whether
   # the model picked a concept it had a rung for. Whether the problem was
   # actually pitched at the rung is deliberately not measured here.
@@ -1572,9 +1579,11 @@ class AiService
       }.join("\n")
     end
 
-    reinforcement_list = reinforcement || user.concepts_needing_reinforcement
+    # Direct callers only; #generate_exercise always passes the plan's list,
+    # which is where the per-section hosting test for drills lives.
+    reinforcement_list = reinforcement || user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS)
     reinforcement_text = reinforcement_list.any? ?
-      reinforcement_list.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
+      reinforcement_list.map { |h| annotate_reinforcement(h) }.join(", ") : "none"
 
     # Both slots resolved once, through the same call the schema assembles
     # from, so guidance, hosting, and schema can never disagree about which
@@ -1621,7 +1630,7 @@ class AiService
       end
 
     fourth_reinforcement_text = fourth_reinforcement.any? ?
-      fourth_reinforcement.map { |h| "#{h[:concept]} (#{h[:tier]})" }.join(", ") : "none"
+      fourth_reinforcement.map { |h| annotate_reinforcement(h) }.join(", ") : "none"
 
     fourth_reinforcement_line =
       if fourth
@@ -1713,6 +1722,7 @@ class AiService
       #{domain_modeling_guidance}
       - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
+      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.
       #{retention_block}
       #{established_block}
       #{fourth_retention_block}

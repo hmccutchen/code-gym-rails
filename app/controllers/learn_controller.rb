@@ -1,4 +1,6 @@
 class LearnController < ApplicationController
+  include LearnScope
+
   helper_method :encountered?
 
   # GET /learn — every concept in this user's vocabularies, grouped, whether or
@@ -6,6 +8,7 @@ class LearnController < ApplicationController
   def index
     @featured   = ConceptReference.featured
     @references = references_by_key
+    @drills     = ConceptDrills.for(current_user)
     @buckets    = learn_buckets.map do |bucket|
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
@@ -19,6 +22,8 @@ class LearnController < ApplicationController
     @reference = ConceptReference.find_by(concept: @concept, language: @bucket)
     @ladder_targets = ladder_targets_for(@reference)
     @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
+    @drills = ConceptDrills.for(current_user)
+    @paused = current_user.concept_masteries.tier_paused.exists?(concept: @concept, language: @bucket)
   end
 
   # Which check the polling page is waiting on. The page states it because the
@@ -118,12 +123,6 @@ class LearnController < ApplicationController
                   .map { |kind| t("sections.#{kind.key}.name") }
   end
 
-  # This user's slice: their language's buckets plus every language-independent
-  # bucket.
-  def learn_buckets
-    ConceptBucket.language_buckets_for(current_user.language) + ConceptBucket::LANGUAGE_INDEPENDENT
-  end
-
   # One query for every reference the page can render, keyed the way the views
   # look them up. The per-concept finder would be seventy queries.
   def references_by_key
@@ -153,27 +152,5 @@ class LearnController < ApplicationController
   # facts, and only the first is shown here.
   def encountered?(concept, bucket)
     current_user.concept_exposure_count(concept, bucket, on_or_before: Date.current).positive?
-  end
-
-  # :bucket and :concept arrive from a URL, so they are held to the closed
-  # vocabulary here rather than trusted downstream — the same boundary rule
-  # ProblemSetIngest applies to provider output. An unknown pair is a 404, not
-  # a page rendering an empty concept.
-  #
-  # Validating the bucket against learn_buckets rather than every bucket also
-  # means a user cannot browse the language they are not assigned by typing
-  # the URL, which keeps the page and its address saying the same thing.
-  def validated_bucket
-    bucket = params[:bucket].to_s
-    raise ActiveRecord::RecordNotFound unless learn_buckets.include?(bucket)
-
-    bucket
-  end
-
-  def validated_concept(bucket)
-    concept = params[:concept].to_s
-    raise ActiveRecord::RecordNotFound unless ConceptBucket.vocabulary_for(bucket).include?(concept)
-
-    concept
   end
 end

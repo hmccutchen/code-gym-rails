@@ -27,6 +27,17 @@
   </script>
 <% end %>
 
+<% if @drills.any? %>
+  <div class="learn-drills">
+    <p><%= t("learn.drill.current", drills: drill_names(@drills)) %> <%= t("learn.drill.current_note") %>
+      <% if @drills.full? %><%= t("learn.drill.at_cap") %><% end %></p>
+    <% @drills.entries.each do |entry| %>
+      <%= button_to t("learn.drill.stop_named", name: drill_label(entry)), drill_stop_path(entry),
+                    method: :delete, class: "btn btn-sm" %>
+    <% end %>
+  </div>
+<% end %>
+
 <div class="learn-filter">
   <input type="search" id="learn-filter-input" placeholder="<%= t("learn.filter_placeholder") %>"
          aria-label="<%= t("learn.filter_placeholder") %>">
@@ -42,12 +53,24 @@
     <h2><%= t("learn.buckets.#{bucket[:key]}") %></h2>
 
     <% bucket[:groups].each do |group_key, concepts| %>
-      <div class="learn-group-block">
+      <div class="learn-group-block" id="<%= learn_group_anchor(bucket[:key], group_key) %>">
         <%# A bucket whose concepts all fall in one group renders flat — that is
             every language-independent bucket, and a heading over the only group
-            would be noise. %>
+            would be noise. A group drill sits with the heading, so a bucket
+            with no headings offers none; its core group is the whole bucket. %>
         <% if bucket[:groups].size > 1 %>
-          <h3 class="learn-group"><%= t("learn.groups.#{group_key}") %></h3>
+          <div class="learn-group-head">
+            <h3 class="learn-group"><%= t("learn.groups.#{group_key}") %></h3>
+            <% if group_key != ConceptGroup::CORE %>
+              <% if @drills.group_drilling?(group_key, bucket[:key]) %>
+                <%= button_to t("learn.drill.stop_group"), learn_group_drill_path(bucket: bucket[:key], group: group_key),
+                              method: :delete, class: "btn btn-sm" %>
+              <% elsif @drills.can_start_group?(group_key, bucket[:key]) %>
+                <%= button_to t("learn.drill.button_group"), learn_group_drill_path(bucket: bucket[:key], group: group_key),
+                              class: "btn btn-sm", title: t("learn.drill.offer") %>
+              <% end %>
+            <% end %>
+          </div>
         <% end %>
 
         <ul class="learn-list">
@@ -56,6 +79,9 @@
               <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
               <% if encountered?(concept, bucket[:key]) %>
                 <span class="learn-seen"><%= t("learn.encountered") %></span>
+              <% end %>
+              <% if @drills.drilling?(concept, bucket[:key]) %>
+                <span class="learn-drilling"><%= t("learn.drill.marker") %></span>
               <% end %>
               <%# Row-existence and guide-existence are different facts, stated
                   once each rather than collapsed into one marker: a row can

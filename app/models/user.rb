@@ -278,10 +278,9 @@ class User < ApplicationRecord
   #
   # `bucket:`/`exclude_buckets:` scope the result by ConceptBucket — added for
   # the fourth slot's independent reinforcement track, which must never mix
-  # with the three-slot vocabulary. Both default to a no-op filter, so every
-  # caller that doesn't pass them (every
-  # caller as of this comment) sees identical behavior to before either
-  # keyword existed. Marking a concept resolved happens before either filter
+  # with the three-slot vocabulary. Both default to a no-op filter, so a
+  # caller that passes neither sees the behavior from before either keyword
+  # existed; DailyPlan passes one on each track. Marking a concept resolved happens before either filter
   # runs; that's safe for the special ConceptBucket vocabularies (architecture,
   # plan_review, ambiguity_hunt, pseudocode_to_code) because each is disjoint from every other
   # vocabulary, including both language vocabularies — a filtered-out
@@ -299,9 +298,19 @@ class User < ApplicationRecord
   # concept that has left its own bucket's vocabulary is not an occurrence of a
   # live concept at all, and must not consume the dedup slot that an older
   # occurrence in a bucket where the name is still valid would fill.
-  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [])
-    resolved = {}
-    result   = []
+  #
+  # Drilled concepts (ConceptDrills) lead the list, since callers truncate it
+  # to what today can host and order is priority. A drilled concept the
+  # history would also list appears once, in the drilled position; a drilled
+  # concept in the paused tier waits out its cooldown like any other.
+  # `hostable:` answers whether today's sections can carry a drilled concept
+  # (given the concept and its bucket), because a drill persists until
+  # mastered — unlike a history entry, which ages out — so one no section
+  # could tag would otherwise claim a slot every day. nil leaves the bucket
+  # filters above as the only restriction.
+  def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], hostable: nil)
+    result   = drilled_reinforcement(bucket, exclude_buckets, hostable)
+    resolved = result.to_h { |h| [ h[:concept], true ] }
 
     recent_daily_responses(limit).each do |r|
       r.answered_concept_tags.each do |section, concept|
@@ -328,6 +337,27 @@ class User < ApplicationRecord
 
     result
   end
+
+  # Never-seen drills first, then least recently seen, so a group drilled past
+  # today's capacity rotates through its concepts rather than repeating the
+  # same first few — the same order SectionRotation and RealSource.pick use.
+  # Read from the exposure index rather than stored, since which drill was
+  # offered is never recorded, like every other offer.
+  def drilled_reinforcement(bucket, exclude_buckets, hostable)
+    buckets = bucket ? [ bucket ] : ConceptBucket.slice_for(language) - exclude_buckets
+    rows    = concept_masteries.drilling.in_buckets(buckets).where.not(tier: :paused)
+
+    rows.select { |cm| hostable.nil? || hostable.call(cm.concept, cm.language) }
+        .sort_by { |cm| drill_order(cm) }
+        .map { |cm| { concept: cm.concept, tier: cm.tier, drilled: true } }
+  end
+  private :drilled_reinforcement
+
+  def drill_order(cm)
+    seen = concept_exposure_index.fetch([ cm.concept, cm.language ], []).max
+    [ seen ? 1 : 0, seen || Date.new, cm.drilled_at ]
+  end
+  private :drill_order
 
   # Mastered concepts whose scheduled re-check has come due, most overdue first.
   # Bucket-scoped by the caller: an architecture concept has no valid home outside

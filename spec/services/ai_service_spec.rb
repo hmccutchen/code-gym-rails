@@ -4986,3 +4986,35 @@ RSpec.describe AiService do
     end
   end
 end
+
+RSpec.describe AiService, "drilled concepts in the generation prompt" do
+  let(:user)    { User.create!(email: "prompt-drill@example.com", name: "Prompt") }
+  let(:service) { FakeService.new("fake-key") }
+
+  it "annotates a drilled entry apart from its tier and explains the annotation once" do
+    prompt = service.send(:build_exercise_prompt, user,
+                          reinforcement: [ { concept: "n_plus_one", tier: "reduced", drilled: true },
+                                           { concept: "memoization", tier: "standard" } ])
+
+    expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (reduced, drilled), memoization (standard)")
+    expect(prompt).to include("Drilled concepts: a concept marked `drilled` is one the engineer asked to practise")
+    expect(prompt).to include("`drilled` on its own never eases or raises anything")
+  end
+
+  it "annotates a drilled fourth-slot entry the same way" do
+    prompt = service.send(:build_exercise_prompt, user, fourth: :plan_review,
+                          fourth_reinforcement: [ { concept: "scope_creep", tier: "standard", drilled: true } ])
+
+    expect(prompt).to include("Fourth-section (plan_review) concept needing reinforcement: scope_creep (standard, drilled)")
+  end
+
+  it "leaves the locked-kind line to override easing for whichever concept it carries" do
+    user.update!(section_kind_levels: { "code_review" => "principal_engineer" }, locked_section_kinds: [ "code_review" ])
+    prompt = service.send(:build_exercise_prompt, user,
+                          reinforcement: [ { concept: "n_plus_one", tier: "reduced", drilled: true } ],
+                          difficulty: KindDifficulty.for(user))
+
+    expect(prompt).to include("Locked (code_review): for these sections, ignore the `(reduced)` easing rule")
+    expect(prompt).to include("whichever concept they carry")
+  end
+end

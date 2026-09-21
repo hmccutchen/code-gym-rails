@@ -37,6 +37,8 @@
   <p>🔭 <%= @reference.senior_lens %></p>
 <% end %>
 
+<%= render "learn/drill_control" %>
+
 <%# Outside the @reference gate on purpose: a citation is hand-curated static
     data, so it is worth showing on a concept whose reference has never been
     generated. ConceptBookSources is never sent to a provider — that is the

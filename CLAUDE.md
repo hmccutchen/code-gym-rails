@@ -642,6 +642,82 @@ concept-specific difficulty descriptions for future generation, not a new set.
   when the slot itself last filled, which is a change to how every day is
   shaped and not something this preference should drag in behind it.
 - **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, deliberately disjoint from `skill_level`). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched.
+- **Drills**: a user can mark one concept, or a whole Learn display group, as
+  drilled from the Learn tab (`ConceptDrills`, `ConceptDrillsController`). A
+  drilled concept leads `User#concepts_needing_reinforcement`, and since
+  `DailyPlan` truncates that list to today's hosts and order is priority, that
+  is the entire boost: no second weighting mechanism, and `SectionRotation`,
+  weights and `KindDifficulty` are untouched. It is the third axis of user
+  control beside those two — which kind, how hard, and now which concept — and
+  it is kept as separate from them as they are from each other. The prompt
+  renders the entry as `concept (tier, drilled)` and one line says `drilled`
+  never eases or raises anything; the locked-kind line already overrides
+  easing "whichever concept they carry", so a drilled concept in a locked
+  section composes with no special case.
+
+  **Storage is two nullable columns on `ConceptMastery`** (`drilled_at`,
+  `drill_group`), since that is already the one row per (user, concept,
+  bucket); drilling a never-met concept creates the row in its untouched
+  state, and every other reader ignores a row with no evidence. A group drill
+  is one row per concept labelled with the group, not a group flag: clearing
+  stays per concept, and the label is what lets the cap count a half-cleared
+  group as one drill. Drilled concepts beyond today's capacity rotate
+  never-seen first, then least recently seen, read from the exposure index —
+  which drill was offered is never recorded, like every other offer.
+
+  **A drill clears on the existing mastery signal and nothing else.** The
+  same co-favorable rating that sets a row to standard in
+  `ConceptMastery.evaluate_concept!` — self-rating "right level" or "too easy"
+  AND AI "solid" or "strong", on one occurrence — also clears the drill. That
+  can be a single day, and no drill-specific count exists on purpose: the
+  retention schedule takes over from there exactly as it does for any
+  mastered concept.
+
+  **The cap is `ConceptDrills::MAX_CONCURRENT`, counted in drills where a
+  group is one.** It is one fewer than the non-fourth slots in
+  `ExerciseSection.slots`, where every drill but a fourth-bucket one competes,
+  so single-concept drills always leave a host for evidence-driven
+  reinforcement or an overdue retention check. A fourth-bucket drill counts
+  against the same cap while occupying only the fourth: the cap bounds how
+  many gaps are worked at once, not how many hosts they take. The reasoning
+  sits beside the constant, a spec pins the value, and
+  `ConceptDrills#can_start?` / `#can_start_group?` are the one statement of
+  what it allows, read by the start methods and by the pages that offer the
+  button.
+
+  **Drills are scoped to what today can tag, and stand a retention check
+  down.** `DailyPlan` hands `concepts_needing_reinforcement` a `hostable:`
+  test built from the day's non-fourth kinds and `code_review` mode through
+  `ProblemSetIngest.selectable_vocabulary_for`, the same authority
+  `AiService#can_host?` reads for retention checks — so a drilled
+  architecture concept is offered only on an architecture day and a drilled
+  data-modeling concept only when some section can tag it. A history entry
+  ages out, but a drill persists until mastered and would otherwise claim a
+  slot every day no section could carry it. When evidence-driven
+  reinforcement is waiting, drills keep all but one host
+  (`DailyPlan.share_hosts`), so a group drill larger than the day cannot
+  starve the concept the ratings flagged; a one-host day still goes to the
+  drill. A drilled concept whose retention
+  check is due is listed once, as reinforcement, and its overdue check
+  neither reserves nor takes a slot: the check would have asked for the same
+  concept under a second instruction in the same prompt.
+
+  **`ConceptDrills.for` reads only the user's current slice**
+  (`ConceptBucket.slice_for`, shared with the Learn tab), so a drill stranded
+  by a language change or a renamed concept neither counts against the cap
+  nor sits unreachable behind a stop control the slice would 404. A concept
+  whose group is drilled joins that group when drilled alone, a group absorbs
+  lone drills of its own members, and a member stops as its group, so one gap
+  is never two entries and a group is never half-labelled.
+
+  **Drilling a paused concept from its own page ends the pause**, through
+  the same exit an expired cooldown takes (`ConceptMastery#end_pause`), and
+  that page says so before the click — the one deliberate look at tier state
+  on the Learn tab, since a silent override would be worse than naming it. A
+  group drill states no such thing, so it leaves a paused member paused and
+  picks it up when the cooldown ends. A concept that reaches the paused tier
+  while drilled keeps its drill but waits out the cooldown; `concepts_needing_reinforcement` skips paused rows whether
+  drilled or not, and the page says it is waiting.
 - **Adaptive sizing toggle**: `User#adaptive_set_size` (default true) is a hard override of the count only, not a reset to a default — `SectionCount.for` takes an early return to `ExerciseSection.slot_count` before any sizing logic runs when it's off, so there is no path from that logic to the output for that user regardless of how the sizing rule changes later. `SectionRotation`'s starvation-weighted kind selection still runs either way: it is not sizing, and it improves a full 4-section day too, so turning the toggle off does not skip the exercise-history query — only the sizing computation. A boolean is the right shape for a single-user-per-account app; if this app ever needed several floors per user, a floor preference would express the intent better than a single on/off switch.
 - **Pausing generation**: `User#paused_generation_at` (nullable timestamp; nil is active) suppresses only generation the user didn't ask for — the cron batch (`GenerateDailyExercisesJob`'s no-arg branch) and `DashboardController#show`'s auto-trigger. It never gates submitting or reviewing: `ResponsesController` has no pause check, so once a row exists for today the submit → review chain runs regardless of pause state or weekday. The toggle is `PATCH /account/toggle_generation` on the Account page — the one control for this column; a second one anywhere else would be a second pause mechanism. Each button posts the state it wants (`paused=0`/`1`) rather than asking for a flip, so a double-tapped Resume stays a resume instead of the second request re-reading an already-unpaused user and pausing it again; with no param posted the endpoint still flips, keeping its original contract. Days fully inside a pause create no `DailyExercise` row at all, so they are non-events to `User#recent_exercise_history` and `#current_streak` rather than skips. The one day that *does* leave a row is the day the pause began (or an explicit `/generate` while paused), and `User#resume_generation!` is what stops that row counting against the user: on resume it re-dates the held, still-unsubmitted exercise — and the draft `DailyResponse` autosave left on it, which must move too or `#create` would build a second response for the same exercise — to `Date.current`. The row lock also settles the race against a concurrent generation, and does it through the foreign key rather than directly: inserting today's exercise needs a FOR KEY SHARE lock on the same `users` row that `with_lock` holds FOR UPDATE, so a generator either committed before the lock (and the `exists?` check sees it) or blocks until after it and loses its own set to the unique index, which `GenerateDailyExercisesJob` already treats as "generated concurrently". Resume wins, which is the right way round — the held set carries the user's draft answers and a fresh one would not. The move still sits in a SAVEPOINT catching both `RecordNotUnique` and a `date`-taken `RecordInvalid` (uniqueness is enforced twice, and the model validation raises first), so that were it ever to fail it rolls back only itself and the pause still lifts. Recovering the set also clears a same-day `last_generation_error`, since `/generate` is not pause-gated and a failed attempt while the held set sat at an earlier date would otherwise leave "Couldn't generate a new set" rendered above it — the banner `persist_failure` exists to avoid. The whole method runs in the user's own zone rather than the caller's, unlike the read-only history and streak readers, since it writes a date that has to be the user's today. That single move both makes the set reachable again (every "today's exercise" lookup is `for_date`, so at its original date it renders nowhere and `#create` 404s) and drops it out of both signals at once, since `recent_exercise_history` filters `date: ...Date.current` and `#current_streak` exempts today — no separate "exclude paused days" rule exists or is needed. Scoped to exercises dated on or after the pause, so a day abandoned *before* pausing stays abandoned; skipped entirely if an exercise already exists for today, so an explicit `/generate` while paused is never overwritten. Both regeneration columns clear on the move, because they describe the row's *day* rather than the set: `regenerated_at` would hide the Generate-new-set button behind a claim the dashboard states outright and that is no longer true ("You've already generated a new set today"), and a leftover `regenerating_since` is worse than cosmetic — `RegenerateExerciseJob` gates only on `exercise&.regenerating_since` after resolving `for_date`, so a retry stranded from the pause day would replace the carried-forward `problem_set` and destroy the draft response the move preserved. **At most one set can ever be carried forward**, because `[user_id, date]` is unique — so a user who stranded several (paused Monday, clicked `/generate` on Tuesday, resumed Wednesday) gets the newest one back and the older ones stay where they are — **still breaking `#current_streak`**, not merely counting as skips: a past weekday holding an unsubmitted exercise hits that method's `exercised.include?(day)` break. Recovering one set does not repair a streak an older stray still zeroes. That is a limit of re-dating rather than a gap to close: two sets cannot both be today. Re-pausing does not move the floor `#held_exercise` searches from — `AccountsController` stamps a pause only when one isn't already running — so a second Pause cannot walk that floor past the set the first pause stranded. The same limit is why the move is skipped outright when today already holds an exercise. **Accepted consequence:** finishing a carried-forward set counts toward the completion-window signal and the streak for the resume day, not the day it was generated.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `User#concept_exposure_index` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule under "One finish action."
@@ -1242,9 +1318,19 @@ always pull in the full suite — is stated once, in
   concept in the user's slice (assigned or not), the per-concept detail page,
   and three generation triggers: a one-concept `#prepare_concept`, a
   slice-wide `#prepare` backfill, and `#prepare_ladders`, which rewrites
-  existing rows for the concepts behind a user's difficulty targets. Validates
-  `:bucket`/`:concept` against the closed vocabulary at the boundary, same as
-  everywhere else provider-adjacent input arrives from a URL.
+  existing rows for the concepts behind a user's difficulty targets.
+- `app/controllers/concerns/learn_scope.rb` — `LearnScope`: the user's slice
+  of the vocabularies and the 404-on-unknown checks for a `:bucket`/`:concept`
+  arriving from a URL, shared by `LearnController` and
+  `ConceptDrillsController` — the same boundary rule `ProblemSetIngest`
+  applies to provider output.
+- `app/models/concept_drills.rb` — `ConceptDrills`: starts and stops drills,
+  owns the concurrent cap and its reasoning, and answers what is drilled for
+  the Learn pages. Writes only the two drill columns on `ConceptMastery` plus
+  the one pause exit drilling is allowed to take.
+- `app/controllers/concept_drills_controller.rb` — the four drill endpoints
+  under `/learn`, per concept and per group; turns `ConceptDrills`' answers
+  into a redirect and a flash and persists nothing itself.
 - `app/views/shared/_featured_concept.html.erb` — the daily featured concept's
   one rendering, shared by the Learn tab and the dashboard; its styles live in
   the layout for that reason, like `responses/_answered_sections`

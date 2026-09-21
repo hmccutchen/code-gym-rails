@@ -500,7 +500,7 @@ RSpec.describe DailyPlan do
     # reintroduced, so an entry the day has no section left to carry is an
     # instruction that cannot be honored.
     it "truncates the reinforcement list itself to what the day can host" do
-      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything).and_return(
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
         [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" },
           { concept: "idempotency", tier: "standard" } ]
       )
@@ -513,7 +513,7 @@ RSpec.describe DailyPlan do
     end
 
     it "gives a reinforcement entry up when an overdue check takes the slot back" do
-      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything).and_return(
+      allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
         [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" } ]
       )
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
@@ -638,5 +638,129 @@ RSpec.describe DailyPlan do
       expect(targeted).to eq(untargeted)
       expect(locked).to eq(untargeted)
     end
+  end
+end
+
+RSpec.describe DailyPlan, "drilled concepts" do
+  let(:user) { User.create!(email: "plan-drill@example.com", name: "Plan") }
+
+  def submit(concept, section: "code_review", date:)
+    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { section => { "concept" => concept } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+                          answers: { section => "x" * 20 }, section_ratings: { section => "too_hard" },
+                          concept_tags: { section => concept }, ai_review: { section => { "rating" => "developing" } })
+  end
+
+  it "keeps drilled concepts when truncating reinforcement to today's hosts" do
+    submit("n_plus_one", date: Date.current - 1)
+    submit("transaction_safety", date: Date.current - 2)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement).to eq([
+      { concept: "memoization", tier: "standard", drilled: true },
+      { concept: "n_plus_one", tier: "standard" }
+    ])
+  end
+
+  it "offers a drilled architecture concept only on a day with an architecture section" do
+    ConceptDrills.start!(user, concept: "sync_vs_async", bucket: "architecture")
+
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement).to eq([])
+
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: nil)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[sync_vs_async])
+  end
+
+  it "offers a drilled data-modeling concept only when a section today can tag it" do
+    ConceptDrills.start!(user, concept: "wrong_cardinality", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
+
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement).to eq([])
+
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[wrong_cardinality])
+  end
+
+  it "leaves one host for evidence-driven reinforcement when a group drill could fill the day" do
+    submit("n_plus_one", date: Date.current - 1)
+    ConceptDrills.start_group!(user, group: "data_modeling", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.size).to eq(3)
+    expect(plan.reinforcement.count { |h| h[:drilled] }).to eq(2)
+    expect(plan.reinforcement.last).to eq(concept: "n_plus_one", tier: "standard")
+  end
+
+  it "still offers a drill on a one-host day with evidence waiting" do
+    submit("n_plus_one", date: Date.current - 1)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization])
+  end
+
+  it "does not let a drilled concept's own overdue check take the slot back from it" do
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    user.concept_masteries.find_by(concept: "memoization").update!(
+      mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20
+    )
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization])
+    expect(plan.due_checks).to eq([])
+  end
+
+  it "lists a drilled concept whose retention check is due once, as reinforcement" do
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    user.concept_masteries.find_by(concept: "memoization").update!(
+      mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20
+    )
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization])
+    expect(plan.due_checks).to eq([])
+  end
+
+  it "gives a drilled fourth-bucket concept the fourth slot" do
+    submit("scope_creep", section: "plan_review", date: Date.current - 1)
+    ConceptDrills.start!(user, concept: "unjustified_constant", bucket: "plan_review")
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.fourth_reinforcement).to eq([ { concept: "unjustified_constant", tier: "standard", drilled: true } ])
+    expect(plan.reinforcement).to eq([])
+  end
+
+  it "keeps a drilled fourth concept out of the fourth retention checks" do
+    ConceptDrills.start!(user, concept: "unjustified_constant", bucket: "plan_review")
+    user.concept_masteries.find_by(concept: "unjustified_constant").update!(
+      mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20
+    )
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.fourth_reinforcement.map { |h| h[:concept] }).to eq(%w[unjustified_constant])
+    expect(plan.fourth_due_checks).to eq([])
   end
 end
