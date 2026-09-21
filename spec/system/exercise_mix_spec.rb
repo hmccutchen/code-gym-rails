@@ -27,6 +27,23 @@ RSpec.describe "Exercise mix", type: :system do
     sleep 0.1 until yield || Time.current > deadline
   end
 
+  # The setup form styles its text inputs full-width; a radio caught by that
+  # rule pushes its own label text onto a second line, and a label margin the
+  # fieldset's flex gap does not know about makes wrapped rows sit further
+  # apart than neighbours on one row. Only a real layout shows either.
+  it "keeps each difficulty radio beside its text with the fieldset gap as the only spacing" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    radio_widths  = page.evaluate_script("Array.from(document.querySelectorAll('.mix-difficulty input[type=radio]')).map(r => r.offsetWidth)")
+    label_margins = page.evaluate_script("Array.from(document.querySelectorAll('.mix-difficulty label')).map(l => getComputedStyle(l).marginBottom)")
+
+    expect(radio_widths).not_to be_empty
+    expect(radio_widths).to all(be_between(1, 30))
+    expect(label_margins).to all(eq("0px"))
+  end
+
   it "saves a slider's stop and shows its label" do
     visit_as(user)
     visit setup_path

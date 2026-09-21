@@ -4,9 +4,9 @@
   .setup-wrap p  { color: var(--muted); margin-bottom: 2rem; }
   .form-field { margin-bottom: 1rem; }
   .form-field label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
-  .form-field input:not([type="checkbox"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
-  .form-field input:not([type="checkbox"]):focus { outline: none; border-color: var(--accent); }
-  .form-field input[type="checkbox"] { width: auto; margin-right: .4rem; vertical-align: middle; }
+  .form-field input:not([type="checkbox"], [type="radio"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }
+  .form-field input:not([type="checkbox"], [type="radio"]):focus { outline: none; border-color: var(--accent); }
+  .form-field input[type="checkbox"], .form-field input[type="radio"] { width: auto; margin-right: .4rem; vertical-align: middle; }
   .form-field select { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
   .form-field select:focus { outline: none; border-color: var(--accent); }
   .hint { font-size: .8rem; color: var(--muted); margin-top: .4rem; }
@@ -18,8 +18,9 @@
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
-  .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .25rem .75rem; font-size: .8rem; }
+  .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
   .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
+  .mix-difficulty label { margin-bottom: 0; }
   .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
   .mix-coverage { flex-basis: 100%; margin-top: 0; }
 </style>
