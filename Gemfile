@@ -85,6 +85,6 @@ group :test do
 end
 
 gem "faraday", "~> 2.14"
-gem "json", "~> 2.0"
+gem "json", "~> 3.0"
 gem "faraday-retry"
 gem "letter_opener", group: :development
