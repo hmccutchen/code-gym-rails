@@ -1,6 +1,6 @@
 class ResponsesController < ApplicationController
-  before_action :set_response, only: [ :review, :email_review, :self_explanation, :explain_differently, :follow_ups, :start_over ]
-  before_action :require_reviewed_section!, only: [ :self_explanation, :explain_differently, :follow_ups ]
+  before_action :set_response, only: [ :review, :email_review, :explain_differently, :follow_ups, :start_over ]
+  before_action :require_reviewed_section!, only: [ :explain_differently, :follow_ups ]
 
   # Double MAX_FOLLOW_UPS_PER_SECTION (3): a follow-up is one clarifying
   # question about an already-finished review, while a duck thread supports
@@ -160,35 +160,6 @@ class ResponsesController < ApplicationController
 
     ReviewMailer.send_review(@response).deliver_later
     redirect_to root_path, notice: "Review sent to #{current_user.email}."
-  end
-
-  # PATCH /responses/:id/self_explanation — save the user's own one-sentence
-  # explanation of why a fix works. Capture only: nothing grades it, and it gates
-  # nothing. Writing to an arbitrarily old response is intentional — /history is
-  # where reviews live, so this is where the prompt is answered.
-  def self_explanation
-    text = params[:text].to_s.strip
-    saved = true
-    errors = nil
-
-    # No AI call here, so the lock is held only for a fast read-merge-write —
-    # unlike explain_differently/follow_ups there's nothing slow to keep
-    # outside it. Without this, two tabs saving different sections at once
-    # each hold their own stale in-memory hash, and the last save wins,
-    # silently dropping the other tab's section.
-    @response.with_lock do
-      @response.self_explanations = @response.self_explanations.merge(
-        @section => text
-      )
-      saved = @response.save
-      errors = @response.errors.full_messages.to_sentence unless saved
-    end
-
-    if saved
-      render json: { status: "saved" }
-    else
-      render_section_error(errors)
-    end
   end
 
   # POST /responses/:id/explain_differently — one section's feedback, reframed.

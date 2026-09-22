@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_22_201823) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_22_213231) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -94,7 +94,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_201823) do
     t.jsonb "review_errors", default: {}, null: false
     t.datetime "reviewing_since"
     t.jsonb "section_ratings", default: {}, null: false
-    t.jsonb "self_explanations", default: {}, null: false
     t.datetime "submitted_at"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false

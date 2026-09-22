@@ -231,7 +231,7 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("mermaid@11.4.1")
     end
 
-    it "emits the ai_review autosave script and the mermaid module exactly once across multiple entries" do
+    it "emits the ai_review script and the mermaid module exactly once across multiple entries" do
       # shared/_ai_review renders once per reviewed entry, and
       # shared/_mermaid_diagram's module renders once per architecture
       # section with a diagram — both would otherwise ship one
@@ -243,7 +243,7 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body.scan("Autosaves on blur.").size).to eq(1)
+      expect(response.body.scan("This script is emitted once").size).to eq(1)
       # Check for mermaid script specifically, since highlight.js script also uses cdn.jsdelivr.net
       expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
     end
@@ -459,13 +459,13 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("<li>Spotted the issue on #{2.days.ago.to_date}</li>")
     end
 
-    it "renders the self-explanation prompt on a reviewed entry" do
+    it "renders no self-explanation box on a reviewed entry" do
       create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
       login_as(user)
       get history_path
 
-      expect(response.body).to include("Break this fix into 2-3 steps and name what each one does.")
-      expect(response.body).to include("self-explanation-input")
+      expect(response.body).not_to include("Break this fix into")
+      expect(response.body).not_to include("self-explanation")
     end
 
     it "marks code_review and improved_code with the exercise's highlight.js language" do
