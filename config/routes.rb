@@ -93,10 +93,9 @@ Rails.application.routes.draw do
     member do
       post :review       # trigger the inline AI review
       post :email_review # email the completed review to the user
-      patch :self_explanation # save the user's own restatement of why a fix works
       post :explain_differently # regenerate one section's feedback with a new framing
       post :follow_ups # ask a clarifying question about one section's review
-      delete :start_over # clear today's answers/ratings/feedback so the same set can be re-attempted
+      delete :start_over # clear today's answers and ratings so the same set can be re-attempted
     end
     collection do
       # Pre-submission Socratic thinking partner. No :id — fully unpersisted,

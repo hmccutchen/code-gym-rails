@@ -79,7 +79,7 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
 
   # Mirrors spec/requests/history_spec.rb's create_session_for: a submitted,
   # reviewed DailyResponse is the only way shared/_ai_review (and therefore
-  # .self-explanation-input / .follow-up-input) ever enters the DOM.
+  # .follow-up-input) ever enters the DOM.
   def seed_reviewed_session
     exercise = DailyExercise.create!(
       user: user, date: weekday.to_date, generated_at: Time.current,
@@ -115,13 +115,12 @@ RSpec.describe "Focusable controls are large enough not to trigger iOS zoom", ty
     expect_no_undersized_controls(minimum_controls: 1)
   end
 
-  it "renders no undersized control on a history entry's AI review, including follow-up/self-explanation inputs" do
+  it "renders no undersized control on a history entry's AI review, including the follow-up input" do
     travel_to(weekday) do
       seed_reviewed_session
       visit_as(user)
       visit history_path
       expect(page).to have_css(".follow-up-input", wait: 10)
-      expect(page).to have_css(".self-explanation-input")
 
       expect_no_undersized_controls(minimum_controls: 1)
     end

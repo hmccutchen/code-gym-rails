@@ -1090,112 +1090,11 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  describe "PATCH /responses/:id/self_explanation" do
-    let(:user) { create_user_with_key }
+  describe "the retired self-explanation endpoint" do
+    it "no longer routes" do
+      patch "/responses/1/self_explanation", params: { section: "code_review", text: "x" }
 
-    def reviewed_response_for(owner)
-      exercise = DailyExercise.create!(
-        user: owner, date: Date.current - 5, generated_at: Time.current, language: "ruby_rails",
-        problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } }
-      )
-      DailyResponse.create!(
-        user: owner, daily_exercise: exercise, date: Date.current - 5,
-        answers: { "code_review" => "an answer with substance" },
-        submitted_at: Time.current,
-        ai_review: { "code_review" => { "rating" => "solid" } }
-      )
-    end
-
-    it "saves and then updates an explanation for a valid section" do
-      r = reviewed_response_for(user)
-      login_as(user)
-
-      patch self_explanation_response_path(r), params: { section: "code_review", text: "Because it batches the query" }
-      expect(response).to have_http_status(:ok)
-      expect(r.reload.self_explanations["code_review"]).to eq("Because it batches the query")
-
-      patch self_explanation_response_path(r), params: { section: "code_review", text: "Revised reasoning" }
-      expect(r.reload.self_explanations["code_review"]).to eq("Revised reasoning")
-    end
-
-    it "404s for another user's response" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
-      r = reviewed_response_for(other)
-      login_as(user)
-
-      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
       expect(response).to have_http_status(:not_found)
-      expect(r.reload.self_explanations).to eq({})
-    end
-
-    # Guards against a regression where require_reviewed_section! runs before
-    # set_response: if the before_action order were ever swapped, this would
-    # 422 ("no review yet") instead of 404, leaking that the row exists at all.
-    # reviewed_response_for(other) would mask this — its ai_review is already
-    # present, so both orderings would happen to 404/422 the same way. Only an
-    # *unreviewed* other-user row can tell the two before_actions apart.
-    it "404s for another user's unreviewed response, not 422" do
-      other = create_user_with_key(email: "other@example.com", name: "Other")
-      r = reviewed_response_for(other)
-      r.update!(ai_review: nil)
-      login_as(user)
-
-      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
-      expect(response).to have_http_status(:not_found)
-      expect(r.reload.self_explanations).to eq({})
-    end
-
-    it "rejects an unreviewed response" do
-      r = reviewed_response_for(user)
-      r.update!(ai_review: nil)
-      login_as(user)
-
-      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(r.reload.self_explanations).to eq({})
-    end
-
-    it "rejects a section absent from the exercise's problem_set" do
-      r = reviewed_response_for(user)
-      login_as(user)
-
-      patch self_explanation_response_path(r), params: { section: "architecture", text: "x" }
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(r.reload.self_explanations).to eq({})
-    end
-
-    it "uses the same {status, error} shape as the other review endpoints on a save failure" do
-      r = reviewed_response_for(user)
-      allow_any_instance_of(DailyResponse).to receive(:save).and_return(false)
-      allow_any_instance_of(DailyResponse).to receive_message_chain(:errors, :full_messages).and_return([ "Answers is invalid" ])
-      login_as(user)
-
-      patch self_explanation_response_path(r), params: { section: "code_review", text: "x" }
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(JSON.parse(response.body)).to eq("status" => "error", "error" => "Answers is invalid")
-    end
-
-    it "doesn't drop another section's explanation written concurrently by a second tab" do
-      r = reviewed_response_for(user)
-      # Simulates a second tab's request for a different section committing in
-      # the gap between this request loading @response (in set_response) and
-      # this request taking the row lock. Without with_lock's reload, the merge
-      # would still be operating on the pre-concurrent-write in-memory hash and
-      # would overwrite "pattern" on save.
-      allow_any_instance_of(DailyResponse).to receive(:with_lock).and_wrap_original do |original, *args, &block|
-        DailyResponse.where(id: r.id)
-          .update_all(%(self_explanations = self_explanations || '{"pattern":"concurrent"}'::jsonb))
-        original.call(*args, &block)
-      end
-      login_as(user)
-
-      patch self_explanation_response_path(r), params: { section: "code_review", text: "Because it batches the query" }
-
-      expect(response).to have_http_status(:ok)
-      expect(r.reload.self_explanations).to eq(
-        "code_review" => "Because it batches the query",
-        "pattern" => "concurrent"
-      )
     end
   end
 

@@ -814,7 +814,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   flavor pools vary. A control that quotes text into a prompt and hopes is
   worse than no control. `ResponsesController#create` ignores a
   `feedback_text` param, `recent_performance` carries no feedback, the
-  prompt renders none, and the column is gone.
+  prompt renders none, and the column is gone. The review's
+  self-explanation box ("Break this fix into 2-3 steps") went the same way:
+  it saved text to a column nothing read, with no grading and no AI call,
+  so it was a notebook dressed as a feature. Its endpoint, script, styles
+  and column are removed too.
 - **Post-hoc difficulty rating**: once a section is reviewed, its review block
   also shows how hard the PROBLEM was — `straightforward` / `moderate` /
   `demanding` (`DailyResponse::DIFFICULTY_LEVELS`) plus a one-sentence reason —
