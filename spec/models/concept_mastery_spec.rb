@@ -406,7 +406,7 @@ RSpec.describe ConceptMastery, type: :model do
       4.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (4 - i)) }
 
       expect(user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails").tier).to eq("reduced")
-      expect(user.concepts_needing_reinforcement).to include(concept: "n_plus_one", tier: "reduced")
+      expect(user.concepts_needing_reinforcement).to include(concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced")
     end
   end
 end

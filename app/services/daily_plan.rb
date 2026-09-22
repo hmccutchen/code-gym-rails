@@ -95,8 +95,15 @@ class DailyPlan
                                         preferences: KindPreferences.for(user))
     kinds         = ExerciseSection.for_plan(**rotation)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
+    # Held to the buckets today can host, like retention and established
+    # concepts: a mixed user's javascript entry on a ruby_rails day could
+    # otherwise sit beside the ruby_rails retention check for the same name,
+    # and the prompt, which names concepts without their bucket, would ask for
+    # one name under two instructions.
+    hostable      = hostable_buckets(language, kinds: kinds)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
                                                         hostable: drill_host_test(language, kinds: kinds, mode: code_review_mode))
+                        .select { |h| hostable.include?(h[:bucket]) }
     # Only the non-fourth kinds present today can ever host a language or
     # architecture concept, so capacity follows the chosen set rather than a
     # literal 3 — a short day (pattern chosen but no third) has fewer hosts,
@@ -229,7 +236,7 @@ class DailyPlan
   def self.established_concepts_for_bucket(user, bucket, reinforcement:, due_checks:)
     claimed = claimed_concepts(reinforcement, due_checks)
 
-    established_in_buckets(user, [ bucket ]).reject { |cm| claimed.include?(cm.concept) }
+    established_in_buckets(user, [ bucket ]).reject { |cm| claimed.include?([ cm.concept, cm.language ]) }
   end
   private_class_method :established_concepts_for_bucket
 
@@ -241,8 +248,9 @@ class DailyPlan
   # non-fourth pool's several, so a single reinforcement concept blocks 100%
   # of its retention capacity rather than a fraction of it).
   def self.overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: [])
-    user.concepts_overdue_for_retention_check(bucket: bucket)
-        .where.not(concept: claimed_concepts(reinforcement)).exists?
+    claimed_here = claimed_concepts(reinforcement).filter_map { |concept, claimed_bucket| concept if claimed_bucket == bucket }
+
+    user.concepts_overdue_for_retention_check(bucket: bucket).where.not(concept: claimed_here).exists?
   end
   private_class_method :overdue_retention_check_pending_for_bucket?
 
@@ -287,14 +295,15 @@ class DailyPlan
   # a slot for a concept the list already carries.
   def self.unclaimed_by(reinforcement, due_checks)
     claimed = claimed_concepts(reinforcement)
-    due_checks.reject { |cm| claimed.include?(cm.concept) }
+    due_checks.reject { |cm| claimed.include?([ cm.concept, cm.language ]) }
   end
   private_class_method :unclaimed_by
 
-  # The concepts a prompt already asks for by name. Matched on name alone,
-  # as reinforcement entries carry no bucket.
+  # The (concept, bucket) pairs a prompt already asks for. Matched on the
+  # pair, never the name: a mixed-language user's javascript over_mocking is
+  # not their ruby_rails one (#190).
   def self.claimed_concepts(reinforcement, due_checks = [])
-    reinforcement.map { |h| h[:concept] } + due_checks.map(&:concept)
+    reinforcement.map { |h| [ h[:concept], h[:bucket] ] } + due_checks.map { |cm| [ cm.concept, cm.language ] }
   end
   private_class_method :claimed_concepts
 
@@ -317,7 +326,7 @@ class DailyPlan
     claimed = claimed_concepts(reinforcement, due_checks)
 
     established_in_buckets(user, hostable_buckets(language, kinds: kinds))
-      .reject { |cm| claimed.include?(cm.concept) }
+      .reject { |cm| claimed.include?([ cm.concept, cm.language ]) }
   end
   private_class_method :established_concepts_for
 

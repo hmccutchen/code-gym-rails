@@ -276,22 +276,20 @@ class User < ApplicationRecord
   # Total absence of both signals is out of scope, same as an unrated
   # concept today.
   #
+  # Every entry carries its bucket, and a concept is resolved per (concept,
+  # bucket) pair: RAILS_CONCEPTS and JS_CONCEPTS share a few names (e.g.
+  # over_mocking), so for a mixed-language user the same name is two concepts
+  # with two histories, and one must never stand in for the other (#190).
+  # Consumers that ask "is this concept already claimed" match on the pair.
+  #
   # `bucket:`/`exclude_buckets:` scope the result by ConceptBucket — added for
   # the fourth slot's independent reinforcement track, which must never mix
   # with the three-slot vocabulary. Both default to a no-op filter, so a
   # caller that passes neither sees the behavior from before either keyword
-  # existed; DailyPlan passes one on each track. Marking a concept resolved happens before either filter
-  # runs; that's safe for the special ConceptBucket vocabularies (architecture,
-  # plan_review, ambiguity_hunt, pseudocode_to_code) because each is disjoint from every other
-  # vocabulary, including both language vocabularies — a filtered-out
-  # most-recent occurrence implies every older occurrence of that same concept
-  # would be filtered too, so dedup and filter order can never disagree. It is
-  # NOT safe for a language bucket ("ruby_rails"/"javascript"): RAILS_CONCEPTS
-  # and JS_CONCEPTS share a few concept names (e.g. over_mocking), so for a
-  # mixed-language user the same concept can carry different buckets on
-  # different days, and dedup-before-filter could drop an occurrence the
-  # filter should have kept. `bucket:`/`exclude_buckets:` are for the special
-  # buckets only; no caller today passes a language bucket.
+  # existed; DailyPlan passes one on each track. Marking a pair resolved
+  # happens before either filter runs, which is safe now that the marker is
+  # the pair: a filtered-out most-recent occurrence implies every older
+  # occurrence of that same pair would be filtered too.
   #
   # The vocabulary-membership filter DOES apply to language buckets, and so
   # runs BEFORE the dedup marker rather than after it: an occurrence naming a
@@ -310,7 +308,7 @@ class User < ApplicationRecord
   # filters above as the only restriction.
   def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], hostable: nil)
     result   = drilled_reinforcement(bucket, exclude_buckets, hostable)
-    resolved = result.to_h { |h| [ h[:concept], true ] }
+    resolved = result.to_h { |h| [ [ h[:concept], h[:bucket] ], true ] }
 
     recent_daily_responses(limit).each do |r|
       r.answered_concept_tags.each do |section, concept|
@@ -318,8 +316,8 @@ class User < ApplicationRecord
 
         tag_bucket = ConceptBucket.for(section, r.daily_exercise&.language)
         next unless still_in_vocabulary?(concept, tag_bucket)
-        next if resolved.key?(concept)
-        resolved[concept] = true
+        next if resolved.key?([ concept, tag_bucket ])
+        resolved[[ concept, tag_bucket ]] = true
 
         next if r.self_rating_for(section).nil? && r.ai_rating_for(section).nil? # out of scope
 
@@ -331,7 +329,7 @@ class User < ApplicationRecord
         tier = concept_masteries.find_by(concept: concept, language: tag_bucket)&.tier || "standard"
         next if tier == "paused"
 
-        result << { concept: concept, tier: tier }
+        result << { concept: concept, bucket: tag_bucket, tier: tier }
       end
     end
 
@@ -349,7 +347,7 @@ class User < ApplicationRecord
 
     rows.select { |cm| hostable.nil? || hostable.call(cm.concept, cm.language) }
         .sort_by { |cm| drill_order(cm) }
-        .map { |cm| { concept: cm.concept, tier: cm.tier, drilled: true } }
+        .map { |cm| { concept: cm.concept, bucket: cm.language, tier: cm.tier, drilled: true } }
   end
   private :drilled_reinforcement
 

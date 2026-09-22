@@ -74,7 +74,7 @@ RSpec.describe DailyPlan do
     it "fills only the slots reinforcement did not claim" do
       mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
       allow(user).to receive(:concepts_needing_reinforcement)
-        .and_return([ { concept: "a", tier: "standard" }, { concept: "b", tier: "standard" } ])
+        .and_return([ { concept: "a", bucket: "ruby_rails", tier: "standard" }, { concept: "b", bucket: "ruby_rails", tier: "standard" } ])
 
       checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
@@ -224,7 +224,7 @@ RSpec.describe DailyPlan do
       established_mastery(concept: "memoization", interval: 14)
 
       result = DailyPlan.send(:established_concepts_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ],
-                              reinforcement: [ { concept: "memoization", tier: "standard" } ], due_checks: [])
+                              reinforcement: [ { concept: "memoization", bucket: "ruby_rails", tier: "standard" } ], due_checks: [])
       expect(result).to eq([])
     end
 
@@ -309,7 +309,7 @@ RSpec.describe DailyPlan do
                                           next_retention_check_on: Date.current + 5)
 
       by_reinforcement = DailyPlan.send(:established_concepts_for_bucket, user, "plan_review",
-                                        reinforcement: [ { concept: "scope_creep", tier: "standard" } ], due_checks: [])
+                                        reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ], due_checks: [])
       by_due_check      = DailyPlan.send(:established_concepts_for_bucket, user, "plan_review",
                                         reinforcement: [], due_checks: [ cm ])
 
@@ -365,7 +365,7 @@ RSpec.describe DailyPlan do
                                      next_retention_check_on: Date.current - 1)
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
-        .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
+        .and_return([ { concept: "unjustified_constant", bucket: "plan_review", tier: "standard" } ])
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
@@ -382,9 +382,9 @@ RSpec.describe DailyPlan do
     it "caps fourth-slot reinforcement at the slot's single capacity" do
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
-        .and_return([ { concept: "scope_creep",           tier: "standard" },
-                      { concept: "unjustified_constant",  tier: "standard" },
-                      { concept: "unflagged_behavior_change", tier: "standard" } ])
+        .and_return([ { concept: "scope_creep", bucket: "plan_review", tier: "standard" },
+                      { concept: "unjustified_constant", bucket: "plan_review", tier: "standard" },
+                      { concept: "unflagged_behavior_change", bucket: "plan_review", tier: "standard" } ])
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
@@ -399,7 +399,7 @@ RSpec.describe DailyPlan do
                                      next_retention_check_on: Date.current - 10)
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
-        .and_return([ { concept: "unjustified_constant", tier: "standard" } ])
+        .and_return([ { concept: "unjustified_constant", bucket: "plan_review", tier: "standard" } ])
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
@@ -501,8 +501,8 @@ RSpec.describe DailyPlan do
     # instruction that cannot be honored.
     it "truncates the reinforcement list itself to what the day can host" do
       allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
-        [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" },
-          { concept: "idempotency", tier: "standard" } ]
+        [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }, { concept: "memoization", bucket: "ruby_rails", tier: "standard" },
+          { concept: "idempotency", bucket: "ruby_rails", tier: "standard" } ]
       )
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
@@ -514,7 +514,7 @@ RSpec.describe DailyPlan do
 
     it "gives a reinforcement entry up when an overdue check takes the slot back" do
       allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
-        [ { concept: "n_plus_one", tier: "standard" }, { concept: "memoization", tier: "standard" } ]
+        [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }, { concept: "memoization", bucket: "ruby_rails", tier: "standard" } ]
       )
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
       user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
@@ -661,8 +661,8 @@ RSpec.describe DailyPlan, "drilled concepts" do
     plan = described_class.for(user, language: "ruby_rails")
 
     expect(plan.reinforcement).to eq([
-      { concept: "memoization", tier: "standard", drilled: true },
-      { concept: "n_plus_one", tier: "standard" }
+      { concept: "memoization", bucket: "ruby_rails", tier: "standard", drilled: true },
+      { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }
     ])
   end
 
@@ -697,7 +697,7 @@ RSpec.describe DailyPlan, "drilled concepts" do
 
     expect(plan.reinforcement.size).to eq(3)
     expect(plan.reinforcement.count { |h| h[:drilled] }).to eq(2)
-    expect(plan.reinforcement.last).to eq(concept: "n_plus_one", tier: "standard")
+    expect(plan.reinforcement.last).to eq(concept: "n_plus_one", bucket: "ruby_rails", tier: "standard")
   end
 
   it "still offers a drill on a one-host day with evidence waiting" do
@@ -747,7 +747,7 @@ RSpec.describe DailyPlan, "drilled concepts" do
 
     plan = described_class.for(user, language: "ruby_rails")
 
-    expect(plan.fourth_reinforcement).to eq([ { concept: "unjustified_constant", tier: "standard", drilled: true } ])
+    expect(plan.fourth_reinforcement).to eq([ { concept: "unjustified_constant", bucket: "plan_review", tier: "standard", drilled: true } ])
     expect(plan.reinforcement).to eq([])
   end
 
@@ -762,5 +762,30 @@ RSpec.describe DailyPlan, "drilled concepts" do
 
     expect(plan.fourth_reinforcement.map { |h| h[:concept] }).to eq(%w[unjustified_constant])
     expect(plan.fourth_due_checks).to eq([])
+  end
+end
+
+RSpec.describe DailyPlan, "same-named concepts across language buckets" do
+  let(:user) { User.create!(email: "plan-mixed@example.com", name: "Plan", language: "mixed") }
+
+  it "lets a ruby retention check stand when only the javascript occurrence is in reinforcement" do
+    exercise = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "javascript",
+      problem_set: { "code_review" => { "concept" => "over_mocking" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+      answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
+      concept_tags: { "code_review" => "over_mocking" }, ai_review: { "code_review" => { "rating" => "developing" } })
+    user.concept_masteries.create!(concept: "over_mocking", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.reinforcement).to eq([])
+    expect(plan.due_checks.map { |cm| [ cm.concept, cm.language ] }).to eq([ [ "over_mocking", "ruby_rails" ] ])
+
+    on_javascript_day = described_class.for(user, language: "javascript")
+
+    expect(on_javascript_day.reinforcement).to eq([ { concept: "over_mocking", bucket: "javascript", tier: "standard" } ])
+    expect(on_javascript_day.due_checks).to eq([])
   end
 end

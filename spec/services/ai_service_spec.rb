@@ -2543,7 +2543,7 @@ RSpec.describe AiService do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       set = full_problem_set("code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" })
       svc = double_class.new(canned_text: set.to_json)
-      allow(user).to receive(:concepts_needing_reinforcement).and_return([ { concept: "n_plus_one", tier: "reduced" } ])
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced" } ])
 
       logged = nil
       allow(Rails.logger).to receive(:info) do |msg|
@@ -2560,7 +2560,7 @@ RSpec.describe AiService do
       expect(payload["date"]).to eq(Date.current.to_s)
       expect(payload["language"]).to eq("ruby_rails")
       expect(payload["requested"]["skill_level"]).to eq(user.skill_level)
-      expect(payload["requested"]["reinforcement"]).to eq([ { "concept" => "n_plus_one", "tier" => "reduced" } ])
+      expect(payload["requested"]["reinforcement"]).to eq([ { "concept" => "n_plus_one", "bucket" => "ruby_rails", "tier" => "reduced" } ])
       expect(payload["requested"]).to have_key("due_checks")
       expect(payload["requested"]).to have_key("established")
       expect(payload["requested"]).to have_key("recent_performance")
@@ -4528,7 +4528,7 @@ RSpec.describe AiService do
 
     it "names the fourth-slot concept needing reinforcement" do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", fourth: :plan_review,
-                            fourth_reinforcement: [ { concept: "scope_creep", tier: "standard" } ])
+                            fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard" } ])
       expect(prompt).to include("scope_creep")
     end
 
@@ -5013,8 +5013,8 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
 
   it "annotates a drilled entry apart from its tier and explains the annotation once" do
     prompt = service.send(:build_exercise_prompt, user,
-                          reinforcement: [ { concept: "n_plus_one", tier: "reduced", drilled: true },
-                                           { concept: "memoization", tier: "standard" } ])
+                          reinforcement: [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced", drilled: true },
+                                           { concept: "memoization", bucket: "ruby_rails", tier: "standard" } ])
 
     expect(prompt).to include("Concepts needing reinforcement right now: n_plus_one (reduced, drilled), memoization (standard)")
     expect(prompt).to include("Drilled concepts: a concept marked `drilled` is one the engineer asked to practise")
@@ -5023,7 +5023,7 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
 
   it "annotates a drilled fourth-slot entry the same way" do
     prompt = service.send(:build_exercise_prompt, user, fourth: :plan_review,
-                          fourth_reinforcement: [ { concept: "scope_creep", tier: "standard", drilled: true } ])
+                          fourth_reinforcement: [ { concept: "scope_creep", bucket: "plan_review", tier: "standard", drilled: true } ])
 
     expect(prompt).to include("Fourth-section (plan_review) concept needing reinforcement: scope_creep (standard, drilled)")
   end
@@ -5031,7 +5031,7 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
   it "leaves the locked-kind line to override easing for whichever concept it carries" do
     user.update!(section_kind_levels: { "code_review" => "principal_engineer" }, locked_section_kinds: [ "code_review" ])
     prompt = service.send(:build_exercise_prompt, user,
-                          reinforcement: [ { concept: "n_plus_one", tier: "reduced", drilled: true } ],
+                          reinforcement: [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced", drilled: true } ],
                           difficulty: KindDifficulty.for(user))
 
     expect(prompt).to include("Locked (code_review): for these sections, ignore the `(reduced)` easing rule")
