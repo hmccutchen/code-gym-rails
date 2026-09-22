@@ -131,8 +131,8 @@ class ResponsesController < ApplicationController
     redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
   end
 
-  # DELETE /responses/:id/start_over — abandon today's saved answers, ratings,
-  # and feedback so the same problem set can be re-attempted from a blank
+  # DELETE /responses/:id/start_over — abandon today's saved answers and
+  # ratings so the same problem set can be re-attempted from a blank
   # state. Destroys the row outright rather than clearing fields in place —
   # #create's persisted-response lookup handles a missing row cleanly, so
   # the next autosave just creates a fresh one with no special-casing needed

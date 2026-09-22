@@ -29,6 +29,11 @@ class AiService
   # it's unfinished.
   class TruncatedResponseError < InvalidResponseError; end
 
+  # The provider's safety classifier declined the request: a 200 with
+  # stop_reason "refusal" and no text. Named so it does not surface as an
+  # empty-response parse error pointing at the prompt.
+  class RefusalError < Error; end
+
   # Faraday sets no timeout by default, so without one a call made from a
   # request thread would tie up a Puma thread indefinitely and outlive
   # ResponsesController#review's claim on the row, letting a second review

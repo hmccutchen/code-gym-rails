@@ -83,6 +83,8 @@ class ClaudeService < AiService
     end
 
     parsed = JSON.parse(resp.body)
+    raise AiService::RefusalError, refusal_message(parsed) if parsed["stop_reason"] == "refusal"
+
     usage  = parsed["usage"] || {}
     # claude-sonnet-5 thinks by default (unlike claude-sonnet-4-5), so the
     # text block is no longer reliably content[0] — a leading thinking block
@@ -102,6 +104,11 @@ class ClaudeService < AiService
 
   def route_for(purpose)
     MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
+  end
+
+  def refusal_message(parsed)
+    category = parsed.dig("stop_details", "category") || "unspecified"
+    "Claude declined this request (#{category})"
   end
 
   def build_connection

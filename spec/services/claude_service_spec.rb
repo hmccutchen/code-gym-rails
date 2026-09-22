@@ -290,6 +290,24 @@ RSpec.describe ClaudeService do
       expect(service.send(:call, system: "sys", prompt: "prompt text")[:truncated]).to be(true)
     end
 
+    # A refusal arrives as a 200 with no text block. Left unnamed it surfaces
+    # as an empty-response parse error pointing at the prompt, when the real
+    # cause is a safety classifier; Opus 5.5's cover more categories than
+    # Opus 5's, so generation is likelier to meet one.
+    it "raises a named refusal, with its category, instead of an empty response" do
+      body = {
+        "content"      => [],
+        "stop_reason"  => "refusal",
+        "stop_details" => { "type" => "refusal", "category" => "cyber", "explanation" => "declined" },
+        "usage"        => { "input_tokens" => 10, "output_tokens" => 0 }
+      }.to_json
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      expect { service.send(:call, system: "sys", prompt: "prompt text") }
+        .to raise_error(AiService::RefusalError, /cyber/)
+    end
+
     it "does not report truncation for a normal end_turn stop reason" do
       body = {
         "content"     => [ { "type" => "text", "text" => "hello" } ],
