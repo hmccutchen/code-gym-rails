@@ -6,8 +6,8 @@
 # rows would charge a teammate's history for a comparison they never ran.
 class ModelComparison
   CANDIDATES = {
-    "generate"  => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5", effort: "medium" } ],
-    "review"    => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5" } ],
+    "generate"  => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5", effort: "medium" } ],
+    "review"    => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5" } ],
     "duck"      => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ],
     "translate" => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ]
   }.freeze

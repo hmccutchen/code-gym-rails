@@ -375,7 +375,6 @@ class ResponsesController < ApplicationController
     if response_params[:submit] == "1"
       @response.section_ratings = @response.section_ratings.slice(*@response.answered_sections)
     end
-    @response.feedback_text = response_params[:feedback_text] if response_params.key?(:feedback_text)
   end
 
   def render_save_result(saved)
@@ -667,7 +666,7 @@ class ResponsesController < ApplicationController
 
   def response_params
     @response_params ||= params.require(:response).permit(
-      :submit, :feedback_text,
+      :submit,
       answers: ExerciseSection.keys,
       section_ratings: ExerciseSection.keys
     )

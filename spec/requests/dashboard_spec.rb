@@ -1438,3 +1438,18 @@ RSpec.describe "Dashboard section folding", type: :request do
     expect(response.body).to include('<div class="section">')
   end
 end
+
+RSpec.describe "Dashboard without the feedback box", type: :request do
+  let(:user) { create_user_with_key }
+
+  before { login_as(user) }
+
+  it "renders the answer form with no free-text feedback field" do
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                          problem_set: { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end" } })
+    get root_path
+
+    expect(response.body).not_to include("feedback_text")
+    expect(response.body).not_to include("Anything to adjust next time?")
+  end
+end

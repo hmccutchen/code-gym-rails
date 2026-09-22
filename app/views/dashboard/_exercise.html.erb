@@ -56,11 +56,6 @@
   <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
     <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
 
-    <div class="section rating-section">
-      <p class="feedback-title">Anything to adjust next time?</p>
-      <textarea name="response[feedback_text]" id="feedback-text" class="answer" style="min-height:70px" placeholder="Optional: anything specific to adjust next time?"><%= response.feedback_text %></textarea>
-    </div>
-
     <% submit_blocker = response.submit_blocker %>
     <% submit_nudges = { unanswered: "Answer at least one section to finish up.",
                          unrated:    "Rate each section you answered to finish up." } %>
@@ -83,7 +78,6 @@
     const progressFill = document.getElementById("progress-fill");
     const progressLabel = document.getElementById("progress-label");
     const ratingButtons = form.querySelectorAll("button[data-rating-for]");
-    const feedbackText  = document.getElementById("feedback-text");
     const submitButton  = document.getElementById("submit-answers");
     const ratingNudge   = document.getElementById("rating-nudge");
     const sectionFields = [...form.querySelectorAll("textarea[data-field]")].map(t => t.dataset.field);
@@ -136,7 +130,7 @@
       const answers = {};
       textareas.forEach(t => answers[t.dataset.field] = t.value);
       return { response: Object.assign(
-        { answers: answers, section_ratings: ratings, feedback_text: feedbackText.value }, extra || {}
+        { answers: answers, section_ratings: ratings }, extra || {}
       ) };
     }
 
@@ -200,8 +194,6 @@
         autoSave();
       });
     });
-
-    feedbackText.addEventListener("input", autoSave);
 
     // Submit goes through fetch with the page's CSRF meta tag. On success it
     // chains straight into the review, which the user asks for every time

@@ -72,7 +72,7 @@ RSpec.describe "per-purpose model routing" do
     it "sends generation to Opus at medium effort" do
       body = posted_body(ClaudeService, purpose: "generate_exercise")
 
-      expect(body["model"]).to eq("claude-opus-5")
+      expect(body["model"]).to eq("claude-opus-5-5")
       expect(body["output_config"]).to eq("effort" => "medium")
     end
 

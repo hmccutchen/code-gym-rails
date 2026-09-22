@@ -238,7 +238,6 @@ class User < ApplicationRecord
       ai_ratings = r.answered_concept_tags.keys.index_with { |section| r.ai_rating_for(section) }.compact
       {
         date:              r.date.to_s,
-        feedback:          r.feedback_text,
         concepts:          r.concept_tags,
         scenarios:         scenarios,
         sections_answered: r.answered_sections.size,

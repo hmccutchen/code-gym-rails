@@ -1579,8 +1579,7 @@ class AiService
         concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""
         framings     = h[:scenarios].presence || []
         framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
-        feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/#{h[:sections_total]} answered#{concept_text}#{framing_text}#{feedback}"
+        "#{h[:date]}: #{h[:sections_answered]}/#{h[:sections_total]} answered#{concept_text}#{framing_text}"
       }.join("\n")
     end
 

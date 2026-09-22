@@ -5038,3 +5038,17 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
     expect(prompt).to include("whichever concept they carry")
   end
 end
+
+RSpec.describe AiService, "generation prompt without feedback" do
+  it "renders history without a Feedback fragment" do
+    user = User.create!(email: "prompt-no-feedback@example.com", name: "Prompt")
+    exercise = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                            problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+                                 answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "n_plus_one" })
+
+    prompt = FakeService.new("fake-key").send(:build_exercise_prompt, user)
+
+    expect(prompt).not_to include("Feedback:")
+  end
+end

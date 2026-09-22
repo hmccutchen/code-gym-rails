@@ -11,7 +11,7 @@ class ClaudeService < AiService
   # move, so they live in one place rather than two.
   DEFAULT_ROUTE = { model: "claude-sonnet-5" }.freeze
   MODEL_FOR_PURPOSE = {
-    "generate_exercise" => { model: "claude-opus-5", effort: "medium" }
+    "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" }
   }.freeze
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
@@ -19,7 +19,7 @@ class ClaudeService < AiService
   # largest response we ask for: a full-day review, each section carrying
   # prose arrays plus a structural `improved_code` block. The original 2500
   # predated those fields and silently truncated reviews mid-string, which
-  # surfaced as a JSON parse error. claude-sonnet-5 and claude-opus-5 both
+  # surfaced as a JSON parse error. claude-sonnet-5 and claude-opus-5-5 both
   # think by default and max_tokens caps thinking + response text together, so
   # this also has to clear whatever the model spends on unrequested thinking.
   MAX_TOKENS = 16_000
