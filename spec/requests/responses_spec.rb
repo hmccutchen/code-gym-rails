@@ -1091,10 +1091,11 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "the retired self-explanation endpoint" do
-    it "no longer routes" do
+    it "no longer routes, and its column is gone" do
       patch "/responses/1/self_explanation", params: { section: "code_review", text: "x" }
 
       expect(response).to have_http_status(:not_found)
+      expect(DailyResponse.column_names).not_to include("self_explanations")
     end
   end
 

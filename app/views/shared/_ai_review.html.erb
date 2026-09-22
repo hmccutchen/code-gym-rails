@@ -84,9 +84,10 @@
     session on the page), so the script below is emitted into the layout's
     shared :page_scripts region — and only on the FIRST render of this
     partial per request — rather than inline here, where it would otherwise
-    ship one identical ~4.7 KB copy per entry. The :not([data-se-wired]) etc.
-    guards inside the script still matter: they're what let this single copy
-    wire up controls that keep appearing across every entry's markup. %>
+    ship one identical copy per entry. The :not([data-alt-wired]) and
+    :not([data-fu-wired]) guards inside the script still matter: they're what
+    let this single copy wire up controls that keep appearing across every
+    entry's markup. %>
 <% unless @ai_review_script_emitted %>
   <% @ai_review_script_emitted = true %>
   <% content_for :page_scripts do %>
