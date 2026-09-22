@@ -292,6 +292,17 @@ RSpec.describe AiService do
       expect(usage.tokens_out).to eq(8_000)
     end
 
+    it "records the billed usage before raising on a refusal, and names the category" do
+      svc = double_class.new(canned_text: nil, input_tokens: 700, output_tokens: 0)
+      allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
+
+      expect {
+        expect { svc.generate_exercise(user) }.to raise_error(AiService::RefusalError, /cyber/)
+      }.to change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
+
+      expect(ApiUsage.last.tokens_in).to eq(700)
+    end
+
     it "raises TruncatedResponseError rather than a confusing parse error" do
       svc = double_class.new(canned_text: '{"code_review": {"correct": ["half a sen', truncated: true)
 

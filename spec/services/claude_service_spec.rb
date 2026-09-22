@@ -204,7 +204,7 @@ RSpec.describe ClaudeService do
       end
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
-      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false)
+      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false, refusal: nil)
     end
 
     it "finds the text block even when a thinking block precedes it" do
@@ -294,7 +294,7 @@ RSpec.describe ClaudeService do
     # as an empty-response parse error pointing at the prompt, when the real
     # cause is a safety classifier; Opus 5.5's cover more categories than
     # Opus 5's, so generation is likelier to meet one.
-    it "raises a named refusal, with its category, instead of an empty response" do
+    it "reports a refusal and its category as data, with the billed usage, rather than raising" do
       body = {
         "content"      => [],
         "stop_reason"  => "refusal",
@@ -304,8 +304,12 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      expect { service.send(:call, system: "sys", prompt: "prompt text") }
-        .to raise_error(AiService::RefusalError, /cyber/)
+      # Reported as data, not raised here, for the same reason as truncation:
+      # AiService#call_and_log records the billed usage before it raises.
+      result = service.send(:call, system: "sys", prompt: "prompt text")
+
+      expect(result[:refusal]).to eq("cyber")
+      expect(result[:input_tokens]).to eq(10)
     end
 
     it "does not report truncation for a normal end_turn stop reason" do

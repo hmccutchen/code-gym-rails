@@ -83,8 +83,6 @@ class ClaudeService < AiService
     end
 
     parsed = JSON.parse(resp.body)
-    raise AiService::RefusalError, refusal_message(parsed) if parsed["stop_reason"] == "refusal"
-
     usage  = parsed["usage"] || {}
     # claude-sonnet-5 thinks by default (unlike claude-sonnet-4-5), so the
     # text block is no longer reliably content[0] — a leading thinking block
@@ -95,7 +93,10 @@ class ClaudeService < AiService
       text:          text_block&.dig("text"),
       input_tokens:  usage["input_tokens"],
       output_tokens: usage["output_tokens"],
-      truncated:     parsed["stop_reason"] == "max_tokens"
+      truncated:     parsed["stop_reason"] == "max_tokens",
+      # Reported as data, like truncation, so call_and_log records the billed
+      # usage before it raises: a refused request still charges its input.
+      refusal:       refusal_category(parsed)
     }
   rescue Faraday::Error => e
     error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
@@ -106,9 +107,10 @@ class ClaudeService < AiService
     MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
   end
 
-  def refusal_message(parsed)
-    category = parsed.dig("stop_details", "category") || "unspecified"
-    "Claude declined this request (#{category})"
+  def refusal_category(parsed)
+    return nil unless parsed["stop_reason"] == "refusal"
+
+    parsed.dig("stop_details", "category") || "unspecified"
   end
 
   def build_connection
