@@ -11,7 +11,7 @@ class ClaudeService < AiService
   # move, so they live in one place rather than two.
   DEFAULT_ROUTE = { model: "claude-sonnet-5" }.freeze
   MODEL_FOR_PURPOSE = {
-    "generate_exercise" => { model: "claude-opus-5", effort: "medium" }
+    "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" }
   }.freeze
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
@@ -19,7 +19,7 @@ class ClaudeService < AiService
   # largest response we ask for: a full-day review, each section carrying
   # prose arrays plus a structural `improved_code` block. The original 2500
   # predated those fields and silently truncated reviews mid-string, which
-  # surfaced as a JSON parse error. claude-sonnet-5 and claude-opus-5 both
+  # surfaced as a JSON parse error. claude-sonnet-5 and claude-opus-5-5 both
   # think by default and max_tokens caps thinking + response text together, so
   # this also has to clear whatever the model spends on unrequested thinking.
   MAX_TOKENS = 16_000
@@ -93,7 +93,10 @@ class ClaudeService < AiService
       text:          text_block&.dig("text"),
       input_tokens:  usage["input_tokens"],
       output_tokens: usage["output_tokens"],
-      truncated:     parsed["stop_reason"] == "max_tokens"
+      truncated:     parsed["stop_reason"] == "max_tokens",
+      # Reported as data, like truncation, so call_and_log records the billed
+      # usage before it raises: a refused request still charges its input.
+      refusal:       refusal_category(parsed)
     }
   rescue Faraday::Error => e
     error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
@@ -102,6 +105,12 @@ class ClaudeService < AiService
 
   def route_for(purpose)
     MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
+  end
+
+  def refusal_category(parsed)
+    return nil unless parsed["stop_reason"] == "refusal"
+
+    parsed.dig("stop_details", "category") || "unspecified"
   end
 
   def build_connection

@@ -921,7 +921,7 @@ RSpec.describe User, type: :model do
                                        answers: { "code_review" => "N+1 query in the loop" },
                                        concept_tags: { "code_review" => "n_plus_one" },
                                        ai_review: { "code_review" => { "rating" => "solid" } },
-                                       section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level", feedback_text: "good one",
+                                       section_ratings: { "code_review" => "right_level" }, legacy_rating: "right_level",
                                        submitted_at: Time.current)
       usage = ApiUsage.create!(user: user, tokens_in: 100, tokens_out: 50,
                                purpose: "generate_exercise", date: Date.current)
@@ -933,7 +933,6 @@ RSpec.describe User, type: :model do
       expect(response.answers).to eq({ "code_review" => "N+1 query in the loop" })
       expect(response.concept_tags).to eq({ "code_review" => "n_plus_one" })
       expect(response.ai_review).to eq({ "code_review" => { "rating" => "solid" } })
-      expect(response.feedback_text).to eq("good one")
       expect(usage.reload.user_id).to eq(user.id)
       expect(ApiUsage.where(user_id: user.id).count).to eq(1)
     end
@@ -1691,5 +1690,18 @@ RSpec.describe User, "#concepts_needing_reinforcement across language buckets", 
     submit_response(concept: "over_mocking", language: "ruby_rails", date: Date.current - 1)
 
     expect(user.concepts_needing_reinforcement).to eq([ { concept: "over_mocking", bucket: "ruby_rails", tier: "standard" } ])
+  end
+end
+
+RSpec.describe User, "#recent_performance without feedback", type: :model do
+  it "carries no feedback key, so nothing free-form reaches the generation prompt" do
+    user = User.create!(email: "no-feedback@example.com", name: "NF")
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                            problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+                                 answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "n_plus_one" })
+
+    expect(user.recent_performance.first).not_to have_key(:feedback)
+    expect(DailyResponse.column_names).not_to include("feedback_text")
   end
 end

@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections, rate difficulty, and leave feedback before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections and rate difficulty before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
 
 ## Git Workflow
 
@@ -210,7 +210,7 @@ User logs in (emailed 6-digit code)
 8am weekdays (Solid Queue cron via config/recurring.yml):
   GenerateDailyExercisesJob
     └→ AiService.for(user) → ClaudeService | GeminiService
-         reads: user.recent_performance (last 10 sessions + ratings + feedback + concepts)
+         reads: user.recent_performance (last 10 sessions + ratings + concepts)
          calls: the user's provider with a personalized prompt, in the user's
                 chosen language (user.language_for_today)
          saves: DailyExercise { problem_set: jsonb, language } on success, or
@@ -230,8 +230,8 @@ User opens dashboard:
        today's count and rotation choose them
 
 User interacts:
-  └→ ResponsesController#create      → auto-saves answers + difficulty rating +
-       feedback text in one debounced fetch (idempotent). Each section's
+  └→ ResponsesController#create      → auto-saves answers + difficulty rating
+       in one debounced fetch (idempotent). Each section's
        difficulty rating renders with that section and gates the Submit
        button — every answered
        section must be rated, and at least one must be answered; a skipped
@@ -259,7 +259,7 @@ User interacts:
        paginated 10 per page (pagy, offset) —
        the single destination for viewing any day's problems, answers, and
        review, today's included. There is no per-day review page.
-       (feedback + concept tags are included in tomorrow's generation prompt)
+       (concept tags are included in tomorrow's generation prompt)
        No review lands here any more; it is reached by navigation, by a
        post-login bounce back to a /history URL the user had already asked
        for, or by #index's own out-of-range correction. Each entry's
@@ -287,7 +287,7 @@ Every page load, any day of the week:
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, a rotating third key, a rotating fourth key), language, generated_at, regenerated_at |
-| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), feedback_text, ai_review (jsonb), concept_tags (jsonb) |
+| `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 
@@ -342,22 +342,28 @@ concept-specific difficulty descriptions for future generation, not a new set.
   silently, `spec/services/model_routing_spec.rb` fails on a key that no call
   site logs, so a typo cannot quietly route nothing.
 
-  Only `generate_exercise` is routed today: `claude-opus-5` at `medium` effort,
-  not `low`, because nothing measures whether `low` holds quality. Generation
-  keeps thinking on and the 16,000-token `MAX_TOKENS`, and Opus 5 shares Sonnet
-  5's tokenizer, so that cap covers the same output. What changes is latency, which
+  Only `generate_exercise` is routed today: `claude-opus-5-5` at `medium`
+  effort, not `low`, because nothing measures whether `low` holds quality.
+  Opus 5.5 replaced Opus 5 on this route because it costs less ($4/$20 per
+  million tokens against $5/$25) on the same tokenizer and context; `medium`
+  is also its default effort, stated explicitly so a change to that default
+  cannot move this route silently. Thinking cannot be turned off on Opus 5.5,
+  which this route never asked for anyway: `#call` sends no `thinking` field
+  unless a caller passes `max_tokens`, and generation does not. Generation
+  keeps thinking on and the 16,000-token `MAX_TOKENS`, and Opus 5.5 shares
+  Sonnet 5's tokenizer, so that cap covers the same output. What changes is latency, which
   matters less than it would on a request: every generation runs in a job
   under the 300-second `GENERATION_READ_TIMEOUT`, so a slower model makes a
   user who opened an empty dashboard wait longer but does not fail sooner.
 
-  Review stays on `claude-sonnet-5` pending a comparison with `claude-opus-5`,
+  Review stays on `claude-sonnet-5` pending a comparison with `claude-opus-5-5`,
   and `duck_thread` and `pseudocode_translate` pending one with
   `claude-haiku-4-5`. `script/compare_models.rb` runs a stored day through both
   models of a pair and prints the results with tokens and time for a person to
   judge. Two constraints apply before routing any of them, both noted beside
   the table. `#call` disables thinking whenever a caller passes `max_tokens`,
-  which on Opus 5 can leak thinking tags into the reply, so a capped purpose
-  should not move to Opus without revisiting that. And Haiku 4.5 caches only a
+  which Opus 5.5 rejects outright with a 400, so a capped purpose cannot move
+  to Opus without replacing that with a lower effort level. And Haiku 4.5 caches only a
   prompt of 4,096 tokens or more, above the duck's system prompt, so moving
   `duck_thread` there ends the caching bet described below.
 - **Conversational calls send real turns**: `AiService#duck_response` and
@@ -720,7 +726,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   drilled or not, and the page says it is waiting.
 - **Adaptive sizing toggle**: `User#adaptive_set_size` (default true) is a hard override of the count only, not a reset to a default — `SectionCount.for` takes an early return to `ExerciseSection.slot_count` before any sizing logic runs when it's off, so there is no path from that logic to the output for that user regardless of how the sizing rule changes later. `SectionRotation`'s starvation-weighted kind selection still runs either way: it is not sizing, and it improves a full 4-section day too, so turning the toggle off does not skip the exercise-history query — only the sizing computation. A boolean is the right shape for a single-user-per-account app; if this app ever needed several floors per user, a floor preference would express the intent better than a single on/off switch.
 - **Pausing generation**: `User#paused_generation_at` (nullable timestamp; nil is active) suppresses only generation the user didn't ask for — the cron batch (`GenerateDailyExercisesJob`'s no-arg branch) and `DashboardController#show`'s auto-trigger. It never gates submitting or reviewing: `ResponsesController` has no pause check, so once a row exists for today the submit → review chain runs regardless of pause state or weekday. The toggle is `PATCH /account/toggle_generation` on the Account page — the one control for this column; a second one anywhere else would be a second pause mechanism. Each button posts the state it wants (`paused=0`/`1`) rather than asking for a flip, so a double-tapped Resume stays a resume instead of the second request re-reading an already-unpaused user and pausing it again; with no param posted the endpoint still flips, keeping its original contract. Days fully inside a pause create no `DailyExercise` row at all, so they are non-events to `User#recent_exercise_history` and `#current_streak` rather than skips. The one day that *does* leave a row is the day the pause began (or an explicit `/generate` while paused), and `User#resume_generation!` is what stops that row counting against the user: on resume it re-dates the held, still-unsubmitted exercise — and the draft `DailyResponse` autosave left on it, which must move too or `#create` would build a second response for the same exercise — to `Date.current`. The row lock also settles the race against a concurrent generation, and does it through the foreign key rather than directly: inserting today's exercise needs a FOR KEY SHARE lock on the same `users` row that `with_lock` holds FOR UPDATE, so a generator either committed before the lock (and the `exists?` check sees it) or blocks until after it and loses its own set to the unique index, which `GenerateDailyExercisesJob` already treats as "generated concurrently". Resume wins, which is the right way round — the held set carries the user's draft answers and a fresh one would not. The move still sits in a SAVEPOINT catching both `RecordNotUnique` and a `date`-taken `RecordInvalid` (uniqueness is enforced twice, and the model validation raises first), so that were it ever to fail it rolls back only itself and the pause still lifts. Recovering the set also clears a same-day `last_generation_error`, since `/generate` is not pause-gated and a failed attempt while the held set sat at an earlier date would otherwise leave "Couldn't generate a new set" rendered above it — the banner `persist_failure` exists to avoid. The whole method runs in the user's own zone rather than the caller's, unlike the read-only history and streak readers, since it writes a date that has to be the user's today. That single move both makes the set reachable again (every "today's exercise" lookup is `for_date`, so at its original date it renders nowhere and `#create` 404s) and drops it out of both signals at once, since `recent_exercise_history` filters `date: ...Date.current` and `#current_streak` exempts today — no separate "exclude paused days" rule exists or is needed. Scoped to exercises dated on or after the pause, so a day abandoned *before* pausing stays abandoned; skipped entirely if an exercise already exists for today, so an explicit `/generate` while paused is never overwritten. Both regeneration columns clear on the move, because they describe the row's *day* rather than the set: `regenerated_at` would hide the Generate-new-set button behind a claim the dashboard states outright and that is no longer true ("You've already generated a new set today"), and a leftover `regenerating_since` is worse than cosmetic — `RegenerateExerciseJob` gates only on `exercise&.regenerating_since` after resolving `for_date`, so a retry stranded from the pause day would replace the carried-forward `problem_set` and destroy the draft response the move preserved. **At most one set can ever be carried forward**, because `[user_id, date]` is unique — so a user who stranded several (paused Monday, clicked `/generate` on Tuesday, resumed Wednesday) gets the newest one back and the older ones stay where they are — **still breaking `#current_streak`**, not merely counting as skips: a past weekday holding an unsubmitted exercise hits that method's `exercised.include?(day)` break. Recovering one set does not repair a streak an older stray still zeroes. That is a limit of re-dating rather than a gap to close: two sets cannot both be today. Re-pausing does not move the floor `#held_exercise` searches from — `AccountsController` stamps a pause only when one isn't already running — so a second Pause cannot walk that floor past the set the first pause stranded. The same limit is why the move is skipped outright when today already holds an exercise. **Accepted consequence:** finishing a carried-forward set counts toward the completion-window signal and the streak for the resume day, not the day it was generated.
-- **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, concept tags, and feedback text. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `User#concept_exposure_index` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule under "One finish action."
+- **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, and concept tags. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `User#concept_exposure_index` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule under "One finish action."
 
   **Skipped retention checks defer without changing knowledge.** When a
   submitted, successfully reviewed skipped section tags a vocabulary-valid
@@ -799,6 +805,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   tap per section and avoids keying browser storage to a response that
   regenerate and start-over would have to invalidate. The read-only render
   stays a plain div.
+- **No free-text feedback box**: the answer form once carried an "Anything
+  to adjust next time?" field whose text was quoted into the next ten days'
+  generation prompts with no instruction about what to do with it. It was
+  removed rather than wired up: everything someone would type there has a
+  structured home — kind weights and exclusions, difficulty targets and
+  locks, drills, the language setting — and scenario taste is what the
+  flavor pools vary. A control that quotes text into a prompt and hopes is
+  worse than no control. `ResponsesController#create` ignores a
+  `feedback_text` param, `recent_performance` carries no feedback, the
+  prompt renders none, and the column is gone.
 - **Post-hoc difficulty rating**: once a section is reviewed, its review block
   also shows how hard the PROBLEM was — `straightforward` / `moderate` /
   `demanding` (`DailyResponse::DIFFICULTY_LEVELS`) plus a one-sentence reason —
@@ -1023,13 +1039,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   shares `persisted_response_for` with pseudocode rounds, recovering an
   initial-create race through the existing unique date constraint. Every
   answer save reloads under the response row lock. Once submitted, answers,
-  section ratings, concept tags, feedback and the submission timestamp are immutable
+  section ratings, concept tags and the submission timestamp are immutable
   through this endpoint, including while a review is running or retrying.
   Ratings freeze too because they decide mastery alongside the AI grade.
   Draft answer merging and submit-only rating pruning both run inside that
   lock, before the first submission freezes the record.
-  Feedback freezes too: there is no post-submit editor, and a late autosave
-  otherwise overwrites the submitted feedback with an older or empty draft.
   Stale autosaves receive a successful acknowledgement with `submitted: true`,
   without changing evidence, and the stale form reloads to the submitted
   page. Repeated submits return the existing review URL, preserving automatic

@@ -22,7 +22,7 @@ customer-facing surface to design around.
   pattern they avoid) show up again in later problem sets until they stick.
 - The daily set is short enough to actually finish before other work crowds
   it out.
-- Feedback and difficulty ratings feed back into tomorrow's generation, so
+- Difficulty ratings and review results feed back into tomorrow's generation, so
   the loop tightens over time instead of staying generic.
 - Nobody needs to remember to run it — it's already waiting at 8am, and
   falling behind on a day doesn't break the next one.

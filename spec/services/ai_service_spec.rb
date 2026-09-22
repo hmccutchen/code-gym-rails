@@ -292,6 +292,17 @@ RSpec.describe AiService do
       expect(usage.tokens_out).to eq(8_000)
     end
 
+    it "records the billed usage before raising on a refusal, and names the category" do
+      svc = double_class.new(canned_text: nil, input_tokens: 700, output_tokens: 0)
+      allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
+
+      expect {
+        expect { svc.generate_exercise(user) }.to raise_error(AiService::RefusalError, /cyber/)
+      }.to change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
+
+      expect(ApiUsage.last.tokens_in).to eq(700)
+    end
+
     it "raises TruncatedResponseError rather than a confusing parse error" do
       svc = double_class.new(canned_text: '{"code_review": {"correct": ["half a sen', truncated: true)
 
@@ -5036,5 +5047,19 @@ RSpec.describe AiService, "drilled concepts in the generation prompt" do
 
     expect(prompt).to include("Locked (code_review): for these sections, ignore the `(reduced)` easing rule")
     expect(prompt).to include("whichever concept they carry")
+  end
+end
+
+RSpec.describe AiService, "generation prompt without feedback" do
+  it "renders history without a Feedback fragment" do
+    user = User.create!(email: "prompt-no-feedback@example.com", name: "Prompt")
+    exercise = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                            problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+                                 answers: { "code_review" => "x" * 20 }, concept_tags: { "code_review" => "n_plus_one" })
+
+    prompt = FakeService.new("fake-key").send(:build_exercise_prompt, user)
+
+    expect(prompt).not_to include("Feedback:")
   end
 end

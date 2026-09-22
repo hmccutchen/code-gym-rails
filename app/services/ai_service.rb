@@ -29,6 +29,11 @@ class AiService
   # it's unfinished.
   class TruncatedResponseError < InvalidResponseError; end
 
+  # The provider's safety classifier declined the request: a 200 with
+  # stop_reason "refusal" and no text. Named so it does not surface as an
+  # empty-response parse error pointing at the prompt.
+  class RefusalError < Error; end
+
   # Faraday sets no timeout by default, so without one a call made from a
   # request thread would tie up a Puma thread indefinitely and outlive
   # ResponsesController#review's claim on the row, letting a second review
@@ -1579,8 +1584,7 @@ class AiService
         concept_text = pairs.any? ? " | #{pairs.join(', ')}" : ""
         framings     = h[:scenarios].presence || []
         framing_text = framings.any? ? " | framings: #{framings.join('; ')}" : ""
-        feedback     = h[:feedback].present? ? " | Feedback: \"#{h[:feedback]}\"" : ""
-        "#{h[:date]}: #{h[:sections_answered]}/#{h[:sections_total]} answered#{concept_text}#{framing_text}#{feedback}"
+        "#{h[:date]}: #{h[:sections_answered]}/#{h[:sections_total]} answered#{concept_text}#{framing_text}"
       }.join("\n")
     end
 
@@ -2505,11 +2509,15 @@ class AiService
   # `allow_truncated:` hands a cut-off reply back with its `truncated` flag
   # instead of raising. Only a prose caller may ask for it: a JSON body that
   # stops early is unusable, but prose that stops a sentence early still is.
+  # A refusal always raises, after the usage row is written: the provider
+  # billed the input even though it returned no text.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
                    read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], allow_truncated: false)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
                   read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
     ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
+
+    raise RefusalError, "Claude declined this request (#{result[:refusal]})" if result[:refusal]
 
     if result[:truncated] && !allow_truncated
       raise TruncatedResponseError,
