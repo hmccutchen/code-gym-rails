@@ -38,8 +38,16 @@ class RegenerateExerciseJob < ApplicationJob
       # raises RecordNotFound on a row that has gone — which no rescue below
       # catches, so the claim would be stranded until it goes stale. A row
       # already gone is simply nil here, which is the no-response case.
+      # The claim is this worker's only title to the row, and it can be
+      # released underneath the provider call: User#carry_forward clears it
+      # when a held set moves to today, from a resume or from a paused
+      # dashboard load after midnight. Re-read under the row lock; a cleared
+      # claim means the set is now the one the user is looking at, so the
+      # generated set is discarded rather than written over it.
+      exercise.lock!
+      kept_for = :released if exercise.regenerating_since.nil?
       existing = DailyResponse.lock.find_by(daily_exercise_id: exercise.id)
-      kept_for = :reviewed if existing&.reviewed?
+      kept_for = :reviewed if kept_for.nil? && existing&.reviewed?
       kept_for = :reviewing if kept_for.nil? && existing&.reviewing?
       raise ActiveRecord::Rollback if kept_for
 
@@ -52,6 +60,7 @@ class RegenerateExerciseJob < ApplicationJob
       )
     end
 
+    return keep_moved_set(user) if kept_for == :released
     return keep_reviewed_set(user, exercise, kept_for) if kept_for
 
     user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
@@ -76,6 +85,13 @@ class RegenerateExerciseJob < ApplicationJob
     reviewed:  "your review landed first, and replacing a reviewed set would discard it — today's reviewed set was kept.",
     reviewing: "a review was running for today's set, so it was kept rather than replaced mid-review."
   }.freeze
+
+  # No error banner: the set on the dashboard is intact and the move that
+  # released the claim cleared the day's error on purpose. Nothing to release
+  # either, since whoever moved the set already did.
+  def keep_moved_set(user)
+    Rails.logger.info("Kept the carried-forward set for #{user.email} on #{Date.current}; discarded the regenerated one")
+  end
 
   # Same shape as a failed attempt — the claim is released and regenerated_at
   # stays nil, so the day's one regeneration is still available once the review
