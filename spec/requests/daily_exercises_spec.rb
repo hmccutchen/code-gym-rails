@@ -205,3 +205,29 @@ RSpec.describe "DailyExercises", type: :request do
     end
   end
 end
+
+RSpec.describe "POST /generate while paused with a held set", type: :request do
+  include ActiveJob::TestHelper
+  include ActiveSupport::Testing::TimeHelpers
+
+  let(:user) { create_user_with_key }
+
+  before { login_as(user) }
+
+  # The dashboard's carry-forward runs on the redirect, so a generation
+  # enqueued here would lose to the moved set and be discarded as a duplicate,
+  # billed and never seen. "Today's set already exists" has to mean the same
+  # thing on both endpoints, so this one carries the held set forward first.
+  it "brings the unfinished set forward instead of enqueuing a generation it would discard" do
+    travel_to(Time.utc(2026, 7, 22, 12)) do
+      held = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current,
+                                   problem_set: { "code_review" => { "question" => "q" } })
+      user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+
+      expect { post generate_path }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+      expect(response).to redirect_to(root_path)
+      expect(held.reload.date).to eq(Date.current)
+    end
+  end
+end

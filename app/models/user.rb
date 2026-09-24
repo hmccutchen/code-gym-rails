@@ -182,13 +182,37 @@ class User < ApplicationRecord
   def resume_generation!
     Time.use_zone(effective_time_zone) do
       with_lock do
-        held = held_exercise
+        recovered = recover_held_set
         update!(paused_generation_at: nil)
-        next if held.nil? || daily_exercises.for_date.exists?
-
-        carry_forward(held)
+        recovered
       end
     end
+  end
+
+  # The same recovery the resume performs, without lifting the pause: the
+  # dashboard calls it whenever a paused user opens a day with no set, so a
+  # set left unfinished when the pause began keeps following the user forward
+  # until they submit it, instead of vanishing at midnight and only
+  # reappearing on resume. Once it is submitted, #held_exercise finds nothing
+  # and the paused day stays empty, which is what the pause is for. Returns
+  # the set moved, or nil when there was nothing to move.
+  #
+  # The unlocked read first is a cost guard, not the decision: most loads have
+  # nothing to move (#held_exercise answers nil at once for an unpaused user),
+  # and taking the row lock on each of them would briefly block a resume or an
+  # anonymize for no reason. The locked check inside #recover_held_set is the
+  # one that holds. A held row that cannot be saved is logged and left where
+  # it is: this runs on every paused dashboard load, and a raise here would
+  # turn each into a 500 with no button to escape by.
+  def carry_held_set_forward!
+    Time.use_zone(effective_time_zone) do
+      return nil if held_exercise.nil?
+
+      with_lock { recover_held_set }
+    end
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.warn("Left held exercise in place for user #{id}: #{e.record.errors.full_messages.to_sentence}")
+    nil
   end
 
   # Idempotent under concurrency: `with_lock` takes a row lock and reloads
@@ -503,18 +527,36 @@ class User < ApplicationRecord
   # twice — the model validation raises RecordInvalid before the index ever
   # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
   # validation, so an unrelated invalid record still surfaces.
+  # Locks the exercise, then its response, and writes in that order: the same
+  # order RegenerateExerciseJob takes, so the two serialize but cannot
+  # deadlock.
+  # #held_exercise read the response outside these locks, and a submit can
+  # commit in between, so the response is re-read under its lock and a
+  # submitted one ends the move — a finished session keeps its day.
   def carry_forward(held)
     transaction(requires_new: true) do
-      held.daily_response&.update!(date: Date.current)
+      held.lock!
+      response = held.daily_response&.lock!
+      next nil if response&.submitted?
+
       held.update!(date: Date.current, regenerated_at: nil, regenerating_since: nil)
+      response&.update!(date: Date.current)
       clear_stale_generation_error!
+      held
     end
-    held
   rescue ActiveRecord::RecordNotUnique
     nil
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
     nil
+  end
+
+  # Must run under #with_lock, in the user's zone: both callers hold both.
+  def recover_held_set
+    held = held_exercise
+    return nil if held.nil? || daily_exercises.for_date.exists?
+
+    carry_forward(held)
   end
 
 

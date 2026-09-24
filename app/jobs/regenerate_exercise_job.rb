@@ -14,6 +14,10 @@ class RegenerateExerciseJob < ApplicationJob
     exercise = user.daily_exercises.for_date.first
     return unless exercise&.regenerating_since
 
+    # The claim's timestamp is this worker's token. Presence alone cannot tell
+    # this claim from a later one: the paused dashboard can clear it and a
+    # second click re-make it while the provider call below is still running.
+    claim = exercise.regenerating_since
     problem_set = AiService.for(user).generate_exercise(user, language: exercise.language)
 
     kept_for = nil
@@ -38,6 +42,16 @@ class RegenerateExerciseJob < ApplicationJob
       # raises RecordNotFound on a row that has gone — which no rescue below
       # catches, so the claim would be stranded until it goes stale. A row
       # already gone is simply nil here, which is the no-response case.
+      # The claim is this worker's only title to the row, and it can change
+      # underneath the provider call: User#carry_forward clears it when a held
+      # set moves to today, and a later click can retake a claim gone stale.
+      # Re-read under the row lock; a claim that is no longer ours means the
+      # set is someone else's to write, so the generated set is discarded.
+      exercise.lock!
+      if exercise.regenerating_since != claim
+        kept_for = :superseded
+        raise ActiveRecord::Rollback # before touching the response: nothing here depends on it
+      end
       existing = DailyResponse.lock.find_by(daily_exercise_id: exercise.id)
       kept_for = :reviewed if existing&.reviewed?
       kept_for = :reviewing if kept_for.nil? && existing&.reviewing?
@@ -52,20 +66,21 @@ class RegenerateExerciseJob < ApplicationJob
       )
     end
 
-    return keep_reviewed_set(user, exercise, kept_for) if kept_for
+    return keep_superseded_set(user) if kept_for == :superseded
+    return keep_reviewed_set(user, exercise, kept_for, claim) if kept_for
 
     user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
     Rails.logger.info("Regenerated exercise for #{user.email} on #{Date.current}")
   rescue AiService::AuthenticationError => e
-    release(user, exercise, "Your API key was rejected — check it in Settings.", e)
+    release(user, exercise, claim, "Your API key was rejected — check it in Settings.", e)
   rescue AiService::RateLimitError => e
-    release(user, exercise, "The AI provider is rate-limiting requests — try again shortly.", e)
+    release(user, exercise, claim, "The AI provider is rate-limiting requests — try again shortly.", e)
   rescue AiService::TimeoutError => e
-    release(user, exercise, "Generation took longer than the provider's budget — try again.", e)
+    release(user, exercise, claim, "Generation took longer than the provider's budget — try again.", e)
   rescue AiService::Error => e
-    release(user, exercise, e.message, e)
+    release(user, exercise, claim, e.message, e)
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
-    release(user, exercise, "Generation returned an unusable set — try again.", e)
+    release(user, exercise, claim, "Generation returned an unusable set — try again.", e)
   end
 
   # Rendered after the dashboard's "Couldn't generate a new set: " prefix. A
@@ -77,21 +92,34 @@ class RegenerateExerciseJob < ApplicationJob
     reviewing: "a review was running for today's set, so it was kept rather than replaced mid-review."
   }.freeze
 
+  # No error banner: the set on the dashboard is intact and, when a move is
+  # what took the claim, it cleared the day's error on purpose. Nothing to
+  # release either, since the claim is no longer ours to release.
+  def keep_superseded_set(user)
+    Rails.logger.info("Regeneration claim for #{user.email} on #{Date.current} was released or retaken under the call; discarded the regenerated one")
+  end
+
   # Same shape as a failed attempt — the claim is released and regenerated_at
   # stays nil, so the day's one regeneration is still available once the review
   # is no longer the reason to refuse. The generated set is discarded: it was
   # built for a day whose sections must not change.
-  def keep_reviewed_set(user, exercise, kept_for)
+  def keep_reviewed_set(user, exercise, kept_for, claim)
     Rails.logger.info("Kept today's set (#{kept_for}) for #{user.email} on #{Date.current}; discarded the regenerated one")
-    exercise.update_columns(regenerating_since: nil)
+    release_own_claim(exercise, claim)
     user.update!(last_generation_error_date: Date.current, last_generation_error: KEPT_SET_MESSAGES.fetch(kept_for))
+  end
+
+  # Releases only the claim this worker holds: a where-guarded UPDATE, so a
+  # newer claim made after ours was cleared is left for its own worker.
+  def release_own_claim(exercise, claim)
+    DailyExercise.where(id: exercise.id, regenerating_since: claim).update_all(regenerating_since: nil)
   end
 
   # regenerated_at is deliberately left untouched: a failed attempt must not
   # consume the user's one regeneration for the day.
-  def release(user, exercise, message, error)
+  def release(user, exercise, claim, message, error)
     Rails.logger.error("Failed to regenerate exercise for #{user.email}: #{error.message}")
-    exercise&.update_columns(regenerating_since: nil)
+    release_own_claim(exercise, claim) if exercise
     user.update!(last_generation_error_date: Date.current, last_generation_error: message)
   end
 end

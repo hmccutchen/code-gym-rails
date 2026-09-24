@@ -1705,3 +1705,117 @@ RSpec.describe User, "#recent_performance without feedback", type: :model do
     expect(DailyResponse.column_names).not_to include("feedback_text")
   end
 end
+
+RSpec.describe User, "#carry_held_set_forward!", type: :model do
+  include ActiveSupport::Testing::TimeHelpers
+
+  let(:wednesday) { Time.utc(2026, 7, 22, 12) }
+  let(:user) { User.create!(email: "holder@example.com", name: "Holder", time_zone: "UTC") }
+
+  def pause_on(date)
+    user.update!(paused_generation_at: date.in_time_zone(user.effective_time_zone) + 9.hours)
+  end
+
+  def exercise_on(date)
+    user.daily_exercises.create!(date: date, generated_at: Time.current,
+                                 problem_set: { "code_review" => { "question" => "q" } })
+  end
+
+  it "re-dates the unfinished set and its draft to today while the pause stays in place" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      draft = user.daily_responses.create!(daily_exercise: held, date: Date.current - 1,
+                                           answers: { "code_review" => "a partial answer here" })
+      pause_on(Date.current - 1)
+
+      expect(user.carry_held_set_forward!).to eq(held)
+      expect(held.reload.date).to eq(Date.current)
+      expect(draft.reload.date).to eq(Date.current)
+      expect(user.reload.paused_generation_at).to be_present
+    end
+  end
+
+  it "does nothing for a user who is not paused" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+
+      expect(user.carry_held_set_forward!).to be_nil
+      expect(held.reload.date).to eq(Date.current - 1)
+    end
+  end
+
+  it "leaves a submitted set where it is, so nothing new is offered while paused" do
+    travel_to(wednesday) do
+      done = exercise_on(Date.current - 1)
+      user.daily_responses.create!(daily_exercise: done, date: Date.current - 1, submitted_at: Time.current, answers: {})
+      pause_on(Date.current - 1)
+
+      expect(user.carry_held_set_forward!).to be_nil
+      expect(done.reload.date).to eq(Date.current - 1)
+    end
+  end
+
+  # #held_exercise reads outside the row locks the move takes, so a submit can
+  # commit between that read and the move. The move re-checks under the
+  # response lock, else a finished session would leave its history day.
+  it "leaves a set alone whose response was submitted after it was read as held" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      response = user.daily_responses.create!(daily_exercise: held, date: Date.current - 1,
+                                              answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+      pause_on(Date.current - 1)
+      allow(user).to receive(:held_exercise).and_return(held)
+
+      expect(user.carry_held_set_forward!).to be_nil
+      expect(held.reload.date).to eq(Date.current - 1)
+      expect(response.reload.date).to eq(Date.current - 1)
+    end
+  end
+
+  # RegenerateExerciseJob locks the exercise before its response; the move
+  # writes in the same order so the two cannot deadlock.
+  it "writes the exercise before its response" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      user.daily_responses.create!(daily_exercise: held, date: Date.current - 1, answers: { "code_review" => "draft" })
+      pause_on(Date.current - 1)
+
+      updates = []
+      subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        sql = payload[:sql]
+        updates << "daily_exercises" if sql.start_with?("UPDATE \"daily_exercises\"")
+        updates << "daily_responses" if sql.start_with?("UPDATE \"daily_responses\"")
+      end
+      user.carry_held_set_forward!
+      ActiveSupport::Notifications.unsubscribe(subscription)
+
+      expect(updates.first(2)).to eq(%w[daily_exercises daily_responses])
+    end
+  end
+
+  # This runs on every paused dashboard load, so a held row that cannot be
+  # saved must not turn every page into a 500 with no way out; it is logged
+  # and left where it is.
+  it "leaves a held set that fails validation in place instead of raising" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      held.update_columns(language: "klingon")
+      pause_on(Date.current - 1)
+
+      expect { expect(user.carry_held_set_forward!).to be_nil }.not_to raise_error
+      expect(held.reload.date).to eq(Date.current - 1)
+    end
+  end
+
+  it "never moves a set over one already dated today" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      today = exercise_on(Date.current)
+      pause_on(Date.current - 1)
+
+      expect(user.carry_held_set_forward!).to be_nil
+      expect(held.reload.date).to eq(Date.current - 1)
+      expect(today.reload.date).to eq(Date.current)
+    end
+  end
+end

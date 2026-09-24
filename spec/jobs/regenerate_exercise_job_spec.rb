@@ -35,6 +35,69 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.regenerating_since).to be_nil
   end
 
+  # A claim can be released under the worker while its provider call runs:
+  # User#carry_forward clears regenerating_since when it moves a held set to
+  # today, whether from a resume or from a paused dashboard load after
+  # midnight. The claim is the worker's only title to the row, so when it is
+  # gone the generated set is discarded rather than written over a set the
+  # user is looking at, and the draft on it survives.
+  it "abandons the regeneration when its claim was released during the provider call" do
+    exercise = claimed_exercise
+    draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                  answers: { "code_review" => "a draft worth keeping here" })
+    fake_service = instance_double(ClaudeService)
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(fake_service).to receive(:generate_exercise) do
+      exercise.update_columns(regenerating_since: nil)
+      { "code_review" => { "question" => "new" } }
+    end
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "old" })
+    expect(exercise.regenerated_at).to be_nil
+    expect(draft.reload).to be_persisted
+    expect(user.reload.last_generation_error).to be_nil
+  end
+
+  # The claim is identified by its timestamp, not by being present: a worker
+  # whose claim was released and then re-made by a later click must not
+  # mistake the newer claim for its own and consume that job's turn.
+  it "abandons the regeneration when a newer claim replaced its own, and leaves that claim standing" do
+    exercise = claimed_exercise
+    original_claim = exercise.regenerating_since
+    newer_claim = original_claim + 90.seconds
+    draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                                  answers: { "code_review" => "a draft worth keeping here" })
+    fake_service = instance_double(ClaudeService)
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(fake_service).to receive(:generate_exercise) do
+      exercise.update_columns(regenerating_since: newer_claim)
+      { "code_review" => { "question" => "new" } }
+    end
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "old" })
+    expect(exercise.regenerating_since).to be_within(1.second).of(newer_claim)
+    expect(draft.reload).to be_persisted
+  end
+
+  it "leaves a newer claim standing when its own attempt fails" do
+    exercise = claimed_exercise
+    newer_claim = exercise.regenerating_since + 90.seconds
+    fake_service = instance_double(ClaudeService)
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(fake_service).to receive(:generate_exercise) do
+      exercise.update_columns(regenerating_since: newer_claim)
+      raise AiService::TimeoutError, "slow"
+    end
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(exercise.reload.regenerating_since).to be_within(1.second).of(newer_claim)
+  end
+
   it "destroys the existing response so the new set starts clean" do
     exercise = claimed_exercise
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,

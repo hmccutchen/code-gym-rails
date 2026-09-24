@@ -13,7 +13,16 @@ class DashboardController < ApplicationController
     # the poller reads generation progress, and a pick is not that.
     @featured = ConceptReference.featured
 
+    # A paused user's unfinished set follows them forward each day until it is
+    # submitted; the same move the resume makes, so it is one rule. Re-read
+    # after the move rather than trusting its return: a second first-load of
+    # the day can lose the race and move nothing, and today's set is still
+    # there to show.
     @exercise = current_user.daily_exercises.for_date.first
+    if @exercise.nil?
+      current_user.carry_held_set_forward!
+      @exercise = current_user.daily_exercises.for_date.first
+    end
     @response = @exercise&.daily_response ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
 
