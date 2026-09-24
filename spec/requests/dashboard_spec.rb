@@ -1453,3 +1453,46 @@ RSpec.describe "Dashboard without the feedback box", type: :request do
     expect(response.body).not_to include("Anything to adjust next time?")
   end
 end
+
+RSpec.describe "Dashboard while paused with an unfinished set", type: :request do
+  include ActiveJob::TestHelper
+  include ActiveSupport::Testing::TimeHelpers
+
+  let(:user) { create_user_with_key }
+  let(:wednesday) { Time.utc(2026, 7, 22, 12) }
+
+  before { login_as(user) }
+
+  def problem_set
+    { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end" } }
+  end
+
+  it "keeps showing the set left unfinished when the pause began, day after day, without generating" do
+    travel_to(wednesday) do
+      held = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, problem_set: problem_set)
+      user.daily_responses.create!(daily_exercise: held, date: Date.current - 1, answers: { "code_review" => "half an answer here" })
+      user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+
+      expect { get root_path }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+      expect(response.body).to include('data-rating-for="code_review"')
+      expect(response.body).to include("half an answer here")
+      expect(response.body).not_to include("Automatic generation is paused")
+      expect(held.reload.date).to eq(Date.current)
+    end
+  end
+
+  it "shows the paused message and generates nothing once that set is submitted" do
+    travel_to(wednesday) do
+      done = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, problem_set: problem_set)
+      user.daily_responses.create!(daily_exercise: done, date: Date.current - 1, submitted_at: Time.current,
+                                   answers: { "code_review" => "a" * 20 })
+      user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+
+      expect { get root_path }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+      expect(response.body).to include("Automatic generation is paused")
+      expect(done.reload.date).to eq(Date.current - 1)
+    end
+  end
+end

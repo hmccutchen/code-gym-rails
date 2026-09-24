@@ -182,13 +182,24 @@ class User < ApplicationRecord
   def resume_generation!
     Time.use_zone(effective_time_zone) do
       with_lock do
-        held = held_exercise
+        recovered = recover_held_set
         update!(paused_generation_at: nil)
-        next if held.nil? || daily_exercises.for_date.exists?
-
-        carry_forward(held)
+        recovered
       end
     end
+  end
+
+  # The same recovery the resume performs, without lifting the pause: the
+  # dashboard calls it on each day's first visit while paused, so a set left
+  # unfinished when the pause began keeps following the user forward until
+  # they submit it, instead of vanishing at midnight and only reappearing on
+  # resume. Once it is submitted, #held_exercise finds nothing and the paused
+  # day stays empty, which is what the pause is for. Returns the set moved, or
+  # nil when there was nothing to move.
+  def carry_held_set_forward!
+    return nil unless paused_generation_at?
+
+    Time.use_zone(effective_time_zone) { with_lock { recover_held_set } }
   end
 
   # Idempotent under concurrency: `with_lock` takes a row lock and reloads
@@ -503,6 +514,15 @@ class User < ApplicationRecord
   # twice — the model validation raises RecordInvalid before the index ever
   # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
   # validation, so an unrelated invalid record still surfaces.
+  # Must run under #with_lock, in the user's zone: the callers above hold both.
+  def recover_held_set
+    held = held_exercise
+    return nil if held.nil? || daily_exercises.for_date.exists?
+
+    carry_forward(held)
+  end
+  private :recover_held_set
+
   def carry_forward(held)
     transaction(requires_new: true) do
       held.daily_response&.update!(date: Date.current)
