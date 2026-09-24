@@ -1755,6 +1755,44 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
     end
   end
 
+  # #held_exercise reads outside the row locks the move takes, so a submit can
+  # commit between that read and the move. The move re-checks under the
+  # response lock, else a finished session would leave its history day.
+  it "leaves a set alone whose response was submitted after it was read as held" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      response = user.daily_responses.create!(daily_exercise: held, date: Date.current - 1,
+                                              answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
+      pause_on(Date.current - 1)
+      allow(user).to receive(:held_exercise).and_return(held)
+
+      expect(user.carry_held_set_forward!).to be_nil
+      expect(held.reload.date).to eq(Date.current - 1)
+      expect(response.reload.date).to eq(Date.current - 1)
+    end
+  end
+
+  # RegenerateExerciseJob locks the exercise before its response; the move
+  # writes in the same order so the two can never wait on each other.
+  it "writes the exercise before its response" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      user.daily_responses.create!(daily_exercise: held, date: Date.current - 1, answers: { "code_review" => "draft" })
+      pause_on(Date.current - 1)
+
+      updates = []
+      subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        sql = payload[:sql]
+        updates << "daily_exercises" if sql.start_with?("UPDATE \"daily_exercises\"")
+        updates << "daily_responses" if sql.start_with?("UPDATE \"daily_responses\"")
+      end
+      user.carry_held_set_forward!
+      ActiveSupport::Notifications.unsubscribe(subscription)
+
+      expect(updates.first(2)).to eq(%w[daily_exercises daily_responses])
+    end
+  end
+
   it "never moves a set over one already dated today" do
     travel_to(wednesday) do
       held = exercise_on(Date.current - 1)

@@ -523,13 +523,22 @@ class User < ApplicationRecord
   # twice — the model validation raises RecordInvalid before the index ever
   # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
   # validation, so an unrelated invalid record still surfaces.
+  # Locks the exercise, then its response, and writes in that order: the same
+  # order RegenerateExerciseJob takes, so the two can never wait on each other.
+  # #held_exercise read the response outside these locks, and a submit can
+  # commit in between, so the response is re-read under its lock and a
+  # submitted one ends the move — a finished session keeps its day.
   def carry_forward(held)
     transaction(requires_new: true) do
-      held.daily_response&.update!(date: Date.current)
+      held.lock!
+      response = held.daily_response&.lock!
+      next nil if response&.submitted?
+
       held.update!(date: Date.current, regenerated_at: nil, regenerating_since: nil)
+      response&.update!(date: Date.current)
       clear_stale_generation_error!
+      held
     end
-    held
   rescue ActiveRecord::RecordNotUnique
     nil
   rescue ActiveRecord::RecordInvalid => e
