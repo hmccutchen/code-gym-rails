@@ -190,16 +190,25 @@ class User < ApplicationRecord
   end
 
   # The same recovery the resume performs, without lifting the pause: the
-  # dashboard calls it on each day's first visit while paused, so a set left
-  # unfinished when the pause began keeps following the user forward until
-  # they submit it, instead of vanishing at midnight and only reappearing on
-  # resume. Once it is submitted, #held_exercise finds nothing and the paused
-  # day stays empty, which is what the pause is for. Returns the set moved, or
-  # nil when there was nothing to move.
+  # dashboard calls it whenever a paused user opens a day with no set, so a
+  # set left unfinished when the pause began keeps following the user forward
+  # until they submit it, instead of vanishing at midnight and only
+  # reappearing on resume. Once it is submitted, #held_exercise finds nothing
+  # and the paused day stays empty, which is what the pause is for. Returns
+  # the set moved, or nil when there was nothing to move.
+  #
+  # The unlocked read first is a cost guard, not the decision: most paused
+  # loads have nothing to move, and taking the row lock on each of them would
+  # briefly block a resume or an anonymize for no reason. The locked check
+  # inside #recover_held_set is the one that holds.
   def carry_held_set_forward!
     return nil unless paused_generation_at?
 
-    Time.use_zone(effective_time_zone) { with_lock { recover_held_set } }
+    Time.use_zone(effective_time_zone) do
+      return nil if held_exercise.nil?
+
+      with_lock { recover_held_set }
+    end
   end
 
   # Idempotent under concurrency: `with_lock` takes a row lock and reloads
@@ -514,15 +523,6 @@ class User < ApplicationRecord
   # twice — the model validation raises RecordInvalid before the index ever
   # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
   # validation, so an unrelated invalid record still surfaces.
-  # Must run under #with_lock, in the user's zone: the callers above hold both.
-  def recover_held_set
-    held = held_exercise
-    return nil if held.nil? || daily_exercises.for_date.exists?
-
-    carry_forward(held)
-  end
-  private :recover_held_set
-
   def carry_forward(held)
     transaction(requires_new: true) do
       held.daily_response&.update!(date: Date.current)
@@ -535,6 +535,14 @@ class User < ApplicationRecord
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
     nil
+  end
+
+  # Must run under #with_lock, in the user's zone: both callers hold both.
+  def recover_held_set
+    held = held_exercise
+    return nil if held.nil? || daily_exercises.for_date.exists?
+
+    carry_forward(held)
   end
 
 
