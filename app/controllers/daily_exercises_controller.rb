@@ -4,6 +4,11 @@ class DailyExercisesController < ApplicationController
   # fire (weekends). No-ops (just redirects) if today's exercise already
   # exists, so a duplicate click can't enqueue a second generation.
   def generate
+    # "Today's set already exists" has to mean the same thing here as on the
+    # dashboard, which carries a paused user's unfinished set forward on the
+    # very redirect this action ends in; enqueuing first would bill a
+    # generation the unique index then discards as a duplicate.
+    current_user.carry_held_set_forward!
     return redirect_to root_path if current_user.daily_exercises.for_date.exists?
 
     # Clear any stale failure from an earlier attempt today so /dashboard/status

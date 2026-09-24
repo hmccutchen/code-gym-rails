@@ -197,18 +197,22 @@ class User < ApplicationRecord
   # and the paused day stays empty, which is what the pause is for. Returns
   # the set moved, or nil when there was nothing to move.
   #
-  # The unlocked read first is a cost guard, not the decision: most paused
-  # loads have nothing to move, and taking the row lock on each of them would
-  # briefly block a resume or an anonymize for no reason. The locked check
-  # inside #recover_held_set is the one that holds.
+  # The unlocked read first is a cost guard, not the decision: most loads have
+  # nothing to move (#held_exercise answers nil at once for an unpaused user),
+  # and taking the row lock on each of them would briefly block a resume or an
+  # anonymize for no reason. The locked check inside #recover_held_set is the
+  # one that holds. A held row that cannot be saved is logged and left where
+  # it is: this runs on every paused dashboard load, and a raise here would
+  # turn each into a 500 with no button to escape by.
   def carry_held_set_forward!
-    return nil unless paused_generation_at?
-
     Time.use_zone(effective_time_zone) do
       return nil if held_exercise.nil?
 
       with_lock { recover_held_set }
     end
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.warn("Left held exercise in place for user #{id}: #{e.record.errors.full_messages.to_sentence}")
+    nil
   end
 
   # Idempotent under concurrency: `with_lock` takes a row lock and reloads
@@ -524,7 +528,8 @@ class User < ApplicationRecord
   # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
   # validation, so an unrelated invalid record still surfaces.
   # Locks the exercise, then its response, and writes in that order: the same
-  # order RegenerateExerciseJob takes, so the two can never wait on each other.
+  # order RegenerateExerciseJob takes, so the two serialize but cannot
+  # deadlock.
   # #held_exercise read the response outside these locks, and a submit can
   # commit in between, so the response is re-read under its lock and a
   # submitted one ends the move — a finished session keeps its day.

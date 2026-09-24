@@ -1773,7 +1773,7 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
   end
 
   # RegenerateExerciseJob locks the exercise before its response; the move
-  # writes in the same order so the two can never wait on each other.
+  # writes in the same order so the two cannot deadlock.
   it "writes the exercise before its response" do
     travel_to(wednesday) do
       held = exercise_on(Date.current - 1)
@@ -1790,6 +1790,20 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
       ActiveSupport::Notifications.unsubscribe(subscription)
 
       expect(updates.first(2)).to eq(%w[daily_exercises daily_responses])
+    end
+  end
+
+  # This runs on every paused dashboard load, so a held row that cannot be
+  # saved must not turn every page into a 500 with no way out; it is logged
+  # and left where it is.
+  it "leaves a held set that fails validation in place instead of raising" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      held.update_columns(language: "klingon")
+      pause_on(Date.current - 1)
+
+      expect { expect(user.carry_held_set_forward!).to be_nil }.not_to raise_error
+      expect(held.reload.date).to eq(Date.current - 1)
     end
   end
 

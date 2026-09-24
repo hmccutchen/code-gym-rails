@@ -1482,6 +1482,25 @@ RSpec.describe "Dashboard while paused with an unfinished set", type: :request d
     end
   end
 
+  # Two first loads of a new day can race: the loser's carry-forward finds
+  # today's set already there and moves nothing, which must read as "here is
+  # today's set", never as "no set today".
+  it "renders today's set when the carry-forward lost a race to another request" do
+    travel_to(wednesday) do
+      held = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, problem_set: problem_set)
+      user.update!(paused_generation_at: (Date.current - 1).in_time_zone(user.effective_time_zone) + 9.hours)
+      allow_any_instance_of(User).to receive(:carry_held_set_forward!) do
+        held.update_columns(date: Date.current)
+        nil
+      end
+
+      get root_path
+
+      expect(response.body).to include('data-rating-for="code_review"')
+      expect(response.body).not_to include("Automatic generation is paused")
+    end
+  end
+
   it "shows the paused message and generates nothing once that set is submitted" do
     travel_to(wednesday) do
       done = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, problem_set: problem_set)
