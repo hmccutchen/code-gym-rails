@@ -202,6 +202,7 @@ RSpec.describe AiService do
       explain_differently
       pseudocode_critique
       pseudocode_translate
+      judge_section
     ].freeze
 
     it "covers every purpose except the two conversational ones" do
@@ -269,6 +270,9 @@ RSpec.describe AiService do
                .critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
       spy_class.new(canned_text: "def x\nend")
                .translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
+      spy_class.new(canned_text: { status: "keep" }.to_json)
+               .judge_section(user, ExerciseSection::CodeReview, exercise.problem_set["code_review"],
+                 rung: "senior", locked: false)
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
       expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size)
@@ -4349,6 +4353,15 @@ RSpec.describe AiService do
       expect(occurrences_per_call).to eq([ 1 ])
     end
 
+    it "reaches the judge exactly once" do
+      recording_class.new(canned_text: { status: "keep" }.to_json)
+        .judge_section(user, ExerciseSection::CodeReview,
+          { "question" => "Find the N+1", "snippet" => "code", "concept" => "n_plus_one" },
+          rung: "senior", locked: false)
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
     # The difficulty assessment rides the same fan-out and had no style rule
     # before, so it is pinned at zero: reaching it would be a new content
     # requirement rather than consolidation.
@@ -5110,5 +5123,41 @@ RSpec.describe AiService, "rung stamps on a generated set" do
     problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
 
     expect(problem_set["code_review"]).not_to have_key("eased")
+  end
+end
+
+RSpec.describe AiService, "#judge_section" do
+  let(:user) { User.create!(email: "judge@example.com", name: "J", provider: "fake", api_key: "fake-test-key") }
+  let(:section) { { "question" => "What is wrong?", "snippet" => "code", "concept" => "n_plus_one", "teaching_note" => "hint", "pitched_at" => "senior" } }
+
+  it "sends the section, its concept, rung, lock state and the kind's task, and never another section or history" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+
+    svc.judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: true)
+
+    expect(captured[:purpose]).to eq("judge_section")
+    expect(captured[:max_tokens]).to eq(AiService::JUDGE_MAX_TOKENS)
+    expect(captured[:system]).to include("checking one section of a generated coding exercise")
+    expect(captured[:system]).to include("Never reject a problem for being hard.")
+    expect(captured[:prompt]).to include("n_plus_one").and include("senior").and include("locked").and include(ExerciseSection::CodeReview.judge_task)
+    expect(captured[:prompt]).not_to include("Recent performance")
+    expect(captured.fetch(:history, [])).to eq([])
+  end
+
+  it "returns a parsed verdict" do
+    expect(FakeService.new("fake-key").judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: false).status).to eq(:keep)
+  end
+
+  it "never sends the ambiguity hunt's answer key" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    hunt = { "request" => "Build a leaderboard", "question" => "q", "teaching_note" => "t", "concept" => "scope_creep", "planted_ambiguities" => [ "SECRET" ] }
+
+    svc.judge_section(user, ExerciseSection::AmbiguityHunt, hunt, rung: "junior", locked: false)
+
+    expect(captured[:prompt]).not_to include("SECRET")
   end
 end

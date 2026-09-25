@@ -88,6 +88,13 @@ RSpec.describe "per-purpose model routing" do
       expect(body).not_to have_key("output_config")
     end
 
+    it "routes judge_section to Sonnet 5 with no effort" do
+      body = posted_body(ClaudeService, purpose: "judge_section")
+
+      expect(body["model"]).to eq("claude-sonnet-5")
+      expect(body).not_to have_key("output_config")
+    end
+
     # Haiku 4.5 rejects the effort parameter with a 400.
     it "never pairs an effort with a model that rejects one" do
       ClaudeService::MODEL_FOR_PURPOSE.each_value do |route|

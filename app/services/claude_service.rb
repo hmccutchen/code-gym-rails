@@ -11,7 +11,8 @@ class ClaudeService < AiService
   # move, so they live in one place rather than two.
   DEFAULT_ROUTE = { model: "claude-sonnet-5" }.freeze
   MODEL_FOR_PURPOSE = {
-    "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" }
+    "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" },
+    "judge_section"     => { model: "claude-sonnet-5" }
   }.freeze
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
