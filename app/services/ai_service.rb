@@ -908,10 +908,6 @@ class AiService
                       :prompt_options, :suggested_concepts)
   private_constant :Draft
 
-  # One, never a loop: a second rejection is evidence about the draft prompt,
-  # not something another call fixes.
-  JUDGE_RETRIES = 1
-
   # ── Generate a personalized daily exercise set ────────────────────────────
   # The day's plan (third section, reinforcement, retention checks) is decided by
   # DailyPlan before any provider is contacted; this method only renders it into
@@ -1352,23 +1348,27 @@ class AiService
   end
 
   # The one regeneration a rejection buys, judged again. Returns
-  # [section_or_nil, outcome]; nil is a drop. A retry that never came back
-  # counts as the second rejection, and a judge that fails on the re-judge
-  # keeps the retry for the same reason it keeps a draft.
+  # [section_or_nil, outcome]; nil is a drop. `retries` counts a retry that was
+  # actually judged, not merely attempted, so a retry whose generation failed
+  # reads as 0. A judge that fails on the re-judge keeps the retry for the
+  # same reason it keeps a draft.
   def resolve_rejection(user, language, draft, kind, section, outcome)
-    outcome = outcome.merge(retries: JUDGE_RETRIES)
+    outcome = outcome.merge(retry_principle: nil)
     retried = retry_section(user, language, draft, kind, section["concept"])
-    return [ nil, outcome.merge(dropped: true) ] if retried.nil?
+    return [ nil, outcome.merge(retries: 0, dropped: true) ] if retried.nil?
 
     verdict, latency = judge_with_fallback(user, kind, retried, draft.difficulty, user.skill_level)
-    outcome = outcome.merge(latency_ms: outcome[:latency_ms] + latency)
+    outcome = outcome.merge(retries: 1, latency_ms: outcome[:latency_ms] + latency)
     return [ retried, outcome.merge(status: :keep, fallback: verdict) ] if verdict.is_a?(String)
-    return [ nil, outcome.merge(dropped: true, principle: verdict.principle) ] if verdict.reject?
 
-    # The draft's principle survives a retry the judge accepted: it is the only
-    # record that this section was rejected at all, and rejection rate per
-    # principle is read off these entries.
-    [ verdict.apply(retried), outcome.merge(judgment(verdict), principle: outcome[:principle]) ]
+    verdict_summary = judgment(verdict)
+    return [ nil, outcome.merge(dropped: true, retry_principle: verdict_summary[:principle],
+                                retry_issues: verdict_summary[:issues]) ] if verdict.reject?
+
+    # The draft's principle and issues survive a retry the judge accepted:
+    # they are the only record this section was rejected at all, and
+    # rejection rate per principle is read off these entries.
+    [ verdict.apply(retried), outcome.merge(status: verdict_summary[:status], retry_issues: verdict_summary[:issues]) ]
   end
 
   # Returns [verdict, ms], or [fallback reason, ms] when the judge could not

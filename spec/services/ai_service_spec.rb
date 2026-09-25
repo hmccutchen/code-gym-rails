@@ -5228,7 +5228,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     expect(judged.dropped_sections).to eq([])
     expect(judged.outcomes["code_review"]).to include(status: :keep, retries: 1, dropped: false,
-                                                      principle: "underdetermined")
+                                                      principle: "underdetermined", retry_principle: nil)
     expect(calls["code_review"]).to eq(2)
   end
 
@@ -5247,7 +5247,9 @@ RSpec.describe AiService, "#generate_judged_exercise" do
   end
 
   it "drops a section rejected twice, records the principle, and never loops" do
+    calls = Hash.new(0)
     allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      calls[kind.key] += 1
       kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
     end
 
@@ -5256,6 +5258,26 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(judged.dropped_sections).to eq([ "pattern" ])
     expect(judged.problem_set).not_to have_key("pattern")
     expect(judged.outcomes["pattern"]).to include(status: :reject, principle: "scope_mismatch", retries: 1, dropped: true)
+    expect(calls["pattern"]).to eq(2)
+  end
+
+  it "keeps the draft's principle on a dropped section and records the retry's own verdict separately" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::Pattern
+
+      calls["pattern"] += 1
+      if calls["pattern"] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "reject", "principle" => "underdetermined", "evidence" => "y", "reason" => "r2" }, kind)
+      end
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.outcomes["pattern"]).to include(status: :reject, principle: "scope_mismatch",
+                                                  retry_principle: "underdetermined", issues: [], retries: 1, dropped: true)
   end
 
   it "drops a rejected section whose retry generation fails, without raising" do
@@ -5275,7 +5297,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     judged = svc.generate_judged_exercise(user, language: "ruby_rails")
 
     expect(judged.dropped_sections).to eq([ "pattern" ])
-    expect(judged.outcomes["pattern"]).to include(retries: 1, dropped: true)
+    expect(judged.outcomes["pattern"]).to include(retries: 0, dropped: true, retry_principle: nil)
   end
 
   it "keeps the draft unedited and logs a fallback when the judge fails or answers invalidly" do
