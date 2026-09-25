@@ -1,0 +1,61 @@
+<h1><%= t("progress.title") %></h1>
+<p class="learn-intro"><%= t("progress.intro") %></p>
+
+<dl class="progress-legend">
+  <% KindDifficulty::LEVELS.each do |rung| %>
+    <div><dt><%= t("progress.rungs.#{rung}") %></dt><dd><%= KindDifficulty::LEVEL_DEFINITIONS.fetch(rung) %></dd></div>
+  <% end %>
+  <div><dt><%= t("progress.standings.not_yet") %></dt><dd>no reviewed answer at any rung yet.</dd></div>
+</dl>
+<p class="progress-note"><%= t("progress.note") %></p>
+
+<% @buckets.each do |bucket| %>
+  <section class="learn-bucket">
+    <h2><%= t("learn.buckets.#{bucket[:key]}") %></h2>
+
+    <% bucket[:groups].each do |group| %>
+      <details class="progress-group">
+        <summary>
+          <span class="progress-group-name"><%= t("learn.groups.#{group[:key]}") %></span>
+          <%# One bar per group, rungs high to low then not yet; widths by count.
+              The bars are the at-a-glance reading, so the list below stays quiet. %>
+          <span class="progress-bar" aria-hidden="true">
+            <% total = group[:standings].size %>
+            <% (KindDifficulty::LEVELS.reverse + [ :not_yet, :not_offered ]).each do |standing| %>
+              <% count = group[:counts].fetch(standing, 0) %>
+              <% if count.positive? %><span class="rung-<%= standing %>" style="width:<%= (count * 100.0 / total).round(1) %>%"></span><% end %>
+            <% end %>
+          </span>
+          <span class="progress-counts">
+            <%= (KindDifficulty::LEVELS.reverse + [ :not_yet, :not_offered ]).filter_map { |standing|
+                  count = group[:counts].fetch(standing, 0)
+                  label = standing.is_a?(String) ? t("progress.rungs.#{standing}") : t("progress.standings.#{standing}")
+                  "#{count} #{label}" if count.positive?
+                }.join(" · ") %>
+          </span>
+        </summary>
+
+        <ul class="progress-list">
+          <% group[:standings].each do |concept, standing| %>
+            <% held_index = standing.is_a?(String) ? KindDifficulty::LEVELS.index(standing) : -1 %>
+            <li class="progress-entry" data-concept="<%= concept %>" data-standing="<%= standing %>">
+              <span class="progress-rungs rung-<%= standing %>" aria-hidden="true">
+                <% KindDifficulty::LEVELS.each_with_index do |rung, i| %>
+                  <span class="progress-rung<%= " held" if i <= held_index %>"></span>
+                <% end %>
+              </span>
+              <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>
+              <span class="progress-word">
+                <%= standing.is_a?(String) ? t("progress.rungs.#{standing}") : t("progress.standings.#{standing}") %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      </details>
+    <% end %>
+  </section>
+<% end %>
+
+<% if @buckets.any? { |b| b[:groups].any? { |g| g[:counts].key?(:not_offered) } } %>
+  <p class="progress-note"><%= t("progress.not_offered_note") %> <%= link_to t("progress.setup_link"), setup_path(anchor: "exercise-mix") %></p>
+<% end %>

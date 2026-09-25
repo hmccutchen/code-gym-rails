@@ -6,25 +6,14 @@ class LadderCoverage
     def gaps = pairs - grounded
   end
 
+  # Which pairs each kind can offer is ConceptHosts' answer; this adds only
+  # which of them already carry a ladder.
   def self.for(user)
-    languages = ConceptBucket.language_buckets_for(user.language)
-    pairs_by_kind = ExerciseSection.all.index_with { |kind| offerable_pairs(kind, languages) }
+    pairs_by_kind = ConceptHosts.for(user).pairs_by_kind
     grounded = laddered_pairs(pairs_by_kind.values.flatten(1).uniq)
 
     new(pairs_by_kind.to_h { |kind, pairs| [ kind, Entry.new(kind: kind, pairs: pairs, grounded: pairs & grounded) ] })
   end
-
-  # The mode is handed to every kind and read only by code_review, whose
-  # selectable vocabulary is the one that varies by day.
-  def self.offerable_pairs(kind, languages)
-    languages.flat_map do |language|
-      bucket = ConceptBucket.for(kind.key, language)
-      DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys
-        .flat_map { |mode| ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) }
-        .map { |concept| [ concept, bucket ] }
-    end.uniq
-  end
-  private_class_method :offerable_pairs
 
   def self.laddered_pairs(pairs)
     ConceptReference.where(concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
