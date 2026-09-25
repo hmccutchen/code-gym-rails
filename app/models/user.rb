@@ -285,8 +285,9 @@ class User < ApplicationRecord
       .limit(limit)
       .map do |exercise|
         ExerciseHistoryEntry.new(
-          section_keys: exercise.active_section_keys,
-          answered:     exercise.daily_response&.answered_sections&.size
+          section_keys: exercise.active_section_keys + exercise.dropped_sections,
+          answered:     exercise.daily_response&.answered_sections&.size,
+          dropped:      exercise.dropped_sections.size
         )
       end
   end

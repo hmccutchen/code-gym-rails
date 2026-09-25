@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe SectionRotation do
   def history(*key_sets)
-    key_sets.map { |keys| ExerciseHistoryEntry.new(section_keys: keys, answered: keys.size) }
+    key_sets.map { |keys| ExerciseHistoryEntry.new(section_keys: keys, answered: keys.size, dropped: 0) }
   end
 
   it "fills every optional slot at full size" do

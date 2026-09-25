@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe SectionCount do
   def history(*answered)
-    answered.map { |count| ExerciseHistoryEntry.new(section_keys: [], answered: count) }
+    answered.map { |count| ExerciseHistoryEntry.new(section_keys: [], answered: count, dropped: 0) }
   end
 
   it "gives a new user the full set until there is evidence" do
@@ -50,5 +50,14 @@ RSpec.describe SectionCount do
       expect(described_class.for(history, adaptive: false)).to eq(ExerciseSection.slot_count)
       expect(history).not_to have_received(:first)
     end
+  end
+end
+
+RSpec.describe SectionCount, "with dropped sections" do
+  it "adds a dropped section back to the answered count so a drop neither shortens tomorrow nor reads as a skip" do
+    full  = ExerciseHistoryEntry.new(section_keys: %w[code_review pattern challenge fourth], answered: 4, dropped: 0)
+    short = ExerciseHistoryEntry.new(section_keys: %w[code_review pattern challenge fourth], answered: 3, dropped: 1)
+
+    expect(described_class.for([ short, full, full ])).to eq(described_class.for([ full, full, full ]))
   end
 end
