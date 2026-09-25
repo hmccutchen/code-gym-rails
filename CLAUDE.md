@@ -911,10 +911,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   adjusted, and only a lock makes it exact. Provider copies of both stamps
   are stripped from every section first. A drilled concept at reduced tier is
   annotated `(reduced, drilled)`, and the prompt's easing rule names that form
-  too, so its `eased` stamp records what was actually asked. Neither stamp reaches the prompt, the review, the duck
-  or any page yet: they exist so a later journey view can say which rung a
-  concept is held at from stored evidence rather than from the diagnostics
-  log, which is where the pitch level lived before. Sections generated
+  too, so its `eased` stamp records what was actually asked. Neither stamp
+  reaches a prompt, the review or the duck — `ProblemSetIngest::SERVER_STAMPS`
+  is the list every serialization of a whole section strips, so a stamp cannot
+  leak into one by being added later. The Progress page does read them, which
+  is what they were written for: it says which rung a concept is held at from
+  stored evidence rather than from the diagnostics log, where the pitch level
+  lived before. Sections generated
   before this carry no stamp and contribute no evidence. No migration: both
   are keys inside the `problem_set` jsonb.
 - **The Progress page shows the rung each concept is held at**, from the
