@@ -18,11 +18,12 @@ SOURCE = ROOT / "app/assets/images/logo-outlined-square.png"
 LAYOUT = ROOT / "app/views/layouts/application.html.erb"
 PUBLIC = ROOT / "public"
 
-# Share of the icon's width the artwork spans. The maskable figure is sized so
-# its whole bounding box, corners included, sits inside the 80% safe-zone
-# circle every platform mask keeps.
-PLAIN_ICON_WIDTH = 0.8
-MASKABLE_SAFE_DIAMETER = 0.78
+# Share of the icon's width the artwork spans. The barbell's ends sit halfway
+# down the art, clear of the corners iOS rounds off, so it can run nearly edge
+# to edge. The maskable figure is sized so every opaque pixel sits inside the
+# 80% safe-zone circle every platform mask keeps.
+PLAIN_ICON_WIDTH = 0.96
+MASKABLE_SAFE_DIAMETER = 0.8
 
 
 def layout_background():
@@ -47,9 +48,18 @@ def plain_icon(art, size, background):
     return centered(art, size, round(size * PLAIN_ICON_WIDTH), background)
 
 
+def farthest_opaque_reach(art):
+    alpha = art.getchannel("A").load()
+    center_x, center_y = art.width / 2, art.height / 2
+    return max(
+        ((x + 0.5 - center_x) ** 2 + (y + 0.5 - center_y) ** 2) ** 0.5
+        for y in range(art.height) for x in range(art.width) if alpha[x, y]
+    )
+
+
 def maskable_icon(art, size, background):
-    diagonal = (art.width ** 2 + art.height ** 2) ** 0.5
-    return centered(art, size, int(size * MASKABLE_SAFE_DIAMETER * art.width / diagonal), background)
+    scale = size * MASKABLE_SAFE_DIAMETER / 2 / farthest_opaque_reach(art)
+    return centered(art, size, int(art.width * scale), background)
 
 
 def favicon(art):

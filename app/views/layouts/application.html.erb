@@ -73,11 +73,10 @@
        truncated name still reads and still edits, a stacked wordmark reads as
        broken. min-width: 0 all the way down is what lets it: a flex item will
        not shrink below its content otherwise. */
-    nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1.1rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
-    /* Sized to the wordmark's line box, so the logo never makes the row
-       taller than it already is. The alt text names the link, which is why
-       the wordmark beside it is hidden from screen readers. */
-    nav .brand-mark { height: 1.75rem; width: auto; image-rendering: pixelated; }
+    nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 2rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+    /* The alt text names the link, which is why the wordmark beside it is
+       hidden from screen readers. */
+    nav .brand-mark { height: 5rem; width: 7rem; }
     nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
     nav .nav-toggle { display: none; }
