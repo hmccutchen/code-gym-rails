@@ -163,6 +163,7 @@ RSpec.describe ModelComparison do
 
     ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
     expect(out.string).to include("detected:")
+    expect(out.string).to include("unstated_prerequisite: 2/2")
     expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
   end
 end

@@ -10,6 +10,12 @@
     "snippet": "class SearchController < ApplicationController\n  def index\n    term = params[:q]\n    sql = \"SELECT * FROM products WHERE name LIKE '%#{term}%'\"\n    @results = Product.find_by_sql(sql)\n    render json: @results\n  end\nend",
     "scenario": "a product search endpoint",
     "teaching_note": "Think about what params[:q] could contain besides a search term.",
-    "concept": "sql_injection_prevention"
+    "concept": "sql_injection_prevention",
+    "reference": {
+      "tagline": "A string built by interpolating user input into SQL is a vulnerability, not a query.",
+      "explanation": "Interpolating params[:q] directly into the SQL string lets an attacker supply SQL syntax instead of a search term, changing what the query does rather than just what it matches.",
+      "code_example": "# Vulnerable — the attacker's input becomes part of the query itself\nProduct.find_by_sql(\"SELECT * FROM products WHERE name LIKE '%#{term}%'\")\n\n# Safe — the placeholder is bound as data, never parsed as SQL\nProduct.where(\"name LIKE ?\", \"%#{term}%\")",
+      "senior_lens": "Any user-controlled value reaching a query string has to be bound as a parameter, never interpolated — that rule holds whether the string is built with find_by_sql, a raw SQL fragment, or string concatenation elsewhere in the app."
+    }
   }
 }

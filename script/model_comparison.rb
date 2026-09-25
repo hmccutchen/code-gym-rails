@@ -159,9 +159,17 @@ class ModelComparison
 
     @out.puts "valid: #{valid.size}/#{rows.size} · detected: #{detected}/#{broken.size} · " \
               "false rejections: #{false_rejects}/#{sound.size} · " \
-              "edits without issues: #{rows.count { |row| row[:edit_without_issues] }} · " \
               "#{rows.sum { |row| row[:ms] }}ms · #{tokens_in} in / #{tokens_out} out · " \
               "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out))}"
+    print_detection_per_principle(broken)
+  end
+
+  def print_detection_per_principle(broken)
+    broken.map { |row| row[:expected_principle] }.uniq.sort.each do |principle|
+      total    = broken.count { |row| row[:expected_principle] == principle }
+      detected = broken.count { |row| row[:expected_principle] == principle && row[:classification] == :detected }
+      @out.puts "#{principle}: #{detected}/#{total}"
+    end
   end
 
   def fixture_cost(model, tokens_in, tokens_out)
@@ -182,12 +190,12 @@ class ModelComparison
   end
 
   def fixture_result(fixture, verdict, ms)
-    return { name: fixture["name"], expected: fixture["expected"], status: nil, principle: nil,
-             classification: :invalid, edit_without_issues: false, ms: ms } if verdict.nil?
+    return { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"],
+             status: nil, principle: nil, classification: :invalid, ms: ms } if verdict.nil?
 
-    { name: fixture["name"], expected: fixture["expected"], status: verdict.status, principle: verdict.principle,
-      classification: classify_fixture(fixture, verdict),
-      edit_without_issues: verdict.edit? && verdict.issues.empty?, ms: ms }
+    { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"],
+      status: verdict.status, principle: verdict.principle,
+      classification: classify_fixture(fixture, verdict), ms: ms }
   end
 
   # detected/wrong_principle/missed for a fixture whose section is meant to be

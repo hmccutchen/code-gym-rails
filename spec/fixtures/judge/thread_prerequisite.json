@@ -5,11 +5,11 @@
   "expected": "reject",
   "principle": "unstated_prerequisite",
   "section": {
-    "question": "What's the issue with this rate-limit counter, and how would you fix it?",
-    "snippet": "class RateLimitCache\n  def initialize\n    @counts = {}\n  end\n\n  def increment(key)\n    @counts[key] ||= 0\n    @counts[key] += 1\n  end\n\n  def record_request(key)\n    Thread.new { increment(key) }\n  end\nend\n\ncache = RateLimitCache.new\n10.times { cache.record_request(\"user:42\") }",
-    "teaching_note": "Look at how many requests actually land in @counts once all ten calls finish.",
-    "concept": "n_plus_one",
-    "scenario": "a per-user API rate limiter",
+    "question": "This class avoids repeating an expensive lookup for a key it's already computed. What's the issue and how would you fix it?",
+    "snippet": "class ExpensiveLookupCache\n  def initialize\n    @cache = {}\n  end\n\n  def fetch(key)\n    return @cache[key] if @cache.key?(key)\n    @cache[key] = ExpensiveLookup.call(key)\n  end\n\n  def warm(keys)\n    keys.each { |key| Thread.new { fetch(key) } }\n  end\nend\n\ncache = ExpensiveLookupCache.new\ncache.warm([\"us\", \"uk\", \"us\", \"de\", \"us\"])",
+    "teaching_note": "Look at what warm actually does when it hands several keys to fetch at once.",
+    "concept": "memoization",
+    "scenario": "a currency-conversion rate cache warmed at boot",
     "diagram": ""
   }
 }
