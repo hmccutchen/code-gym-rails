@@ -826,6 +826,18 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["architecture"]).not_to have_key("eased")
   end
 
+  # Only the judge path may say a section was shipped after being rejected,
+  # and only a grounded code_review carries a real excerpt's trace.
+  it "strips a provider-written anchor marker and a stray source trace" do
+    set = problem_set.deep_dup
+    set["pattern"].merge!("anchored" => true, "source" => "forged-trace")
+
+    result = ingest(set, pitched_at: { "code_review" => "junior", "pattern" => "junior" })
+
+    expect(result["pattern"]).not_to have_key("anchored")
+    expect(result["pattern"]).not_to have_key("source")
+  end
+
   it "marks a section eased only when its concept is one the prompt was told to ease there" do
     result = ingest(problem_set, pitched_at: { "code_review" => "senior", "pattern" => "senior" },
                                  eased_for: { "code_review" => [ "n_plus_one" ], "pattern" => [ "n_plus_one" ] })

@@ -22,6 +22,20 @@ class ProblemSetIngest
   # must never carry it.
   ANSWER_KEY_FIELD = "planted_ambiguities".freeze
 
+  # Facts about a section that the server knows and the provider does not: the
+  # rung asked for, whether the prompt was told to ease it, which real excerpt
+  # it was grounded in, and whether the judge rejected it twice and it shipped
+  # anyway. A provider copy of any of them is stripped from every section on
+  # every call, so none can be forged. `anchored` is stamped after ingest, by
+  # the judged path, and is listed here because the strip is the guarantee.
+  #
+  # They describe how the section was made, not what it asks, so nothing that
+  # serializes a section to a model may include them — AiService#judge_section
+  # reads this list for exactly that. `current_schema` is server-owned too and
+  # deliberately absent: it is the table the engineer is shown, and the judge
+  # has to read it to tell whether the question is answerable.
+  SERVER_STAMPS = %w[pitched_at eased source anchored].freeze
+
   # Upper bound on a section's Mermaid `diagram`. The prompt asks for at most
   # 8 nodes with short labels, which lands well under half this — so the bound
   # rejects runaway output without rejecting anything actually asked for.
@@ -165,7 +179,7 @@ class ProblemSetIngest
     normalize_diagrams!
     shuffle_parsons_blocks!
     strip_current_schemas!
-    strip_pitched_rungs!
+    strip_server_stamps!
     ground_code_review!
     stamp_pitched_rungs!
 
@@ -358,41 +372,36 @@ class ProblemSetIngest
   # ask and invents a business domain would leave the page saying something
   # untrue about deployed code. `source` is the trace RealSource.last_seen_for
   # reads back: code_review_mode itself is never persisted, so this is the
-  # only record of what was grounded — so only the server may write it. A toy
-  # day deletes whatever the provider put there rather than leaving it, or a
-  # model that happened to emit a `source` key would mint a trace for an
+  # only record of what was grounded. A toy day needs no deletion here —
+  # strip_server_stamps! has already removed whatever the provider put there,
+  # or a model that happened to emit a `source` key would mint a trace for an
   # excerpt this set never showed. `current_schema` is server-owned the same
   # way, so it is stamped only from a source that has one; every provider copy
   # is already gone by now (see strip_current_schemas!).
   # In production code_review is always present — ExerciseSection.for_plan
   # never omits it — but ingest is also called on partial sets, and a set
-  # with no code_review has no trace to strip or stamp.
+  # with no code_review has no trace to stamp.
   def ground_code_review!
+    return if @code_review_source.nil?
     return unless ExerciseSection.present?(@problem_set, "code_review")
 
     section = @problem_set["code_review"]
+    section["scenario"] = @code_review_source.scenario
+    section["source"]   = @code_review_source.id
 
-    if @code_review_source.nil?
-      section.delete("source")
-    else
-      section["scenario"] = @code_review_source.scenario
-      section["source"]   = @code_review_source.id
-    end
-
-    schema = @code_review_source&.current_schema
+    schema = @code_review_source.current_schema
     section["current_schema"] = schema if schema
   end
 
-  # Both stamps are facts the server knows and the provider does not, so a
-  # provider copy is stripped from every section on every call, whatever the
-  # caller passed — the same shape as strip_current_schemas!. Every section,
-  # because an unrequested one can still win its slot by list precedence.
-  def strip_pitched_rungs!
+  # See SERVER_STAMPS. Stripped from every section, because an unrequested one
+  # can still win its slot by list precedence — the same shape as
+  # strip_current_schemas!. Runs before ground_code_review!, which stamps the
+  # grounded day's `source` back on.
+  def strip_server_stamps!
     @problem_set.each_value do |section|
       next unless section.is_a?(Hash)
 
-      section.delete("pitched_at")
-      section.delete("eased")
+      SERVER_STAMPS.each { |stamp| section.delete(stamp) }
     end
   end
 

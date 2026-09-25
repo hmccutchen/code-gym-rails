@@ -888,6 +888,12 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".judge_task" do
+    it "is required of every kind" do
+      expect { ExerciseSection.judge_task }.to raise_error(NotImplementedError, /must state its task/)
+    end
+  end
+
   describe ".answer_lines" do
     it "marks an absent answer and rating rather than rendering blanks" do
       expect(ExerciseSection.answer_lines(nil, nil))

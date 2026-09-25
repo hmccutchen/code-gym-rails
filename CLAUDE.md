@@ -604,7 +604,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   user-facing change. `code_review` is never dropped
   (`ExerciseSection.droppable?`), since the day is built around it and a set
   with no sections would fail `DailyExercise`'s presence validation; a
-  twice-rejected one ships with `fallback: anchor`.
+  twice-rejected one ships with `fallback: anchor`, and the delivered section
+  is stamped `anchored: true` — server-owned like `pitched_at`, and the only
+  record left once the outcomes are discarded, since an anchored section is
+  still graded and still counts as skill evidence. That is the accepted cost
+  of never dropping the anchor: the stamp exists so such a day is diagnosable
+  and so a later change has something to exclude on.
 
   **The rotation trade is stated rather than compensated for.** A dropped
   section still reads as scheduled: `User#recent_exercise_history` puts the
@@ -617,7 +622,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   compensates, on purpose. Drop rate per kind is read off the
   `[difficulty_diagnostics]` line's `judge:` entries, which are keyed by
   section key and carry `dropped: true`; rejection rate per principle comes
-  off `principle` and `retry_principle` in the same entries. That drop rate is
+  off `principle` and `retry_principle` in the same entries, each with the
+  `evidence` the judge quoted and the `reason` it gave, so a rate can be read
+  back against the text it was about. That drop rate is
   the thing to watch, and `pattern` is the likely candidate, since its task is
   the least stated in the generation prompt.
 
@@ -647,8 +654,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   judge on a four-section day, the draft is roughly $0.15-0.23; judging adds
   about $0.03, and one retry with its re-judge about $0.07 more — under a
   fifth of a normal day, and Haiku would halve the judge's share. Worst case
-  with one retry runs about 55-155 seconds on top of the draft (judge fan-out
-  5-15s, retry 15-40s, re-judge 5-10s), well inside each call's own
+  runs about 55-155 seconds on top of the draft (judge fan-out
+  5-15s, retry 15-40s, re-judge 5-10s), and stays there however many sections
+  were rejected: the retries fan out the same way the judging does, so the
+  day waits for the slowest rather than their sum. Each retry asks for one
+  section, so it runs on `RETRY_READ_TIMEOUT` rather than the draft's
   300-second budget, and the batch is hourly. Both figures assume that token
   shape and that list price; re-measure against `ApiUsage` rows under
   `purpose: "judge_section"` rather than re-deriving them.
@@ -656,10 +666,23 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Stage 1 never carried `PLAIN_LANGUAGE_STANDARD`.** The standard is
   interpolated into the duck, alternates, follow-up, grading and concept
   reference prompts, and into neither `build_system_prompt` nor
-  `build_exercise_prompt`. So nothing was removed from the draft prompt to
+  `build_exercise_prompt`. `JUDGE_SYSTEM_PROMPT` does carry it, which is the
+  point: the judge rewrites prose, so the standard sits where the rewriting
+  happens. So nothing was removed from the draft prompt to
   make room for the judge: the field bounds it does carry define the artifact
   or are enforced by ingest, and they stay. Prose quality is the judge's job
   by assignment, not by subtraction.
+
+  **The judge is shown the section, not how it was made.** `judge_section`
+  strips the answer key and every `ProblemSetIngest::SERVER_STAMPS` field, so
+  it never learns the day eased this section, which real file grounded it, or
+  that an earlier verdict rejected it. `current_schema` is deliberately not
+  stripped: it is on the engineer's screen, and answerability depends on it.
+  The rung and lock state reach the judge as stated arguments instead, since
+  a level is what it measures against. `JUDGE_SYSTEM_PROMPT` enumerates the
+  rejection principles and issue types from `JudgeVerdict`'s own constants
+  rather than restating them, so the prompt cannot offer a verdict the
+  boundary would refuse.
 - **Scenario flavor**: the business setting every section's `scenario` is dressed
   in comes from one prompt line, and that line now offers one of two pools
   (`AiService::SCENARIO_POOLS`): the general, job-adjacent `SCENARIO_DOMAINS`
@@ -1525,7 +1548,7 @@ always pull in the full suite — is stated once, in
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
 - `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing valid-output rate, detection per principle, false rejections, edits with their issues, and latency and cost per model from `LIST_PRICE_PER_MILLION`
-- `spec/fixtures/judge/` — eleven stored sections, each stating the verdict it expects, that `ModelComparison#judge_fixtures` reads to compare judge models. Six are broken, one per rejection principle plus the two incidents this feature exists for (the Ruby `Thread` and frame-rate `code_review`s, both `unstated_prerequisite`); five are hard but sound, so a candidate's false rejections are as visible as its detections
+- `spec/fixtures/judge/` — eleven stored sections, each stating the verdict it expects, that `ModelComparison#judge_fixtures` reads to compare judge models. Six are broken, and not one per principle: one `scope_mismatch`, one `underdetermined`, two `reasoning_failure`, and two `unstated_prerequisite` — the Ruby `Thread` and frame-rate `code_review`s, the incidents this feature exists for; five are hard but sound, so a candidate's false rejections are as visible as its detections
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
 - `app/views/responses/_sections.html.erb` / `_section.html.erb` (+ `bodies/`, `answers/`) — the one loop over `DailyExercise#active_section_keys` and the one wrapper every section renders through, in both the answer-form and read-only states. Only the body and the answer area vary per kind, and each kind names its own partial for those (`ExerciseSection.body_partial` / `.answer_partial`), so adding a ninth kind is a body partial, an answer partial if it needs one, two `sections.<key>` locale strings, and whichever facets differ from the defaults — never a new branch in a template.

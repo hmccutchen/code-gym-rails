@@ -5160,6 +5160,35 @@ RSpec.describe AiService, "#judge_section" do
 
     expect(captured[:prompt]).not_to include("SECRET")
   end
+
+  # The stamps say the day eased this section, which real file it came from,
+  # and that an earlier judgment rejected it — all of it about the author's
+  # intent, which the judge is deliberately not told.
+  it "never sends the server's own stamps, and still sends the current schema" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    stamped = section.merge("eased" => true, "source" => "excerpt-trace-id", "anchored" => true,
+                            "current_schema" => "create_table :orders do |t|")
+
+    svc.judge_section(user, ExerciseSection::CodeReview, stamped, rung: "senior", locked: false)
+
+    ProblemSetIngest::SERVER_STAMPS.each { |stamp| expect(captured[:prompt]).not_to include(stamp) }
+    expect(captured[:prompt]).not_to include("excerpt-trace-id")
+    expect(captured[:prompt]).to include("create_table :orders")
+  end
+end
+
+RSpec.describe AiService, "JUDGE_SYSTEM_PROMPT" do
+  it "enumerates the rejection principles and issue types from JudgeVerdict's own constants" do
+    expect(AiService::JUDGE_PRINCIPLE_GUIDANCE.keys).to eq(JudgeVerdict::PRINCIPLES)
+    expect(AiService::JUDGE_SYSTEM_PROMPT).to include("Rejection principles, the only #{JudgeVerdict::PRINCIPLES.size}:")
+    JudgeVerdict::PRINCIPLES.each do |principle|
+      expect(AiService::JUDGE_SYSTEM_PROMPT).to include("- #{principle}: #{AiService::JUDGE_PRINCIPLE_GUIDANCE.fetch(principle)}")
+    end
+    expect(AiService::JUDGE_SYSTEM_PROMPT)
+      .to include("Issues, the only #{JudgeVerdict::ISSUE_TYPES.size}: #{JudgeVerdict::ISSUE_TYPES.join(', ')}.")
+  end
 end
 
 RSpec.describe AiService, "single-section retry prompt" do
@@ -5321,6 +5350,88 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(calls["pattern"]).to eq(2)
   end
 
+  # Serially, each rejection costs a full generation plus a re-judge, so three
+  # of them would run far past the single generation this path replaced.
+  it "resolves two rejections at once rather than one after the other" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless [ ExerciseSection::Pattern, ExerciseSection::Challenge ].include?(kind)
+
+      calls[kind.key] += 1
+      if calls[kind.key] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+    entered = Queue.new
+    release = Queue.new
+    allow_any_instance_of(FakeService).to receive(:retry_section) do |_, _user, _language, _draft, kind, _concept|
+      entered << kind.key
+      release.pop
+      FakeService::EXERCISE_PROBLEM_SET[kind.key].deep_dup
+    end
+
+    judged = nil
+    runner = Thread.new { judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails") }
+    # Both retries are inside retry_section before either has been allowed to
+    # return, which a serial loop cannot reach.
+    both = Timeout.timeout(20) { [ entered.pop, entered.pop ] }
+    2.times { release << :go }
+    runner.join(30)
+
+    expect(both).to contain_exactly("pattern", "challenge")
+    expect(judged.dropped_sections).to eq([])
+    expect(calls).to eq("pattern" => 2, "challenge" => 2)
+  end
+
+  it "asks a single-section retry for a tighter read budget than a whole day's draft" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+    timeouts = []
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      timeouts << kw[:read_timeout] if kw[:purpose] == "generate_exercise"
+      m.call(*args, **kw)
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(timeouts).to eq([ AiService::GENERATION_READ_TIMEOUT, AiService::RETRY_READ_TIMEOUT ])
+    expect(AiService::RETRY_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
+  end
+
+  # Nothing else distinguishes an anchored section: the outcomes hash the
+  # marker used to live in is discarded once the day is written.
+  it "stamps the anchored code_review, and stamps nothing on an ordinary section" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::CodeReview
+
+      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.problem_set["code_review"]["anchored"]).to be(true)
+    expect(judged.problem_set["pattern"]).not_to have_key("anchored")
+  end
+
+  # Time.zone is thread-isolated, so a judge thread left on UTC would date its
+  # usage row a day away from the generation it belongs to.
+  it "dates every judge thread's usage row in the user's own zone" do
+    user.update!(time_zone: "Auckland")
+
+    travel_to Time.utc(2026, 9, 25, 22, 30) do
+      Time.use_zone("Auckland") do
+        FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+      end
+    end
+
+    dates = user.api_usages.where(purpose: %w[generate_exercise judge_section]).distinct.pluck(:date)
+    expect(user.api_usages.where(purpose: "judge_section").count).to be > 0
+    expect(dates).to eq([ Date.new(2026, 9, 26) ])
+  end
+
   # The day is built around code_review and an empty set fails DailyExercise's
   # presence validation, which would escape the batch job's per-user rescue.
   it "keeps a twice-rejected code_review as the day's anchor rather than dropping it" do
@@ -5454,6 +5565,26 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(payload["judge"]["pattern"]["latency_ms"]).to be_a(Integer)
     expect(payload["unhosted"]).to include("section" => "pattern", "concept" => concept, "planned_as" => "retention")
     expect(payload["delivered"]).not_to have_key("pattern")
+  end
+
+  # A rejection rate says how often; only the quoted text says on what.
+  it "records what a rejection was about in the diagnostics payload" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::Pattern
+
+      verdict({ "status" => "reject", "principle" => "reasoning_failure",
+                "evidence" => "the question names the missing index", "reason" => "It says where to look." }, kind)
+    end
+    logged = nil
+    allow(Rails.logger).to receive(:info) do |msg|
+      logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+
+    expect(payload["judge"]["pattern"]).to include("evidence" => "the question names the missing index",
+                                                   "reason" => "It says where to look.")
   end
 
   it "leaves the single-stage path's diagnostics without a judge" do
