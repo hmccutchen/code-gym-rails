@@ -88,3 +88,22 @@ RSpec.describe KindDifficulty do
       .to eq([ [ :keyreq, :levels ], [ :keyreq, :locked ] ])
   end
 end
+
+RSpec.describe KindDifficulty, "#rung_for" do
+  let(:challenge) { ExerciseSection::Challenge }
+
+  it "maps every skill level to a rung, once" do
+    User::SKILL_LEVELS.each do |skill_level|
+      expect(described_class::LEVELS).to include(described_class::RUNG_FOR_SKILL_LEVEL.fetch(skill_level))
+    end
+  end
+
+  it "answers the target when one is set, else the skill level's rung" do
+    targeted = described_class.new(levels: { "challenge" => "principal_engineer" }, locked: [])
+
+    expect(targeted.rung_for(challenge, skill_level: "beginner")).to eq("principal_engineer")
+    expect(described_class.none.rung_for(challenge, skill_level: "beginner")).to eq("junior")
+    expect(described_class.none.rung_for(challenge, skill_level: "solid")).to eq("senior")
+    expect(described_class.none.rung_for(challenge, skill_level: "strong")).to eq("principal_engineer")
+  end
+end

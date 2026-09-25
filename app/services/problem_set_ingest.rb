@@ -36,10 +36,13 @@ class ProblemSetIngest
 
   # Raises AiService::InvalidResponseError when the set cannot be used at all.
   # `code_review_source` is the RealSource excerpt today's code_review was
-  # grounded in, or nil for a toy day.
-  def self.call(problem_set, language:, expected_keys:, code_review_source: nil)
+  # grounded in, or nil for a toy day. `pitched_at` maps each section key to
+  # the rung the prompt pitched it at, and `eased_for` to the concepts the
+  # prompt was told to ease there; both are server facts stamped into the
+  # sections, and a caller that passes neither gets no stamps.
+  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {})
     new(problem_set, language: language, expected_keys: expected_keys,
-        code_review_source: code_review_source).call
+        code_review_source: code_review_source, pitched_at: pitched_at, eased_for: eased_for).call
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -133,11 +136,13 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:, expected_keys:, code_review_source: nil)
+  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
     @code_review_source = code_review_source
+    @pitched_at         = pitched_at
+    @eased_for          = eased_for
     @suggested_concepts = []
   end
 
@@ -156,6 +161,7 @@ class ProblemSetIngest
     shuffle_parsons_blocks!
     strip_current_schemas!
     ground_code_review!
+    stamp_pitched_rungs!
 
     Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts)
   end
@@ -349,6 +355,24 @@ class ProblemSetIngest
 
     schema = @code_review_source&.current_schema
     section["current_schema"] = schema if schema
+  end
+
+  # The rung a section was pitched at is a fact the server knows and the
+  # provider does not, so a provider copy is replaced rather than trusted.
+  # `eased` is stamped after the concept is known — it depends on which
+  # concept the model chose — and only ever as true, so its absence means
+  # the rung was asked for as stated. Runs after normalize_concepts!, so the
+  # concept compared is the one the set will carry.
+  def stamp_pitched_rungs!
+    return if @pitched_at.nil?
+
+    @problem_set.each do |key, section|
+      next unless section.is_a?(Hash) && @pitched_at.key?(key)
+
+      section["pitched_at"] = @pitched_at.fetch(key)
+      section.delete("eased")
+      section["eased"] = true if @eased_for.fetch(key, []).include?(section["concept"])
+    end
   end
 
   # The provider returns "blocks" already in correct order, so the scramble is

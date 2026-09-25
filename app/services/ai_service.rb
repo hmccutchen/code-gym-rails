@@ -905,7 +905,9 @@ class AiService
       parse_json_object(result[:text], subject: "problem set"),
       language: language,
       expected_keys: kinds.map(&:key),
-      code_review_source: plan.code_review_source
+      code_review_source: plan.code_review_source,
+      pitched_at: kinds.to_h { |kind| [ kind.key, difficulty.rung_for(kind, skill_level: user.skill_level) ] },
+      eased_for: eased_concepts_for(kinds, plan, difficulty)
     )
     problem_set = ingested.problem_set
     # After ingest, never during: ingest writes nothing and raises on an
@@ -1476,6 +1478,19 @@ class AiService
   # one into the other — a log line can then tell them apart too.
   def annotate_reinforcement(entry)
     "#{entry[:concept]} (#{[ entry[:tier], ("drilled" if entry[:drilled]) ].compact.join(', ')})"
+  end
+
+  # Which concepts the prompt was told to ease in each section: reduced-tier
+  # reinforcement, unless the kind is locked, which the locked line exempts
+  # from the `(reduced)` rule. The fourth slot reads its own list. Recorded so
+  # a section's evidence can say whether the rung it names was asked for as
+  # stated or eased below it.
+  def eased_concepts_for(kinds, plan, difficulty)
+    reduced = ->(entries) { entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] } }
+
+    kinds.reject { |kind| difficulty.locked?(kind) }.to_h do |kind|
+      [ kind.key, reduced.call(kind.fourth? ? plan.fourth_reinforcement : plan.reinforcement) ]
+    end
   end
 
   # Coverage says whether material was available; chosen_grounded says whether
