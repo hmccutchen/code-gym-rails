@@ -813,6 +813,19 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["code_review"]).not_to have_key("eased")
   end
 
+  # An unrequested section can still win a slot by list precedence, so a
+  # provider-written stamp on it would reach the page as if the server wrote it.
+  it "strips provider-written stamps from a section the day never asked for" do
+    set = problem_set.merge("architecture" => { "question" => "q", "concept" => "sync_vs_async",
+                                                "pitched_at" => "principal_engineer", "eased" => true })
+
+    result = described_class.call(set, language: "ruby_rails", expected_keys: problem_set.keys,
+                                  pitched_at: { "code_review" => "junior", "pattern" => "junior" }).problem_set
+
+    expect(result["architecture"]).not_to have_key("pitched_at")
+    expect(result["architecture"]).not_to have_key("eased")
+  end
+
   it "marks a section eased only when its concept is one the prompt was told to ease there" do
     result = ingest(problem_set, pitched_at: { "code_review" => "senior", "pattern" => "senior" },
                                  eased_for: { "code_review" => [ "n_plus_one" ], "pattern" => [ "n_plus_one" ] })

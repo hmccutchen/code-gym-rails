@@ -358,19 +358,24 @@ class ProblemSetIngest
   end
 
   # The rung a section was pitched at is a fact the server knows and the
-  # provider does not, so a provider copy is replaced rather than trusted.
-  # `eased` is stamped after the concept is known — it depends on which
-  # concept the model chose — and only ever as true, so its absence means
-  # the rung was asked for as stated. Runs after normalize_concepts!, so the
-  # concept compared is the one the set will carry.
+  # provider does not, so every provider copy is stripped first — from every
+  # section, since an unrequested one can still win a slot by list
+  # precedence — and the requested sections are then stamped. `eased` is
+  # stamped after the concept is known, since it depends on which concept the
+  # model chose, and only ever as true. It records one thing: the prompt's
+  # `(reduced)` rule was asked for here. It does not claim the rung was
+  # otherwise pitched as stated — the prompt's rating adjustments can move an
+  # unlocked section too, and the model decides when they apply, so the
+  # server cannot record that. Runs after normalize_concepts!, so the concept
+  # compared is the one the set will carry.
   def stamp_pitched_rungs!
     return if @pitched_at.nil?
 
+    @problem_set.each_value { |section| section.delete("pitched_at") && section.delete("eased") if section.is_a?(Hash) }
     @problem_set.each do |key, section|
       next unless section.is_a?(Hash) && @pitched_at.key?(key)
 
       section["pitched_at"] = @pitched_at.fetch(key)
-      section.delete("eased")
       section["eased"] = true if @eased_for.fetch(key, []).include?(section["concept"])
     end
   end

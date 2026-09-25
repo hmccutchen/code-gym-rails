@@ -1482,9 +1482,11 @@ class AiService
 
   # Which concepts the prompt was told to ease in each section: reduced-tier
   # reinforcement, unless the kind is locked, which the locked line exempts
-  # from the `(reduced)` rule. The fourth slot reads its own list. Recorded so
-  # a section's evidence can say whether the rung it names was asked for as
-  # stated or eased below it.
+  # from the `(reduced)` rule. The fourth slot reads its own list. This is
+  # the one easing the server decides; the prompt's "too hard" and "too easy"
+  # rating adjustments also move an unlocked section, but the model judges
+  # when they apply, so they cannot be recorded here. Only a lock makes a
+  # rung exact.
   def eased_concepts_for(kinds, plan, difficulty)
     reduced = ->(entries) { entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] } }
 

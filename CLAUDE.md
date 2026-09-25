@@ -735,7 +735,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   was offered as reduced-tier reinforcement in an unlocked kind also carries
   `eased: true`, since the prompt's `(reduced)` rule asked for an easier
   problem than the rung says; a locked kind exempts itself from that rule and
-  so is never marked. Neither stamp reaches the prompt, the review, the duck
+  so is never marked. That is the one easing the server decides. The prompt's
+  "too hard" and "too easy" rating adjustments also move an unlocked
+  section's pitch, and the model judges when they apply, so they are not
+  recorded: an unlocked section's rung is what was asked for, possibly
+  adjusted, and only a lock makes it exact. Provider copies of both stamps
+  are stripped from every section first, since an unrequested section can
+  still win a slot by list precedence. Neither stamp reaches the prompt, the review, the duck
   or any page yet: they exist so a later journey view can say which rung a
   concept is held at from stored evidence rather than from the diagnostics
   log, which is where the pitch level lived before. Sections generated
