@@ -58,6 +58,8 @@ Rails.application.routes.draw do
   # not they have met one. Not nested under anything — a concept's guide
   # belongs to the vocabulary, not to a user or to a day.
   get  "learn", to: "learn#index"
+  # Which rung each concept is held at, grouped as Learn groups them.
+  get  "progress", to: "progress#index"
   post "learn/prepare", to: "learn#prepare", as: :prepare_learn
   post "learn/prepare_ladders", to: "learn#prepare_ladders", as: :prepare_learn_ladders
   get  "learn/:bucket/:concept", to: "learn#show", as: :learn_concept
