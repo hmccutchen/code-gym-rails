@@ -23,6 +23,13 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".droppable?" do
+    it "is false for the day's anchor and true for every other kind" do
+      expect(ExerciseSection::CodeReview.droppable?).to be(false)
+      expect((described_class.all - [ ExerciseSection::CodeReview ]).map(&:droppable?)).to all(be(true))
+    end
+  end
+
   describe ".thirds" do
     # Precedence, not enumeration order — DailyExercise#third_key relies on
     # architecture winning over security_review over challenge.

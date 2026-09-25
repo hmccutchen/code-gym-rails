@@ -7,6 +7,12 @@ class ExerciseSection::CodeReview < ExerciseSection
     false
   end
 
+  # Every day is built around code_review, and a set with no sections at all
+  # fails DailyExercise's presence validation.
+  def self.droppable?
+    false
+  end
+
   def self.judge_task
     "Find the one planted issue in the snippet and say how to fix it."
   end

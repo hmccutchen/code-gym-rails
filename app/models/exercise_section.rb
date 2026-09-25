@@ -206,6 +206,12 @@ class ExerciseSection
       true
     end
 
+    # Whether the judge may drop this kind from the day rather than ship a
+    # section it rejected twice. A day reads fine without any one of these.
+    def droppable?
+      true
+    end
+
     # ── What the judge measures against ─────────────────────────────────────
     # judge_task, discovery?, and prose_fields are read by the review-time
     # judge that checks a generated section's prose for a reasoning failure —

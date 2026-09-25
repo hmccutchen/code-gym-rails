@@ -1336,7 +1336,17 @@ class AiService
                 dropped: false, fallback: nil, latency_ms: latency }
     return [ kind.key, outcome.merge(fallback: verdict), section ] if verdict.is_a?(String)
 
-    [ kind.key, outcome.merge(judgment(verdict)), verdict.apply(section) ]
+    [ kind.key, outcome.merge(judgment(verdict)), apply_verdict(verdict, section) ]
+  end
+
+  # `source` marks a section ProblemSetIngest#ground_code_review! stamped its
+  # own scenario onto — the real file, and that the copy is altered — so that
+  # field is the server's to write, not an editable prose field.
+  def apply_verdict(verdict, section)
+    edited = verdict.apply(section)
+    return edited if section["source"].blank?
+
+    edited.merge("scenario" => section["scenario"])
   end
 
   def judgment(verdict)
@@ -1355,20 +1365,32 @@ class AiService
   def resolve_rejection(user, language, draft, kind, section, outcome)
     outcome = outcome.merge(retry_principle: nil)
     retried = retry_section(user, language, draft, kind, section["concept"])
-    return [ nil, outcome.merge(retries: 0, dropped: true) ] if retried.nil?
+    return drop_or_anchor(kind, section, outcome.merge(retries: 0)) if retried.nil?
 
     verdict, latency = judge_with_fallback(user, kind, retried, draft.difficulty, user.skill_level)
     outcome = outcome.merge(retries: 1, latency_ms: outcome[:latency_ms] + latency)
     return [ retried, outcome.merge(status: :keep, fallback: verdict) ] if verdict.is_a?(String)
 
     verdict_summary = judgment(verdict)
-    return [ nil, outcome.merge(dropped: true, retry_principle: verdict_summary[:principle],
-                                retry_issues: verdict_summary[:issues]) ] if verdict.reject?
+    if verdict.reject?
+      return drop_or_anchor(kind, retried, outcome.merge(retry_principle: verdict_summary[:principle],
+                                                         retry_issues: verdict_summary[:issues]))
+    end
 
     # The draft's principle and issues survive a retry the judge accepted:
     # they are the only record this section was rejected at all, and
     # rejection rate per principle is read off these entries.
-    [ verdict.apply(retried), outcome.merge(status: verdict_summary[:status], retry_issues: verdict_summary[:issues]) ]
+    [ apply_verdict(verdict, retried), outcome.merge(status: verdict_summary[:status], retry_issues: verdict_summary[:issues]) ]
+  end
+
+  # A second rejection drops the section — unless the kind is the one the day
+  # cannot be delivered without, which ships the best section it has and says
+  # so. The principle is recorded either way, so the rejection is still read
+  # off the log.
+  def drop_or_anchor(kind, section, outcome)
+    return [ nil, outcome.merge(dropped: true) ] if kind.droppable?
+
+    [ section, outcome.merge(fallback: "anchor") ]
   end
 
   # Returns [verdict, ms], or [fallback reason, ms] when the judge could not
@@ -1410,7 +1432,7 @@ class AiService
     ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "#{kind.key} retry"), language: language,
       expected_keys: [ kind.key ], fixed_concepts: { kind.key => concept },
-      code_review_source: (draft.plan.code_review_source if kind == ExerciseSection::CodeReview),
+      code_review_source: draft.plan.code_review_source,
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     ).problem_set[kind.key]

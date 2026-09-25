@@ -60,6 +60,7 @@ class RegenerateExerciseJob < ApplicationJob
       existing&.destroy
       exercise.update!(
         problem_set:        problem_set,
+        dropped_sections:   [],
         generated_at:       Time.current,
         regenerated_at:     Time.current,
         regenerating_since: nil
