@@ -784,3 +784,81 @@ RSpec.describe ProblemSetIngest do
     end
   end
 end
+
+RSpec.describe ProblemSetIngest, "pitched rung stamps" do
+  let(:problem_set) do
+    { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+      "pattern"     => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" } }
+  end
+
+  def ingest(set, pitched_at:, eased_for: {})
+    described_class.call(set, language: "ruby_rails", expected_keys: set.keys,
+                         pitched_at: pitched_at, eased_for: eased_for).problem_set
+  end
+
+  it "stamps every section with the rung it was pitched at" do
+    result = ingest(problem_set, pitched_at: { "code_review" => "senior", "pattern" => "junior" })
+
+    expect(result["code_review"]["pitched_at"]).to eq("senior")
+    expect(result["pattern"]["pitched_at"]).to eq("junior")
+  end
+
+  it "replaces a provider-written rung and removes a provider-written eased flag" do
+    set = problem_set.deep_dup
+    set["code_review"].merge!("pitched_at" => "principal_engineer", "eased" => true)
+
+    result = ingest(set, pitched_at: { "code_review" => "junior", "pattern" => "junior" })
+
+    expect(result["code_review"]["pitched_at"]).to eq("junior")
+    expect(result["code_review"]).not_to have_key("eased")
+  end
+
+  # An unrequested section can still win a slot by list precedence, so a
+  # provider-written stamp on it would reach the page as if the server wrote it.
+  it "strips provider-written stamps from a section the day never asked for" do
+    set = problem_set.merge("architecture" => { "question" => "q", "concept" => "sync_vs_async",
+                                                "pitched_at" => "principal_engineer", "eased" => true })
+
+    result = described_class.call(set, language: "ruby_rails", expected_keys: problem_set.keys,
+                                  pitched_at: { "code_review" => "junior", "pattern" => "junior" }).problem_set
+
+    expect(result["architecture"]).not_to have_key("pitched_at")
+    expect(result["architecture"]).not_to have_key("eased")
+  end
+
+  it "marks a section eased only when its concept is one the prompt was told to ease there" do
+    result = ingest(problem_set, pitched_at: { "code_review" => "senior", "pattern" => "senior" },
+                                 eased_for: { "code_review" => [ "n_plus_one" ], "pattern" => [ "n_plus_one" ] })
+
+    expect(result["code_review"]["eased"]).to be(true)
+    expect(result["pattern"]).not_to have_key("eased")
+  end
+
+  it "removes a provider-written eased flag even when no rung came with it" do
+    set = problem_set.deep_dup
+    set["code_review"]["eased"] = true
+
+    result = ingest(set, pitched_at: { "code_review" => "junior", "pattern" => "junior" })
+
+    expect(result["code_review"]).not_to have_key("eased")
+  end
+
+  it "stamps a section the day did not ask for when a rung is known for its kind, since it can still win its slot" do
+    set = problem_set.merge("architecture" => { "question" => "q", "concept" => "sync_vs_async" })
+
+    result = described_class.call(set, language: "ruby_rails", expected_keys: problem_set.keys,
+                                  pitched_at: { "code_review" => "junior", "pattern" => "junior", "architecture" => "senior" }).problem_set
+
+    expect(result["architecture"]["pitched_at"]).to eq("senior")
+  end
+
+  it "strips provider copies but stamps nothing when no rungs are given" do
+    set = problem_set.deep_dup
+    set["code_review"].merge!("pitched_at" => "senior", "eased" => true)
+
+    result = described_class.call(set, language: "ruby_rails", expected_keys: set.keys).problem_set
+
+    expect(result["code_review"]).not_to have_key("pitched_at")
+    expect(result["code_review"]).not_to have_key("eased")
+  end
+end

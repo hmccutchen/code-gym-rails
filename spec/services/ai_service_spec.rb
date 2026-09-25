@@ -1544,7 +1544,7 @@ RSpec.describe AiService do
 
     it "includes reduced-tier generation guidance and the tiered mastery-loop instruction" do
       prompt = service.send(:build_exercise_prompt, user)
-      expect(prompt).to include("(reduced)")            # from the guidance text
+      expect(prompt).to include("annotation includes `reduced`") # the easing rule, drilled form included
       expect(prompt).to include("exits reinforcement only on full mastery")
     end
 
@@ -2579,7 +2579,11 @@ RSpec.describe AiService do
       expect(payload["requested"]["third"]).to eq("challenge")
       expect(payload["requested"]["fourth"]).to eq("plan_review")
       expect(payload["requested"]["section_count"]).to eq(4)
-      expect(payload["delivered"]).to eq(JSON.parse(set.to_json))
+      # Ingest stamps the rung each presented section was pitched at, so the
+      # delivered record carries it; everything else is the set as returned.
+      without_stamps = payload["delivered"].transform_values { |section| section.is_a?(Hash) ? section.except("pitched_at", "eased") : section }
+      expect(without_stamps).to eq(JSON.parse(set.to_json))
+      expect(payload["delivered"]["code_review"]["pitched_at"]).to eq("junior")
     end
 
     it "includes due retention checks and established concepts by name" do
@@ -5061,5 +5065,50 @@ RSpec.describe AiService, "generation prompt without feedback" do
     prompt = FakeService.new("fake-key").send(:build_exercise_prompt, user)
 
     expect(prompt).not_to include("Feedback:")
+  end
+end
+
+RSpec.describe AiService, "rung stamps on a generated set" do
+  let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "solid", provider: "fake", api_key: "fake-test-key") }
+
+  it "stamps each section with its target when set, else the skill level's rung" do
+    user.update!(section_kind_levels: { "code_review" => "principal_engineer" })
+
+    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+
+    expect(problem_set["code_review"]["pitched_at"]).to eq("principal_engineer")
+    expect(problem_set["pattern"]["pitched_at"]).to eq("senior")
+  end
+
+  it "marks a section eased when its concept was offered as reduced reinforcement in an unlocked kind" do
+    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("code_review", "concept")
+    user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :reduced)
+    allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
+      m.call(*args, **kw).with(reinforcement: [ { concept: concept, bucket: "ruby_rails", tier: "reduced" } ])
+    end
+
+    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+
+    expect(problem_set["code_review"]["eased"]).to be(true)
+  end
+
+  it "stamps a rung on every section the provider returned, so a slot won by precedence is not left blank" do
+    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+
+    ExerciseSection.keys.select { |key| problem_set[key].is_a?(Hash) && problem_set[key].any? }.each do |key|
+      expect(problem_set[key]["pitched_at"]).to eq("senior"), "#{key} carries no rung"
+    end
+  end
+
+  it "does not mark a section eased when its kind is locked" do
+    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("code_review", "concept")
+    user.update!(section_kind_levels: { "code_review" => "senior" }, locked_section_kinds: [ "code_review" ])
+    allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
+      m.call(*args, **kw).with(reinforcement: [ { concept: concept, bucket: "ruby_rails", tier: "reduced" } ])
+    end
+
+    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+
+    expect(problem_set["code_review"]).not_to have_key("eased")
   end
 end
