@@ -66,7 +66,9 @@
 
     /* Positioned, because the collapsed menu below hangs off it. */
     nav { position: relative; background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
-    nav .inner { display: flex; justify-content: space-between; align-items: center; }
+    /* Wider than the page column, so on a desktop the brand sits apart from
+       the links instead of crowding them inside the same 800px. */
+    nav .inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; }
     /* The brand refuses to shrink or wrap: squeezed against the name editor in
        a wide browser tab, it otherwise broke into three lines (the bolt, then
        "Code", then "Gym"). The name editor absorbs the squeeze instead — a
