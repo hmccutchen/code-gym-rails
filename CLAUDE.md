@@ -568,7 +568,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   security review.
 
   **Every deterministic check lives at the boundary, in `JudgeVerdict`.**
-  `STATUSES`, `ISSUE_TYPES` (seven) and `PRINCIPLES` (four) are closed lists;
+  `STATUSES`, `ISSUE_TYPES` and `PRINCIPLES` are closed lists;
   `.parse` refuses a status, issue type or principle outside them, a rewritten
   field that is not one of the kind's `prose_fields`, a field rewritten to
   blank, and evidence that does not quote text. `#apply` merges the rewrite
