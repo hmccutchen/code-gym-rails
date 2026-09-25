@@ -5190,11 +5190,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
   end
 
-  it "keeps a set the judge keeps, with every section still present and stamped" do
+  it "keeps and judges only the sections the plan scheduled" do
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
     expect(judged.dropped_sections).to eq([])
-    expect(judged.problem_set.keys).to include("code_review", "pattern")
+    expect(judged.problem_set.keys).to match_array(%w[code_review pattern challenge plan_review])
+    expect(judged.outcomes.keys).to match_array(judged.problem_set.keys)
     expect(judged.outcomes.values).to all(include(status: :keep))
   end
 

@@ -60,4 +60,11 @@ RSpec.describe SectionCount, "with dropped sections" do
 
     expect(described_class.for([ short, full, full ])).to eq(described_class.for([ full, full, full ]))
   end
+
+  it "does not count a drop as completed when the day has no response" do
+    full    = ExerciseHistoryEntry.new(section_keys: %w[code_review pattern challenge fourth], answered: 4, dropped: 0)
+    skipped = ExerciseHistoryEntry.new(section_keys: %w[code_review pattern challenge fourth], answered: nil, dropped: 3)
+
+    expect(described_class.for([ skipped, skipped, full ])).to eq(described_class::FLOOR)
+  end
 end

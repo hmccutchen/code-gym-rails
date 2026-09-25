@@ -182,7 +182,7 @@ class ModelComparison
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     verdict = begin
       service.judge_section(user, kind, fixture["section"], rung: fixture["rung"], locked: fixture["locked"])
-    rescue JudgeVerdict::Invalid
+    rescue JudgeVerdict::Invalid, AiService::InvalidResponseError
       nil
     end
 

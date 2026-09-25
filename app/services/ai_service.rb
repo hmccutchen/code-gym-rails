@@ -934,7 +934,7 @@ class AiService
     # Copied rather than mutated in place, so the draft keeps the concept of
     # every section — including the ones dropped below, which log_retention
     # and the unhosted list are named after.
-    set      = draft.problem_set.dup
+    set      = draft.problem_set.slice(*draft.kinds.map(&:key))
     outcomes = judge_all(user, draft.kinds, set, draft.difficulty, user.skill_level)
 
     rejected_keys(outcomes).each do |key|

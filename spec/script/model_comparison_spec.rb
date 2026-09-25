@@ -166,4 +166,15 @@ RSpec.describe ModelComparison do
     expect(out.string).to include("unstated_prerequisite: 2/2")
     expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
   end
+
+  it "records malformed fixture responses as invalid and continues" do
+    allow_any_instance_of(ClaudeService).to receive(:judge_section)
+      .and_raise(AiService::InvalidResponseError, "invalid JSON")
+
+    comparison.judge_fixtures
+
+    fixture_count = Dir[Rails.root.join("spec/fixtures/judge/*.json")].size
+    expect(out.string.scan("classification=invalid").size)
+      .to eq(fixture_count * ModelComparison::CANDIDATES.fetch("judge").size)
+  end
 end
