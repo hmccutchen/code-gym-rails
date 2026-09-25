@@ -206,6 +206,31 @@ class ExerciseSection
       true
     end
 
+    # ── What the judge measures against ─────────────────────────────────────
+    # judge_task, discovery?, and prose_fields are read by the review-time
+    # judge that checks a generated section's prose for a reasoning failure —
+    # never by generation or grading. judge_task is the one-sentence yardstick
+    # it measures a structural giveaway against; discovery? marks a kind whose
+    # task is to find something hidden, so naming where it is defeats the task
+    # (the rest legitimately name the concept); prose_fields bounds which
+    # fields the judge may rewrite to everything but the artifact (snippet,
+    # options, blocks, and the like).
+
+    # Abstract rather than defaulted: a new kind with no stated task should
+    # fail loudly rather than ship with a task the judge silently never checks.
+    def judge_task
+      raise NotImplementedError, "#{name} must state its task"
+    end
+
+    def discovery?
+      false
+    end
+
+    # The fields the judge may rewrite. Everything else is the artifact.
+    def prose_fields
+      %w[title scenario question teaching_note]
+    end
+
     # Whether grading this kind needs the engineer's answer translated into
     # code first (AiService#translate_before_grading). A declared per-kind fact
     # rather than a name comparison in the review path, like every other facet

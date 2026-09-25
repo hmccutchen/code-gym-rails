@@ -29,6 +29,10 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     :pseudocode_to_code
   end
 
+  def self.judge_task
+    "Write pseudocode that meets the stated requirements, including the one an under-specified plan would miss."
+  end
+
   def self.default_scaffold
     nil
   end

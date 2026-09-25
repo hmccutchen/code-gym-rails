@@ -18,6 +18,14 @@ class ExerciseSection::PlanReview < ExerciseSection
     :plan_review
   end
 
+  def self.judge_task
+    "Find the planted flaws across levels and say what to push back on before approving."
+  end
+
+  def self.discovery?
+    true
+  end
+
   # The reviewed artifact is a prose plan, so the "improvement" is a rewritten
   # plan — not source. Syntax-highlighting it as the day's language and calling
   # it "Improved code" would misdescribe it in both the review view and the

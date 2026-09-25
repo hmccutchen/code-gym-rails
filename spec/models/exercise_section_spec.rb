@@ -1043,3 +1043,17 @@ RSpec.describe ExerciseSection do
     end
   end
 end
+
+RSpec.describe ExerciseSection, "judge facets" do
+  it "gives every kind a task and prose fields drawn from its own schema" do
+    ExerciseSection.all.each do |kind|
+      expect(kind.judge_task).to be_a(String).and(satisfy { |s| s.length > 20 })
+      expect(kind.prose_fields).to include("question", "teaching_note")
+      expect(kind.prose_fields).not_to include("concept", "snippet", "starter_code", "blocks", "plan_excerpt", "planted_ambiguities", "problem_statement", "answer_scaffold", "diagram", "options")
+    end
+  end
+
+  it "marks the discovery kinds" do
+    expect(ExerciseSection.all.select(&:discovery?).map(&:key)).to match_array(%w[code_review security_review plan_review parsons_problem])
+  end
+end
