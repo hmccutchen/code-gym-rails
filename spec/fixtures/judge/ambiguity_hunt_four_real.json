@@ -1,0 +1,21 @@
+{
+  "kind": "ambiguity_hunt",
+  "rung": "senior",
+  "locked": false,
+  "expected": "keep_or_edit",
+  "principle": null,
+  "section": {
+    "title": "Bulk CSV Roster Import",
+    "scenario": "an admin tool for onboarding a batch of new engineers at once",
+    "request": "Let admins upload a CSV to bulk-add new engineers to Code Gym. Each row has a name and email. Just wire it up so it works like our other admin imports.",
+    "planted_ambiguities": [
+      "Whether an email already in the system should be skipped, updated in place, or treated as an error",
+      "What language and skill_level a bulk-imported user starts with, since the CSV has no column for either",
+      "What happens to a malformed row — missing email, invalid format — skip it, reject the whole file, or something else",
+      "Whether an import that lands mid-week should backfill that day's exercise immediately or wait for the next scheduled generation"
+    ],
+    "question": "What would you need clarified before writing a spec for this?",
+    "teaching_note": "Read the request for anything about how the system already behaves that it never states.",
+    "concept": "unspecified_edge_cases"
+  }
+}

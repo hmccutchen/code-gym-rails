@@ -1,0 +1,23 @@
+{
+  "kind": "architecture",
+  "rung": "senior",
+  "locked": false,
+  "expected": "keep_or_edit",
+  "principle": null,
+  "section": {
+    "title": "Notification Delivery: Sync or Queued",
+    "scenario": "Order confirmation emails currently send synchronously inside the checkout request. Checkout p95 latency is 900ms, and the mail provider occasionally takes 3-4s under load.",
+    "question": "Would you move notification delivery to a background queue, and how would you justify that choice?",
+    "options": [
+      "Keep sending synchronously inside the request",
+      "Move delivery to a background job queue",
+      "Batch and send notifications on a short delay"
+    ],
+    "answer_scaffold": [
+      "Which option, and why:",
+      "Tradeoffs you considered:"
+    ],
+    "teaching_note": "Weigh checkout latency against what happens if a queued job silently fails.",
+    "concept": "sync_vs_async"
+  }
+}

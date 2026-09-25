@@ -9,10 +9,22 @@ class ModelComparison
     "generate"  => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5", effort: "medium" } ],
     "review"    => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5" } ],
     "duck"      => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ],
-    "translate" => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ]
+    "translate" => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ],
+    "judge"     => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ]
   }.freeze
 
   REVIEW_FIELDS = %w[rating missed next_step].freeze
+  VERDICT_FIELDS = %w[status issues principle evidence reason].freeze
+
+  FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
+
+  # List prices as of writing, per million tokens; read nowhere in app/ — this
+  # is what #judge_fixtures prices a candidate's run against, for a person
+  # comparing them, never anything billed.
+  LIST_PRICE_PER_MILLION = {
+    "claude-sonnet-5"  => { input: 2.0, output: 10.0 },
+    "claude-haiku-4-5" => { input: 1.0, output: 5.0 }
+  }.freeze
 
   Run = Data.define(:route, :output, :seconds, :tokens_in, :tokens_out)
 
@@ -63,7 +75,132 @@ class ModelComparison
     end
   end
 
+  # Drafts one problem set through the pinned generation route (so both judge
+  # candidates score the same sections), then sends every drafted section
+  # through each candidate's own judge_section, one section at a time. A
+  # section's own verdict, or its error class and message, stands in its
+  # place the way timed_run already does for a whole run — one bad section
+  # never loses the rest of the candidate's output.
+  def judge(user_id)
+    user       = User.find(user_id)
+    language   = user.language_for_today
+    plan       = DailyPlan.for(user, language: language)
+    difficulty = KindDifficulty.for(user)
+
+    draft = with_fixed_plan(plan) do
+      pinned_service(CANDIDATES.fetch("generate").first, []).send(:draft_exercise, user, language: language, blocking: true)
+    end
+
+    compare("judge", heading: "user #{user.id}, #{language}") do |service|
+      judge_draft(service, user, draft, difficulty)
+    end
+  end
+
+  # Runs every fixture under spec/fixtures/judge through each judge candidate
+  # and prints a detection table per model: whether the output parsed, whether
+  # a broken fixture was caught under its own principle, whether a sound
+  # fixture was wrongly rejected, and cost from the accumulated tokens at the
+  # model's list price. No user_id: the fixtures carry their own rung/lock,
+  # and the fixture user is never persisted.
+  def judge_fixtures
+    fixtures = Dir[FIXTURE_DIR.join("*.json")].sort.map { |path| load_fixture(path) }
+    user     = User.new(skill_level: "solid")
+
+    CANDIDATES.fetch("judge").each { |route| print_fixture_table(route, fixtures, user) }
+  end
+
   private
+
+  def load_fixture(path)
+    JSON.parse(File.read(path)).merge("name" => File.basename(path, ".json"))
+  end
+
+  def judge_draft(service, user, draft, difficulty)
+    draft.kinds.filter_map do |kind|
+      section = draft.problem_set[kind.key]
+      [ kind.key, judge_drafted_section(service, user, kind, section, difficulty) ] if section
+    end.to_h
+  end
+
+  def judge_drafted_section(service, user, kind, section, difficulty)
+    verdict = service.judge_section(
+      user, kind, section,
+      rung: difficulty.rung_for(kind, skill_level: user.skill_level), locked: difficulty.locked?(kind)
+    )
+    VERDICT_FIELDS.index_with { |field| verdict.public_send(field) }
+  rescue JudgeVerdict::Invalid, AiService::Error => e
+    "#{e.class}: #{e.message}"
+  end
+
+  def print_fixture_table(route, fixtures, user)
+    usage   = []
+    service = pinned_service(route, usage)
+    rows    = fixtures.map { |fixture| fixture_row(service, user, fixture) }
+
+    @out.puts "=== judge_fixtures: #{route[:model]} ==="
+    rows.each { |row| print_fixture_row(row) }
+    print_fixture_totals(route, rows, usage)
+    @out.puts
+  end
+
+  def print_fixture_row(row)
+    @out.puts "#{row[:name]}: expected=#{row[:expected]} got=#{row[:status] || 'invalid'} " \
+              "classification=#{row[:classification]} principle=#{row[:principle]} #{row[:ms]}ms"
+  end
+
+  def print_fixture_totals(route, rows, usage)
+    broken        = rows.select { |row| row[:expected] == "reject" }
+    sound         = rows.select { |row| row[:expected] == "keep_or_edit" }
+    valid         = rows.reject { |row| row[:classification] == :invalid }
+    detected      = broken.count { |row| row[:classification] == :detected }
+    false_rejects = sound.count { |row| row[:classification] == :false_reject }
+    tokens_in     = usage.sum { |row| row[:tokens_in] }
+    tokens_out    = usage.sum { |row| row[:tokens_out] }
+
+    @out.puts "valid: #{valid.size}/#{rows.size} · detected: #{detected}/#{broken.size} · " \
+              "false rejections: #{false_rejects}/#{sound.size} · " \
+              "edits without issues: #{rows.count { |row| row[:edit_without_issues] }} · " \
+              "#{rows.sum { |row| row[:ms] }}ms · #{tokens_in} in / #{tokens_out} out · " \
+              "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out))}"
+  end
+
+  def fixture_cost(model, tokens_in, tokens_out)
+    price = LIST_PRICE_PER_MILLION.fetch(model)
+    (tokens_in * price[:input] + tokens_out * price[:output]) / 1_000_000.0
+  end
+
+  def fixture_row(service, user, fixture)
+    kind    = ExerciseSection.for(fixture["kind"])
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    verdict = begin
+      service.judge_section(user, kind, fixture["section"], rung: fixture["rung"], locked: fixture["locked"])
+    rescue JudgeVerdict::Invalid
+      nil
+    end
+
+    fixture_result(fixture, verdict, ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round)
+  end
+
+  def fixture_result(fixture, verdict, ms)
+    return { name: fixture["name"], expected: fixture["expected"], status: nil, principle: nil,
+             classification: :invalid, edit_without_issues: false, ms: ms } if verdict.nil?
+
+    { name: fixture["name"], expected: fixture["expected"], status: verdict.status, principle: verdict.principle,
+      classification: classify_fixture(fixture, verdict),
+      edit_without_issues: verdict.edit? && verdict.issues.empty?, ms: ms }
+  end
+
+  # detected/wrong_principle/missed for a fixture whose section is meant to be
+  # caught; ok/false_reject for one that's meant to survive.
+  def classify_fixture(fixture, verdict)
+    if fixture["expected"] == "reject"
+      return :missed unless verdict.reject?
+
+      verdict.principle == fixture["principle"] ? :detected : :wrong_principle
+    else
+      verdict.reject? ? :false_reject : :ok
+    end
+  end
 
   def compare(mode, heading:)
     runs = CANDIDATES.fetch(mode).map { |route| timed_run(route) { |service| yield service } }

@@ -1,0 +1,15 @@
+{
+  "kind": "code_review",
+  "rung": "principal_engineer",
+  "locked": true,
+  "expected": "keep_or_edit",
+  "principle": null,
+  "section": {
+    "question": "This job is meant to process each pending payout exactly once, even when two workers pick up the queue at the same moment. What's the issue and how would you fix it?",
+    "snippet": "class PayoutWorker\n  def run\n    Payout.where(status: \"pending\").find_each do |payout|\n      next unless payout.status == \"pending\"\n      payout.update!(status: \"processing\")\n      PaymentGateway.send(payout)\n      payout.update!(status: \"complete\")\n    end\n  end\nend",
+    "teaching_note": "Consider what two workers running this loop at the same instant could both observe.",
+    "concept": "concurrency",
+    "scenario": "a payout queue processed by several worker instances",
+    "diagram": ""
+  }
+}

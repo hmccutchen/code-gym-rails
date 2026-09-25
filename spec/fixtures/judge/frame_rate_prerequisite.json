@@ -1,0 +1,15 @@
+{
+  "kind": "code_review",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "unstated_prerequisite",
+  "section": {
+    "question": "What's the issue with this player-movement update, and how would you fix it?",
+    "snippet": "function gameLoop(timestamp) {\n  player.x += player.vx;\n  player.y += player.vy;\n  render(player);\n  requestAnimationFrame(gameLoop);\n}\n\nfunction onKeyDown(e) {\n  if (e.key === \"ArrowRight\") player.vx = 4;\n  if (e.key === \"ArrowUp\") player.vy = -4;\n}\n\nrequestAnimationFrame(gameLoop);",
+    "teaching_note": "Notice what player.vx actually represents from one call to the next.",
+    "concept": "debouncing_throttling",
+    "scenario": "a browser platformer's player-movement loop",
+    "diagram": ""
+  }
+}

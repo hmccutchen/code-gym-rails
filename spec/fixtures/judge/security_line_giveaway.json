@@ -1,0 +1,15 @@
+{
+  "kind": "security_review",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "reasoning_failure",
+  "section": {
+    "title": "Search Endpoint",
+    "question": "Line 4 builds a SQL string by interpolating params[:q] directly into it — what's the vulnerability and how would you mitigate it?",
+    "snippet": "class SearchController < ApplicationController\n  def index\n    term = params[:q]\n    sql = \"SELECT * FROM products WHERE name LIKE '%#{term}%'\"\n    @results = Product.find_by_sql(sql)\n    render json: @results\n  end\nend",
+    "scenario": "a product search endpoint",
+    "teaching_note": "Think about what params[:q] could contain besides a search term.",
+    "concept": "sql_injection_prevention"
+  }
+}

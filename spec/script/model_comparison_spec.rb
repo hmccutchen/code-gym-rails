@@ -130,4 +130,39 @@ RSpec.describe ModelComparison do
 
     expect(out.string.scan("AiService::RateLimitError: slow down").size).to eq(2)
   end
+
+  it "drafts once, judges every section with each candidate, and prints a verdict block per section" do
+    comparison.judge(user.id)
+
+    expect(posted.map { |body| body["model"] }.uniq).to eq(ModelComparison::CANDIDATES.fetch("judge").map { |route| route[:model] })
+    ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("--- #{route[:model]}") }
+    expect(out.string).to include("\"code_review\"").and include("\"status\"")
+  end
+
+  it "never prints the ambiguity hunt's planted answer key while judging" do
+    plan = DailyPlan.for(user, language: "ruby_rails").with(fourth: "ambiguity_hunt")
+    allow(DailyPlan).to receive(:for).and_return(plan)
+
+    comparison.judge(user.id)
+
+    expect(out.string).to include("ambiguity_hunt")
+    expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
+  end
+
+  it "judge_fixtures prints a per-model detection table and never the answer key" do
+    fixture_dir = Rails.root.join("spec/fixtures/judge")
+    verdicts = Dir[fixture_dir.join("*.json")].to_h do |path|
+      fixture = JSON.parse(File.read(path))
+      verdict = fixture["expected"] == "reject" ? JudgeVerdict.new(status: :reject, principle: fixture["principle"], evidence: "quoted text", reason: "why") :
+                                                   JudgeVerdict.new(status: :keep)
+      [ fixture["section"], verdict ]
+    end
+    allow_any_instance_of(ClaudeService).to receive(:judge_section) { |_service, _user, _kind, section, **| verdicts.fetch(section) }
+
+    comparison.judge_fixtures
+
+    ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
+    expect(out.string).to include("detected:")
+    expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
+  end
 end
