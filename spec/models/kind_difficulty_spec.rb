@@ -98,6 +98,10 @@ RSpec.describe KindDifficulty, "#rung_for" do
     end
   end
 
+  it "reads a skill level outside the scale as junior rather than raising, like the class's other readers" do
+    expect(described_class.none.rung_for(challenge, skill_level: "intermediate")).to eq("junior")
+  end
+
   it "answers the target when one is set, else the skill level's rung" do
     targeted = described_class.new(levels: { "challenge" => "principal_engineer" }, locked: [])
 

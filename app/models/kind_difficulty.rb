@@ -51,8 +51,12 @@ class KindDifficulty
   end
 
   # The rung a kind is pitched at today: its target, else the skill level's.
+  # A skill level outside the scale reads as the lowest rung rather than
+  # raising, the same total-by-construction contract as #level_for: an
+  # orphaned console write must understate evidence, never abort generation
+  # after the provider call was billed.
   def rung_for(kind, skill_level:)
-    level_for(kind) || RUNG_FOR_SKILL_LEVEL.fetch(skill_level)
+    level_for(kind) || RUNG_FOR_SKILL_LEVEL.fetch(skill_level, LEVELS.first)
   end
 
   def locked?(kind)

@@ -160,6 +160,7 @@ class ProblemSetIngest
     normalize_diagrams!
     shuffle_parsons_blocks!
     strip_current_schemas!
+    strip_pitched_rungs!
     ground_code_review!
     stamp_pitched_rungs!
 
@@ -357,10 +358,21 @@ class ProblemSetIngest
     section["current_schema"] = schema if schema
   end
 
-  # The rung a section was pitched at is a fact the server knows and the
-  # provider does not, so every provider copy is stripped first — from every
-  # section, since an unrequested one can still win a slot by list
-  # precedence — and the requested sections are then stamped. `eased` is
+  # Both stamps are facts the server knows and the provider does not, so a
+  # provider copy is stripped from every section on every call, whatever the
+  # caller passed — the same shape as strip_current_schemas!. Every section,
+  # because an unrequested one can still win its slot by list precedence.
+  def strip_pitched_rungs!
+    @problem_set.each_value do |section|
+      next unless section.is_a?(Hash)
+
+      section.delete("pitched_at")
+      section.delete("eased")
+    end
+  end
+
+  # Stamps every section a rung is known for, requested or not, since the
+  # rendered set is resolved by precedence over what came back. `eased` is
   # stamped after the concept is known, since it depends on which concept the
   # model chose, and only ever as true. It records one thing: the prompt's
   # `(reduced)` rule was asked for here. It does not claim the rung was
@@ -371,7 +383,6 @@ class ProblemSetIngest
   def stamp_pitched_rungs!
     return if @pitched_at.nil?
 
-    @problem_set.each_value { |section| section.delete("pitched_at") && section.delete("eased") if section.is_a?(Hash) }
     @problem_set.each do |key, section|
       next unless section.is_a?(Hash) && @pitched_at.key?(key)
 

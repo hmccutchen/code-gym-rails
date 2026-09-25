@@ -906,8 +906,11 @@ class AiService
       language: language,
       expected_keys: kinds.map(&:key),
       code_review_source: plan.code_review_source,
-      pitched_at: kinds.to_h { |kind| [ kind.key, difficulty.rung_for(kind, skill_level: user.skill_level) ] },
-      eased_for: eased_concepts_for(kinds, plan, difficulty)
+      # Over every kind, not today's: the rendered set is resolved by slot
+      # precedence over what the provider returned, so a section the day did
+      # not ask for can still be the one shown, and #rung_for is total.
+      pitched_at: ExerciseSection.all.to_h { |kind| [ kind.key, difficulty.rung_for(kind, skill_level: user.skill_level) ] },
+      eased_for: eased_concepts_for(plan, difficulty)
     )
     problem_set = ingested.problem_set
     # After ingest, never during: ingest writes nothing and raises on an
@@ -1482,17 +1485,23 @@ class AiService
 
   # Which concepts the prompt was told to ease in each section: reduced-tier
   # reinforcement, unless the kind is locked, which the locked line exempts
-  # from the `(reduced)` rule. The fourth slot reads its own list. This is
-  # the one easing the server decides; the prompt's "too hard" and "too easy"
-  # rating adjustments also move an unlocked section, but the model judges
-  # when they apply, so they cannot be recorded here. Only a lock makes a
-  # rung exact.
-  def eased_concepts_for(kinds, plan, difficulty)
-    reduced = ->(entries) { entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] } }
+  # from the `(reduced)` rule. There are exactly two lists — the fourth slot
+  # reads its own — so each is computed once and every kind maps onto one.
+  # This is the one easing the server decides; the prompt's "too hard" and
+  # "too easy" rating adjustments also move an unlocked section, but the
+  # model judges when they apply, so they cannot be recorded here. Only a
+  # lock makes a rung exact.
+  def eased_concepts_for(plan, difficulty)
+    reduced_main   = reduced_concepts(plan.reinforcement)
+    reduced_fourth = reduced_concepts(plan.fourth_reinforcement)
 
-    kinds.reject { |kind| difficulty.locked?(kind) }.to_h do |kind|
-      [ kind.key, reduced.call(kind.fourth? ? plan.fourth_reinforcement : plan.reinforcement) ]
+    ExerciseSection.all.reject { |kind| difficulty.locked?(kind) }.to_h do |kind|
+      [ kind.key, kind.fourth? ? reduced_fourth : reduced_main ]
     end
+  end
+
+  def reduced_concepts(entries)
+    entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] }
   end
 
   # Coverage says whether material was available; chosen_grounded says whether
@@ -1746,7 +1755,7 @@ class AiService
       #{module_design_depth_guidance}
       #{silent_correctness_guidance}
       #{domain_modeling_guidance}
-      - Reduced-tier concepts: for any concept marked `(reduced)`, keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
+      - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
       - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.
       #{retention_block}

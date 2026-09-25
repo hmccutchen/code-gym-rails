@@ -1544,7 +1544,7 @@ RSpec.describe AiService do
 
     it "includes reduced-tier generation guidance and the tiered mastery-loop instruction" do
       prompt = service.send(:build_exercise_prompt, user)
-      expect(prompt).to include("(reduced)")            # from the guidance text
+      expect(prompt).to include("annotation includes `reduced`") # the easing rule, drilled form included
       expect(prompt).to include("exits reinforcement only on full mastery")
     end
 
@@ -5083,15 +5083,21 @@ RSpec.describe AiService, "rung stamps on a generated set" do
   it "marks a section eased when its concept was offered as reduced reinforcement in an unlocked kind" do
     concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("code_review", "concept")
     user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :reduced)
-    plan = instance_double(DailyPlan::Result)
     allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
-      real = m.call(*args, **kw)
-      real.with(reinforcement: [ { concept: concept, bucket: "ruby_rails", tier: "reduced" } ])
+      m.call(*args, **kw).with(reinforcement: [ { concept: concept, bucket: "ruby_rails", tier: "reduced" } ])
     end
 
     problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
 
     expect(problem_set["code_review"]["eased"]).to be(true)
+  end
+
+  it "stamps a rung on every section the provider returned, so a slot won by precedence is not left blank" do
+    problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+
+    ExerciseSection.keys.select { |key| problem_set[key].is_a?(Hash) && problem_set[key].any? }.each do |key|
+      expect(problem_set[key]["pitched_at"]).to eq("senior"), "#{key} carries no rung"
+    end
   end
 
   it "does not mark a section eased when its kind is locked" do

@@ -834,9 +834,31 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["pattern"]).not_to have_key("eased")
   end
 
-  it "stamps nothing when no rungs are given, so existing callers are unchanged" do
-    result = described_class.call(problem_set, language: "ruby_rails", expected_keys: problem_set.keys).problem_set
+  it "removes a provider-written eased flag even when no rung came with it" do
+    set = problem_set.deep_dup
+    set["code_review"]["eased"] = true
+
+    result = ingest(set, pitched_at: { "code_review" => "junior", "pattern" => "junior" })
+
+    expect(result["code_review"]).not_to have_key("eased")
+  end
+
+  it "stamps a section the day did not ask for when a rung is known for its kind, since it can still win its slot" do
+    set = problem_set.merge("architecture" => { "question" => "q", "concept" => "sync_vs_async" })
+
+    result = described_class.call(set, language: "ruby_rails", expected_keys: problem_set.keys,
+                                  pitched_at: { "code_review" => "junior", "pattern" => "junior", "architecture" => "senior" }).problem_set
+
+    expect(result["architecture"]["pitched_at"]).to eq("senior")
+  end
+
+  it "strips provider copies but stamps nothing when no rungs are given" do
+    set = problem_set.deep_dup
+    set["code_review"].merge!("pitched_at" => "senior", "eased" => true)
+
+    result = described_class.call(set, language: "ruby_rails", expected_keys: set.keys).problem_set
 
     expect(result["code_review"]).not_to have_key("pitched_at")
+    expect(result["code_review"]).not_to have_key("eased")
   end
 end

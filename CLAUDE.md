@@ -726,8 +726,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   drilled or not, and the page says it is waiting.
 - **Each section records the rung it was pitched at**: `ProblemSetIngest`
   stamps `pitched_at` (`junior` / `senior` / `principal_engineer`) into every
-  presented section, server-owned like `scenario` and `current_schema`, so a
-  provider copy is replaced rather than trusted. The rung is
+  section the provider returned, not only the ones the day asked for, because
+  the rendered set is resolved by slot precedence over what came back and an
+  unrequested section can win. Server-owned like `scenario` and
+  `current_schema`: every provider copy is stripped on every call, whatever
+  the caller passed, before the stamps go on. The rung is
   `KindDifficulty#rung_for`: the kind's target when one is set, else the
   profile's skill level read through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`
   (beginner and developing are junior, solid is senior, strong is principal),
@@ -740,8 +743,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   section's pitch, and the model judges when they apply, so they are not
   recorded: an unlocked section's rung is what was asked for, possibly
   adjusted, and only a lock makes it exact. Provider copies of both stamps
-  are stripped from every section first, since an unrequested section can
-  still win a slot by list precedence. Neither stamp reaches the prompt, the review, the duck
+  are stripped from every section first. A drilled concept at reduced tier is
+  annotated `(reduced, drilled)`, and the prompt's easing rule names that form
+  too, so its `eased` stamp records what was actually asked. Neither stamp reaches the prompt, the review, the duck
   or any page yet: they exist so a later journey view can say which rung a
   concept is held at from stored evidence rather than from the diagnostics
   log, which is where the pitch level lived before. Sections generated
