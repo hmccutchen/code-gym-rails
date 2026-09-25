@@ -38,7 +38,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     if (exercise = DailyExercise.find_by(user: user, date: Date.current))
       nudge_if_due(user, exercise)
     else
-      generate_for(user)
+      generate_for(user, judge: true)
       remind(user)
     end
   end
@@ -80,16 +80,20 @@ class GenerateDailyExercisesJob < ApplicationJob
   # polling GET /dashboard/status (DashboardController#status) and reloading
   # — this app loads no Turbo/Stimulus JS, so a live broadcast here would
   # have no subscriber.
-  def generate_for(user)
-    language    = user.language_for_today
-    problem_set = AiService.for(user).generate_exercise(user, language: language)
+  def generate_for(user, judge: false)
+    language = user.language_for_today
+    service  = AiService.for(user)
+    judged   = judge ? service.generate_judged_exercise(user, language: language)
+                     : AiService::JudgedSet.new(problem_set: service.generate_exercise(user, language: language),
+                                                dropped_sections: [], outcomes: {})
 
     DailyExercise.create!(
-      user:         user,
-      date:         Date.current,
-      problem_set:  problem_set,
-      generated_at: Time.current,
-      language:     language
+      user:             user,
+      date:             Date.current,
+      problem_set:      judged.problem_set,
+      dropped_sections: judged.dropped_sections,
+      generated_at:     Time.current,
+      language:         language
     )
 
     # Defense-in-depth: #status/#show both check exercise-existence before
