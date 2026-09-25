@@ -902,6 +902,16 @@ class AiService
     end
   end
 
+  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
+
+  Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
+                      :prompt_options, :suggested_concepts)
+  private_constant :Draft
+
+  # One, never a loop: a second rejection is evidence about the draft prompt,
+  # not something another call fixes.
+  JUDGE_RETRIES = 1
+
   # ── Generate a personalized daily exercise set ────────────────────────────
   # The day's plan (third section, reinforcement, retention checks) is decided by
   # DailyPlan before any provider is contacted; this method only renders it into
@@ -911,55 +921,39 @@ class AiService
   # tighter read budget (see SYNC_GENERATION_READ_TIMEOUT). Callers state their
   # constraint; the timeout policy stays here.
   def generate_exercise(user, language: user.language_for_today, blocking: false)
-    plan = DailyPlan.for(user, language: language)
-    # Fetched once and threaded through to both the prompt and the
-    # diagnostics log below — two separate calls to #recent_performance
-    # would double the query and risk the logged "requested" history
-    # silently diverging from what the prompt actually contained if
-    # anything changed for this user during the provider call.
-    history = user.recent_performance
+    draft = draft_exercise(user, language: language, blocking: blocking)
+    finish_generation(user, language, draft, draft.problem_set)
+    draft.problem_set
+  end
 
-    difficulty = KindDifficulty.for(user)
-    kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
-    ladders    = ladders_for(kinds, difficulty, language, plan.code_review_mode)
+  # ── Draft, judge, retry once, drop — the weekday batch's path ────────────
+  # Each section is judged in its own thread, like grading. A rejection buys
+  # one regeneration of that section with its kind and concept fixed — the
+  # plan placed that concept, and a retry free to change it could drop a due
+  # check — judged again; a second rejection drops the section. A judge that
+  # fails or answers invalidly leaves the draft unedited: the judge is never
+  # why a day has no set. The logs run last so they describe the final set.
+  def generate_judged_exercise(user, language: user.language_for_today)
+    draft = draft_exercise(user, language: language, blocking: false)
+    # Copied rather than mutated in place, so the draft keeps the concept of
+    # every section — including the ones dropped below, which log_retention
+    # and the unhosted list are named after.
+    set      = draft.problem_set.dup
+    outcomes = judge_all(user, draft.kinds, set, draft.difficulty, user.skill_level)
 
-    result = call_and_log(
-      user, purpose: "generate_exercise",
-      read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
-      system: build_system_prompt(language),
-      prompt: build_exercise_prompt(user, language, third: plan.third, pattern: plan.pattern,
-                                    reinforcement: plan.reinforcement, due_checks: plan.due_checks,
-                                    established: plan.established, history: history,
-                                    fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
-                                    fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
-                                    code_review_mode: plan.code_review_mode,
-                                    code_review_source: plan.code_review_source,
-                                    scenario_flavor: plan.scenario_flavor,
-                                    difficulty: difficulty, ladders: ladders)
-    )
-
-    ingested = ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "problem set"),
-      language: language,
-      expected_keys: kinds.map(&:key),
-      code_review_source: plan.code_review_source,
-      # Over every kind, not today's: the rendered set is resolved by slot
-      # precedence over what the provider returned, so a section the day did
-      # not ask for can still be the one shown, and #rung_for is total.
-      pitched_at: ExerciseSection.all.to_h { |kind| [ kind.key, difficulty.rung_for(kind, skill_level: user.skill_level) ] },
-      eased_for: eased_concepts_for(plan, difficulty)
-    )
-    problem_set = ingested.problem_set
-    # After ingest, never during: ingest writes nothing and raises on an
-    # unusable set, so a rejected response cannot have left a suggestion behind.
-    record_suggested_concepts(ingested.suggested_concepts)
-    log_retention(user, language, plan.due_checks, problem_set, plan.code_review_mode)
-    if plan.fourth
-      log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
-                    problem_set, plan.code_review_mode)
+    rejected_keys(outcomes).each do |key|
+      section, outcome = resolve_rejection(user, language, draft, ExerciseSection.find(key), set[key], outcomes[key])
+      outcomes[key] = outcome
+      if section
+        set[key] = section
+      else
+        set.delete(key)
+      end
     end
-    log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds: kinds, difficulty: difficulty, ladders: ladders)
-    problem_set
+
+    dropped = outcomes.select { |_, outcome| outcome[:dropped] }.keys
+    finish_generation(user, language, draft, set, dropped: dropped, judge: outcomes)
+    JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes)
   end
 
   # ── Review a submitted response, one thread per still-missing section ────
@@ -1251,6 +1245,199 @@ class AiService
     PROMPT
   end
 
+  # Everything stage 1 decided, kept so the judged path can re-render the same
+  # guidance for one section and describe the draft after sections are dropped.
+  #
+  # History is fetched once and carried on the Draft to both the prompt and the
+  # diagnostics log — two separate calls to #recent_performance would double the
+  # query and risk the logged "requested" history silently diverging from what
+  # the prompt actually contained if anything changed for this user during the
+  # provider call.
+  def draft_exercise(user, language:, blocking:)
+    plan       = DailyPlan.for(user, language: language)
+    history    = user.recent_performance
+    difficulty = KindDifficulty.for(user)
+    kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
+    ladders    = ladders_for(kinds, difficulty, language, plan.code_review_mode)
+    options    = exercise_prompt_options(plan, history, difficulty, ladders)
+
+    result = call_and_log(
+      user, purpose: "generate_exercise",
+      read_timeout: blocking ? SYNC_GENERATION_READ_TIMEOUT : GENERATION_READ_TIMEOUT,
+      system: build_system_prompt(language),
+      prompt: build_exercise_prompt(user, language, **options)
+    )
+
+    ingested = ProblemSetIngest.call(
+      parse_json_object(result[:text], subject: "problem set"),
+      language: language, expected_keys: kinds.map(&:key), code_review_source: plan.code_review_source,
+      pitched_at: pitched_rungs(difficulty, user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
+    )
+
+    Draft.new(problem_set: ingested.problem_set, plan: plan, kinds: kinds, difficulty: difficulty,
+              ladders: ladders, history: history, prompt_options: options,
+              suggested_concepts: ingested.suggested_concepts)
+  end
+
+  def exercise_prompt_options(plan, history, difficulty, ladders)
+    { third: plan.third, pattern: plan.pattern,
+      reinforcement: plan.reinforcement, due_checks: plan.due_checks,
+      established: plan.established, history: history,
+      fourth: plan.fourth, fourth_reinforcement: plan.fourth_reinforcement,
+      fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
+      code_review_mode: plan.code_review_mode,
+      code_review_source: plan.code_review_source,
+      scenario_flavor: plan.scenario_flavor,
+      difficulty: difficulty, ladders: ladders }
+  end
+
+  # Over every kind, not today's: the rendered set is resolved by slot
+  # precedence over what the provider returned, so a section the day did
+  # not ask for can still be the one shown, and #rung_for is total.
+  def pitched_rungs(difficulty, skill_level)
+    ExerciseSection.all.to_h { |kind| [ kind.key, difficulty.rung_for(kind, skill_level: skill_level) ] }
+  end
+
+  # The tail both paths share. `set` is what will be delivered; `draft` still
+  # holds every drafted section, so a dropped key can still be named with the
+  # concept it was carrying.
+  def finish_generation(user, language, draft, set, dropped: [], judge: nil)
+    plan = draft.plan
+    # After ingest, never during: ingest writes nothing and raises on an
+    # unusable set, so a rejected response cannot have left a suggestion behind.
+    record_suggested_concepts(draft.suggested_concepts)
+
+    dropped_concepts = dropped.to_h { |key| [ key, draft.problem_set.dig(key, "concept") ] }
+    log_retention(user, language, plan.due_checks, set, plan.code_review_mode, dropped: dropped_concepts)
+    if plan.fourth
+      log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
+                    set, plan.code_review_mode, dropped: dropped_concepts)
+    end
+    log_difficulty_diagnostics(user, language, plan, set, draft.history,
+                               kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
+                               judge: judge, unhosted: unhosted_concepts(plan, dropped_concepts))
+  end
+
+  # One thread per drafted section, as grading does. No thread writes the set:
+  # each returns its own section back and the caller assembles both hashes, so
+  # the only shared state is read-only for the length of the fan-out.
+  def judge_all(user, kinds, set, difficulty, skill_level)
+    threads = kinds.filter_map do |kind|
+      section = set[kind.key]
+      Thread.new { judge_outcome(user, kind, section, difficulty, skill_level) } if section
+    end
+
+    threads.map(&:value).each_with_object({}) do |(key, outcome, section), outcomes|
+      set[key]      = section
+      outcomes[key] = outcome
+    end
+  end
+
+  # [key, outcome, section].
+  def judge_outcome(user, kind, section, difficulty, skill_level)
+    verdict, latency = judge_with_fallback(user, kind, section, difficulty, skill_level)
+    outcome = { status: :keep, issues: [], principle: nil, retries: 0,
+                dropped: false, fallback: nil, latency_ms: latency }
+    return [ kind.key, outcome.merge(fallback: verdict), section ] if verdict.is_a?(String)
+
+    [ kind.key, outcome.merge(judgment(verdict)), verdict.apply(section) ]
+  end
+
+  def judgment(verdict)
+    { status: verdict.status, issues: verdict.issues.map { |issue| issue[:type] }, principle: verdict.principle }
+  end
+
+  def rejected_keys(outcomes)
+    outcomes.select { |_, outcome| outcome[:status] == :reject }.keys
+  end
+
+  # The one regeneration a rejection buys, judged again. Returns
+  # [section_or_nil, outcome]; nil is a drop. A retry that never came back
+  # counts as the second rejection, and a judge that fails on the re-judge
+  # keeps the retry for the same reason it keeps a draft.
+  def resolve_rejection(user, language, draft, kind, section, outcome)
+    outcome = outcome.merge(retries: JUDGE_RETRIES)
+    retried = retry_section(user, language, draft, kind, section["concept"])
+    return [ nil, outcome.merge(dropped: true) ] if retried.nil?
+
+    verdict, latency = judge_with_fallback(user, kind, retried, draft.difficulty, user.skill_level)
+    outcome = outcome.merge(latency_ms: outcome[:latency_ms] + latency)
+    return [ retried, outcome.merge(status: :keep, fallback: verdict) ] if verdict.is_a?(String)
+    return [ nil, outcome.merge(dropped: true, principle: verdict.principle) ] if verdict.reject?
+
+    # The draft's principle survives a retry the judge accepted: it is the only
+    # record that this section was rejected at all, and rejection rate per
+    # principle is read off these entries.
+    [ verdict.apply(retried), outcome.merge(judgment(verdict), principle: outcome[:principle]) ]
+  end
+
+  # Returns [verdict, ms], or [fallback reason, ms] when the judge could not
+  # answer. Its own service instance, and therefore its own connection, like
+  # every other thread this class fans out.
+  def judge_with_fallback(user, kind, section, difficulty, skill_level)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    verdict = self.class.new(@api_key).judge_section(
+      user, kind, section,
+      rung: difficulty.rung_for(kind, skill_level: skill_level), locked: difficulty.locked?(kind)
+    )
+    [ verdict, elapsed_ms(started) ]
+  rescue JudgeVerdict::Invalid, AiService::Error, *INFRASTRUCTURE_ERRORS => e
+    reason = judge_fallback_reason(e)
+    Rails.logger.warn("[judge_fallback] user=#{user.id} section=#{kind.key} reason=#{reason}: #{e.message}")
+    [ reason, elapsed_ms(started) ]
+  end
+
+  # A timeout is the judge's commonest failure and the one worth separating,
+  # so it is named here rather than in #error_code_for, which the review path
+  # shares and where "other" is already what a timeout means.
+  def judge_fallback_reason(error)
+    case error
+    when JudgeVerdict::Invalid then "invalid_output"
+    when TimeoutError          then "timeout"
+    else                            error_code_for(error)
+    end
+  end
+
+  # One kind, one concept, through the same builder and the same ingest as the
+  # draft — narrower, not different. Failure is a drop, never a raised set.
+  def retry_section(user, language, draft, kind, concept)
+    result = call_and_log(
+      user, purpose: "generate_exercise", read_timeout: GENERATION_READ_TIMEOUT,
+      system: build_system_prompt(language),
+      prompt: build_exercise_prompt(user, language, **draft.prompt_options, only: kind, fixed_concept: concept)
+    )
+
+    ProblemSetIngest.call(
+      parse_json_object(result[:text], subject: "#{kind.key} retry"), language: language,
+      expected_keys: [ kind.key ], fixed_concepts: { kind.key => concept },
+      code_review_source: (draft.plan.code_review_source if kind == ExerciseSection::CodeReview),
+      pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
+      eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
+    ).problem_set[kind.key]
+  rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
+    Rails.logger.warn("[judge_retry_failed] user=#{user.id} section=#{kind.key}: #{e.message}")
+    nil
+  end
+
+  # What the plan asked for that no delivered section carries. The plan
+  # attributes a concept to a section only in the fourth slot, so this is
+  # decided after the fact the way log_retention decides honored: the dropped
+  # section's own concept, matched against what the plan offered.
+  def unhosted_concepts(plan, dropped_concepts)
+    retention     = (plan.due_checks + plan.fourth_due_checks).map(&:concept)
+    reinforcement = (plan.reinforcement.to_a + plan.fourth_reinforcement.to_a).map { |entry| entry[:concept] }
+
+    dropped_concepts.filter_map do |key, concept|
+      planned_as = "retention" if retention.include?(concept)
+      planned_as ||= "reinforcement" if reinforcement.include?(concept)
+      { section: key, concept: concept, planned_as: planned_as } if planned_as
+    end
+  end
+
+  def elapsed_ms(started)
+    ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round
+  end
+
   # Guide and ladder fields are optional (see CONCEPT_GUIDE_FIELDS and
   # CONCEPT_LADDER_FIELDS). Guide text is rendered into the Learn tab and rungs
   # into a generation prompt, so both get boundary treatment: only a String
@@ -1490,7 +1677,10 @@ class AiService
   # Takes a ConceptBucket rather than a language because the fourth slot's
   # track is bucket-scoped and language-independent; for the three-slot track
   # the bucket IS the day's language (see ConceptBucket.for).
-  def log_retention(user, bucket, due_checks, problem_set, code_review_mode)
+  #
+  # `honored` is computed over the delivered set, so a due check the judge
+  # dropped reads as offered and not honored; `dropped` is what names it.
+  def log_retention(user, bucket, due_checks, problem_set, code_review_mode, dropped: {})
     return if due_checks.empty?
 
     offered = due_checks.map(&:concept)
@@ -1502,7 +1692,8 @@ class AiService
       "code_review_mode=#{code_review_mode} " \
       "offered=#{offered.join(',').presence || '-'} " \
       "honored=#{honored.join(',').presence || '-'} " \
-      "tagged=#{tagged.join(',').presence || '-'}"
+      "tagged=#{tagged.join(',').presence || '-'} " \
+      "dropped=#{dropped.map { |key, concept| "#{key}:#{concept}" }.join(',').presence || '-'}"
     )
   end
 
@@ -1515,7 +1706,8 @@ class AiService
   # ResponsesController#log_review_diagnostics (correlated by user_id + date).
   # Safe to remove once that question is settled. See
   # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
-  def log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds:, difficulty:, ladders:)
+  def log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds:, difficulty:, ladders:,
+                                 judge: nil, unhosted: [])
     requested = {
       skill_level: user.skill_level,
       code_review_mode: plan.code_review_mode,
@@ -1538,7 +1730,9 @@ class AiService
       date: Date.current.to_s,
       language: language,
       requested: requested,
-      delivered: without_answer_key(problem_set)
+      delivered: without_answer_key(problem_set),
+      judge: judge,
+      unhosted: unhosted
     }
 
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
