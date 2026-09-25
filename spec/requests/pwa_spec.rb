@@ -88,11 +88,12 @@ RSpec.describe "PWA", type: :request do
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
 
-    # The nav row is tight enough on a phone that the bolt has to go, and the
-    # stylesheet can only hide it while it is an element of its own. Inline it
-    # back into the brand text and the wordmark starts wrapping again with
-    # nothing failing to say so. This is the logged-out brand; dashboard_spec's
-    # "brand title link" covers the linked one.
+    # The bolt renders at every width now that the nav's destinations fold
+    # behind a menu button and the row has room. What this still pins is that
+    # it stays an element of its own: inline it into the brand text and no
+    # stylesheet can hide it again, which is the move any future squeeze would
+    # reach for. This is the logged-out brand; dashboard_spec's "brand title
+    # link" covers the linked one.
     it "keeps the brand's bolt separately addressable from the wordmark" do
       expect(response.body).to include(%(<span class="brand"><span class="brand-mark">⚡</span> Code Gym</span>))
     end

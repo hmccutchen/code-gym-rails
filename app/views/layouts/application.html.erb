@@ -100,7 +100,7 @@
         background: var(--surface); border-bottom: 1px solid var(--border);
         padding: .5rem 1.5rem 1rem;
       }
-      nav .nav-links[data-open] a { padding: .6rem 0; }
+      nav .nav-links[data-open] a { padding: .75rem 0; }
       nav .nav-links[data-open] .name-editor-input { width: 100%; }
     }
 
@@ -399,7 +399,7 @@
         <button type="button" class="nav-toggle" id="nav-toggle"
                 aria-expanded="false" aria-controls="nav-links"
                 aria-label="<%= t("nav.menu") %>">
-          <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+          <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
         </button>
         <div class="nav-links" id="nav-links">
           <span class="name-editor">

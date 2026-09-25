@@ -49,10 +49,11 @@ RSpec.describe "Mobile nav menu", type: :system do
 
     menu_button.click
     expect(page).to have_link("History", visible: :visible)
-    # A real press well below the open panel, rather than on an element the
-    # panel overlays — and the path assertion is what keeps this honest, since
-    # a press that navigated would also have closed the menu.
-    page.driver.with_playwright_page { |pw| pw.mouse.click(200, 600) }
+    # A real press below the open panel and to the right of the container's
+    # text column, where no link's rendered width reaches. The path assertion
+    # is what keeps it honest: a press that navigated would also have closed
+    # the menu, so a mis-aimed coordinate fails rather than passes quietly.
+    page.driver.with_playwright_page { |pw| pw.mouse.click(365, 600) }
     expect(page).to have_no_link("History", visible: :visible)
     expect(page).to have_current_path(learn_path)
   end
