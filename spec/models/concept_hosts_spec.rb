@@ -23,6 +23,18 @@ RSpec.describe ConceptHosts do
     expect(hosts.kinds_for("prototype_chain", "javascript")).to eq([])
   end
 
+  # The page words a concept with no unexcluded host as the user's choice, so
+  # every concept must have a host to begin with or that wording lies.
+  it "gives every concept in every bucket of the slice at least one host" do
+    mixed = described_class.for(User.new(language: "mixed"))
+
+    ConceptBucket.slice_for("mixed").each do |bucket|
+      ConceptBucket.vocabulary_for(bucket).each do |concept|
+        expect(mixed.kinds_for(concept, bucket)).not_to be_empty, "#{bucket}/#{concept} has no host"
+      end
+    end
+  end
+
   it "covers both languages for a mixed user" do
     mixed = described_class.for(User.new(language: "mixed"))
 

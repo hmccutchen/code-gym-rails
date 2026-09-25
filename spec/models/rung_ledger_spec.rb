@@ -13,7 +13,11 @@ RSpec.describe RungLedger do
       answers: sections.transform_values { |s| s.fetch(:answered, true) ? "x" * 20 : "" },
       concept_tags: sections.transform_values { |s| s[:concept] },
       section_ratings: sections.transform_values { |s| s.fetch(:self, "right_level") },
-      ai_review: sections.filter_map { |key, s| [ key, { "rating" => s.fetch(:ai, "solid") } ] unless s[:unreviewed] }.to_h
+      ai_review: sections.filter_map { |key, s|
+        next if s[:unreviewed]
+        rating = s.key?(:ai) ? s[:ai] : "solid"
+        [ key, rating ? { "rating" => rating, "correct" => "c" } : { "correct" => "c" } ]
+      }.to_h
     )
   end
 
@@ -60,6 +64,28 @@ RSpec.describe RungLedger do
     )
 
     expect(none.held("n_plus_one", "ruby_rails")).to be_nil
+  end
+
+  # record_review! judges a concept by its least favourable section that day
+  # and needs every self-rating favourable; a rung is held on the same terms.
+  it "judges a concept tagged on two sections of one day by the least favourable section" do
+    split = ledger(response_on(Date.current, sections: {
+      "code_review" => { concept: "n_plus_one", rung: "senior" },
+      "pattern"     => { concept: "n_plus_one", rung: "senior", ai: "developing" }
+    }))
+
+    expect(split.held("n_plus_one", "ruby_rails")).to be_nil
+  end
+
+  # A review that stored no rating is no signal, as record_review! treats it,
+  # not an unfavourable one; it neither holds nor releases.
+  it "treats a reviewed section with no rating as no attempt, leaving an earlier verdict standing" do
+    unrated = ledger(
+      response_on(Date.current,     sections: { "code_review" => { concept: "n_plus_one", rung: "senior", ai: nil } }),
+      response_on(Date.current - 2, sections: { "code_review" => { concept: "n_plus_one", rung: "senior" } })
+    )
+
+    expect(unrated.held("n_plus_one", "ruby_rails")).to eq("senior")
   end
 
   it "keeps a shared concept name apart by bucket" do

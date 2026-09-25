@@ -103,7 +103,10 @@ en:
   progress:
     title: "Progress"
     intro: "Which rung you currently hold on each concept, from your reviewed answers. Nothing here is a target: it describes now, and it changes only when a new answer is reviewed."
-    note: "A rung is held when your latest reviewed answer at that pitch was rated just right or too easy by you and solid or strong by the review. Holding a higher rung covers the ones below it. Answers from before rungs were recorded, and sections the prompt was told to ease, are not counted."
+    note: "A rung is held when your latest reviewed answer to a section asked at that rung was rated just right or too easy by you and solid or strong by the review. Holding a higher rung covers the ones below it. Answers from before rungs were recorded, and sections the prompt was told to ease, are not counted. A section's rung is what was asked for: your difficulty ratings can still nudge an unlocked section, and only a lock makes the rung exact."
+    legend:
+      not_yet: "no reviewed answer at any rung yet."
+      not_offered: "every section that could show it is excluded in your exercise mix."
     rungs:
       junior: "junior"
       senior: "senior"

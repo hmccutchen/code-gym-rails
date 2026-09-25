@@ -1,5 +1,5 @@
-# GET /progress — which rung each concept is currently held at, grouped
-# exactly as the Learn tab groups the same concepts. Read-only: every
+# GET /progress — which rung each concept is currently held at, in the
+# buckets and groups the Learn tab uses for the same concepts. Read-only: every
 # standing comes from RungLedger over stored responses and from the user's
 # current section preferences; nothing here writes.
 class ProgressController < ApplicationController
