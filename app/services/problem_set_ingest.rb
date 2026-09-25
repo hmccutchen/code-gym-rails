@@ -175,8 +175,16 @@ class ProblemSetIngest
   # step is load-bearing for correctness — nothing here writes, so no ordering
   # can leave a stray row behind.
   def call
-    reject_missing_sections!
-    warn_unrequested_sections!
+    # Strict pruning is the judged path's rule, not the single-stage path's:
+    # extras come off before a missing planned key is rejected there, while the
+    # historical path keeps its existing missing-then-warn order.
+    if @prune_extras
+      warn_unrequested_sections!
+      reject_missing_sections!
+    else
+      reject_missing_sections!
+      warn_unrequested_sections!
+    end
     reject_unusable_answer_key!
     reject_unusable_problem_statement!
     enforce_fixed_concepts!

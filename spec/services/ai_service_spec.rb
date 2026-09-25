@@ -5350,6 +5350,40 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(calls["pattern"]).to eq(2)
   end
 
+  it "keeps draft ingestion unchanged" do
+    ingest_calls = []
+    allow(ProblemSetIngest).to receive(:call).and_wrap_original do |m, *args, **kw|
+      ingest_calls << kw.slice(:expected_keys, :fixed_concepts, :prune_extras)
+      m.call(*args, **kw)
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    draft_calls = ingest_calls.select { |kw| kw[:fixed_concepts].blank? && kw[:expected_keys].size > 1 }
+
+    expect(draft_calls).to eq([ { expected_keys: %w[code_review pattern challenge plan_review] } ])
+  end
+
+  it "does not replay ingest on an already-built judged parsons_problem set" do
+    allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
+      m.call(*args, **kw).with(third: :parsons_problem)
+    end
+    allow_any_instance_of(FakeService).to receive(:judge_section) { |_, _, kind, _section, **| verdict({ "status" => "keep" }, kind) }
+
+    ingest_orders = []
+    allow(ProblemSetIngest).to receive(:call).and_wrap_original do |m, *args, **kw|
+      result = m.call(*args, **kw)
+      if kw[:expected_keys] == %w[code_review pattern parsons_problem plan_review]
+        ingest_orders << result.problem_set.dig("parsons_problem", "display_order")&.dup
+      end
+      result
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(ingest_orders).to eq([ judged.problem_set.dig("parsons_problem", "display_order") ])
+  end
+
   it "prunes unplanned extras before a dropped third can expose one as delivered" do
     allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
       kind == ExerciseSection::Challenge ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)

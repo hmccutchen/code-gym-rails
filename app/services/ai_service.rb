@@ -966,11 +966,11 @@ class AiService
   # generation and a re-judge each, which put the worst case far past the
   # single call this path replaced, on a schedule that ticks hourly.
   def generate_judged_exercise(user, language: user.language_for_today)
-    draft = draft_exercise(user, language: language, blocking: false, prune_extras: true)
-    # Copied rather than mutated in place, so the draft keeps the concept of
-    # every section — including the ones dropped below, which log_retention
-    # and the unhosted list are named after.
-    set      = draft.problem_set.dup
+    draft = draft_exercise(user, language: language, blocking: false)
+    # Strict pruning happens here, after the draft is built, on a deep copy —
+    # the draft keeps the concept of every section, including the ones dropped
+    # below, which log_retention and the unhosted list are named after.
+    set = draft.problem_set.deep_dup.slice(*draft.kinds.map(&:key))
     outcomes = judge_all(user, draft.kinds, set, draft.difficulty, user.skill_level)
 
     resolve_rejections(user, language, draft, set, outcomes).each do |key, section, outcome|
@@ -1284,7 +1284,7 @@ class AiService
   # query and risk the logged "requested" history silently diverging from what
   # the prompt actually contained if anything changed for this user during the
   # provider call.
-  def draft_exercise(user, language:, blocking:, prune_extras: false)
+  def draft_exercise(user, language:, blocking:)
     plan       = DailyPlan.for(user, language: language)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
@@ -1302,8 +1302,7 @@ class AiService
     ingested = ProblemSetIngest.call(
       parse_json_object(result[:text], subject: "problem set"),
       language: language, expected_keys: kinds.map(&:key), code_review_source: plan.code_review_source,
-      pitched_at: pitched_rungs(difficulty, user.skill_level), eased_for: eased_concepts_for(plan, difficulty),
-      prune_extras: prune_extras
+      pitched_at: pitched_rungs(difficulty, user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
     Draft.new(problem_set: ingested.problem_set, plan: plan, kinds: kinds, difficulty: difficulty,

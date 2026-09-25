@@ -154,6 +154,22 @@ RSpec.describe ProblemSetIngest do
 
       expect(result.problem_set.keys).to contain_exactly("code_review", "pattern")
     end
+
+    it "warns about extras before rejecting a missing planned section in strict mode" do
+      expect(Rails.logger).to receive(:warn).with(include("[unrequested_sections]"))
+
+      expect do
+        described_class.call(
+          {
+            "code_review" => { "concept" => "n_plus_one" },
+            "architecture" => { "concept" => "sync_vs_async" }
+          },
+          language: "ruby_rails",
+          expected_keys: %w[code_review pattern],
+          prune_extras: true
+        )
+      end.to raise_error(AiService::InvalidResponseError, "Provider omitted intended section(s): pattern")
+    end
   end
 
   describe ".selectable_vocabulary_for" do
