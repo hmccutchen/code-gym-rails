@@ -139,6 +139,21 @@ RSpec.describe ProblemSetIngest do
       expect { ingest({ "code_review" => { "concept" => "invented_concept" } }) }
         .not_to change(SuggestedConcept, :count)
     end
+
+    it "prunes sections outside expected keys when requested" do
+      result = described_class.call(
+        {
+          "code_review" => { "concept" => "n_plus_one" },
+          "pattern" => { "concept" => "service_objects" },
+          "architecture" => { "concept" => "sync_vs_async" }
+        },
+        language: "ruby_rails",
+        expected_keys: %w[code_review pattern],
+        prune_extras: true
+      )
+
+      expect(result.problem_set.keys).to contain_exactly("code_review", "pattern")
+    end
   end
 
   describe ".selectable_vocabulary_for" do

@@ -5350,6 +5350,19 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(calls["pattern"]).to eq(2)
   end
 
+  it "prunes unplanned extras before a dropped third can expose one as delivered" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Challenge ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    exercise = DailyExercise.new(problem_set: judged.problem_set, language: "ruby_rails", generated_at: Time.current, date: Date.current)
+
+    expect(judged.dropped_sections).to eq([ "challenge" ])
+    expect(judged.problem_set.keys).to contain_exactly("code_review", "pattern", "plan_review")
+    expect(exercise.active_section_keys).to eq(%w[code_review pattern plan_review])
+  end
+
   # Serially, each rejection costs a full generation plus a re-judge, so three
   # of them would run far past the single generation this path replaced.
   it "resolves two rejections at once rather than one after the other" do

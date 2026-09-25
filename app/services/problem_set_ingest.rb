@@ -53,13 +53,17 @@ class ProblemSetIngest
   # grounded in, or nil for a toy day. `pitched_at` maps each section key to
   # the rung the prompt pitched it at, and `eased_for` to the concepts the
   # prompt was told to ease there; both are server facts stamped into the
-  # sections, and a caller that passes neither gets no stamps. `fixed_concepts`
+  # sections, and a caller that passes neither gets no stamps. `prune_extras`
+  # is the judged path's strict mode: drop provider-added keys before judging
+  # or persistence while the single-stage path keeps logging-only behavior.
+  # `fixed_concepts`
   # maps a section key to the concept a single-section retry demanded — the
   # day's plan already placed that concept there, so a returned section tagging
   # anything else is not a repaired section, it's a wrong one.
-  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
+  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {},
+                prune_extras: false)
     new(problem_set, language: language, expected_keys: expected_keys, code_review_source: code_review_source,
-        pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
+        pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts, prune_extras: prune_extras).call
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -153,7 +157,8 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
+  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {},
+                 prune_extras: false)
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
@@ -161,6 +166,7 @@ class ProblemSetIngest
     @pitched_at         = pitched_at
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
+    @prune_extras       = prune_extras
     @suggested_concepts = []
   end
 
@@ -218,10 +224,10 @@ class ProblemSetIngest
       "#{unrequested.to_json} (intended: #{@expected_keys.to_json})"
     )
 
-    # A single-section retry asked for exactly one key; a provider that
-    # returns the whole set anyway must not smuggle the untouched sections
-    # back in as if they had been regenerated too.
-    unrequested.each { |key| @problem_set.delete(key) } if @fixed_concepts.any?
+    # A judged draft asked for one resolved set, and a single-section retry
+    # asked for exactly one key; either way, the provider's extras are not part
+    # of what this path may judge or persist.
+    @problem_set.slice!(*@expected_keys) if @prune_extras || @fixed_concepts.any?
   end
 
   # Unlike every other step, this one rejects rather than repairs. The planted
