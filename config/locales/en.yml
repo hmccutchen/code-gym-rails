@@ -200,6 +200,8 @@ en:
     history_summary: "%{provider}'s review"
     calibration_note: "You rated this \"%{rating}\" — the review suggests there's more to work on here."
     difficulty_note: "This problem was rated %{level} difficulty, judged from the problem itself rather than from your answer."
+  nav:
+    menu: "Menu"
   profile:
     name:
       saved: "Saved ✓"
