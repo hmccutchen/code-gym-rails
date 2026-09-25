@@ -39,10 +39,13 @@ class ProblemSetIngest
   # grounded in, or nil for a toy day. `pitched_at` maps each section key to
   # the rung the prompt pitched it at, and `eased_for` to the concepts the
   # prompt was told to ease there; both are server facts stamped into the
-  # sections, and a caller that passes neither gets no stamps.
-  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {})
-    new(problem_set, language: language, expected_keys: expected_keys,
-        code_review_source: code_review_source, pitched_at: pitched_at, eased_for: eased_for).call
+  # sections, and a caller that passes neither gets no stamps. `fixed_concepts`
+  # maps a section key to the concept a single-section retry demanded — the
+  # day's plan already placed that concept there, so a returned section tagging
+  # anything else is not a repaired section, it's a wrong one.
+  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
+    new(problem_set, language: language, expected_keys: expected_keys, code_review_source: code_review_source,
+        pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -136,13 +139,14 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {})
+  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
     @code_review_source = code_review_source
     @pitched_at         = pitched_at
     @eased_for          = eased_for
+    @fixed_concepts     = fixed_concepts
     @suggested_concepts = []
   end
 
@@ -155,6 +159,7 @@ class ProblemSetIngest
     warn_unrequested_sections!
     reject_unusable_answer_key!
     reject_unusable_problem_statement!
+    enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
@@ -198,6 +203,11 @@ class ProblemSetIngest
       "[unrequested_sections] provider returned section(s) the day did not intend: " \
       "#{unrequested.to_json} (intended: #{@expected_keys.to_json})"
     )
+
+    # A single-section retry asked for exactly one key; a provider that
+    # returns the whole set anyway must not smuggle the untouched sections
+    # back in as if they had been regenerated too.
+    unrequested.each { |key| @problem_set.delete(key) } if @fixed_concepts.any?
   end
 
   # Unlike every other step, this one rejects rather than repairs. The planted
@@ -258,6 +268,21 @@ class ProblemSetIngest
     end
 
     section["problem_statement"] = statement.truncate(kind::MAX_PROBLEM_STATEMENT_LENGTH)
+  end
+
+  # A single-section retry names the concept the day's plan already placed at
+  # this key — the rejected section's replacement is not free to retag it.
+  # Runs before normalize_concepts!, which would otherwise silently pass a
+  # mismatched concept through (or launder it to "other") rather than let the
+  # caller know the retry didn't do what it was asked.
+  def enforce_fixed_concepts!
+    @fixed_concepts.each do |key, concept|
+      actual = @problem_set.dig(key, "concept")
+      next if actual == concept
+
+      raise AiService::InvalidResponseError,
+            "Retry for #{key} returned concept #{actual.inspect}, not #{concept.inspect}"
+    end
   end
 
   # A provider occasionally invents tags; keep the vocabulary closed so

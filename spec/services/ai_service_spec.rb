@@ -5161,3 +5161,15 @@ RSpec.describe AiService, "#judge_section" do
     expect(captured[:prompt]).not_to include("SECRET")
   end
 end
+
+RSpec.describe AiService, "single-section retry prompt" do
+  let(:user) { User.create!(email: "retry@example.com", name: "R") }
+  it "renders one kind's schema and fixes the concept" do
+    prompt = FakeService.new("fake-key").send(:build_exercise_prompt, user, "ruby_rails",
+                                              third: :challenge, pattern: :pattern, fourth: :plan_review,
+                                              only: ExerciseSection::Challenge, fixed_concept: "memoization")
+    expect(prompt).to include('"challenge": {')
+    expect(prompt).not_to include('"code_review": {')
+    expect(prompt).to include("This section's concept must be exactly `memoization`")
+  end
+end

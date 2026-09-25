@@ -1639,12 +1639,12 @@ class AiService
   # The code-bearing fields' label switches with `language` so instructions
   # never assume Ruby idioms when generating JS — the structure itself never
   # changes across languages.
-  def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review, pattern: :pattern)
+  def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review, pattern: :pattern, only: nil)
     label = config_for(language)[:label]
 
-    sections = ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
-                              .map { |kind| kind.schema_fragment(label: label) }
-                              .join(",\n  ")
+    kinds = only ? [ only ] : ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
+    sections = kinds.map { |kind| kind.schema_fragment(label: label) }
+                    .join(",\n  ")
 
     <<~SCHEMA
       {
@@ -1663,7 +1663,8 @@ class AiService
                             fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
                             code_review_mode: :application_code, code_review_source: nil,
                             scenario_flavor: :general,
-                            difficulty: KindDifficulty.none, ladders: {})
+                            difficulty: KindDifficulty.none, ladders: {},
+                            only: nil, fixed_concept: nil)
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
     else
@@ -1692,7 +1693,11 @@ class AiService
     # from, so guidance, hosting, and schema can never disagree about which
     # kind a slot holds — and a symbol rolled into a slot it can't occupy fails
     # here rather than reaching a kind that has no guidance to give.
-    kinds = ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
+    #
+    # `only`, when given, is a single-section retry: guidance and schema both
+    # shrink to that one kind, while every other block (difficulty, retention,
+    # reinforcement, flavor, mode, source) still renders as it does for a full day.
+    kinds = only ? [ only ] : ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
 
     # Advisory, like every other concept instruction here — the model may ignore it.
     # If real-world hit rate turns out low, the fix is to escalate THIS wording
@@ -1772,6 +1777,14 @@ class AiService
         ""
       end
 
+    # A retry's fixed concept folds onto the end of the Drilled-concepts bullet
+    # rather than its own heredoc line — an empty interpolation on its own line
+    # still renders a blank line, which the byte-for-byte prompt snapshots would
+    # catch on every day that isn't a retry.
+    fixed_concept_line = fixed_concept ?
+      "\n- This section's concept must be exactly `#{fixed_concept}`: it replaces a section that was rejected on wording alone, and the day's plan already placed this concept here." :
+      ""
+
     config = config_for(language)
     label  = config[:label]
     focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
@@ -1825,7 +1838,7 @@ class AiService
       #{domain_modeling_guidance}
       - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
-      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.
+      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line}
       #{retention_block}
       #{established_block}
       #{fourth_retention_block}
@@ -1834,7 +1847,7 @@ class AiService
       - Concepts most recently rated "right level" have no special weighting.
 
       Return JSON matching this schema exactly:
-      #{exercise_schema_for(language, third: third, fourth: fourth, pattern: pattern)}
+      #{exercise_schema_for(language, third: third, fourth: fourth, pattern: pattern, only: only)}
     PROMPT
   end
 

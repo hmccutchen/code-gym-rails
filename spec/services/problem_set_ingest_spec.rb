@@ -862,3 +862,16 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["code_review"]).not_to have_key("eased")
   end
 end
+
+RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
+  let(:set) { { "challenge" => { "question" => "q", "starter_code" => "s", "concept" => "n_plus_one" } } }
+  it "raises when the returned concept is not the fixed one, before normalization can hide it" do
+    expect { described_class.call(set, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "memoization" }) }
+      .to raise_error(AiService::InvalidResponseError, /memoization/)
+  end
+  it "drops sections the retry did not ask for instead of keeping them" do
+    extra = set.merge("pattern" => { "question" => "q", "concept" => "memoization" })
+    result = described_class.call(extra, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }).problem_set
+    expect(result.keys).to eq([ "challenge" ])
+  end
+end
