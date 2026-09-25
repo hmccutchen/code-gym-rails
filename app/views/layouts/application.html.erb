@@ -65,23 +65,43 @@
 
     .container { max-width: 800px; margin: 0 auto; padding: 0 1.5rem; }
 
-    nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
+    /* Positioned, because the collapsed menu below hangs off it. */
+    nav { position: relative; background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
     nav .inner { display: flex; justify-content: space-between; align-items: center; }
-    /* The brand refuses to shrink or wrap: squeezed between the name editor and
-       the links on a phone, it otherwise broke into three lines (the bolt, then
-       "Code", then "Gym"). A browser tab is where that still happens, since the
-       installed app hides the name editor (see the standalone block above). The
-       name editor absorbs the squeeze instead — a truncated name still reads and
-       still edits, a stacked wordmark reads as broken. min-width: 0 all the way
-       down is what lets it: a flex item will not shrink below its content
-       otherwise. */
+    /* The brand refuses to shrink or wrap: squeezed against the name editor in
+       a wide browser tab, it otherwise broke into three lines (the bolt, then
+       "Code", then "Gym"). The name editor absorbs the squeeze instead — a
+       truncated name still reads and still edits, a stacked wordmark reads as
+       broken. min-width: 0 all the way down is what lets it: a flex item will
+       not shrink below its content otherwise. */
     nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
     nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
-    /* Below this the row is too tight for the bolt and the wordmark both, and
-       the wordmark is the half that names the app. */
+    nav .nav-toggle { display: none; }
+
+    /* Below this width the row cannot hold the brand and four destinations at
+       once, so the destinations fold behind the button and the row keeps the
+       brand whole. */
     @media (max-width: 600px) {
-      nav .brand-mark { display: none; }
+      nav .nav-toggle {
+        display: flex; flex-direction: column; justify-content: center; gap: 4px;
+        width: 2.5rem; height: 2.5rem; padding: 0 .6rem; flex-shrink: 0;
+        background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+      }
+      nav .nav-toggle .bar { height: 2px; background: var(--muted); border-radius: 1px; }
+      /* Only .nav-links itself ever carries a display here, never a child: the
+         standalone block above hides the name editor through
+         `nav .nav-links .name-editor`, and any rule of higher specificity in
+         this block would put it back in the installed app. */
+      nav .nav-links { display: none; }
+      nav .nav-links[data-open] {
+        display: flex; flex-direction: column; align-items: stretch; gap: .25rem;
+        position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+        background: var(--surface); border-bottom: 1px solid var(--border);
+        padding: .5rem 1.5rem 1rem;
+      }
+      nav .nav-links[data-open] a { padding: .75rem 0; }
+      nav .nav-links[data-open] .name-editor-input { width: 100%; }
     }
 
     .flash { padding: .75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: .9rem; }
@@ -376,7 +396,12 @@
         <span class="brand"><span class="brand-mark">⚡</span> Code Gym</span>
       <% end %>
       <% if logged_in? %>
-        <div class="nav-links">
+        <button type="button" class="nav-toggle" id="nav-toggle"
+                aria-expanded="false" aria-controls="nav-links"
+                aria-label="<%= t("nav.menu") %>">
+          <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
+        </button>
+        <div class="nav-links" id="nav-links">
           <span class="name-editor">
             <input type="text"
                    id="nav-name-input"
@@ -462,6 +487,42 @@
           <%= link_to "History", history_path %>
           <%= link_to "Account", account_path %>
         </div>
+        <%# Inline script, same convention as the name editor above. The panel's
+            collapsed state is CSS, so above the breakpoint the button is gone
+            and data-open means nothing — nothing here has to undo itself on a
+            resize. %>
+        <script>
+          (function () {
+            const toggle = document.getElementById("nav-toggle");
+            const links  = document.getElementById("nav-links");
+            if (!toggle || !links) return;
+
+            function closeMenu() {
+              links.removeAttribute("data-open");
+              toggle.setAttribute("aria-expanded", "false");
+            }
+
+            toggle.addEventListener("click", (event) => {
+              event.stopPropagation();
+              if (links.hasAttribute("data-open")) { closeMenu(); return; }
+              links.setAttribute("data-open", "");
+              toggle.setAttribute("aria-expanded", "true");
+            });
+
+            document.addEventListener("click", (event) => {
+              if (!links.hasAttribute("data-open")) return;
+              if (links.contains(event.target)) return;
+              closeMenu();
+            });
+
+            document.addEventListener("keydown", (event) => {
+              if (event.key !== "Escape") return;
+              if (!links.hasAttribute("data-open")) return;
+              closeMenu();
+              toggle.focus();
+            });
+          })();
+        </script>
       <% end %>
     </div>
   </nav>
