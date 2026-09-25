@@ -342,7 +342,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   silently, `spec/services/model_routing_spec.rb` fails on a key that no call
   site logs, so a typo cannot quietly route nothing.
 
-  Only `generate_exercise` is routed today: `claude-opus-5-5` at `medium`
+  Two purposes are routed today. `generate_exercise` goes to
+  `claude-opus-5-5` at `medium`
   effort, not `low`, because nothing measures whether `low` holds quality.
   Opus 5.5 replaced Opus 5 on this route because it costs less ($4/$20 per
   million tokens against $5/$25) on the same tokenizer and context; `medium`
@@ -355,6 +356,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   matters less than it would on a request: every generation runs in a job
   under the 300-second `GENERATION_READ_TIMEOUT`, so a slower model makes a
   user who opened an empty dashboard wait longer but does not fail sooner.
+
+  `judge_section` goes to `claude-sonnet-5`, named explicitly even though it
+  is the default route, so usage rows and the comparison tooling agree on what
+  ran. Sonnet first because the judge has to read code carefully and answer in
+  a closed vocabulary, which is where a smaller model's false rejections would
+  show. Haiku 4.5 is the comparison candidate at half the price;
+  `script/compare_models.rb judge` runs one stored day's draft through both,
+  and `judge_fixtures` runs both over the fixture set with its expected
+  verdicts. The route stays on Sonnet until those are read, and moving it is
+  editing one entry.
 
   Review stays on `claude-sonnet-5` pending a comparison with `claude-opus-5-5`,
   and `duck_thread` and `pseudocode_translate` pending one with
@@ -517,6 +528,135 @@ concept-specific difficulty descriptions for future generation, not a new set.
   says so — are the whole guardrail. Entries are appended, never inserted,
   because list order is the never-seen drain order, and a method at exactly
   `MAX_LINES` is left out since the next edit would evict it.
+- **Two-stage generation**: the weekday batch drafts a set, then reads each
+  section back and decides keep, edit or reject
+  (`AiService#generate_judged_exercise`). It exists because two real sections
+  shipped broken in the same way. A `code_review` planted on a Ruby `Thread`
+  needed the engineer to know how threads behave, and a game-flavored one
+  needed to know that render loops are hardware-dependent. In both the missing
+  knowledge was not the tagged concept, so `ConceptReference` — which explains
+  only the tagged concept — had nothing to offer, and the section was
+  unanswerable for a reason no downstream check could see.
+
+  **Cron only.** Judging costs a second provider call per section and a
+  possible third for a retry, so it runs where nobody is waiting:
+  `GenerateDailyExercisesJob#generate_for(user, judge:)` passes `judge: true`
+  from the cron branch alone. The dashboard's on-demand generation and
+  `RegenerateExerciseJob` pass nothing and stay on `#generate_exercise`, the
+  single-stage path, which is unchanged.
+
+  **The judge classifies; it never writes a second draft.**
+  `JUDGE_SYSTEM_PROMPT` states the principle it turns on: "A question may be
+  difficult, unfamiliar, or conceptually demanding. Its difficulty must come
+  from the intended reasoning task, not from unclear wording, missing
+  information, or accidental prerequisites … Never reject a problem for being
+  hard." It may rewrite prose fields and nothing else — never code, schema,
+  options, blocks, the tagged concept, the kind, or any field carrying the
+  planted defect — and it is told not to change the task or the pitch. A
+  creative second pass would be a second generator, with a second set of
+  failures nothing checks.
+
+  **Each kind states its own task**, so the judge measures a giveaway against
+  something concrete rather than a general idea of fairness:
+  `ExerciseSection.judge_task` is the one-sentence task (abstract on the base
+  class, so a new kind fails loudly rather than shipping unjudged),
+  `.discovery?` marks the kinds whose task is to find something hidden
+  (`code_review`, `security_review`, `plan_review`, `parsons_problem`), and
+  `.prose_fields` bounds what may be rewritten. A kind whose task is to name
+  the concept is not rejected for naming it: the prompt says so outright, and
+  "What vulnerability exists in this endpoint?" is the intended framing for a
+  security review.
+
+  **Every deterministic check lives at the boundary, in `JudgeVerdict`.**
+  `STATUSES`, `ISSUE_TYPES` (seven) and `PRINCIPLES` (four) are closed lists;
+  `.parse` refuses a status, issue type or principle outside them, a rewritten
+  field that is not one of the kind's `prose_fields`, a field rewritten to
+  blank, and evidence that does not quote text. `#apply` merges the rewrite
+  over the section, leaving the artifact untouched. Because the code checks
+  all of that, the prompt states only the semantic judgments — the same split
+  `ProblemSetIngest` applies to a problem set.
+
+  **Concept history is deliberately not passed.** The judge sees one section,
+  its concept, its rung and lock state, and the kind's task; no other section,
+  no rationale, no history. That severs the channels a tier could leak
+  through, and it costs something real: the judge cannot know what this user
+  has met, so "unstated prerequisite" is judged against the rung's
+  `KindDifficulty::LEVEL_DEFINITIONS` sentence rather than against the person.
+  The app records nothing about incidental knowledge anyway — whether someone
+  knows what a Thread is was never tracked — so there is no history that would
+  have answered it.
+
+  **A rejection buys one retry, never a loop.** `retry_section` regenerates
+  that kind alone through the same builder and the same ingest —
+  `build_exercise_prompt`'s `only:` restricts the kinds and the schema,
+  `fixed_concept:` adds the line naming the concept the section must carry,
+  and `ProblemSetIngest`'s `fixed_concepts:` enforces it through
+  `enforce_fixed_concepts!` at the boundary. The concept is fixed because the
+  plan placed it: a retry free to choose again could drop a due retention
+  check. The retry is judged once more. A second rejection, or a retry
+  generation that fails for any reason (`[judge_retry_failed]`), drops the
+  section.
+
+  **A drop removes the key after ingest**, so no placeholder exists and every
+  downstream count still derives from `active_section_keys`. The dropped keys
+  persist on `daily_exercises.dropped_sections` (jsonb), and the dashboard
+  says so in one muted line (`dashboard.section_left_out`), which is the only
+  user-facing change.
+
+  **The rotation trade is stated rather than compensated for.** A dropped
+  section still reads as scheduled: `User#recent_exercise_history` puts the
+  dropped keys back into `section_keys`, so `SectionRotation` sees the kind as
+  shown and its staleness does not grow from a delivery failure, and
+  `ExerciseHistoryEntry#dropped` is added back into `SectionCount`'s mean so a
+  drop cannot shrink tomorrow's set. The cost is the reverse of the loop it
+  prevents: a kind the judge keeps rejecting can go unseen for a long time
+  without the starvation guarantee noticing. Nothing in the scheduler
+  compensates, on purpose. Drop rate per kind is read off the
+  `[difficulty_diagnostics]` line's `judge:` entries, which are keyed by
+  section key and carry `dropped: true`; rejection rate per principle comes
+  off `principle` and `retry_principle` in the same entries. That drop rate is
+  the thing to watch, and `pattern` is the likely candidate, since its task is
+  the least stated in the generation prompt.
+
+  **Planned concepts a drop left unhosted are recorded and nothing is
+  rescheduled.** The plan attributes a concept to a section only in the fourth
+  slot, so `unhosted_concepts` decides after the fact the way `log_retention`
+  already decides honored: the dropped section's own concept, matched against
+  what the plan offered as a due check or as reinforcement. It can therefore
+  never name a concept the plan did not offer. The `[retention]` line gains
+  `dropped=key:concept`, so a due check tagged on a dropped section reads as
+  offered rather than honored, and the diagnostics payload gains `unhosted:`.
+
+  **A judge failure never costs the day its set.** When `judge_section`
+  raises, times out, or returns output `JudgeVerdict` refuses, the draft
+  section stands unedited, `fallback` records the reason
+  (`invalid_output`, `timeout`, or the shared error code), and
+  `[judge_fallback]` warns. The judge is never retried.
+
+  **Known leak, reported and left.** The reference disclosure above a section
+  is titled "Reference — <concept>: how it works", which on a discovery kind
+  names what to find before the engineer looks. It is the same leak the judge
+  is told never to flag, because the label already exists outside the section.
+  Fixing it means a neutral summary until the section is answered, which is a
+  change to the reference, not to generation.
+
+  **Cost and latency are estimates.** Against an Opus 5.5 draft and a Sonnet 5
+  judge on a four-section day, the draft is roughly $0.15-0.23; judging adds
+  about $0.03, and one retry with its re-judge about $0.07 more — under a
+  fifth of a normal day, and Haiku would halve the judge's share. Worst case
+  with one retry runs about 55-155 seconds on top of the draft (judge fan-out
+  5-15s, retry 15-40s, re-judge 5-10s), well inside each call's own
+  300-second budget, and the batch is hourly. Both figures assume that token
+  shape and that list price; re-measure against `ApiUsage` rows under
+  `purpose: "judge_section"` rather than re-deriving them.
+
+  **Stage 1 never carried `PLAIN_LANGUAGE_STANDARD`.** The standard is
+  interpolated into the duck, alternates, follow-up, grading and concept
+  reference prompts, and into neither `build_system_prompt` nor
+  `build_exercise_prompt`. So nothing was removed from the draft prompt to
+  make room for the judge: the field bounds it does carry define the artifact
+  or are enforced by ingest, and they stay. Prose quality is the judge's job
+  by assignment, not by subtraction.
 - **Scenario flavor**: the business setting every section's `scenario` is dressed
   in comes from one prompt line, and that line now offers one of two pools
   (`AiService::SCENARIO_POOLS`): the general, job-adjacent `SCENARIO_DOMAINS`
@@ -615,7 +755,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   scaffold fade. It just isn't branded as a visible "rotation", consistent with
   tier state staying invisible everywhere else here.
 - **The fourth slot**: an optional fourth `problem_set` key, alongside `code_review`/`pattern`/the rotating third — `DailyPlan::NO_FOURTH_TRACK` lets a day give it up entirely, and `AiService#fourth_reinforcement_line` reads as nil-able rather than assuming the key is always present. When present, it rotates 50/50 between `plan_review` (review a flawed implementation plan) and `ambiguity_hunt` (list what needs clarifying about a vague feature request). Each has its own closed vocabulary (`AiService::PLAN_REVIEW_CONCEPTS` / `AMBIGUITY_HUNT_CONCEPTS`) and its own `ConceptBucket` — language-independent, like `architecture`, so its mastery/reinforcement history never mixes with a programming-language bucket. `DailyPlan#for` decides the fourth slot's kind and its reinforcement/retention state on a track fully independent of the three-slot one, since the vocabularies can never mix. The slot holds exactly one concept (`DailyPlan::FOURTH_SLOT_CAPACITY`), so reinforcement is truncated to one and gives the slot up entirely when an overdue retention check claims it — never both. `ambiguity_hunt` also returns a hidden `planted_ambiguities` list — the answer key for grading coverage — which must never reach the rendered page, a pre-submission AI context (e.g. the duck thread), or log storage (`AiService#without_answer_key` strips it from the difficulty-diagnostics payload, the one place a whole `problem_set` is serialized); `plan_review`/`ambiguity_hunt`'s `plan_excerpt`/`request` fields are visible on screen and so are safe to include there. Since coverage grading has no meaning without that list, `ProblemSetIngest#reject_unusable_answer_key!` validates it at the provider boundary and raises `InvalidResponseError` when no usable entry came back — but only when `ambiguity_hunt` actually won the fourth slot, since an answer key nothing downstream will read is no reason to discard the rest of the day's sections — the one normalizer that can refuse rather than repair. A *wrong count* is not a failure: `ExerciseSection::AmbiguityHunt::PLANTED_COUNT` is the generator's target, but nothing downstream reads it (the review prompt lists the ambiguities, never counts them), so a short list still grades and rejecting it would discard the rest of a variable-length day over the likeliest deviation an LLM makes on a counted list. Long lists are truncated to `ExerciseSection::AmbiguityHunt::MAX_PLANTED`.
-- **Which sections count**: `DailyExercise#active_section_keys` — code_review plus whichever of pattern/third/fourth today's plan chose, precedence-resolved for third and fourth — is the single authority for "how many sections does this day have." A day holds 2-4 sections; `SectionCount`/`SectionRotation` decide how many and which, but `active_section_keys` is still the one place anything downstream reads the answer. Every denominator (progress bar, `completeness`, history's count, the generation prompt's history line), the numerator (`DailyResponse#answered_sections`, via `DailyResponse#section_keys`), the submit gate, the answer/rating param slices, the duck-thread section guard, and the review fan-out derive from it. Never `problem_set.keys`, and never `answers.keys`: a payload can hold more third- or fourth-shaped keys than the page renders (`FakeService` holds all eight deliberately, and a provider can return an extra alternate), and a regenerated day can leave an answer behind for a section it no longer presents — counting either reports a section count the page never showed.
+- **Which sections count**: `DailyExercise#active_section_keys` — code_review plus whichever of pattern/third/fourth today's plan chose, precedence-resolved for third and fourth — is the single authority for "how many sections does this day have." A day holds 2-4 sections; `SectionCount`/`SectionRotation` decide how many and which, but `active_section_keys` is still the one place anything downstream reads the answer. Every denominator (progress bar, `completeness`, history's count, the generation prompt's history line), the numerator (`DailyResponse#answered_sections`, via `DailyResponse#section_keys`), the submit gate, the answer/rating param slices, the duck-thread section guard, and the review fan-out derive from it. Never `problem_set.keys`, and never `answers.keys`: a payload can hold more third- or fourth-shaped keys than the page renders (`FakeService` holds all eight deliberately, and a provider can return an extra alternate), and a regenerated day can leave an answer behind for a section it no longer presents — counting either reports a section count the page never showed. `active_section_keys` is unchanged by two-stage generation — it reads the delivered set, and a judged day's dropped key is gone from it. `DailyExercise#dropped_sections` is what makes a short judged day distinguishable from a short planned one: the day's shape is in `active_section_keys`, and why it is that shape is in the drop list beside it.
 - **Section kind weight preferences**: a user's stated multiplier
   (`KindPreferences::MULTIPLIERS`, x0.25..x4, default x1) leans
   `SectionRotation#pick_kind`'s weighted roll and nothing else — it is applied
@@ -1337,6 +1477,9 @@ against a `FakeService` (`provider: "fake"`) test user, never a real API key.
 `FakeService` returns every section kind at once rather than the three a real
 provider is asked for, so system specs can't assert which third `DailyPlan`
 chose — cover that in service/job specs instead.
+`FakeService` answers the judge's system prompt with a canned
+`{"status":"keep"}`, so the judged path runs end to end in specs without a
+rejection unless an example stubs `judge_section` itself.
 Running them locally requires a one-time Playwright CLI install — see the
 comment block at the top of `spec/support/system_test_helper.rb` for the
 exact commands. The npm manifests live in `spec/playwright/`, not the repo
@@ -1362,10 +1505,11 @@ always pull in the full suite — is stated once, in
 
 ## File Map
 
-- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read
+- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt and the two-stage path: `#generate_judged_exercise` drafts, fans the judge out a section at a time, retries a rejection once with its concept fixed, drops a second rejection, and logs what happened
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, and rejects an unusable ambiguity-hunt answer key, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
+- `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence is invalid output rather than a judgment. Pure; its specs need no database
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
 - `app/models/kind_preferences.rb` — `KindPreferences`: a user's stated weight and exclusion bias over rotating kinds, as plain values `SectionRotation` takes instead of a `User`, so its specs need no database. `.none` is the untouched default; a stored value outside `MULTIPLIERS` reads back as that default rather than reaching `WeightedRoll`
 - `app/models/kind_difficulty.rb` — `KindDifficulty`: a user's stated difficulty target and lock per section kind, as plain values the same way `KindPreferences` is. A level outside `LEVELS` reads as unset and a lock on an untargeted kind reads as unlocked, so an orphaned lock can never suppress easing the user did not validly choose. `#rung_for` is the rung a kind is pitched at today, target or skill level, and `RUNG_FOR_SKILL_LEVEL` the one reading of the skill scale as rungs
@@ -1376,7 +1520,8 @@ always pull in the full suite — is stated once, in
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt); one class per kind answers which are thirds, which are fourths, which vocabulary they draw from, which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns the language config; it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
-- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it
+- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing valid-output rate, detection per principle, false rejections, edits with their issues, and latency and cost per model from `LIST_PRICE_PER_MILLION`
+- `spec/fixtures/judge/` — eleven stored sections, each stating the verdict it expects, that `ModelComparison#judge_fixtures` reads to compare judge models. Six are broken, one per rejection principle plus the two incidents this feature exists for (the Ruby `Thread` and frame-rate `code_review`s, both `unstated_prerequisite`); five are hard but sound, so a candidate's false rejections are as visible as its detections
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
 - `app/views/responses/_sections.html.erb` / `_section.html.erb` (+ `bodies/`, `answers/`) — the one loop over `DailyExercise#active_section_keys` and the one wrapper every section renders through, in both the answer-form and read-only states. Only the body and the answer area vary per kind, and each kind names its own partial for those (`ExerciseSection.body_partial` / `.answer_partial`), so adding a ninth kind is a body partial, an answer partial if it needs one, two `sections.<key>` locale strings, and whichever facets differ from the defaults — never a new branch in a template.
