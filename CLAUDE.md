@@ -1177,8 +1177,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   chrome. The `apple-` meta tags are not redundant with the manifest — iOS reads
   `display: standalone` only from 17.4. `status-bar-style` is `black`, so
   content stays below the status bar and nothing needs `viewport-fit=cover` or
-  safe-area insets. `public/icon.svg` is the committed source of the icon;
-  `icon.png`, `icon-192.png` and `apple-touch-icon.png` are rasterized from it.
+  safe-area insets. `app/assets/images/logo-outlined-square.png` is the source
+  of every icon; `script/generate_icons.py` rasterizes `favicon.ico` (32px
+  only, since the art turns to mush at 16px), `icon-192.png`, `icon-512.png`,
+  `icon-maskable-512.png` and `apple-touch-icon.png` from it, nearest-neighbor,
+  onto the layout's `--bg`. `logo.png` and `logo-square.png` are the same art
+  without the light outline, unused while every surface the logo sits on is
+  dark.
   Standalone mode itself still needs no service worker — but one is registered
   now, for the daily reminder (see "Push reminders" below); `GET
   /service-worker.js` serves it from the root path, since a worker's scope is
