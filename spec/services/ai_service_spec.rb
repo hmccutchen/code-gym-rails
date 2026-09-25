@@ -5350,10 +5350,11 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(calls["pattern"]).to eq(2)
   end
 
-  it "keeps draft ingestion unchanged" do
+  it "keeps draft ingestion unchanged and prunes the judged set through ProblemSetIngest" do
     ingest_calls = []
+    allow(ProblemSetIngest).to receive(:prune_to_expected_keys).and_call_original
     allow(ProblemSetIngest).to receive(:call).and_wrap_original do |m, *args, **kw|
-      ingest_calls << kw.slice(:expected_keys, :fixed_concepts, :prune_extras)
+      ingest_calls << kw.slice(:expected_keys, :fixed_concepts)
       m.call(*args, **kw)
     end
 
@@ -5361,6 +5362,8 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     draft_calls = ingest_calls.select { |kw| kw[:fixed_concepts].blank? && kw[:expected_keys].size > 1 }
 
+    expect(ProblemSetIngest).to have_received(:prune_to_expected_keys)
+      .with(instance_of(Hash), expected_keys: %w[code_review pattern challenge plan_review])
     expect(draft_calls).to eq([ { expected_keys: %w[code_review pattern challenge plan_review] } ])
   end
 

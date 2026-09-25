@@ -53,17 +53,21 @@ class ProblemSetIngest
   # grounded in, or nil for a toy day. `pitched_at` maps each section key to
   # the rung the prompt pitched it at, and `eased_for` to the concepts the
   # prompt was told to ease there; both are server facts stamped into the
-  # sections, and a caller that passes neither gets no stamps. `prune_extras`
-  # is the judged path's strict mode: drop provider-added keys before judging
-  # or persistence while the single-stage path keeps logging-only behavior.
-  # `fixed_concepts`
+  # sections, and a caller that passes neither gets no stamps. `fixed_concepts`
   # maps a section key to the concept a single-section retry demanded — the
   # day's plan already placed that concept there, so a returned section tagging
   # anything else is not a repaired section, it's a wrong one.
-  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {},
-                prune_extras: false)
+  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
     new(problem_set, language: language, expected_keys: expected_keys, code_review_source: code_review_source,
-        pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts, prune_extras: prune_extras).call
+        pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
+  end
+
+  # The judged path resolves its final set from an already-ingested draft, so
+  # it may only drop unexpected top-level keys — never normalize, scramble, or
+  # mutate that draft in place. A deep dup keeps the judged set independent of
+  # the draft the logs still read.
+  def self.prune_to_expected_keys(problem_set, expected_keys:)
+    problem_set.deep_dup.slice(*expected_keys)
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -157,8 +161,7 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {},
-                 prune_extras: false)
+  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
@@ -166,7 +169,6 @@ class ProblemSetIngest
     @pitched_at         = pitched_at
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
-    @prune_extras       = prune_extras
     @suggested_concepts = []
   end
 
@@ -175,16 +177,8 @@ class ProblemSetIngest
   # step is load-bearing for correctness — nothing here writes, so no ordering
   # can leave a stray row behind.
   def call
-    # Strict pruning is the judged path's rule, not the single-stage path's:
-    # extras come off before a missing planned key is rejected there, while the
-    # historical path keeps its existing missing-then-warn order.
-    if @prune_extras
-      warn_unrequested_sections!
-      reject_missing_sections!
-    else
-      reject_missing_sections!
-      warn_unrequested_sections!
-    end
+    reject_missing_sections!
+    warn_unrequested_sections!
     reject_unusable_answer_key!
     reject_unusable_problem_statement!
     enforce_fixed_concepts!
@@ -232,10 +226,9 @@ class ProblemSetIngest
       "#{unrequested.to_json} (intended: #{@expected_keys.to_json})"
     )
 
-    # A judged draft asked for one resolved set, and a single-section retry
-    # asked for exactly one key; either way, the provider's extras are not part
-    # of what this path may judge or persist.
-    @problem_set.slice!(*@expected_keys) if @prune_extras || @fixed_concepts.any?
+    # A single-section retry asked for exactly one key, so anything else the
+    # provider returned is not part of the repaired section this path may keep.
+    @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys) if @fixed_concepts.any?
   end
 
   # Unlike every other step, this one rejects rather than repairs. The planted

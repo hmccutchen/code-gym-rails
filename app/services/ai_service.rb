@@ -970,7 +970,7 @@ class AiService
     # Strict pruning happens here, after the draft is built, on a deep copy —
     # the draft keeps the concept of every section, including the ones dropped
     # below, which log_retention and the unhosted list are named after.
-    set = draft.problem_set.deep_dup.slice(*draft.kinds.map(&:key))
+    set = ProblemSetIngest.prune_to_expected_keys(draft.problem_set, expected_keys: draft.kinds.map(&:key))
     outcomes = judge_all(user, draft.kinds, set, draft.difficulty, user.skill_level)
 
     resolve_rejections(user, language, draft, set, outcomes).each do |key, section, outcome|

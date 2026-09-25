@@ -139,36 +139,26 @@ RSpec.describe ProblemSetIngest do
       expect { ingest({ "code_review" => { "concept" => "invented_concept" } }) }
         .not_to change(SuggestedConcept, :count)
     end
+  end
 
-    it "prunes sections outside expected keys when requested" do
-      result = described_class.call(
-        {
-          "code_review" => { "concept" => "n_plus_one" },
-          "pattern" => { "concept" => "service_objects" },
-          "architecture" => { "concept" => "sync_vs_async" }
+  describe ".prune_to_expected_keys" do
+    it "returns a deep-duped set containing only the expected keys" do
+      drafted = {
+        "code_review" => { "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "concept" => "memoization",
+          "blocks" => [ "one", "two", "three", "four" ],
+          "display_order" => [ 1, 3, 2, 0 ]
         },
-        language: "ruby_rails",
-        expected_keys: %w[code_review pattern],
-        prune_extras: true
-      )
+        "architecture" => { "concept" => "sync_vs_async" }
+      }
 
-      expect(result.problem_set.keys).to contain_exactly("code_review", "pattern")
-    end
+      pruned = described_class.prune_to_expected_keys(drafted, expected_keys: %w[code_review parsons_problem])
+      pruned["parsons_problem"]["display_order"] << 4
 
-    it "warns about extras before rejecting a missing planned section in strict mode" do
-      expect(Rails.logger).to receive(:warn).with(include("[unrequested_sections]"))
-
-      expect do
-        described_class.call(
-          {
-            "code_review" => { "concept" => "n_plus_one" },
-            "architecture" => { "concept" => "sync_vs_async" }
-          },
-          language: "ruby_rails",
-          expected_keys: %w[code_review pattern],
-          prune_extras: true
-        )
-      end.to raise_error(AiService::InvalidResponseError, "Provider omitted intended section(s): pattern")
+      expect(pruned.keys).to contain_exactly("code_review", "parsons_problem")
+      expect(drafted.keys).to contain_exactly("code_review", "parsons_problem", "architecture")
+      expect(drafted.dig("parsons_problem", "display_order")).to eq([ 1, 3, 2, 0 ])
     end
   end
 
