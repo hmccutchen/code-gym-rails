@@ -3,13 +3,9 @@
 # builds an unsaved DailyResponse, so opening the page and leaving without
 # touching anything looks identical here.
 #
-# `delivered_section_keys` is the delivered set, derived from
-# DailyExercise#active_section_keys. SectionRotation still needs the scheduled
-# set, so `section_keys` keeps the dropped keys alongside the delivered ones.
-#
-# `dropped` counts sections the judge removed that day. They sit inside
-# section_keys so rotation reads them as scheduled — a delivery failure must
-# not grow a kind's staleness. SectionCount adds them to `answered`, but the
-# day's credit never exceeds the delivered set, so a day that lost more
-# sections than the engineer left unanswered can still shorten tomorrow.
+# `delivered_section_keys` is DailyExercise#active_section_keys, the sections
+# the engineer was shown. `section_keys` adds the dropped keys to it, so
+# SectionRotation reads a dropped kind as scheduled — a delivery failure must
+# not grow a kind's staleness. `dropped` counts those keys; how much of it
+# SectionCount credits is decided there, in credited_sections.
 ExerciseHistoryEntry = Data.define(:section_keys, :delivered_section_keys, :answered, :dropped)

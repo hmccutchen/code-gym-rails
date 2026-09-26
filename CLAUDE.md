@@ -622,13 +622,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   delivered (`active_section_keys`), so a drop cannot count as finishing
   sections the engineer never saw. That cap means a drop can still shorten
   tomorrow: three planned four-section days that each delivered two sections
-  contribute at most two apiece, and the next day gets three sections. Within
-  the cap, a drop fills in unanswered delivered sections, so on a day that lost
-  one section, answering two of the three delivered counts the same as
-  answering all three (#215). The cost of the rotation trade is the reverse of the loop it
-  prevents: a kind the judge keeps rejecting can go unseen for a long time
-  without the starvation guarantee noticing. Nothing in the scheduler
-  compensates, on purpose. Drop rate per kind is read off the
+  contribute at most two apiece, so the next day gets at most three sections.
+  Within the cap, a drop fills in unanswered delivered sections, so on a day
+  that lost one section, answering two of the three delivered counts the same
+  as answering all three (#215). The cost of the rotation trade is the reverse
+  of the loop it prevents: a kind the judge keeps rejecting can go unseen for
+  a long time without the starvation guarantee noticing. Nothing in the
+  scheduler compensates, on purpose. Drop rate per kind is read off the
   `[difficulty_diagnostics]` line's `judge:` entries, which are keyed by
   section key and carry `dropped: true`; rejection rate per principle comes
   off `principle` and `retry_principle` in the same entries, each with the
