@@ -213,14 +213,14 @@ class ExerciseSection
     end
 
     # ── What the judge measures against ─────────────────────────────────────
-    # judge_task, discovery?, and prose_fields are read by the review-time
-    # judge that checks a generated section's prose for a reasoning failure —
-    # never by generation or grading. judge_task is the one-sentence yardstick
-    # it measures a structural giveaway against; discovery? marks a kind whose
-    # task is to find something hidden, so naming where it is defeats the task
-    # (the rest legitimately name the concept); prose_fields bounds which
-    # fields the judge may rewrite to everything but the artifact (snippet,
-    # options, blocks, and the like).
+    # judge_task, discovery?, and prose_fields are read only by the judge that
+    # checks each drafted section on the weekday batch (AiService#judge_section),
+    # never by the draft prompt or by grading. judge_task is the one-sentence
+    # yardstick it measures a structural giveaway against; discovery? marks a
+    # kind whose task is to find something hidden, so naming where it is
+    # defeats the task (the rest legitimately name the concept); prose_fields
+    # bounds which fields the judge may rewrite to everything but the artifact
+    # (snippet, options, blocks, and the like).
 
     # Abstract rather than defaulted: a new kind with no stated task should
     # fail loudly rather than ship with a task the judge silently never checks.

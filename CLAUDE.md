@@ -921,9 +921,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   are stripped from every section first. A drilled concept at reduced tier is
   annotated `(reduced, drilled)`, and the prompt's easing rule names that form
   too, so its `eased` stamp records what was actually asked. Neither stamp
-  reaches a prompt, the review or the duck — `ProblemSetIngest::SERVER_STAMPS`
-  is the list every serialization of a whole section strips, so a stamp cannot
-  leak into one by being added later. The Progress page does read them, which
+  reaches a prompt, the review or the duck. Those build their text from named
+  fields, and the judge, the one prompt that serializes a whole section,
+  strips every `ProblemSetIngest::SERVER_STAMPS` field first. The
+  diagnostics log serializes whole sections too and keeps the stamps, since
+  it is read by a person rather than a model. The Progress page does read them, which
   is what they were written for: it says which rung a concept is held at from
   stored evidence rather than from the diagnostics log, where the pitch level
   lived before. Sections generated
