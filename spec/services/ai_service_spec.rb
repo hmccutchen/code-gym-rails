@@ -226,11 +226,11 @@ RSpec.describe AiService do
     # out of the guarantee while the empty-history assertion still passes on
     # whatever is left.
     it "reaches the provider with no conversational history, from every one of them" do
-      calls = []
+      histories = []
       spy_class = Class.new(double_class) do
         define_method(:call) do |system:, prompt:, cache_system: false,
                                  read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil|
-          calls << [ purpose, history ]
+          histories << history
           super(system: system, prompt: prompt, cache_system: cache_system,
                 read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
         end
@@ -280,8 +280,8 @@ RSpec.describe AiService do
                  rung: "senior", locked: false)
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
-      expect(calls.map(&:first)).to include(*SINGLE_SHOT_PURPOSES)
-      expect(calls.select { |purpose, _history| SINGLE_SHOT_PURPOSES.include?(purpose) }.map(&:last)).to all(be_empty)
+      expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size + 1)
+      expect(histories).to all(be_empty)
     end
   end
 

@@ -342,8 +342,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   silently, `spec/services/model_routing_spec.rb` fails on a key that no call
   site logs, so a typo cannot quietly route nothing.
 
-  Two purposes are routed today. `generate_exercise` goes to
-  `claude-opus-5-5` at `medium`
+  `generate_exercise` goes to `claude-opus-5-5` at `medium`
   effort, not `low`, because nothing measures whether `low` holds quality.
   Opus 5.5 replaced Opus 5 on this route because it costs less ($4/$20 per
   million tokens against $5/$25) on the same tokenizer and context; `medium`
@@ -356,6 +355,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   matters less than it would on a request: every generation runs in a job
   under the 300-second `GENERATION_READ_TIMEOUT`, so a slower model makes a
   user who opened an empty dashboard wait longer but does not fail sooner.
+  `retry_section` is billed separately, but it uses the same route on each
+  provider, because it is a narrower generation call rather than a different
+  kind of work.
 
   `judge_section` goes to `claude-sonnet-5`, named explicitly even though it
   is the default route, so usage rows and the comparison tooling agree on what
@@ -391,7 +393,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   byte-identical. Two specs hold that jointly, because neither can alone —
   `spec/services/provider_request_characterization_spec.rb` pins that an empty
   history serializes to the same body as before at the `#call` boundary, and
-  `ai_service_spec`'s "single-shot purposes" group drives the six other public
+  `ai_service_spec`'s "single-shot purposes" group drives the other public
   entry points and asserts the history each one reaches `#call` with is empty.
   **`duck_response` passes `cache_system: true`; the other conversational
   caller does not.** Counted with `count_tokens` against `claude-sonnet-5`
