@@ -13,7 +13,7 @@ class ClaudeService < AiService
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" },
     "judge_section"     => { model: "claude-sonnet-5" }
-  }.freeze
+  }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
   # headroom-heavy cap costs nothing on the common case. It has to clear the

@@ -1498,7 +1498,7 @@ class AiService
   # budget too (see RETRY_READ_TIMEOUT). Failure is a drop, never a raised set.
   def retry_section(user, language, draft, kind, concept)
     result = call_and_log(
-      user, purpose: "generate_exercise", read_timeout: RETRY_READ_TIMEOUT,
+      user, purpose: "retry_section", read_timeout: RETRY_READ_TIMEOUT,
       system: build_system_prompt(language),
       prompt: build_exercise_prompt(user, language, **draft.prompt_options, only: kind, fixed_concept: concept)
     )

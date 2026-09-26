@@ -195,6 +195,7 @@ RSpec.describe AiService do
   describe "single-shot purposes" do
     SINGLE_SHOT_PURPOSES = %w[
       generate_exercise
+      retry_section
       review_response
       assess_difficulty
       generate_concept_reference
@@ -225,11 +226,11 @@ RSpec.describe AiService do
     # out of the guarantee while the empty-history assertion still passes on
     # whatever is left.
     it "reaches the provider with no conversational history, from every one of them" do
-      histories = []
+      calls = []
       spy_class = Class.new(double_class) do
         define_method(:call) do |system:, prompt:, cache_system: false,
                                  read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil|
-          histories << history
+          calls << [ purpose, history ]
           super(system: system, prompt: prompt, cache_system: cache_system,
                 read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
         end
@@ -257,6 +258,10 @@ RSpec.describe AiService do
       }.to_json
 
       spy_class.new(canned_text: full_problem_set.to_json).generate_exercise(user)
+      retry_draft = spy_class.new(canned_text: full_problem_set.to_json)
+                            .send(:draft_exercise, user, language: "ruby_rails", blocking: false)
+      spy_class.new(canned_text: { "pattern" => FakeService::EXERCISE_PROBLEM_SET["pattern"].deep_dup }.to_json)
+               .send(:retry_section, user, "ruby_rails", retry_draft, ExerciseSection::Pattern, "service_objects")
       spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
       spy_class.new(canned_text: reference_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
       spy_class.new(canned_text: "Another framing.")
@@ -275,8 +280,8 @@ RSpec.describe AiService do
                  rung: "senior", locked: false)
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
-      expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size)
-      expect(histories).to all(be_empty)
+      expect(calls.map(&:first)).to include(*SINGLE_SHOT_PURPOSES)
+      expect(calls.select { |purpose, _history| SINGLE_SHOT_PURPOSES.include?(purpose) }.map(&:last)).to all(be_empty)
     end
   end
 
@@ -5539,16 +5544,40 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
       kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
     end
-    timeouts = []
+    timeouts = {}
     allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
-      timeouts << kw[:read_timeout] if kw[:purpose] == "generate_exercise"
+      if %w[generate_exercise retry_section].include?(kw[:purpose])
+        timeouts[kw[:purpose]] = kw[:read_timeout]
+      end
       m.call(*args, **kw)
     end
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
-    expect(timeouts).to eq([ AiService::GENERATION_READ_TIMEOUT, AiService::RETRY_READ_TIMEOUT ])
+    expect(timeouts).to eq(
+      "generate_exercise" => AiService::GENERATION_READ_TIMEOUT,
+      "retry_section"     => AiService::RETRY_READ_TIMEOUT
+    )
     expect(AiService::RETRY_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
+  end
+
+  it "records a retry separately from the initial draft" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::Pattern
+
+      calls[kind.key] += 1
+      if calls[kind.key] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    expect {
+      FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    }.to change { ApiUsage.where(purpose: "retry_section").count }.by(1)
+      .and change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
   end
 
   # Nothing else distinguishes an anchored section: the outcomes hash the

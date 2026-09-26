@@ -4,10 +4,14 @@ require "faraday/retry"
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
-  # Keyed by the ApiUsage purpose string, like ClaudeService's. No purpose is
-  # routed off the default yet.
+  # Keyed by the ApiUsage purpose string, like ClaudeService's. Generation and
+  # its single-section retry share the default route explicitly so route
+  # coverage can pin both usage labels.
   DEFAULT_ROUTE = { model: "gemini-3.5-flash" }.freeze
-  MODEL_FOR_PURPOSE = {}.freeze
+  MODEL_FOR_PURPOSE = {
+    "generate_exercise" => DEFAULT_ROUTE,
+    "retry_section"     => DEFAULT_ROUTE
+  }.freeze
 
   # The default model thinks at "medium" effort unless told otherwise, and
   # thinking tokens are generated into — and billed as — the same output budget
