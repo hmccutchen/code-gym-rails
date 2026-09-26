@@ -284,9 +284,10 @@ class User < ApplicationRecord
       .order(date: :desc)
       .limit(limit)
       .map do |exercise|
+        delivered = exercise.active_section_keys
         ExerciseHistoryEntry.new(
-          section_keys:           exercise.active_section_keys + exercise.dropped_sections,
-          delivered_section_keys: exercise.active_section_keys,
+          section_keys:           delivered + exercise.dropped_sections,
+          delivered_section_keys: delivered,
           answered:               exercise.daily_response&.answered_sections&.size,
           dropped:                exercise.dropped_sections.size
         )

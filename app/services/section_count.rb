@@ -19,11 +19,17 @@ class SectionCount
     window = capped_window(history)
     return ceiling if window.size < MIN_SESSIONS
 
-    mean = window.sum { |entry| [ entry.answered.to_i + entry.dropped.to_i, entry.delivered_section_keys.to_a.size ].min }
-      .fdiv(window.size)
+    mean = window.sum { |entry| credited_sections(entry) }.fdiv(window.size)
 
     (mean.round + STRETCH).clamp(FLOOR, ceiling)
   end
+
+  # A drop is credited so it does not read as a skip, but never past what was
+  # delivered, so it cannot claim completion of sections nobody saw.
+  def self.credited_sections(entry)
+    [ entry.answered.to_i + entry.dropped, entry.delivered_section_keys.size ].min
+  end
+  private_class_method :credited_sections
 
   def self.ceiling
     ExerciseSection.slot_count

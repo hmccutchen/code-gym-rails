@@ -9,7 +9,7 @@
 #
 # `dropped` counts sections the judge removed that day. They sit inside
 # section_keys so rotation reads them as scheduled — a delivery failure must
-# not grow a kind's staleness — and SectionCount credits them only up to what
-# the engineer actually saw, so a drop neither shortens tomorrow nor invents
-# completion.
+# not grow a kind's staleness. SectionCount adds them to `answered`, but the
+# day's credit never exceeds the delivered set, so a day that lost more
+# sections than the engineer left unanswered can still shorten tomorrow.
 ExerciseHistoryEntry = Data.define(:section_keys, :delivered_section_keys, :answered, :dropped)

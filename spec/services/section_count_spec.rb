@@ -69,7 +69,14 @@ RSpec.describe SectionCount do
       expect(described_class.for([ capped, capped, capped ])).to eq(3)
     end
 
-    it "adds a delivered drop back to the answered count so a drop neither shortens tomorrow nor reads as a skip" do
+    it "can shorten tomorrow when more sections were dropped than the engineer left unanswered" do
+      half_delivered = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern], answered: 2, dropped: 2)
+
+      expect(described_class.for([ half_delivered, half_delivered, half_delivered ])).to eq(3)
+    end
+
+    it "credits a drop against an unanswered delivered section, so it does not read as a skip" do
       full  = exercise_history_entry(section_keys: %w[code_review pattern challenge],
         delivered_section_keys: %w[code_review pattern challenge],
         answered: 3, dropped: 0)
