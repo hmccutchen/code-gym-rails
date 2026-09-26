@@ -9,8 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>Code Gym</title>
   <link rel="manifest" href="<%= pwa_manifest_path %>">
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="icon" href="/icon-192.png" type="image/png">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
   <%# iOS reads the manifest's display:standalone only from 17.4, so
       apple-mobile-web-app-capable is what actually drops Safari's address bar,
       reload and "aA" buttons on a home-screen launch; mobile-web-app-capable is
@@ -67,14 +66,19 @@
 
     /* Positioned, because the collapsed menu below hangs off it. */
     nav { position: relative; background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
-    nav .inner { display: flex; justify-content: space-between; align-items: center; }
+    /* Wider than the page column, so on a desktop the brand sits apart from
+       the links instead of crowding them inside the same 800px. */
+    nav .inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; }
     /* The brand refuses to shrink or wrap: squeezed against the name editor in
        a wide browser tab, it otherwise broke into three lines (the bolt, then
        "Code", then "Gym"). The name editor absorbs the squeeze instead — a
        truncated name still reads and still edits, a stacked wordmark reads as
        broken. min-width: 0 all the way down is what lets it: a flex item will
        not shrink below its content otherwise. */
-    nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+    nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 2rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+    /* The alt text names the link, which is why the wordmark beside it is
+       hidden from screen readers. */
+    nav .brand-mark { height: 5rem; width: 7rem; }
     nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
     nav .nav-toggle { display: none; }
@@ -390,10 +394,11 @@
   <% unless content_for?(:hide_nav) %>
   <nav>
     <div class="container inner">
+      <% brand = capture do %><%= image_tag "logo-outlined.png", alt: "Code Gym", class: "brand-mark", width: 930, height: 654 %><span aria-hidden="true">Code Gym</span><% end %>
       <% if logged_in? %>
-        <%= link_to root_path, class: "brand" do %><span class="brand-mark">⚡</span> Code Gym<% end %>
+        <%= link_to brand, root_path, class: "brand" %>
       <% else %>
-        <span class="brand"><span class="brand-mark">⚡</span> Code Gym</span>
+        <span class="brand"><%= brand %></span>
       <% end %>
       <% if logged_in? %>
         <button type="button" class="nav-toggle" id="nav-toggle"
