@@ -181,6 +181,33 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.last_generation_error).to be_nil
   end
 
+  it "judges on the cron path and records dropped sections" do
+    judged_set = AiService::JudgedSet.new(
+      problem_set:      { "code_review" => { "question" => "q", "concept" => "n_plus_one" } },
+      dropped_sections: [ "pattern" ],
+      outcomes:         {}
+    )
+    fake_service = instance_double(ClaudeService, generate_judged_exercise: judged_set)
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+    travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+      described_class.new.perform
+      exercise = DailyExercise.find_by(user: user, date: Date.current)
+      expect(exercise.dropped_sections).to eq([ "pattern" ])
+    end
+  end
+
+  it "does not judge on the on-demand path" do
+    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    expect(fake_service).not_to receive(:generate_judged_exercise)
+
+    described_class.new.perform(user_id: user.id)
+
+    exercise = DailyExercise.find_by(user: user, date: Date.current)
+    expect(exercise.dropped_sections).to eq([])
+  end
+
   it "skips an anonymized user on the on-demand path" do
     user.anonymize!
     expect(AiService).not_to receive(:for)
@@ -192,7 +219,8 @@ RSpec.describe GenerateDailyExercisesJob do
 
   describe "hourly batch (no user_id), zone-gated" do
     def stub_generation_for(u)
-      svc = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {})
+      svc = instance_double(ClaudeService, generate_judged_exercise: judged_set, generate_exercise: { "code_review" => {} })
       allow(AiService).to receive(:for).with(u).and_return(svc)
     end
 
@@ -274,7 +302,8 @@ RSpec.describe GenerateDailyExercisesJob do
 
   describe "the push reminder" do
     def stub_generation_for(u)
-      svc = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
+      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {})
+      svc = instance_double(ClaudeService, generate_judged_exercise: judged_set, generate_exercise: { "code_review" => {} })
       allow(AiService).to receive(:for).with(u).and_return(svc)
     end
 
@@ -312,7 +341,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
     it "does not enqueue when the provider failed and no set exists" do
       svc = instance_double(ClaudeService)
-      allow(svc).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
+      allow(svc).to receive(:generate_judged_exercise).and_raise(AiService::Error, "boom")
       allow(AiService).to receive(:for).with(pac).and_return(svc)
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do

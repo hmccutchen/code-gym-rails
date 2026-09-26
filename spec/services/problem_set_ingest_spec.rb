@@ -141,6 +141,27 @@ RSpec.describe ProblemSetIngest do
     end
   end
 
+  describe ".prune_to_expected_keys" do
+    it "returns a deep-duped set containing only the expected keys" do
+      drafted = {
+        "code_review" => { "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "concept" => "memoization",
+          "blocks" => [ "one", "two", "three", "four" ],
+          "display_order" => [ 1, 3, 2, 0 ]
+        },
+        "architecture" => { "concept" => "sync_vs_async" }
+      }
+
+      pruned = described_class.prune_to_expected_keys(drafted, expected_keys: %w[code_review parsons_problem])
+      pruned["parsons_problem"]["display_order"] << 4
+
+      expect(pruned.keys).to contain_exactly("code_review", "parsons_problem")
+      expect(drafted.keys).to contain_exactly("code_review", "parsons_problem", "architecture")
+      expect(drafted.dig("parsons_problem", "display_order")).to eq([ 1, 3, 2, 0 ])
+    end
+  end
+
   describe ".selectable_vocabulary_for" do
     # Parsons grades by positional diff against one correct sequence, and
     # neither the data-modeling nor the meta-skill concepts are sequential —
@@ -826,6 +847,18 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["architecture"]).not_to have_key("eased")
   end
 
+  # Only the judge path may say a section was shipped after being rejected,
+  # and only a grounded code_review carries a real excerpt's trace.
+  it "strips a provider-written anchor marker and a stray source trace" do
+    set = problem_set.deep_dup
+    set["pattern"].merge!("anchored" => true, "source" => "forged-trace")
+
+    result = ingest(set, pitched_at: { "code_review" => "junior", "pattern" => "junior" })
+
+    expect(result["pattern"]).not_to have_key("anchored")
+    expect(result["pattern"]).not_to have_key("source")
+  end
+
   it "marks a section eased only when its concept is one the prompt was told to ease there" do
     result = ingest(problem_set, pitched_at: { "code_review" => "senior", "pattern" => "senior" },
                                  eased_for: { "code_review" => [ "n_plus_one" ], "pattern" => [ "n_plus_one" ] })
@@ -860,5 +893,24 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
 
     expect(result["code_review"]).not_to have_key("pitched_at")
     expect(result["code_review"]).not_to have_key("eased")
+  end
+end
+
+RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
+  let(:set) { { "challenge" => { "question" => "q", "starter_code" => "s", "concept" => "n_plus_one" } } }
+  it "raises when the returned concept is not the fixed one, before normalization can hide it" do
+    expect { described_class.call(set, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "memoization" }) }
+      .to raise_error(AiService::InvalidResponseError, /memoization/)
+  end
+  it "rejects a retry tagged with any different concept when n_plus_one was fixed" do
+    mismatch = { "challenge" => set.fetch("challenge").merge("concept" => "memoization") }
+
+    expect { described_class.call(mismatch, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }) }
+      .to raise_error(AiService::InvalidResponseError, /n_plus_one/)
+  end
+  it "drops sections the retry did not ask for instead of keeping them" do
+    extra = set.merge("pattern" => { "question" => "q", "concept" => "memoization" })
+    result = described_class.call(extra, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }).problem_set
+    expect(result.keys).to eq([ "challenge" ])
   end
 end

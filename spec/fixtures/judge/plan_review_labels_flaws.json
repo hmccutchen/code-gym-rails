@@ -1,0 +1,19 @@
+{
+  "kind": "plan_review",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "reasoning_failure",
+  "section": {
+    "title": "Migrating notification sends to background jobs",
+    "scenario": "moving synchronous email sends to a job queue",
+    "plan_excerpt": "1. Wrap NotificationMailer.deliver_now calls in a Sidekiq job (this step is wrong — deliver_now still blocks if the job itself waits on it, which contradicts the async pattern used everywhere else in this app).\n2. While we're in there, also add a new admin dashboard for viewing send history (this is scope creep beyond the migration).\n3. Silently drop any notification whose recipient no longer exists, instead of raising (this quietly changes current behavior, which raises and alerts on-call today).",
+    "question": "What would you push back on before approving this plan?",
+    "answer_scaffold": [
+      "What's wrong:",
+      "What you'd push back on before approving:"
+    ],
+    "teaching_note": "Read each step for whether it does only what the migration needs.",
+    "concept": "contradicts_existing_pattern"
+  }
+}

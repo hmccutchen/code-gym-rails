@@ -292,6 +292,8 @@ class FakeService < AiService
         PSEUDOCODE_CRITIQUE.to_json
       when /TRANSCRIBER, not a reviewer/
         PSEUDOCODE_TRANSLATION
+      when /checking one section of a generated coding exercise/
+        { "status" => "keep" }.to_json
       else
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end

@@ -63,7 +63,9 @@ class DailyExercise < ApplicationRecord
   # reads the payload, not the plan — the plan is gone by the time anything
   # asks — so a section the provider added unasked for still counts here if it
   # resolves (ProblemSetIngest logs that case; see warn_unrequested_sections!).
-  # A day holds 2-4 of them.
+  # A planned day holds 2-4 of them, and a judged one can hold fewer: every
+  # kind but code_review is droppable, so a day the judge rejected its way
+  # through can arrive with code_review alone.
   #
   # NOT `problem_set.keys`. A payload can hold more than one third- or
   # fourth-shaped key — FakeService persists all eight deliberately, and a real

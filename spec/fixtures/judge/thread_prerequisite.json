@@ -1,0 +1,15 @@
+{
+  "kind": "code_review",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "unstated_prerequisite",
+  "section": {
+    "question": "This class avoids repeating an expensive lookup for a key it's already computed. What's the issue and how would you fix it?",
+    "snippet": "class ExpensiveLookupCache\n  def initialize\n    @cache = {}\n  end\n\n  def fetch(key)\n    return @cache[key] if @cache.key?(key)\n    @cache[key] = ExpensiveLookup.call(key)\n  end\n\n  def warm(keys)\n    keys.each { |key| Thread.new { fetch(key) } }\n  end\nend\n\ncache = ExpensiveLookupCache.new\ncache.warm([\"us\", \"uk\", \"us\", \"de\", \"us\"])",
+    "teaching_note": "Look at what warm actually does when it hands several keys to fetch at once.",
+    "concept": "memoization",
+    "scenario": "a currency-conversion rate cache warmed at boot",
+    "diagram": ""
+  }
+}

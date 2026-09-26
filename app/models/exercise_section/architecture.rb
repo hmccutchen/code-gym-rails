@@ -21,6 +21,10 @@ class ExerciseSection::Architecture < ExerciseSection
     false
   end
 
+  def self.judge_task
+    "Choose between the presented options and justify the choice against their tradeoffs."
+  end
+
   def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The third section is an ARCHITECTURE decision, not a coding task. Present 2-3 viable options and ask for a decision plus justification. Its reference must center on tradeoffs (plural).

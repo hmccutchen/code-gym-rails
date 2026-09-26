@@ -22,6 +22,20 @@ class ProblemSetIngest
   # must never carry it.
   ANSWER_KEY_FIELD = "planted_ambiguities".freeze
 
+  # Facts about a section that the server knows and the provider does not: the
+  # rung asked for, whether the prompt was told to ease it, which real excerpt
+  # it was grounded in, and whether the judge rejected it twice and it shipped
+  # anyway. A provider copy of any of them is stripped from every section on
+  # every call, so none can be forged. `anchored` is stamped after ingest, by
+  # the judged path, and is listed here because the strip is the guarantee.
+  #
+  # They describe how the section was made, not what it asks, so nothing that
+  # serializes a section to a model may include them — AiService#judge_section
+  # reads this list for exactly that. `current_schema` is server-owned too and
+  # deliberately absent: it is the table the engineer is shown, and the judge
+  # has to read it to tell whether the question is answerable.
+  SERVER_STAMPS = %w[pitched_at eased source anchored].freeze
+
   # Upper bound on a section's Mermaid `diagram`. The prompt asks for at most
   # 8 nodes with short labels, which lands well under half this — so the bound
   # rejects runaway output without rejecting anything actually asked for.
@@ -39,10 +53,21 @@ class ProblemSetIngest
   # grounded in, or nil for a toy day. `pitched_at` maps each section key to
   # the rung the prompt pitched it at, and `eased_for` to the concepts the
   # prompt was told to ease there; both are server facts stamped into the
-  # sections, and a caller that passes neither gets no stamps.
-  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {})
-    new(problem_set, language: language, expected_keys: expected_keys,
-        code_review_source: code_review_source, pitched_at: pitched_at, eased_for: eased_for).call
+  # sections, and a caller that passes neither gets no stamps. `fixed_concepts`
+  # maps a section key to the concept a single-section retry demanded — the
+  # day's plan already placed that concept there, so a returned section tagging
+  # anything else is not a repaired section, it's a wrong one.
+  def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
+    new(problem_set, language: language, expected_keys: expected_keys, code_review_source: code_review_source,
+        pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
+  end
+
+  # The judged path resolves its final set from an already-ingested draft, so
+  # it may only drop unexpected top-level keys — never normalize, scramble, or
+  # mutate that draft in place. A deep dup keeps the judged set independent of
+  # the draft the logs still read.
+  def self.prune_to_expected_keys(problem_set, expected_keys:)
+    problem_set.deep_dup.slice(*expected_keys)
   end
 
   # ── Two lookups, deliberately not one ────────────────────────────────────
@@ -136,13 +161,14 @@ class ProblemSetIngest
   end
   private_class_method :language_config
 
-  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {})
+  def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
     @code_review_source = code_review_source
     @pitched_at         = pitched_at
     @eased_for          = eased_for
+    @fixed_concepts     = fixed_concepts
     @suggested_concepts = []
   end
 
@@ -153,14 +179,16 @@ class ProblemSetIngest
   def call
     reject_missing_sections!
     warn_unrequested_sections!
+    prune_retry_extras!
     reject_unusable_answer_key!
     reject_unusable_problem_statement!
+    enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
     shuffle_parsons_blocks!
     strip_current_schemas!
-    strip_pitched_rungs!
+    strip_server_stamps!
     ground_code_review!
     stamp_pitched_rungs!
 
@@ -198,6 +226,14 @@ class ProblemSetIngest
       "[unrequested_sections] provider returned section(s) the day did not intend: " \
       "#{unrequested.to_json} (intended: #{@expected_keys.to_json})"
     )
+  end
+
+  # A single-section retry asked for exactly one key, so anything else the
+  # provider returned is not part of the repaired section this path may keep.
+  def prune_retry_extras!
+    return if @fixed_concepts.empty?
+
+    @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
 
   # Unlike every other step, this one rejects rather than repairs. The planted
@@ -258,6 +294,21 @@ class ProblemSetIngest
     end
 
     section["problem_statement"] = statement.truncate(kind::MAX_PROBLEM_STATEMENT_LENGTH)
+  end
+
+  # A single-section retry names the concept the day's plan already placed at
+  # this key — the rejected section's replacement is not free to retag it.
+  # Runs before normalize_concepts!, which would otherwise silently pass a
+  # mismatched concept through (or launder it to "other") rather than let the
+  # caller know the retry didn't do what it was asked.
+  def enforce_fixed_concepts!
+    @fixed_concepts.each do |key, concept|
+      actual = @problem_set.dig(key, "concept")
+      next if actual == concept
+
+      raise AiService::InvalidResponseError,
+            "Retry for #{key} returned concept #{actual.inspect}, not #{concept.inspect}"
+    end
   end
 
   # A provider occasionally invents tags; keep the vocabulary closed so
@@ -333,41 +384,36 @@ class ProblemSetIngest
   # ask and invents a business domain would leave the page saying something
   # untrue about deployed code. `source` is the trace RealSource.last_seen_for
   # reads back: code_review_mode itself is never persisted, so this is the
-  # only record of what was grounded — so only the server may write it. A toy
-  # day deletes whatever the provider put there rather than leaving it, or a
-  # model that happened to emit a `source` key would mint a trace for an
+  # only record of what was grounded. A toy day needs no deletion here —
+  # strip_server_stamps! has already removed whatever the provider put there,
+  # or a model that happened to emit a `source` key would mint a trace for an
   # excerpt this set never showed. `current_schema` is server-owned the same
   # way, so it is stamped only from a source that has one; every provider copy
   # is already gone by now (see strip_current_schemas!).
   # In production code_review is always present — ExerciseSection.for_plan
   # never omits it — but ingest is also called on partial sets, and a set
-  # with no code_review has no trace to strip or stamp.
+  # with no code_review has no trace to stamp.
   def ground_code_review!
+    return if @code_review_source.nil?
     return unless ExerciseSection.present?(@problem_set, "code_review")
 
     section = @problem_set["code_review"]
+    section["scenario"] = @code_review_source.scenario
+    section["source"]   = @code_review_source.id
 
-    if @code_review_source.nil?
-      section.delete("source")
-    else
-      section["scenario"] = @code_review_source.scenario
-      section["source"]   = @code_review_source.id
-    end
-
-    schema = @code_review_source&.current_schema
+    schema = @code_review_source.current_schema
     section["current_schema"] = schema if schema
   end
 
-  # Both stamps are facts the server knows and the provider does not, so a
-  # provider copy is stripped from every section on every call, whatever the
-  # caller passed — the same shape as strip_current_schemas!. Every section,
-  # because an unrequested one can still win its slot by list precedence.
-  def strip_pitched_rungs!
+  # See SERVER_STAMPS. Stripped from every section, because an unrequested one
+  # can still win its slot by list precedence — the same shape as
+  # strip_current_schemas!. Runs before ground_code_review!, which stamps the
+  # grounded day's `source` back on.
+  def strip_server_stamps!
     @problem_set.each_value do |section|
       next unless section.is_a?(Hash)
 
-      section.delete("pitched_at")
-      section.delete("eased")
+      SERVER_STAMPS.each { |stamp| section.delete(stamp) }
     end
   end
 

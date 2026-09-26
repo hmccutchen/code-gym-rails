@@ -56,6 +56,10 @@
   <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
     <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
 
+    <% if exercise.dropped_sections.any? %>
+      <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
+    <% end %>
+
     <% submit_blocker = response.submit_blocker %>
     <% submit_nudges = { unanswered: "Answer at least one section to finish up.",
                          unrated:    "Rate each section you answered to finish up." } %>

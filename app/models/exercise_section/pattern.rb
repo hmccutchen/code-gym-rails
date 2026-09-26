@@ -22,6 +22,14 @@ class ExerciseSection::Pattern < ExerciseSection
     true
   end
 
+  def self.judge_task
+    "Design an approach to the stated problem, explaining the tradeoffs the scaffold names; naming the pattern is the point."
+  end
+
+  def self.prose_fields
+    %w[title why scenario question teaching_note]
+  end
+
   def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - Choose the pattern concept from this vocabulary, exactly one: #{vocabulary.join(", ")}

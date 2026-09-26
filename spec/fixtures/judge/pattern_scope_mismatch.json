@@ -1,0 +1,20 @@
+{
+  "kind": "pattern",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "scope_mismatch",
+  "section": {
+    "title": "Repository Pattern",
+    "why": "Separates persistence access from business logic so the two can change independently.",
+    "question": "How would you restructure this checkout flow so retry-and-rollback handling doesn't leak into every controller action that touches an order?",
+    "scenario": "an e-commerce checkout flow spread across three controller actions",
+    "teaching_note": "Think about where the retry-and-rollback logic currently lives.",
+    "concept": "query_objects",
+    "answer_scaffold": [
+      "Your approach:",
+      "Interface — how would this be called:",
+      "What would be easy to get wrong or worth testing:"
+    ]
+  }
+}

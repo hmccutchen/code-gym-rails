@@ -46,6 +46,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   before { login_as(user) }
 
+  it "says when a section was left out today" do
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                          dropped_sections: [ "challenge" ],
+                          problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } })
+    get root_path
+    expect(response.body).to include("left out today")
+  end
+
   it "renders the rating widget at the end of the unsubmitted problem set" do
     create_exercise
     get root_path

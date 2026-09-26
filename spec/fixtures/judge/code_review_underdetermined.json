@@ -1,0 +1,15 @@
+{
+  "kind": "code_review",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "underdetermined",
+  "section": {
+    "question": "The apply_discount method silently ignores expired coupon codes. What's the issue and how would you fix it?",
+    "snippet": "class Order\n  def total_cents\n    line_items.sum(&:price_cents)\n  end\n\n  def add_coupon(code)\n    coupon = Coupon.find_by(code: code)\n    @coupon = coupon if coupon\n  end\nend",
+    "teaching_note": "Check what happens when add_coupon is called with an expired code.",
+    "concept": "error_handling",
+    "scenario": "a shopping cart applying a promo code",
+    "diagram": ""
+  }
+}

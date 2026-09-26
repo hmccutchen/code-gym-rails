@@ -6,6 +6,14 @@ class ExerciseSection::SecurityReview < ExerciseSection
     :security_concepts
   end
 
+  def self.judge_task
+    "Identify the one exploitable vulnerability and propose a mitigation."
+  end
+
+  def self.discovery?
+    true
+  end
+
   def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The third section is a SECURITY REVIEW, not a general correctness check. The snippet must contain one real, exploitable vulnerability appropriate to #{label}. The question asks the engineer to identify the vulnerability AND propose a mitigation — not just "what's wrong with this code."

@@ -1,0 +1,15 @@
+{
+  "kind": "pseudocode_to_code",
+  "rung": "senior",
+  "locked": false,
+  "expected": "keep_or_edit",
+  "principle": null,
+  "section": {
+    "title": "Merge Overlapping Reminder Windows",
+    "scenario": "collapsing overlapping push-reminder time windows before scheduling",
+    "problem_statement": "You're given a list of reminder windows, each a [start, end] pair of minutes past midnight, not necessarily sorted. Write pseudocode that returns the minimal list of windows covering the same total time, merging any two windows that overlap OR touch at an endpoint (e.g. [60,120] and [120,180] merge into [60,180]). The input list may be empty.",
+    "question": "Write pseudocode for this.",
+    "teaching_note": "Think about what order you need the windows in before a single pass can merge them correctly.",
+    "concept": "unhandled_empty_input"
+  }
+}

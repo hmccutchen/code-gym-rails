@@ -7,6 +7,10 @@ class ExerciseSection::Challenge < ExerciseSection
     false
   end
 
+  def self.judge_task
+    "Implement what the question asks from the starter code."
+  end
+
   # Answered in code, so the textarea gets the monospace treatment.
   def self.answer_class
     "answer code-answer"
