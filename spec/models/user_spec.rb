@@ -1830,6 +1830,7 @@ RSpec.describe User, "#recent_exercise_history with dropped sections", type: :mo
     entry = user.recent_exercise_history(limit: 5).first
 
     expect(entry.section_keys).to match_array(%w[code_review pattern challenge])
+    expect(entry.delivered_section_keys).to match_array(%w[code_review pattern])
     expect(entry.dropped).to eq(1)
   end
 end

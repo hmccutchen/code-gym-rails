@@ -2,7 +2,16 @@ require "rails_helper"
 
 RSpec.describe SectionCount do
   def history(*answered)
-    answered.map { |count| ExerciseHistoryEntry.new(section_keys: [], answered: count, dropped: 0) }
+    answered.map do |count|
+      delivered_section_keys = Array.new(count.to_i, "section")
+      ExerciseHistoryEntry.new(section_keys: delivered_section_keys, delivered_section_keys: delivered_section_keys,
+        answered: count, dropped: 0)
+    end
+  end
+
+  def exercise_history_entry(section_keys:, delivered_section_keys:, answered:, dropped:)
+    ExerciseHistoryEntry.new(section_keys: section_keys, delivered_section_keys: delivered_section_keys,
+      answered: answered, dropped: dropped)
   end
 
   it "gives a new user the full set until there is evidence" do
@@ -51,13 +60,39 @@ RSpec.describe SectionCount do
       expect(history).not_to have_received(:first)
     end
   end
-end
 
-RSpec.describe SectionCount, "with dropped sections" do
-  it "adds a dropped section back to the answered count so a drop neither shortens tomorrow nor reads as a skip" do
-    full  = ExerciseHistoryEntry.new(section_keys: %w[code_review pattern challenge fourth], answered: 4, dropped: 0)
-    short = ExerciseHistoryEntry.new(section_keys: %w[code_review pattern challenge fourth], answered: 3, dropped: 1)
+  describe "with dropped sections" do
+    it "caps drop credit at the sections the engineer actually saw" do
+      capped = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern], answered: 1, dropped: 2)
 
-    expect(described_class.for([ short, full, full ])).to eq(described_class.for([ full, full, full ]))
+      expect(described_class.for([ capped, capped, capped ])).to eq(3)
+    end
+
+    it "can shorten tomorrow when more sections were dropped than the engineer left unanswered" do
+      half_delivered = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern], answered: 2, dropped: 2)
+
+      expect(described_class.for([ half_delivered, half_delivered, half_delivered ])).to eq(3)
+    end
+
+    it "credits a drop against an unanswered delivered section, so it does not read as a skip" do
+      full  = exercise_history_entry(section_keys: %w[code_review pattern challenge],
+        delivered_section_keys: %w[code_review pattern challenge],
+        answered: 3, dropped: 0)
+      short = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern challenge], answered: 2, dropped: 1)
+
+      expect(described_class.for([ short, full, full ])).to eq(described_class.for([ full, full, full ]))
+    end
+
+    it "handles a no-response row without crediting beyond what was delivered" do
+      no_response = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: [ "code_review" ], answered: nil, dropped: 3)
+      full = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern challenge plan_review], answered: 4, dropped: 0)
+
+      expect(described_class.for([ no_response, no_response, full ])).to eq(3)
+    end
   end
 end
