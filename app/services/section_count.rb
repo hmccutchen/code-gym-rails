@@ -19,10 +19,22 @@ class SectionCount
     window = capped_window(history)
     return ceiling if window.size < MIN_SESSIONS
 
-    mean = window.sum { |entry| entry.answered.to_i + entry.dropped.to_i }.fdiv(window.size)
+    mean = window.sum { |entry| credited_sections(entry) }.fdiv(window.size)
 
     (mean.round + STRETCH).clamp(FLOOR, ceiling)
   end
+
+  # A drop counts only when every delivered section was answered, so a dropped
+  # section never stands in for one the engineer saw and skipped.
+  def self.credited_sections(entry)
+    answered = entry.answered.to_i
+    delivered = entry.delivered_section_keys.size
+
+    return answered unless answered >= delivered
+
+    [ answered + entry.dropped, delivered ].min
+  end
+  private_class_method :credited_sections
 
   def self.ceiling
     ExerciseSection.slot_count
