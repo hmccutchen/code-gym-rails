@@ -11,6 +11,10 @@ class ExerciseSection::Challenge < ExerciseSection
     "Implement what the question asks from the starter code."
   end
 
+  def self.planned_concept(mode: nil)
+    "n_plus_one"
+  end
+
   # Answered in code, so the textarea gets the monospace treatment.
   def self.answer_class
     "answer code-answer"

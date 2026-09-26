@@ -5321,7 +5321,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(calls["code_review"]).to eq(2)
   end
 
-  it "asks the retry for the same kind and the draft's concept" do
+  it "asks the retry for the same kind and the draft's concept when the draft concept is usable" do
     allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
       kind == ExerciseSection::Challenge ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
     end
@@ -5333,6 +5333,45 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     expect(prompts.last).to include('"challenge": {').and include("This section's concept must be exactly `memoization`")
     expect(prompts.last).not_to include('"code_review": {')
+  end
+
+  it "retries a rejected section with the plan's concept when the draft normalized it to other" do
+    attempts = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      attempts[kind.key] += 1
+      if kind == ExerciseSection::Challenge && attempts["challenge"] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    draft = FakeService::EXERCISE_PROBLEM_SET.deep_dup
+    draft["challenge"]["concept"] = "invented_concept"
+    retry_set = { "challenge" => FakeService::EXERCISE_PROBLEM_SET["challenge"].merge("concept" => "n_plus_one") }
+
+    prompts = []
+    generate_calls = 0
+    svc = FakeService.new("fake-key")
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      if kw[:purpose] == "generate_exercise"
+        prompts << kw[:prompt]
+        generate_calls += 1
+        text = generate_calls == 1 ? draft.to_json : retry_set.to_json
+        { text: text, input_tokens: 0, output_tokens: 0 }
+      else
+        m.call(*args, **kw)
+      end
+    end
+
+    judged = svc.generate_judged_exercise(user, language: "ruby_rails")
+    draft_request_body = prompts.first
+    retry_request_body = prompts.last
+
+    expect(draft_request_body).to include("The challenge section's concept must be exactly `n_plus_one`")
+    expect(retry_request_body).to include("This section's concept must be exactly `n_plus_one`")
+    expect(retry_request_body).not_to include("This section's concept must be exactly `other`")
+    expect(judged.dropped_sections).not_to include("challenge")
   end
 
   it "drops a section rejected twice, records the principle, and never loops" do

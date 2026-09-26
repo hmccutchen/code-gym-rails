@@ -228,6 +228,10 @@ class ExerciseSection
       raise NotImplementedError, "#{name} must state its task"
     end
 
+    def planned_concept(mode: nil)
+      raise NotImplementedError, "#{name} must state its planned concept"
+    end
+
     def discovery?
       false
     end

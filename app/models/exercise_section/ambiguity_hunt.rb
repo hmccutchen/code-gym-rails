@@ -42,6 +42,10 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     "List what needs clarifying before a spec could be written."
   end
 
+  def self.planned_concept(mode: nil)
+    "missing_success_criteria"
+  end
+
   def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The fourth section is an AMBIGUITY HUNT: "request" is a vague feature ask, 2-4 sentences, phrased the way a stakeholder or PM would ask for it — not an engineer. It must contain EXACTLY #{PLANTED_COUNT} deliberately planted ambiguities, listed in "planted_ambiguities". Each must be a genuine gap — a missing scope boundary, an undefined edge case, no stated success criteria, an unstated data implication, or an undefined permissions model — never something "request" already answers.

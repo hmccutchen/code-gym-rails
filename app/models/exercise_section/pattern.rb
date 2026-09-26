@@ -26,6 +26,10 @@ class ExerciseSection::Pattern < ExerciseSection
     "Design an approach to the stated problem, explaining the tradeoffs the scaffold names; naming the pattern is the point."
   end
 
+  def self.planned_concept(mode: nil)
+    "service_objects"
+  end
+
   def self.prose_fields
     %w[title why scenario question teaching_note]
   end

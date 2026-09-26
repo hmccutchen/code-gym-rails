@@ -10,6 +10,10 @@ class ExerciseSection::SecurityReview < ExerciseSection
     "Identify the one exploitable vulnerability and propose a mitigation."
   end
 
+  def self.planned_concept(mode: nil)
+    "mass_assignment_protection"
+  end
+
   def self.discovery?
     true
   end

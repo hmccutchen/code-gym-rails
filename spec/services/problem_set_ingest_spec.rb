@@ -902,6 +902,12 @@ RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
     expect { described_class.call(set, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "memoization" }) }
       .to raise_error(AiService::InvalidResponseError, /memoization/)
   end
+  it "rejects a retry tagged with any different concept when n_plus_one was fixed" do
+    mismatch = { "challenge" => set.fetch("challenge").merge("concept" => "memoization") }
+
+    expect { described_class.call(mismatch, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }) }
+      .to raise_error(AiService::InvalidResponseError, /n_plus_one/)
+  end
   it "drops sections the retry did not ask for instead of keeping them" do
     extra = set.merge("pattern" => { "question" => "q", "concept" => "memoization" })
     result = described_class.call(extra, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }).problem_set

@@ -17,6 +17,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     "Find the one planted issue in the snippet and say how to fix it."
   end
 
+  def self.planned_concept(mode: nil)
+    mode == :schema_review ? "missing_index" : "n_plus_one"
+  end
+
   def self.discovery?
     true
   end

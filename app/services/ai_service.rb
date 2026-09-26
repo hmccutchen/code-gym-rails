@@ -935,6 +935,26 @@ class AiService
 
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
 
+  class PlannedConcepts
+    def initialize(plan, concepts)
+      @plan = plan
+      @concepts = concepts
+    end
+
+    def concept_for(section_key)
+      @concepts.fetch(section_key)
+    end
+
+    def method_missing(name, *args, **kwargs, &block)
+      @plan.public_send(name, *args, **kwargs, &block)
+    end
+
+    def respond_to_missing?(name, include_private = false)
+      @plan.respond_to?(name, include_private) || super
+    end
+  end
+  private_constant :PlannedConcepts
+
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
                       :prompt_options, :suggested_concepts)
   private_constant :Draft
@@ -948,7 +968,7 @@ class AiService
   # tighter read budget (see SYNC_GENERATION_READ_TIMEOUT). Callers state their
   # constraint; the timeout policy stays here.
   def generate_exercise(user, language: user.language_for_today, blocking: false)
-    draft = draft_exercise(user, language: language, blocking: blocking)
+    draft = draft_exercise(user, language: language, blocking: blocking, judge: false)
     finish_generation(user, language, draft, draft.problem_set)
     draft.problem_set
   end
@@ -966,7 +986,7 @@ class AiService
   # generation and a re-judge each, which put the worst case far past the
   # single call this path replaced, on a schedule that ticks hourly.
   def generate_judged_exercise(user, language: user.language_for_today)
-    draft = draft_exercise(user, language: language, blocking: false)
+    draft = draft_exercise(user, language: language, blocking: false, judge: true)
     # Strict pruning happens here, after the draft is built, on a deep copy —
     # the draft keeps the concept of every section, including the ones dropped
     # below, which log_retention and the unhosted list are named after.
@@ -1284,13 +1304,14 @@ class AiService
   # query and risk the logged "requested" history silently diverging from what
   # the prompt actually contained if anything changed for this user during the
   # provider call.
-  def draft_exercise(user, language:, blocking:)
+  def draft_exercise(user, language:, blocking:, judge: false)
     plan       = DailyPlan.for(user, language: language)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
+    plan       = plan_with_concepts(plan, kinds, language) if judge
     ladders    = ladders_for(kinds, difficulty, language, plan.code_review_mode)
-    options    = exercise_prompt_options(plan, history, difficulty, ladders)
+    options    = exercise_prompt_options(plan, history, difficulty, ladders, judged: judge, kinds: kinds)
 
     result = call_and_log(
       user, purpose: "generate_exercise",
@@ -1310,7 +1331,7 @@ class AiService
               suggested_concepts: ingested.suggested_concepts)
   end
 
-  def exercise_prompt_options(plan, history, difficulty, ladders)
+  def exercise_prompt_options(plan, history, difficulty, ladders, judged:, kinds:)
     { third: plan.third, pattern: plan.pattern,
       reinforcement: plan.reinforcement, due_checks: plan.due_checks,
       established: plan.established, history: history,
@@ -1319,7 +1340,62 @@ class AiService
       code_review_mode: plan.code_review_mode,
       code_review_source: plan.code_review_source,
       scenario_flavor: plan.scenario_flavor,
-      difficulty: difficulty, ladders: ladders }
+      difficulty: difficulty, ladders: ladders,
+      section_concepts: judged ? kinds.to_h { |kind| [ kind.key, plan.concept_for(kind.key) ] } : nil }
+  end
+
+  def plan_with_concepts(plan, kinds, language)
+    return plan if plan.respond_to?(:concept_for)
+
+    PlannedConcepts.new(plan, offered_concepts_for(plan, kinds, language))
+  end
+
+  def offered_concepts_for(plan, kinds, language)
+    assignments = {}
+
+    assign_planned_concepts!(
+      assignments,
+      kinds.reject(&:fourth?),
+      plan.due_checks.map(&:concept),
+      language,
+      mode: plan.code_review_mode
+    )
+    assign_planned_concepts!(
+      assignments,
+      kinds.reject(&:fourth?),
+      plan.reinforcement.map { |entry| entry[:concept] },
+      language,
+      mode: plan.code_review_mode
+    )
+
+    fourth_kind = kinds.find(&:fourth?)
+    if fourth_kind
+      assignments[fourth_kind.key] =
+        plan.fourth_due_checks.first&.concept ||
+        plan.fourth_reinforcement.first&.fetch(:concept) ||
+        fallback_planned_concept_for(fourth_kind, language, mode: plan.code_review_mode)
+    end
+
+    kinds.each do |kind|
+      assignments[kind.key] ||= fallback_planned_concept_for(kind, language, mode: plan.code_review_mode)
+    end
+
+    assignments
+  end
+
+  def assign_planned_concepts!(assignments, kinds, concepts, language, mode:)
+    concepts.each do |concept|
+      kind = kinds.find do |candidate|
+        !assignments.key?(candidate.key) &&
+          ProblemSetIngest.selectable_vocabulary_for(candidate.key, language,
+                                                     mode: (mode if candidate == ExerciseSection::CodeReview)).include?(concept)
+      end
+      assignments[kind.key] = concept if kind
+    end
+  end
+
+  def fallback_planned_concept_for(kind, language, mode:)
+    kind.planned_concept(mode: (mode if kind == ExerciseSection::CodeReview))
   end
 
   # Over every kind, not today's: the rendered set is resolved by slot
@@ -1425,7 +1501,7 @@ class AiService
   # same reason it keeps a draft.
   def resolve_rejection(user, language, draft, kind, section, outcome)
     outcome = outcome.merge(retry_principle: nil)
-    retried = retry_section(user, language, draft, kind, section["concept"])
+    retried = retry_section(user, language, draft, kind, retry_concept_for(draft.plan, kind, section["concept"]))
     return drop_or_anchor(kind, section, outcome.merge(retries: 0)) if retried.nil?
 
     verdict, latency = judge_with_fallback(user, kind, retried, draft.difficulty, user.skill_level)
@@ -1444,6 +1520,20 @@ class AiService
     # they are the only record this section was rejected at all, and
     # rejection rate per principle is read off these entries.
     [ apply_verdict(verdict, retried), outcome.merge(status: verdict_summary[:status], retry_issues: verdict_summary[:issues]) ]
+  end
+
+  def planned_concept_for(plan, section_key)
+    plan.concept_for(section_key)
+  rescue NoMethodError => e
+    raise KeyError, "DailyPlan offered no concept for #{section_key}" if e.name == :concept_for
+
+    raise
+  end
+
+  def retry_concept_for(plan, kind, drafted_concept)
+    return drafted_concept unless drafted_concept == "other"
+
+    planned_concept_for(plan, kind.key)
   end
 
   # A second rejection drops the section — unless the kind is the one the day
@@ -1951,6 +2041,7 @@ class AiService
                             code_review_mode: :application_code, code_review_source: nil,
                             scenario_flavor: :general,
                             difficulty: KindDifficulty.none, ladders: {},
+                            section_concepts: nil,
                             only: nil, fixed_concept: nil)
     history_text = if history.empty?
       "No history yet — this is their first exercise set."
@@ -2071,6 +2162,14 @@ class AiService
     fixed_concept_line = fixed_concept ?
       "\n- This section's concept must be exactly `#{fixed_concept}`: it replaces a section that was rejected on wording alone, and the day's plan already placed this concept here." :
       ""
+    section_concept_lines =
+      if fixed_concept || section_concepts.blank?
+        ""
+      else
+        "\n" + kinds.map { |kind|
+          "- The #{kind.key} section's concept must be exactly `#{section_concepts.fetch(kind.key)}`."
+        }.join("\n")
+      end
 
     config = config_for(language)
     label  = config[:label]
@@ -2125,7 +2224,7 @@ class AiService
       #{domain_modeling_guidance}
       - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
-      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line}
+      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line}#{section_concept_lines}
       #{retention_block}
       #{established_block}
       #{fourth_retention_block}
