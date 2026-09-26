@@ -1367,14 +1367,16 @@ class AiService
     end
   end
 
-  # One thread per rejection, each with its own service instance inside
-  # #retry_section and #judge_with_fallback, so nothing mutable crosses a
-  # thread boundary: `set` is read once per key here and written by the caller.
+  # One thread per rejection, each on its own service instance and therefore
+  # its own connection, so nothing mutable crosses a thread boundary: `set` is
+  # read once per key here and written by the caller.
   # Returns [key, section_or_nil, outcome] per rejection.
   def resolve_rejections(user, language, draft, set, outcomes)
     rejected_keys(outcomes).map { |key|
       kind = ExerciseSection.find(key)
-      thread_in_caller_zone { [ key, *resolve_rejection(user, language, draft, kind, set[key], outcomes[key]) ] }
+      thread_in_caller_zone do
+        [ key, *self.class.new(@api_key).send(:resolve_rejection, user, language, draft, kind, set[key], outcomes[key]) ]
+      end
     }.map(&:value)
   end
 

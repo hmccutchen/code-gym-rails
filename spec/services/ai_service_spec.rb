@@ -5332,7 +5332,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     prompts = []
-    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| prompts << kw[:prompt]; m.call(*args, **kw) }
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| prompts << kw[:prompt]; m.call(*args, **kw) }
 
     svc.generate_judged_exercise(user, language: "ruby_rails")
 
@@ -5540,6 +5540,33 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(calls).to eq("pattern" => 2, "challenge" => 2)
   end
 
+  # Every other fan-out here builds a fresh instance per thread, so no Faraday
+  # connection is shared between threads.
+  it "runs each retry on its own service instance, never the caller's" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless [ ExerciseSection::Pattern, ExerciseSection::Challenge ].include?(kind)
+
+      calls[kind.key] += 1
+      next verdict({ "status" => "keep" }, kind) if calls[kind.key] > 1
+
+      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+    end
+    retry_instances = Queue.new
+    allow_any_instance_of(FakeService).to receive(:retry_section) do |instance, _user, _language, _draft, kind, _concept|
+      retry_instances << instance
+      FakeService::EXERCISE_PROBLEM_SET[kind.key].deep_dup
+    end
+    caller_service = FakeService.new("fake-key")
+
+    caller_service.generate_judged_exercise(user, language: "ruby_rails")
+
+    instances = Array.new(retry_instances.size) { retry_instances.pop }
+    expect(instances.size).to eq(2)
+    expect(instances.map(&:object_id)).not_to include(caller_service.object_id)
+    expect(instances.map(&:object_id).uniq.size).to eq(2)
+  end
+
   it "asks a single-section retry for a tighter read budget than a whole day's draft" do
     allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
       kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
@@ -5657,7 +5684,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     drafted = false
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
       raise AiService::RateLimitError, "slow down" if drafted
 
       drafted = true
@@ -5697,7 +5724,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     end
     svc = FakeService.new("fake-key")
     drafted = false
-    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
       raise AiService::RateLimitError, "slow down" if drafted
       drafted = true
       m.call(*args, **kw)
