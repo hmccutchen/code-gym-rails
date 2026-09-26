@@ -532,7 +532,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `MAX_LINES` is left out since the next edit would evict it.
 - **Two-stage generation**: the weekday batch drafts a set, then reads each
   section back and decides keep, edit or reject
-  (`AiService#generate_judged_exercise`). It exists because two real sections
+  (`AiService#generate_judged_exercise`, which delegates everything after the
+  draft to `JudgedGeneration`). It exists because two real sections
   shipped broken in the same way. A `code_review` planted on a Ruby `Thread`
   needed the engineer to know how threads behave, and a game-flavored one
   needed to know that render loops are hardware-dependent. In both the missing
@@ -1546,7 +1547,8 @@ always pull in the full suite — is stated once, in
 
 ## File Map
 
-- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt and the two-stage path: `#generate_judged_exercise` drafts, fans the judge out a section at a time, retries a rejection once with its concept fixed, drops a second rejection, and logs what happened
+- `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt, the single-section retry call, and the two-stage entry point: `#generate_judged_exercise` drafts, then hands the draft to `JudgedGeneration`
+- `app/services/judged_generation.rb` — `JudgedGeneration`: the two-stage path after the draft. Fans the judge out a section at a time, retries a rejection once with its concept fixed, drops a second rejection, and hands the final set to `AiService`'s shared logging tail. It reaches the provider only through `JudgedGeneration::Provider` (`judge_section` and `retry_section`, as callables built fresh per call), so its specs need no provider subclass
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, and rejects an unusable ambiguity-hunt answer key, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
