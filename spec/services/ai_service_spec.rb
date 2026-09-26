@@ -336,7 +336,36 @@ RSpec.describe AiService do
       result = svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
 
       expect(result).to eq("still usable")
-      expect(Rails.logger).to have_received(:warn).with("ApiUsage log failed: could not obtain a connection")
+      expect(Rails.logger).to have_received(:warn).with(
+        "[usage] ApiUsage log failed for purpose=explain_differently user_id=#{user.id} tokens_in=1 tokens_out=1: " \
+        "ActiveRecord::ConnectionTimeoutError: could not obtain a connection"
+      )
+    end
+
+    it "still raises a truncated response when checking out a connection for usage logging times out" do
+      user
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {} })
+      svc = double_class.new(canned_text: "a cut-off expl", truncated: true)
+
+      allow(ActiveRecord::Base.connection_pool).to receive(:with_connection)
+        .and_raise(ActiveRecord::ConnectionTimeoutError, "could not obtain a connection")
+
+      expect {
+        svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
+      }.to raise_error(AiService::TruncatedResponseError)
+    end
+
+    it "lets an error that is not a database failure escape usage logging" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {} })
+      svc = double_class.new(canned_text: "still usable")
+
+      allow(ApiUsage).to receive(:create!).and_raise(NoMethodError, "a bug in the usage write")
+
+      expect {
+        svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
+      }.to raise_error(NoMethodError, "a bug in the usage write")
     end
   end
 
@@ -3334,8 +3363,8 @@ RSpec.describe AiService do
     # checked-out connection for the entire (up to READ_TIMEOUT-second)
     # provider call, even though the only DB work is ApiUsage.create! in
     # #log_usage. With Puma's thread count matching database.yml's pool size,
-    # that left zero spare connections for any concurrent request. #call_and_log
-    # now scopes the checkout to #log_usage alone, so the thread must hold no
+    # that left zero spare connections for any concurrent request. #log_usage
+    # now checks out its own connection, so the thread must hold no
     # connection while #call — the provider HTTP round trip — is running.
     it "holds no pooled connection for the review thread while the provider call is in flight" do
       exercise, response = exercise_and_response

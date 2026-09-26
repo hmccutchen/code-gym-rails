@@ -935,7 +935,7 @@ class AiService
   # No pooled DB connection is held for the duration of a thread — only the
   # provider HTTP call happens here, and that can run up to REVIEW_READ_TIMEOUT
   # seconds. The one bit of real DB work (ApiUsage.create! inside #log_usage)
-  # checks out a connection for itself, scoped narrowly in #call_and_log, so
+  # checks out a connection for itself, after the provider call returns, so
   # a multi-section review never pins (section count) pooled connections for
   # the length of an HTTP round trip — with Puma's thread count and
   # database.yml's pool sized 1:1, that used to leave zero spare connections
@@ -2138,7 +2138,7 @@ class AiService
   # A thread abandoned here keeps running and may still write its ApiUsage row
   # after the request has ended — deliberate. The provider call really happened
   # and really cost money, so recording it is honest accounting, and #log_usage
-  # swallows its own errors, so a late write cannot fail anything. Killing the
+  # swallows its own database errors, so a late write cannot fail anything. Killing the
   # thread instead would save nothing: the provider bills from the moment the
   # request is sent.
   def awaited_difficulty(thread)
@@ -2500,6 +2500,9 @@ class AiService
     Rails.logger.warn("SuggestedConcept recording failed: #{e.message}")
   end
 
+  # Rescues database failures only, the pool checkout included. Anything else
+  # here is a bug, and swallowing it would silently empty the table that cost
+  # questions are answered from.
   def log_usage(user, result, purpose:)
     ActiveRecord::Base.connection_pool.with_connection do
       ApiUsage.create!(
@@ -2510,8 +2513,12 @@ class AiService
         date:       Date.current
       )
     end
-  rescue => e
-    Rails.logger.warn("ApiUsage log failed: #{e.message}")
+  rescue ActiveRecord::ActiveRecordError => e
+    Rails.logger.warn(
+      "[usage] ApiUsage log failed for purpose=#{purpose} user_id=#{user&.id} " \
+      "tokens_in=#{result[:input_tokens].to_i} tokens_out=#{result[:output_tokens].to_i}: " \
+      "#{e.class}: #{e.message}"
+    )
   end
 
   # Every provider entry point funnels through here so usage is recorded on
@@ -2525,9 +2532,9 @@ class AiService
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
   #
-  # #log_usage checks out its own connection after the provider call, and
-  # rescues both the checkout and the write: usage is telemetry, never a
-  # reason to discard a billed provider result.
+  # #log_usage checks out its own connection after the provider call and
+  # rescues a failed checkout or write, so a busy pool never discards a result
+  # the provider already billed. A refusal or truncation still raises below.
   #
   # `allow_truncated:` hands a cut-off reply back with its `truncated` flag
   # instead of raising. Only a prose caller may ask for it: a JSON body that
