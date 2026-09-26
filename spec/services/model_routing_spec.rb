@@ -38,6 +38,11 @@ RSpec.describe "per-purpose model routing" do
       expect(service_class::MODEL_FOR_PURPOSE.keys - purposes_in_use).to be_empty
     end
 
+    it "routes retry_section like generate_exercise for #{service_class}" do
+      expect(service_class::MODEL_FOR_PURPOSE.fetch("retry_section"))
+        .to eq(service_class::MODEL_FOR_PURPOSE.fetch("generate_exercise"))
+    end
+
     it "sends #{service_class}'s default model for a purpose with no entry" do
       body = posted_body(service_class, purpose: "not_a_listed_purpose")
 
@@ -85,6 +90,13 @@ RSpec.describe "per-purpose model routing" do
     it "sends no effort for a route that names none" do
       body = posted_body(ClaudeService, purpose: "review_response")
 
+      expect(body).not_to have_key("output_config")
+    end
+
+    it "routes judge_section to Sonnet 5 with no effort" do
+      body = posted_body(ClaudeService, purpose: "judge_section")
+
+      expect(body["model"]).to eq("claude-sonnet-5")
       expect(body).not_to have_key("output_config")
     end
 

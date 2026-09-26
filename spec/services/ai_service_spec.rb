@@ -195,6 +195,7 @@ RSpec.describe AiService do
   describe "single-shot purposes" do
     SINGLE_SHOT_PURPOSES = %w[
       generate_exercise
+      retry_section
       review_response
       assess_difficulty
       generate_concept_reference
@@ -202,6 +203,7 @@ RSpec.describe AiService do
       explain_differently
       pseudocode_critique
       pseudocode_translate
+      judge_section
     ].freeze
 
     it "covers every purpose except the two conversational ones" do
@@ -256,6 +258,10 @@ RSpec.describe AiService do
       }.to_json
 
       spy_class.new(canned_text: full_problem_set.to_json).generate_exercise(user)
+      retry_draft = spy_class.new(canned_text: full_problem_set.to_json)
+                            .send(:draft_exercise, user, language: "ruby_rails", blocking: false)
+      spy_class.new(canned_text: { "pattern" => FakeService::EXERCISE_PROBLEM_SET["pattern"].deep_dup }.to_json)
+               .send(:retry_section, user, "ruby_rails", retry_draft, ExerciseSection::Pattern, "service_objects")
       spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
       spy_class.new(canned_text: reference_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
       spy_class.new(canned_text: "Another framing.")
@@ -269,9 +275,12 @@ RSpec.describe AiService do
                .critique_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
       spy_class.new(canned_text: "def x\nend")
                .translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
+      spy_class.new(canned_text: { status: "keep" }.to_json)
+               .judge_section(user, ExerciseSection::CodeReview, exercise.problem_set["code_review"],
+                 rung: "senior", locked: false)
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
-      expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size)
+      expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size + 1)
       expect(histories).to all(be_empty)
     end
   end
@@ -4349,6 +4358,15 @@ RSpec.describe AiService do
       expect(occurrences_per_call).to eq([ 1 ])
     end
 
+    it "reaches the judge exactly once" do
+      recording_class.new(canned_text: { status: "keep" }.to_json)
+        .judge_section(user, ExerciseSection::CodeReview,
+          { "question" => "Find the N+1", "snippet" => "code", "concept" => "n_plus_one" },
+          rung: "senior", locked: false)
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
     # The difficulty assessment rides the same fan-out and had no style rule
     # before, so it is pinned at zero: reaching it would be a new content
     # requirement rather than consolidation.
@@ -5110,5 +5128,732 @@ RSpec.describe AiService, "rung stamps on a generated set" do
     problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
 
     expect(problem_set["code_review"]).not_to have_key("eased")
+  end
+end
+
+RSpec.describe AiService, "#judge_section" do
+  let(:user) { User.create!(email: "judge@example.com", name: "J", provider: "fake", api_key: "fake-test-key") }
+  let(:section) { { "question" => "What is wrong?", "snippet" => "code", "concept" => "n_plus_one", "teaching_note" => "hint", "pitched_at" => "senior" } }
+
+  it "sends the section, its concept, rung, lock state and the kind's task, and never another section or history" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+
+    svc.judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: true)
+
+    expect(captured[:purpose]).to eq("judge_section")
+    expect(captured[:max_tokens]).to eq(AiService::JUDGE_MAX_TOKENS)
+    expect(captured[:system]).to include("checking one section of a generated coding exercise")
+    expect(captured[:system]).to include("Never reject a problem for being hard.")
+    expect(captured[:prompt]).to include("n_plus_one").and include("senior").and include("locked").and include(ExerciseSection::CodeReview.judge_task)
+    expect(captured[:prompt]).not_to include("Recent performance")
+    expect(captured.fetch(:history, [])).to eq([])
+  end
+
+  it "returns a parsed verdict" do
+    expect(FakeService.new("fake-key").judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: false).status).to eq(:keep)
+  end
+
+  it "never sends the ambiguity hunt's answer key" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    hunt = { "request" => "Build a leaderboard", "question" => "q", "teaching_note" => "t", "concept" => "scope_creep", "planted_ambiguities" => [ "SECRET" ] }
+
+    svc.judge_section(user, ExerciseSection::AmbiguityHunt, hunt, rung: "junior", locked: false)
+
+    expect(captured[:prompt]).not_to include("SECRET")
+  end
+
+  # The stamps say the day eased this section, which real file it came from,
+  # and that an earlier judgment rejected it — all of it about the author's
+  # intent, which the judge is deliberately not told.
+  it "never sends the server's own stamps, and still sends the current schema" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    stamped = section.merge("eased" => true, "source" => "excerpt-trace-id", "anchored" => true,
+                            "current_schema" => "create_table :orders do |t|")
+
+    svc.judge_section(user, ExerciseSection::CodeReview, stamped, rung: "senior", locked: false)
+
+    ProblemSetIngest::SERVER_STAMPS.each { |stamp| expect(captured[:prompt]).not_to include(stamp) }
+    expect(captured[:prompt]).not_to include("excerpt-trace-id")
+    expect(captured[:prompt]).to include("create_table :orders")
+  end
+end
+
+RSpec.describe AiService, "JUDGE_SYSTEM_PROMPT" do
+  it "enumerates the rejection principles and issue types from JudgeVerdict's own constants" do
+    expect(AiService::JUDGE_PRINCIPLE_GUIDANCE.keys).to eq(JudgeVerdict::PRINCIPLES)
+    expect(AiService::JUDGE_SYSTEM_PROMPT).to include("Rejection principles, the only #{JudgeVerdict::PRINCIPLES.size}:")
+    JudgeVerdict::PRINCIPLES.each do |principle|
+      expect(AiService::JUDGE_SYSTEM_PROMPT).to include("- #{principle}: #{AiService::JUDGE_PRINCIPLE_GUIDANCE.fetch(principle)}")
+    end
+    expect(AiService::JUDGE_SYSTEM_PROMPT)
+      .to include("Issues, the only #{JudgeVerdict::ISSUE_TYPES.size}: #{JudgeVerdict::ISSUE_TYPES.join(', ')}.")
+  end
+end
+
+RSpec.describe AiService, "single-section retry prompt" do
+  let(:user) { User.create!(email: "retry@example.com", name: "R") }
+  it "renders one kind's schema and fixes the concept" do
+    prompt = FakeService.new("fake-key").send(:build_exercise_prompt, user, "ruby_rails",
+                                              third: :challenge, pattern: :pattern, fourth: :plan_review,
+                                              only: ExerciseSection::Challenge, fixed_concept: "memoization")
+    expect(prompt).to include('"challenge": {')
+    expect(prompt).not_to include('"code_review": {')
+    expect(prompt).to include("This section's concept must be exactly `memoization`")
+  end
+end
+
+RSpec.describe AiService, "#generate_judged_exercise" do
+  let(:user) { User.create!(email: "two-stage@example.com", name: "T", provider: "fake", api_key: "fake-test-key") }
+
+  def verdict(hash, kind) = JudgeVerdict.parse(hash, kind: kind)
+
+  # Both rolls pinned so every example runs the same four-kind, plain-snippet
+  # day: a drop assertion needs the kind it drops to have been scheduled, and
+  # a retention assertion needs code_review's concept to be hostable there.
+  before do
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    # Restored after the and_call_original above, which drops the suite-wide pin.
+    allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
+  end
+
+  it "keeps a set the judge keeps, with every section still present and stamped" do
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.dropped_sections).to eq([])
+    expect(judged.problem_set.keys).to include("code_review", "pattern")
+    expect(judged.outcomes.values).to all(include(status: :keep))
+  end
+
+  it "applies an edit to prose only" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      if kind == ExerciseSection::CodeReview
+        verdict({ "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                  "fields" => { "question" => "Tighter question" } }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.problem_set["code_review"]["question"]).to eq("Tighter question")
+    expect(judged.problem_set["code_review"]["snippet"]).to include("loyalty_tier")
+    expect(judged.outcomes["code_review"]).to include(status: :edit, issues: [ "padding" ])
+  end
+
+  # ProblemSetIngest stamps a grounded code_review's scenario itself — which
+  # real file, and that the copy is altered — so an edit that rewrites it
+  # would leave the page saying something untrue about deployed code.
+  it "keeps ingest's scenario when an edit rewrites it on a grounded section" do
+    allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:real)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::CodeReview
+
+      verdict({ "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                "fields" => { "scenario" => "a shipping label printer", "question" => "Tighter question" } }, kind)
+    end
+
+    section = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set["code_review"]
+
+    expect(section["source"]).to be_present
+    expect(section["scenario"]).to eq(RealSource.all.find { |excerpt| excerpt.id == section["source"] }.scenario)
+    expect(section["question"]).to eq("Tighter question")
+  end
+
+  # The retry runs through the same ingest as the draft, so a grounded day's
+  # retried code_review is stamped again — and the edit above can reach it.
+  it "keeps ingest's scenario on a retried grounded section the judge then edits" do
+    allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:real)
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::CodeReview
+
+      calls["code_review"] += 1
+      if calls["code_review"] == 1
+        verdict({ "status" => "reject", "principle" => "underdetermined", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                  "fields" => { "scenario" => "a shipping label printer", "question" => "Tighter question" } }, kind)
+      end
+    end
+
+    section = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set["code_review"]
+
+    expect(section["source"]).to be_present
+    expect(section["scenario"]).to eq(RealSource.all.find { |excerpt| excerpt.id == section["source"] }.scenario)
+    expect(section["question"]).to eq("Tighter question")
+  end
+
+  it "applies an edit to an ungrounded section's scenario" do
+    allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::CodeReview
+
+      verdict({ "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                "fields" => { "scenario" => "a shipping label printer" } }, kind)
+    end
+
+    section = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set["code_review"]
+
+    expect(section["source"]).to be_blank
+    expect(section["scenario"]).to eq("a shipping label printer")
+  end
+
+  it "retries a rejected section once with the same concept, and keeps the retry when it passes" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      calls[kind.key] += 1
+      if kind == ExerciseSection::CodeReview && calls["code_review"] == 1
+        verdict({ "status" => "reject", "principle" => "underdetermined", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.dropped_sections).to eq([])
+    expect(judged.outcomes["code_review"]).to include(status: :keep, retries: 1, dropped: false,
+                                                      principle: "underdetermined", retry_principle: nil)
+    expect(calls["code_review"]).to eq(2)
+  end
+
+  it "asks the retry for the same kind and the draft's concept when the draft concept is usable" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Challenge ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+    svc = FakeService.new("fake-key")
+    prompts = []
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| prompts << kw[:prompt]; m.call(*args, **kw) }
+
+    svc.generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(prompts.last).to include('"challenge": {').and include("This section's concept must be exactly `memoization`")
+    expect(prompts.last).not_to include('"code_review": {')
+  end
+
+  it "drops a rejected section normalized to other without spending a retry call" do
+    attempts = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      attempts[kind.key] += 1
+      if kind == ExerciseSection::Challenge && attempts["challenge"] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    draft = FakeService::EXERCISE_PROBLEM_SET.deep_dup
+    draft["challenge"]["concept"] = "invented_concept"
+
+    generate_calls = 0
+    svc = FakeService.new("fake-key")
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      if kw[:purpose] == "generate_exercise"
+        generate_calls += 1
+        { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
+      else
+        m.call(*args, **kw)
+      end
+    end
+
+    judged = svc.generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(generate_calls).to eq(1)
+    expect(judged.dropped_sections).to eq([ "challenge" ])
+    expect(judged.outcomes["challenge"]).to include(retries: 0, dropped: true, retry_principle: nil)
+  end
+
+  it "keeps a rejected code_review normalized to other as the anchor without spending a retry call" do
+    attempts = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      attempts[kind.key] += 1
+      if kind == ExerciseSection::CodeReview && attempts["code_review"] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    draft = FakeService::EXERCISE_PROBLEM_SET.deep_dup
+    draft["code_review"]["concept"] = "invented_concept"
+
+    generate_calls = 0
+    svc = FakeService.new("fake-key")
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      if kw[:purpose] == "generate_exercise"
+        generate_calls += 1
+        { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
+      else
+        m.call(*args, **kw)
+      end
+    end
+
+    judged = svc.generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(generate_calls).to eq(1)
+    expect(judged.dropped_sections).to eq([])
+    expect(judged.problem_set["code_review"]["anchored"]).to be(true)
+    expect(judged.outcomes["code_review"]).to include(retries: 0, dropped: false, fallback: "anchor", retry_principle: nil)
+  end
+
+  it "skips retry for other on a javascript day too" do
+    attempts = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      attempts[kind.key] += 1
+      if kind == ExerciseSection::Challenge && attempts["challenge"] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    draft = FakeService::EXERCISE_PROBLEM_SET.deep_dup
+    draft["challenge"]["concept"] = "invented_concept"
+
+    prompts = []
+    generate_calls = 0
+    svc = FakeService.new("fake-key")
+    allow(svc).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      if kw[:purpose] == "generate_exercise"
+        generate_calls += 1
+        prompts << kw[:prompt]
+        { text: draft.to_json, input_tokens: 0, output_tokens: 0 }
+      else
+        m.call(*args, **kw)
+      end
+    end
+
+    judged = svc.generate_judged_exercise(user, language: "javascript")
+
+    expect(generate_calls).to eq(1)
+    expect(prompts.one?).to be(true)
+    expect(prompts.first).not_to include("This section's concept must be exactly")
+    expect(judged.dropped_sections).to eq([ "challenge" ])
+  end
+
+  it "drops a section rejected twice, records the principle, and never loops" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      calls[kind.key] += 1
+      kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.dropped_sections).to eq([ "pattern" ])
+    expect(judged.problem_set).not_to have_key("pattern")
+    expect(judged.outcomes["pattern"]).to include(status: :reject, principle: "scope_mismatch", retries: 1, dropped: true)
+    expect(calls["pattern"]).to eq(2)
+  end
+
+  it "keeps draft ingestion unchanged and prunes the judged set through ProblemSetIngest" do
+    ingest_calls = []
+    allow(ProblemSetIngest).to receive(:prune_to_expected_keys).and_call_original
+    allow(ProblemSetIngest).to receive(:call).and_wrap_original do |m, *args, **kw|
+      ingest_calls << kw.slice(:expected_keys, :fixed_concepts)
+      m.call(*args, **kw)
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    draft_calls = ingest_calls.select { |kw| kw[:fixed_concepts].blank? && kw[:expected_keys].size > 1 }
+
+    expect(ProblemSetIngest).to have_received(:prune_to_expected_keys)
+      .with(instance_of(Hash), expected_keys: %w[code_review pattern challenge plan_review])
+    expect(draft_calls).to eq([ { expected_keys: %w[code_review pattern challenge plan_review] } ])
+  end
+
+  it "does not replay ingest on an already-built judged parsons_problem set" do
+    allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
+      m.call(*args, **kw).with(third: :parsons_problem)
+    end
+    allow_any_instance_of(FakeService).to receive(:judge_section) { |_, _, kind, _section, **| verdict({ "status" => "keep" }, kind) }
+
+    ingest_orders = []
+    allow(ProblemSetIngest).to receive(:call).and_wrap_original do |m, *args, **kw|
+      result = m.call(*args, **kw)
+      if kw[:expected_keys] == %w[code_review pattern parsons_problem plan_review]
+        ingest_orders << result.problem_set.dig("parsons_problem", "display_order")&.dup
+      end
+      result
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(ingest_orders).to eq([ judged.problem_set.dig("parsons_problem", "display_order") ])
+  end
+
+  it "prunes unplanned extras before a dropped third can expose one as delivered" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Challenge ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    exercise = DailyExercise.new(problem_set: judged.problem_set, language: "ruby_rails", generated_at: Time.current, date: Date.current)
+
+    expect(judged.dropped_sections).to eq([ "challenge" ])
+    expect(judged.problem_set.keys).to contain_exactly("code_review", "pattern", "plan_review")
+    expect(exercise.active_section_keys).to eq(%w[code_review pattern plan_review])
+  end
+
+  # Serially, each rejection costs a full generation plus a re-judge, so three
+  # of them would run far past the single generation this path replaced.
+  it "resolves two rejections at once rather than one after the other" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless [ ExerciseSection::Pattern, ExerciseSection::Challenge ].include?(kind)
+
+      calls[kind.key] += 1
+      if calls[kind.key] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+    entered = Queue.new
+    release = Queue.new
+    allow_any_instance_of(FakeService).to receive(:retry_section) do |_, _user, _language, _draft, kind, _concept|
+      entered << kind.key
+      release.pop
+      FakeService::EXERCISE_PROBLEM_SET[kind.key].deep_dup
+    end
+
+    judged = nil
+    runner = Thread.new { judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails") }
+    # Both retries are inside retry_section before either has been allowed to
+    # return, which a serial loop cannot reach.
+    both = Timeout.timeout(20) { [ entered.pop, entered.pop ] }
+    2.times { release << :go }
+    runner.join(30)
+
+    expect(both).to contain_exactly("pattern", "challenge")
+    expect(judged.dropped_sections).to eq([])
+    expect(calls).to eq("pattern" => 2, "challenge" => 2)
+  end
+
+  # Every other fan-out here builds a fresh instance per thread, so no Faraday
+  # connection is shared between threads.
+  it "runs each retry on its own service instance, never the caller's" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless [ ExerciseSection::Pattern, ExerciseSection::Challenge ].include?(kind)
+
+      calls[kind.key] += 1
+      next verdict({ "status" => "keep" }, kind) if calls[kind.key] > 1
+
+      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+    end
+    retry_instances = Queue.new
+    allow_any_instance_of(FakeService).to receive(:retry_section) do |instance, _user, _language, _draft, kind, _concept|
+      retry_instances << instance
+      FakeService::EXERCISE_PROBLEM_SET[kind.key].deep_dup
+    end
+    caller_service = FakeService.new("fake-key")
+
+    caller_service.generate_judged_exercise(user, language: "ruby_rails")
+
+    instances = Array.new(retry_instances.size) { retry_instances.pop }
+    expect(instances.size).to eq(2)
+    expect(instances.map(&:object_id)).not_to include(caller_service.object_id)
+    expect(instances.map(&:object_id).uniq.size).to eq(2)
+  end
+
+  it "asks a single-section retry for a tighter read budget than a whole day's draft" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+    timeouts = {}
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      if %w[generate_exercise retry_section].include?(kw[:purpose])
+        timeouts[kw[:purpose]] = kw[:read_timeout]
+      end
+      m.call(*args, **kw)
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(timeouts).to eq(
+      "generate_exercise" => AiService::GENERATION_READ_TIMEOUT,
+      "retry_section"     => AiService::RETRY_READ_TIMEOUT
+    )
+    expect(AiService::RETRY_READ_TIMEOUT).to be < AiService::GENERATION_READ_TIMEOUT
+  end
+
+  it "records a retry separately from the initial draft" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::Pattern
+
+      calls[kind.key] += 1
+      if calls[kind.key] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "keep" }, kind)
+      end
+    end
+
+    expect {
+      FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    }.to change { ApiUsage.where(purpose: "retry_section").count }.by(1)
+      .and change { ApiUsage.where(purpose: "generate_exercise").count }.by(1)
+  end
+
+  # Nothing else distinguishes an anchored section: the outcomes hash the
+  # marker used to live in is discarded once the day is written.
+  it "stamps the anchored code_review, and stamps nothing on an ordinary section" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::CodeReview
+
+      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.problem_set["code_review"]["anchored"]).to be(true)
+    expect(judged.problem_set["pattern"]).not_to have_key("anchored")
+  end
+
+  # Time.zone is thread-isolated, so a judge thread left on UTC would date its
+  # usage row a day away from the generation it belongs to.
+  it "dates every judge thread's usage row on the caller's date" do
+    user.update!(time_zone: "Auckland")
+
+    travel_to Time.utc(2026, 9, 25, 22, 30) do
+      Time.use_zone("Auckland") do
+        FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+      end
+    end
+
+    dates = user.api_usages.where(purpose: %w[generate_exercise judge_section]).distinct.pluck(:date)
+    expect(user.api_usages.where(purpose: "judge_section").count).to be > 0
+    expect(dates).to eq([ Date.new(2026, 9, 26) ])
+  end
+
+  # The stored zone differs from the caller's so the spec also fails if the
+  # threads reread the user's zone instead of carrying the caller's.
+  it "dates every retry thread's usage row on the caller's date" do
+    user.update!(time_zone: "Hawaii")
+    judged_patterns = 0
+    allow_any_instance_of(FakeService).to receive(:judge_section).and_wrap_original do |m, *args, **kw|
+      kind = args[1]
+      next m.call(*args, **kw) unless kind == ExerciseSection::Pattern && (judged_patterns += 1) == 1
+
+      m.call(*args, **kw)
+      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+    end
+
+    travel_to Time.utc(2026, 9, 25, 22, 30) do
+      Time.use_zone("Auckland") do
+        FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+      end
+    end
+
+    expect(user.api_usages.where(purpose: "retry_section").count).to eq(1)
+    expect(user.api_usages.distinct.pluck(:date)).to eq([ Date.new(2026, 9, 26) ])
+  end
+
+  # The day is built around code_review and an empty set fails DailyExercise's
+  # presence validation, which would escape the batch job's per-user rescue.
+  it "keeps a twice-rejected code_review as the day's anchor rather than dropping it" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::CodeReview
+
+      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.dropped_sections).to eq([])
+    expect(judged.problem_set["code_review"]).to be_present
+    expect(judged.outcomes["code_review"]).to include(dropped: false, fallback: "anchor", retries: 1,
+                                                      principle: "scope_mismatch", retry_principle: "scope_mismatch")
+  end
+
+  it "keeps the drafted code_review when its retry generation fails" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::CodeReview ? verdict({ "status" => "reject", "principle" => "underdetermined", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+    svc = FakeService.new("fake-key")
+    drafted = false
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      raise AiService::RateLimitError, "slow down" if drafted
+
+      drafted = true
+      m.call(*args, **kw)
+    end
+    allow(Rails.logger).to receive(:warn)
+
+    judged = svc.generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.dropped_sections).to eq([])
+    expect(judged.problem_set["code_review"]["question"]).to eq(FakeService::EXERCISE_PROBLEM_SET["code_review"]["question"])
+    expect(judged.outcomes["code_review"]).to include(dropped: false, fallback: "anchor", retries: 0, retry_principle: nil)
+  end
+
+  it "keeps the draft's principle on a dropped section and records the retry's own verdict separately" do
+    calls = Hash.new(0)
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::Pattern
+
+      calls["pattern"] += 1
+      if calls["pattern"] == 1
+        verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+      else
+        verdict({ "status" => "reject", "principle" => "underdetermined", "evidence" => "y", "reason" => "r2" }, kind)
+      end
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.outcomes["pattern"]).to include(status: :reject, principle: "scope_mismatch",
+                                                  retry_principle: "underdetermined", issues: [], retries: 1, dropped: true)
+  end
+
+  it "drops a rejected section whose retry generation fails, without raising" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "underdetermined", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+    svc = FakeService.new("fake-key")
+    drafted = false
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      raise AiService::RateLimitError, "slow down" if drafted
+      drafted = true
+      m.call(*args, **kw)
+    end
+    allow(Rails.logger).to receive(:warn)
+    expect(Rails.logger).to receive(:warn).with(/judge_retry_failed/).at_least(:once)
+
+    judged = svc.generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.dropped_sections).to eq([ "pattern" ])
+    expect(judged.outcomes["pattern"]).to include(retries: 0, dropped: true, retry_principle: nil)
+  end
+
+  it "keeps the draft unedited and logs a fallback when the judge fails or answers invalidly" do
+    allow_any_instance_of(FakeService).to receive(:judge_section).and_raise(AiService::TimeoutError, "slow")
+    allow(Rails.logger).to receive(:warn)
+    expect(Rails.logger).to receive(:warn).with(/judge_fallback/).at_least(:once)
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.dropped_sections).to eq([])
+    expect(judged.outcomes.values).to all(include(fallback: "timeout", status: :keep))
+    expect(judged.problem_set["code_review"]["question"]).to eq(FakeService::EXERCISE_PROBLEM_SET["code_review"]["question"])
+  end
+
+  it "keeps the draft unedited when the judge answers outside its vocabulary" do
+    allow_any_instance_of(FakeService).to receive(:judge_section).and_raise(JudgeVerdict::Invalid, "unknown status")
+    allow(Rails.logger).to receive(:warn)
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(judged.outcomes.values).to all(include(fallback: "invalid_output"))
+  end
+
+  it "records a dropped section's planned concept as unhosted in the retention log" do
+    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("pattern", "concept")
+    user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard, mastered_at: 1.month.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - 3)
+    allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "reasoning_failure", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+
+    expect(Rails.logger).to receive(:info).with(/\[retention\].*dropped=pattern:#{concept}/).at_least(:once)
+    allow(Rails.logger).to receive(:info).and_call_original
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+  end
+
+  it "reports each dropped concept only on the retention line for its own track" do
+    fake_set = FakeService::EXERCISE_PROBLEM_SET
+    language_concept = fake_set.dig("pattern", "concept")
+    fourth_concept   = fake_set.dig("plan_review", "concept")
+    { language_concept => "ruby_rails", fourth_concept => ConceptBucket::PLAN_REVIEW }.each do |concept, bucket|
+      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard, mastered_at: 1.month.ago,
+                                     retention_interval_days: 7, next_retention_check_on: Date.current - 3)
+    end
+    allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless [ ExerciseSection::Pattern, ExerciseSection::PlanReview ].include?(kind)
+
+      verdict({ "status" => "reject", "principle" => "reasoning_failure", "evidence" => "x", "reason" => "r" }, kind)
+    end
+    retention_lines = []
+    allow(Rails.logger).to receive(:info).and_wrap_original do |m, msg|
+      retention_lines << msg if msg.is_a?(String) && msg.start_with?("[retention]")
+      m.call(msg)
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    language_line = retention_lines.find { |line| line.include?("bucket=ruby_rails ") }
+    fourth_line   = retention_lines.find { |line| line.include?("bucket=#{ConceptBucket::PLAN_REVIEW} ") }
+    expect(language_line).to end_with("dropped=pattern:#{language_concept}")
+    expect(fourth_line).to end_with("dropped=plan_review:#{fourth_concept}")
+  end
+
+  it "names the judge's outcomes and the unhosted planned concept in the diagnostics payload" do
+    concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("pattern", "concept")
+    user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard, mastered_at: 1.month.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - 3)
+    allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      kind == ExerciseSection::Pattern ? verdict({ "status" => "reject", "principle" => "reasoning_failure", "evidence" => "x", "reason" => "r" }, kind) : verdict({ "status" => "keep" }, kind)
+    end
+    logged = nil
+    allow(Rails.logger).to receive(:info) do |msg|
+      logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+
+    expect(payload["judge"]["pattern"]).to include("status" => "reject", "dropped" => true, "principle" => "reasoning_failure")
+    expect(payload["judge"]["pattern"]["latency_ms"]).to be_a(Integer)
+    expect(payload["unhosted"]).to include("section" => "pattern", "concept" => concept, "planned_as" => "retention")
+    expect(payload["delivered"]).not_to have_key("pattern")
+  end
+
+  # A rejection rate says how often; only the quoted text says on what.
+  it "records what a rejection was about in the diagnostics payload" do
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless kind == ExerciseSection::Pattern
+
+      verdict({ "status" => "reject", "principle" => "reasoning_failure",
+                "evidence" => "the question names the missing index", "reason" => "It says where to look." }, kind)
+    end
+    logged = nil
+    allow(Rails.logger).to receive(:info) do |msg|
+      logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+
+    expect(payload["judge"]["pattern"]).to include("evidence" => "the question names the missing index",
+                                                   "reason" => "It says where to look.")
+  end
+
+  it "leaves the single-stage path's diagnostics without a judge" do
+    logged = nil
+    allow(Rails.logger).to receive(:info) do |msg|
+      logged = msg if msg.is_a?(String) && msg.start_with?("[difficulty_diagnostics]")
+    end
+
+    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    payload = JSON.parse(logged.delete_prefix("[difficulty_diagnostics] "))
+
+    expect(payload["judge"]).to be_nil
+    expect(payload["unhosted"]).to eq([])
   end
 end

@@ -19,7 +19,7 @@ class SectionCount
     window = capped_window(history)
     return ceiling if window.size < MIN_SESSIONS
 
-    mean = window.sum { |entry| entry.answered.to_i }.fdiv(window.size)
+    mean = window.sum { |entry| entry.answered.to_i + entry.dropped.to_i }.fdiv(window.size)
 
     (mean.round + STRETCH).clamp(FLOOR, ceiling)
   end

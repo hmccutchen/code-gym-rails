@@ -10,6 +10,14 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
+    def judge_task
+      "Arrange the blocks into the working order."
+    end
+
+    def discovery?
+      true
+    end
+
     # Parsons is a SEQUENCING format: 5-8 blocks reordered into one correct
     # sequence, graded by positional diff against a known-correct order.
     #

@@ -7,6 +7,24 @@ class ExerciseSection::CodeReview < ExerciseSection
     false
   end
 
+  # Every day is built around code_review, and a set with no sections at all
+  # fails DailyExercise's presence validation.
+  def self.droppable?
+    false
+  end
+
+  def self.judge_task
+    "Find the one planted issue in the snippet and say how to fix it."
+  end
+
+  def self.discovery?
+    true
+  end
+
+  def self.prose_fields
+    %w[scenario question teaching_note]
+  end
+
   # The only kind with a content mode. `artifact` is the day's language-
   # specific schema artifact and `test_framework` its test-framework steer
   # (both from AiService::LANGUAGE_CONFIG); each is read only on the matching

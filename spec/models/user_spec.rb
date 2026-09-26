@@ -1819,3 +1819,17 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
     end
   end
 end
+
+RSpec.describe User, "#recent_exercise_history with dropped sections", type: :model do
+  it "counts a dropped section as scheduled for rotation and carries its count" do
+    user = User.create!(email: "drops@example.com", name: "D")
+    user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { "code_review" => { "question" => "q" }, "pattern" => { "question" => "q" } },
+      dropped_sections: [ "challenge" ])
+
+    entry = user.recent_exercise_history(limit: 5).first
+
+    expect(entry.section_keys).to match_array(%w[code_review pattern challenge])
+    expect(entry.dropped).to eq(1)
+  end
+end

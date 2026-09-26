@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_22_213231) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_25_040303) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -70,6 +70,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_22_213231) do
   create_table "daily_exercises", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
+    t.jsonb "dropped_sections", default: [], null: false
     t.datetime "generated_at", null: false
     t.string "language", default: "ruby_rails", null: false
     t.jsonb "problem_set", default: {}, null: false

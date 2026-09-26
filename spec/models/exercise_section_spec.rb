@@ -23,6 +23,13 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".droppable?" do
+    it "is false for the day's anchor and true for every other kind" do
+      expect(ExerciseSection::CodeReview.droppable?).to be(false)
+      expect((described_class.all - [ ExerciseSection::CodeReview ]).map(&:droppable?)).to all(be(true))
+    end
+  end
+
   describe ".thirds" do
     # Precedence, not enumeration order — DailyExercise#third_key relies on
     # architecture winning over security_review over challenge.
@@ -881,6 +888,12 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".judge_task" do
+    it "is required of every kind" do
+      expect { ExerciseSection.judge_task }.to raise_error(NotImplementedError, /must state its task/)
+    end
+  end
+
   describe ".answer_lines" do
     it "marks an absent answer and rating rather than rendering blanks" do
       expect(ExerciseSection.answer_lines(nil, nil))
@@ -1041,5 +1054,19 @@ RSpec.describe ExerciseSection do
       expect(described_class.rotatable)
         .not_to include(ExerciseSection::CodeReview, ExerciseSection::Pattern)
     end
+  end
+end
+
+RSpec.describe ExerciseSection, "judge facets" do
+  it "gives every kind a task and prose fields drawn from its own schema" do
+    ExerciseSection.all.each do |kind|
+      expect(kind.judge_task).to be_a(String).and(satisfy { |s| s.length > 20 })
+      expect(kind.prose_fields).to include("question", "teaching_note")
+      expect(kind.prose_fields).not_to include("concept", "snippet", "starter_code", "blocks", "plan_excerpt", "planted_ambiguities", "problem_statement", "answer_scaffold", "diagram", "options")
+    end
+  end
+
+  it "marks the discovery kinds" do
+    expect(ExerciseSection.all.select(&:discovery?).map(&:key)).to match_array(%w[code_review security_review plan_review parsons_problem])
   end
 end

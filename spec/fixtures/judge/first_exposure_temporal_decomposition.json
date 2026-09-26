@@ -1,0 +1,20 @@
+{
+  "kind": "pattern",
+  "rung": "senior",
+  "locked": false,
+  "expected": "keep_or_edit",
+  "principle": null,
+  "section": {
+    "title": "Ordering Steps by Data, Not by Time",
+    "why": "Splitting a module by when steps happen instead of by what actually varies independently makes every step's interface leak into the next one.",
+    "question": "This onboarding flow is split into CollectProfileStep, VerifyEmailStep, and SendWelcomeStep classes that pass a mutable session hash between them in a fixed order. What's a better way to decompose it?",
+    "scenario": "a multi-step user-onboarding flow",
+    "teaching_note": "Ask what each step actually needs to know, rather than what order it currently runs in.",
+    "concept": "temporal_decomposition",
+    "answer_scaffold": [
+      "Your approach:",
+      "Interface — how would this be called:",
+      "What would be easy to get wrong or worth testing:"
+    ]
+  }
+}
