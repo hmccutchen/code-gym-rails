@@ -33,10 +33,6 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     "Write pseudocode that meets the stated requirements, including the one an under-specified plan would miss."
   end
 
-  def self.planned_concept(mode: nil)
-    "unhandled_empty_input"
-  end
-
   def self.default_scaffold
     nil
   end

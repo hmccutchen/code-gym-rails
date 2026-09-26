@@ -22,10 +22,6 @@ class ExerciseSection::PlanReview < ExerciseSection
     "Find the planted flaws across levels and say what to push back on before approving."
   end
 
-  def self.planned_concept(mode: nil)
-    "unjustified_constant"
-  end
-
   def self.discovery?
     true
   end

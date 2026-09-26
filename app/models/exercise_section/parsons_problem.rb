@@ -14,10 +14,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       "Arrange the blocks into the working order."
     end
 
-    def planned_concept(mode: nil)
-      "idempotency"
-    end
-
     def discovery?
       true
     end
