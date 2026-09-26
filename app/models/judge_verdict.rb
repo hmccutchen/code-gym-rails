@@ -1,8 +1,8 @@
 # The judge's reply, held to its closed vocabulary at the boundary the way
 # ProblemSetIngest holds a problem set: a status outside three, an issue type
-# or principle outside the lists, or a rewritten field outside the kind's
-# prose fields is invalid output, not a judgment. Pure; specs need no
-# database.
+# or principle outside the lists, a rewritten field outside the kind's prose
+# fields, or blank evidence or reason is invalid output, not a judgment. Pure;
+# specs need no database.
 class JudgeVerdict
   Invalid = Class.new(StandardError)
 
@@ -41,22 +41,23 @@ class JudgeVerdict
     raise Invalid, "issue must be an object" unless issue.is_a?(Hash)
     type = issue["type"].to_s
     raise Invalid, "unknown issue type #{type.inspect}" unless ISSUE_TYPES.include?(type)
-    { type: type, evidence: quoted(issue["evidence"]) }
+    { type: type, evidence: required_text(issue["evidence"], "evidence") }
   end
   private_class_method :parse_issue
 
   def self.parse_reject(raw)
     principle = raw["principle"].to_s
     raise Invalid, "unknown principle #{principle.inspect}" unless PRINCIPLES.include?(principle)
-    new(status: :reject, principle: principle, evidence: quoted(raw["evidence"]), reason: raw["reason"].to_s.strip)
+    new(status: :reject, principle: principle,
+        evidence: required_text(raw["evidence"], "evidence"), reason: required_text(raw["reason"], "reason"))
   end
   private_class_method :parse_reject
 
-  def self.quoted(value)
-    raise Invalid, "evidence must quote the text" unless value.is_a?(String) && value.strip.present?
+  def self.required_text(value, name)
+    raise Invalid, "#{name} must be non-blank text" unless value.is_a?(String) && value.strip.present?
     value.strip
   end
-  private_class_method :quoted
+  private_class_method :required_text
 
   def initialize(status:, issues: [], fields: {}, principle: nil, evidence: nil, reason: nil)
     @status = status

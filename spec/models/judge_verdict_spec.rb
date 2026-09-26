@@ -37,6 +37,14 @@ RSpec.describe JudgeVerdict do
       .to raise_error(described_class::Invalid, /evidence/)
   end
 
+  it "rejects a rejection whose reason is missing, blank, or not a string" do
+    base = { "status" => "reject", "principle" => "underdetermined", "evidence" => "x" }
+    [ {}, { "reason" => " " }, { "reason" => [ "a", "b" ] } ].each do |reason|
+      expect { described_class.parse(base.merge(reason), kind: kind) }.to raise_error(described_class::Invalid, /reason/)
+    end
+    expect(described_class.parse(base.merge("reason" => " It never says. "), kind: kind).reason).to eq("It never says.")
+  end
+
   it "rejects an edit with no issues, a blank rewritten field, or a non-hash" do
     expect { described_class.parse({ "status" => "edit", "issues" => [], "fields" => { "question" => "q" } }, kind: kind) }.to raise_error(described_class::Invalid)
     expect { described_class.parse({ "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ], "fields" => { "question" => " " } }, kind: kind) }.to raise_error(described_class::Invalid)

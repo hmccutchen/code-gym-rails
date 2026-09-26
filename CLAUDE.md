@@ -573,7 +573,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `STATUSES`, `ISSUE_TYPES` and `PRINCIPLES` are closed lists;
   `.parse` refuses a status, issue type or principle outside them, a rewritten
   field that is not one of the kind's `prose_fields`, a field rewritten to
-  blank, and evidence that does not quote text. `#apply` merges the rewrite
+  blank, and evidence or a rejection reason that is missing, blank or not a
+  string. Evidence is not matched against the section's text: nothing acts on
+  it, and a verdict refused over a paraphrased or elided quote falls back to
+  the draft, so a real rejection would ship the broken section it caught. It
+  is there for a person reading the log. `#apply` merges the rewrite
   over the section, leaving the artifact untouched. Because the code checks
   all of that, the prompt states only the semantic judgments — the same split
   `ProblemSetIngest` applies to a problem set.
@@ -1544,7 +1548,7 @@ always pull in the full suite — is stated once, in
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, and rejects an unusable ambiguity-hunt answer key, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
-- `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence is invalid output rather than a judgment. Pure; its specs need no database
+- `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence or reason is invalid output rather than a judgment. Pure; its specs need no database
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
 - `app/models/kind_preferences.rb` — `KindPreferences`: a user's stated weight and exclusion bias over rotating kinds, as plain values `SectionRotation` takes instead of a `User`, so its specs need no database. `.none` is the untouched default; a stored value outside `MULTIPLIERS` reads back as that default rather than reaching `WeightedRoll`
 - `app/models/kind_difficulty.rb` — `KindDifficulty`: a user's stated difficulty target and lock per section kind, as plain values the same way `KindPreferences` is. A level outside `LEVELS` reads as unset and a lock on an untargeted kind reads as unlocked, so an orphaned lock can never suppress easing the user did not validly choose. `#rung_for` is the rung a kind is pitched at today, target or skill level, and `RUNG_FOR_SKILL_LEVEL` the one reading of the skill scale as rungs
