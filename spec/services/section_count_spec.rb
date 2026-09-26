@@ -62,11 +62,32 @@ RSpec.describe SectionCount do
   end
 
   describe "with dropped sections" do
-    it "caps drop credit at the sections the engineer actually saw" do
+    it "counts only answered sections when a delivered section was left unanswered" do
+      partial = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern challenge], answered: 2, dropped: 1)
+
+      expect(described_class.send(:credited_sections, partial)).to eq(2)
+    end
+
+    it "credits a drop when every delivered section was answered" do
+      complete = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern challenge], answered: 3, dropped: 1)
+
+      expect(described_class.send(:credited_sections, complete)).to eq(3)
+    end
+
+    it "treats a no-response day as zero credit even when sections were dropped" do
+      no_response = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern challenge], answered: nil, dropped: 1)
+
+      expect(described_class.send(:credited_sections, no_response)).to eq(0)
+    end
+
+    it "counts only the answered section when some delivered sections were dropped" do
       capped = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
         delivered_section_keys: %w[code_review pattern], answered: 1, dropped: 2)
 
-      expect(described_class.for([ capped, capped, capped ])).to eq(3)
+      expect(described_class.for([ capped, capped, capped ])).to eq(2)
     end
 
     it "can shorten tomorrow when more sections were dropped than the engineer left unanswered" do
@@ -76,23 +97,23 @@ RSpec.describe SectionCount do
       expect(described_class.for([ half_delivered, half_delivered, half_delivered ])).to eq(3)
     end
 
-    it "credits a drop against an unanswered delivered section, so it does not read as a skip" do
+    it "can lower tomorrow when dropped sections no longer mask skipped delivered work" do
       full  = exercise_history_entry(section_keys: %w[code_review pattern challenge],
         delivered_section_keys: %w[code_review pattern challenge],
         answered: 3, dropped: 0)
       short = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
         delivered_section_keys: %w[code_review pattern challenge], answered: 2, dropped: 1)
 
-      expect(described_class.for([ short, full, full ])).to eq(described_class.for([ full, full, full ]))
+      expect(described_class.for([ short, short, full ])).to be < described_class.for([ full, full, full ])
     end
 
-    it "handles a no-response row without crediting beyond what was delivered" do
+    it "lets no-response rows count as zero in tomorrow's section count" do
       no_response = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
         delivered_section_keys: [ "code_review" ], answered: nil, dropped: 3)
       full = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
         delivered_section_keys: %w[code_review pattern challenge plan_review], answered: 4, dropped: 0)
 
-      expect(described_class.for([ no_response, no_response, full ])).to eq(3)
+      expect(described_class.for([ no_response, no_response, full ])).to eq(2)
     end
   end
 end

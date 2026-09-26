@@ -24,10 +24,15 @@ class SectionCount
     (mean.round + STRETCH).clamp(FLOOR, ceiling)
   end
 
-  # A drop is credited so it does not read as a skip, but never past what was
-  # delivered, so it cannot claim completion of sections nobody saw.
+  # A drop counts only when every delivered section was answered, so a dropped
+  # section never stands in for one the engineer saw and skipped.
   def self.credited_sections(entry)
-    [ entry.answered.to_i + entry.dropped, entry.delivered_section_keys.size ].min
+    answered = entry.answered.to_i
+    delivered = entry.delivered_section_keys.size
+
+    return answered unless answered >= delivered
+
+    [ answered + entry.dropped, delivered ].min
   end
   private_class_method :credited_sections
 
