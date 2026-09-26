@@ -5624,7 +5624,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
   # Time.zone is thread-isolated, so a judge thread left on UTC would date its
   # usage row a day away from the generation it belongs to.
-  it "dates every judge thread's usage row in the user's own zone" do
+  it "dates every judge thread's usage row on the caller's date" do
     user.update!(time_zone: "Auckland")
 
     travel_to Time.utc(2026, 9, 25, 22, 30) do
