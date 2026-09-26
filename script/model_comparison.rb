@@ -144,14 +144,22 @@ class ModelComparison
   end
 
   def print_fixture_row(row)
-    @out.puts "#{row[:name]}: expected=#{row[:expected]} got=#{row[:status] || 'invalid'} " \
-              "classification=#{row[:classification]} principle=#{row[:principle]} #{row[:ms]}ms"
+    @out.puts "#{row[:name]}: expected=#{row[:expected]} got=#{row[:status] || row[:classification]} " \
+              "classification=#{row[:classification]} principle=#{row[:principle]} #{row[:ms]}ms" \
+              "#{fixture_row_detail(row)}"
+  end
+
+  def fixture_row_detail(row)
+    return " (#{row[:error]})" if row[:error]
+    return "" if row[:issues].blank?
+
+    " issues=" + row[:issues].map { |issue| "#{issue[:type]}: #{issue[:evidence].inspect}" }.join("; ")
   end
 
   def print_fixture_totals(route, rows, usage)
     broken        = rows.select { |row| row[:expected] == "reject" }
     sound         = rows.select { |row| row[:expected] == "keep_or_edit" }
-    valid         = rows.reject { |row| row[:classification] == :invalid }
+    valid         = rows.reject { |row| %i[invalid error].include?(row[:classification]) }
     detected      = broken.count { |row| row[:classification] == :detected }
     false_rejects = sound.count { |row| row[:classification] == :false_reject }
     tokens_in     = usage.sum { |row| row[:tokens_in] }
@@ -177,25 +185,35 @@ class ModelComparison
     (tokens_in * price[:input] + tokens_out * price[:output]) / 1_000_000.0
   end
 
+  # A provider failure is an error row, not invalid output, so one fixture's
+  # timeout neither ends the run nor counts against the model's valid rate
+  # as if it had answered badly.
   def fixture_row(service, user, fixture)
     kind    = ExerciseSection.for(fixture["kind"])
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    verdict = begin
-      service.judge_section(user, kind, fixture["section"], rung: fixture["rung"], locked: fixture["locked"])
-    rescue JudgeVerdict::Invalid
-      nil
+    result  = begin
+      fixture_result(fixture, service.judge_section(user, kind, fixture["section"],
+                                                    rung: fixture["rung"], locked: fixture["locked"]))
+    rescue JudgeVerdict::Invalid => e
+      fixture_failure(fixture, :invalid, e)
+    rescue AiService::Error => e
+      fixture_failure(fixture, :error, e)
     end
 
-    fixture_result(fixture, verdict, ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round)
+    result.merge(ms: ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round)
   end
 
-  def fixture_result(fixture, verdict, ms)
-    return { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"],
-             status: nil, principle: nil, classification: :invalid, ms: ms } if verdict.nil?
+  def fixture_result(fixture, verdict)
+    fixture_identity(fixture).merge(status: verdict.status, principle: verdict.principle, issues: verdict.issues,
+                                    classification: classify_fixture(fixture, verdict))
+  end
 
-    { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"],
-      status: verdict.status, principle: verdict.principle,
-      classification: classify_fixture(fixture, verdict), ms: ms }
+  def fixture_failure(fixture, classification, error)
+    fixture_identity(fixture).merge(classification: classification, error: "#{error.class}: #{error.message}")
+  end
+
+  def fixture_identity(fixture)
+    { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"] }
   end
 
   # detected/wrong_principle/missed for a fixture whose section is meant to be

@@ -166,4 +166,31 @@ RSpec.describe ModelComparison do
     expect(out.string).to include("unstated_prerequisite: 2/2")
     expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
   end
+
+  it "judge_fixtures prints a provider failure as that fixture's row and finishes every table" do
+    failing = JSON.parse(File.read(Rails.root.join("spec/fixtures/judge/thread_prerequisite.json")))["section"]
+    allow_any_instance_of(ClaudeService).to receive(:judge_section) do |_service, _user, _kind, section, **|
+      raise AiService::RateLimitError, "slow down" if section == failing
+
+      JudgeVerdict.new(status: :keep)
+    end
+
+    comparison.judge_fixtures
+
+    ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
+    expect(out.string.scan(/^thread_prerequisite: .*got=error .*AiService::RateLimitError: slow down/).size)
+      .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
+    expect(out.string).to include("valid: 10/11")
+  end
+
+  it "judge_fixtures prints each edit's issues with the text they quote" do
+    allow_any_instance_of(ClaudeService).to receive(:judge_section).and_return(
+      JudgeVerdict.new(status: :edit, issues: [ { type: "padding", evidence: "Once upon a time" } ],
+                       fields: { "question" => "Shorter?" })
+    )
+
+    comparison.judge_fixtures
+
+    expect(out.string).to include("issues=padding: \"Once upon a time\"")
+  end
 end
