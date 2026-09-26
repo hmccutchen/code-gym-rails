@@ -638,6 +638,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   never name a concept the plan did not offer. The `[retention]` line gains
   `dropped=key:concept`, so a due check tagged on a dropped section reads as
   offered rather than honored, and the diagnostics payload gains `unhosted:`.
+  Each of the two `[retention]` lines names only its own track's drops: a
+  dropped fourth-slot kind (`ExerciseSection.fourths`) goes on the fourth
+  bucket's line, and every other dropped kind on the language line.
 
   **A judge failure never costs the day its set.** When `judge_section`
   raises, times out, or returns output `JudgeVerdict` refuses, the draft

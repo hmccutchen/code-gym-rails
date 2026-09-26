@@ -5724,6 +5724,34 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
   end
 
+  it "reports each dropped concept only on the retention line for its own track" do
+    fake_set = FakeService::EXERCISE_PROBLEM_SET
+    language_concept = fake_set.dig("pattern", "concept")
+    fourth_concept   = fake_set.dig("plan_review", "concept")
+    { language_concept => "ruby_rails", fourth_concept => ConceptBucket::PLAN_REVIEW }.each do |concept, bucket|
+      user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard, mastered_at: 1.month.ago,
+                                     retention_interval_days: 7, next_retention_check_on: Date.current - 3)
+    end
+    allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+    allow_any_instance_of(FakeService).to receive(:judge_section) do |_, _, kind, _section, **|
+      next verdict({ "status" => "keep" }, kind) unless [ ExerciseSection::Pattern, ExerciseSection::PlanReview ].include?(kind)
+
+      verdict({ "status" => "reject", "principle" => "reasoning_failure", "evidence" => "x", "reason" => "r" }, kind)
+    end
+    retention_lines = []
+    allow(Rails.logger).to receive(:info).and_wrap_original do |m, msg|
+      retention_lines << msg if msg.is_a?(String) && msg.start_with?("[retention]")
+      m.call(msg)
+    end
+
+    FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    language_line = retention_lines.find { |line| line.include?("bucket=ruby_rails ") }
+    fourth_line   = retention_lines.find { |line| line.include?("bucket=#{ConceptBucket::PLAN_REVIEW} ") }
+    expect(language_line).to end_with("dropped=pattern:#{language_concept}")
+    expect(fourth_line).to end_with("dropped=plan_review:#{fourth_concept}")
+  end
+
   it "names the judge's outcomes and the unhosted planned concept in the diagnostics payload" do
     concept = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails").dig("pattern", "concept")
     user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard, mastered_at: 1.month.ago,

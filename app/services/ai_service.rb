@@ -1340,10 +1340,12 @@ class AiService
     record_suggested_concepts(draft.suggested_concepts)
 
     dropped_concepts = dropped.to_h { |key| [ key, draft.problem_set.dig(key, "concept") ] }
-    log_retention(user, language, plan.due_checks, set, plan.code_review_mode, dropped: dropped_concepts)
+    fourth_dropped, language_dropped = dropped_concepts
+      .partition { |key, _| ExerciseSection.fourths.include?(ExerciseSection.find(key)) }.map(&:to_h)
+    log_retention(user, language, plan.due_checks, set, plan.code_review_mode, dropped: language_dropped)
     if plan.fourth
       log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
-                    set, plan.code_review_mode, dropped: dropped_concepts)
+                    set, plan.code_review_mode, dropped: fourth_dropped)
     end
     log_difficulty_diagnostics(user, language, plan, set, draft.history,
                                kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
