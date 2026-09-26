@@ -1355,16 +1355,10 @@ class AiService
   # One thread per drafted section, as grading does. No thread writes the set:
   # each returns its own section back and the caller assembles both hashes, so
   # the only shared state is read-only for the length of the fan-out.
-  #
-  # Time.zone is per thread, so the zone is carried in explicitly: without it
-  # every ApiUsage row a judge thread writes is dated in UTC while the
-  # generation it belongs to is dated in the user's zone, splitting one day's
-  # cost across two dates either side of midnight.
   def judge_all(user, kinds, set, difficulty, skill_level)
-    zone    = Time.zone
     threads = kinds.filter_map do |kind|
       section = set[kind.key]
-      Thread.new { Time.use_zone(zone) { judge_outcome(user, kind, section, difficulty, skill_level) } } if section
+      thread_in_caller_zone { judge_outcome(user, kind, section, difficulty, skill_level) } if section
     end
 
     threads.map(&:value).each_with_object({}) do |(key, outcome, section), outcomes|
@@ -1378,13 +1372,9 @@ class AiService
   # thread boundary: `set` is read once per key here and written by the caller.
   # Returns [key, section_or_nil, outcome] per rejection.
   def resolve_rejections(user, language, draft, set, outcomes)
-    zone = Time.zone
-
     rejected_keys(outcomes).map { |key|
       kind = ExerciseSection.find(key)
-      Thread.new do
-        Time.use_zone(zone) { [ key, *resolve_rejection(user, language, draft, kind, set[key], outcomes[key]) ] }
-      end
+      thread_in_caller_zone { [ key, *resolve_rejection(user, language, draft, kind, set[key], outcomes[key]) ] }
     }.map(&:value)
   end
 
@@ -2500,6 +2490,16 @@ class AiService
     ExerciseSection.for(section).grading_note(
       section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
     )
+  end
+
+  # Time.zone is per thread, so a bare Thread.new runs in the default zone and
+  # its ApiUsage row lands on a different date from the rows its caller writes
+  # whenever the two zones straddle midnight. Carrying the caller's zone, rather
+  # than rereading the user's, keeps every row of one fan-out on the date the
+  # caller's own unthreaded calls use.
+  def thread_in_caller_zone(&work)
+    zone = Time.zone
+    Thread.new { Time.use_zone(zone, &work) }
   end
 
   # The grades are what the engineer paid for, so the note never gets to hold

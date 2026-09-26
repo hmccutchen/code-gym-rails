@@ -5611,6 +5611,29 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(dates).to eq([ Date.new(2026, 9, 26) ])
   end
 
+  # The stored zone differs from the caller's so the spec also fails if the
+  # threads reread the user's zone instead of carrying the caller's.
+  it "dates every retry thread's usage row on the caller's date" do
+    user.update!(time_zone: "Hawaii")
+    judged_patterns = 0
+    allow_any_instance_of(FakeService).to receive(:judge_section).and_wrap_original do |m, *args, **kw|
+      kind = args[1]
+      next m.call(*args, **kw) unless kind == ExerciseSection::Pattern && (judged_patterns += 1) == 1
+
+      m.call(*args, **kw)
+      verdict({ "status" => "reject", "principle" => "scope_mismatch", "evidence" => "x", "reason" => "r" }, kind)
+    end
+
+    travel_to Time.utc(2026, 9, 25, 22, 30) do
+      Time.use_zone("Auckland") do
+        FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+      end
+    end
+
+    expect(user.api_usages.where(purpose: "retry_section").count).to eq(1)
+    expect(user.api_usages.distinct.pluck(:date)).to eq([ Date.new(2026, 9, 26) ])
+  end
+
   # The day is built around code_review and an empty set fails DailyExercise's
   # presence validation, which would escape the batch job's per-user rescue.
   it "keeps a twice-rejected code_review as the day's anchor rather than dropping it" do
