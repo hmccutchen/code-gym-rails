@@ -3210,6 +3210,27 @@ RSpec.describe AiService do
       }.to change { ApiUsage.where(purpose: "review_response").count }.by(3)
     end
 
+    it "dates every review fanout usage row on the reviewer's local day across UTC midnight" do
+      exercise, response = exercise_and_response
+      user.update!(time_zone: "America/Los_Angeles")
+      svc = assessing_class.new(review: { "rating" => "solid" },
+                                difficulty: { "code_review" => { "level" => "moderate", "reason" => "One moving part." },
+                                              "pattern" => { "level" => "moderate", "reason" => "Two moving parts." } })
+
+      travel_to(Time.utc(2026, 7, 15, 2, 30)) do
+        local_today = Time.use_zone(user.effective_time_zone) { Date.current }
+
+        Time.use_zone(user.effective_time_zone) do
+          svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+        end
+
+        usage = ApiUsage.order(:purpose, :id)
+
+        expect(usage.pluck(:purpose)).to eq(%w[assess_difficulty review_response review_response])
+        expect(usage.pluck(:date).uniq).to eq([ local_today ])
+      end
+    end
+
     # A grading thread that hits pool exhaustion used to propagate through
     # Thread#value past ResponsesController#review's rescues: a 500 on a request
     # whose other sections had already graded, their results discarded after
