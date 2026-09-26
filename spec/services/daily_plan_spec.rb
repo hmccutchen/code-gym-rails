@@ -632,7 +632,8 @@ RSpec.describe DailyPlan do
   describe "difficulty targets" do
     it "never reads KindDifficulty and plans the same day regardless" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
-      allow(WeightedRoll).to receive(:pick).and_return(:application_code)
+      pin_code_review_mode(:application_code)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
       expect(KindDifficulty).not_to receive(:for)
       expect(KindDifficulty).not_to receive(:new)
 

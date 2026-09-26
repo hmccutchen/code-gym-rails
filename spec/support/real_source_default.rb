@@ -13,6 +13,10 @@
 # `allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:real)`
 # — a later stub wins — so the feature stays tested where it is meant to be,
 # never by accident elsewhere.
+#
+# That rule also means a later `receive(:pick)` stub with no `with(...)`
+# matches every roll and silently drops this pin. Pin any other roll by its
+# own weights, as `pin_code_review_mode` does.
 RSpec.configure do |config|
   config.before do
     allow(WeightedRoll).to receive(:pick).and_call_original
