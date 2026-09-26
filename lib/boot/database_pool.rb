@@ -7,8 +7,9 @@ require "active_support/configuration_file"
 # one thread per section, and each of those checks out a connection to write
 # its ApiUsage row, on top of the one the job thread may already hold. Solid
 # Queue's own polling and heartbeat take two more. The default pool of 5 held
-# the worker threads alone, so a checkout could time out and lose a verdict
-# the provider had already billed.
+# the worker threads alone, so a judge thread could wait out the checkout
+# timeout at the point it records a call the provider already billed. Sized
+# this way, the fan-out never waits for a connection.
 #
 # The cron batch generates one user at a time, so three judged generations at
 # once needs three overlapping hourly runs. The pool is sized for it anyway:
