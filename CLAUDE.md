@@ -625,7 +625,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   contribute at most two apiece, and the next day gets three sections. Within
   the cap, a drop fills in unanswered delivered sections, so on a day that lost
   one section, answering two of the three delivered counts the same as
-  answering all three. The cost of the rotation trade is the reverse of the loop it
+  answering all three (#215). The cost of the rotation trade is the reverse of the loop it
   prevents: a kind the judge keeps rejecting can go unseen for a long time
   without the starvation guarantee noticing. Nothing in the scheduler
   compensates, on purpose. Drop rate per kind is read off the
