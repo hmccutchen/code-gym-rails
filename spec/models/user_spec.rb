@@ -1823,7 +1823,7 @@ end
 RSpec.describe User, "#recent_exercise_history with dropped sections", type: :model do
   it "counts a dropped section as scheduled for rotation and carries its count" do
     user = User.create!(email: "drops@example.com", name: "D")
-    exercise = user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+    user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
       problem_set: { "code_review" => { "question" => "q" }, "pattern" => { "question" => "q" } },
       dropped_sections: [ "challenge" ])
 

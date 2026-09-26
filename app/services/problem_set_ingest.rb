@@ -179,6 +179,7 @@ class ProblemSetIngest
   def call
     reject_missing_sections!
     warn_unrequested_sections!
+    prune_retry_extras!
     reject_unusable_answer_key!
     reject_unusable_problem_statement!
     enforce_fixed_concepts!
@@ -225,10 +226,14 @@ class ProblemSetIngest
       "[unrequested_sections] provider returned section(s) the day did not intend: " \
       "#{unrequested.to_json} (intended: #{@expected_keys.to_json})"
     )
+  end
 
-    # A single-section retry asked for exactly one key, so anything else the
-    # provider returned is not part of the repaired section this path may keep.
-    @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys) if @fixed_concepts.any?
+  # A single-section retry asked for exactly one key, so anything else the
+  # provider returned is not part of the repaired section this path may keep.
+  def prune_retry_extras!
+    return if @fixed_concepts.empty?
+
+    @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
 
   # Unlike every other step, this one rejects rather than repairs. The planted
