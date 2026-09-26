@@ -2501,13 +2501,15 @@ class AiService
   end
 
   def log_usage(user, result, purpose:)
-    ApiUsage.create!(
-      user:       user,
-      tokens_in:  result[:input_tokens].to_i,
-      tokens_out: result[:output_tokens].to_i,
-      purpose:    purpose,
-      date:       Date.current
-    )
+    ActiveRecord::Base.connection_pool.with_connection do
+      ApiUsage.create!(
+        user:       user,
+        tokens_in:  result[:input_tokens].to_i,
+        tokens_out: result[:output_tokens].to_i,
+        purpose:    purpose,
+        date:       Date.current
+      )
+    end
   rescue => e
     Rails.logger.warn("ApiUsage log failed: #{e.message}")
   end
@@ -2523,14 +2525,9 @@ class AiService
   # that it's fatal is shared policy, and belongs with the rest of the
   # response handling here.
   #
-  # The connection checkout wraps only #log_usage, not the `call` above it —
-  # `call` is the provider HTTP round trip, the one part of this method with
-  # no DB work in it, and it's shared by #review_sections' per-section
-  # threads (see that method's comment). A caller that already holds a
-  # connection (every non-threaded caller, via Rails' request-cycle checkout)
-  # sees a harmless no-op here: ActiveRecord's with_connection reuses a
-  # connection already leased to the current thread rather than checking out
-  # a second one.
+  # #log_usage checks out its own connection after the provider call, and
+  # rescues both the checkout and the write: usage is telemetry, never a
+  # reason to discard a billed provider result.
   #
   # `allow_truncated:` hands a cut-off reply back with its `truncated` flag
   # instead of raising. Only a prose caller may ask for it: a JSON body that
@@ -2541,7 +2538,7 @@ class AiService
                    read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], allow_truncated: false)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
                   read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
-    ActiveRecord::Base.connection_pool.with_connection { log_usage(user, result, purpose: purpose) }
+    log_usage(user, result, purpose: purpose)
 
     raise RefusalError, "Claude declined this request (#{result[:refusal]})" if result[:refusal]
 

@@ -322,6 +322,22 @@ RSpec.describe AiService do
         }.to raise_error(AiService::TruncatedResponseError)
       }.to change { ApiUsage.where(purpose: "explain_differently").count }.by(1)
     end
+
+    it "returns the provider result when checking out a connection for usage logging times out" do
+      user
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {} })
+      svc = double_class.new(canned_text: "still usable")
+
+      allow(ActiveRecord::Base.connection_pool).to receive(:with_connection)
+        .and_raise(ActiveRecord::ConnectionTimeoutError, "could not obtain a connection")
+      allow(Rails.logger).to receive(:warn)
+
+      result = svc.explain_differently(user, exercise, resp, section: "code_review", prior_alternates: [])
+
+      expect(result).to eq("still usable")
+      expect(Rails.logger).to have_received(:warn).with("ApiUsage log failed: could not obtain a connection")
+    end
   end
 
   # Assembly only. Each kind's own fragment is specified at its interface in
@@ -3296,6 +3312,22 @@ RSpec.describe AiService do
 
       expect(results["code_review"][:ok]).to be(true)
       expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", message: "rate limited")
+    end
+
+    it "keeps the graded sections when usage logging cannot check out a connection" do
+      exercise, response = exercise_and_response
+      review = { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }
+      svc = double_class.new(canned_text: review.to_json)
+
+      allow(ActiveRecord::Base.connection_pool).to receive(:with_connection)
+        .and_raise(ActiveRecord::ConnectionTimeoutError, "could not obtain a connection")
+
+      results = nil
+      expect { results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern]) }
+        .not_to raise_error
+
+      expect(results["code_review"]).to eq(ok: true, review: review)
+      expect(results["pattern"]).to eq(ok: true, review: review)
     end
 
     # Regression for a pool-exhaustion bug: each review thread used to hold a
