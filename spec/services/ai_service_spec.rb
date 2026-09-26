@@ -2726,8 +2726,7 @@ RSpec.describe AiService do
 
     it "logs level, lock, coverage, the chosen concept, and the block's length" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
-      allow(WeightedRoll).to receive(:pick).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+      pin_code_review_mode(:application_code)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       user.update!(section_kind_levels: { "challenge" => "principal_engineer" }, locked_section_kinds: [ "challenge" ])
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",

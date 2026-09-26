@@ -577,6 +577,13 @@ RSpec.describe DailyPlan do
       expect(plan(roll: :toy).code_review_source).to be_nil
     end
 
+    it "keeps the suite-wide toy pin when only the mode is pinned" do
+      allow(WeightedRoll).to receive(:rand).and_return(0.1)
+      pin_code_review_mode(:application_code)
+
+      expect(DailyPlan.for(user, language: "ruby_rails").code_review_source).to be_nil
+    end
+
     # Code Gym is Ruby; a javascript day asks for JS/React code or a Prisma
     # schema, and there is nothing here to ground either in. The roll is
     # pinned to :real so the example proves the gate, not the dice.
@@ -625,7 +632,8 @@ RSpec.describe DailyPlan do
   describe "difficulty targets" do
     it "never reads KindDifficulty and plans the same day regardless" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
-      allow(WeightedRoll).to receive(:pick).and_return(:application_code)
+      pin_code_review_mode(:application_code)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
       expect(KindDifficulty).not_to receive(:for)
       expect(KindDifficulty).not_to receive(:new)
 
@@ -680,11 +688,10 @@ RSpec.describe DailyPlan, "drilled concepts" do
     ConceptDrills.start!(user, concept: "wrong_cardinality", bucket: "ruby_rails")
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
 
-    allow(WeightedRoll).to receive(:pick).and_call_original
-    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    pin_code_review_mode(:application_code)
     expect(described_class.for(user, language: "ruby_rails").reinforcement).to eq([])
 
-    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
+    pin_code_review_mode(:schema_review)
     expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[wrong_cardinality])
   end
 
@@ -704,8 +711,7 @@ RSpec.describe DailyPlan, "drilled concepts" do
     submit("n_plus_one", date: Date.current - 1)
     ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
-    allow(WeightedRoll).to receive(:pick).and_call_original
-    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    pin_code_review_mode(:application_code)
 
     plan = described_class.for(user, language: "ruby_rails")
 
@@ -718,8 +724,7 @@ RSpec.describe DailyPlan, "drilled concepts" do
       mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 20
     )
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
-    allow(WeightedRoll).to receive(:pick).and_call_original
-    allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    pin_code_review_mode(:application_code)
 
     plan = described_class.for(user, language: "ruby_rails")
 

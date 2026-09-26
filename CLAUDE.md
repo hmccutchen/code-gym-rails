@@ -1357,7 +1357,10 @@ path opts out with its own `:real` stub. The mode roll is deliberately *not*
 pinned this way — it only changes the prompt, so a canned response comes back
 through ingest identical either way — but the real-source roll changes what
 ingest stamps onto the set, and without the default every example asserting
-on a delivered set is nondeterministic at the roll's weight.
+on a delivered set is nondeterministic at the roll's weight. A spec that needs
+a particular mode calls `pin_code_review_mode` (`spec/support/code_review_mode_helpers.rb`),
+which stubs only the mode's weights. A `WeightedRoll.pick` stub without
+`with(...)` matches every roll, so it replaces the `:toy` pin without failing.
 
 CI runs the suite against postgres 16 on every PR (see `.github/workflows/ci.yml`).
 
