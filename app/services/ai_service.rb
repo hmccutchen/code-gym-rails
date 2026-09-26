@@ -954,34 +954,16 @@ class AiService
   end
 
   # ── Draft, judge, retry once, drop — the weekday batch's path ────────────
-  # Each section is judged in its own thread, like grading. A rejection buys
-  # one regeneration of that section with its kind and drafted concept fixed,
-  # unless the drafted concept normalized to "other", which is rejected
-  # directly rather than spending a retry on an unusable tag. A second
-  # rejection drops the section. A judge that fails or answers invalidly
-  # leaves the draft unedited: the judge is never why a day has no set. The
-  # logs run last so they describe the final set.
-  #
-  # The retries fan out the way the judging does, so a day with three of them
-  # waits for the slowest rather than their sum — serially they ran a full
-  # generation and a re-judge each, which put the worst case far past the
-  # single call this path replaced, on a schedule that ticks hourly.
+  # Drafts here, then hands the draft to JudgedGeneration, which owns the
+  # judge, retry and drop rules. Every provider instance it uses is a fresh one
+  # built from this key, as every other fan-out here builds its own.
   def generate_judged_exercise(user, language: user.language_for_today)
     draft = draft_exercise(user, language: language, blocking: false)
-    # Strict pruning happens here, after the draft is built, on a deep copy —
-    # the draft keeps the concept of every section, including the ones dropped
-    # below, which log_retention and the unhosted list are named after.
-    set = ProblemSetIngest.prune_to_expected_keys(draft.problem_set, expected_keys: draft.kinds.map(&:key))
-    outcomes = judge_all(user, draft.kinds, set, draft.difficulty, user.skill_level)
-
-    resolve_rejections(user, language, draft, set, outcomes).each do |key, section, outcome|
-      outcomes[key] = outcome
-      section ? set[key] = section : set.delete(key)
-    end
-
-    dropped = outcomes.select { |_, outcome| outcome[:dropped] }.keys
-    finish_generation(user, language, draft, set, dropped: dropped, judge: outcomes)
-    JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes)
+    JudgedGeneration.call(
+      user: user, language: language, draft: draft,
+      providers: -> { self.class.new(@api_key).judged_generation_provider },
+      finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
+    )
   end
 
   # ── Review a submitted response, one thread per still-missing section ────
@@ -1259,6 +1241,25 @@ class AiService
     JudgeVerdict.parse(parse_json_object(result[:text], subject: "#{kind.key} verdict"), kind: kind)
   end
 
+  # Maps an error to the code a fan-out records for it. A class method so
+  # JudgedGeneration names failures the same way this class does.
+  def self.error_code_for(error)
+    case error
+    when AuthenticationError  then "authentication"
+    when RateLimitError       then "rate_limit"
+    when InvalidResponseError then "invalid_response"
+    else                           "other"
+    end
+  end
+
+  protected
+
+  # The two provider calls JudgedGeneration makes, handed over as bound methods
+  # so neither has to join this class's public API.
+  def judged_generation_provider
+    JudgedGeneration::Provider.new(judge_section: method(:judge_section), retry_section: method(:retry_section))
+  end
+
   private
 
   def judge_prompt(kind, visible, rung:, locked:)
@@ -1333,13 +1334,12 @@ class AiService
   # The tail both paths share. `set` is what will be delivered; `draft` still
   # holds every drafted section, so a dropped key can still be named with the
   # concept it was carrying.
-  def finish_generation(user, language, draft, set, dropped: [], judge: nil)
+  def finish_generation(user, language, draft, set, dropped_concepts: {}, judge: nil, unhosted: [])
     plan = draft.plan
     # After ingest, never during: ingest writes nothing and raises on an
     # unusable set, so a rejected response cannot have left a suggestion behind.
     record_suggested_concepts(draft.suggested_concepts)
 
-    dropped_concepts = dropped.to_h { |key| [ key, draft.problem_set.dig(key, "concept") ] }
     fourth_dropped, language_dropped = dropped_concepts
       .partition { |key, _| ExerciseSection.fourths.include?(ExerciseSection.find(key)) }.map(&:to_h)
     log_retention(user, language, plan.due_checks, set, plan.code_review_mode, dropped: language_dropped)
@@ -1349,147 +1349,13 @@ class AiService
     end
     log_difficulty_diagnostics(user, language, plan, set, draft.history,
                                kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
-                               judge: judge, unhosted: unhosted_concepts(plan, dropped_concepts))
-  end
-
-  # One thread per drafted section, as grading does. No thread writes the set:
-  # each returns its own section back and the caller assembles both hashes, so
-  # the only shared state is read-only for the length of the fan-out.
-  def judge_all(user, kinds, set, difficulty, skill_level)
-    threads = kinds.filter_map do |kind|
-      section = set[kind.key]
-      thread_in_caller_zone { judge_outcome(user, kind, section, difficulty, skill_level) } if section
-    end
-
-    threads.map(&:value).each_with_object({}) do |(key, outcome, section), outcomes|
-      set[key]      = section
-      outcomes[key] = outcome
-    end
-  end
-
-  # One thread per rejection, each on its own service instance and therefore
-  # its own connection, so nothing mutable crosses a thread boundary: `set` is
-  # read once per key here and written by the caller.
-  # Returns [key, section_or_nil, outcome] per rejection.
-  def resolve_rejections(user, language, draft, set, outcomes)
-    rejected_keys(outcomes).map { |key|
-      kind = ExerciseSection.find(key)
-      thread_in_caller_zone do
-        [ key, *self.class.new(@api_key).send(:resolve_rejection, user, language, draft, kind, set[key], outcomes[key]) ]
-      end
-    }.map(&:value)
-  end
-
-  # [key, outcome, section].
-  def judge_outcome(user, kind, section, difficulty, skill_level)
-    verdict, latency = judge_with_fallback(user, kind, section, difficulty, skill_level)
-    outcome = { status: :keep, issues: [], principle: nil, retries: 0,
-                dropped: false, fallback: nil, latency_ms: latency }
-    return [ kind.key, outcome.merge(fallback: verdict), section ] if verdict.is_a?(String)
-
-    [ kind.key, outcome.merge(judgment(verdict)), apply_verdict(verdict, section) ]
-  end
-
-  # `source` marks a section ProblemSetIngest#ground_code_review! stamped its
-  # own scenario onto — the real file, and that the copy is altered — so that
-  # field is the server's to write, not an editable prose field.
-  def apply_verdict(verdict, section)
-    edited = verdict.apply(section)
-    return edited if section["source"].blank?
-
-    edited.merge("scenario" => section["scenario"])
-  end
-
-  # The quoted text and the stated reason travel with the principle: a count
-  # per principle says how often the judge rejects, and only these say on
-  # what. Safe to log — the judge is never shown the answer key, so nothing
-  # it quotes can be from one.
-  def judgment(verdict)
-    { status: verdict.status, issues: verdict.issues.map { |issue| issue[:type] }, principle: verdict.principle,
-      evidence: verdict.evidence, reason: verdict.reason }
-  end
-
-  def rejected_keys(outcomes)
-    outcomes.select { |_, outcome| outcome[:status] == :reject }.keys
-  end
-
-  # The one regeneration a rejection buys, judged again. Returns
-  # [section_or_nil, outcome]; nil is a drop. `retries` counts a retry that was
-  # actually judged, not merely attempted, so a retry whose generation failed
-  # reads as 0. A judge that fails on the re-judge keeps the retry for the
-  # same reason it keeps a draft.
-  def resolve_rejection(user, language, draft, kind, section, outcome)
-    outcome = outcome.merge(retry_principle: nil)
-    return drop_or_anchor(kind, section, outcome.merge(retries: 0)) if section["concept"] == "other"
-
-    retried = retry_section(user, language, draft, kind, section["concept"])
-    return drop_or_anchor(kind, section, outcome.merge(retries: 0)) if retried.nil?
-
-    verdict, latency = judge_with_fallback(user, kind, retried, draft.difficulty, user.skill_level)
-    outcome = outcome.merge(retries: 1, latency_ms: outcome[:latency_ms] + latency)
-    return [ retried, outcome.merge(status: :keep, fallback: verdict) ] if verdict.is_a?(String)
-
-    verdict_summary = judgment(verdict)
-    if verdict.reject?
-      return drop_or_anchor(kind, retried, outcome.merge(retry_principle: verdict_summary[:principle],
-                                                         retry_issues: verdict_summary[:issues],
-                                                         retry_evidence: verdict_summary[:evidence],
-                                                         retry_reason: verdict_summary[:reason]))
-    end
-
-    # The draft's principle and issues survive a retry the judge accepted:
-    # they are the only record this section was rejected at all, and
-    # rejection rate per principle is read off these entries.
-    [ apply_verdict(verdict, retried), outcome.merge(status: verdict_summary[:status], retry_issues: verdict_summary[:issues]) ]
-  end
-
-  # A second rejection drops the section — unless the kind is the one the day
-  # cannot be delivered without, which ships the best section it has and says
-  # so. The principle is recorded either way, so the rejection is still read
-  # off the log.
-  #
-  # The delivered section is stamped too, because the outcomes are gone once
-  # the day is written: without it nothing in the set says the app judged this
-  # section broken and shipped it anyway. Nothing reads the stamp yet — it is
-  # graded and feeds mastery exactly as any other section does — so it exists
-  # to make such a day diagnosable and to give a later exclusion something to
-  # read.
-  def drop_or_anchor(kind, section, outcome)
-    return [ nil, outcome.merge(dropped: true) ] if kind.droppable?
-
-    [ section.merge("anchored" => true), outcome.merge(fallback: "anchor") ]
-  end
-
-  # Returns [verdict, ms], or [fallback reason, ms] when the judge could not
-  # answer. Its own service instance, and therefore its own connection, like
-  # every other thread this class fans out.
-  def judge_with_fallback(user, kind, section, difficulty, skill_level)
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    verdict = self.class.new(@api_key).judge_section(
-      user, kind, section,
-      rung: difficulty.rung_for(kind, skill_level: skill_level), locked: difficulty.locked?(kind)
-    )
-    [ verdict, elapsed_ms(started) ]
-  rescue JudgeVerdict::Invalid, AiService::Error, *INFRASTRUCTURE_ERRORS => e
-    reason = judge_fallback_reason(e)
-    Rails.logger.warn("[judge_fallback] user=#{user.id} section=#{kind.key} reason=#{reason}: #{e.message}")
-    [ reason, elapsed_ms(started) ]
-  end
-
-  # A timeout is the judge's commonest failure and the one worth separating,
-  # so it is named here rather than in #error_code_for, which the review path
-  # shares and where "other" is already what a timeout means.
-  def judge_fallback_reason(error)
-    case error
-    when JudgeVerdict::Invalid then "invalid_output"
-    when TimeoutError          then "timeout"
-    else                            error_code_for(error)
-    end
+                               judge: judge, unhosted: unhosted)
   end
 
   # One kind, one concept, through the same builder and the same ingest as the
   # draft — narrower, not different, which is why it asks for a narrower read
-  # budget too (see RETRY_READ_TIMEOUT). Failure is a drop, never a raised set.
+  # budget too (see RETRY_READ_TIMEOUT). Raises on failure; JudgedGeneration
+  # decides what a failed retry means.
   def retry_section(user, language, draft, kind, concept)
     result = call_and_log(
       user, purpose: "retry_section", read_timeout: RETRY_READ_TIMEOUT,
@@ -1504,28 +1370,6 @@ class AiService
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     ).problem_set[kind.key]
-  rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
-    Rails.logger.warn("[judge_retry_failed] user=#{user.id} section=#{kind.key}: #{e.message}")
-    nil
-  end
-
-  # What the plan asked for that no delivered section carries. The plan
-  # attributes a concept to a section only in the fourth slot, so this is
-  # decided after the fact the way log_retention decides honored: the dropped
-  # section's own concept, matched against what the plan offered.
-  def unhosted_concepts(plan, dropped_concepts)
-    retention     = (plan.due_checks + plan.fourth_due_checks).map(&:concept)
-    reinforcement = (plan.reinforcement.to_a + plan.fourth_reinforcement.to_a).map { |entry| entry[:concept] }
-
-    dropped_concepts.filter_map do |key, concept|
-      planned_as = "retention" if retention.include?(concept)
-      planned_as ||= "reinforcement" if reinforcement.include?(concept)
-      { section: key, concept: concept, planned_as: planned_as } if planned_as
-    end
-  end
-
-  def elapsed_ms(started)
-    ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round
   end
 
   # Guide and ladder fields are optional (see CONCEPT_GUIDE_FIELDS and
@@ -1686,14 +1530,7 @@ class AiService
     text
   end
 
-  def error_code_for(error)
-    case error
-    when AuthenticationError  then "authentication"
-    when RateLimitError       then "rate_limit"
-    when InvalidResponseError then "invalid_response"
-    else                           "other"
-    end
-  end
+  def error_code_for(error) = self.class.error_code_for(error)
 
   # Looks up the fixed per-language config, failing loudly on anything
   # outside RAILS_CONCEPTS/JS_CONCEPTS's languages (e.g. "mixed", or a typo)
@@ -2492,16 +2329,6 @@ class AiService
     ExerciseSection.for(section).grading_note(
       section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
     )
-  end
-
-  # Time.zone is per thread, so a bare Thread.new runs in the default zone and
-  # its ApiUsage row lands on a different date from the rows its caller writes
-  # whenever the two zones straddle midnight. Carrying the caller's zone, rather
-  # than rereading the user's, keeps every row of one fan-out on the date the
-  # caller's own unthreaded calls use.
-  def thread_in_caller_zone(&work)
-    zone = Time.zone
-    Thread.new { Time.use_zone(zone, &work) }
   end
 
   # The grades are what the engineer paid for, so the note never gets to hold
