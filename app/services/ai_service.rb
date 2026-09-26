@@ -944,13 +944,13 @@ class AiService
     # Started first so it overlaps everything below rather than following it:
     # the assessment is an extra provider call, but not extra waiting. It reads
     # the problems alone, so the translation step below writes nothing it needs.
-    difficulty = Thread.new { safe_difficulty_assessment(user, exercise, sections) }
+    difficulty = thread_in_caller_zone { safe_difficulty_assessment(user, exercise, sections) }
 
     translate_before_grading(user, exercise, daily_response, sections)
 
     coach   = config_for(exercise.language)[:coach]
     context = build_review_day_context(coach, exercise, daily_response)
-    threads = sections.map { |section| Thread.new { grade_section(user, exercise, daily_response, section, context) } }
+    threads = sections.map { |section| thread_in_caller_zone { grade_section(user, exercise, daily_response, section, context) } }
 
     results = threads.map(&:value).to_h
     merge_difficulty!(results, awaited_difficulty(difficulty))
@@ -2127,6 +2127,16 @@ class AiService
     ExerciseSection.for(section).grading_note(
       section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
     )
+  end
+
+  # Time.zone is per thread, so a bare Thread.new runs in the default zone and
+  # its ApiUsage row lands on a different date from the rows its caller writes
+  # whenever the two zones straddle midnight. Carrying the caller's zone, rather
+  # than rereading the user's, keeps every row of one fan-out on the date the
+  # caller's own unthreaded calls use.
+  def thread_in_caller_zone(&work)
+    zone = Time.zone
+    Thread.new { Time.use_zone(zone, &work) }
   end
 
   # The grades are what the engineer paid for, so the note never gets to hold

@@ -3210,6 +3210,47 @@ RSpec.describe AiService do
       }.to change { ApiUsage.where(purpose: "review_response").count }.by(3)
     end
 
+    it "dates every review fanout usage row on the reviewer's local day across UTC midnight" do
+      exercise, response = exercise_and_response
+      user.update!(time_zone: "America/Los_Angeles")
+      svc = assessing_class.new(review: { "rating" => "solid" },
+                                difficulty: { "code_review" => { "level" => "moderate", "reason" => "One moving part." },
+                                              "pattern" => { "level" => "moderate", "reason" => "Two moving parts." } })
+
+      travel_to(Time.utc(2026, 7, 15, 2, 30)) do
+        local_today = Time.use_zone(user.effective_time_zone) { Date.current }
+
+        Time.use_zone(user.effective_time_zone) do
+          svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+        end
+
+        usage = ApiUsage.order(:purpose, :id)
+
+        expect(usage.pluck(:purpose)).to eq(%w[assess_difficulty review_response review_response])
+        expect(usage.pluck(:date).uniq).to eq([ local_today ])
+      end
+    end
+
+    # The rows a review writes before its fan-out, such as the pseudocode
+    # translation, are dated in the caller's zone. Rereading the user's stored
+    # zone inside the threads would split one review across two dates whenever
+    # a caller runs in any other zone.
+    it "dates the fanout on the caller's zone rather than rereading the user's" do
+      exercise, response = exercise_and_response
+      user.update!(time_zone: "America/Los_Angeles")
+      svc = assessing_class.new(review: { "rating" => "solid" }, difficulty: {})
+
+      travel_to(Time.utc(2026, 7, 15, 2, 30)) do
+        Time.use_zone("Asia/Tokyo") do
+          svc.review_sections(user, exercise, response, sections: %w[code_review])
+        end
+      end
+
+      expect(ApiUsage.pluck(:purpose, :date)).to contain_exactly(
+        [ "assess_difficulty", Date.new(2026, 7, 15) ], [ "review_response", Date.new(2026, 7, 15) ]
+      )
+    end
+
     # A grading thread that hits pool exhaustion used to propagate through
     # Thread#value past ResponsesController#review's rescues: a 500 on a request
     # whose other sections had already graded, their results discarded after
