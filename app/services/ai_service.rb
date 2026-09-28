@@ -138,12 +138,19 @@ class AiService
     (read_timeout * (RETRY_MAX + 1)) + (RETRY_MAX * RETRY_MAX_INTERVAL)
   end
 
+  # call_budget_seconds plus an open timeout per attempt. Every attempt counts
+  # even for a call whose read timeout is final: a 429 or 5xx still retries,
+  # and it can arrive just before the read timeout each time.
+  def self.worst_case_call_seconds(read_timeout)
+    call_budget_seconds(read_timeout) + ((RETRY_MAX + 1) * OPEN_TIMEOUT)
+  end
+
   # How long a judged generation can run before it lands or fails: the draft,
   # then the judge fan-out, the retry fan-out and the re-judge fan-out, each
-  # waiting on its slowest thread. The draft and the retry exceed READ_TIMEOUT,
-  # so a timeout ends them after one attempt; the judge runs at READ_TIMEOUT
-  # and gets every retry.
-  JUDGED_GENERATION_BUDGET = GENERATION_READ_TIMEOUT + RETRY_READ_TIMEOUT + (2 * call_budget_seconds(READ_TIMEOUT))
+  # waiting on its slowest thread.
+  JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
+                             worst_case_call_seconds(RETRY_READ_TIMEOUT) +
+                             (2 * worst_case_call_seconds(READ_TIMEOUT))
 
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the

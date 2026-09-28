@@ -17,11 +17,9 @@ RSpec.describe AiService do
     # The difficulty note runs alongside everything and then gets
     # DIFFICULTY_ASSESSMENT_GRACE_SECONDS once grading is done.
     #
-    # Each call's worst case is AiService.call_budget_seconds at its own read
-    # timeout, plus an open timeout per attempt, which that method leaves out.
-    # That holds for the grade even though its budget makes a timeout final:
-    # a 429, 5xx or 529 still retries, and it can arrive just before the read
-    # timeout on every attempt.
+    # Each call's worst case is AiService.worst_case_call_seconds at its own
+    # read timeout. That holds for the grade even though its budget makes a
+    # timeout final: a 429, 5xx or 529 still retries.
     TRANSLATIONS_BEFORE_GRADING = 1
 
     # Provider time excludes usage writes, translation persistence, parsing,
@@ -29,14 +27,27 @@ RSpec.describe AiService do
     # for that work; this is headroom, not a deadline on database waits.
     REVIEW_OVERHEAD_SECONDS = 1.minute.to_i
 
-    def worst_case_call_seconds(read_timeout)
-      AiService.call_budget_seconds(read_timeout) + ((AiService::RETRY_MAX + 1) * AiService::OPEN_TIMEOUT)
+    def provider_review_budget_seconds
+      (TRANSLATIONS_BEFORE_GRADING * AiService.worst_case_call_seconds(AiService::READ_TIMEOUT)) +
+        AiService.worst_case_call_seconds(AiService::REVIEW_READ_TIMEOUT) +
+        AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS
     end
 
-    def provider_review_budget_seconds
-      (TRANSLATIONS_BEFORE_GRADING * worst_case_call_seconds(AiService::READ_TIMEOUT)) +
-        worst_case_call_seconds(AiService::REVIEW_READ_TIMEOUT) +
-        AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS
+    it "counts every attempt and its open timeout in a call's worst case" do
+      expect(AiService.worst_case_call_seconds(AiService::GENERATION_READ_TIMEOUT))
+        .to eq((AiService::RETRY_MAX + 1) * (AiService::GENERATION_READ_TIMEOUT + AiService::OPEN_TIMEOUT) +
+               (AiService::RETRY_MAX * AiService::RETRY_MAX_INTERVAL))
+    end
+
+    # A judged generation's stages run one after another, each waiting on its
+    # slowest thread, and a draft or retry whose timeout is final still retries
+    # a 429 or 5xx, so the dashboard's poller has to outlast every attempt.
+    it "gives a judged generation every attempt of each stage" do
+      stages = [ AiService::GENERATION_READ_TIMEOUT, AiService::READ_TIMEOUT,
+                 AiService::RETRY_READ_TIMEOUT, AiService::READ_TIMEOUT ]
+
+      expect(AiService::JUDGED_GENERATION_BUDGET)
+        .to be >= stages.sum { |timeout| AiService.worst_case_call_seconds(timeout) }
     end
 
     it "keeps the provider budget below the review claim window" do
