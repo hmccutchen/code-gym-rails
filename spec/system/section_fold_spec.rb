@@ -8,7 +8,7 @@ RSpec.describe "Section folding", type: :system do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       first_field = rating_row_fields.first
@@ -47,7 +47,7 @@ RSpec.describe "Section folding", type: :system do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       section = find(%(details.section[data-section-fold="pattern"]))

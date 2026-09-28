@@ -1524,6 +1524,37 @@ RSpec (`spec/` — models, requests, services, jobs, mailers). Run with:
 bundle exec rspec
 ```
 
+**What to run when.** During a TDD step, run the spec file you are changing.
+When a task is done, run the unit suite once
+(`bundle exec rspec --exclude-pattern "system/**/*_spec.rb"`). Before opening
+a PR, run `spec/system` once. CI runs everything on every PR. A diff that
+touches one of the shared authorities named in
+`.github/copilot-instructions.md` still runs the full unit suite, not just the
+changed file. After a failing run, `bundle exec rspec --only-failures` re-runs
+only what failed; RSpec records each example's result in `spec/examples.txt`
+(gitignored).
+
+**Parallel runs.** `parallel_tests` splits the suite across processes, each
+with its own test database (`code_gym_rails_test`, `code_gym_rails_test2`,
+...; see the test section of `config/database.yml`). One-time setup, and again
+after a migration:
+
+```bash
+RAILS_ENV=test bin/rails "parallel:create[4]" "parallel:prepare[4]"
+bundle exec parallel_rspec -n 4 --exclude-pattern "^spec/system/" spec
+bundle exec parallel_rspec -n 2 spec/system
+```
+
+Two processes for system specs, not four: each starts its own Chromium, and
+the fetch-driven specs wait on real timing, so a crowded CPU makes them the
+first to flake. Each process keeps its own `spec/examples<N>.txt`, so
+`--only-failures` after a parallel run only sees the first process's results;
+re-run the failures the summary lists instead. CI runs serially.
+
+`BCrypt::Engine.cost` is set to its minimum for the whole suite
+(`spec/support/bcrypt_cost.rb`). At the default cost every `login_as` spent
+about half a second hashing, which was most of the suite's runtime.
+
 `spec/system/` holds a small number of real-browser specs (Capybara +
 capybara-playwright-driver) covering flows unit/request specs can't fully
 verify — rating-gated submit, review loading state — driven exclusively
@@ -1534,6 +1565,10 @@ chose — cover that in service/job specs instead.
 `FakeService` answers the judge's system prompt with a canned
 `{"status":"keep"}`, so the judged path runs end to end in specs without a
 rejection unless an example stubs `judge_section` itself.
+A system spec that needs today's set calls `visit_with_todays_set(user)`,
+which generates it before the first page load; visiting first would wait out
+the dashboard's 3-second "generating" poll. `dashboard_generation_spec.rb` is
+the one spec that goes through that poll on purpose.
 Running them locally requires a one-time Playwright CLI install — see the
 comment block at the top of `spec/support/system_test_helper.rb` for the
 exact commands. The npm manifests live in `spec/playwright/`, not the repo

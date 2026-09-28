@@ -10,7 +10,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
   # See spec/support/csrf_helper.rb.
 
   def open_duck(user)
-    perform_enqueued_jobs { visit_as(user) }
+    visit_with_todays_set(user)
     expect(page).to have_content(/Code Review/i, wait: 10)
 
     duck = first("[data-duck-thread][data-section='code_review']")
@@ -190,7 +190,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       find(%(textarea[data-field="code_review"])).fill_in(

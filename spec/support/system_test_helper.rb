@@ -93,6 +93,20 @@ module RatingHelper
   end
 end
 
+# Generates today's set before the first dashboard render, running the same
+# on-demand job the dashboard would enqueue. Visiting first instead renders the
+# "generating" placeholder and waits out its 3s status poll before any section
+# appears. dashboard_generation_spec.rb is the one spec that goes through that
+# poll on purpose; everything else uses this.
+module TodaysSetHelper
+  def visit_with_todays_set(user)
+    perform_enqueued_jobs do
+      GenerateDailyExercisesJob.perform_now(user_id: user.id)
+      visit_as(user)
+    end
+  end
+end
+
 RSpec.configure do |config|
   config.before(:each, type: :system) do
     driven_by :capybara_playwright
@@ -105,4 +119,5 @@ RSpec.configure do |config|
 
   config.include SystemTimeHelper, type: :system
   config.include RatingHelper, type: :system
+  config.include TodaysSetHelper, type: :system
 end

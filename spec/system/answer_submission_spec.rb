@@ -11,7 +11,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     weekday = a_weekday
 
     travel_to(weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       # Regex, not a literal string: this label renders inside
       # `.section-label` (CSS `text-transform: uppercase`), and the
       # Playwright driver matches on rendered text — see
@@ -48,7 +48,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
       fill_in_answer("code_review", "A substantive answer that will stay.")
       rate_section("code_review")
@@ -74,7 +74,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     weekday = a_weekday
 
     travel_to(weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       expect(page).to have_button("Submit answers →", disabled: true)
@@ -106,7 +106,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       user = create_fake_provider_user
 
       travel_to(a_weekday) do
-        perform_enqueued_jobs { visit_as(user) }
+        visit_with_todays_set(user)
         expect(page).to have_content(/Code Review/i, wait: 10)
         original = "The earlier autosaved answer."
         final = "The final edit typed immediately before submission."
@@ -156,7 +156,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
       fill_in_answer("code_review", "The answer that survives the lost submission acknowledgement.")
       rate_section("code_review")
@@ -191,7 +191,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
       fill_in_answer("code_review", "The answer that will be submitted before navigation fails.")
       rate_section("code_review")
@@ -219,7 +219,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
       rate_section("code_review")
       fill_in_answer("code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
@@ -238,7 +238,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
       hold_response_requests
       fill_in_answer("code_review", "The substantive answer to keep.")
