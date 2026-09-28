@@ -23,6 +23,16 @@ RSpec.describe ClaudeService do
     { "content" => [ { "type" => "text", "text" => text } ], "usage" => { "input_tokens" => 1, "output_tokens" => 1 } }.to_json
   end
 
+  # A 200 whose body is not JSON (a proxy's HTML page, a truncated body) has
+  # to reach callers as an AiService::Error, which every one of them rescues;
+  # a bare JSON::ParserError would escape those rescues.
+  it "raises InvalidResponseError when a successful response body is not JSON" do
+    service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
+
+    expect { service.send(:call, system: "sys", prompt: "p") }
+      .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
+  end
+
   describe "#build_connection" do
     it "sets Anthropic auth headers" do
       conn = service.send(:build_connection)

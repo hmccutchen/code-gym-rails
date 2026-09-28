@@ -83,7 +83,7 @@ class ClaudeService < AiService
       raise error_class, message
     end
 
-    parsed = JSON.parse(resp.body)
+    parsed = parse_provider_envelope(resp.body, provider: "Claude")
     usage  = parsed["usage"] || {}
     # claude-sonnet-5 thinks by default (unlike claude-sonnet-4-5), so the
     # text block is no longer reliably content[0] — a leading thinking block

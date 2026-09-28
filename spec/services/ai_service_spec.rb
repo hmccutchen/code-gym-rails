@@ -2274,6 +2274,15 @@ RSpec.describe AiService do
       }.to raise_error(AiService::InvalidResponseError)
     end
 
+    # json 3 rejects a repeated key instead of keeping the last value, so a
+    # reply that names a field twice fails at the boundary like any other
+    # malformed reply rather than silently dropping one of the two values.
+    it "rejects a reply that repeats a key" do
+      expect {
+        service.send(:parse_json_response, '{"concept":"n_plus_one","concept":"other"}')
+      }.to raise_error(AiService::InvalidResponseError, /duplicate key/)
+    end
+
     it "does not leak the raw provider text into the exception message" do
       huge_text = "garbage " * 200
       expect {
