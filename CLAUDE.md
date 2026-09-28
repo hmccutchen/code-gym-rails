@@ -190,7 +190,7 @@ advisory signal; it is not evidence that anything was verified.
 
 ## Stack
 
-- **Rails 8.1.3.1** + PostgreSQL
+- **Rails 8.1.4** + PostgreSQL
 - **Solid Queue** — background jobs + recurring hourly cron, gated per user to 8am weekdays for generation and to early afternoon for reminder nudges (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
