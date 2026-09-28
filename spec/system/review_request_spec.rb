@@ -13,7 +13,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
     weekday = a_weekday
 
     travel_to(weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       find(%(textarea[data-field="code_review"])).fill_in(
@@ -42,7 +42,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
     weekday = a_weekday
 
     travel_to(weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       find(%(textarea[data-field="code_review"])).fill_in(
@@ -79,7 +79,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       .and_raise(AiService::RateLimitError, "slow down")
 
     travel_to(weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       find(%(textarea[data-field="code_review"])).fill_in(

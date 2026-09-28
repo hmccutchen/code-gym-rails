@@ -25,7 +25,7 @@ RSpec.describe "Save status", type: :system do
 
   it "reports a dropped connection while answers are auto-saving" do
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       break_the_network
@@ -39,7 +39,7 @@ RSpec.describe "Save status", type: :system do
 
   it "replaces a stale answer form when another tab has submitted the day" do
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
       exercise = user.daily_exercises.sole
       saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
@@ -55,7 +55,7 @@ RSpec.describe "Save status", type: :system do
 
   it "reloads a stale rated form without restoring a skipped section's discarded rating" do
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
       exercise = user.daily_exercises.sole
       saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,

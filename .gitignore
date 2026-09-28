@@ -39,3 +39,6 @@
 
 # Subagent-driven-development scratch (ledger, briefs, review packages)
 .superpowers/
+
+# RSpec --only-failures state, one file per parallel_tests process
+/spec/examples*.txt

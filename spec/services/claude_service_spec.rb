@@ -106,6 +106,10 @@ RSpec.describe ClaudeService do
   end
 
   describe "retry/backoff" do
+    # The backoff pauses for real between attempts; these assert how many
+    # attempts run and what they raise, never how long they waited.
+    before { allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) }
+
     it "raises a timeout-specific error when the provider never responds" do
       conn = Faraday.new do |f|
         f.request :retry, ClaudeService::RETRY_OPTIONS.merge(max: 0)

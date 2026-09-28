@@ -20,7 +20,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
   end
 
   def open_reference(user)
-    perform_enqueued_jobs { visit_as(user) }
+    visit_with_todays_set(user)
     expect(page).to have_content(/Code Review/i, wait: 10)
 
     box = first(".concept-alternates")
@@ -109,7 +109,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     cache_reference
 
     travel_to(a_weekday) do
-      perform_enqueued_jobs { visit_as(user) }
+      visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       details = first(".concept-alternates").find(:xpath, "ancestor::details[1]")
