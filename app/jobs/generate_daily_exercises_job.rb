@@ -4,7 +4,8 @@ class GenerateDailyExercisesJob < ApplicationJob
   # Called two ways:
   #   1. Cron (no args) — runs hourly; generates for users whose local time is
   #      a weekday morning at/after 8am, one exercise per local day
-  #   2. On-demand (user_id:) — generates for one user when they first open the app
+  #   2. On-demand (user_id:) — generates for one user when they first open the
+  #      app, judged on a weekday the same as the batch
   def perform(user_id: nil)
     if user_id
       # On-demand: the dashboard already gated weekday; generate in the user's
@@ -73,7 +74,7 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   def generate_now(user)
     return if DailyExercise.exists?(user: user, date: Date.current)
-    generate_for(user)
+    generate_for(user, judge: Date.current.on_weekday?)
   end
 
   # On completion (success or failure), the dashboard learns the outcome by

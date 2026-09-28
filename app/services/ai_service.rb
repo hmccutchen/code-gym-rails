@@ -56,9 +56,9 @@ class AiService
   # Two budgets, because generation runs from two places with different costs
   # for waiting:
   #   - GENERATION_READ_TIMEOUT: GenerateDailyExercisesJob, the morning batch
-  #     and every on-demand dashboard trigger. Runs on the worker, holds no
-  #     Puma thread and no review claim, and nobody is watching a spinner, so
-  #     it can wait as long as the provider needs.
+  #     and every on-demand dashboard trigger. Runs on the worker and holds no
+  #     Puma thread and no review claim, so it can wait as long as the
+  #     provider needs; the dashboard's poller waits with it.
   #   - SYNC_GENERATION_READ_TIMEOUT: currently uncalled. It sized the read
   #     budget for a generation that blocks a Puma thread with a user waiting
   #     on the response — enough room to finish and no more. Its only caller
@@ -137,6 +137,13 @@ class AiService
   def self.call_budget_seconds(read_timeout)
     (read_timeout * (RETRY_MAX + 1)) + (RETRY_MAX * RETRY_MAX_INTERVAL)
   end
+
+  # How long a judged generation can run before it lands or fails: the draft,
+  # then the judge fan-out, the retry fan-out and the re-judge fan-out, each
+  # waiting on its slowest thread. The draft and the retry exceed READ_TIMEOUT,
+  # so a timeout ends them after one attempt; the judge runs at READ_TIMEOUT
+  # and gets every retry.
+  JUDGED_GENERATION_BUDGET = GENERATION_READ_TIMEOUT + RETRY_READ_TIMEOUT + (2 * call_budget_seconds(READ_TIMEOUT))
 
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the

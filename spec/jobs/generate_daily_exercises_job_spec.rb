@@ -5,9 +5,25 @@ RSpec.describe GenerateDailyExercisesJob do
 
   let(:user) { User.create!(email: "cronuser@example.com", name: "Cron", provider: "anthropic", api_key: "sk-ant-test", time_zone: "UTC") }
 
+  # On-demand generation is judged on a weekday and single-stage on a weekend,
+  # and examples without a travel_to run on whatever day the suite does, so
+  # these stubs answer both paths the same way.
+  def stub_provider(u = user, problem_set: { "code_review" => {} })
+    judged = AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: [], outcomes: {})
+    svc = instance_double(ClaudeService, generate_exercise: problem_set, generate_judged_exercise: judged)
+    allow(AiService).to receive(:for).with(u).and_return(svc)
+    svc
+  end
+
+  def stub_provider_failure(error, message, u = user)
+    svc = instance_double(ClaudeService)
+    allow(svc).to receive(:generate_exercise).and_raise(error, message)
+    allow(svc).to receive(:generate_judged_exercise).and_raise(error, message)
+    allow(AiService).to receive(:for).with(u).and_return(svc)
+  end
+
   it "creates a DailyExercise from the provider's generated problem set" do
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider
 
     described_class.new.perform(user_id: user.id)
 
@@ -16,8 +32,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "does not touch last_generation_error fields on success" do
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider
 
     described_class.new.perform(user_id: user.id)
 
@@ -27,8 +42,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   it "clears a prior failure once generation succeeds" do
     user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider
 
     described_class.new.perform(user_id: user.id)
 
@@ -37,9 +51,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "logs and continues when AiService::Error is raised" do
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider_failure(AiService::Error, "boom")
 
     expect(Rails.logger).to receive(:error).with(/Failed to generate exercise.*boom/)
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
@@ -47,9 +59,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "persists a Settings-pointing error when AiService::AuthenticationError is raised" do
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::AuthenticationError, "invalid x-api-key")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider_failure(AiService::AuthenticationError, "invalid x-api-key")
 
     expect(Rails.logger).to receive(:error).with(/Auth failure generating exercise.*invalid x-api-key/)
     described_class.new.perform(user_id: user.id)
@@ -60,9 +70,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "persists a try-again error when AiService::RateLimitError is raised" do
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::RateLimitError, "rate limited")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider_failure(AiService::RateLimitError, "rate limited")
 
     expect(Rails.logger).to receive(:warn).with(/Rate limited generating exercise.*rate limited/)
     described_class.new.perform(user_id: user.id)
@@ -73,9 +81,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "persists the raw message when a generic AiService::Error is raised" do
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider_failure(AiService::Error, "boom")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
@@ -88,9 +94,7 @@ RSpec.describe GenerateDailyExercisesJob do
   it "persists the failure date in the user's own time zone" do
     pac = User.create!(email: "pac2@example.com", name: "Pac", provider: "anthropic",
                        api_key: "sk-ant-test", time_zone: "America/Los_Angeles")
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
-    allow(AiService).to receive(:for).with(pac).and_return(fake_service)
+    stub_provider_failure(AiService::Error, "boom", pac)
     allow(Rails.logger).to receive(:error)
 
     # 2026-07-13 06:00 UTC == 2026-07-12 23:00 PDT — still July 12th in LA.
@@ -103,8 +107,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   it "persists the resolved language on the created DailyExercise" do
     user.update!(language: "javascript")
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider
 
     described_class.new.perform(user_id: user.id)
 
@@ -112,19 +115,9 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(exercise.language).to eq("javascript")
   end
 
-  it "passes the resolved language through to generate_exercise" do
-    user.update!(language: "javascript")
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
-
-    described_class.new.perform(user_id: user.id)
-
-    expect(fake_service).to have_received(:generate_exercise).with(user, language: "javascript")
-  end
 
   it "logs and continues when a concurrent job already created today's exercise (unique index race)" do
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider
     allow(DailyExercise).to receive(:create!).and_raise(
       ActiveRecord::RecordNotUnique.new("duplicate key value violates unique constraint")
     )
@@ -135,10 +128,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "persists a wait-and-retry error when AiService::TimeoutError is raised" do
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise)
-      .and_raise(AiService::TimeoutError, "Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider_failure(AiService::TimeoutError, "Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>")
     allow(Rails.logger).to receive(:warn)
 
     described_class.new.perform(user_id: user.id)
@@ -155,9 +145,7 @@ RSpec.describe GenerateDailyExercisesJob do
   it "does not persist a failure when today's exercise already exists" do
     DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
                           generated_at: Time.current, language: "ruby_rails")
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider_failure(AiService::Error, "boom")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.send(:generate_for, user)
@@ -170,9 +158,7 @@ RSpec.describe GenerateDailyExercisesJob do
     user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
     DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
                           generated_at: Time.current, language: "ruby_rails")
-    fake_service = instance_double(ClaudeService)
-    allow(fake_service).to receive(:generate_exercise).and_raise(AiService::Error, "boom")
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider_failure(AiService::Error, "boom")
     allow(Rails.logger).to receive(:error)
 
     described_class.new.send(:generate_for, user)
@@ -197,15 +183,33 @@ RSpec.describe GenerateDailyExercisesJob do
     end
   end
 
-  it "does not judge on the on-demand path" do
-    fake_service = instance_double(ClaudeService, generate_exercise: { "code_review" => {} })
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    expect(fake_service).not_to receive(:generate_judged_exercise)
+  it "judges an on-demand generation on a weekday" do
+    user.update!(language: "javascript")
+    svc = stub_provider
+    allow(svc).to receive(:generate_judged_exercise).and_return(
+      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "pattern" ], outcomes: {})
+    )
 
-    described_class.new.perform(user_id: user.id)
+    travel_to(Time.utc(2026, 7, 13, 6, 0)) do
+      described_class.new.perform(user_id: user.id)
 
-    exercise = DailyExercise.find_by(user: user, date: Date.current)
-    expect(exercise.dropped_sections).to eq([])
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript")
+      expect(svc).not_to have_received(:generate_exercise)
+      expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "pattern" ])
+    end
+  end
+
+  it "does not judge an on-demand generation on a weekend" do
+    user.update!(language: "javascript")
+    svc = stub_provider
+
+    travel_to(Time.utc(2026, 7, 18, 12, 0)) do
+      described_class.new.perform(user_id: user.id)
+
+      expect(svc).to have_received(:generate_exercise).with(user, language: "javascript")
+      expect(svc).not_to have_received(:generate_judged_exercise)
+      expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([])
+    end
   end
 
   it "skips an anonymized user on the on-demand path" do

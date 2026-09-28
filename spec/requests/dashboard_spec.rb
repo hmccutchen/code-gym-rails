@@ -1244,7 +1244,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     # The poller shipped with a fixed 40 attempts (120s) while the worker's
     # generation budget is GENERATION_READ_TIMEOUT (300s), so a slow but healthy
-    # generation told the user to refresh while the job was still running.
+    # generation told the user to refresh while the job was still running. A
+    # weekday on-demand generation is judged, which runs past that budget.
     it "keeps polling for longer than a generation is allowed to take" do
       # A weekday with no exercise yet is the state that renders the spinner.
       travel_to Time.utc(2026, 8, 7, 12, 0, 0) do
@@ -1255,6 +1256,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
         expect(attempts).to be_positive
         expect(attempts * interval).to be > AiService::GENERATION_READ_TIMEOUT
+        expect(attempts * interval).to be > AiService::JUDGED_GENERATION_BUDGET
         expect(attempts * interval).to be > DailyExercise::REGENERATION_STALE_AFTER.to_i
       end
     end

@@ -25,8 +25,15 @@ RSpec.describe "Dashboard on-demand generation", type: :system do
       # literal "Code Review" would fail. Case-insensitive regex sidesteps
       # both the DOM casing and this rendering detail.
       expect(page).to have_content(/Code Review/i, wait: 10)
-      expect(page).to have_content(/Pattern of the Month/i)
-      expect(page).to have_content(/Architecture Decision/i)
+
+      # A weekday on-demand set is judged, and the judged path keeps only the
+      # kinds the plan chose, so which third and fourth render depends on the
+      # plan rather than on FakeService's all-kinds payload.
+      exercise = DailyExercise.find_by!(user: user, date: Date.current)
+      expect(exercise.active_section_keys.size).to be >= 2
+      exercise.active_section_keys.each do |key|
+        expect(page).to have_content(/#{Regexp.escape(I18n.t("sections.#{key}.name"))}/i)
+      end
     end
   end
 end

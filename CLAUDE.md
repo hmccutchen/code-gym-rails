@@ -541,12 +541,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   only the tagged concept — had nothing to offer, and the section was
   unanswerable for a reason no downstream check could see.
 
-  **Cron only.** Judging costs a second provider call per section and a
-  possible third for a retry, so it runs where nobody is waiting:
+  **Every weekday first generation, not regeneration.** Judging costs a
+  second provider call per section and a possible third for a retry.
   `GenerateDailyExercisesJob#generate_for(user, judge:)` passes `judge: true`
-  from the cron branch alone. The dashboard's on-demand generation and
-  `RegenerateExerciseJob` pass nothing and stay on `#generate_exercise`, the
-  single-stage path, which is unchanged.
+  from the cron branch and, on a weekday, from the on-demand branch too. It
+  was cron-only at first, but a user who opened the dashboard before their
+  8am tick got an on-demand set, and the batch then found the day filled, so
+  an early riser was rarely judged. The cost of the change is a longer
+  spinner on the dashboard, which is why `dashboard/_generating` polls for
+  `AiService::JUDGED_GENERATION_BUDGET` rather than the draft's budget alone.
+  A weekend "generate anyway" set and `RegenerateExerciseJob` stay on
+  `#generate_exercise`, the single-stage path, which is unchanged.
 
   **The judge classifies; it never writes a second draft.**
   `JUDGE_SYSTEM_PROMPT` states the principle it turns on: "A question may be
@@ -676,7 +681,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   were rejected: the retries fan out the same way the judging does, so the
   day waits for the slowest rather than their sum. Each retry asks for one
   section, so it runs on `RETRY_READ_TIMEOUT` rather than the draft's
-  300-second budget, and the batch is hourly. Both figures assume that token
+  300-second budget. Both figures assume that token
   shape and that list price; re-measure against `ApiUsage` rows under
   `purpose: "judge_section"` rather than re-deriving them.
 
