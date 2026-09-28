@@ -90,7 +90,7 @@ class GeminiService < AiService
       raise error_class, message
     end
 
-    parsed       = JSON.parse(resp.body)
+    parsed       = parse_provider_envelope(resp.body, provider: "Gemini")
     model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }
     text_parts   = Array(model_output && model_output["content"]).select { |c| c["type"] == "text" }.map { |c| c["text"] }
     usage        = parsed["usage"] || {}

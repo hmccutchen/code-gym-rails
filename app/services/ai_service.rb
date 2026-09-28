@@ -2665,6 +2665,16 @@ class AiService
     raise InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
   end
 
+  # The HTTP envelope of a successful call, as opposed to the model's reply
+  # inside it. Callers rescue AiService::Error, so a body that is not JSON (a
+  # proxy's HTML page, a cut-off response) has to arrive as one.
+  def parse_provider_envelope(body, provider:)
+    JSON.parse(body.to_s)
+  rescue JSON::ParserError
+    log_raw_snippet("Unreadable #{provider} response body", body)
+    raise InvalidResponseError, "#{provider} returned an unreadable response"
+  end
+
   # Extracts a provider's own explanation for a failed HTTP response, when
   # one is available, so users see actionable detail (e.g. "credit balance
   # too low") instead of a bare status code. Falls back to `fallback`

@@ -144,7 +144,7 @@ class ConceptReferenceCalibration
     [ :ok, true ]
   rescue AiService::TimeoutError
     [ :timeout, true ]
-  rescue AiService::InvalidResponseError, JSON::ParserError => e
+  rescue AiService::InvalidResponseError => e
     [ e.class.name, true ]
   rescue AiService::Error => e
     [ e.class.name, false ]

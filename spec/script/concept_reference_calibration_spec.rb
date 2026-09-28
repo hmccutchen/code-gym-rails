@@ -168,7 +168,7 @@ RSpec.describe ConceptReferenceCalibration do
     context "when the provider envelope is malformed JSON" do
       let(:provider_reply) { [ 200, {}, "not json at all" ] }
 
-      include_examples "a measured response failure", "JSON::ParserError"
+      include_examples "a measured response failure", "AiService::InvalidResponseError"
     end
 
     it "excludes refused and transport-failed calls from the latency spread" do
