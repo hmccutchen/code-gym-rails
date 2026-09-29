@@ -159,7 +159,10 @@ class AiService
   # entire problem set rather than a better outcome. Short calls keep retrying,
   # and this never suppresses a retry_statuses retry (429/5xx arrive as
   # Faraday::RetriableResponse, not a timeout).
+  # Every retry, a retryable status included, is decided here (both connections
+  # set methods: []), so a single-attempt request refuses all of them.
   RETRY_TIMEOUT_GUARD = lambda do |env, exception|
+    return false if env.request.context.to_h[:single_attempt]
     return true unless exception.is_a?(Faraday::TimeoutError)
 
     !env.request.context.to_h[:long_running]
@@ -1788,8 +1791,9 @@ class AiService
   # MODEL_FOR_PURPOSE, falling back to its DEFAULT_ROUTE. `response_schema`,
   # when given, is a JSON Schema the provider should hold the reply to; a
   # provider that cannot enforce one ignores it, and the caller's own parse is
-  # still the boundary either way.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil)
+  # still the boundary either way. `single_attempt` makes this request once,
+  # with no transport retry of any kind.
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -2858,10 +2862,10 @@ class AiService
   # A refusal always raises, after the usage row is written: the provider
   # billed the input even though it returned no text.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
-                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false)
+                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false, single_attempt: false)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
                   read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,
-                  response_schema: response_schema)
+                  response_schema: response_schema, single_attempt: single_attempt)
     log_usage(user, result, purpose: purpose)
 
     raise RefusalError, "Claude declined this request (#{result[:refusal]})" if result[:refusal]

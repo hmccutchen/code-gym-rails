@@ -59,7 +59,7 @@ class ClaudeService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     route = route_for(purpose)
     body = {
       model:      route[:model],
@@ -81,7 +81,7 @@ class ClaudeService < AiService
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
-      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT)
+      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
     end
 
     unless resp.success?

@@ -196,6 +196,40 @@ RSpec.describe ClaudeService do
       # second stubbed response is never consumed.
       expect(responses.size).to eq(1)
     end
+
+    describe "a single-attempt call" do
+      it "makes one request for a 429 and raises" do
+        responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
+        service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+        expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+        expect(responses.size).to eq(2)
+      end
+
+      it "makes one request for a timeout and raises" do
+        attempts = 0
+        conn = Faraday.new do |f|
+          f.request :retry, ClaudeService::RETRY_OPTIONS
+          f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+        end
+        service.instance_variable_set(:@conn, conn)
+
+        expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::TimeoutError)
+        expect(attempts).to eq(1)
+      end
+
+      it "leaves an unflagged call on every retry attempt" do
+        attempts = 0
+        conn = Faraday.new do |f|
+          f.request :retry, ClaudeService::RETRY_OPTIONS
+          f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+        end
+        service.instance_variable_set(:@conn, conn)
+
+        expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::TimeoutError)
+        expect(attempts).to eq(AiService::RETRY_MAX + 1)
+      end
+    end
   end
 
   describe "#call" do

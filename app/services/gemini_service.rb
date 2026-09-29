@@ -55,7 +55,7 @@ class GeminiService < AiService
 
   # response_schema is not sent yet, so a Gemini reply is held only by its
   # prompt and the caller's parse (#228).
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     body = {
       model:              MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model],
       system_instruction: system,
@@ -78,7 +78,7 @@ class GeminiService < AiService
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
-      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT)
+      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
     end
 
     unless resp.success?
