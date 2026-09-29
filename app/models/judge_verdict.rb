@@ -24,6 +24,32 @@ class JudgeVerdict
     end
   end
 
+  # The reply shape the provider is held to, one alternative per status, so a
+  # prose reply cannot be generated at all. Built from the same closed lists
+  # .parse checks, which stays the boundary: the provider's schema support has
+  # no length constraints, so a blank string still has to be refused there.
+  def self.schema_for(kind)
+    { "anyOf" => STATUSES.map { |status| closed_object({ "status" => { "const" => status } }.merge(shape_for(status, kind))) } }
+  end
+
+  def self.shape_for(status, kind)
+    text = { "type" => "string" }
+    case status
+    when "keep"   then {}
+    when "edit"
+      issue  = closed_object({ "type" => { "type" => "string", "enum" => ISSUE_TYPES }, "evidence" => text })
+      fields = closed_object(kind.prose_fields.index_with { text }, required: [])
+      { "issues" => { "type" => "array", "items" => issue }, "fields" => fields }
+    when "reject" then { "principle" => { "type" => "string", "enum" => PRINCIPLES }, "evidence" => text, "reason" => text }
+    end
+  end
+  private_class_method :shape_for
+
+  def self.closed_object(properties, required: properties.keys)
+    { "type" => "object", "properties" => properties, "required" => required, "additionalProperties" => false }
+  end
+  private_class_method :closed_object
+
   def self.parse_edit(raw, kind)
     issues = Array(raw["issues"]).map { |issue| parse_issue(issue) }
     raise Invalid, "an edit names at least one issue" if issues.empty?

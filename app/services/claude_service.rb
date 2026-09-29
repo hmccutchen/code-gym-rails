@@ -48,7 +48,7 @@ class ClaudeService < AiService
 
   private
 
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil)
     route = route_for(purpose)
     body = {
       model:      route[:model],
@@ -65,7 +65,8 @@ class ClaudeService < AiService
     # Disabling thinking outright avoids having to guess a split that
     # reserves enough tokens for both.
     body[:thinking] = { type: "disabled" } if max_tokens
-    body[:output_config] = { effort: route[:effort] } if route[:effort]
+    output_config = { effort: route[:effort], format: json_format(response_schema) }.compact
+    body[:output_config] = output_config if output_config.any?
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
@@ -102,6 +103,12 @@ class ClaudeService < AiService
   rescue Faraday::Error => e
     error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
     raise error_class, "Network error calling Claude: #{e.message}"
+  end
+
+  # Structured outputs rather than a prefilled "{": every model this service
+  # routes to rejects an assistant prefill with a 400.
+  def json_format(schema)
+    { type: "json_schema", schema: schema } if schema
   end
 
   def route_for(purpose)

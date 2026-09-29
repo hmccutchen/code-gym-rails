@@ -665,6 +665,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   (`invalid_output`, `timeout`, or the shared error code), and
   `[judge_fallback]` warns. The judge is never retried.
 
+  **The judge's reply is held to a schema on Claude.** Its call is capped, so
+  it runs with thinking off, and with nowhere else to reason the model once
+  wrote its checks out as prose and never reached the JSON. `judge_section`
+  passes `JudgeVerdict.schema_for(kind)` as `response_schema:`, and
+  `ClaudeService` sends it as structured output (`output_config.format`), so
+  the API only lets the model return one of the three verdict shapes. A
+  prefilled `{` was the other option; every model `ClaudeService` routes to
+  rejects a prefill with a 400. The schema is built from the same closed
+  lists `.parse` checks, and `.parse` stays the boundary, since the schema
+  cannot bound string length. `GeminiService` accepts the keyword and does not
+  send it yet (#228), so a Gemini judge reply is held only by its prompt.
+  `response_schema:` is the fourth additive keyword on `#call`, after
+  `cache_system:`, `max_tokens:` and `history:`; every other caller omits it.
+
   **Known leak, reported and left.** The reference disclosure above a section
   is titled "Reference — <concept>: how it works", which on a discovery kind
   names what to find before the engineer looks. It is the same leak the judge

@@ -416,7 +416,7 @@ class AiService
 
     A question may be difficult, unfamiliar, or conceptually demanding. Its difficulty must come from the intended reasoning task, not from unclear wording, missing information, or accidental prerequisites. Reject when the problem itself is broken. Edit when the problem is sound but poorly expressed. Never reject a problem for being hard.
 
-    Decide in this order and stop at the first rejection.
+    Work through these checks internally, in this order, and stop at the first rejection. Reply with only the JSON verdict, with no text before or after it.
     1. Answerable. Can a knowledgeable developer at the stated level reach a defensible answer without guessing which scenario the author meant? Normal technical inference is allowed. The section is unanswerable only when materially different readings are possible and the answer depends on picking the author's. If prose can close the gap, that is an edit, on one condition: a clarification may only surface what the draft already shows or implies, such as behaviour visible in the code that the prose never states. If the missing information is not in the draft at all, you have no source for it: reject as underdetermined. Never invent facts.
     2. Valid. Check the remaining rejection principles.
     3. Improvable. If the section is sound, rewrite its prose fields where one of the listed issues applies, or return keep.
@@ -1285,6 +1285,7 @@ class AiService
     visible = section.except(ProblemSetIngest::ANSWER_KEY_FIELD, *ProblemSetIngest::SERVER_STAMPS)
     result  = call_and_log(
       user, purpose: "judge_section", max_tokens: JUDGE_MAX_TOKENS,
+      response_schema: JudgeVerdict.schema_for(kind),
       system: JUDGE_SYSTEM_PROMPT,
       prompt: judge_prompt(kind, visible, rung: rung, locked: locked)
     )
@@ -1783,8 +1784,11 @@ class AiService
   # turns of a conversation; `prompt` is always the new final user turn, so an
   # empty `history` is the single-shot case every non-conversational caller uses.
   # `purpose` is the ApiUsage purpose; each provider looks it up in its own
-  # MODEL_FOR_PURPOSE, falling back to its DEFAULT_ROUTE.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+  # MODEL_FOR_PURPOSE, falling back to its DEFAULT_ROUTE. `response_schema`,
+  # when given, is a JSON Schema the provider should hold the reply to; a
+  # provider that cannot enforce one ignores it, and the caller's own parse is
+  # still the boundary either way.
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -2853,9 +2857,10 @@ class AiService
   # A refusal always raises, after the usage row is written: the provider
   # billed the input even though it returned no text.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
-                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], allow_truncated: false)
+                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
-                  read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
+                  read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,
+                  response_schema: response_schema)
     log_usage(user, result, purpose: purpose)
 
     raise RefusalError, "Claude declined this request (#{result[:refusal]})" if result[:refusal]

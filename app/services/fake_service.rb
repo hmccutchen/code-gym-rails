@@ -273,7 +273,7 @@ class FakeService < AiService
   # aid rather than a guarantee. What actually catches a broken section scan is
   # fake_service_spec's "returns a difficulty for every section it was asked
   # about"; keep that spec if this raise is ever removed.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil)
     text =
       case system
       when /generating personalized daily exercise sets/

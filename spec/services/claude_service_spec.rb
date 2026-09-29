@@ -465,4 +465,40 @@ RSpec.describe ClaudeService do
       expect(captured_body(history: history)["messages"].last["content"]).to eq("new turn")
     end
   end
+
+  describe "#call with response_schema" do
+    let(:schema) { { "type" => "object", "properties" => { "status" => { "type" => "string" } }, "required" => [ "status" ], "additionalProperties" => false } }
+
+    def captured_body(**kwargs)
+      body = nil
+      conn = Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(ClaudeService::API_URL) do |env|
+            body = JSON.parse(env.body)
+            [ 200, {}, success_body ]
+          end
+        end
+      end
+      service.instance_variable_set(:@conn, conn)
+      service.send(:call, system: "sys", prompt: "p", **kwargs)
+      body
+    end
+
+    it "constrains the reply to the schema and sends no prefill" do
+      body = captured_body(response_schema: schema, max_tokens: 100, purpose: "judge_section")
+
+      expect(body["output_config"]).to eq("format" => { "type" => "json_schema", "schema" => schema })
+      expect(body["messages"].last["role"]).to eq("user")
+    end
+
+    it "sends the schema beside a route's effort" do
+      body = captured_body(response_schema: schema, purpose: "generate_exercise")
+
+      expect(body["output_config"]).to eq("effort" => "medium", "format" => { "type" => "json_schema", "schema" => schema })
+    end
+
+    it "sends no format when no schema is given" do
+      expect(captured_body(purpose: "judge_section")).not_to have_key("output_config")
+    end
+  end
 end
