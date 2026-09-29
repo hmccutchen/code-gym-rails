@@ -52,8 +52,24 @@ RSpec.describe RecognitionGuide do
     end
   end
 
+  def guide(**overrides)
+    described_class.new(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", **overrides)
+  end
+
   it "refuses a key outside the recognition groups" do
-    expect(described_class.new(group_key: "core")).not_to be_valid
-    expect(described_class.new(group_key: "code_smell")).to be_valid
+    expect(guide(group_key: "core")).not_to be_valid
+    expect(guide).to be_valid
+  end
+
+  AiService::RECOGNITION_GUIDE_FIELDS.each do |field|
+    it "refuses a guide with no #{field}" do
+      expect(guide(field => " ")).not_to be_valid
+    end
+
+    it "refuses a row with no #{field} at the database too" do
+      guide.save!
+
+      expect { described_class.update_all(field => nil) }.to raise_error(ActiveRecord::NotNullViolation)
+    end
   end
 end

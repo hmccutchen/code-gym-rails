@@ -23,6 +23,17 @@ RSpec.describe GenerateRecognitionGuideJob do
     expect(guide.questions).to eq(FakeService::RECOGNITION_GUIDE["questions"])
   end
 
+  it "dates its usage row on the user's own day, not the worker's" do
+    local = User.create!(email: "guide-zone@example.com", name: "Zone", provider: "fake", api_key: "fake-key",
+                         time_zone: "Pacific/Auckland")
+
+    travel_to Time.utc(2026, 9, 29, 20, 0, 0) do
+      described_class.perform_now(group_key: "code_smell", user_id: local.id)
+    end
+
+    expect(ApiUsage.where(user: local, purpose: "generate_recognition_guide").sole.date).to eq(Date.new(2026, 9, 30))
+  end
+
   it "never rewrites a guide that exists" do
     RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
     expect(AiService).not_to receive(:for)

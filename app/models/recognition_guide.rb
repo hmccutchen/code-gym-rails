@@ -31,6 +31,9 @@ class RecognitionGuide < ApplicationRecord
   }.freeze
 
   validates :group_key, presence: true, uniqueness: true, inclusion: { in: GROUP_KEYS }
+  # A row's existence is what stops the backfill retrying, so a partial one
+  # would sit blank forever.
+  validates(*AiService::RECOGNITION_GUIDE_FIELDS, presence: true)
 
   # The guide shown above a group block on the Learn index, or nil for a block
   # that has none.

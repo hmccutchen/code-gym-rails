@@ -117,9 +117,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_120000) do
 
   create_table "recognition_guides", force: :cascade do |t|
     t.string "group_key", null: false
-    t.text "questions"
-    t.text "contrast"
-    t.text "misfires"
+    t.text "questions", null: false
+    t.text "contrast", null: false
+    t.text "misfires", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["group_key"], name: "index_recognition_guides_on_group_key", unique: true

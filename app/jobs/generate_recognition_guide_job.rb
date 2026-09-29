@@ -16,7 +16,8 @@ class GenerateRecognitionGuideJob < ApplicationJob
     user = User.find_by(id: user_id)
     return unless user
 
-    guide = AiService.for(user).generate_recognition_guide(user, group_key)
+    # ApiUsage dates the call with Date.current, which must be the user's day.
+    guide = Time.use_zone(user.effective_time_zone) { AiService.for(user).generate_recognition_guide(user, group_key) }
     RecognitionGuide.create!(guide.merge("group_key" => group_key))
 
     Rails.logger.info("Generated recognition guide for #{group_key}")
