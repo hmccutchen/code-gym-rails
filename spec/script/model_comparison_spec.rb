@@ -6,6 +6,8 @@ RSpec.describe ModelComparison do
   let(:out) { StringIO.new }
   let(:posted) { [] }
   let(:judge_replies) { [] }
+  # Output tokens for successive judge calls; any call past the queue reports 30.
+  let(:judge_output_tokens) { [] }
   let(:comparison) { described_class.new(api_key: "sk-ant-runner", out: out) }
 
   # Answers every request the way FakeService would, in Anthropic's response
@@ -13,12 +15,14 @@ RSpec.describe ModelComparison do
   before do
     requests = posted
     replies  = judge_replies
+    judge_tokens = judge_output_tokens
     connection = Faraday.new do |f|
       f.adapter :test do |stub|
         stub.post(ClaudeService::API_URL) do |env|
           body   = JSON.parse(env.body)
           system = body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"]
           requests << body
+          output_tokens = system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT && judge_tokens.any? ? judge_tokens.shift : 30
           if system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT && replies.any?
             reply = replies.shift
             next [ 500, {}, "{}" ] if reply == :provider_error
@@ -28,7 +32,7 @@ RSpec.describe ModelComparison do
             text = FakeService.new("unused").send(:call, system: system, prompt: body["messages"].last["content"])[:text]
           end
           [ 200, {}, { "content" => [ { "type" => "text", "text" => text } ],
-                       "usage" => { "input_tokens" => 70, "output_tokens" => 30 } }.to_json ]
+                       "usage" => { "input_tokens" => 70, "output_tokens" => output_tokens } }.to_json ]
         end
       end
     end
@@ -240,6 +244,29 @@ RSpec.describe ModelComparison do
       expect(out.string).to match(%r{edits: 1/2 \(plain_language_violation 0/2, verbosity 1/2\) · merges: 1 · invalid: 1/4 · provider errors: 1/4 · \d+ms})
       expect(out.string).to match(%r{edits: 0/4 \(plain_language_violation 0/4, verbosity 0/4\) · merges: 0 · invalid: 0/4 · provider errors: 0/4})
       expect(out.string).to include("$")
+    end
+
+    # The activation gate checks single replies against the output cap and the
+    # read timeout, which a run's totals cannot show: [100, 1400] and
+    # [750, 750] total the same.
+    it "prints each call's output tokens and names the largest reply and slowest call against their limits" do
+      store_reviews(%w[code_review pattern])
+      judge_output_tokens.push(100, 1400, 750, 750)
+
+      comparison.review_prose(user.id)
+
+      sonnet_block, haiku_block = out.string.split(/^=== review_prose: /).drop(1)
+      # ai_review is jsonb, which does not keep key order, so labels are read
+      # back from the output rather than assumed.
+      calls = sonnet_block.scan(/^(\S+ \w+): keep \d+ms · (\d+) out$/)
+      expect(calls.map(&:last)).to eq(%w[100 1400])
+      expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+
+      first_haiku_label = haiku_block[/^(\S+ \w+): keep \d+ms · 750 out$/, 1]
+      expect(haiku_block).to include("largest reply: 750 out (#{first_haiku_label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")
+      [ sonnet_block, haiku_block ].each do |block|
+        expect(block).to match(/slowest: \d+ms \(\S+ \w+\) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout/)
+      end
     end
 
     it "reads each response's exercise without a query per response" do

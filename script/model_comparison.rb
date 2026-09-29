@@ -354,7 +354,8 @@ class ModelComparison
   # Review text is printed here by design: it is read by a person in a
   # terminal, not stored in application logs.
   def print_prose_result(result, input)
-    @out.puts "#{result.label}: #{result.outcome}#{" (expected #{result.expected})" if result.expected} #{result.ms}ms"
+    @out.puts "#{result.label}: #{result.outcome}#{" (expected #{result.expected})" if result.expected} " \
+              "#{result.ms}ms · #{result.tokens_out} out"
     @out.puts "  must survive: #{input[:must_survive].join(' | ')}" if input[:must_survive].present?
     lines = result.verdict ? rewrite_lines(result.verdict, ReviewProseVerdict.project(input[:review])) : [ result.error ]
     lines.each { |line| @out.puts "  #{line}" }
@@ -388,8 +389,20 @@ class ModelComparison
               "provider errors: #{results.count { |result| result.outcome == :error }}/#{results.size} · " \
               "#{results.sum(&:ms)}ms · #{tokens_in} in / #{tokens_out} out · " \
               "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out))}"
+    print_prose_extremes(results)
     expected = results.select(&:expected)
     @out.puts "matched expected status: #{expected.count { |result| result.outcome.to_s == result.expected }}/#{expected.size}" if expected.any?
+  end
+
+  # The activation gate checks single replies against the cap and the one
+  # attempt's timeout, which totals hide.
+  def print_prose_extremes(results)
+    return if results.empty?
+
+    largest = results.max_by(&:tokens_out)
+    slowest = results.max_by(&:ms)
+    @out.puts "largest reply: #{largest.tokens_out} out (#{largest.label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap · " \
+              "slowest: #{slowest.ms}ms (#{slowest.label}) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout"
   end
 
   def issue_rates(edits, valid_count)
