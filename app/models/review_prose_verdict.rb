@@ -33,6 +33,8 @@ class ReviewProseVerdict
 
     issues = parse_issues(raw["issues"])
     fields = parse_fields(raw["fields"], projection)
+    return new(status: :keep) if fields.empty?
+
     if merged?(fields) && issues.none? { |issue| issue[:type] == "verbosity" }
       raise Invalid, "a merge needs a verbosity issue"
     end
@@ -51,14 +53,17 @@ class ReviewProseVerdict
   end
   private_class_method :parse_issues
 
+  # A rewrite of a field that was empty is dropped, not refused: it has
+  # nothing to cite, so it can only be invented, and refusing the verdict
+  # would also throw away a sound rewrite of another field.
   def self.parse_fields(raw, projection)
     raise Invalid, "fields must be a non-empty object" unless raw.is_a?(Hash) && raw.any?
 
-    raw.to_h do |field, value|
+    raw.each_with_object({}) do |(field, value), fields|
       raise Invalid, "a rewritten field is not a prose field" unless prose_fields.include?(field)
-      raise Invalid, "#{field} is empty and cannot be rewritten" if projection.fetch(field).empty?
+      next if projection.fetch(field).empty?
 
-      [ field, list_field?(field) ? parse_entries(field, value, projection.fetch(field).size) : required_text(value, field) ]
+      fields[field] = list_field?(field) ? parse_entries(field, value, projection.fetch(field).size) : required_text(value, field)
     end
   end
   private_class_method :parse_fields

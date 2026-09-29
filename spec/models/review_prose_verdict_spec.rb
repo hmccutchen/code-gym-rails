@@ -68,8 +68,28 @@ RSpec.describe ReviewProseVerdict do
       end
     end
 
-    it "refuses rewriting a field whose projection is empty" do
-      expect { parse(edit("better_questions" => [ { "from" => [ 0 ], "text" => "invented" } ])) }.to raise_error(described_class::Invalid)
+    # An empty field has nothing to cite, so anything written into it is
+    # invented. Dropping that rewrite blocks the invention without throwing
+    # away a sound rewrite of another field in the same verdict.
+    it "drops a rewrite of an empty field and keeps the rest of the edit" do
+      verdict = parse(edit("better_questions" => [ { "from" => [ 0 ], "text" => "invented" } ],
+                           "next_step" => "Read about includes."))
+
+      expect(verdict.fields).to eq("next_step" => "Read about includes.")
+      expect(verdict.apply(review)["better_questions"]).to eq([])
+    end
+
+    it "drops an empty field's rewrite without judging its shape" do
+      verdict = parse(edit("better_questions" => "not even a list", "next_step" => "Read about includes."))
+
+      expect(verdict.fields).to eq("next_step" => "Read about includes.")
+    end
+
+    it "reads an edit whose only rewrites were of empty fields as keep" do
+      verdict = parse(edit("better_questions" => [ { "from" => [ 0 ], "text" => "invented" } ]))
+
+      expect(verdict.status).to eq(:keep)
+      expect(verdict.apply(review)).to equal(review)
     end
 
     it "refuses a dropped, duplicated, out-of-range, empty or non-integer index" do
@@ -91,13 +111,15 @@ RSpec.describe ReviewProseVerdict do
         expect(parse("status" => "keep").status).to eq(:keep)
       end
 
-      it "refuses a rewrite of next_step, naming the field" do
-        expect { parse(edit("next_step" => "Read about includes.")) }
-          .to raise_error(described_class::Invalid, /next_step is empty/)
+      it "drops a rewrite of next_step, storing nothing invented" do
+        verdict = parse(edit("next_step" => "Read about includes."))
+
+        expect(verdict.status).to eq(:keep)
+        expect(verdict.apply(review)).to equal(review)
       end
 
-      it "refuses an empty-string rewrite of next_step" do
-        expect { parse(edit("next_step" => "")) }.to raise_error(described_class::Invalid)
+      it "drops an empty-string rewrite of next_step the same way" do
+        expect(parse(edit("next_step" => "")).status).to eq(:keep)
       end
     end
 

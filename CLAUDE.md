@@ -1144,8 +1144,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   field that is not one of `DailyResponse::AI_REVIEW_FIELDS`, a blank rewrite,
   and a list field that does not cite every original entry exactly once, in
   order, at its earliest source's position; a merge of entries needs a
-  `verbosity` issue. Grade, rating and every other field are protected
-  because only the prose fields can be named. On a `keep` or a fallback the
+  `verbosity` issue. A rewrite of a field that was empty is dropped rather
+  than refused: it has nothing to cite, so it can only be invented, and
+  refusing would also discard a sound rewrite of another field. An edit left
+  with nothing after that reads as `keep`. Grade, rating and every other
+  field are protected because only the prose fields can be named. On a `keep` or a fallback the
   grade is stored as the provider returned it, and `grade_section` strips any
   `graded_prose` key the provider sent, since `graded_prose` is server-owned:
   an edit stores the grader's original prose there, exactly as returned, as
