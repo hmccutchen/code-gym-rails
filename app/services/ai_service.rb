@@ -456,10 +456,11 @@ class AiService
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
-  # Sized from the largest stored review's projection (243 characters across
-  # 4 local reviews, measured 2026-09-29): a full rewrite plus issues, from
-  # arrays and JSON structure, with three times that as headroom for a model
-  # overrunning, floored at 1,500. Passing it turns thinking off.
+  # The 1,500 floor governs: the local sample was only 4 section reviews
+  # (largest projection 243 characters). Review output has no length bound, so
+  # a long review can hit this cap and fall back unedited as `truncated`.
+  # Re-check the value against the review_prose script's measured output
+  # tokens before the switch is turned on. Passing it turns thinking off.
   REVIEW_JUDGE_MAX_TOKENS = 1_500
 
   REVIEW_PROSE_ISSUE_GUIDANCE = {
@@ -998,11 +999,6 @@ class AiService
   # provider from a two-entry key-format allowlist — so a fake-provider user in
   # production could only come from a console/DB mistake, where silently serving
   # canned exercises would be worse than failing loudly.
-  # Whether this provider's reviews go through the prose judge. A provider
-  # fact, so each subclass answers it; false until a provider has been
-  # measured (see ReviewProseJudge).
-  def self.judges_review_prose? = false
-
   def self.for(user)
     case user.provider
     when "anthropic" then ClaudeService.new(user.api_key)
@@ -1015,6 +1011,11 @@ class AiService
       raise Error, "User #{user.id} has no recognized AI provider configured"
     end
   end
+
+  # Whether this provider's reviews go through the prose judge. A provider
+  # fact, so each subclass answers it; false until a provider has been
+  # measured (see ReviewProseJudge).
+  def self.judges_review_prose? = false
 
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
 

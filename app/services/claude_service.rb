@@ -4,7 +4,8 @@ require "faraday/retry"
 class ClaudeService < AiService
   API_URL = "https://api.anthropic.com/v1/messages"
 
-  # Measured by script/compare_models.rb's review_prose modes.
+  # Not yet measured: script/compare_models.rb's review_prose modes measure it,
+  # and that has to happen before this switch is turned on.
   def self.judges_review_prose? = true
 
   # Keyed by the ApiUsage purpose string, so usage rows and routes name calls
