@@ -32,6 +32,19 @@ RSpec.describe "History", type: :request do
     )
   end
 
+  it "shows a rewritten review and never the grader's original kept for audit" do
+    reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+    reviewed.update!(ai_review: { "code_review" => {
+      "rating" => "solid", "missed" => [ "Rewritten point." ], "graded_prose" => { "missed" => [ "SENTINEL-ORIGINAL" ] }
+    } })
+
+    login_as(user)
+    get history_path
+
+    expect(response.body).to include("Rewritten point.")
+    expect(response.body).not_to include("SENTINEL-ORIGINAL")
+  end
+
   describe "parsons_problem third section, submitted" do
     it "renders the submitted order read-only, without the reorder controls" do
       exercise = DailyExercise.create!(

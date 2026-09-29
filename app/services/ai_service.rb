@@ -2598,11 +2598,46 @@ class AiService
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
       cache_system: true, read_timeout: REVIEW_READ_TIMEOUT
     )
-    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+    # graded_prose is server-owned: only the prose judge's edit writes it.
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review").except(ReviewProseVerdict::ORIGINAL_KEY)
     review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+    review = service.send(:judged_review, user, exercise, section, review)
     [ section, { ok: true, review: review } ]
   rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+  end
+
+  # Its own rescue, so a judge failure returns the grade the provider already
+  # gave instead of reaching grade_section's, which marks the section failed.
+  def judged_review(user, exercise, section, review)
+    return review unless ReviewProseJudge.enabled? && self.class.judges_review_prose?
+
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    verdict = judge_review_prose(user, ExerciseSection.for(section), review, coach: config_for(exercise.language)[:coach])
+    log_review_judge(user, section, verdict, started)
+    verdict.apply(review)
+  rescue ReviewProseVerdict::Invalid, Error, *INFRASTRUCTURE_ERRORS => e
+    Rails.logger.warn("[review_judge_fallback] user=#{user.id} section=#{section} reason=#{review_judge_fallback_reason(e)}")
+    review
+  end
+
+  # A fixed code, never the message: a message can carry provider text.
+  def review_judge_fallback_reason(error)
+    case error
+    when ReviewProseVerdict::Invalid  then "invalid_output"
+    when TruncatedResponseError       then "truncated"
+    when InvalidResponseError         then "invalid_json"
+    when RefusalError                 then "refusal"
+    when TimeoutError, Timeout::Error then "timeout"
+    else                                   error_code_for(error)
+    end
+  end
+
+  def log_review_judge(user, section, verdict, started)
+    ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round
+    Rails.logger.info("[review_judge] user=#{user.id} section=#{section} status=#{verdict.status} " \
+                      "issues=#{verdict.issues.map { |issue| issue[:type] }.uniq.join(',')} " \
+                      "merges=#{verdict.merges.to_json} ms=#{ms}")
   end
 
   # Rate how hard each problem is, from its content alone.

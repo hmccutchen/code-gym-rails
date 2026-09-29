@@ -3711,6 +3711,26 @@ RSpec.describe AiService do
   end
 
   describe "#answer_follow_up" do
+    it "never sends the grader's original prose kept for audit" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {
+        "missed" => [ "Rewritten point." ], "graded_prose" => { "missed" => [ "SENTINEL-ORIGINAL" ] }
+      } })
+      spy_class = Class.new(double_class) do
+        attr_reader :last_system
+        def call(system:, **kwargs)
+          @last_system = system
+          super
+        end
+      end
+      svc = spy_class.new(canned_text: "An answer")
+
+      svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
+
+      expect(svc.last_system).to include("Rewritten point.")
+      expect(svc.last_system).not_to include("SENTINEL-ORIGINAL")
+    end
+
     it "sends the question, the section's review, and the prior thread in order" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
         "code_review" => { "question" => "Find the N+1", "snippet" => "code" }
@@ -6217,5 +6237,116 @@ RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
     ReviewProseVerdict::ISSUE_TYPES.each { |type| expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("- #{type}:") }
     expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(AiService::PLAIN_LANGUAGE_STANDARD.strip)
       .and include("reply with only the JSON verdict")
+  end
+end
+
+RSpec.describe AiService, "judging graded reviews" do
+  let(:user) { User.create!(email: "graded@example.com", name: "G", provider: "fake", api_key: "fake-test-key") }
+  let(:exercise) do
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                          problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
+  end
+  let(:response) do
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          answers: { "code_review" => "The query runs once per row, so preload it." }, submitted_at: Time.current)
+  end
+  let(:service) { FakeService.new("fake-key") }
+  let(:logged) { StringIO.new }
+  let(:grade) { FakeService::REVIEW_SECTION.deep_stringify_keys.merge("missed" => [ "SENTINEL-G one.", "SENTINEL-G two." ]) }
+
+  around do |example|
+    original_logger = Rails.logger
+    original_switch = ENV["REVIEW_PROSE_JUDGE"]
+    Rails.logger = ActiveSupport::Logger.new(logged)
+    example.run
+  ensure
+    Rails.logger = original_logger
+    ENV["REVIEW_PROSE_JUDGE"] = original_switch
+  end
+
+  # Grades with a canned reply, and answers the judge with `judge_reply`
+  # (a String, or an exception to raise), counting judge calls.
+  def graded(judge_reply: { "status" => "keep" }.to_json, grader: grade, provider: FakeService)
+    judge_calls = 0
+    svc = provider.new("key")
+    allow(provider).to receive(:new).and_return(svc)
+    allow(svc).to receive(:call).and_wrap_original do |_m, system:, **|
+      if system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT
+        judge_calls += 1
+        raise judge_reply if judge_reply.is_a?(Exception)
+        { text: judge_reply, input_tokens: 1, output_tokens: 1 }
+      else
+        { text: grader.to_json, input_tokens: 1, output_tokens: 1 }
+      end
+    end
+    context = svc.send(:build_review_day_context, "Rails", exercise, response)
+    _, result = svc.send(:grade_section, user, exercise, response, "code_review", context)
+    [ result, judge_calls ]
+  end
+
+  def edit_reply
+    { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "SENTINEL-G two." } ],
+      "fields" => { "missed" => [ { "from" => [ 0, 1 ], "text" => "One query per row." } ] } }.to_json
+  end
+
+  context "with the switch off" do
+    it "makes no judge call and returns the grade as returned" do
+      result, calls = graded
+      expect(calls).to eq(0)
+      expect(result).to eq(ok: true, review: grade)
+    end
+
+    it "removes a provider-supplied graded_prose" do
+      result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
+      expect(result[:review]).to eq(grade)
+    end
+  end
+
+  context "with the switch on" do
+    before { ENV["REVIEW_PROSE_JUDGE"] = "1" }
+
+    it "applies an edit, keeps the rating, and stores the grader's prose" do
+      result, calls = graded(judge_reply: edit_reply)
+      expect(calls).to eq(1)
+      expect(result[:ok]).to be(true)
+      expect(result[:review]["missed"]).to eq([ "One query per row." ])
+      expect(result[:review]["rating"]).to eq(grade["rating"])
+      expect(result[:review]["graded_prose"]).to eq(grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys))
+      expect(logged.string).to match(/\[review_judge\] user=#{user.id} section=code_review status=edit issues=verbosity merges=\{"missed":\[\[0,1\]\]\}/)
+    end
+
+    it "keeps the sanitized grade on keep, dropping a forged graded_prose" do
+      result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
+      expect(result[:review]).to eq(grade)
+    end
+
+    it "replaces a forged graded_prose with its own on edit" do
+      result, = graded(judge_reply: edit_reply, grader: grade.merge("graded_prose" => { "missed" => "forged" }))
+      expect(result[:review]["graded_prose"]).to eq(grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys))
+    end
+
+    {
+      "plain prose" => [ "SENTINEL-G The review looks fine to me.", "invalid_json" ],
+      "malformed JSON" => [ "{\"status\": \"edit\", SENTINEL-G", "invalid_json" ],
+      "a JSON array" => [ "[\"SENTINEL-G\"]", "invalid_json" ],
+      "a verdict the boundary refuses" => [ { "status" => "edit", "issues" => [], "fields" => {} }.to_json, "invalid_output" ],
+      "a timeout" => [ AiService::TimeoutError.new("SENTINEL-G slow"), "timeout" ],
+      "a refusal" => [ AiService::RefusalError.new("SENTINEL-G declined"), "refusal" ],
+      "a truncated reply" => [ AiService::TruncatedResponseError.new("SENTINEL-G cut off"), "truncated" ],
+      "a rate limit" => [ AiService::RateLimitError.new("SENTINEL-G busy"), "rate_limit" ]
+    }.each do |name, (reply, reason)|
+      it "falls back to the sanitized grade on #{name}, logging a code and no review text" do
+        result, = graded(judge_reply: reply, grader: grade.merge("graded_prose" => "forged"))
+        expect(result).to eq(ok: true, review: grade)
+        expect(logged.string).to include("[review_judge_fallback] user=#{user.id} section=code_review reason=#{reason}")
+        expect(logged.string).not_to include("SENTINEL-G")
+      end
+    end
+
+    it "never judges for a provider that does not judge" do
+      result, calls = graded(provider: GeminiService)
+      expect(calls).to eq(0)
+      expect(result[:review]).to eq(grade)
+    end
   end
 end
