@@ -156,10 +156,10 @@ class AiService
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the
   # work we stopped waiting for, so retrying buys a duplicate charge for the
-  # entire problem set rather than a better outcome. Short calls keep retrying,
-  # and this never suppresses a retry_statuses retry (429/5xx arrive as
-  # Faraday::RetriableResponse, not a timeout).
-  # Every retry, a retryable status included, is decided here (both connections
+  # entire problem set rather than a better outcome. Short calls keep retrying.
+  # On a single_attempt request, every retry is refused, including status
+  # retries (429/5xx arrive as Faraday::RetriableResponse, not a timeout).
+  # Every retry decision, status or timeout, is made here (both connections
   # set methods: []), so a single-attempt request refuses all of them.
   RETRY_TIMEOUT_GUARD = lambda do |env, exception|
     return false if env.request.context.to_h[:single_attempt]
