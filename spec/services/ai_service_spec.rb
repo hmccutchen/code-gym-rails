@@ -27,10 +27,18 @@ RSpec.describe AiService do
     # for that work; this is headroom, not a deadline on database waits.
     REVIEW_OVERHEAD_SECONDS = 1.minute.to_i
 
+    # The prose judge runs after the grade in the same thread, once, with no
+    # retry, so the grading stage grows by one single attempt whether or not
+    # the judge is switched on: the claim has to cover the on case.
     def provider_review_budget_seconds
       (TRANSLATIONS_BEFORE_GRADING * AiService.worst_case_call_seconds(AiService::READ_TIMEOUT)) +
         AiService.worst_case_call_seconds(AiService::REVIEW_READ_TIMEOUT) +
+        AiService.single_attempt_call_seconds(AiService::REVIEW_JUDGE_READ_TIMEOUT) +
         AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS
+    end
+
+    it "counts one attempt and its open timeout for a single-attempt call" do
+      expect(AiService.single_attempt_call_seconds(30)).to eq(30 + AiService::OPEN_TIMEOUT)
     end
 
     it "counts every attempt and its open timeout in a call's worst case" do

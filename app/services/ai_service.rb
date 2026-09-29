@@ -40,8 +40,8 @@ class AiService
   # start while the first is still in flight. READ_TIMEOUT is the budget for
   # every call that doesn't pass a larger one. The ceiling that matters is the
   # longest #review request: a pre-grading translation on this budget, then a
-  # grade on REVIEW_READ_TIMEOUT, each allowed every retry attempt. That chain
-  # has to stay under DailyResponse::REVIEW_CLAIM_STALE_AFTER, which
+  # grade on REVIEW_READ_TIMEOUT, each allowed every retry attempt, then one prose-judge attempt on
+  # REVIEW_JUDGE_READ_TIMEOUT. That chain has to stay under DailyResponse::REVIEW_CLAIM_STALE_AFTER, which
   # ai_service_spec asserts so the two cannot drift apart.
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
@@ -120,6 +120,11 @@ class AiService
   # times for a grade the provider had usually already produced.
   REVIEW_READ_TIMEOUT = 120
 
+  # The review prose judge's one attempt. Short because the engineer is
+  # waiting on it, and it is added to the review claim's budget as a single
+  # attempt: the judge never retries.
+  REVIEW_JUDGE_READ_TIMEOUT = 30
+
   # Both providers configure the same retry policy (see ClaudeService::RETRY_OPTIONS /
   # GeminiService::RETRY_OPTIONS), so how many attempts and how long the backoff
   # can grow are base-class facts, not per-provider ones — a caller computing a
@@ -144,6 +149,12 @@ class AiService
   # and it can arrive just before the read timeout each time.
   def self.worst_case_call_seconds(read_timeout)
     call_budget_seconds(read_timeout) + ((RETRY_MAX + 1) * OPEN_TIMEOUT)
+  end
+
+  # A call made with single_attempt: one open timeout and one read timeout,
+  # no retries, no backoff.
+  def self.single_attempt_call_seconds(read_timeout)
+    OPEN_TIMEOUT + read_timeout
   end
 
   # How long a judged generation can run before it lands or fails: the draft,
