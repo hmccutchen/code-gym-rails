@@ -132,7 +132,7 @@ class ClaudeService < AiService
   end
 
   def thinking_off_for(model)
-    THINKING_OFF.fetch(model) { raise ArgumentError, "#{model} has no thinking-off setting, so it cannot take a capped call" }
+    THINKING_OFF.fetch(model) { raise AiService::UnsupportedRouteError, "#{model} has no thinking-off setting, so it cannot take a capped call" }
   end
 
   def refusal_category(parsed)

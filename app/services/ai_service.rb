@@ -34,6 +34,12 @@ class AiService
   # empty-response parse error pointing at the prompt.
   class RefusalError < Error; end
 
+  # A call routed to a model that cannot take its shape, such as a capped call
+  # on a model with no way to turn thinking off. A configuration mistake, not
+  # a provider failure, but an Error all the same so callers' existing rescues
+  # show the engineer a try-again message rather than an error page.
+  class UnsupportedRouteError < Error; end
+
   # Faraday sets no timeout by default, so without one a call made from a
   # request thread would tie up a Puma thread indefinitely and outlive
   # ResponsesController#review's claim on the row, letting a second review

@@ -327,8 +327,18 @@ RSpec.describe ClaudeService do
         expect(capped_body("claude-haiku-4-5")["thinking"]).to eq("type" => "disabled")
       end
 
-      it "refuses a capped call on a model with no thinking-off setting, before sending" do
-        expect { capped_body("claude-opus-5-5") }.to raise_error(ArgumentError, /claude-opus-5-5/)
+      # An AiService::Error, so the controllers' existing rescue shows the
+      # engineer a try-again message instead of an error page.
+      it "refuses a capped call on a model with no thinking-off setting, before sending, as an AiService error" do
+        posts = 0
+        conn = Faraday.new { |f| f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { posts += 1; [ 200, {}, success_body ] } } }
+        service.instance_variable_set(:@conn, conn)
+        allow(service).to receive(:route_for).and_return({ model: "claude-opus-5-5" })
+
+        expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 100) }
+          .to raise_error(AiService::UnsupportedRouteError, /claude-opus-5-5/)
+        expect(posts).to eq(0)
+        expect(AiService::UnsupportedRouteError).to be < AiService::Error
       end
     end
 
