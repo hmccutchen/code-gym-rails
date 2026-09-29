@@ -1506,7 +1506,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `overscroll-behavior-y: none` removes the rubber-band bounce, and with it
   the only way to reload a home-screen launch, which has no reload button.
   `shared/_pull_to_refresh` adds the gesture back as plain touch listeners on
-  top of that rule, which is unchanged. It reads standalone mode from whether
+  top of that rule, which is unchanged. It follows the iOS pattern: the nav
+  stays where it is while the layout's `[data-pull-content]` slides down with
+  UIScrollView's rubber-band resistance, and the spinner, layered beneath both,
+  shows in the gap that opens. The content's transform is cleared whenever it
+  comes to rest, since a transformed ancestor would re-anchor any
+  `position: fixed` element inside the page. It reads standalone mode from whether
   its indicator is displayed, and only the layout's `display-mode: standalone`
   block displays it, so that media query stays the one standalone test and a
   browser tab keeps its native pull. The action is a full reload, and it
@@ -1519,9 +1524,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   reloading over it. The gesture also refuses to start while a text field has
   focus, while any form is `inert` (the dashboard's submission and review
   handoff), or inside an inner area scrolled away from its top. On release the
-  spinner snaps into view and turns for at least half a second, and a
-  sessionStorage note lets the reloaded page open with it still turning and
-  tuck it away once loaded, since the page it was drawn on is gone by then. Playwright cannot emulate
+  content settles to a held gap and the spinner turns for at least half a
+  second, and a sessionStorage note lets the reloaded page open still held
+  with the spinner turning, and settle once loaded, since the page it was drawn on is gone by then. Playwright cannot emulate
   `display-mode`, so `spec/requests/pwa_spec.rb` pins the stylesheet rule and
   `spec/system/pull_to_refresh_spec.rb` forces that rule on to drive the
   gesture.

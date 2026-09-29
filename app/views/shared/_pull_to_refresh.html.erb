@@ -2,6 +2,14 @@
     and, with the layout's overscroll-behavior-y: none, no native pull either.
     That rule stays: this is a separate gesture, never native overscroll.
 
+    It follows the iOS pattern: the nav stays where it is and the page content
+    (the layout's [data-pull-content]) slides down with the finger, with the
+    rubber-band resistance UIScrollView uses, revealing the spinner in the gap
+    it opens. The spinner sits beneath the nav and the content (z-index -1), so
+    it only shows where the content has moved out of the way. The transform is
+    removed again whenever the content comes to rest, because a transformed
+    ancestor would re-anchor any position: fixed element inside the page.
+
     Standalone mode is decided by the layout's display-mode media query alone.
     The indicator is displayed only inside that block, so a hidden indicator
     means a browser tab, where the native gesture already exists and this
@@ -15,27 +23,31 @@
 
     The spinner has to survive the reload to read as a refresh: the page it
     was drawn on is gone the moment the new one arrives. So a pull leaves a
-    note in sessionStorage, and the reloaded page opens with the spinner
-    already turning and tucks it away once it has loaded. %>
+    note in sessionStorage, and the reloaded page opens with the content still
+    held down and the spinner turning, and lets both settle once it has loaded. %>
 <div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
 <script>
   (() => {
     const indicator = document.getElementById("pull-refresh");
-    if (getComputedStyle(indicator).display === "none") return;
+    const content = document.querySelector("[data-pull-content]");
+    if (!content || getComputedStyle(indicator).display === "none") return;
 
-    const THRESHOLD = 80;
-    const MAX_TRAVEL = 96;
-    const REST = -56;
-    const REFRESH_TOP = 24;
+    // UIScrollView's rubber band: travel approaches MAX_TRAVEL but never
+    // reaches it, so the content keeps giving a little under a longer pull.
+    const MAX_TRAVEL = 160;
+    const THRESHOLD = 64;
+    const HOLD = 64;
     const MIN_SPIN_MS = 500;
     const SETTLE_AFTER_LOAD_MS = 400;
     const SAVE_POLL_MS = 100;
     const SAVE_WAIT_LIMIT_MS = 10000;
     const RELOADED_KEY = "codegym:pull-refreshed";
+    const nav = document.querySelector("body > nav");
     const spinner = indicator.querySelector(".spinner");
     let startY = null;
     let ready = false;
     let refreshing = false;
+    let gap = null;
 
     function isEditable(element) {
       return element instanceof Element && element.matches("input, textarea, select, [contenteditable]");
@@ -59,21 +71,42 @@
              !insideScrolledArea(event.target);
     }
 
+    // Read while the content is at rest, so the gap is the layout's own.
+    function measureGap() {
+      const top = nav ? nav.getBoundingClientRect().bottom : 0;
+      gap = { top, height: content.getBoundingClientRect().top - top };
+    }
+
+    function rubberBand(distance) {
+      return distance * MAX_TRAVEL / (distance + MAX_TRAVEL);
+    }
+
+    function setSettling(settling) {
+      indicator.classList.toggle("is-settling", settling);
+      content.classList.toggle("pull-settling", settling);
+    }
+
+    function moveTo(travel) {
+      const middle = gap.top + (gap.height + travel) / 2;
+      content.style.transform = travel > 0 ? `translateY(${travel}px)` : "";
+      indicator.style.transform = `translateY(${middle - indicator.offsetHeight / 2}px)`;
+    }
+
     function show(distance) {
-      const travel = Math.min(distance * 0.8, MAX_TRAVEL);
-      indicator.classList.remove("is-settling");
-      indicator.style.transform = `translateY(${REST + travel}px)`;
-      indicator.style.opacity = Math.min(distance / THRESHOLD, 1);
-      spinner.style.transform = `rotate(${distance * 3}deg)`;
-      ready = distance >= THRESHOLD;
+      const travel = rubberBand(distance);
+      setSettling(false);
+      moveTo(travel);
+      indicator.style.opacity = Math.min(travel / THRESHOLD, 1);
+      spinner.style.transform = `rotate(${travel * 4}deg)`;
+      ready = travel >= THRESHOLD;
       indicator.classList.toggle("is-ready", ready);
     }
 
     function spin() {
       refreshing = true;
       spinner.style.transform = "";
-      indicator.classList.add("is-settling", "is-refreshing");
-      indicator.style.transform = `translateY(${REFRESH_TOP}px)`;
+      indicator.classList.add("is-refreshing");
+      moveTo(HOLD);
       indicator.style.opacity = 1;
     }
 
@@ -95,9 +128,9 @@
       startY = null;
       ready = false;
       refreshing = false;
-      indicator.classList.remove("is-refreshing");
-      indicator.classList.add("is-settling");
-      indicator.classList.remove("is-ready");
+      setSettling(true);
+      indicator.classList.remove("is-refreshing", "is-ready");
+      content.style.transform = "";
       indicator.style.transform = "";
       indicator.style.opacity = "";
     }
@@ -116,11 +149,13 @@
     }
 
     // A second finger, or any touch that cannot start a pull, ends the one
-    // already showing rather than leaving the ring on screen.
+    // already showing rather than leaving the content pulled down.
     document.addEventListener("touchstart", (event) => {
       if (refreshing) return;
       if (startY !== null) reset();
-      startY = canStart(event) ? event.touches[0].clientY : null;
+      if (!canStart(event)) return;
+      measureGap();
+      startY = event.touches[0].clientY;
     }, { passive: true });
 
     document.addEventListener("touchmove", (event) => {
@@ -135,6 +170,7 @@
       if (!ready) return reset();
 
       startY = null;
+      setSettling(true);
       spin();
       setTimeout(reloadWhenSaved, MIN_SPIN_MS);
     });
@@ -143,8 +179,8 @@
 
     if (recall(RELOADED_KEY)) {
       remember(RELOADED_KEY, null);
+      measureGap();
       spin();
-      indicator.classList.remove("is-settling");
       const settle = () => setTimeout(reset, SETTLE_AFTER_LOAD_MS);
       if (document.readyState === "complete") settle();
       else window.addEventListener("load", settle, { once: true });
