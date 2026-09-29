@@ -97,7 +97,7 @@ class ClaudeService < AiService
 
     parsed = parse_provider_envelope(resp.body, provider: "Claude")
     usage  = parsed["usage"] || {}
-    # claude-sonnet-5 thinks by default (unlike claude-sonnet-4-5), so the
+    # Current Sonnet models think by default (unlike claude-sonnet-4-5), so the
     # text block is no longer reliably content[0] — a leading thinking block
     # pushes it back, and dig(0, "text") silently returns nil.
     text_block = (parsed["content"] || []).find { |block| block["type"] == "text" }
