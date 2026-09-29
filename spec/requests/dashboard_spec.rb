@@ -305,9 +305,22 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       ps["code_review"]["teaching_note"] = "Count the queries per iteration"
       create_exercise(problem_set: ps)
       get root_path
-      expect(response.body).to include("Need a nudge?")
-      expect(response.body).to include("Count the queries per iteration")
-      expect(response.body).to include('class="hint locked"')
+      slot = Nokogiri::HTML5(response.body).at_css('.hint-slot[data-hint-for="code_review"]')
+      expect(slot.at_css(".hint-locked")["hidden"]).to be_nil
+      expect(slot.at_css(".hint-locked").text).to eq("Available after you attempt this section")
+      expect(slot.xpath("./details")).to be_empty
+      expect(slot.at_css("template").inner_html).to include("Count the queries per iteration")
+    end
+
+    it "renders the disclosure for a draft whose answer already counts" do
+      ps = base_problem_set
+      ps["code_review"]["teaching_note"] = "Count the queries per iteration"
+      exercise = create_exercise(problem_set: ps)
+      create_response(exercise, submitted: false)
+      get root_path
+      slot = Nokogiri::HTML5(response.body).at_css('.hint-slot[data-hint-for="code_review"]')
+      expect(slot.at_css(".hint-locked")["hidden"]).not_to be_nil
+      expect(slot.xpath("./details").first.at_css("summary").text).to include("Need a nudge?")
     end
 
     it "renders the hint unlocked after submission" do
@@ -315,8 +328,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       ps["pattern"]["teaching_note"] = "Think about single responsibility"
       create_response(create_exercise(problem_set: ps))
       get root_path
-      expect(response.body).to include("Think about single responsibility")
-      expect(response.body).not_to include('class="hint locked"')
+      slot = Nokogiri::HTML5(response.body).at_css('.hint-slot[data-hint-for="pattern"]')
+      expect(slot.xpath("./details").first.at_css(".hint-body").text).to include("Think about single responsibility")
+      expect(slot.at_css(".hint-locked")["hidden"]).not_to be_nil
     end
 
     it "renders no hint markup for exercises without teaching notes" do
@@ -393,6 +407,26 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include(
         %(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['duck typing'])}" tabindex="0" role="button" aria-label="duck typing: #{ERB::Util.html_escape(Glossary::TERMS['duck typing'])}">duck typing</span>)
       )
+    end
+
+    # A term inside a summary would be a control nested in the control that
+    # folds the section.
+    it "leaves a section's title unwrapped, in the form and once submitted, while its body text is still wrapped" do
+      ps = base_problem_set
+      ps["pattern"]["why"] = "Service objects keep controllers thin."
+      exercise = create_exercise(problem_set: ps)
+
+      get root_path
+      summary = Nokogiri::HTML(response.body).at_css(%(details.section[data-section-fold="pattern"] > summary))
+      expect(summary.text).to include("Service Objects")
+      expect(summary.css(".gloss-term")).to be_empty
+      expect(response.body).to include(%(<span class="gloss-term" data-definition="#{ERB::Util.html_escape(Glossary::TERMS['service objects'])}"))
+
+      create_response(exercise)
+      get root_path
+      labels = Nokogiri::HTML(response.body).css("div.section > .section-label")
+      expect(labels.map(&:text).join).to include("Service Objects")
+      expect(labels.css(".gloss-term")).to be_empty
     end
 
     it "renders an old exercise with a populated but now-unused glossary field without error" do

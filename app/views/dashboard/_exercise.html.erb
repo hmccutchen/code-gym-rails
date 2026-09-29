@@ -124,10 +124,17 @@
       const filled = [...textareas].filter(answered).length;
       progressFill.style.width = (filled / sectionFields.length * 100) + "%";
       progressLabel.textContent = filled === sectionFields.length ? "✓ All answered" : `${filled} of ${sectionFields.length} answered`;
-      document.querySelectorAll("details.hint[data-hint-for]").forEach(d => {
-        const t = form.querySelector(`textarea[data-field="${d.dataset.hintFor}"]`);
-        if (t) d.classList.toggle("locked", !answered(t));
+      form.querySelectorAll(".hint-slot[data-hint-for]").forEach(slot => {
+        const t = form.querySelector(`textarea[data-field="${slot.dataset.hintFor}"]`);
+        if (t) setHintLocked(slot, !answered(t));
       });
+    }
+
+    function setHintLocked(slot, locked) {
+      slot.querySelector(".hint-locked").hidden = !locked;
+      const disclosure = slot.querySelector(":scope > details.hint");
+      if (locked) disclosure?.remove();
+      else if (!disclosure) slot.querySelector(".hint-locked").after(slot.querySelector("template").content.cloneNode(true));
     }
 
     function payload(extra) {
@@ -176,14 +183,6 @@
       if (fold && !fold.open && ratings[section]) fold.open = true;
     }
 
-    // A glossary term in the summary is a span, so its tap would also count
-    // as the summary's activation and fold the section. On a phone the
-    // definition is only reachable by tap, so the fold yields; the layout's
-    // document-level handler still opens the definition.
-    form.querySelectorAll("details.section > summary .gloss-term").forEach(term => {
-      term.addEventListener("click", event => event.preventDefault());
-    });
-
     textareas.forEach(t => {
       t.addEventListener("input", () => {
         reopenIfRated(t.dataset.field);
@@ -195,8 +194,10 @@
       btn.addEventListener("click", () => {
         const section = btn.dataset.ratingFor;
         ratings[section] = btn.dataset.rating;
-        form.querySelectorAll(`button[data-rating-for="${section}"]`)
-            .forEach(b => b.classList.toggle("active", b === btn));
+        form.querySelectorAll(`button[data-rating-for="${section}"]`).forEach(b => {
+          b.classList.toggle("active", b === btn);
+          b.setAttribute("aria-pressed", b === btn);
+        });
         refreshSubmit();
         refreshStatus(section);
         autoSave();

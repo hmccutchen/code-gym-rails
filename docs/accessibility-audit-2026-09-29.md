@@ -2,8 +2,8 @@
 
 Four checks: reduced motion, screen-reader announcements for content that
 arrives after a request, color contrast, and keyboard focus. Items 1 and 2 are
-fixed in this branch. Items 3 and 4 are findings with proposed fixes, applied
-only once the proposals are agreed.
+fixed in this branch. Items 3 and 4 were reported first, and the agreed fixes
+are now applied.
 
 How it was checked: axe-core 4.13.0 ran in the system-spec browser against the
 dashboard (answer form and submitted state), history, Learn index, a Learn
@@ -72,97 +72,102 @@ screen-reader pass.
 `spec/system/live_regions_spec.rb` covers the three changed behaviors, and a
 request spec covers the generating hint.
 
-## 3. Color contrast (findings, not yet applied)
+## 3. Color contrast (applied)
 
 WCAG AA: 4.5:1 for normal text, 3:1 for large text and UI components. The
-failures come from three colors. Each misses narrowly, but on text that
-appears on every page.
+failures came from three colors. Each missed narrowly, but on text that appears
+on every page. The fix changes shared variables in the layout, not individual
+elements:
 
-| Element (pages) | Colors | Ratio | Needs |
+- `--accent` stays `#7c6af7` for borders, fills and the progress bar.
+- `--accent-text: #988bf9` is new. Every rule that colored text with
+  `--accent` now reads it: links, the brand, disclosure summaries, section
+  labels, review headings and rating pills, history tags, pagination, the
+  featured-concept label, the drill markers, and highlighted code keywords.
+- `--muted` goes from `#888` to `#999`.
+- `--button-bg: #6a57e8` (hover `--button-bg-hover: #5b48d9`) is the fill
+  behind white text: primary buttons and the selected rating button. The white
+  text is unchanged.
+
+| Element | Background | Before | After |
 | --- | --- | --- | --- |
-| Links on the surface color: nav, Learn list, footers (every page) | `#7c6af7` on `#1a1a2e` | 4.27 | 4.5 |
-| Disclosure summaries: "Reference", "Structure diagram", history "Show review" (dashboard, history) | `#7c6af7` on `#1a1a2e` | 4.27 | 4.5 |
-| Section labels ("1 — CODE REVIEW"), `.section-title`, glossary terms in labels (dashboard, history) | `#7c6af7` on `#1a1a2e`, 12px | 4.27 | 4.5 |
-| History concept tags `.history-tag` | `#7c6af7` on `#1a1a2e` | 4.27 | 4.5 |
-| AI rating pill `.review-rating` (dashboard, history) | `#7c6af7` on `#252146` / `#2e2a56` | 3.8 / 3.32 | 4.5 |
-| History review heading `h4.review-rating` | `#7c6af7` on `#201f3a` | 3.99 | 4.5 |
-| "Why it exists" box `.why-box` text (dashboard, history) | `#888` on `#22203e` | 4.4 | 4.5 |
-| Difficulty note and small buttons in history panels | `#888` on `#201f3a` | 4.49 | 4.5 |
-| Primary buttons: "Save key →", "Send code →" (Setup, login) | `#fff` on `#7c6af7` | 3.99 | 4.5 |
+| Accent text (links, summaries, labels, tags) | `#1a1a2e` surface | 4.27 | 6.01 |
+| | `#0f0f1a` page | 4.77 | 6.70 |
+| | `#0d0d1a` code and fields | 4.83 | 6.79 |
+| | `#22203e` why-box | 3.91 | 5.50 |
+| | `#201f3a` history panel | 3.99 | 5.61 |
+| AI rating pill | `#252146` | 3.80 | 5.34 |
+| | `#2e2a56` | 3.33 | 4.68 |
+| Muted text | `#1a1a2e` surface | 4.81 | 5.99 |
+| | `#0f0f1a` page | 5.37 | 6.68 |
+| | `#22203e` why-box | 4.41 | 5.48 |
+| | `#201f3a` history panel | 4.49 | 5.59 |
+| | `#2e2a56` rating pill | 3.75 | 4.66 |
+| White on primary button / selected rating | fill | 3.99 | 5.07 |
+| White on primary button, hover | fill | 5.14 | 6.22 |
 
-Not a failure: the "Need a nudge?" hint shows at 1.87:1 while locked. It is
-deliberately dimmed as an inactive control, and WCAG exempts inactive
-controls. Section 4 covers its keyboard problem, which is a real one.
+Muted text still reads as secondary. Body text `#e0e0f0` against the new
+`#999` is 2.18:1 (it was 2.72:1 against `#888`), so muted text stays a clear
+step down from body text.
 
-Proposed adjustments. Each ratio was checked against every background the
-color actually sits on.
+After the change, axe-core's contrast rule reports no violations on the
+dashboard (answer form, with a rating selected, and submitted state), history,
+Learn index, a Learn concept page, Progress, Account, Setup and login, with
+every disclosure open. The locked hint is no longer dimmed (section 4), so its
+exemption no longer applies.
 
-1. **Split accent into fill and text.** Keep `--accent: #7c6af7` for borders,
-   the progress fill and other non-text uses. Add `--accent-text: #988bf9` and
-   use it wherever accent colors text. That gives 6.01 on the surface, 5.5 in
-   the why-box, 5.61 in history panels, and 5.34 and 4.68 on the two rating
-   pills.
-2. **Darken the primary button fill** to `#6a57e8`, giving white text 5.07:1.
-   The button still reads as the same purple, one step deeper.
-3. **Lighten `--muted` from `#888` to `#999`:** 5.99 on the surface, 5.48 in
-   the why-box, 5.59 in history panels, 6.68 on the page background.
-
-These change only lightness, keep the same hues, and touch no layout. The
-risk is how much `var(--accent)` is used as text: the split has to be applied
-by hand to each rule, not by a global swap.
-
-## 4. Keyboard focus and tab order (findings, not yet applied)
+## 4. Keyboard focus and tab order (applied)
 
 Tab order follows visual order on every audited page:
 
 - **Dashboard:** nav, "Generate new set", then per section the summary,
-  reference, hint, answer, the three ratings, and the duck.
+  reference, hint (once unlocked), answer, the three ratings, and the duck.
 - **Exercise mix:** per kind, the slider, the exclude checkbox, then the
   difficulty radios.
 - **Learn index and concept pages:** match the layout.
 - **Login and Setup forms:** fields in reading order.
 
-The disabled Submit button and the disabled lock checkboxes are skipped, which
-is correct for disabled controls. Most controls keep the browser's own focus
-ring, and screenshots confirm it shows clearly on the dark theme.
+What changed:
 
-### Clearly broken (proposed fixes)
+1. **One focus ring.** `--focus-ring: #c9c0ff`, 2px wide with a 2px offset
+   (`--focus-ring-width`, `--focus-ring-offset`), applied with `:focus-visible`
+   to text inputs, textareas, selects, Parsons blocks and glossary terms. It is
+   at least 7.88:1 against every background it can sit on. The page rules that
+   set `outline: none` on focus now only recolor the border, so the ring is not
+   removed anywhere. No field sits inside an `overflow: hidden` or scrolling
+   parent, so the ring is not clipped. The only such elements are
+   visually-hidden text and the progress page's rung bar.
+2. **Sliders show focus on the thumb.** Chromium and Safari accept an outline
+   on the native `::-webkit-slider-thumb` and Firefox on `::-moz-range-thumb`,
+   so the slider keeps its native look and only the thumb gets the ring. Each
+   thumb rule stands alone, because a browser drops a whole selector list over
+   one vendor pseudo-element it doesn't know.
+3. **The locked "Need a nudge?" hint cannot be opened.** While the section is
+   unattempted, the page shows the plain line "Available after you attempt this
+   section". The disclosure itself waits in a `<template>`, outside the
+   document, and the dashboard script puts it in place once the answer counts
+   (and takes it out again if the answer is cleared). There is nothing to tab
+   to, press or announce before then.
+4. **The sticky progress bar no longer covers a focused field.** The bar takes
+   its height from `--progress-sticky-height` (3.25rem; it measured 50.27px
+   against the new 52px). `scroll-padding-top` on the root reads the same
+   variable, plus the focus ring's reach, so a browser that scrolls a field to
+   the top edge (iOS Safari does) stops with the field and its ring below the
+   bar. At 390px wide the field lands 4px below the bar with no sideways
+   scroll. Without the padding it lands underneath the bar.
+5. **Glossary terms are no longer wrapped in section titles.** A title is a
+   heading, and on the answer form it is also the summary that folds the
+   section. Terms are still wrapped in the scenario, question and other body
+   text.
+6. **Rating buttons announce their state.** Each row is a group named "How
+   hard was <section> for you?", and each button carries `aria-pressed`, set
+   from the same state that draws the selected style, including a rating
+   stored before the page loaded.
 
-1. **Exercise-mix sliders have no visible focus.** Setup's
-   `.form-field input:not([type="checkbox"], [type="radio"]):focus { outline: none; border-color: … }`
-   also matches the range sliders, which have no border to recolor, so a
-   focused slider looks identical to an unfocused one. Fix: add
-   `[type="range"]` to that `:not()` list, so sliders keep the browser's ring.
-2. **A locked "Need a nudge?" hint opens from the keyboard.** The lock is
-   `pointer-events: none`, which only stops the mouse. Tabbing to it and
-   pressing Enter opens the hint before the section is answered, which
-   bypasses the gating the dim styling promises. Fix: set `inert` on a locked
-   hint in the same `updateProgress` call that toggles `.locked`. That takes it
-   out of the tab order and blocks opening. The trade-off is that `inert` also
-   hides it from screen readers until it unlocks. `aria-disabled` plus a
-   prevented toggle is the alternative, if the hint should stay discoverable
-   while locked.
+Specs: `spec/system/focus_ring_spec.rb` (a field on each form page, and a
+screenshot check for the slider thumb), `spec/system/teaching_hint_lock_spec.rb`
+(Tab, Enter and Space on a locked hint, then unlocking and re-locking),
+`spec/system/sticky_progress_focus_spec.rb`, `spec/system/rating_buttons_spec.rb`,
+and request specs for the hint's server render and unwrapped titles.
 
-### Judgment calls (flagged, not changed)
-
-3. **Text fields show focus as a 1px accent border** (answer textareas, Setup
-   inputs and selects, login). The border changes from `#2a2a4a` to `#7c6af7`,
-   a 3.44:1 change, which meets the AA 3:1 requirement for non-text contrast.
-   But at 1px it is thin, and the AAA focus-appearance guidance asks for 2px.
-   A `box-shadow` ring alongside the border would strengthen it without moving
-   the layout.
-4. **The dashboard's sticky progress bar can cover a focused control** when
-   tabbing backwards, because the browser scrolls the control to the top edge,
-   under the bar. `scroll-padding-top` set to the bar's height would keep
-   focused controls clear of it. Whether this happens in practice depends on
-   screen height, so it is worth checking on a phone first.
-5. **Glossary terms inside section summaries are focusable** (each is a
-   `<span role="button" tabindex="0">` inside a `<summary>`). They work, but a focusable element
-   nested in another interactive element is discouraged, and some screen
-   readers announce the pair confusingly. There is no obvious alternative
-   that keeps the tap-to-define behavior, so this is flagged only.
-6. **Rating buttons do not expose their selected state** (no
-   `aria-pressed`). The selection shows visually but is not announced. This is
-   outside the focus audit and noted for completeness.
-
-No migration was needed for any of this.
+No migration was needed for any of this, and no dependency was added.

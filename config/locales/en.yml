@@ -41,6 +41,7 @@ en:
     section_left_out:
       one: "One section was left out today because it didn't pass a quality check."
       other: "%{count} sections were left out today because they didn't pass a quality check."
+    rating_group: "How hard was %{section} for you?"
   learn:
     title: "Learn"
     intro: "Every concept your sets can draw from — read up on one whenever you like."

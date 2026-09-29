@@ -28,7 +28,13 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #0f0f1a; --surface: #1a1a2e; --border: #2a2a4a;
-      --accent: #7c6af7; --text: #e0e0f0; --muted: #888;
+      --accent: #7c6af7; --text: #e0e0f0; --muted: #999;
+      /* --accent is too dark to read as text on the surface colors (4.27:1 on
+         --surface), so text takes a lighter shade of the same hue and --accent
+         stays for borders and fills. White on --button-bg is 5.07:1. */
+      --accent-text: #988bf9;
+      --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
+      --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
       --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
       /* iOS auto-zooms a focused input below 16px, which shifts the layout and
          doesn't cleanly restore. max() keeps the floor without overriding a
@@ -62,8 +68,22 @@
       nav .nav-links .name-editor { display: none; }
       body .pull-refresh { display: flex; }
     }
-    a { color: var(--accent); text-decoration: none; }
+    a { color: var(--accent-text); text-decoration: none; }
     a:hover { text-decoration: underline; }
+
+    /* The one focus ring for fields and sliders. Offset, so it sits on the
+       background around the control rather than on the control's own border.
+       A slider's ring goes on its thumb, the part the arrow keys move. The
+       thumb selectors each get a rule of their own because a browser drops a
+       whole selector list when it doesn't know one vendor pseudo-element. */
+    input:not([type="checkbox"], [type="radio"], [type="range"]):focus-visible,
+    textarea:focus-visible, select:focus-visible,
+    .parsons-block:focus-visible, .gloss-term:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset);
+    }
+    input[type="range"]:focus-visible::-webkit-slider-thumb { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+    input[type="range"]:focus-visible::-moz-range-thumb { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+    input[type="range"]:focus-visible { outline: none; }
 
     .container { max-width: 800px; margin: 0 auto; padding: 0 1.5rem; }
 
@@ -78,7 +98,7 @@
        truncated name still reads and still edits, a stacked wordmark reads as
        broken. min-width: 0 all the way down is what lets it: a flex item will
        not shrink below its content otherwise. */
-    nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 2rem; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+    nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 2rem; color: var(--accent-text); white-space: nowrap; flex-shrink: 0; }
     /* The alt text names the link, which is why the wordmark beside it is
        hidden from screen readers. */
     nav .brand-mark { height: 5rem; width: 7rem; }
@@ -117,10 +137,10 @@
 
     .btn { display: inline-block; padding: .5rem 1.25rem; border-radius: 6px; font-size: .9rem; font-weight: 600; cursor: pointer; border: none; }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: #6a58e0; }
+    .btn-primary { background: var(--button-bg); color: #fff; }
+    .btn-primary:hover { background: var(--button-bg-hover); }
     .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent-text); }
     .btn-sm { padding: .3rem .8rem; font-size: .8rem; }
     /* Loading state for buttons whose click starts a wait. Two consumers:
        forms tagged data-loading-form (shared script at the bottom of this
@@ -191,7 +211,7 @@
     .pseudocode-code pre { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .85rem; overflow-x: auto; white-space: pre; margin: .6rem 0 .2rem; }
     .pseudocode-caption { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
     .hljs { color: var(--text); }
-    .hljs-keyword, .hljs-title.function_, .hljs-title.class_ { color: var(--accent); }
+    .hljs-keyword, .hljs-title.function_, .hljs-title.class_ { color: var(--accent-text); }
     .hljs-string, .hljs-regexp { color: var(--green); }
     .hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
     .hljs-number, .hljs-literal { color: var(--yellow); }
@@ -199,7 +219,7 @@
     .hljs-built_in, .hljs-title { color: #7dd3fc; }
     .hljs-variable { color: var(--text); }
     .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .75rem; }
-    .review-block h4 { color: var(--accent); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+    .review-block h4 { color: var(--accent-text); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
     .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
     .difficulty-note { font-size: .8rem; line-height: 1.6; color: var(--muted); margin-top: .3rem; }
     .review-item { font-size: .9rem; line-height: 1.7; margin-top: .4rem; }
@@ -234,7 +254,7 @@
        responses/_submission — all of which render on BOTH the dashboard and the
        history page, so these cannot live in a per-page <style> block. */
     .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
-    .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .95rem; }
+    .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin-bottom: .95rem; }
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
     details.section > summary::-webkit-details-marker { display: none; }
     details.section > summary::before { content: "▼ "; }
@@ -264,7 +284,6 @@
     .parsons-block { display: flex; align-items: flex-start; gap: .5rem; margin-bottom: .4rem; }
     .parsons-block pre.snippet { flex: 1; margin: 0; padding: .55rem .75rem; }
     .parsons-controls { display: flex; flex-direction: column; gap: .2rem; }
-    .parsons-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .parsons-keyhint, .parsons-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .parsons-list:focus-within + .parsons-keyhint { position: static; width: auto; height: auto; clip-path: none; font-size: .8rem; color: var(--muted); margin: -.75rem 0 1rem; }
     .parsons-list:not(.parsons-list-readonly) .parsons-block { cursor: grab; }
@@ -272,7 +291,7 @@
     .parsons-misplaced pre.snippet { border-color: #a4453f; }
 
     details.ref { margin-bottom: 1rem; }
-    details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+    details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
     details.ref summary::before { content: "▶ "; }
     details.ref[open] summary::before { content: "▼ "; }
     .ref-body { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
@@ -287,10 +306,10 @@
     .mermaid-diagram svg { max-width: 100%; height: auto; }
 
     details.hint { margin-bottom: 1rem; }
-    details.hint summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+    details.hint summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
     details.hint summary::before { content: "▶ "; }
     details.hint[open] summary::before { content: "▼ "; }
-    details.hint.locked { pointer-events: none; opacity: .45; }
+    .hint-locked { font-size: .85rem; color: var(--muted); padding: .4rem 0; margin-bottom: 1rem; }
     .hint-body { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; border-radius: 0 6px 6px 0; margin-top: .5rem; line-height: 1.6; }
 
     .gloss-term { border-bottom: 1px dotted var(--muted); cursor: help; position: relative; }
@@ -322,7 +341,6 @@
       .gloss-term:hover::after { display: block; }
     }
     .gloss-term.gloss-open::after, .gloss-term:focus-visible::after { display: block; }
-    .gloss-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
     .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
@@ -342,8 +360,6 @@
       border-radius: 6px;
     }
     .name-editor-input:focus {
-      outline: 1px solid var(--accent);
-      outline-offset: 0;
       background: rgba(124, 106, 247, .06);
       border-color: var(--border);
     }
@@ -364,7 +380,7 @@
     .learn-intro, .learn-bucket-label, .learn-no-guide, .learn-empty { color: var(--muted); }
     .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
     .learn-prepare { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
-    .learn-drilling { font-size: .75rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 .5rem; }
+    .learn-drilling { font-size: .75rem; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: 0 .5rem; }
     .progress-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; font-size: .85rem; color: var(--muted); margin: 1rem 0 1.5rem; }
     .progress-legend dt { display: inline; font-weight: 600; color: var(--text); }
     .progress-legend dd { display: inline; margin: 0 0 0 .3rem; }
@@ -372,7 +388,7 @@
     details.progress-group { border: 1px solid var(--border); border-radius: 6px; padding: .6rem .9rem; margin-bottom: .6rem; }
     details.progress-group summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
     details.progress-group summary::-webkit-details-marker { display: none; }
-    details.progress-group summary::before { content: "▶"; color: var(--accent); font-size: .8rem; }
+    details.progress-group summary::before { content: "▶"; color: var(--accent-text); font-size: .8rem; }
     details.progress-group[open] summary::before { content: "▼"; }
     .progress-group-name { font-weight: 600; min-width: 9rem; }
     /* Each standing sets --rung once; the bar segments and the held dots read it. */
@@ -391,7 +407,7 @@
     .progress-word { font-size: .8rem; color: var(--muted); margin-left: auto; }
     .learn-drill, .learn-drills { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
     .learn-drills form, .learn-group-head form { display: inline-block; margin-right: .5rem; }
-    .learn-drill-paused { color: var(--accent); }
+    .learn-drill-paused { color: var(--accent-text); }
     .learn-group-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
     .learn-group-head h3 { margin: 0; }
     .learn-worked-example { white-space: pre-wrap; }
@@ -404,7 +420,7 @@
        per-page <style> block. .featured-compact is the dashboard's wrapper;
        it dials the same block down rather than giving it a second markup. */
     .featured-concept { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; }
-    .featured-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: .5rem; }
+    .featured-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin-bottom: .5rem; }
     .featured-title { font-size: 1.25rem; margin-bottom: .25rem; }
     .featured-bucket, .featured-tagline { color: var(--muted); font-size: .9rem; }
     .featured-tagline { margin-top: .5rem; }

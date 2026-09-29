@@ -18,7 +18,8 @@ RSpec.describe "Parsons reorder controls", type: :system do
         "parsons_problem" => {
           "title" => "Sort names", "question" => "Arrange these blocks",
           "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
-          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one",
+          "teaching_note" => "Start with what has to exist first."
         }
       }
     )
@@ -74,13 +75,14 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
         expect(page).to have_content("0 of 3 answered")
         expect(hidden_answer).to be_empty
+        expect(page).to have_no_css('.hint-slot[data-hint-for="parsons_problem"] > details')
         expect(page).to have_button("Submit answers →", disabled: true)
         rate_section("parsons_problem")
         expect(page).to have_button("Submit answers →", disabled: true)
         click_button "Use this order"
 
         expect(page).to have_content("1 of 3 answered")
-        expect(page).to have_no_css('details.hint[data-hint-for="parsons_problem"].locked')
+        expect(page).to have_css('.hint-slot[data-hint-for="parsons_problem"] > details.hint')
         expect(page).to have_button("Submit answers →", disabled: false)
         Timeout.timeout(10) do
           sleep 0.05 until user.daily_responses.reload.first&.answered?("parsons_problem")
