@@ -143,23 +143,23 @@
 
     /* The installed app's replacement for the pull-to-refresh a Safari tab has
        natively. Shown only by the standalone block above; shared/_pull_to_refresh
-       moves it down with the finger and sets its state classes. */
+       slides [data-pull-content] down and centres this in the gap it opens.
+       z-index -1 keeps it beneath the nav and the content, so it shows only
+       where the content has moved out of the way. */
     .pull-refresh {
-      display: none; position: fixed; top: 0; left: 50%; z-index: 60;
-      width: 2.75rem; height: 2.75rem; margin-left: -1.375rem;
+      display: none; position: fixed; top: 0; left: 50%; z-index: -1;
+      width: 2rem; height: 2rem; margin-left: -1rem;
       align-items: center; justify-content: center; pointer-events: none;
-      background: var(--bg); border: 1px solid var(--accent); border-radius: 50%;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
-      transform: translateY(-3.5rem); opacity: 0;
+      opacity: 0;
     }
     .pull-refresh .spinner {
-      width: 1.5rem; height: 1.5rem; border-width: 3px; animation: none; opacity: .6;
+      width: 1.75rem; height: 1.75rem; border-width: 3px; animation: none; opacity: .6;
       border-color: color-mix(in srgb, var(--accent) 30%, transparent);
       border-top-color: var(--accent); border-right-color: var(--accent);
     }
     .pull-refresh.is-ready .spinner, .pull-refresh.is-refreshing .spinner { opacity: 1; }
     .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
-    .pull-refresh.is-settling { transition: transform .25s ease, opacity .25s ease; }
+    .pull-refresh.is-settling, .pull-settling { transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s ease; }
 
     /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
        allows breaks at spaces/newlines, so snippets wrap on phones instead of
@@ -559,7 +559,7 @@
   </nav>
   <% end %>
 
-  <div class="container">
+  <div class="container" data-pull-content>
     <% if flash[:notice] %>
       <div class="flash notice"><%= flash[:notice] %></div>
     <% end %>
