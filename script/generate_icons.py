@@ -25,6 +25,11 @@ PUBLIC = ROOT / "public"
 PLAIN_ICON_WIDTH = 0.96
 MASKABLE_SAFE_DIAMETER = 0.8
 
+# The barbell makes the art about 1.4x wider than tall, so fitting it whole into
+# a square tab icon leaves the lifter too short to read at 16px. The favicon
+# trims the plates' outer halves down to this width-to-height ratio instead.
+FAVICON_ASPECT = 1.1
+
 
 def layout_background():
     hex_color = re.search(r"--bg:\s*#([0-9a-fA-F]{6})", LAYOUT.read_text()).group(1)
@@ -62,10 +67,16 @@ def maskable_icon(art, size, background):
     return centered(art, size, int(art.width * scale), background)
 
 
+def trimmed_to_aspect(art, aspect):
+    width = min(art.width, round(art.height * aspect))
+    left = (art.width - width) // 2
+    return art.crop((left, 0, left + width, art.height))
+
+
 def favicon(art):
     # Transparent, and filled edge to edge: a browser tab has its own
     # background, and the outline is what keeps the barbell visible on a dark one.
-    return centered(art, 32, 32, (0, 0, 0, 0))
+    return centered(trimmed_to_aspect(art, FAVICON_ASPECT), 32, 32, (0, 0, 0, 0))
 
 
 def main():
