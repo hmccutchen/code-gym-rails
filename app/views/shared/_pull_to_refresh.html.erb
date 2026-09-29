@@ -1,0 +1,91 @@
+<%# Pull-to-refresh for the installed app, which has no browser reload button
+    and, with the layout's overscroll-behavior-y: none, no native pull either.
+    That rule stays: this is a separate gesture, never native overscroll.
+
+    Standalone mode is decided by the layout's display-mode media query alone.
+    The indicator is displayed only inside that block, so a hidden indicator
+    means a browser tab, where the native gesture already exists and this
+    script does nothing.
+
+    A full reload is the whole action. Two places could lose work to one, so
+    the gesture will not start there: while a text field has focus (the
+    dashboard's autosave waits 800ms after the last keystroke), and while a
+    form is inert (the dashboard's submission and review handoff). %>
+<div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
+<script>
+  (() => {
+    const indicator = document.getElementById("pull-refresh");
+    if (getComputedStyle(indicator).display === "none") return;
+
+    const THRESHOLD = 80;
+    const MAX_TRAVEL = 64;
+    const REST = -48;
+    const spinner = indicator.querySelector(".spinner");
+    let startY = null;
+    let ready = false;
+
+    function isEditable(element) {
+      return element instanceof Element && element.matches("input, textarea, select, [contenteditable]");
+    }
+
+    // Pulling inside an inner area that is scrolled down scrolls that area,
+    // not the page, so it is not a refresh.
+    function insideScrolledArea(element) {
+      for (let node = element; node instanceof Element; node = node.parentElement) {
+        if (node.scrollTop > 0) return true;
+      }
+      return false;
+    }
+
+    function canStart(event) {
+      return event.touches.length === 1 &&
+             window.scrollY <= 0 &&
+             !isEditable(document.activeElement) &&
+             !isEditable(event.target) &&
+             !document.querySelector("form[inert]") &&
+             !insideScrolledArea(event.target);
+    }
+
+    function show(distance) {
+      const travel = Math.min(distance / 2, MAX_TRAVEL);
+      indicator.classList.remove("is-settling");
+      indicator.style.transform = `translateY(${REST + travel}px)`;
+      indicator.style.opacity = Math.min(distance / THRESHOLD, 1);
+      spinner.style.transform = `rotate(${distance * 3}deg)`;
+      ready = distance >= THRESHOLD;
+      indicator.classList.toggle("is-ready", ready);
+    }
+
+    function reset() {
+      startY = null;
+      ready = false;
+      indicator.classList.add("is-settling");
+      indicator.classList.remove("is-ready");
+      indicator.style.transform = "";
+      indicator.style.opacity = "";
+    }
+
+    document.addEventListener("touchstart", (event) => {
+      startY = canStart(event) ? event.touches[0].clientY : null;
+    }, { passive: true });
+
+    document.addEventListener("touchmove", (event) => {
+      if (startY === null) return;
+      const distance = event.touches[0].clientY - startY;
+      if (distance <= 0 || window.scrollY > 0) return reset();
+      show(distance);
+    }, { passive: true });
+
+    document.addEventListener("touchend", () => {
+      if (startY === null) return;
+      if (!ready) return reset();
+
+      startY = null;
+      spinner.style.transform = "";
+      indicator.classList.add("is-refreshing");
+      window.location.reload();
+    });
+
+    document.addEventListener("touchcancel", () => { if (startY !== null) reset(); });
+  })();
+</script>

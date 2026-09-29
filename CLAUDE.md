@@ -1501,6 +1501,22 @@ concept-specific difficulty descriptions for future generation, not a new set.
   now, for the daily reminder (see "Push reminders" below); `GET
   /service-worker.js` serves it from the root path, since a worker's scope is
   the directory it is served from.
+
+  **Pull-to-refresh in the installed app.** The layout's
+  `overscroll-behavior-y: none` removes the rubber-band bounce, and with it
+  the only way to reload a home-screen launch, which has no reload button.
+  `shared/_pull_to_refresh` adds the gesture back as plain touch listeners on
+  top of that rule, which is unchanged. It reads standalone mode from whether
+  its indicator is displayed, and only the layout's `display-mode: standalone`
+  block displays it, so that media query stays the one standalone test and a
+  browser tab keeps its native pull. The action is a full reload. The gesture
+  refuses to start where a reload would cost work: while a text field has
+  focus (the dashboard's autosave waits 800ms after the last keystroke), while
+  any form is `inert` (the dashboard's submission and review handoff), or
+  inside an inner area scrolled away from its top. Playwright cannot emulate
+  `display-mode`, so `spec/requests/pwa_spec.rb` pins the stylesheet rule and
+  `spec/system/pull_to_refresh_spec.rb` forces that rule on to drive the
+  gesture.
 - **Push reminders**: an optional notification each weekday when the day's set
   is ready, and an optional afternoon nudge on days it is left unfinished,
   turned on and off on the Account page.
@@ -1760,6 +1776,7 @@ always pull in the full suite — is stated once, in
 - `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately. Owns the nudge's copy, which varies with how far through the day is — untouched, partway, answered but unrated, or ready to submit
 - `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, the not-submitted stopping rule, and the quiet period that keeps a half-finished day from being nudged while it is still being worked on. Pure, so its specs need no database
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
+- `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing

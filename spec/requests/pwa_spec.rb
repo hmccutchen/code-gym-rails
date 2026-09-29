@@ -130,4 +130,33 @@ RSpec.describe "PWA", type: :request do
       expect(standalone_block).to include("nav .nav-links .name-editor")
     end
   end
+
+  # Same limit as above: the indicator's visibility is what tells the
+  # pull-to-refresh script it is in the installed app, so the rule that shows
+  # it is asserted against the stylesheet. spec/system/pull_to_refresh_spec.rb
+  # covers the gesture itself.
+  describe "the pull-to-refresh indicator" do
+    let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
+    let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }
+
+    it "is shown only from inside the app's one standalone-mode media query" do
+      expect(standalone_block).to include("body .pull-refresh { display: flex; }")
+      expect(layout.scan(/^\s*[^{}\n]*\.pull-refresh \{[^}]*display: (\w+)/).flatten).to eq(%w[flex none])
+    end
+
+    it "outranks the hidden base rule that comes after it" do
+      expect(layout.index("body .pull-refresh { display: flex; }")).to be < layout.index(".pull-refresh {\n      display: none;")
+    end
+
+    it "leaves the native bounce suppression scoped as it was" do
+      expect(standalone_block).to include("html, body { overscroll-behavior-y: none; }")
+      expect(layout.scan("overscroll-behavior").size).to eq(1)
+    end
+
+    it "is rendered on every page, signed in or not" do
+      get login_path
+
+      expect(response.body).to include('id="pull-refresh"')
+    end
+  end
 end
