@@ -1,5 +1,5 @@
 {
-  "model": "claude-sonnet-5",
+  "model": "claude-sonnet-5-5",
   "max_tokens": 250,
   "system": "SYSTEM TEXT",
   "messages": [
@@ -9,6 +9,9 @@
     }
   ],
   "thinking": {
-    "type": "disabled"
+    "type": "between_tools"
+  },
+  "output_config": {
+    "effort": "high"
   }
 }

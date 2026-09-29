@@ -6,11 +6,11 @@
 # rows would charge a teammate's history for a comparison they never ran.
 class ModelComparison
   CANDIDATES = {
-    "generate"  => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5", effort: "medium" } ],
-    "review"    => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5" } ],
-    "duck"      => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ],
-    "translate" => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ],
-    "judge"     => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ]
+    "generate"  => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-opus-5-5", effort: "medium" } ],
+    "review"    => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-opus-5-5" } ],
+    "duck"      => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
+    "translate" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
+    "judge"     => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ]
   }.freeze
 
   REVIEW_FIELDS = %w[rating missed next_step].freeze
@@ -22,8 +22,8 @@ class ModelComparison
   # is what #judge_fixtures prices a candidate's run against, for a person
   # comparing them, never anything billed.
   LIST_PRICE_PER_MILLION = {
-    "claude-sonnet-5"  => { input: 2.0, output: 10.0 },
-    "claude-haiku-4-5" => { input: 1.0, output: 5.0 }
+    "claude-sonnet-5-5" => { input: 2.0, output: 10.0 },
+    "claude-haiku-4-5"  => { input: 1.0, output: 5.0 }
   }.freeze
 
   Run = Data.define(:route, :output, :seconds, :tokens_in, :tokens_out)

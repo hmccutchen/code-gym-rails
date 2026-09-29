@@ -359,7 +359,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   provider, because it is a narrower generation call rather than a different
   kind of work.
 
-  `judge_section` goes to `claude-sonnet-5`, named explicitly even though it
+  The default route is `claude-sonnet-5-5` at an explicit `effort: "high"`,
+  5.5's own default, stated so a change to it cannot move every default-route
+  purpose silently. Sonnet 5.5 costs the same as Sonnet 5 and shares its
+  tokenizer, but its effort levels are recalibrated, so every uncapped
+  default-route purpose changed cost and latency by an unmeasured amount when
+  it moved.
+
+  `judge_section` goes to `claude-sonnet-5-5` at `effort: "high"`, named explicitly even though it
   is the default route, so usage rows and the comparison tooling agree on what
   ran. Sonnet first because the judge has to read code carefully and answer in
   a closed vocabulary, which is where a smaller model's false rejections would
@@ -369,14 +376,15 @@ concept-specific difficulty descriptions for future generation, not a new set.
   verdicts. The route stays on Sonnet until those are read, and moving it is
   editing one entry.
 
-  Review stays on `claude-sonnet-5` pending a comparison with `claude-opus-5-5`,
+  Review stays on `claude-sonnet-5-5` pending a comparison with `claude-opus-5-5`,
   and `duck_thread` and `pseudocode_translate` pending one with
   `claude-haiku-4-5`. `script/compare_models.rb` runs a stored day through both
   models of a pair and prints the results with tokens and time for a person to
   judge. Two constraints apply before routing any of them, both noted beside
-  the table. `#call` disables thinking whenever a caller passes `max_tokens`,
-  which Opus 5.5 rejects outright with a 400, so a capped purpose cannot move
-  to Opus without replacing that with a lower effort level. And Haiku 4.5 caches only a
+  the table. `#call` turns thinking off whenever a caller passes `max_tokens`,
+  using the routed model's entry in `ClaudeService::THINKING_OFF` (`between_tools`
+  on Sonnet 5.5, `disabled` on Haiku 4.5). Opus 5.5 has no thinking-off setting
+  and no entry, so a capped purpose cannot move to Opus: the call raises before sending. And Haiku 4.5 caches only a
   prompt of 4,096 tokens or more, above the duck's system prompt, so moving
   `duck_thread` there ends the caching bet described below.
 - **Conversational calls send real turns**: `AiService#duck_response` and
@@ -396,16 +404,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `ai_service_spec`'s "single-shot purposes" group drives the other public
   entry points and asserts the history each one reaches `#call` with is empty.
   **`duck_response` passes `cache_system: true`; the other conversational
-  caller does not.** Counted with `count_tokens` against `claude-sonnet-5`
+  caller does not.** Counted with `count_tokens` against `claude-sonnet-5` (5.5 shares its tokenizer)
   rather than estimated from characters, the merged duck prompt runs 993-1,182
   tokens across the stored `code_review` exercises — median 1,059 — and 1,364
   for the largest excerpt `RealSource` can actually produce. That last figure
   predates the current-schema block a grounded migration day now adds, so
   those prompts run larger, which only strengthens the case for caching.
-  Against a 1024-token minimum that means the ordinary day caches, not just a
-  real-source one; only the shortest sections fall short, and there the
-  provider declines to cache rather than billing a write, so they pay nothing
-  for the marker.
+  Against Sonnet 5.5's 512-token minimum every one of those prompts caches,
+  the shortest sections included.
 
   **It is a bet, not a free win, and this is the shape of it.** A thread is
   multi-turn by design but nothing forces a second turn, and the first turn of
@@ -431,9 +437,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **`answer_follow_up` stays uncached, and that is checked rather than
   inherited.** Its system prompt carries the question and a review summary
-  instead of the section's code, measuring 533-604 tokens — roughly half the
-  minimum, a margin no tokenization error closes. Asking there would set a
-  marker the provider ignores.
+  instead of the section's code, measuring 533-604 tokens. That cleared nothing
+  against Sonnet 5's 1,024-token minimum; against Sonnet 5.5's 512 it is
+  cacheable. Caching it is the same bet the duck makes, and it has not been
+  taken: follow-up threads are unmeasured, so the prompt, history and caching
+  choice stay as they were.
 
   What the turn conversion itself buys is that a user typing `You:` into the
   duck box can no longer forge an assistant

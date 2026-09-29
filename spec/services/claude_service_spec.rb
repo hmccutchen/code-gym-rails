@@ -269,25 +269,33 @@ RSpec.describe ClaudeService do
       service.send(:call, system: "sys", prompt: "prompt text")
     end
 
-    # claude-sonnet-5 thinks by default and max_tokens caps thinking + reply
-    # text together (see the MAX_TOKENS comment above). A caller-supplied
-    # max_tokens is by construction tighter than the generous default, so
-    # without this the model could spend the whole budget on thinking and
-    # emit no reply text at all — a fully valid request coming back
-    # truncated/empty and surfacing as a 503.
-    it "disables thinking when a caller overrides max_tokens with a tight budget" do
-      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
-      fake_conn = instance_double(Faraday::Connection)
-      service.instance_variable_set(:@conn, fake_conn)
-
-      expect(fake_conn).to receive(:post) do |_url, body|
-        parsed = JSON.parse(body)
-        expect(parsed["max_tokens"]).to eq(150)
-        expect(parsed["thinking"]).to eq("type" => "disabled")
-        fake_response
+    # max_tokens caps thinking and reply together, so a capped call turns
+    # thinking off; which setting does that is a per-model fact.
+    describe "thinking-off for a capped call" do
+      def capped_body(model)
+        body = nil
+        fake_conn = instance_double(Faraday::Connection)
+        service.instance_variable_set(:@conn, fake_conn)
+        allow(service).to receive(:route_for).and_return({ model: model })
+        allow(fake_conn).to receive(:post) do |_url, raw|
+          body = JSON.parse(raw)
+          instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
+        end
+        service.send(:call, system: "sys", prompt: "p", max_tokens: 100)
+        body
       end
 
-      service.send(:call, system: "sys", prompt: "prompt text", max_tokens: 150)
+      it "sends between_tools on Sonnet 5.5" do
+        expect(capped_body("claude-sonnet-5-5")["thinking"]).to eq("type" => "between_tools")
+      end
+
+      it "sends disabled on Haiku 4.5" do
+        expect(capped_body("claude-haiku-4-5")["thinking"]).to eq("type" => "disabled")
+      end
+
+      it "refuses a capped call on a model with no thinking-off setting, before sending" do
+        expect { capped_body("claude-opus-5-5") }.to raise_error(ArgumentError, /claude-opus-5-5/)
+      end
     end
 
     it "reports truncation when the model stopped at the output cap" do
@@ -487,7 +495,7 @@ RSpec.describe ClaudeService do
     it "constrains the reply to the schema and sends no prefill" do
       body = captured_body(response_schema: schema, max_tokens: 100, purpose: "judge_section")
 
-      expect(body["output_config"]).to eq("format" => { "type" => "json_schema", "schema" => schema })
+      expect(body["output_config"]).to eq("effort" => "high", "format" => { "type" => "json_schema", "schema" => schema })
       expect(body["messages"].last["role"]).to eq("user")
     end
 
@@ -498,7 +506,7 @@ RSpec.describe ClaudeService do
     end
 
     it "sends no format when no schema is given" do
-      expect(captured_body(purpose: "judge_section")).not_to have_key("output_config")
+      expect(captured_body(purpose: "judge_section")["output_config"]).not_to have_key("format")
     end
   end
 end

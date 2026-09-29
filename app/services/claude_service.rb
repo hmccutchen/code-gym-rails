@@ -9,18 +9,29 @@ class ClaudeService < AiService
   # before it is added here. CLAUDE.md's "Per-purpose model routing" holds what
   # to check before moving a purpose — the provider facts behind those checks
   # move, so they live in one place rather than two.
-  DEFAULT_ROUTE = { model: "claude-sonnet-5" }.freeze
+  # Effort is stated even where it is the model's default, so a change to that
+  # default cannot move a route silently.
+  DEFAULT_ROUTE = { model: "claude-sonnet-5-5", effort: "high" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" },
-    "judge_section"     => { model: "claude-sonnet-5" }
+    "judge_section"     => { model: "claude-sonnet-5-5", effort: "high" }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
+
+  # How each model turns thinking off for a capped call. Sonnet 5.5 rejects
+  # "disabled" with a 400 and takes "between_tools", which is valid only at
+  # effort high or below. Opus 5.5 has no thinking-off setting, so it has no
+  # entry and a capped call routed to it raises before sending.
+  THINKING_OFF = {
+    "claude-sonnet-5-5" => { type: "between_tools" },
+    "claude-haiku-4-5"  => { type: "disabled" }
+  }.freeze
 
   # Output ceiling, not a target — Anthropic bills generated tokens, so a
   # headroom-heavy cap costs nothing on the common case. It has to clear the
   # largest response we ask for: a full-day review, each section carrying
   # prose arrays plus a structural `improved_code` block. The original 2500
   # predated those fields and silently truncated reviews mid-string, which
-  # surfaced as a JSON parse error. claude-sonnet-5 and claude-opus-5-5 both
+  # surfaced as a JSON parse error. claude-sonnet-5-5 and claude-opus-5-5 both
   # think by default and max_tokens caps thinking + response text together, so
   # this also has to clear whatever the model spends on unrequested thinking.
   MAX_TOKENS = 16_000
@@ -62,9 +73,9 @@ class ClaudeService < AiService
     # see the comment above). Sharing a tight budget with thinking risks the
     # model spending it all before emitting any reply text, which surfaces as
     # a truncated/empty response and a 503 for an otherwise-valid request.
-    # Disabling thinking outright avoids having to guess a split that
-    # reserves enough tokens for both.
-    body[:thinking] = { type: "disabled" } if max_tokens
+    # Turning thinking off avoids having to guess a split that reserves enough
+    # tokens for both; THINKING_OFF says how each model does that.
+    body[:thinking] = thinking_off_for(route[:model]) if max_tokens
     output_config = { effort: route[:effort], format: json_format(response_schema) }.compact
     body[:output_config] = output_config if output_config.any?
 
@@ -113,6 +124,10 @@ class ClaudeService < AiService
 
   def route_for(purpose)
     MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
+  end
+
+  def thinking_off_for(model)
+    THINKING_OFF.fetch(model) { raise ArgumentError, "#{model} has no thinking-off setting, so it cannot take a capped call" }
   end
 
   def refusal_category(parsed)

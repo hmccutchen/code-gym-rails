@@ -92,7 +92,7 @@ RSpec.describe ConceptReferenceCalibration do
 
       calibration(repeats: 1, concurrency: 1).run([ [ "architecture", "sync_vs_async" ] ])
 
-      expect(out.string).to include("claude claude-sonnet-5 · architecture/sync_vs_async · sequential · ")
+      expect(out.string).to include("claude claude-sonnet-5-5 · architecture/sync_vs_async · sequential · ")
         .and include(" · ok · 1 attempt · 70 in / 30 out")
         .and include("architecture/sync_vs_async · concurrent · ")
         .and match(/^sequential: n=1 /).and match(/^concurrent: n=1 /)

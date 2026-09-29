@@ -87,7 +87,8 @@ class AiService
   # blocking, thinking-on call, so this one was sized the same order.
   #
   # Measured on 2026-09-19 with script/calibrate_concept_references.rb on the
-  # deployed routes. 36 claude-sonnet-5 calls ran 19-43 seconds, median 30,
+  # deployed routes, which were then claude-sonnet-5; not re-measured on
+  # claude-sonnet-5-5. 36 claude-sonnet-5 calls ran 19-43 seconds, median 30,
   # six of them concurrently. Of 17 measured gemini-3.5-flash calls, 16
   # completed in 20-70 seconds and one hit the 90-second timeout; the median
   # across all 17 was 25 seconds. The key's daily quota ended the run before
