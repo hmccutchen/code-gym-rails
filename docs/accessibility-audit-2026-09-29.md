@@ -39,9 +39,10 @@ finger during a pull, since that movement is the person's own gesture rather
 than an animation.
 
 `spec/system/reduced_motion_spec.rb` checks the computed styles with the
-setting on and off. `spec/views/reduced_motion_coverage_spec.rb` fails when a
-view declares an animation or transition without a reduced-motion rule, so a
-new one cannot skip this.
+setting on and off. `spec/views/reduced_motion_coverage_spec.rb` fails when any
+single animation or transition, selector by selector, has no matching
+reduced-motion rule, so a new one cannot skip this even in a file that handles
+others.
 
 ## 2. Screen-reader announcements (fixed where missing)
 
@@ -109,6 +110,10 @@ elements:
 Muted text still reads as secondary. Body text `#e0e0f0` against the new
 `#999` is 2.18:1 (it was 2.72:1 against `#888`), so muted text stays a clear
 step down from body text.
+
+`spec/views/palette_contrast_spec.rb` reads these variables and the tinted
+backgrounds from the layout and fails if any pair above drops below its
+minimum, so a later palette edit cannot quietly undo this.
 
 After the change, axe-core's contrast rule reports no violations on the
 dashboard (answer form, with a rating selected, and submitted state), history,
