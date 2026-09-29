@@ -686,6 +686,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   send it yet (#228), so a Gemini judge reply is held only by its prompt.
   `response_schema:` is the fourth additive keyword on `#call`, after
   `cache_system:`, `max_tokens:` and `history:`; every other caller omits it.
+  `single_attempt:` is the fifth: the review prose judge sets it, and every
+  other caller omits it.
 
   **Known leak, reported and left.** The reference disclosure above a section
   is titled "Reference — <concept>: how it works", which on a discovery kind
@@ -1126,6 +1128,71 @@ concept-specific difficulty descriptions for future generation, not a new set.
   can reach it even in principle, since `ai_review` does not exist until a
   *submitted* response is reviewed. Display-only: nothing about tier
   transitions, retention scheduling, or generation guidance changed.
+- **Review prose judge**: an optional second pass over each graded review,
+  for readability only. `AiService#judge_review_prose` reads the review as the
+  page renders it (`ReviewProseVerdict.project`) and may reword its prose
+  fields for plain language or length; it is never shown the answer, the
+  problem or the grading note, so it has nothing to regrade from. The
+  signature is the guarantee, as with `#assess_difficulty`. Verdicts are
+  `keep` or `edit`, with issue types `plain_language_violation` and
+  `verbosity`.
+
+  **What is mechanical.** `ReviewProseVerdict.parse` is the boundary. It
+  refuses a status or issue type outside the closed lists, a rewrite of any
+  field that is not one of `DailyResponse::AI_REVIEW_FIELDS`, a blank rewrite,
+  and a list field that does not cite every original entry exactly once, in
+  order, at its earliest source's position; a merge of entries needs a
+  `verbosity` issue. Grade, rating and every other field are protected
+  because only the prose fields can be named. On a `keep` or a fallback the
+  grade is stored as the provider returned it, and `grade_section` strips any
+  `graded_prose` key the provider sent, since `graded_prose` is server-owned:
+  an edit stores the grader's original prose there, exactly as returned, as
+  the audit record.
+
+  **The accepted risk is claim preservation.** Citation proves no point was
+  dropped or duplicated; it cannot prove a rewrite still says the same thing.
+  A negation, a condition or an identifier could change and nothing checks it.
+  That is why the judge ships off.
+
+  **Placement and failure.** `AiService#judged_review` runs inside each
+  section's grading thread, after grading and the Parsons rating override, and
+  has its own rescue. It rescues `StandardError`, not just `AiService::Error`,
+  because `Thread#value` re-raises whatever `grade_section`'s narrower rescue
+  misses, and no judge failure may cost the engineer the review. A failure
+  returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
+  reason code (`invalid_output`, `truncated`, `invalid_json`, `refusal`,
+  `timeout`, or the shared error code), never the error message, which can
+  carry provider text. The call is billed as `judge_review`, which is in
+  `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). That
+  cap came from a local sample of only four reviews, so it must be re-checked
+  against the output tokens the comparison script measures before the switch
+  goes on.
+
+  **One attempt, and a 12-minute claim.** The call passes `single_attempt:
+  true`, which refuses every retry, status retries included, and runs on
+  `REVIEW_JUDGE_READ_TIMEOUT`. The grading stage's time budget now includes
+  that one call (`OPEN_TIMEOUT + REVIEW_JUDGE_READ_TIMEOUT`), so
+  `DailyResponse::REVIEW_CLAIM_STALE_AFTER` is 12 minutes, whether or not the
+  switch is on. A claim window shorter than the chain would let a second
+  review start while the first is still running.
+
+  **Claude only.** `AiService.judges_review_prose?` is false on the base class
+  and true on `ClaudeService` (and `FakeService`, for specs), because the
+  judge relies on structured output, which `GeminiService` does not send yet
+  (#228). A Gemini user is never judged.
+
+  **Logging.** The `[review_judge]` line records status, issue types, merge
+  indexes and timing, never review text, and the reply is parsed with
+  `log_raw: false`. Transport-level raw-response logging in the provider
+  subclass may still record the text; that path is not the judge's.
+
+  **The switch and the activation gate.** `ReviewProseJudge.enabled?` is true
+  only when `REVIEW_PROSE_JUDGE` is exactly `"1"`. It ships off. Before
+  turning it on: run both `review_prose` modes of `script/compare_models.rb`
+  (`review_prose` on stored days and `review_prose_fixtures`), read every
+  rewrite beside its sources, and confirm no claim changed, including
+  negations, conditions and identifiers. Check the measured output tokens
+  against `REVIEW_JUDGE_MAX_TOKENS` at the same time.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
@@ -1213,7 +1280,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `ConceptReference` has no `user_id` — it's a shared, team-wide cache
   keyed on `(concept, language)`, so the first person to run the backfill pays
   for everyone and every later teammate pays almost nothing. Roughly $0.02 per
-  concept against `claude-sonnet-5`, so a couple of dollars for one user's
+  concept, an estimate from before the reference moved to `claude-sonnet-5-5`
+  at effort `high` (the new effort level changed the cost by an amount nobody
+  has measured), so a couple of dollars for one user's
   whole slice, growing with it — no count is quoted here on purpose, since the
   last one went stale the first time a vocabulary grew. The rate is an estimate
   from prompt shape rather than a measurement, and both it and the slice's size
@@ -1661,7 +1730,10 @@ always pull in the full suite — is stated once, in
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt); one class per kind answers which are thirds, which are fourths, which vocabulary they draw from, which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns the language config; it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
-- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, and latency and cost per model from `LIST_PRICE_PER_MILLION`
+- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read
+- `app/models/review_prose_verdict.rb` — `ReviewProseVerdict`: the prose judge's reply held to its closed lists, the structured-output schema, the projection the judge reads, and `#apply`, which stores the grader's original prose under `graded_prose`. Pure; its specs need no database
+- `app/services/review_prose_judge.rb` — `ReviewProseJudge.enabled?`: the deployment-wide `REVIEW_PROSE_JUDGE` switch, off unless exactly `"1"`
+- `spec/fixtures/review_judge/` — stored reviews that `ModelComparison#review_prose_fixtures` reads to compare candidates for the prose judge
 - `spec/fixtures/judge/` — eleven stored sections, each stating the verdict it expects, that `ModelComparison#judge_fixtures` reads to compare judge models. Six are broken, and not one per principle: one `scope_mismatch`, one `underdetermined`, two `reasoning_failure`, and two `unstated_prerequisite` — the Ruby `Thread` and frame-rate `code_review`s, the incidents this feature exists for; five are hard but sound, so a candidate's false rejections are as visible as its detections
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints
