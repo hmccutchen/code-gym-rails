@@ -311,6 +311,8 @@
         // post the version the first is about to move, and be refused as a
         // conflict with itself, snapping the user's latest change back.
         let inFlight = Promise.resolve();
+        // After load: this inline script runs before the layout defines CodeGymSaveStatus.
+        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => pending !== null || queuedSaves > 0));
         const saveMix = () => {
           editRevision++;
           prepareButton.disabled = true;

@@ -51,13 +51,16 @@
        way to; a deliberate trade, and renaming is unchanged in a browser tab.
        This media query is the app's one standalone-mode test (it is also what
        the two rules above are scoped by) — a second mechanism could disagree
-       with it. Selected through .nav-links to outrank `nav .name-editor`,
+       with it. The pull-to-refresh script reads its answer from whether
+       .pull-refresh is displayed, for the same reason; `body` outranks that
+       element's hidden base rule further down, as .nav-links does here. Selected through .nav-links to outrank `nav .name-editor`,
        which sets a display of its own further down the sheet: a media query
        adds no specificity, so the later rule would otherwise win. */
     @media (display-mode: standalone) {
       html, body { overscroll-behavior-y: none; }
       body { -webkit-tap-highlight-color: transparent; }
       nav .nav-links .name-editor { display: none; }
+      body .pull-refresh { display: flex; }
     }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -137,6 +140,26 @@
       border-radius: 50%; animation: spin .7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* The installed app's replacement for the pull-to-refresh a Safari tab has
+       natively. Shown only by the standalone block above; shared/_pull_to_refresh
+       moves it down with the finger and sets its state classes. */
+    .pull-refresh {
+      display: none; position: fixed; top: 0; left: 50%; z-index: 60;
+      width: 2.75rem; height: 2.75rem; margin-left: -1.375rem;
+      align-items: center; justify-content: center; pointer-events: none;
+      background: var(--bg); border: 1px solid var(--accent); border-radius: 50%;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+      transform: translateY(-3.5rem); opacity: 0;
+    }
+    .pull-refresh .spinner {
+      width: 1.5rem; height: 1.5rem; border-width: 3px; animation: none; opacity: .6;
+      border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+      border-top-color: var(--accent); border-right-color: var(--accent);
+    }
+    .pull-refresh.is-ready .spinner, .pull-refresh.is-refreshing .spinner { opacity: 1; }
+    .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
+    .pull-refresh.is-settling { transition: transform .25s ease, opacity .25s ease; }
 
     /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
        allows breaks at spaces/newlines, so snippets wrap on phones instead of
@@ -660,6 +683,7 @@
       one-shot time-zone detection higher up this file stays fire-and-forget on
       purpose — see the partial. %>
   <%= render "shared/save_status" if logged_in? %>
+  <%= render "shared/pull_to_refresh" %>
   <%= yield :page_scripts %>
 </body>
 </html>

@@ -17,7 +17,9 @@
 
     Rendered from the layout ahead of `yield :page_scripts`, the same way
     shared/_push_script is, so a page's own script can rely on
-    window.CodeGymSaveStatus existing by the time it runs. %>
+    window.CodeGymSaveStatus existing by the time it runs. The dashboard's and
+    /setup's scripts are inline in the page body instead, which runs first:
+    they reach it lazily, and register watch() probes on DOMContentLoaded. %>
 <p id="save-status" class="save-status" role="status" aria-live="polite" hidden></p>
 
 <script>
@@ -36,6 +38,20 @@
     // save that succeeded after it.
     const issued = new Map();
     let counter = 0;
+
+    // Work the page shows but the server has not stored yet: a request on the
+    // wire, or a delayed save a page registered through watch(). Pull-to-refresh
+    // waits on pending() so a reload cannot drop an edit mid-save.
+    let requests = 0;
+    const probes = [];
+
+    function watch(probe) {
+      probes.push(probe);
+    }
+
+    function pending() {
+      return requests > 0 || probes.some((probe) => probe());
+    }
 
     function render() {
       const messages = Array.from(failures.values());
@@ -75,6 +91,7 @@
 
       const current = () => issued.get(key) === ticket;
 
+      requests++;
       return fetch(url, {
         method: method,
         headers: {
@@ -111,9 +128,9 @@
       }).catch(() => {
         if (current()) fail(key, GENERIC);
         return { ok: false };
-      });
+      }).finally(() => { requests--; });
     }
 
-    return { save: save };
+    return { save: save, watch: watch, pending: pending };
   })();
 </script>

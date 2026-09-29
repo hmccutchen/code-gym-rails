@@ -1,0 +1,153 @@
+<%# Pull-to-refresh for the installed app, which has no browser reload button
+    and, with the layout's overscroll-behavior-y: none, no native pull either.
+    That rule stays: this is a separate gesture, never native overscroll.
+
+    Standalone mode is decided by the layout's display-mode media query alone.
+    The indicator is displayed only inside that block, so a hidden indicator
+    means a browser tab, where the native gesture already exists and this
+    script does nothing.
+
+    A full reload is the whole action, and it waits for CodeGymSaveStatus to
+    report no pending save: the dashboard and /setup delay each autosave, so an
+    edit made just before the pull may not have reached the server yet. The
+    gesture also will not start while a text field has focus, or while a form
+    is inert (the dashboard's submission and review handoff).
+
+    The spinner has to survive the reload to read as a refresh: the page it
+    was drawn on is gone the moment the new one arrives. So a pull leaves a
+    note in sessionStorage, and the reloaded page opens with the spinner
+    already turning and tucks it away once it has loaded. %>
+<div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
+<script>
+  (() => {
+    const indicator = document.getElementById("pull-refresh");
+    if (getComputedStyle(indicator).display === "none") return;
+
+    const THRESHOLD = 80;
+    const MAX_TRAVEL = 96;
+    const REST = -56;
+    const REFRESH_TOP = 24;
+    const MIN_SPIN_MS = 500;
+    const SETTLE_AFTER_LOAD_MS = 400;
+    const SAVE_POLL_MS = 100;
+    const SAVE_WAIT_LIMIT_MS = 10000;
+    const RELOADED_KEY = "codegym:pull-refreshed";
+    const spinner = indicator.querySelector(".spinner");
+    let startY = null;
+    let ready = false;
+    let refreshing = false;
+
+    function isEditable(element) {
+      return element instanceof Element && element.matches("input, textarea, select, [contenteditable]");
+    }
+
+    // Pulling inside an inner area that is scrolled down scrolls that area,
+    // not the page, so it is not a refresh.
+    function insideScrolledArea(element) {
+      for (let node = element; node instanceof Element; node = node.parentElement) {
+        if (node.scrollTop > 0) return true;
+      }
+      return false;
+    }
+
+    function canStart(event) {
+      return event.touches.length === 1 &&
+             window.scrollY <= 0 &&
+             !isEditable(document.activeElement) &&
+             !isEditable(event.target) &&
+             !document.querySelector("form[inert]") &&
+             !insideScrolledArea(event.target);
+    }
+
+    function show(distance) {
+      const travel = Math.min(distance * 0.8, MAX_TRAVEL);
+      indicator.classList.remove("is-settling");
+      indicator.style.transform = `translateY(${REST + travel}px)`;
+      indicator.style.opacity = Math.min(distance / THRESHOLD, 1);
+      spinner.style.transform = `rotate(${distance * 3}deg)`;
+      ready = distance >= THRESHOLD;
+      indicator.classList.toggle("is-ready", ready);
+    }
+
+    function spin() {
+      refreshing = true;
+      spinner.style.transform = "";
+      indicator.classList.add("is-settling", "is-refreshing");
+      indicator.style.transform = `translateY(${REFRESH_TOP}px)`;
+      indicator.style.opacity = 1;
+    }
+
+    // sessionStorage throws in some private modes; the spinner is only polish.
+    function remember(key, value) {
+      try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value); } catch {}
+    }
+
+    function recall(key) {
+      try { return sessionStorage.getItem(key); } catch { return null; }
+    }
+
+    function reload() {
+      remember(RELOADED_KEY, "1");
+      window.location.reload();
+    }
+
+    function reset() {
+      startY = null;
+      ready = false;
+      refreshing = false;
+      indicator.classList.remove("is-refreshing");
+      indicator.classList.add("is-settling");
+      indicator.classList.remove("is-ready");
+      indicator.style.transform = "";
+      indicator.style.opacity = "";
+    }
+
+    // Absent on signed-out pages, which have nothing to save.
+    function savesPending() {
+      return window.CodeGymSaveStatus?.pending() ?? false;
+    }
+
+    // A save still pending at the limit is treated as hung: the pull is
+    // cancelled rather than reloading over it, and can be tried again.
+    function reloadWhenSaved(waited = 0) {
+      if (!savesPending()) return reload();
+      if (waited >= SAVE_WAIT_LIMIT_MS) return reset();
+      setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
+    }
+
+    // A second finger, or any touch that cannot start a pull, ends the one
+    // already showing rather than leaving the ring on screen.
+    document.addEventListener("touchstart", (event) => {
+      if (refreshing) return;
+      if (startY !== null) reset();
+      startY = canStart(event) ? event.touches[0].clientY : null;
+    }, { passive: true });
+
+    document.addEventListener("touchmove", (event) => {
+      if (startY === null) return;
+      const distance = event.touches[0].clientY - startY;
+      if (distance <= 0 || window.scrollY > 0) return reset();
+      show(distance);
+    }, { passive: true });
+
+    document.addEventListener("touchend", () => {
+      if (startY === null) return;
+      if (!ready) return reset();
+
+      startY = null;
+      spin();
+      setTimeout(reloadWhenSaved, MIN_SPIN_MS);
+    });
+
+    document.addEventListener("touchcancel", () => { if (startY !== null) reset(); });
+
+    if (recall(RELOADED_KEY)) {
+      remember(RELOADED_KEY, null);
+      spin();
+      indicator.classList.remove("is-settling");
+      const settle = () => setTimeout(reset, SETTLE_AFTER_LOAD_MS);
+      if (document.readyState === "complete") settle();
+      else window.addEventListener("load", settle, { once: true });
+    }
+  })();
+</script>
