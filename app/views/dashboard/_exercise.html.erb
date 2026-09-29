@@ -138,13 +138,17 @@
       ) };
     }
 
-    let saveTimer;
+    let saveTimer = null;
+    // After load: this inline script runs before the layout defines CodeGymSaveStatus.
+    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null));
     function autoSave() {
       clearTimeout(saveTimer);
+      saveTimer = null;
       if (form.inert) return;
       // Through CodeGymSaveStatus so a refused or dropped save is reported
       // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
+        saveTimer = null;
         window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, data }) => {
           if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
         });
@@ -226,6 +230,7 @@
       event.preventDefault();
       if (form.inert || submitBlocker()) return;
       clearTimeout(saveTimer);
+      saveTimer = null;
 
       form.inert = true;
       submitButton.disabled = true;

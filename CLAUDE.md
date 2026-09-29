@@ -1509,11 +1509,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   top of that rule, which is unchanged. It reads standalone mode from whether
   its indicator is displayed, and only the layout's `display-mode: standalone`
   block displays it, so that media query stays the one standalone test and a
-  browser tab keeps its native pull. The action is a full reload. The gesture
-  refuses to start where a reload would cost work: while a text field has
-  focus (the dashboard's autosave waits 800ms after the last keystroke), while
-  any form is `inert` (the dashboard's submission and review handoff), or
-  inside an inner area scrolled away from its top. Playwright cannot emulate
+  browser tab keeps its native pull. The action is a full reload, and it
+  waits for `CodeGymSaveStatus.pending()` to clear first: that counts
+  requests on the wire plus the delayed saves the dashboard and /setup
+  register through `watch()`, since both hold an edit for a moment before
+  sending it. Their scripts are inline in the page body, which runs before the
+  layout defines `CodeGymSaveStatus`, so they register on `DOMContentLoaded`.
+  A save still pending after ten seconds cancels the pull rather than
+  reloading over it. The gesture also refuses to start while a text field has
+  focus, while any form is `inert` (the dashboard's submission and review
+  handoff), or inside an inner area scrolled away from its top. Playwright cannot emulate
   `display-mode`, so `spec/requests/pwa_spec.rb` pins the stylesheet rule and
   `spec/system/pull_to_refresh_spec.rb` forces that rule on to drive the
   gesture.

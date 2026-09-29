@@ -7,10 +7,11 @@
     means a browser tab, where the native gesture already exists and this
     script does nothing.
 
-    A full reload is the whole action. Two places could lose work to one, so
-    the gesture will not start there: while a text field has focus (the
-    dashboard's autosave waits 800ms after the last keystroke), and while a
-    form is inert (the dashboard's submission and review handoff). %>
+    A full reload is the whole action, and it waits for CodeGymSaveStatus to
+    report no pending save: the dashboard and /setup delay each autosave, so an
+    edit made just before the pull may not have reached the server yet. The
+    gesture also will not start while a text field has focus, or while a form
+    is inert (the dashboard's submission and review handoff). %>
 <div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
 <script>
   (() => {
@@ -20,9 +21,12 @@
     const THRESHOLD = 80;
     const MAX_TRAVEL = 64;
     const REST = -48;
+    const SAVE_POLL_MS = 100;
+    const SAVE_WAIT_LIMIT_MS = 10000;
     const spinner = indicator.querySelector(".spinner");
     let startY = null;
     let ready = false;
+    let refreshing = false;
 
     function isEditable(element) {
       return element instanceof Element && element.matches("input, textarea, select, [contenteditable]");
@@ -59,13 +63,32 @@
     function reset() {
       startY = null;
       ready = false;
+      refreshing = false;
+      indicator.classList.remove("is-refreshing");
       indicator.classList.add("is-settling");
       indicator.classList.remove("is-ready");
       indicator.style.transform = "";
       indicator.style.opacity = "";
     }
 
+    // Absent on signed-out pages, which have nothing to save.
+    function savesPending() {
+      return window.CodeGymSaveStatus?.pending() ?? false;
+    }
+
+    // A save still pending at the limit is treated as hung: the pull is
+    // cancelled rather than reloading over it, and can be tried again.
+    function reloadWhenSaved(waited = 0) {
+      if (!savesPending()) return window.location.reload();
+      if (waited >= SAVE_WAIT_LIMIT_MS) return reset();
+      setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
+    }
+
+    // A second finger, or any touch that cannot start a pull, ends the one
+    // already showing rather than leaving the ring on screen.
     document.addEventListener("touchstart", (event) => {
+      if (refreshing) return;
+      if (startY !== null) reset();
       startY = canStart(event) ? event.touches[0].clientY : null;
     }, { passive: true });
 
@@ -81,9 +104,10 @@
       if (!ready) return reset();
 
       startY = null;
+      refreshing = true;
       spinner.style.transform = "";
       indicator.classList.add("is-refreshing");
-      window.location.reload();
+      reloadWhenSaved();
     });
 
     document.addEventListener("touchcancel", () => { if (startY !== null) reset(); });
