@@ -614,13 +614,21 @@ class ResponsesController < ApplicationController
 
     critiqued = response.critiqued?(section)
     gaps      = ExerciseSection::PseudocodeToCode.normalize_critique(response.pseudocode_round(section)["critique"]).size
-    missed    = DailyResponse.review_points(response.ai_review&.dig(section, "missed")).size
+    missed    = DailyResponse.review_points(graded_missed(response.ai_review&.dig(section))).size
 
     Rails.logger.info(
       "[pseudocode] user=#{response.user_id} date=#{response.daily_exercise.date} phase=review " \
       "critiqued=#{critiqued} gaps=#{gaps} missed=#{missed} " \
       "disagreement=#{critiqued && gaps.zero? && missed.positive?}"
     )
+  end
+
+  # The grader's own missed points: the prose judge may have merged the stored
+  # ones, and keeps the originals under graded_prose when it does.
+  def graded_missed(review)
+    return nil unless review.is_a?(Hash)
+
+    review.dig(ReviewProseVerdict::ORIGINAL_KEY, "missed") || review["missed"]
   end
 
   def zero_success_alert(failures)

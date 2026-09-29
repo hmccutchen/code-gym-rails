@@ -294,6 +294,28 @@ RSpec.describe "Pseudocode rounds", type: :request do
       line = lines.find { |l| l.include?("phase=review") }
       expect(line).to include("critiqued=true", "gaps=1", "missed=2", "disagreement=false")
     end
+
+    # The metric compares critique gaps with what the grader found, so it must
+    # not move when the prose judge merges missed points.
+    it "counts the grader's missed points, not the prose judge's merged ones" do
+      response_row = submitted_response(
+        rounds: { "gaps_found" => false, "critique" => [], "critiqued_at" => Time.current.iso8601,
+                  "generated_code" => "def f; end", "translated_at" => Time.current.iso8601 },
+        review: nil
+      )
+
+      lines = logged_pseudocode_lines do
+        allow_any_instance_of(FakeService).to receive(:review_sections).and_return(
+          "pseudocode_to_code" => { ok: true, review: { "rating" => "developing", "missed" => [ "a and b" ],
+                                                        "correct" => [], "better_questions" => [],
+                                                        "next_step" => "x", "improved_code" => "",
+                                                        "graded_prose" => { "missed" => %w[a b c] } } }
+        )
+        post review_response_path(response_row)
+      end
+
+      expect(lines.find { |l| l.include?("phase=review") }).to include("missed=3", "disagreement=true")
+    end
   end
 
   # Round 2 is no longer a button: the review translates whatever pseudocode was
