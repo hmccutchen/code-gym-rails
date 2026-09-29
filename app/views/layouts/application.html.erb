@@ -161,6 +161,15 @@
     .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
     .pull-refresh.is-settling { transition: transform .25s ease, opacity .25s ease; }
 
+    /* For anyone whose OS asks for less motion. A spinner stops turning rather
+       than disappearing: each one sits beside text that already says the work
+       is under way, and a still ring beside it keeps the same meaning. Kept
+       after every rule it overrides, since it relies on source order. */
+    @media (prefers-reduced-motion: reduce) {
+      .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
+      .pull-refresh.is-settling { transition: none; }
+    }
+
     /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
        allows breaks at spaces/newlines, so snippets wrap on phones instead of
        forcing horizontal scroll. */

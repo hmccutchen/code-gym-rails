@@ -535,6 +535,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
         expect(response.body).to include(dashboard_status_path)
       end
+
+      # The hint is rewritten in place when generation runs long, which a
+      # screen reader only reads out from inside a live region.
+      it "announces the generating hint's updates" do
+        get root_path
+
+        expect(response.body).to include('id="generating-hint" aria-live="polite"')
+      end
     end
 
     context "on a weekend" do
