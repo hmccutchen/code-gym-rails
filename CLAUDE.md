@@ -1198,7 +1198,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   (`review_prose` on stored days and `review_prose_fixtures`), read every
   rewrite beside its sources, and confirm no claim changed, including
   negations, conditions and identifiers. Check the measured output tokens
-  against `REVIEW_JUDGE_MAX_TOKENS` at the same time.
+  against `REVIEW_JUDGE_MAX_TOKENS` at the same time, and the slowest
+  measured calls against `REVIEW_JUDGE_READ_TIMEOUT` (30 seconds): the call
+  has one attempt, so a timeout is billed and then falls back.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
