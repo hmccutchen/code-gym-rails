@@ -685,7 +685,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   cannot bound string length. `GeminiService` accepts the keyword and does not
   send it yet (#228), so a Gemini judge reply is held only by its prompt.
   `response_schema:` is the fourth additive keyword on `#call`, after
-  `cache_system:`, `max_tokens:` and `history:`; every other caller omits it.
+  `cache_system:`, `max_tokens:` and `history:`; `judge_section` and
+  `judge_review_prose` (`ReviewProseVerdict.schema`) pass it, and every other
+  caller omits it.
   `single_attempt:` is the fifth: the review prose judge sets it, and every
   other caller omits it.
 

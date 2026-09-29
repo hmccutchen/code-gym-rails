@@ -1012,9 +1012,9 @@ class AiService
     end
   end
 
-  # Whether this provider's reviews go through the prose judge. A provider
-  # fact, so each subclass answers it; false until a provider has been
-  # measured (see ReviewProseJudge).
+  # Whether this provider can hold the prose judge's reply to a schema. The
+  # base answers false; a provider that can opts in. Turning the judge on is
+  # the separate ReviewProseJudge switch, which waits on measurement.
   def self.judges_review_prose? = false
 
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
@@ -2516,9 +2516,9 @@ class AiService
   # of the fan-out rather than inside the section's own thread, because
   # #build_review_day_context reads the stored translation ONCE for every
   # grading thread: a translation written later than this line would be graded
-  # against a day context that never mentions it. The cost is that a day
-  # carrying such a kind spends two provider calls end to end where every other
-  # day spends one, which ai_service_spec holds against the review claim window.
+  # against a day context that never mentions it. The cost is one sequential
+  # call before grading (and grading's optional prose judge) on a day carrying
+  # such a kind, which ai_service_spec holds against the review claim window.
   #
   # Failure is swallowed as widely as the difficulty note's, and for the same
   # reason: the grades are what the engineer paid for, and .review_context
