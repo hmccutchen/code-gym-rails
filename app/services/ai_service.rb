@@ -456,6 +456,39 @@ class AiService
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
+  # Sized from the largest stored review's projection (243 characters across
+  # 4 local reviews, measured 2026-09-29): a full rewrite plus issues, from
+  # arrays and JSON structure, with three times that as headroom for a model
+  # overrunning, floored at 1,500. Passing it turns thinking off.
+  REVIEW_JUDGE_MAX_TOKENS = 1_500
+
+  REVIEW_PROSE_ISSUE_GUIDANCE = {
+    "plain_language_violation" => "jargon or buzzwords where a plainer word works, needless hedging, or a miss explained in a more complicated way than it needs.",
+    "verbosity" => "the same point made twice, the rating restated in prose, filler, or a next step that names more than one thing to study."
+  }.freeze
+
+  REVIEW_PROSE_ISSUE_LINES = ReviewProseVerdict::ISSUE_TYPES
+    .map { |type| "- #{type}: #{REVIEW_PROSE_ISSUE_GUIDANCE.fetch(type)}" }
+    .join("\n").freeze
+
+  REVIEW_PROSE_JUDGE_SYSTEM_PROMPT = <<~PROMPT.freeze
+    You are editing the prose of one section's code review so the engineer who submitted the work can read it easily. The grade is final: you change how the review says things, never what it says.
+
+    Check for these problems, the only #{ReviewProseVerdict::ISSUE_TYPES.size}:
+    #{REVIEW_PROSE_ISSUE_LINES}
+
+    #{PLAIN_LANGUAGE_STANDARD}
+
+    Rules for any rewrite:
+    - Keep what every entry claims. Keep each negation ("does not", "never"), each condition ("only when", "unless"), and every identifier (a method, column, constant or file name) exactly as written.
+    - Never add a claim, a fix or an example the entry does not already make. Never touch code.
+    - A list field is rewritten as entries, each with "from": the zero-based indexes of the original entries it replaces. Cite every original index exactly once. Merge entries only when they make the same point, and then report a verbosity issue. Order entries by their first index.
+    - Rewrite only the fields that have a problem and leave the others out. If nothing needs changing, return keep.
+    - Each issue's evidence quotes the text it is about.
+
+    Work through this internally, then reply with only the JSON verdict, with no text before or after it.
+  PROMPT
+
   # Fixed concept vocabularies, one per generation language. Embedded in the
   # generation prompt; anything a provider returns outside the active list is
   # normalized to "other" so per-user concept history stays aggregatable.
@@ -965,6 +998,11 @@ class AiService
   # provider from a two-entry key-format allowlist — so a fake-provider user in
   # production could only come from a console/DB mistake, where silently serving
   # canned exercises would be worse than failing loudly.
+  # Whether this provider's reviews go through the prose judge. A provider
+  # fact, so each subclass answers it; false until a provider has been
+  # measured (see ReviewProseJudge).
+  def self.judges_review_prose? = false
+
   def self.for(user)
     case user.provider
     when "anthropic" then ClaudeService.new(user.api_key)
@@ -1307,6 +1345,23 @@ class AiService
     JudgeVerdict.parse(parse_json_object(result[:text], subject: "#{kind.key} verdict"), kind: kind)
   end
 
+  # Handed the review alone, as the page renders it, plus the section's kind
+  # and the coaching language: never the answer, the problem or the grading
+  # note, so the judge has nothing to regrade from. The signature is the
+  # guarantee, like #assess_difficulty's.
+  def judge_review_prose(user, kind, review, coach:)
+    projection = ReviewProseVerdict.project(review)
+    result = call_and_log(
+      user, purpose: "judge_review", max_tokens: REVIEW_JUDGE_MAX_TOKENS,
+      read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
+      response_schema: ReviewProseVerdict.schema,
+      system: REVIEW_PROSE_JUDGE_SYSTEM_PROMPT,
+      prompt: review_prose_prompt(kind, coach, projection)
+    )
+    raw = parse_json_object(result[:text], subject: "review prose verdict", log_raw: false)
+    ReviewProseVerdict.parse(raw, projection: projection)
+  end
+
   # Maps an error to the code a fan-out records for it. A class method so
   # JudgedGeneration names failures the same way this class does.
   def self.error_code_for(error)
@@ -1327,6 +1382,17 @@ class AiService
   end
 
   private
+
+  def review_prose_prompt(kind, coach, projection)
+    <<~PROMPT
+      Section kind: #{kind.key}
+      The review is written for an engineer working in #{coach}.
+      Each list field is an array; an entry's index is its zero-based position.
+
+      The review's prose:
+      #{JSON.pretty_generate(projection)}
+    PROMPT
+  end
 
   def judge_prompt(kind, visible, rung:, locked:)
     <<~PROMPT

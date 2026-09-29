@@ -1,7 +1,7 @@
 class ApiUsage < ApplicationRecord
   belongs_to :user
 
-  PURPOSES = %w[generate_exercise retry_section review_response assess_difficulty generate_concept_reference generate_recognition_guide explain_concept_differently explain_differently review_follow_up duck_thread pseudocode_critique pseudocode_translate judge_section].freeze
+  PURPOSES = %w[generate_exercise retry_section review_response assess_difficulty generate_concept_reference generate_recognition_guide explain_concept_differently explain_differently review_follow_up duck_thread pseudocode_critique pseudocode_translate judge_section judge_review].freeze
   validates :purpose, inclusion: { in: PURPOSES }
   validates :date, :tokens_in, :tokens_out, presence: true
 end

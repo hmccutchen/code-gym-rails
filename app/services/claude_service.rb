@@ -4,6 +4,9 @@ require "faraday/retry"
 class ClaudeService < AiService
   API_URL = "https://api.anthropic.com/v1/messages"
 
+  # Measured by script/compare_models.rb's review_prose modes.
+  def self.judges_review_prose? = true
+
   # Keyed by the ApiUsage purpose string, so usage rows and routes name calls
   # the same way. script/compare_models.rb is how a candidate route gets read
   # before it is added here. CLAUDE.md's "Per-purpose model routing" holds what
@@ -14,7 +17,8 @@ class ClaudeService < AiService
   DEFAULT_ROUTE = { model: "claude-sonnet-5-5", effort: "high" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" },
-    "judge_section"     => { model: "claude-sonnet-5-5", effort: "high" }
+    "judge_section"     => { model: "claude-sonnet-5-5", effort: "high" },
+    "judge_review"      => { model: "claude-sonnet-5-5", effort: "high" }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
   # How each model turns thinking off for a capped call. Sonnet 5.5 rejects

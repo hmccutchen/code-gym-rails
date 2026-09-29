@@ -74,6 +74,10 @@ RSpec.describe "per-purpose model routing" do
   end
 
   describe ClaudeService do
+    it "routes judge_review to Sonnet 5.5 at an explicit high effort" do
+      expect(ClaudeService::MODEL_FOR_PURPOSE.fetch("judge_review")).to eq(model: "claude-sonnet-5-5", effort: "high")
+    end
+
     it "sends generation to Opus at medium effort" do
       body = posted_body(ClaudeService, purpose: "generate_exercise")
 

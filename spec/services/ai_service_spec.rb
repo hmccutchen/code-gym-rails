@@ -224,6 +224,7 @@ RSpec.describe AiService do
       pseudocode_critique
       pseudocode_translate
       judge_section
+      judge_review
     ].freeze
 
     it "covers every purpose except the two conversational ones" do
@@ -299,6 +300,8 @@ RSpec.describe AiService do
       spy_class.new(canned_text: { status: "keep" }.to_json)
                .judge_section(user, ExerciseSection::CodeReview, exercise.problem_set["code_review"],
                  rung: "senior", locked: false)
+      spy_class.new(canned_text: { status: "keep" }.to_json)
+               .judge_review_prose(user, ExerciseSection::CodeReview, response.ai_review["code_review"], coach: "Rails")
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
       expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size + 1)
@@ -6163,5 +6166,56 @@ RSpec.describe AiService, "quiet JSON parsing" do
     expect { service.send(:parse_json_object, "SENTINEL-8 is not JSON", subject: "review") }
       .to raise_error(AiService::InvalidResponseError)
     expect(logged.string).to include("SENTINEL-8")
+  end
+end
+
+RSpec.describe AiService, "#judge_review_prose" do
+  let(:user) { User.create!(email: "prose@example.com", name: "P", provider: "fake", api_key: "fake-test-key") }
+  let(:review) do
+    { "rating" => "solid", "correct" => [ "Uses includes." ], "missed" => [ "One query per row." ],
+      "better_questions" => [], "next_step" => "Read about eager loading.", "improved_code" => "User.includes(:posts)" }
+  end
+  let(:service) { FakeService.new("fake-key") }
+
+  def captured_call
+    captured = nil
+    allow(service).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    service.judge_review_prose(user, ExerciseSection::CodeReview, review, coach: "Rails")
+    captured
+  end
+
+  it "calls judge_review once, capped, on its own timeout, with the verdict schema" do
+    kw = captured_call
+    expect(kw).to include(purpose: "judge_review", max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
+                          read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
+                          response_schema: ReviewProseVerdict.schema, system: AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)
+  end
+
+  it "shows the projection and never the rating, code, answer or problem" do
+    prompt = captured_call[:prompt]
+    expect(prompt).to include("One query per row.").and include("code_review").and include("Rails")
+    expect(prompt).not_to include("User.includes(:posts)")
+    expect(prompt).not_to include("\"rating\"")
+  end
+
+  it "takes no answer, problem or grading note: the signature is the guarantee" do
+    expect(AiService.instance_method(:judge_review_prose).parameters)
+      .to eq([ [ :req, :user ], [ :req, :kind ], [ :req, :review ], [ :keyreq, :coach ] ])
+  end
+
+  it "returns a parsed verdict" do
+    expect(service.judge_review_prose(user, ExerciseSection::CodeReview, review, coach: "Rails").status).to eq(:keep)
+  end
+
+  it "says which providers judge" do
+    expect([ AiService, ClaudeService, GeminiService, FakeService ].map(&:judges_review_prose?)).to eq([ false, true, false, true ])
+  end
+end
+
+RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
+  it "lists issue types from ReviewProseVerdict and carries the plain-language standard" do
+    ReviewProseVerdict::ISSUE_TYPES.each { |type| expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("- #{type}:") }
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(AiService::PLAIN_LANGUAGE_STANDARD.strip)
+      .and include("reply with only the JSON verdict")
   end
 end
