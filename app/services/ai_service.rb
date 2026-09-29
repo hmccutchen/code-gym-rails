@@ -2744,18 +2744,23 @@ class AiService
   # by key, so a non-Hash payload has to fail here rather than downstream: an
   # array saved to ai_review is still truthy, which flips DailyResponse#reviewed?
   # and leaves the user an empty review they can't regenerate.
-  def parse_json_object(text, subject:)
-    parsed = parse_json_response(text)
+  def parse_json_object(text, subject:, log_raw: true)
+    parsed = parse_json_response(text, subject: subject, log_raw: log_raw)
     return parsed if parsed.is_a?(Hash)
 
     raise InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
   end
 
-  def parse_json_response(text)
+  # log_raw: false is for replies that are an engineer's review text, which
+  # stays out of application logs: nothing is logged, and the message never
+  # quotes the reply (a parser message can).
+  def parse_json_response(text, subject: "response", log_raw: true)
     # Strip any accidental markdown fences
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
     JSON.parse(clean)
   rescue JSON::ParserError => e
+    raise InvalidResponseError, "Provider returned invalid JSON for the #{subject}" unless log_raw
+
     log_raw_snippet("Invalid JSON from provider", text)
     raise InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
   end

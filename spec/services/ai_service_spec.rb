@@ -6140,3 +6140,28 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(payload["unhosted"]).to eq([])
   end
 end
+
+RSpec.describe AiService, "quiet JSON parsing" do
+  let(:service) { FakeService.new("fake-key") }
+  let(:logged) { StringIO.new }
+
+  around do |example|
+    original = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(logged)
+    example.run
+  ensure
+    Rails.logger = original
+  end
+
+  it "raises without logging the reply or quoting it" do
+    expect { service.send(:parse_json_object, "SENTINEL-7 is not JSON", subject: "verdict", log_raw: false) }
+      .to raise_error(AiService::InvalidResponseError, "Provider returned invalid JSON for the verdict")
+    expect(logged.string).not_to include("SENTINEL-7")
+  end
+
+  it "still logs a malformed reply by default" do
+    expect { service.send(:parse_json_object, "SENTINEL-8 is not JSON", subject: "review") }
+      .to raise_error(AiService::InvalidResponseError)
+    expect(logged.string).to include("SENTINEL-8")
+  end
+end
