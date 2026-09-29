@@ -5479,8 +5479,8 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
     judged = JudgedGeneration.call(user: user, language: "ruby_rails", draft: draft, providers: providers, finish: ->(*, **) { })
 
     expect(judged.problem_set["code_review"]).to eq(section)
-    expect(judged.outcomes["code_review"]).to include(fallback: "invalid_response", dropped: false)
-    expect(Rails.logger).to have_received(:warn).with(/\[judge_fallback\] user=#{user.id} section=code_review reason=invalid_response/)
+    expect(judged.outcomes["code_review"]).to include(fallback: "invalid_json", dropped: false)
+    expect(Rails.logger).to have_received(:warn).with(/\[judge_fallback\] user=#{user.id} section=code_review reason=invalid_json/)
   end
 end
 
@@ -6357,5 +6357,30 @@ RSpec.describe AiService, "judging graded reviews" do
       expect(calls).to eq(0)
       expect(result[:review]).to eq(grade)
     end
+  end
+end
+
+RSpec.describe AiService, ".judge_fallback_reason" do
+  # One table for both judges, so their fallback rates can be compared.
+  {
+    JudgeVerdict::Invalid.new("x")                     => "invalid_output",
+    ReviewProseVerdict::Invalid.new("x")               => "invalid_output",
+    AiService::TruncatedResponseError.new("x")         => "truncated",
+    AiService::InvalidResponseError.new("x")           => "invalid_json",
+    AiService::RefusalError.new("x")                   => "refusal",
+    AiService::TimeoutError.new("x")                   => "timeout",
+    Timeout::Error.new("x")                            => "timeout",
+    AiService::RateLimitError.new("x")                 => "rate_limit",
+    AiService::AuthenticationError.new("x")            => "authentication",
+    AiService::Error.new("x")                          => "other"
+  }.each do |error, reason|
+    it "names #{error.class} #{reason}" do
+      expect(AiService.judge_fallback_reason(error)).to eq(reason)
+    end
+  end
+
+  it "is the table both judges read" do
+    expect(JudgedGeneration.private_instance_methods).not_to include(:judge_fallback_reason)
+    expect(AiService.private_instance_methods).not_to include(:review_judge_fallback_reason)
   end
 end

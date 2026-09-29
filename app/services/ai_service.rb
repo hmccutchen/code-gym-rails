@@ -1374,6 +1374,22 @@ class AiService
     end
   end
 
+  # The reason either judge records when it falls back: one table for both, so
+  # their fallback rates can be compared. A code, never the message, which can
+  # carry provider text. A timeout is the judges' commonest failure, so it is
+  # named here rather than in error_code_for, where the review fan-out reads
+  # it as "other".
+  def self.judge_fallback_reason(error)
+    case error
+    when JudgeVerdict::Invalid, ReviewProseVerdict::Invalid then "invalid_output"
+    when TruncatedResponseError                              then "truncated"
+    when InvalidResponseError                                then "invalid_json"
+    when RefusalError                                        then "refusal"
+    when TimeoutError, Timeout::Error                        then "timeout"
+    else                                                          error_code_for(error)
+    end
+  end
+
   protected
 
   # The two provider calls JudgedGeneration makes, handed over as bound methods
@@ -2619,20 +2635,8 @@ class AiService
     log_review_judge(user, section, verdict, started)
     verdict.apply(review)
   rescue StandardError => e
-    Rails.logger.warn("[review_judge_fallback] user=#{user.id} section=#{section} reason=#{review_judge_fallback_reason(e)}")
+    Rails.logger.warn("[review_judge_fallback] user=#{user.id} section=#{section} reason=#{self.class.judge_fallback_reason(e)}")
     review
-  end
-
-  # A fixed code, never the message: a message can carry provider text.
-  def review_judge_fallback_reason(error)
-    case error
-    when ReviewProseVerdict::Invalid  then "invalid_output"
-    when TruncatedResponseError       then "truncated"
-    when InvalidResponseError         then "invalid_json"
-    when RefusalError                 then "refusal"
-    when TimeoutError, Timeout::Error then "timeout"
-    else                                   error_code_for(error)
-    end
   end
 
   def log_review_judge(user, section, verdict, started)

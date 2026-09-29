@@ -142,6 +142,13 @@ RSpec.describe JudgedGeneration do
     expect(Rails.logger).to have_received(:warn).with(/\[judge_fallback\]/).exactly(3).times
   end
 
+  it "records a truncated judge reply under the reason the review judge uses" do
+    verdicts["code_review"] = [ AiService::TruncatedResponseError.new("cut off") ]
+    allow(Rails.logger).to receive(:warn)
+
+    expect(run.outcomes["code_review"][:fallback]).to eq("truncated")
+  end
+
   it "asks the factory for a fresh provider for every judge and retry call" do
     verdicts["pattern"] = [ reject, { "status" => "keep" } ]
     built = 0

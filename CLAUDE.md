@@ -669,9 +669,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **A judge failure never costs the day its set.** When `judge_section`
   raises, times out, or returns output `JudgeVerdict` refuses, the draft
-  section stands unedited, `fallback` records the reason
-  (`invalid_output`, `timeout`, or the shared error code), and
-  `[judge_fallback]` warns. The judge is never retried.
+  section stands unedited, `fallback` records the reason from
+  `AiService.judge_fallback_reason` (`invalid_output`, `truncated`,
+  `invalid_json`, `refusal`, `timeout`, or the shared error code), and
+  `[judge_fallback]` warns. The judge is never retried. The review prose
+  judge reads the same table, so the two judges' fallback rates compare.
 
   **The judge's reply is held to a schema on Claude.** Its call is capped, so
   it runs with thinking off, and with nowhere else to reason the model once
@@ -1165,9 +1167,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   because `Thread#value` re-raises whatever `grade_section`'s narrower rescue
   misses, and no judge failure may cost the engineer the review. A failure
   returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
-  reason code (`invalid_output`, `truncated`, `invalid_json`, `refusal`,
-  `timeout`, or the shared error code), never the error message, which can
-  carry provider text. The call is billed as `judge_review`, which is in
+  reason code from `AiService.judge_fallback_reason`, the table the section
+  judge also reads, never the error message, which can carry provider text. The call is billed as `judge_review`, which is in
   `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). That
   cap came from a local sample of only four reviews, so it must be re-checked
   against the output tokens the comparison script measures before the switch
