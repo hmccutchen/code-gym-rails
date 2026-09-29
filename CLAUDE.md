@@ -686,8 +686,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `purpose: "judge_section"` rather than re-deriving them.
 
   **Stage 1 never carried `PLAIN_LANGUAGE_STANDARD`.** The standard is
-  interpolated into the duck, alternates, follow-up, grading and concept
-  reference prompts, and into neither `build_system_prompt` nor
+  interpolated into the duck, alternates, follow-up, grading, concept
+  reference and recognition guide prompts, and into neither `build_system_prompt` nor
   `build_exercise_prompt`. `JUDGE_SYSTEM_PROMPT` does carry it, which is the
   point: the judge rewrites prose, so the standard sits where the rewriting
   happens. So nothing was removed from the draft prompt to
@@ -1201,6 +1201,27 @@ concept-specific difficulty descriptions for future generation, not a new set.
   from `ConceptMastery`: tier is kept invisible everywhere by design, and a
   marker sourced from it would be exactly the readout the post-hoc difficulty
   rating went to lengths to avoid becoming.
+- **Recognition guides**: each recognition group on the Learn index carries
+  one generated piece on how to look for that kind of problem
+  (`RecognitionGuide`, table `recognition_guides`), in a disclosure at the top
+  of the group's block, above its concept list. A recognition group is a named
+  `ConceptGroup` or a language-independent bucket, whose flat list already is
+  one group; a language bucket's `core` group has no shared identity and gets
+  none. The guide teaches a process, never an answer: it never defines one
+  concept, which is `ConceptReference`'s job, and never hints at a planted
+  defect. `AiService::RECOGNITION_GUIDE_SCOPE` states that in the prompt, and
+  `#generate_recognition_guide(user, group_key)`'s signature holds it, since
+  it is handed no exercise, response or history. It is therefore shown with no
+  exposure gating. One row per group, shared across languages and the team,
+  written by `GenerateRecognitionGuideJob` from the existing "Write up the
+  rest" backfill and never rewritten; all three fields are required, so a
+  flubbed response writes nothing and the next backfill retries. Two framings
+  are derived rather than branched: a group holding any `TRADEOFF_CONCEPTS`
+  gets a line saying those are choices, and meta skill is framed as the habit
+  its tracked concepts exercise together (`RecognitionGuide::FRAMINGS`),
+  since its concepts are already process concepts. Nothing else reads a
+  guide. Design:
+  `docs/superpowers/specs/2026-09-29-recognition-guides-design.md`.
 - **Book citations**: `ConceptBookSources` maps a concept to an ARRAY of
   reading pointers — title, author, and where the book has one, the term the
   book itself coined — rendered as "Where this comes from" at the bottom of a
@@ -1671,6 +1692,12 @@ always pull in the full suite — is stated once, in
 - `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
   book pointers a Learn page renders under "Where this comes from". Closed,
   array-valued, and never read by any prompt — extend it by adding a line
+- `app/models/recognition_guide.rb` — `RecognitionGuide`: the cached "how to
+  look for these" piece per recognition group, which groups have one, and
+  what the prompt says each group is about.
+- `app/jobs/generate_recognition_guide_job.rb` — writes one missing
+  recognition guide; same permit and race handling as
+  `GenerateConceptReferenceJob`.
 - `app/models/concept_group.rb` — `ConceptGroup`: which display group a
   concept renders under on the Learn index, and the order groups appear in.
   Display-only, derived from `AiService`'s named vocabulary constants rather

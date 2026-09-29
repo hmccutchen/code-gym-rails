@@ -80,12 +80,21 @@ en:
       stopped: "Stopped drilling %{name}."
     featured:
       label: "Today's concept"
+    recognition:
+      summary: "How to look for these"
+      questions: "What to ask"
+      contrast: "Telling it apart"
+      misfires: "Where this goes wrong"
     filter_placeholder: "Filter concepts"
     seen_only: "Only ones I've seen"
     no_matches: "No concepts match that."
     prepare_prompt:
-      one: "1 concept hasn't been written up yet. Writing it up runs against your own API key, and what it writes is shared with everyone on the team."
-      other: "%{count} concepts haven't been written up yet. Writing them up runs against your own API key, and what it writes is shared with everyone on the team."
+      one: "1 concept hasn't been written up yet."
+      other: "%{count} concepts haven't been written up yet."
+    prepare_guides_prompt:
+      one: "1 guide on how to look for a group's problems hasn't been written yet."
+      other: "%{count} guides on how to look for each group's problems haven't been written yet."
+    prepare_cost: "Writing these up runs against your own API key, and what it writes is shared with everyone on the team."
     prepare_button: "Write up the rest"
     preparing: "Writing them up now — they'll appear as each one finishes."
     buckets:

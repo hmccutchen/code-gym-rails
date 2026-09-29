@@ -120,6 +120,82 @@ RSpec.describe "Learn", type: :request do
   # The views resolve headings by key, so a bucket or group added without its
   # string raises in the template rather than at the point of the change. This
   # turns that into a failing spec instead.
+  describe "recognition guides on GET /learn" do
+    before { user.update!(language: "ruby_rails") }
+
+    def create_guide(group_key)
+      RecognitionGuide.create!(group_key: group_key, questions: "Ask #{group_key} questions.",
+                               contrast: "#{group_key} contrast.", misfires: "#{group_key} misfires.")
+    end
+
+    def group_block(bucket, group)
+      Nokogiri::HTML(response.body).at_css("##{ApplicationController.helpers.learn_group_anchor(bucket, group)}")
+    end
+
+    it "renders a named group's guide at the top of its block, above the concept list" do
+      create_guide("code_smell")
+      get learn_path
+
+      block = group_block("ruby_rails", "code_smell")
+      guide = block.at_css(".learn-recognition")
+      expect(guide.text).to include("Ask code_smell questions.", "code_smell contrast.", "code_smell misfires.")
+      expect(block.css("details.learn-recognition, ul.learn-list").map(&:name)).to eq(%w[details ul])
+    end
+
+    it "renders a language-independent bucket's guide above its flat list" do
+      create_guide("architecture")
+      get learn_path
+
+      expect(group_block("architecture", ConceptGroup::CORE).at_css(".learn-recognition").text)
+        .to include("Ask architecture questions.")
+    end
+
+    # The guide sits under an h2 in a flat bucket and an h3 in a named group, so
+    # any heading inside it would skip a level in one of them.
+    it "adds no headings, so neither placement skips a heading level" do
+      create_guide("architecture")
+      create_guide("code_smell")
+      get learn_path
+
+      Nokogiri::HTML(response.body).css(".learn-recognition").each do |guide|
+        expect(guide.css("h1, h2, h3, h4, h5, h6")).to be_empty
+      end
+    end
+
+    it "renders no guide in a language bucket's core group" do
+      RecognitionGuide::GROUP_KEYS.each { |key| create_guide(key) }
+      get learn_path
+
+      expect(group_block("ruby_rails", ConceptGroup::CORE).at_css(".learn-recognition")).to be_nil
+    end
+
+    it "offers the backfill when only guides are missing" do
+      (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
+        ConceptBucket.vocabulary_for(bucket).each do |concept|
+          ConceptReference.create!(concept: concept, language: bucket,
+                                   tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
+        end
+      end
+      get learn_path
+
+      expect(response.body).to include(ERB::Util.h(I18n.t("learn.prepare_guides_prompt", count: RecognitionGuide::GROUP_KEYS.size)))
+      expect(response.body).not_to include(ERB::Util.h(I18n.t("learn.prepare_prompt", count: 2).delete_prefix("2 ")))
+    end
+
+    it "offers no backfill once every concept and guide is written" do
+      (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
+        ConceptBucket.vocabulary_for(bucket).each do |concept|
+          ConceptReference.create!(concept: concept, language: bucket,
+                                   tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
+        end
+      end
+      RecognitionGuide::GROUP_KEYS.each { |key| create_guide(key) }
+      get learn_path
+
+      expect(response.body).not_to include(I18n.t("learn.prepare_button"))
+    end
+  end
+
   describe "heading coverage" do
     it "has a locale string for every bucket a user can browse" do
       (AiService::LANGUAGE_CONFIG.keys).each do |bucket|
@@ -443,6 +519,16 @@ RSpec.describe "Learn", type: :request do
         post prepare_learn_path
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
         .with(hash_including(refresh: true))
+    end
+
+    it "enqueues one job per recognition group with no guide" do
+      RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
+
+      expect {
+        post prepare_learn_path
+      }.to have_enqueued_job(GenerateRecognitionGuideJob).exactly(RecognitionGuide::GROUP_KEYS.size - 1).times
+
+      expect(GenerateRecognitionGuideJob).not_to have_been_enqueued.with(group_key: "code_smell", user_id: user.id)
     end
 
     it "enqueues nothing once every concept has a row" do

@@ -918,6 +918,22 @@ class AiService
     not tied to any single problem.
   SCOPE
 
+  # A recognition guide is rendered as three parts, all required: a guide with
+  # a part missing has nothing worth showing, so the call fails and a later
+  # backfill retries rather than caching half of one forever.
+  RECOGNITION_GUIDE_FIELDS = %w[questions contrast misfires].freeze
+
+  # The one line this surface must hold. Stated in the prompt, but what holds it
+  # is #generate_recognition_guide's signature: it is handed no exercise, no
+  # response and no history, so it cannot reach a particular problem.
+  RECOGNITION_GUIDE_SCOPE = <<~SCOPE.chomp
+    This teaches a PROCESS for recognizing the category, never an ANSWER.
+    - Good: "ask whether this interface hides what it should, or makes every caller repeat the same decision."
+    - Bad: defining any one concept in the list, such as "shallow_module means the interface is as complex as the implementation". Each concept already has its own reference.
+    - Bad: anything that tells the reader what to look for in a particular problem they may be given. Never name or describe a specific planted defect, exercise, or answer.
+    It is a lens the reader carries into any problem, not a hint about one.
+  SCOPE
+
   # Max bytes of raw provider output logged server-side when a provider
   # response can't be used (invalid JSON, non-success HTTP status). Keeps
   # exception messages — which surface in flash alerts and error trackers —
@@ -1036,6 +1052,26 @@ class AiService
     normalize_optional_reference_fields!(reference)
 
     reference
+  end
+
+  # ── Generate the one-time cached recognition guide for a group ───────────
+  # Same narrow shape as #generate_concept_reference: no exercise, no response,
+  # no history. See RECOGNITION_GUIDE_SCOPE for why that matters here.
+  def generate_recognition_guide(user, group_key)
+    result = call_and_log(
+      user, purpose: "generate_recognition_guide",
+      system: "You are a senior engineer writing a short, durable piece on how to recognize one category of problem. Return ONLY valid JSON.",
+      prompt: build_recognition_guide_prompt(group_key),
+      read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT
+    )
+
+    guide = parse_json_object(result[:text], subject: "recognition guide")
+    RECOGNITION_GUIDE_FIELDS.each { |field| guide[field] = usable_optional_text(guide[field], MAX_CONCEPT_GUIDE_LENGTH) }
+
+    missing = RECOGNITION_GUIDE_FIELDS.select { |field| guide[field].nil? }
+    raise InvalidResponseError, "Recognition guide missing usable field(s): #{missing.join(', ')}" if missing.any?
+
+    guide.slice(*RECOGNITION_GUIDE_FIELDS)
   end
 
   # ── Reframe one cached concept reference a different way ─────────────────
@@ -2614,6 +2650,45 @@ class AiService
         "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept"
       }
     PROMPT
+  end
+
+  def build_recognition_guide_prompt(group_key)
+    concepts = RecognitionGuide.concepts_for(group_key)
+
+    <<~PROMPT
+      Write a short teaching piece on how to recognize one category of problem.
+
+      The category, "#{group_key.humanize}", is about #{RecognitionGuide.subject_for(group_key)}
+      The concepts in it are: #{concepts.join(', ')}.
+      #{RecognitionGuide.framing_for(group_key)}
+      #{recognition_tradeoff_line(concepts)}
+
+      #{RECOGNITION_GUIDE_SCOPE}
+
+      Write for any engineer reading a library, with no exercise in front of them.
+      Keep examples language-neutral: plain description, or a few lines of
+      pseudocode at most. Invent them; never describe a real exercise.
+
+      This standard applies to every field:
+      #{PLAIN_LANGUAGE_STANDARD}
+
+      Return JSON matching this schema exactly:
+      {
+        "questions": "string — the questions to ask, in the order you would ask them, when reading code or a plan to see whether it has a problem of this kind. At most two short paragraphs.",
+        "contrast":  "string — two short invented situations of the same shape: one where those questions turn something up, and a look-alike where they come back clean. Then say which question told them apart. At most two short paragraphs.",
+        "misfires":  "string — how this way of looking goes wrong: what it flags that is not a problem, and what it misses. One short paragraph."
+      }
+    PROMPT
+  end
+
+  # Derived from TRADEOFF_CONCEPTS rather than keyed to a group, so the framing
+  # follows the concepts wherever they are grouped.
+  def recognition_tradeoff_line(concepts)
+    choices = concepts & TRADEOFF_CONCEPTS
+    return if choices.empty?
+
+    "Some of these (#{choices.join(', ')}) are choices between two defensible options rather than defects. " \
+      "For those, the lens recognizes that a choice is being made and which property of the context decides it, never which side is right."
   end
 
   # `medium` is nil for a concept with no code of its own — see
