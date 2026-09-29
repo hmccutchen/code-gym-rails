@@ -150,6 +150,18 @@ RSpec.describe "Learn", type: :request do
         .to include("Ask architecture questions.")
     end
 
+    # The guide sits under an h2 in a flat bucket and an h3 in a named group, so
+    # any heading inside it would skip a level in one of them.
+    it "adds no headings, so neither placement skips a heading level" do
+      create_guide("architecture")
+      create_guide("code_smell")
+      get learn_path
+
+      Nokogiri::HTML(response.body).css(".learn-recognition").each do |guide|
+        expect(guide.css("h1, h2, h3, h4, h5, h6")).to be_empty
+      end
+    end
+
     it "renders no guide in a language bucket's core group" do
       RecognitionGuide::GROUP_KEYS.each { |key| create_guide(key) }
       get learn_path

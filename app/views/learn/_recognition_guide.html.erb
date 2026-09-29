@@ -1,13 +1,15 @@
 <%# Required locals: guide (a RecognitionGuide).
 
     A disclosure only to keep the index scannable. Nothing gates it: the guide
-    teaches a way of looking, never an answer, so every user sees it. %>
+    teaches a way of looking, never an answer, so every user sees it. Its labels
+    are not headings because it sits under an h2 in a flat bucket and under an
+    h3 in a named group, and no one heading level fits both. %>
 <details class="learn-recognition">
   <summary><%= t("learn.recognition.summary") %></summary>
-  <h4><%= t("learn.recognition.questions") %></h4>
+  <p class="learn-recognition-label"><%= t("learn.recognition.questions") %></p>
   <p><%= guide.questions %></p>
-  <h4><%= t("learn.recognition.contrast") %></h4>
+  <p class="learn-recognition-label"><%= t("learn.recognition.contrast") %></p>
   <p class="learn-worked-example"><%= guide.contrast %></p>
-  <h4><%= t("learn.recognition.misfires") %></h4>
+  <p class="learn-recognition-label"><%= t("learn.recognition.misfires") %></p>
   <p><%= guide.misfires %></p>
 </details>
