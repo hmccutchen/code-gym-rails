@@ -7,11 +7,15 @@
   <%= render "shared/featured_concept", reference: @featured %>
 <% end %>
 
-<% if @ungenerated.positive? %>
-  <%# Quotes the count and says whose key pays, because it spends the user's
+<% if @ungenerated.positive? || @ungenerated_guides.positive? %>
+  <%# Quotes the counts and says whose key pays, because it spends the user's
       own provider key and the rows it writes are shared with the whole team. %>
   <div class="learn-prepare">
-    <p><%= t("learn.prepare_prompt", count: @ungenerated) %></p>
+    <p>
+      <% if @ungenerated.positive? %><%= t("learn.prepare_prompt", count: @ungenerated) %><% end %>
+      <% if @ungenerated_guides.positive? %><%= t("learn.prepare_guides_prompt", count: @ungenerated_guides) %><% end %>
+      <%= t("learn.prepare_cost") %>
+    </p>
     <%= button_to t("learn.prepare_button"), prepare_learn_path, class: "btn btn-sm", form: { id: "learn-prepare-form" } %>
   </div>
 
@@ -71,6 +75,10 @@
               <% end %>
             <% end %>
           </div>
+        <% end %>
+
+        <% if (guide = @recognition_guides[RecognitionGuide.key_for(bucket[:key], group_key)]) %>
+          <%= render "learn/recognition_guide", guide: guide %>
         <% end %>
 
         <ul class="learn-list">

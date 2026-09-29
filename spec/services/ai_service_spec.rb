@@ -210,6 +210,7 @@ RSpec.describe AiService do
       review_response
       assess_difficulty
       generate_concept_reference
+      generate_recognition_guide
       explain_concept_differently
       explain_differently
       pseudocode_critique
@@ -275,6 +276,7 @@ RSpec.describe AiService do
                .send(:retry_section, user, "ruby_rails", retry_draft, ExerciseSection::Pattern, "service_objects")
       spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
       spy_class.new(canned_text: reference_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      spy_class.new(canned_text: FakeService::RECOGNITION_GUIDE.to_json).generate_recognition_guide(user, "code_smell")
       spy_class.new(canned_text: "Another framing.")
                .explain_differently(user, exercise, response, section: "code_review")
       spy_class.new(canned_text: "A different angle on the same concept.")
@@ -4404,7 +4406,7 @@ RSpec.describe AiService do
     end
   end
 
-  # One standard, seven prompts. Each example sends a request down one call
+  # One standard, many prompts. Each example sends a request down one call
   # path and counts the standard in what reached the provider: zero means a
   # site lost it, two means a site both inlined and interpolated it.
   describe "the shared plain-language standard" do
@@ -4455,6 +4457,12 @@ RSpec.describe AiService do
     it "reaches the concept reference prompt exactly once" do
       json = { tagline: "t", explanation: "e", code_example: "c", senior_lens: "s" }.to_json
       recording_class.new(canned_text: json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+
+      expect(occurrences_per_call).to eq([ 1 ])
+    end
+
+    it "reaches the recognition guide prompt exactly once" do
+      recording_class.new(canned_text: FakeService::RECOGNITION_GUIDE.to_json).generate_recognition_guide(user, "code_smell")
 
       expect(occurrences_per_call).to eq([ 1 ])
     end
@@ -4656,6 +4664,98 @@ RSpec.describe AiService do
       expect {
         service.generate_concept_reference(user, "n_plus_one", "mixed")
       }.to raise_error(AiService::Error, /Unsupported generation language/)
+    end
+  end
+
+  describe "#generate_recognition_guide" do
+    let(:valid_json) { FakeService::RECOGNITION_GUIDE.to_json }
+
+    let(:capturing_class) do
+      Class.new(double_class) do
+        attr_reader :last_system
+
+        def call(system:, **options)
+          @last_system = system
+          super
+        end
+      end
+    end
+
+    def prompt_for(group_key)
+      svc = capturing_class.new(canned_text: valid_json)
+      svc.generate_recognition_guide(user, group_key)
+      svc.last_prompt
+    end
+
+    it "returns exactly the three guide fields" do
+      result = double_class.new(canned_text: valid_json.sub("{", '{"extra":"x",')).generate_recognition_guide(user, "code_smell")
+
+      expect(result.keys).to contain_exactly(*AiService::RECOGNITION_GUIDE_FIELDS)
+      expect(result["questions"]).to eq(FakeService::RECOGNITION_GUIDE["questions"])
+    end
+
+    AiService::RECOGNITION_GUIDE_FIELDS.each do |field|
+      [ nil, 1, [ "prose" ], "", "  ", "x" * (AiService::MAX_CONCEPT_GUIDE_LENGTH + 1) ].each do |invalid|
+        it "rejects #{invalid.inspect.truncate(20)} in #{field}" do
+          payload = FakeService::RECOGNITION_GUIDE.merge(field => invalid)
+
+          expect {
+            double_class.new(canned_text: payload.to_json).generate_recognition_guide(user, "code_smell")
+          }.to raise_error(AiService::InvalidResponseError, /#{field}/)
+        end
+      end
+    end
+
+    it "logs usage under its own purpose on the concept reference's read budget" do
+      service = double_class.new(canned_text: valid_json)
+
+      expect { service.generate_recognition_guide(user, "code_smell") }
+        .to change { ApiUsage.where(purpose: "generate_recognition_guide").count }.by(1)
+      expect(service.last_read_timeout).to eq(AiService::CONCEPT_REFERENCE_READ_TIMEOUT)
+    end
+
+    # Held by the signature, as for #explain_concept_differently: with no
+    # exercise, response or history to pass, the guide cannot describe one.
+    it "cannot see any exercise, because it takes only the user and the group" do
+      params = AiService.instance_method(:generate_recognition_guide).parameters
+
+      expect(params).to eq([ [ :req, :user ], [ :req, :group_key ] ])
+    end
+
+    it "states the process-not-answer scope and names the group's concepts" do
+      prompt = prompt_for("module_design")
+
+      expect(prompt).to include(AiService::RECOGNITION_GUIDE_SCOPE)
+      expect(prompt).to include(RecognitionGuide.subject_for("module_design"))
+      AiService::MODULE_DESIGN_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
+    end
+
+    it "reads a language-independent bucket's concepts and focus" do
+      prompt = prompt_for("plan_review")
+
+      expect(prompt).to include(AiService::LANGUAGE_CONFIG["plan_review"][:focus])
+      AiService::PLAN_REVIEW_CONCEPTS.each { |concept| expect(prompt).to include(concept) }
+    end
+
+    it "frames the tradeoff concepts a group holds as choices, and no others" do
+      architecture = prompt_for("architecture")
+      data_modeling = prompt_for("data_modeling")
+
+      expect(architecture).to include("choices between two defensible options")
+      expect(architecture[/Some of these \((.*?)\)/, 1].split(", "))
+        .to match_array(AiService::ARCHITECTURE_CONCEPTS & AiService::TRADEOFF_CONCEPTS)
+      expect(data_modeling[/Some of these \((.*?)\)/, 1]).to eq("denormalization_tradeoffs")
+      expect(prompt_for("code_smell")).not_to include("choices between two defensible options")
+    end
+
+    it "frames meta skill as the habit its tracked concepts exercise, and only meta skill" do
+      expect(prompt_for("meta_skill")).to include(RecognitionGuide::FRAMINGS.fetch("meta_skill"))
+      expect(prompt_for("code_smell")).not_to include(RecognitionGuide::FRAMINGS.fetch("meta_skill"))
+    end
+
+    it "is answered by FakeService" do
+      expect(FakeService.new("fake").generate_recognition_guide(user, "code_smell"))
+        .to eq(FakeService::RECOGNITION_GUIDE)
     end
   end
 

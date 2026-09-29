@@ -207,6 +207,13 @@ class FakeService < AiService
     "ladder_principal_engineer" => "The fix has a real cost elsewhere, and the answer weighs that cost against leaving it."
   }.freeze
 
+  RECOGNITION_GUIDE = {
+    "questions" => "Ask what the code is trying to guarantee, then whether anything on the page actually enforces it.",
+    "contrast" => "Two methods of the same shape: in one a check stands between the input and the write, and in the other " \
+                  "nothing does. The question that told them apart was where the guarantee is enforced.",
+    "misfires" => "This way of looking flags guarantees that a caller already enforces, and it misses ones enforced nowhere at all."
+  }.freeze
+
   # The concept-reference reframing. Deliberately a different angle from
   # EXPLAIN_DIFFERENTLY_TEXT below rather than a copy of it, so a spec that
   # confused the two surfaces fails instead of passing on the same string.
@@ -280,6 +287,8 @@ class FakeService < AiService
         difficulty_assessment(prompt).to_json
       when /writing a concise, durable reference/
         CONCEPT_REFERENCE.to_json
+      when /how to recognize one category of problem/
+        RECOGNITION_GUIDE.to_json
       when /re-teaching one concept/
         CONCEPT_ALTERNATE_TEXT
       when /re-explaining one point/

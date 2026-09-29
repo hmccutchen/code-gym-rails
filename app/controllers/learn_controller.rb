@@ -13,6 +13,8 @@ class LearnController < ApplicationController
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
     @ungenerated = ungenerated_concepts(@references).size
+    @recognition_guides = RecognitionGuide.where(group_key: recognition_group_keys).index_by(&:group_key)
+    @ungenerated_guides = recognition_group_keys.size - @recognition_guides.size
   end
 
   # GET /learn/:bucket/:concept
@@ -76,7 +78,7 @@ class LearnController < ApplicationController
   end
 
   # POST /learn/prepare — write up every concept in this user's slice that has
-  # no row at all.
+  # no row at all, and every recognition group on the page with no guide.
   #
   # Idempotent and resumable: each job re-checks before calling, so pressing
   # this again after a partial run enqueues only what is still missing and
@@ -87,6 +89,10 @@ class LearnController < ApplicationController
 
     ungenerated_concepts(references).each do |concept, bucket|
       GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id)
+    end
+
+    missing_recognition_guides.each do |group_key|
+      GenerateRecognitionGuideJob.perform_later(group_key: group_key, user_id: current_user.id)
     end
 
     redirect_to learn_path, notice: t("learn.preparing")
@@ -141,6 +147,17 @@ class LearnController < ApplicationController
                    .reject { |concept| references.key?([ concept, bucket ]) }
                    .map { |concept| [ concept, bucket ] }
     end
+  end
+
+  # The recognition groups whose blocks this user's index renders.
+  def recognition_group_keys
+    @recognition_group_keys ||= learn_buckets.flat_map do |bucket|
+      ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)).map { |group, _concepts| RecognitionGuide.key_for(bucket, group) }
+    end.compact.uniq
+  end
+
+  def missing_recognition_guides
+    recognition_group_keys - RecognitionGuide.where(group_key: recognition_group_keys).pluck(:group_key)
   end
 
   # Has this user actually met the concept in a submitted set? Reads the
