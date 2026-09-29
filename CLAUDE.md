@@ -1518,7 +1518,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   A save still pending after ten seconds cancels the pull rather than
   reloading over it. The gesture also refuses to start while a text field has
   focus, while any form is `inert` (the dashboard's submission and review
-  handoff), or inside an inner area scrolled away from its top. Playwright cannot emulate
+  handoff), or inside an inner area scrolled away from its top. On release the
+  spinner snaps into view and turns for at least half a second, and a
+  sessionStorage note lets the reloaded page open with it still turning and
+  tuck it away once loaded, since the page it was drawn on is gone by then. Playwright cannot emulate
   `display-mode`, so `spec/requests/pwa_spec.rb` pins the stylesheet rule and
   `spec/system/pull_to_refresh_spec.rb` forces that rule on to drive the
   gesture.

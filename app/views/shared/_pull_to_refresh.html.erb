@@ -11,7 +11,12 @@
     report no pending save: the dashboard and /setup delay each autosave, so an
     edit made just before the pull may not have reached the server yet. The
     gesture also will not start while a text field has focus, or while a form
-    is inert (the dashboard's submission and review handoff). %>
+    is inert (the dashboard's submission and review handoff).
+
+    The spinner has to survive the reload to read as a refresh: the page it
+    was drawn on is gone the moment the new one arrives. So a pull leaves a
+    note in sessionStorage, and the reloaded page opens with the spinner
+    already turning and tucks it away once it has loaded. %>
 <div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
 <script>
   (() => {
@@ -19,10 +24,14 @@
     if (getComputedStyle(indicator).display === "none") return;
 
     const THRESHOLD = 80;
-    const MAX_TRAVEL = 64;
-    const REST = -48;
+    const MAX_TRAVEL = 96;
+    const REST = -56;
+    const REFRESH_TOP = 24;
+    const MIN_SPIN_MS = 500;
+    const SETTLE_AFTER_LOAD_MS = 400;
     const SAVE_POLL_MS = 100;
     const SAVE_WAIT_LIMIT_MS = 10000;
+    const RELOADED_KEY = "codegym:pull-refreshed";
     const spinner = indicator.querySelector(".spinner");
     let startY = null;
     let ready = false;
@@ -51,13 +60,35 @@
     }
 
     function show(distance) {
-      const travel = Math.min(distance / 2, MAX_TRAVEL);
+      const travel = Math.min(distance * 0.8, MAX_TRAVEL);
       indicator.classList.remove("is-settling");
       indicator.style.transform = `translateY(${REST + travel}px)`;
       indicator.style.opacity = Math.min(distance / THRESHOLD, 1);
       spinner.style.transform = `rotate(${distance * 3}deg)`;
       ready = distance >= THRESHOLD;
       indicator.classList.toggle("is-ready", ready);
+    }
+
+    function spin() {
+      refreshing = true;
+      spinner.style.transform = "";
+      indicator.classList.add("is-settling", "is-refreshing");
+      indicator.style.transform = `translateY(${REFRESH_TOP}px)`;
+      indicator.style.opacity = 1;
+    }
+
+    // sessionStorage throws in some private modes; the spinner is only polish.
+    function remember(key, value) {
+      try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value); } catch {}
+    }
+
+    function recall(key) {
+      try { return sessionStorage.getItem(key); } catch { return null; }
+    }
+
+    function reload() {
+      remember(RELOADED_KEY, "1");
+      window.location.reload();
     }
 
     function reset() {
@@ -79,7 +110,7 @@
     // A save still pending at the limit is treated as hung: the pull is
     // cancelled rather than reloading over it, and can be tried again.
     function reloadWhenSaved(waited = 0) {
-      if (!savesPending()) return window.location.reload();
+      if (!savesPending()) return reload();
       if (waited >= SAVE_WAIT_LIMIT_MS) return reset();
       setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
     }
@@ -104,12 +135,19 @@
       if (!ready) return reset();
 
       startY = null;
-      refreshing = true;
-      spinner.style.transform = "";
-      indicator.classList.add("is-refreshing");
-      reloadWhenSaved();
+      spin();
+      setTimeout(reloadWhenSaved, MIN_SPIN_MS);
     });
 
     document.addEventListener("touchcancel", () => { if (startY !== null) reset(); });
+
+    if (recall(RELOADED_KEY)) {
+      remember(RELOADED_KEY, null);
+      spin();
+      indicator.classList.remove("is-settling");
+      const settle = () => setTimeout(reset, SETTLE_AFTER_LOAD_MS);
+      if (document.readyState === "complete") settle();
+      else window.addEventListener("load", settle, { once: true });
+    }
   })();
 </script>

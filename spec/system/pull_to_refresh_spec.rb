@@ -170,10 +170,46 @@ RSpec.describe "Pull to refresh", type: :system do
 
     expect(still_the_same_page?).to be(true)
     expect(indicator("classList.contains('is-refreshing')")).to be(true)
+    expect(indicator("style.transform")).to eq("translateY(24px)")
 
     page.execute_script("window.__saving = false")
 
     expect(reloaded?).to be(true)
+  end
+
+  # The page the spinner was drawn on is replaced by the reload, so the new
+  # page has to pick the spinner up for the refresh to read as one.
+  it "opens the reloaded page with the spinner turning, then tucks it away" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+    page.execute_script("sessionStorage.setItem('codegym:pull-refreshed', '1')")
+
+    visit learn_path
+
+    expect(indicator("classList.contains('is-refreshing')")).to be(true)
+    Timeout.timeout(5) { sleep 0.1 while indicator("classList.contains('is-refreshing')") }
+    expect(indicator("style.transform")).to eq("")
+    expect(page.evaluate_script("sessionStorage.getItem('codegym:pull-refreshed') === null")).to be(true)
+  end
+
+  it "leaves the note for the reloaded page when a pull reloads" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+    mark_page
+    page.execute_script(<<~JS)
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === "codegym:pull-refreshed") window.name = "noted";
+        return setItem.call(this, key, value);
+      };
+    JS
+
+    pull(200)
+
+    expect(reloaded?).to be(true)
+    expect(page.evaluate_script("window.name")).to eq("noted")
   end
 
   it "keeps a dashboard answer typed just before the pull", with_csrf: true do
