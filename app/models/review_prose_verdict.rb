@@ -56,35 +56,35 @@ class ReviewProseVerdict
 
     raw.to_h do |field, value|
       raise Invalid, "a rewritten field is not a prose field" unless prose_fields.include?(field)
-      raise Invalid, "a rewritten field is empty" if projection.fetch(field).empty?
+      raise Invalid, "#{field} is empty and cannot be rewritten" if projection.fetch(field).empty?
 
-      [ field, list_field?(field) ? parse_entries(value, projection.fetch(field).size) : required_text(value, field) ]
+      [ field, list_field?(field) ? parse_entries(field, value, projection.fetch(field).size) : required_text(value, field) ]
     end
   end
   private_class_method :parse_fields
 
-  def self.parse_entries(value, size)
-    raise Invalid, "entries must be a non-empty list" unless value.is_a?(Array) && value.any?
+  def self.parse_entries(field, value, size)
+    raise Invalid, "#{field} must be a list of entries" unless value.is_a?(Array) && value.any?
 
-    entries = value.map { |entry| parse_entry(entry) }
+    entries = value.map { |entry| parse_entry(field, entry) }
     cited   = entries.flat_map { |entry| entry[:from] }
-    raise Invalid, "entries must cite every original entry exactly once" unless cited.sort == (0...size).to_a
+    raise Invalid, "#{field} must cite every original entry exactly once" unless cited.sort == (0...size).to_a
 
     firsts = entries.map { |entry| entry[:from].first }
     in_place = firsts == firsts.sort && entries.all? { |entry| entry[:from] == entry[:from].sort }
-    raise Invalid, "entries must sit at their earliest source's position" unless in_place
+    raise Invalid, "#{field} entries must sit at their earliest source's position" unless in_place
 
     entries
   end
   private_class_method :parse_entries
 
-  def self.parse_entry(entry)
-    raise Invalid, "entry must be an object" unless entry.is_a?(Hash)
+  def self.parse_entry(field, entry)
+    raise Invalid, "#{field} entry must be an object" unless entry.is_a?(Hash)
 
     from = entry["from"]
-    raise Invalid, "entry needs a non-empty list of integer indexes" unless from.is_a?(Array) && from.any? && from.all?(Integer)
+    raise Invalid, "#{field} entry needs a non-empty list of integer indexes" unless from.is_a?(Array) && from.any? && from.all?(Integer)
 
-    { from: from, text: required_text(entry["text"], "text") }
+    { from: from, text: required_text(entry["text"], field) }
   end
   private_class_method :parse_entry
 

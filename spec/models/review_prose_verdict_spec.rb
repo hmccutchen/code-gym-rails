@@ -84,6 +84,23 @@ RSpec.describe ReviewProseVerdict do
       end
     end
 
+    context "when every prose field of the graded review is empty" do
+      let(:review) { { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => nil } }
+
+      it "parses keep" do
+        expect(parse("status" => "keep").status).to eq(:keep)
+      end
+
+      it "refuses a rewrite of next_step, naming the field" do
+        expect { parse(edit("next_step" => "Read about includes.")) }
+          .to raise_error(described_class::Invalid, /next_step is empty/)
+      end
+
+      it "refuses an empty-string rewrite of next_step" do
+        expect { parse(edit("next_step" => "")) }.to raise_error(described_class::Invalid)
+      end
+    end
+
     it "refuses entries out of earliest-position order, or a descending from" do
       expect { parse(edit("missed" => [ { "from" => [ 1 ], "text" => "b" }, { "from" => [ 0, 2 ], "text" => "a" } ])) }
         .to raise_error(described_class::Invalid)
