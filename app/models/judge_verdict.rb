@@ -26,10 +26,11 @@ class JudgeVerdict
 
   # The reply shape the provider is held to, one alternative per status, so a
   # prose reply cannot be generated at all. Built from the same closed lists
-  # .parse checks, which stays the boundary: the provider's schema support has
-  # no length constraints, so a blank string still has to be refused there.
+  # .parse checks, which stays the boundary: a schema cannot bound a string or
+  # require a non-empty list, so a blank string or an edit with no issues
+  # still has to be refused there.
   def self.schema_for(kind)
-    { "anyOf" => STATUSES.map { |status| closed_object({ "status" => { "const" => status } }.merge(shape_for(status, kind))) } }
+    VerdictSchema.one_per_status(STATUSES) { |status| shape_for(status, kind) }
   end
 
   def self.shape_for(status, kind)
@@ -37,18 +38,13 @@ class JudgeVerdict
     case status
     when "keep"   then {}
     when "edit"
-      issue  = closed_object({ "type" => { "type" => "string", "enum" => ISSUE_TYPES }, "evidence" => text })
-      fields = closed_object(kind.prose_fields.index_with { text }, required: [])
+      issue  = VerdictSchema.closed_object({ "type" => { "type" => "string", "enum" => ISSUE_TYPES }, "evidence" => text })
+      fields = VerdictSchema.closed_object(kind.prose_fields.index_with { text }, required: [])
       { "issues" => { "type" => "array", "items" => issue }, "fields" => fields }
     when "reject" then { "principle" => { "type" => "string", "enum" => PRINCIPLES }, "evidence" => text, "reason" => text }
     end
   end
   private_class_method :shape_for
-
-  def self.closed_object(properties, required: properties.keys)
-    { "type" => "object", "properties" => properties, "required" => required, "additionalProperties" => false }
-  end
-  private_class_method :closed_object
 
   def self.parse_edit(raw, kind)
     issues = Array(raw["issues"]).map { |issue| parse_issue(issue) }

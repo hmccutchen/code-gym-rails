@@ -106,27 +106,22 @@ class ReviewProseVerdict
   private_class_method :merged?
 
   # Structured-output schema from the same lists .parse checks. .parse stays
-  # the boundary: the schema cannot say "each index exactly once" or bound a
-  # string's length.
+  # the boundary: the schema cannot say "each index exactly once", bound a
+  # string's length, or require a non-empty issues, fields or from list.
   def self.schema
-    { "anyOf" => STATUSES.map { |status| closed_object({ "status" => { "const" => status } }.merge(shape_for(status))) } }
+    VerdictSchema.one_per_status(STATUSES) { |status| shape_for(status) }
   end
 
   def self.shape_for(status)
     return {} if status == "keep"
 
     text   = { "type" => "string" }
-    entry  = closed_object({ "from" => { "type" => "array", "items" => { "type" => "integer" } }, "text" => text })
-    issue  = closed_object({ "type" => { "type" => "string", "enum" => ISSUE_TYPES }, "evidence" => text })
+    entry  = VerdictSchema.closed_object({ "from" => { "type" => "array", "items" => { "type" => "integer" } }, "text" => text })
+    issue  = VerdictSchema.closed_object({ "type" => { "type" => "string", "enum" => ISSUE_TYPES }, "evidence" => text })
     fields = prose_fields.index_with { |field| list_field?(field) ? { "type" => "array", "items" => entry } : text }
-    { "issues" => { "type" => "array", "items" => issue }, "fields" => closed_object(fields, required: []) }
+    { "issues" => { "type" => "array", "items" => issue }, "fields" => VerdictSchema.closed_object(fields, required: []) }
   end
   private_class_method :shape_for
-
-  def self.closed_object(properties, required: properties.keys)
-    { "type" => "object", "properties" => properties, "required" => required, "additionalProperties" => false }
-  end
-  private_class_method :closed_object
 
   def initialize(status:, issues: [], fields: {})
     @status = status
