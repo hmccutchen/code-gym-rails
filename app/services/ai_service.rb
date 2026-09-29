@@ -2609,6 +2609,8 @@ class AiService
 
   # Its own rescue, so a judge failure returns the grade the provider already
   # gave instead of reaching grade_section's, which marks the section failed.
+  # StandardError, because Thread#value re-raises anything grade_section's
+  # narrower rescue misses, and that would cost the whole day's review.
   def judged_review(user, exercise, section, review)
     return review unless ReviewProseJudge.enabled? && self.class.judges_review_prose?
 
@@ -2616,7 +2618,7 @@ class AiService
     verdict = judge_review_prose(user, ExerciseSection.for(section), review, coach: config_for(exercise.language)[:coach])
     log_review_judge(user, section, verdict, started)
     verdict.apply(review)
-  rescue ReviewProseVerdict::Invalid, Error, *INFRASTRUCTURE_ERRORS => e
+  rescue StandardError => e
     Rails.logger.warn("[review_judge_fallback] user=#{user.id} section=#{section} reason=#{review_judge_fallback_reason(e)}")
     review
   end

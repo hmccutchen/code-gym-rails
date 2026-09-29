@@ -6250,7 +6250,6 @@ RSpec.describe AiService, "judging graded reviews" do
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                           answers: { "code_review" => "The query runs once per row, so preload it." }, submitted_at: Time.current)
   end
-  let(:service) { FakeService.new("fake-key") }
   let(:logged) { StringIO.new }
   let(:grade) { FakeService::REVIEW_SECTION.deep_stringify_keys.merge("missed" => [ "SENTINEL-G one.", "SENTINEL-G two." ]) }
 
@@ -6329,6 +6328,8 @@ RSpec.describe AiService, "judging graded reviews" do
       "plain prose" => [ "SENTINEL-G The review looks fine to me.", "invalid_json" ],
       "malformed JSON" => [ "{\"status\": \"edit\", SENTINEL-G", "invalid_json" ],
       "a JSON array" => [ "[\"SENTINEL-G\"]", "invalid_json" ],
+      "a JSON string" => [ "\"ok\"", "invalid_json" ],
+      "an unexpected error" => [ ArgumentError.new("SENTINEL-G boom"), "other" ],
       "a verdict the boundary refuses" => [ { "status" => "edit", "issues" => [], "fields" => {} }.to_json, "invalid_output" ],
       "a timeout" => [ AiService::TimeoutError.new("SENTINEL-G slow"), "timeout" ],
       "a refusal" => [ AiService::RefusalError.new("SENTINEL-G declined"), "refusal" ],
@@ -6341,6 +6342,14 @@ RSpec.describe AiService, "judging graded reviews" do
         expect(logged.string).to include("[review_judge_fallback] user=#{user.id} section=code_review reason=#{reason}")
         expect(logged.string).not_to include("SENTINEL-G")
       end
+    end
+
+    it "stores an array and keeps the original string when the grader's missed is a string" do
+      reply = { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "SENTINEL-G" } ],
+                "fields" => { "missed" => [ { "from" => [ 0 ], "text" => "Rewritten." } ] } }.to_json
+      result, = graded(judge_reply: reply, grader: grade.merge("missed" => "One long missed string."))
+      expect(result[:review]["missed"]).to eq([ "Rewritten." ])
+      expect(result[:review]["graded_prose"]["missed"]).to eq("One long missed string.")
     end
 
     it "never judges for a provider that does not judge" do
