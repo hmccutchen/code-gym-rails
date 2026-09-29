@@ -1,0 +1,7 @@
+{ "kind": "code_review", "coach": "Rails", "expected": "edit",
+  "must_survive": ["ConceptMastery.evaluate_concept!", "REVIEW_CLAIM_STALE_AFTER", "app/models/daily_response.rb", "last_rating"],
+  "review": {
+    "correct": ["You traced the call into ConceptMastery.evaluate_concept! correctly."],
+    "missed": ["In terms of the overall architecture, it is important to understand that REVIEW_CLAIM_STALE_AFTER in app/models/daily_response.rb is what gates the retry, and last_rating is read before it is written."],
+    "better_questions": [],
+    "next_step": "Read DailyResponse#reviewing?." } }

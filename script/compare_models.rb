@@ -6,16 +6,18 @@
 #   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb translate DAILY_RESPONSE_ID
 #   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb judge     USER_ID
 #   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb judge_fixtures
+#   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_prose USER_ID [LIMIT]
+#   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_prose_fixtures
 require_relative "model_comparison"
 
 mode, id, *rest = ARGV
 api_key = ENV["ANTHROPIC_API_KEY"].presence
 usage   = File.readlines(__FILE__).grep(/^#   /).join
-known_modes = ModelComparison::CANDIDATES.keys + [ "judge_fixtures" ]
+known_modes = ModelComparison::CANDIDATES.keys + %w[judge_fixtures review_prose_fixtures]
 
 abort("ANTHROPIC_API_KEY is not set. Calls are billed to it, never to a user's stored key.\n\n#{usage}") unless api_key
 abort(usage) unless known_modes.include?(mode)
-abort(usage) if mode != "judge_fixtures" && id.blank?
+abort(usage) if %w[judge_fixtures review_prose_fixtures].exclude?(mode) && id.blank?
 
 comparison = ModelComparison.new(api_key: api_key)
 
@@ -25,6 +27,12 @@ when "review"         then comparison.review(id)
 when "translate"      then comparison.translate(id)
 when "judge"          then comparison.judge(id)
 when "judge_fixtures" then comparison.judge_fixtures
+when "review_prose_fixtures" then comparison.review_prose_fixtures
+when "review_prose"
+  limit = rest.first ? Integer(rest.first, exception: false) : 5
+  abort("LIMIT must be a positive integer.\n\n#{usage}") unless limit&.positive?
+
+  comparison.review_prose(id, limit: limit)
 when "duck"
   section, message = rest
   abort(usage) if section.blank?

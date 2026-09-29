@@ -1,0 +1,7 @@
+{ "kind": "code_review", "coach": "Rails", "expected": "edit",
+  "must_survive": ["one query per row", "no index on posts.user_id"],
+  "review": {
+    "correct": ["You spotted that the page is slow."],
+    "missed": ["The loop runs one query per row.", "Each row triggers its own separate query, so the query count grows with the rows.", "posts.user_id has no index."],
+    "better_questions": [],
+    "next_step": "Read about includes." } }
