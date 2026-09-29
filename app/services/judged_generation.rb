@@ -174,20 +174,9 @@ class JudgedGeneration
     )
     [ verdict, elapsed_ms(started) ]
   rescue JudgeVerdict::Invalid, AiService::Error, *AiService::INFRASTRUCTURE_ERRORS => e
-    reason = judge_fallback_reason(e)
+    reason = AiService.judge_fallback_reason(e)
     Rails.logger.warn("[judge_fallback] user=#{@user.id} section=#{kind.key} reason=#{reason}: #{e.message}")
     [ reason, elapsed_ms(started) ]
-  end
-
-  # A timeout is the judge's commonest failure and the one worth separating,
-  # so it is named here rather than in AiService.error_code_for, which the
-  # review path shares and where "other" is already what a timeout means.
-  def judge_fallback_reason(error)
-    case error
-    when JudgeVerdict::Invalid     then "invalid_output"
-    when AiService::TimeoutError   then "timeout"
-    else                                AiService.error_code_for(error)
-    end
   end
 
   # Failure is a drop, never a raised set.

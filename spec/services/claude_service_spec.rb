@@ -196,6 +196,40 @@ RSpec.describe ClaudeService do
       # second stubbed response is never consumed.
       expect(responses.size).to eq(1)
     end
+
+    describe "a single-attempt call" do
+      it "makes one request for a 429 and raises" do
+        responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
+        service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+        expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+        expect(responses.size).to eq(2)
+      end
+
+      it "makes one request for a timeout and raises" do
+        attempts = 0
+        conn = Faraday.new do |f|
+          f.request :retry, ClaudeService::RETRY_OPTIONS
+          f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+        end
+        service.instance_variable_set(:@conn, conn)
+
+        expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::TimeoutError)
+        expect(attempts).to eq(1)
+      end
+
+      it "leaves an unflagged call on every retry attempt" do
+        attempts = 0
+        conn = Faraday.new do |f|
+          f.request :retry, ClaudeService::RETRY_OPTIONS
+          f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+        end
+        service.instance_variable_set(:@conn, conn)
+
+        expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::TimeoutError)
+        expect(attempts).to eq(AiService::RETRY_MAX + 1)
+      end
+    end
   end
 
   describe "#call" do
@@ -269,25 +303,43 @@ RSpec.describe ClaudeService do
       service.send(:call, system: "sys", prompt: "prompt text")
     end
 
-    # claude-sonnet-5 thinks by default and max_tokens caps thinking + reply
-    # text together (see the MAX_TOKENS comment above). A caller-supplied
-    # max_tokens is by construction tighter than the generous default, so
-    # without this the model could spend the whole budget on thinking and
-    # emit no reply text at all — a fully valid request coming back
-    # truncated/empty and surfacing as a 503.
-    it "disables thinking when a caller overrides max_tokens with a tight budget" do
-      fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
-      fake_conn = instance_double(Faraday::Connection)
-      service.instance_variable_set(:@conn, fake_conn)
-
-      expect(fake_conn).to receive(:post) do |_url, body|
-        parsed = JSON.parse(body)
-        expect(parsed["max_tokens"]).to eq(150)
-        expect(parsed["thinking"]).to eq("type" => "disabled")
-        fake_response
+    # max_tokens caps thinking and reply together, so a capped call turns
+    # thinking off; which setting does that is a per-model fact.
+    describe "thinking-off for a capped call" do
+      def capped_body(model)
+        body = nil
+        fake_conn = instance_double(Faraday::Connection)
+        service.instance_variable_set(:@conn, fake_conn)
+        allow(service).to receive(:route_for).and_return({ model: model })
+        allow(fake_conn).to receive(:post) do |_url, raw|
+          body = JSON.parse(raw)
+          instance_double(Faraday::Response, success?: true, status: 200, body: success_body)
+        end
+        service.send(:call, system: "sys", prompt: "p", max_tokens: 100)
+        body
       end
 
-      service.send(:call, system: "sys", prompt: "prompt text", max_tokens: 150)
+      it "sends between_tools on Sonnet 5.5" do
+        expect(capped_body("claude-sonnet-5-5")["thinking"]).to eq("type" => "between_tools")
+      end
+
+      it "sends disabled on Haiku 4.5" do
+        expect(capped_body("claude-haiku-4-5")["thinking"]).to eq("type" => "disabled")
+      end
+
+      # An AiService::Error, so the controllers' existing rescue shows the
+      # engineer a try-again message instead of an error page.
+      it "refuses a capped call on a model with no thinking-off setting, before sending, as an AiService error" do
+        posts = 0
+        conn = Faraday.new { |f| f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { posts += 1; [ 200, {}, success_body ] } } }
+        service.instance_variable_set(:@conn, conn)
+        allow(service).to receive(:route_for).and_return({ model: "claude-opus-5-5" })
+
+        expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 100) }
+          .to raise_error(AiService::UnsupportedRouteError, /claude-opus-5-5/)
+        expect(posts).to eq(0)
+        expect(AiService::UnsupportedRouteError).to be < AiService::Error
+      end
     end
 
     it "reports truncation when the model stopped at the output cap" do
@@ -463,6 +515,42 @@ RSpec.describe ClaudeService do
       history = [ { role: "assistant", content: "prior reply" } ]
 
       expect(captured_body(history: history)["messages"].last["content"]).to eq("new turn")
+    end
+  end
+
+  describe "#call with response_schema" do
+    let(:schema) { { "type" => "object", "properties" => { "status" => { "type" => "string" } }, "required" => [ "status" ], "additionalProperties" => false } }
+
+    def captured_body(**kwargs)
+      body = nil
+      conn = Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(ClaudeService::API_URL) do |env|
+            body = JSON.parse(env.body)
+            [ 200, {}, success_body ]
+          end
+        end
+      end
+      service.instance_variable_set(:@conn, conn)
+      service.send(:call, system: "sys", prompt: "p", **kwargs)
+      body
+    end
+
+    it "constrains the reply to the schema and sends no prefill" do
+      body = captured_body(response_schema: schema, max_tokens: 100, purpose: "judge_section")
+
+      expect(body["output_config"]).to eq("effort" => "high", "format" => { "type" => "json_schema", "schema" => schema })
+      expect(body["messages"].last["role"]).to eq("user")
+    end
+
+    it "sends the schema beside a route's effort" do
+      body = captured_body(response_schema: schema, purpose: "generate_exercise")
+
+      expect(body["output_config"]).to eq("effort" => "medium", "format" => { "type" => "json_schema", "schema" => schema })
+    end
+
+    it "sends no format when no schema is given" do
+      expect(captured_body(purpose: "judge_section")["output_config"]).not_to have_key("format")
     end
   end
 end

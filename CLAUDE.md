@@ -359,7 +359,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   provider, because it is a narrower generation call rather than a different
   kind of work.
 
-  `judge_section` goes to `claude-sonnet-5`, named explicitly even though it
+  The default route is `claude-sonnet-5-5` at an explicit `effort: "high"`,
+  5.5's own default, stated so a change to it cannot move every default-route
+  purpose silently. Sonnet 5.5 costs the same as Sonnet 5 and shares its
+  tokenizer, but its effort levels are recalibrated, so every uncapped
+  default-route purpose changed cost and latency by an unmeasured amount when
+  it moved.
+
+  `judge_section` goes to `claude-sonnet-5-5` at `effort: "high"`, named explicitly even though it
   is the default route, so usage rows and the comparison tooling agree on what
   ran. Sonnet first because the judge has to read code carefully and answer in
   a closed vocabulary, which is where a smaller model's false rejections would
@@ -369,14 +376,15 @@ concept-specific difficulty descriptions for future generation, not a new set.
   verdicts. The route stays on Sonnet until those are read, and moving it is
   editing one entry.
 
-  Review stays on `claude-sonnet-5` pending a comparison with `claude-opus-5-5`,
+  Review stays on `claude-sonnet-5-5` pending a comparison with `claude-opus-5-5`,
   and `duck_thread` and `pseudocode_translate` pending one with
   `claude-haiku-4-5`. `script/compare_models.rb` runs a stored day through both
   models of a pair and prints the results with tokens and time for a person to
   judge. Two constraints apply before routing any of them, both noted beside
-  the table. `#call` disables thinking whenever a caller passes `max_tokens`,
-  which Opus 5.5 rejects outright with a 400, so a capped purpose cannot move
-  to Opus without replacing that with a lower effort level. And Haiku 4.5 caches only a
+  the table. `#call` turns thinking off whenever a caller passes `max_tokens`,
+  using the routed model's entry in `ClaudeService::THINKING_OFF` (`between_tools`
+  on Sonnet 5.5, `disabled` on Haiku 4.5). Opus 5.5 has no thinking-off setting
+  and no entry, so a capped purpose cannot move to Opus: the call raises before sending. And Haiku 4.5 caches only a
   prompt of 4,096 tokens or more, above the duck's system prompt, so moving
   `duck_thread` there ends the caching bet described below.
 - **Conversational calls send real turns**: `AiService#duck_response` and
@@ -396,16 +404,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `ai_service_spec`'s "single-shot purposes" group drives the other public
   entry points and asserts the history each one reaches `#call` with is empty.
   **`duck_response` passes `cache_system: true`; the other conversational
-  caller does not.** Counted with `count_tokens` against `claude-sonnet-5`
+  caller does not.** Counted with `count_tokens` against `claude-sonnet-5` (5.5 shares its tokenizer)
   rather than estimated from characters, the merged duck prompt runs 993-1,182
   tokens across the stored `code_review` exercises — median 1,059 — and 1,364
   for the largest excerpt `RealSource` can actually produce. That last figure
   predates the current-schema block a grounded migration day now adds, so
   those prompts run larger, which only strengthens the case for caching.
-  Against a 1024-token minimum that means the ordinary day caches, not just a
-  real-source one; only the shortest sections fall short, and there the
-  provider declines to cache rather than billing a write, so they pay nothing
-  for the marker.
+  Against Sonnet 5.5's 512-token minimum every one of those prompts caches,
+  the shortest sections included.
 
   **It is a bet, not a free win, and this is the shape of it.** A thread is
   multi-turn by design but nothing forces a second turn, and the first turn of
@@ -431,9 +437,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **`answer_follow_up` stays uncached, and that is checked rather than
   inherited.** Its system prompt carries the question and a review summary
-  instead of the section's code, measuring 533-604 tokens — roughly half the
-  minimum, a margin no tokenization error closes. Asking there would set a
-  marker the provider ignores.
+  instead of the section's code, measuring 533-604 tokens. That cleared nothing
+  against Sonnet 5's 1,024-token minimum; against Sonnet 5.5's 512 it is
+  cacheable. Caching it is the same bet the duck makes, and it has not been
+  taken: follow-up threads are unmeasured, so the prompt, history and caching
+  choice stay as they were.
 
   What the turn conversion itself buys is that a user typing `You:` into the
   duck box can no longer forge an assistant
@@ -661,9 +669,29 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **A judge failure never costs the day its set.** When `judge_section`
   raises, times out, or returns output `JudgeVerdict` refuses, the draft
-  section stands unedited, `fallback` records the reason
-  (`invalid_output`, `timeout`, or the shared error code), and
-  `[judge_fallback]` warns. The judge is never retried.
+  section stands unedited, `fallback` records the reason from
+  `AiService.judge_fallback_reason` (`invalid_output`, `truncated`,
+  `invalid_json`, `refusal`, `timeout`, or the shared error code), and
+  `[judge_fallback]` warns. The judge is never retried. The review prose
+  judge reads the same table, so the two judges' fallback rates compare.
+
+  **The judge's reply is held to a schema on Claude.** Its call is capped, so
+  it runs with thinking off, and with nowhere else to reason the model once
+  wrote its checks out as prose and never reached the JSON. `judge_section`
+  passes `JudgeVerdict.schema_for(kind)` as `response_schema:`, and
+  `ClaudeService` sends it as structured output (`output_config.format`), so
+  the API only lets the model return one of the three verdict shapes. A
+  prefilled `{` was the other option; every model `ClaudeService` routes to
+  rejects a prefill with a 400. The schema is built from the same closed
+  lists `.parse` checks, and `.parse` stays the boundary, since the schema
+  cannot bound string length. `GeminiService` accepts the keyword and does not
+  send it yet (#228), so a Gemini judge reply is held only by its prompt.
+  `response_schema:` is the fourth additive keyword on `#call`, after
+  `cache_system:`, `max_tokens:` and `history:`; `judge_section` and
+  `judge_review_prose` (`ReviewProseVerdict.schema`) pass it, and every other
+  caller omits it.
+  `single_attempt:` is the fifth: the review prose judge sets it, and every
+  other caller omits it.
 
   **Known leak, reported and left.** The reference disclosure above a section
   is titled "Reference — <concept>: how it works", which on a discovery kind
@@ -1104,6 +1132,75 @@ concept-specific difficulty descriptions for future generation, not a new set.
   can reach it even in principle, since `ai_review` does not exist until a
   *submitted* response is reviewed. Display-only: nothing about tier
   transitions, retention scheduling, or generation guidance changed.
+- **Review prose judge**: an optional second pass over each graded review,
+  for readability only. `AiService#judge_review_prose` reads the review as the
+  page renders it (`ReviewProseVerdict.project`) and may reword its prose
+  fields for plain language or length; it is never shown the answer, the
+  problem or the grading note, so it has nothing to regrade from. The
+  signature is the guarantee, as with `#assess_difficulty`. Verdicts are
+  `keep` or `edit`, with issue types `plain_language_violation` and
+  `verbosity`.
+
+  **What is mechanical.** `ReviewProseVerdict.parse` is the boundary. It
+  refuses a status or issue type outside the closed lists, a rewrite of any
+  field that is not one of `DailyResponse::AI_REVIEW_FIELDS`, a blank rewrite,
+  and a list field that does not cite every original entry exactly once, in
+  order, at its earliest source's position; a merge of entries needs a
+  `verbosity` issue. A rewrite of a field that was empty is dropped rather
+  than refused: it has nothing to cite, so it can only be invented, and
+  refusing would also discard a sound rewrite of another field. An edit left
+  with nothing after that reads as `keep`. Grade, rating and every other
+  field are protected because only the prose fields can be named. On a `keep` or a fallback the
+  grade is stored as the provider returned it, and `grade_section` strips any
+  `graded_prose` key the provider sent, since `graded_prose` is server-owned:
+  an edit stores the grader's original prose there, exactly as returned, as
+  the audit record.
+
+  **The accepted risk is claim preservation.** Citation proves no point was
+  dropped or duplicated; it cannot prove a rewrite still says the same thing.
+  A negation, a condition or an identifier could change and nothing checks it.
+  That is why the judge ships off.
+
+  **Placement and failure.** `AiService#judged_review` runs inside each
+  section's grading thread, after grading and the Parsons rating override, and
+  has its own rescue. It rescues `StandardError`, not just `AiService::Error`,
+  because `Thread#value` re-raises whatever `grade_section`'s narrower rescue
+  misses, and no judge failure may cost the engineer the review. A failure
+  returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
+  reason code from `AiService.judge_fallback_reason`, the table the section
+  judge also reads, never the error message, which can carry provider text. The call is billed as `judge_review`, which is in
+  `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). That
+  cap came from a local sample of only four reviews, so it must be re-checked
+  against the output tokens the comparison script measures before the switch
+  goes on.
+
+  **One attempt, and a 12-minute claim.** The call passes `single_attempt:
+  true`, which refuses every retry, status retries included, and runs on
+  `REVIEW_JUDGE_READ_TIMEOUT`. The grading stage's time budget now includes
+  that one call (`OPEN_TIMEOUT + REVIEW_JUDGE_READ_TIMEOUT`), so
+  `DailyResponse::REVIEW_CLAIM_STALE_AFTER` is 12 minutes, whether or not the
+  switch is on. A claim window shorter than the chain would let a second
+  review start while the first is still running.
+
+  **Claude only.** `AiService.judges_review_prose?` is false on the base class
+  and true on `ClaudeService` (and `FakeService`, for specs), because the
+  judge relies on structured output, which `GeminiService` does not send yet
+  (#228). A Gemini user is never judged.
+
+  **Logging.** The `[review_judge]` line records status, issue types, merge
+  indexes and timing, never review text, and the reply is parsed with
+  `log_raw: false`. Transport-level raw-response logging in the provider
+  subclass may still record the text; that path is not the judge's.
+
+  **The switch and the activation gate.** `ReviewProseJudge.enabled?` is true
+  only when `REVIEW_PROSE_JUDGE` is exactly `"1"`. It ships off. Before
+  turning it on: run both `review_prose` modes of `script/compare_models.rb`
+  (`review_prose` on stored days and `review_prose_fixtures`), read every
+  rewrite beside its sources, and confirm no claim changed, including
+  negations, conditions and identifiers. Check the measured output tokens
+  against `REVIEW_JUDGE_MAX_TOKENS` at the same time, and the slowest
+  measured calls against `REVIEW_JUDGE_READ_TIMEOUT` (30 seconds): the call
+  has one attempt, so a timeout is billed and then falls back.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
@@ -1191,7 +1288,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `ConceptReference` has no `user_id` — it's a shared, team-wide cache
   keyed on `(concept, language)`, so the first person to run the backfill pays
   for everyone and every later teammate pays almost nothing. Roughly $0.02 per
-  concept against `claude-sonnet-5`, so a couple of dollars for one user's
+  concept, an estimate from before the reference moved to `claude-sonnet-5-5`
+  at effort `high` (the new effort level changed the cost by an amount nobody
+  has measured), so a couple of dollars for one user's
   whole slice, growing with it — no count is quoted here on purpose, since the
   last one went stale the first time a vocabulary grew. The rate is an estimate
   from prompt shape rather than a measurement, and both it and the slice's size
@@ -1639,7 +1738,10 @@ always pull in the full suite — is stated once, in
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt); one class per kind answers which are thirds, which are fourths, which vocabulary they draw from, which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns the language config; it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
-- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, and latency and cost per model from `LIST_PRICE_PER_MILLION`
+- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read
+- `app/models/review_prose_verdict.rb` — `ReviewProseVerdict`: the prose judge's reply held to its closed lists, the structured-output schema, the projection the judge reads, and `#apply`, which stores the grader's original prose under `graded_prose`. Pure; its specs need no database
+- `app/services/review_prose_judge.rb` — `ReviewProseJudge.enabled?`: the deployment-wide `REVIEW_PROSE_JUDGE` switch, off unless exactly `"1"`
+- `spec/fixtures/review_judge/` — stored reviews that `ModelComparison#review_prose_fixtures` reads to compare candidates for the prose judge
 - `spec/fixtures/judge/` — eleven stored sections, each stating the verdict it expects, that `ModelComparison#judge_fixtures` reads to compare judge models. Six are broken, and not one per principle: one `scope_mismatch`, one `underdetermined`, two `reasoning_failure`, and two `unstated_prerequisite` — the Ruby `Thread` and frame-rate `code_review`s, the incidents this feature exists for; five are hard but sound, so a candidate's false rejections are as visible as its detections
 - `app/jobs/generate_daily_exercises_job.rb` — morning batch job + on-demand generation; persists failure state for the dashboard's status-polling to observe
 - `app/controllers/responses_controller.rb` — auto-save (answers + rating), review, email-review endpoints

@@ -55,4 +55,38 @@ RSpec.describe JudgeVerdict do
     expect(described_class::ISSUE_TYPES).to eq(%w[referential_ambiguity technical_ambiguity unstated_incidental_term leakage padding answer_instruction sequencing])
     expect(described_class::PRINCIPLES).to eq(%w[scope_mismatch unstated_prerequisite underdetermined reasoning_failure])
   end
+  describe ".schema_for" do
+    let(:schema) { described_class.schema_for(kind) }
+    let(:shapes) { schema.fetch("anyOf").index_by { |shape| shape.dig("properties", "status", "const") } }
+
+    def objects_in(node)
+      return [] unless node.is_a?(Hash) || node.is_a?(Array)
+      children = node.is_a?(Hash) ? node.values : node
+      own = node.is_a?(Hash) && node["type"] == "object" ? [ node ] : []
+      own + children.flat_map { |child| objects_in(child) }
+    end
+
+    it "offers one shape per status, named from STATUSES" do
+      expect(shapes.keys).to eq(described_class::STATUSES)
+    end
+
+    it "draws issue types and principles from the closed lists" do
+      expect(shapes["edit"].dig("properties", "issues", "items", "properties", "type", "enum")).to eq(described_class::ISSUE_TYPES)
+      expect(shapes["reject"].dig("properties", "principle", "enum")).to eq(described_class::PRINCIPLES)
+    end
+
+    it "lets an edit rewrite only the kind's prose fields, none of them required" do
+      [ ExerciseSection::CodeReview, ExerciseSection::Pattern, ExerciseSection::AmbiguityHunt ].each do |each_kind|
+        fields = described_class.schema_for(each_kind)["anyOf"]
+          .find { |shape| shape.dig("properties", "status", "const") == "edit" }.dig("properties", "fields")
+        expect(fields["properties"].keys).to eq(each_kind.prose_fields)
+        expect(fields["required"]).to eq([])
+      end
+    end
+
+    # The provider refuses a schema with any open object.
+    it "closes every object" do
+      expect(objects_in(schema)).to all(include("additionalProperties" => false))
+    end
+  end
 end

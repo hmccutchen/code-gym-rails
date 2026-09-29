@@ -189,6 +189,38 @@ RSpec.describe GeminiService do
     end
   end
 
+  describe "a single-attempt call" do
+    before { allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) }
+
+    it "makes one request for a 429 and raises" do
+      responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
+      service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::RateLimitError)
+      expect(responses.size).to eq(2)
+    end
+
+    it "makes one request for a timeout and raises" do
+      attempts = 0
+      conn = Faraday.new do |f|
+        f.request :retry, GeminiService::RETRY_OPTIONS
+        f.adapter(:test) { |stub| stub.post(GeminiService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }.to raise_error(AiService::TimeoutError)
+      expect(attempts).to eq(1)
+    end
+
+    it "leaves an unflagged call on every retry attempt" do
+      responses = [ [ 429, "" ], [ 429, "" ], [ 429, "" ], [ 429, "" ] ]
+      service.instance_variable_set(:@conn, stubbed_connection(responses))
+
+      expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::RateLimitError)
+      expect(responses.size).to eq(1)
+    end
+  end
+
   describe "#call" do
     it "posts the Gemini-shaped request body and extracts text + usage from the model_output step" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,

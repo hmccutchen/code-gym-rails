@@ -6,27 +6,35 @@
 # rows would charge a teammate's history for a comparison they never ran.
 class ModelComparison
   CANDIDATES = {
-    "generate"  => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5", effort: "medium" } ],
-    "review"    => [ { model: "claude-sonnet-5" }, { model: "claude-opus-5-5" } ],
-    "duck"      => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ],
-    "translate" => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ],
-    "judge"     => [ { model: "claude-sonnet-5" }, { model: "claude-haiku-4-5" } ]
+    "generate"  => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-opus-5-5", effort: "medium" } ],
+    "review"    => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-opus-5-5" } ],
+    "duck"      => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
+    "translate" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
+    "judge"     => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
+    "review_prose" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ]
   }.freeze
 
   REVIEW_FIELDS = %w[rating missed next_step].freeze
   VERDICT_FIELDS = %w[status issues principle evidence reason].freeze
 
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
+  REVIEW_PROSE_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_judge")
 
   # List prices as of writing, per million tokens; read nowhere in app/ — this
   # is what #judge_fixtures prices a candidate's run against, for a person
   # comparing them, never anything billed.
   LIST_PRICE_PER_MILLION = {
-    "claude-sonnet-5"  => { input: 2.0, output: 10.0 },
-    "claude-haiku-4-5" => { input: 1.0, output: 5.0 }
+    "claude-sonnet-5-5" => { input: 2.0, output: 10.0 },
+    "claude-haiku-4-5"  => { input: 1.0, output: 5.0 }
   }.freeze
 
   Run = Data.define(:route, :output, :seconds, :tokens_in, :tokens_out)
+
+  # One judge call's outcome for one model and one input: :keep or :edit with
+  # its verdict, :invalid when the reply was not a usable verdict, :error when
+  # the provider call failed. Kept whole so a model's summary is computed from
+  # every input, failures and their waiting time included.
+  ProseResult = Data.define(:label, :outcome, :verdict, :error, :ms, :tokens_in, :tokens_out, :expected)
 
   def initialize(api_key:, out: $stdout)
     @api_key = api_key
@@ -107,6 +115,27 @@ class ModelComparison
     user     = User.new(skill_level: "solid")
 
     CANDIDATES.fetch("judge").each { |route| print_fixture_table(route, fixtures, user) }
+  end
+
+  # Runs the prose judge over a user's stored reviews, newest first. A review
+  # the live judge already edited is measured from the grader's original, kept
+  # under graded_prose.
+  def review_prose(user_id, limit: 5)
+    raise ArgumentError, "limit must be a positive integer" unless limit.is_a?(Integer) && limit.positive?
+
+    user   = User.find(user_id)
+    inputs = stored_review_inputs(user, limit)
+    CANDIDATES.fetch("review_prose").each do |route|
+      run_prose_judge("review_prose: user #{user.id} · #{route[:model]}", route, inputs, user)
+    end
+  end
+
+  def review_prose_fixtures
+    user   = User.new(skill_level: "solid")
+    inputs = Dir[REVIEW_PROSE_FIXTURE_DIR.join("*.json")].sort.map { |path| fixture_input(load_fixture(path)) }
+    CANDIDATES.fetch("review_prose").each do |route|
+      run_prose_judge("review_prose_fixtures: #{route[:model]}", route, inputs, user)
+    end
   end
 
   private
@@ -254,6 +283,11 @@ class ModelComparison
     lock = Mutex.new
 
     Class.new(ClaudeService) do
+      # A grading comparison measures the grader alone, whatever the
+      # deployment's switch says; the review_prose modes call the judge
+      # directly instead.
+      def self.judges_review_prose? = false
+
       define_method(:route_for) { |_purpose| route }
       define_method(:log_usage) do |_user, result, purpose:|
         lock.synchronize { usage << { tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i } }
@@ -261,6 +295,120 @@ class ModelComparison
       define_method(:record_suggested_concept) { |_suggestion| }
       private :route_for, :log_usage, :record_suggested_concept
     end.new(@api_key)
+  end
+
+  def stored_review_inputs(user, limit)
+    responses = DailyResponse.where(user: user).where.not(ai_review: nil)
+                             .includes(:daily_exercise).order(date: :desc).limit(limit)
+    responses.flat_map do |response|
+      coach = coach_for(response.daily_exercise.language)
+      response.ai_review.filter_map do |section, review|
+        next unless review.is_a?(Hash) && ExerciseSection.keys.include?(section)
+
+        { label: "#{response.date} #{section}", kind: ExerciseSection.for(section), coach: coach,
+          review: review.merge(review.fetch(ReviewProseVerdict::ORIGINAL_KEY, {})) }
+      end
+    end
+  end
+
+  def fixture_input(fixture)
+    { label: fixture["name"], kind: ExerciseSection.for(fixture["kind"]), coach: fixture["coach"],
+      review: fixture["review"], expected: fixture["expected"], must_survive: fixture["must_survive"] }
+  end
+
+  def coach_for(language) = AiService::LANGUAGE_CONFIG.fetch(language)[:coach]
+
+  def run_prose_judge(heading, route, inputs, user)
+    usage   = []
+    service = pinned_service(route, usage)
+    @out.puts "=== #{heading} ==="
+    results = inputs.map do |input|
+      judge_prose_input(service, usage, user, input).tap { |result| print_prose_result(result, input) }
+    end
+    print_prose_summary(route, results)
+    @out.puts
+    results
+  end
+
+  # Elapsed time and tokens are measured on failure too, so a model that keeps
+  # timing out cannot look fast.
+  def judge_prose_input(service, usage, user, input)
+    seen    = usage.size
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    outcome, verdict, error = prose_outcome { service.judge_review_prose(user, input[:kind], input[:review], coach: input[:coach]) }
+    calls = usage.drop(seen)
+    ProseResult.new(label: input[:label], outcome: outcome, verdict: verdict, error: error, expected: input[:expected],
+                    ms: ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round,
+                    tokens_in: calls.sum { |row| row[:tokens_in] }, tokens_out: calls.sum { |row| row[:tokens_out] })
+  end
+
+  def prose_outcome
+    verdict = yield
+    [ verdict.status, verdict, nil ]
+  rescue ReviewProseVerdict::Invalid, AiService::InvalidResponseError => e
+    [ :invalid, nil, "#{e.class}: #{e.message}" ]
+  rescue AiService::Error => e
+    [ :error, nil, "#{e.class}: #{e.message}" ]
+  end
+
+  # Review text is printed here by design: it is read by a person in a
+  # terminal, not stored in application logs.
+  def print_prose_result(result, input)
+    @out.puts "#{result.label}: #{result.outcome}#{" (expected #{result.expected})" if result.expected} " \
+              "#{result.ms}ms · #{result.tokens_out} out"
+    @out.puts "  must survive: #{input[:must_survive].join(' | ')}" if input[:must_survive].present?
+    lines = result.verdict ? rewrite_lines(result.verdict, ReviewProseVerdict.project(input[:review])) : [ result.error ]
+    lines.each { |line| @out.puts "  #{line}" }
+  end
+
+  # Each rewritten entry printed beside the originals it cites, so a reader can
+  # check the claim survived.
+  def rewrite_lines(verdict, projection)
+    return [ "keep" ] unless verdict.edit?
+
+    issues = verdict.issues.map { |issue| "#{issue[:type]}: #{issue[:evidence].inspect}" }.join("; ")
+    [ "edit · issues: #{issues}" ] + verdict.fields.flat_map { |field, value| rewritten_field_lines(field, value, projection[field]) }
+  end
+
+  def rewritten_field_lines(field, value, original)
+    return [ "#{field}:", "  was: #{original}", "  now: #{value}" ] unless value.is_a?(Array)
+
+    [ "#{field}:" ] + value.flat_map do |entry|
+      [ "  #{entry[:from].inspect} now: #{entry[:text]}" ] + entry[:from].map { |i| "      was[#{i}]: #{original[i]}" }
+    end
+  end
+
+  def print_prose_summary(route, results)
+    valid = results.select { |result| %i[keep edit].include?(result.outcome) }
+    edits = valid.select { |result| result.outcome == :edit }
+    tokens_in  = results.sum(&:tokens_in)
+    tokens_out = results.sum(&:tokens_out)
+    @out.puts "edits: #{edits.size}/#{valid.size} (#{issue_rates(edits, valid.size)}) · " \
+              "merges: #{edits.sum { |result| result.verdict.merges.values.sum(&:size) }} · " \
+              "invalid: #{results.count { |result| result.outcome == :invalid }}/#{results.size} · " \
+              "provider errors: #{results.count { |result| result.outcome == :error }}/#{results.size} · " \
+              "#{results.sum(&:ms)}ms · #{tokens_in} in / #{tokens_out} out · " \
+              "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out))}"
+    print_prose_extremes(results)
+    expected = results.select(&:expected)
+    @out.puts "matched expected status: #{expected.count { |result| result.outcome.to_s == result.expected }}/#{expected.size}" if expected.any?
+  end
+
+  # The activation gate checks single replies against the cap and the one
+  # attempt's timeout, which totals hide.
+  def print_prose_extremes(results)
+    return if results.empty?
+
+    largest = results.max_by(&:tokens_out)
+    slowest = results.max_by(&:ms)
+    @out.puts "largest reply: #{largest.tokens_out} out (#{largest.label}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap · " \
+              "slowest: #{slowest.ms}ms (#{slowest.label}) of the #{AiService::REVIEW_JUDGE_READ_TIMEOUT * 1_000}ms timeout"
+  end
+
+  def issue_rates(edits, valid_count)
+    ReviewProseVerdict::ISSUE_TYPES.map do |type|
+      "#{type} #{edits.count { |result| result.verdict.issues.any? { |issue| issue[:type] == type } }}/#{valid_count}"
+    end.join(", ")
   end
 
   def review_section(service, response, exercise, section)

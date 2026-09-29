@@ -27,10 +27,18 @@ RSpec.describe AiService do
     # for that work; this is headroom, not a deadline on database waits.
     REVIEW_OVERHEAD_SECONDS = 1.minute.to_i
 
+    # The prose judge runs after the grade in the same thread, once, with no
+    # retry, so the grading stage grows by one single attempt whether or not
+    # the judge is switched on: the claim has to cover the on case.
     def provider_review_budget_seconds
       (TRANSLATIONS_BEFORE_GRADING * AiService.worst_case_call_seconds(AiService::READ_TIMEOUT)) +
         AiService.worst_case_call_seconds(AiService::REVIEW_READ_TIMEOUT) +
+        AiService.single_attempt_call_seconds(AiService::REVIEW_JUDGE_READ_TIMEOUT) +
         AiService::DIFFICULTY_ASSESSMENT_GRACE_SECONDS
+    end
+
+    it "counts one attempt and its open timeout for a single-attempt call" do
+      expect(AiService.single_attempt_call_seconds(30)).to eq(30 + AiService::OPEN_TIMEOUT)
     end
 
     it "counts every attempt and its open timeout in a call's worst case" do
@@ -134,7 +142,7 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
         @last_read_timeout = read_timeout
         @last_max_tokens   = max_tokens
         @last_prompt       = prompt
@@ -163,7 +171,7 @@ RSpec.describe AiService do
 
       private
 
-      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+      def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
         text =
           if system.include?("rating how hard")
             raise AiService::RateLimitError, "rate limited" if @difficulty == :raise
@@ -216,6 +224,7 @@ RSpec.describe AiService do
       pseudocode_critique
       pseudocode_translate
       judge_section
+      judge_review
     ].freeze
 
     it "covers every purpose except the two conversational ones" do
@@ -241,7 +250,7 @@ RSpec.describe AiService do
       histories = []
       spy_class = Class.new(double_class) do
         define_method(:call) do |system:, prompt:, cache_system: false,
-                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil|
+                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false|
           histories << history
           super(system: system, prompt: prompt, cache_system: cache_system,
                 read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
@@ -291,6 +300,8 @@ RSpec.describe AiService do
       spy_class.new(canned_text: { status: "keep" }.to_json)
                .judge_section(user, ExerciseSection::CodeReview, exercise.problem_set["code_review"],
                  rung: "senior", locked: false)
+      spy_class.new(canned_text: { status: "keep" }.to_json)
+               .judge_review_prose(user, ExerciseSection::CodeReview, response.ai_review["code_review"], coach: "Rails")
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
       expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size + 1)
@@ -3339,7 +3350,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           raise ActiveRecord::ConnectionTimeoutError, "could not obtain a connection" if prompt.include?('"pattern"')
 
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
@@ -3368,7 +3379,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           nil.this_method_does_not_exist
         end
 
@@ -3398,7 +3409,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           @calls += 1
           raise AiService::RateLimitError, "rate limited" if prompt.include?('"pattern"')
           { text: @canned_text, input_tokens: 1, output_tokens: 1, truncated: false }
@@ -3452,7 +3463,7 @@ RSpec.describe AiService do
 
         private
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           # #active_connection? returns the leased connection object or nil (not a
           # boolean) — see ActiveRecord::ConnectionAdapters::ConnectionPool#active_connection?.
           self.class.held_connection_during_call = ActiveRecord::Base.connection_pool.active_connection?
@@ -3472,7 +3483,7 @@ RSpec.describe AiService do
 
       auth_failing = Class.new(AiService) do
         private
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil) = raise(AiService::AuthenticationError, "bad key")
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false) = raise(AiService::AuthenticationError, "bad key")
         def build_connection = nil
       end.new("fake_key")
 
@@ -3513,7 +3524,7 @@ RSpec.describe AiService do
     let(:capturing_class) do
       Class.new(double_class) do
         attr_reader :last_system, :last_prompt, :last_max_tokens
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           @last_system = system
           @last_prompt = prompt
           @last_max_tokens = max_tokens
@@ -3612,7 +3623,7 @@ RSpec.describe AiService do
           "<<explain-differently:#{subject}>>"
         end
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           @last_prompt = prompt
           super
         end
@@ -3661,7 +3672,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           @last_prompt = prompt
           super
         end
@@ -3700,6 +3711,26 @@ RSpec.describe AiService do
   end
 
   describe "#answer_follow_up" do
+    it "never sends the grader's original prose kept for audit" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => {
+        "missed" => [ "Rewritten point." ], "graded_prose" => { "missed" => [ "SENTINEL-ORIGINAL" ] }
+      } })
+      spy_class = Class.new(double_class) do
+        attr_reader :last_system
+        def call(system:, **kwargs)
+          @last_system = system
+          super
+        end
+      end
+      svc = spy_class.new(canned_text: "An answer")
+
+      svc.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?", thread: [])
+
+      expect(svc.last_system).to include("Rewritten point.")
+      expect(svc.last_system).not_to include("SENTINEL-ORIGINAL")
+    end
+
     it "sends the question, the section's review, and the prior thread in order" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: {
         "code_review" => { "question" => "Find the N+1", "snippet" => "code" }
@@ -3715,7 +3746,7 @@ RSpec.describe AiService do
 
       spy_class = Class.new(double_class) do
         attr_reader :last_prompt, :last_system, :last_history
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           @last_system  = system
           @last_prompt  = prompt
           @last_history = history
@@ -3775,7 +3806,7 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt, :last_system
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           @last_system = system
           @last_prompt = prompt
           super
@@ -3976,7 +4007,7 @@ RSpec.describe AiService do
       Class.new(double_class) do
         attr_reader :last_prompt, :last_system, :last_history
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           @last_system  = system
           @last_prompt  = prompt
           @last_history = history
@@ -4418,7 +4449,7 @@ RSpec.describe AiService do
       Class.new(double_class) do
         define_singleton_method(:calls) { calls }
 
-        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+        def call(system:, prompt:, cache_system: false, read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
           self.class.calls << "#{system}\n#{prompt}"
           super
         end
@@ -5008,7 +5039,7 @@ RSpec.describe AiService do
       caps = []
       capturing_class = Class.new(double_class) do
         define_method(:call) do |system:, prompt:, cache_system: false,
-                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil|
+                                 read_timeout: AiService::READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false|
           caps << [ system.include?("rating how hard") ? :difficulty : :grade, max_tokens ]
           super(system: system, prompt: prompt, cache_system: cache_system,
                 read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
@@ -5372,6 +5403,16 @@ RSpec.describe AiService, "#judge_section" do
     expect(captured.fetch(:history, [])).to eq([])
   end
 
+  it "asks the provider for a reply shaped by the kind's verdict schema" do
+    svc = FakeService.new("fake-key")
+    captured = nil
+    allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+
+    svc.judge_section(user, ExerciseSection::Pattern, section, rung: "senior", locked: false)
+
+    expect(captured[:response_schema]).to eq(JudgeVerdict.schema_for(ExerciseSection::Pattern))
+  end
+
   it "returns a parsed verdict" do
     expect(FakeService.new("fake-key").judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: false).status).to eq(:keep)
   end
@@ -5405,7 +5446,51 @@ RSpec.describe AiService, "#judge_section" do
   end
 end
 
+# A production judge reply, stored as logged: reasoning written out as prose
+# with no JSON, from a call whose request carried no schema. The schema now
+# prevents it; this pins that the boundary still refuses it and the day keeps
+# its draft if one ever gets through.
+RSpec.describe AiService, "#judge_section given a prose reply" do
+  let(:user) { User.create!(email: "judge-prose@example.com", name: "J", provider: "anthropic", api_key: "sk-ant-test") }
+  let(:prose) { Rails.root.join("spec/fixtures/judge_replies/prose_without_json.txt").read }
+  let(:service) do
+    ClaudeService.new("sk-ant-test").tap do |svc|
+      reply = { "content" => [ { "type" => "text", "text" => prose } ], "usage" => { "input_tokens" => 1, "output_tokens" => 1 } }.to_json
+      svc.instance_variable_set(:@conn, Faraday.new { |f| f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { [ 200, {}, reply ] } } })
+    end
+  end
+  let(:section) { { "question" => "What is the one interface-design flaw?", "snippet" => "def pick = CumulativeSelector.new.pick", "concept" => "pass_through_methods" } }
+
+  it "raises InvalidResponseError rather than returning a verdict" do
+    expect { service.judge_section(user, ExerciseSection::CodeReview, section, rung: "senior", locked: false) }
+      .to raise_error(AiService::InvalidResponseError)
+  end
+
+  it "keeps the draft and records the fallback" do
+    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, keyword_init: true).new(
+      problem_set: { "code_review" => section },
+      plan: Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true)
+        .new(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
+      kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none
+    )
+    providers = -> { JudgedGeneration::Provider.new(judge_section: service.method(:judge_section), retry_section: ->(*) { raise "no retry expected" }) }
+    allow(Rails.logger).to receive(:warn)
+
+    judged = JudgedGeneration.call(user: user, language: "ruby_rails", draft: draft, providers: providers, finish: ->(*, **) { })
+
+    expect(judged.problem_set["code_review"]).to eq(section)
+    expect(judged.outcomes["code_review"]).to include(fallback: "invalid_json", dropped: false)
+    expect(Rails.logger).to have_received(:warn).with(/\[judge_fallback\] user=#{user.id} section=code_review reason=invalid_json/)
+  end
+end
+
 RSpec.describe AiService, "JUDGE_SYSTEM_PROMPT" do
+  it "asks for the checks to be worked through internally and the reply to be only the JSON verdict" do
+    expect(AiService::JUDGE_SYSTEM_PROMPT)
+      .to include("Work through these checks internally")
+      .and include("Reply with only the JSON verdict, with no text before or after it.")
+  end
+
   it "enumerates the rejection principles and issue types from JudgeVerdict's own constants" do
     expect(AiService::JUDGE_PRINCIPLE_GUIDANCE.keys).to eq(JudgeVerdict::PRINCIPLES)
     expect(AiService::JUDGE_SYSTEM_PROMPT).to include("Rejection principles, the only #{JudgeVerdict::PRINCIPLES.size}:")
@@ -6076,5 +6161,226 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     expect(payload["judge"]).to be_nil
     expect(payload["unhosted"]).to eq([])
+  end
+end
+
+RSpec.describe AiService, "quiet JSON parsing" do
+  let(:service) { FakeService.new("fake-key") }
+  let(:logged) { StringIO.new }
+
+  around do |example|
+    original = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(logged)
+    example.run
+  ensure
+    Rails.logger = original
+  end
+
+  it "raises without logging the reply or quoting it" do
+    expect { service.send(:parse_json_object, "SENTINEL-7 is not JSON", subject: "verdict", log_raw: false) }
+      .to raise_error(AiService::InvalidResponseError, "Provider returned invalid JSON for the verdict")
+    expect(logged.string).not_to include("SENTINEL-7")
+  end
+
+  it "still logs a malformed reply by default" do
+    expect { service.send(:parse_json_object, "SENTINEL-8 is not JSON", subject: "review") }
+      .to raise_error(AiService::InvalidResponseError)
+    expect(logged.string).to include("SENTINEL-8")
+  end
+end
+
+RSpec.describe AiService, "#judge_review_prose" do
+  let(:user) { User.create!(email: "prose@example.com", name: "P", provider: "fake", api_key: "fake-test-key") }
+  let(:review) do
+    { "rating" => "solid", "correct" => [ "Uses includes." ], "missed" => [ "One query per row." ],
+      "better_questions" => [], "next_step" => "Read about eager loading.", "improved_code" => "User.includes(:posts)" }
+  end
+  let(:service) { FakeService.new("fake-key") }
+
+  def captured_call
+    captured = nil
+    allow(service).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+    service.judge_review_prose(user, ExerciseSection::CodeReview, review, coach: "Rails")
+    captured
+  end
+
+  it "calls judge_review once, capped, on its own timeout, with the verdict schema" do
+    kw = captured_call
+    expect(kw).to include(purpose: "judge_review", max_tokens: AiService::REVIEW_JUDGE_MAX_TOKENS,
+                          read_timeout: AiService::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
+                          response_schema: ReviewProseVerdict.schema, system: AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)
+  end
+
+  it "shows the projection and never the rating, code, answer or problem" do
+    prompt = captured_call[:prompt]
+    expect(prompt).to include("One query per row.").and include("code_review").and include("Rails")
+    expect(prompt).not_to include("User.includes(:posts)")
+    expect(prompt).not_to include("\"rating\"")
+  end
+
+  it "takes no answer, problem or grading note: the signature is the guarantee" do
+    expect(AiService.instance_method(:judge_review_prose).parameters)
+      .to eq([ [ :req, :user ], [ :req, :kind ], [ :req, :review ], [ :keyreq, :coach ] ])
+  end
+
+  it "returns a parsed verdict" do
+    expect(service.judge_review_prose(user, ExerciseSection::CodeReview, review, coach: "Rails").status).to eq(:keep)
+  end
+
+  it "says which providers judge" do
+    expect([ AiService, ClaudeService, GeminiService, FakeService ].map(&:judges_review_prose?)).to eq([ false, true, false, true ])
+  end
+end
+
+RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
+  it "lists issue types from ReviewProseVerdict and carries the plain-language standard" do
+    ReviewProseVerdict::ISSUE_TYPES.each { |type| expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("- #{type}:") }
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(AiService::PLAIN_LANGUAGE_STANDARD.strip)
+      .and include("reply with only the JSON verdict")
+  end
+end
+
+RSpec.describe AiService, "judging graded reviews" do
+  let(:user) { User.create!(email: "graded@example.com", name: "G", provider: "fake", api_key: "fake-test-key") }
+  let(:exercise) do
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                          problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
+  end
+  let(:response) do
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          answers: { "code_review" => "The query runs once per row, so preload it." }, submitted_at: Time.current)
+  end
+  let(:logged) { StringIO.new }
+  let(:grade) { FakeService::REVIEW_SECTION.deep_stringify_keys.merge("missed" => [ "SENTINEL-G one.", "SENTINEL-G two." ]) }
+
+  around do |example|
+    original_logger = Rails.logger
+    original_switch = ENV["REVIEW_PROSE_JUDGE"]
+    Rails.logger = ActiveSupport::Logger.new(logged)
+    example.run
+  ensure
+    Rails.logger = original_logger
+    ENV["REVIEW_PROSE_JUDGE"] = original_switch
+  end
+
+  # Grades with a canned reply, and answers the judge with `judge_reply`
+  # (a String, or an exception to raise), counting judge calls.
+  def graded(judge_reply: { "status" => "keep" }.to_json, grader: grade, provider: FakeService)
+    judge_calls = 0
+    svc = provider.new("key")
+    allow(provider).to receive(:new).and_return(svc)
+    allow(svc).to receive(:call).and_wrap_original do |_m, system:, **|
+      if system == AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT
+        judge_calls += 1
+        raise judge_reply if judge_reply.is_a?(Exception)
+        { text: judge_reply, input_tokens: 1, output_tokens: 1 }
+      else
+        { text: grader.to_json, input_tokens: 1, output_tokens: 1 }
+      end
+    end
+    context = svc.send(:build_review_day_context, "Rails", exercise, response)
+    _, result = svc.send(:grade_section, user, exercise, response, "code_review", context)
+    [ result, judge_calls ]
+  end
+
+  def edit_reply
+    { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "SENTINEL-G two." } ],
+      "fields" => { "missed" => [ { "from" => [ 0, 1 ], "text" => "One query per row." } ] } }.to_json
+  end
+
+  context "with the switch off" do
+    it "makes no judge call and returns the grade as returned" do
+      result, calls = graded
+      expect(calls).to eq(0)
+      expect(result).to eq(ok: true, review: grade)
+    end
+
+    it "removes a provider-supplied graded_prose" do
+      result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
+      expect(result[:review]).to eq(grade)
+    end
+  end
+
+  context "with the switch on" do
+    before { ENV["REVIEW_PROSE_JUDGE"] = "1" }
+
+    it "applies an edit, keeps the rating, and stores the grader's prose" do
+      result, calls = graded(judge_reply: edit_reply)
+      expect(calls).to eq(1)
+      expect(result[:ok]).to be(true)
+      expect(result[:review]["missed"]).to eq([ "One query per row." ])
+      expect(result[:review]["rating"]).to eq(grade["rating"])
+      expect(result[:review]["graded_prose"]).to eq(grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys))
+      expect(logged.string).to match(/\[review_judge\] user=#{user.id} section=code_review status=edit issues=verbosity merges=\{"missed":\[\[0,1\]\]\}/)
+    end
+
+    it "keeps the sanitized grade on keep, dropping a forged graded_prose" do
+      result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
+      expect(result[:review]).to eq(grade)
+    end
+
+    it "replaces a forged graded_prose with its own on edit" do
+      result, = graded(judge_reply: edit_reply, grader: grade.merge("graded_prose" => { "missed" => "forged" }))
+      expect(result[:review]["graded_prose"]).to eq(grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys))
+    end
+
+    {
+      "plain prose" => [ "SENTINEL-G The review looks fine to me.", "invalid_json" ],
+      "malformed JSON" => [ "{\"status\": \"edit\", SENTINEL-G", "invalid_json" ],
+      "a JSON array" => [ "[\"SENTINEL-G\"]", "invalid_json" ],
+      "a JSON string" => [ "\"ok\"", "invalid_json" ],
+      "an unexpected error" => [ ArgumentError.new("SENTINEL-G boom"), "other" ],
+      "a verdict the boundary refuses" => [ { "status" => "edit", "issues" => [], "fields" => {} }.to_json, "invalid_output" ],
+      "a timeout" => [ AiService::TimeoutError.new("SENTINEL-G slow"), "timeout" ],
+      "a refusal" => [ AiService::RefusalError.new("SENTINEL-G declined"), "refusal" ],
+      "a truncated reply" => [ AiService::TruncatedResponseError.new("SENTINEL-G cut off"), "truncated" ],
+      "a rate limit" => [ AiService::RateLimitError.new("SENTINEL-G busy"), "rate_limit" ]
+    }.each do |name, (reply, reason)|
+      it "falls back to the sanitized grade on #{name}, logging a code and no review text" do
+        result, = graded(judge_reply: reply, grader: grade.merge("graded_prose" => "forged"))
+        expect(result).to eq(ok: true, review: grade)
+        expect(logged.string).to include("[review_judge_fallback] user=#{user.id} section=code_review reason=#{reason}")
+        expect(logged.string).not_to include("SENTINEL-G")
+      end
+    end
+
+    it "stores an array and keeps the original string when the grader's missed is a string" do
+      reply = { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "SENTINEL-G" } ],
+                "fields" => { "missed" => [ { "from" => [ 0 ], "text" => "Rewritten." } ] } }.to_json
+      result, = graded(judge_reply: reply, grader: grade.merge("missed" => "One long missed string."))
+      expect(result[:review]["missed"]).to eq([ "Rewritten." ])
+      expect(result[:review]["graded_prose"]["missed"]).to eq("One long missed string.")
+    end
+
+    it "never judges for a provider that does not judge" do
+      result, calls = graded(provider: GeminiService)
+      expect(calls).to eq(0)
+      expect(result[:review]).to eq(grade)
+    end
+  end
+end
+
+RSpec.describe AiService, ".judge_fallback_reason" do
+  # One table for both judges, so their fallback rates can be compared.
+  {
+    JudgeVerdict::Invalid.new("x")                     => "invalid_output",
+    ReviewProseVerdict::Invalid.new("x")               => "invalid_output",
+    AiService::TruncatedResponseError.new("x")         => "truncated",
+    AiService::InvalidResponseError.new("x")           => "invalid_json",
+    AiService::RefusalError.new("x")                   => "refusal",
+    AiService::TimeoutError.new("x")                   => "timeout",
+    Timeout::Error.new("x")                            => "timeout",
+    AiService::RateLimitError.new("x")                 => "rate_limit",
+    AiService::AuthenticationError.new("x")            => "authentication",
+    AiService::Error.new("x")                          => "other"
+  }.each do |error, reason|
+    it "names #{error.class} #{reason}" do
+      expect(AiService.judge_fallback_reason(error)).to eq(reason)
+    end
+  end
+
+  it "is the table both judges read" do
+    expect(JudgedGeneration.private_instance_methods).not_to include(:judge_fallback_reason)
+    expect(AiService.private_instance_methods).not_to include(:review_judge_fallback_reason)
   end
 end

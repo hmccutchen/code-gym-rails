@@ -1,0 +1,7 @@
+{ "kind": "code_review", "coach": "Rails", "expected": "edit",
+  "must_survive": ["the error happens ONLY WHEN the list is empty"],
+  "review": {
+    "correct": ["You read the stack trace."],
+    "missed": ["What is going on here, essentially, from a high-level perspective, is that the method raises NoMethodError, but only when the list is empty, because first returns nil in that particular situation."],
+    "better_questions": [],
+    "next_step": "Read about how first behaves on an empty relation." } }

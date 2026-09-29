@@ -1,0 +1,7 @@
+{ "kind": "code_review", "coach": "Rails", "expected": "keep",
+  "must_survive": ["missing index on orders.user_id", "missing index on orders.created_at", "these must stay two entries"],
+  "review": {
+    "correct": ["You found the slow query."],
+    "missed": ["orders.user_id has no index, so the lookup by user scans the table.", "orders.created_at has no index, so sorting by date scans the table."],
+    "better_questions": [],
+    "next_step": "Read about composite indexes." } }

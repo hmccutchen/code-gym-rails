@@ -74,6 +74,10 @@ RSpec.describe "per-purpose model routing" do
   end
 
   describe ClaudeService do
+    it "routes judge_review to Sonnet 5.5 at an explicit high effort" do
+      expect(ClaudeService::MODEL_FOR_PURPOSE.fetch("judge_review")).to eq(model: "claude-sonnet-5-5", effort: "high")
+    end
+
     it "sends generation to Opus at medium effort" do
       body = posted_body(ClaudeService, purpose: "generate_exercise")
 
@@ -87,17 +91,33 @@ RSpec.describe "per-purpose model routing" do
       end
     end
 
-    it "sends no effort for a route that names none" do
+    it "sends the default route to Sonnet 5.5 at an explicit high effort" do
       body = posted_body(ClaudeService, purpose: "review_response")
 
-      expect(body).not_to have_key("output_config")
+      expect(body["model"]).to eq("claude-sonnet-5-5")
+      expect(body["output_config"]).to eq("effort" => "high")
     end
 
-    it "routes judge_section to Sonnet 5 with no effort" do
+    it "routes judge_section to Sonnet 5.5 at an explicit high effort" do
       body = posted_body(ClaudeService, purpose: "judge_section")
 
-      expect(body["model"]).to eq("claude-sonnet-5")
-      expect(body).not_to have_key("output_config")
+      expect(body["model"]).to eq("claude-sonnet-5-5")
+      expect(body["output_config"]).to eq("effort" => "high")
+    end
+
+    # between_tools is rejected above high effort.
+    it "keeps every between_tools route at high effort or below" do
+      routes = ClaudeService::MODEL_FOR_PURPOSE.values + [ ClaudeService::DEFAULT_ROUTE ]
+      routes.select { |route| ClaudeService::THINKING_OFF[route[:model]] == { type: "between_tools" } }.each do |route|
+        expect([ nil, "low", "medium", "high" ]).to include(route[:effort])
+      end
+    end
+
+    it "gives every non-generation route a thinking-off setting, since any of them may be capped" do
+      generation = ClaudeService::MODEL_FOR_PURPOSE.values_at("generate_exercise", "retry_section")
+      (ClaudeService::MODEL_FOR_PURPOSE.values + [ ClaudeService::DEFAULT_ROUTE ] - generation).each do |route|
+        expect(ClaudeService::THINKING_OFF).to have_key(route[:model])
+      end
     end
 
     # Haiku 4.5 rejects the effort parameter with a 400.

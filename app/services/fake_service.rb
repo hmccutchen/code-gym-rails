@@ -8,6 +8,9 @@
 # reads which section to grade out of `prompt:`, since #review_sections
 # sends the same shared system context to every section's call.
 class FakeService < AiService
+  # So specs can drive the judged review path; the fake always keeps.
+  def self.judges_review_prose? = true
+
   # All nine ExerciseSection kinds populated at once. DailyExercise#third_key
   # resolves by precedence over whichever keys are present hashes
   # (ExerciseSection.thirds: architecture, security_review, challenge,
@@ -273,9 +276,11 @@ class FakeService < AiService
   # aid rather than a guarantee. What actually catches a broken section scan is
   # fake_service_spec's "returns a difficulty for every section it was asked
   # about"; keep that spec if this raise is ever removed.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     text =
       case system
+      when /editing the prose of one section's code review/
+        { "status" => "keep" }.to_json
       when /generating personalized daily exercise sets/
         EXERCISE_PROBLEM_SET.to_json
       when /giving direct, specific feedback/

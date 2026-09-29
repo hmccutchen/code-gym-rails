@@ -1,0 +1,6 @@
+{ "kind": "code_review", "coach": "Rails", "expected": "keep", "must_survive": [],
+  "review": {
+    "correct": ["You found the N+1 query in the loop."],
+    "missed": ["posts.user_id has no index, so the preload still scans the table."],
+    "better_questions": ["How many queries does this page run for 100 users?"],
+    "next_step": "Read about database indexes on foreign keys." } }

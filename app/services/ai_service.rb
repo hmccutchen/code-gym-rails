@@ -34,14 +34,20 @@ class AiService
   # empty-response parse error pointing at the prompt.
   class RefusalError < Error; end
 
+  # A call routed to a model that cannot take its shape, such as a capped call
+  # on a model with no way to turn thinking off. A configuration mistake, not
+  # a provider failure, but an Error all the same so callers' existing rescues
+  # show the engineer a try-again message rather than an error page.
+  class UnsupportedRouteError < Error; end
+
   # Faraday sets no timeout by default, so without one a call made from a
   # request thread would tie up a Puma thread indefinitely and outlive
   # ResponsesController#review's claim on the row, letting a second review
   # start while the first is still in flight. READ_TIMEOUT is the budget for
   # every call that doesn't pass a larger one. The ceiling that matters is the
   # longest #review request: a pre-grading translation on this budget, then a
-  # grade on REVIEW_READ_TIMEOUT, each allowed every retry attempt. That chain
-  # has to stay under DailyResponse::REVIEW_CLAIM_STALE_AFTER, which
+  # grade on REVIEW_READ_TIMEOUT, each allowed every retry attempt, then one prose-judge attempt on
+  # REVIEW_JUDGE_READ_TIMEOUT. That chain has to stay under DailyResponse::REVIEW_CLAIM_STALE_AFTER, which
   # ai_service_spec asserts so the two cannot drift apart.
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
@@ -87,7 +93,8 @@ class AiService
   # blocking, thinking-on call, so this one was sized the same order.
   #
   # Measured on 2026-09-19 with script/calibrate_concept_references.rb on the
-  # deployed routes. 36 claude-sonnet-5 calls ran 19-43 seconds, median 30,
+  # deployed routes, which were then claude-sonnet-5; not re-measured on
+  # claude-sonnet-5-5. 36 claude-sonnet-5 calls ran 19-43 seconds, median 30,
   # six of them concurrently. Of 17 measured gemini-3.5-flash calls, 16
   # completed in 20-70 seconds and one hit the 90-second timeout; the median
   # across all 17 was 25 seconds. The key's daily quota ended the run before
@@ -119,6 +126,11 @@ class AiService
   # times for a grade the provider had usually already produced.
   REVIEW_READ_TIMEOUT = 120
 
+  # The review prose judge's one attempt. Short because the engineer is
+  # waiting on it, and it is added to the review claim's budget as a single
+  # attempt: the judge never retries.
+  REVIEW_JUDGE_READ_TIMEOUT = 30
+
   # Both providers configure the same retry policy (see ClaudeService::RETRY_OPTIONS /
   # GeminiService::RETRY_OPTIONS), so how many attempts and how long the backoff
   # can grow are base-class facts, not per-provider ones — a caller computing a
@@ -145,6 +157,12 @@ class AiService
     call_budget_seconds(read_timeout) + ((RETRY_MAX + 1) * OPEN_TIMEOUT)
   end
 
+  # A call made with single_attempt: one open timeout and one read timeout,
+  # no retries, no backoff.
+  def self.single_attempt_call_seconds(read_timeout)
+    OPEN_TIMEOUT + read_timeout
+  end
+
   # How long a judged generation can run before it lands or fails: the draft,
   # then the judge fan-out, the retry fan-out and the re-judge fan-out, each
   # waiting on its slowest thread.
@@ -155,10 +173,13 @@ class AiService
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the
   # work we stopped waiting for, so retrying buys a duplicate charge for the
-  # entire problem set rather than a better outcome. Short calls keep retrying,
-  # and this never suppresses a retry_statuses retry (429/5xx arrive as
-  # Faraday::RetriableResponse, not a timeout).
+  # entire problem set rather than a better outcome. Short calls keep retrying.
+  # On a single_attempt request, every retry is refused, including status
+  # retries (429/5xx arrive as Faraday::RetriableResponse, not a timeout).
+  # Every retry decision, status or timeout, is made here (both connections
+  # set methods: []), so a single-attempt request refuses all of them.
   RETRY_TIMEOUT_GUARD = lambda do |env, exception|
+    return false if env.request.context.to_h[:single_attempt]
     return true unless exception.is_a?(Faraday::TimeoutError)
 
     !env.request.context.to_h[:long_running]
@@ -416,7 +437,7 @@ class AiService
 
     A question may be difficult, unfamiliar, or conceptually demanding. Its difficulty must come from the intended reasoning task, not from unclear wording, missing information, or accidental prerequisites. Reject when the problem itself is broken. Edit when the problem is sound but poorly expressed. Never reject a problem for being hard.
 
-    Decide in this order and stop at the first rejection.
+    Work through these checks internally, in this order, and stop at the first rejection. Reply with only the JSON verdict, with no text before or after it.
     1. Answerable. Can a knowledgeable developer at the stated level reach a defensible answer without guessing which scenario the author meant? Normal technical inference is allowed. The section is unanswerable only when materially different readings are possible and the answer depends on picking the author's. If prose can close the gap, that is an edit, on one condition: a clarification may only surface what the draft already shows or implies, such as behaviour visible in the code that the prose never states. If the missing information is not in the draft at all, you have no source for it: reject as underdetermined. Never invent facts.
     2. Valid. Check the remaining rejection principles.
     3. Improvable. If the section is sound, rewrite its prose fields where one of the listed issues applies, or return keep.
@@ -439,6 +460,40 @@ class AiService
     {"status":"keep"}
     {"status":"edit","issues":[{"type":"...","evidence":"<quoted text>"}],"fields":{"<prose field>":"<rewritten>"}}
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
+  PROMPT
+
+  # The 1,500 floor governs: the local sample was only 4 section reviews
+  # (largest projection 243 characters). Review output has no length bound, so
+  # a long review can hit this cap and fall back unedited as `truncated`.
+  # Re-check the value against the review_prose script's measured output
+  # tokens before the switch is turned on. Passing it turns thinking off.
+  REVIEW_JUDGE_MAX_TOKENS = 1_500
+
+  REVIEW_PROSE_ISSUE_GUIDANCE = {
+    "plain_language_violation" => "jargon or buzzwords where a plainer word works, needless hedging, or a miss explained in a more complicated way than it needs.",
+    "verbosity" => "the same point made twice, the rating restated in prose, filler, or a next step that names more than one thing to study."
+  }.freeze
+
+  REVIEW_PROSE_ISSUE_LINES = ReviewProseVerdict::ISSUE_TYPES
+    .map { |type| "- #{type}: #{REVIEW_PROSE_ISSUE_GUIDANCE.fetch(type)}" }
+    .join("\n").freeze
+
+  REVIEW_PROSE_JUDGE_SYSTEM_PROMPT = <<~PROMPT.freeze
+    You are editing the prose of one section's code review so the engineer who submitted the work can read it easily. The grade is final: you change how the review says things, never what it says.
+
+    Check for these problems, the only #{ReviewProseVerdict::ISSUE_TYPES.size}:
+    #{REVIEW_PROSE_ISSUE_LINES}
+
+    #{PLAIN_LANGUAGE_STANDARD}
+
+    Rules for any rewrite:
+    - Keep what every entry claims. Keep each negation ("does not", "never"), each condition ("only when", "unless"), and every identifier (a method, column, constant or file name) exactly as written.
+    - Never add a claim, a fix or an example the entry does not already make. Never touch code.
+    - A list field is rewritten as entries, each with "from": the zero-based indexes of the original entries it replaces. Cite every original index exactly once. Merge entries only when they make the same point, and then report a verbosity issue. Order entries by their first index.
+    - Rewrite only the fields that have a problem and leave the others out. If nothing needs changing, return keep.
+    - Each issue's evidence quotes the text it is about.
+
+    Work through this internally, then reply with only the JSON verdict, with no text before or after it.
   PROMPT
 
   # Fixed concept vocabularies, one per generation language. Embedded in the
@@ -963,6 +1018,11 @@ class AiService
     end
   end
 
+  # Whether this provider can hold the prose judge's reply to a schema. The
+  # base answers false; a provider that can opts in. Turning the judge on is
+  # the separate ReviewProseJudge switch, which waits on measurement.
+  def self.judges_review_prose? = false
+
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
@@ -1285,10 +1345,28 @@ class AiService
     visible = section.except(ProblemSetIngest::ANSWER_KEY_FIELD, *ProblemSetIngest::SERVER_STAMPS)
     result  = call_and_log(
       user, purpose: "judge_section", max_tokens: JUDGE_MAX_TOKENS,
+      response_schema: JudgeVerdict.schema_for(kind),
       system: JUDGE_SYSTEM_PROMPT,
       prompt: judge_prompt(kind, visible, rung: rung, locked: locked)
     )
     JudgeVerdict.parse(parse_json_object(result[:text], subject: "#{kind.key} verdict"), kind: kind)
+  end
+
+  # Handed the review alone, as the page renders it, plus the section's kind
+  # and the coaching language: never the answer, the problem or the grading
+  # note, so the judge has nothing to regrade from. The signature is the
+  # guarantee, like #assess_difficulty's.
+  def judge_review_prose(user, kind, review, coach:)
+    projection = ReviewProseVerdict.project(review)
+    result = call_and_log(
+      user, purpose: "judge_review", max_tokens: REVIEW_JUDGE_MAX_TOKENS,
+      read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true,
+      response_schema: ReviewProseVerdict.schema,
+      system: REVIEW_PROSE_JUDGE_SYSTEM_PROMPT,
+      prompt: review_prose_prompt(kind, coach, projection)
+    )
+    raw = parse_json_object(result[:text], subject: "review prose verdict", log_raw: false)
+    ReviewProseVerdict.parse(raw, projection: projection)
   end
 
   # Maps an error to the code a fan-out records for it. A class method so
@@ -1302,6 +1380,22 @@ class AiService
     end
   end
 
+  # The reason either judge records when it falls back: one table for both, so
+  # their fallback rates can be compared. A code, never the message, which can
+  # carry provider text. A timeout is the judges' commonest failure, so it is
+  # named here rather than in error_code_for, where the review fan-out reads
+  # it as "other".
+  def self.judge_fallback_reason(error)
+    case error
+    when JudgeVerdict::Invalid, ReviewProseVerdict::Invalid then "invalid_output"
+    when TruncatedResponseError                              then "truncated"
+    when InvalidResponseError                                then "invalid_json"
+    when RefusalError                                        then "refusal"
+    when TimeoutError, Timeout::Error                        then "timeout"
+    else                                                          error_code_for(error)
+    end
+  end
+
   protected
 
   # The two provider calls JudgedGeneration makes, handed over as bound methods
@@ -1311,6 +1405,17 @@ class AiService
   end
 
   private
+
+  def review_prose_prompt(kind, coach, projection)
+    <<~PROMPT
+      Section kind: #{kind.key}
+      The review is written for an engineer working in #{coach}.
+      Each list field is an array; an entry's index is its zero-based position.
+
+      The review's prose:
+      #{JSON.pretty_generate(projection)}
+    PROMPT
+  end
 
   def judge_prompt(kind, visible, rung:, locked:)
     <<~PROMPT
@@ -1783,8 +1888,12 @@ class AiService
   # turns of a conversation; `prompt` is always the new final user turn, so an
   # empty `history` is the single-shot case every non-conversational caller uses.
   # `purpose` is the ApiUsage purpose; each provider looks it up in its own
-  # MODEL_FOR_PURPOSE, falling back to its DEFAULT_ROUTE.
-  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil)
+  # MODEL_FOR_PURPOSE, falling back to its DEFAULT_ROUTE. `response_schema`,
+  # when given, is a JSON Schema the provider should hold the reply to; a
+  # provider that cannot enforce one ignores it, and the caller's own parse is
+  # still the boundary either way. `single_attempt` makes this request once,
+  # with no transport retry of any kind.
+  def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
 
@@ -2429,9 +2538,9 @@ class AiService
   # of the fan-out rather than inside the section's own thread, because
   # #build_review_day_context reads the stored translation ONCE for every
   # grading thread: a translation written later than this line would be graded
-  # against a day context that never mentions it. The cost is that a day
-  # carrying such a kind spends two provider calls end to end where every other
-  # day spends one, which ai_service_spec holds against the review claim window.
+  # against a day context that never mentions it. The cost is one sequential
+  # call before grading (and grading's optional prose judge) on a day carrying
+  # such a kind, which ai_service_spec holds against the review claim window.
   #
   # Failure is swallowed as widely as the difficulty note's, and for the same
   # reason: the grades are what the engineer paid for, and .review_context
@@ -2511,11 +2620,36 @@ class AiService
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
       cache_system: true, read_timeout: REVIEW_READ_TIMEOUT
     )
-    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+    # graded_prose is server-owned: only the prose judge's edit writes it.
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review").except(ReviewProseVerdict::ORIGINAL_KEY)
     review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
+    review = service.send(:judged_review, user, exercise, section, review)
     [ section, { ok: true, review: review } ]
   rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+  end
+
+  # Its own rescue, so a judge failure returns the grade the provider already
+  # gave instead of reaching grade_section's, which marks the section failed.
+  # StandardError, because Thread#value re-raises anything grade_section's
+  # narrower rescue misses, and that would cost the whole day's review.
+  def judged_review(user, exercise, section, review)
+    return review unless ReviewProseJudge.enabled? && self.class.judges_review_prose?
+
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    verdict = judge_review_prose(user, ExerciseSection.for(section), review, coach: config_for(exercise.language)[:coach])
+    log_review_judge(user, section, verdict, started)
+    verdict.apply(review)
+  rescue StandardError => e
+    Rails.logger.warn("[review_judge_fallback] user=#{user.id} section=#{section} reason=#{self.class.judge_fallback_reason(e)}")
+    review
+  end
+
+  def log_review_judge(user, section, verdict, started)
+    ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1_000).round
+    Rails.logger.info("[review_judge] user=#{user.id} section=#{section} status=#{verdict.status} " \
+                      "issues=#{verdict.issues.map { |issue| issue[:type] }.uniq.join(',')} " \
+                      "merges=#{verdict.merges.to_json} ms=#{ms}")
   end
 
   # Rate how hard each problem is, from its content alone.
@@ -2724,18 +2858,23 @@ class AiService
   # by key, so a non-Hash payload has to fail here rather than downstream: an
   # array saved to ai_review is still truthy, which flips DailyResponse#reviewed?
   # and leaves the user an empty review they can't regenerate.
-  def parse_json_object(text, subject:)
-    parsed = parse_json_response(text)
+  def parse_json_object(text, subject:, log_raw: true)
+    parsed = parse_json_response(text, subject: subject, log_raw: log_raw)
     return parsed if parsed.is_a?(Hash)
 
     raise InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
   end
 
-  def parse_json_response(text)
+  # log_raw: false is for replies that are an engineer's review text, which
+  # stays out of application logs: nothing is logged, and the message never
+  # quotes the reply (a parser message can).
+  def parse_json_response(text, subject: "response", log_raw: true)
     # Strip any accidental markdown fences
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
     JSON.parse(clean)
   rescue JSON::ParserError => e
+    raise InvalidResponseError, "Provider returned invalid JSON for the #{subject}" unless log_raw
+
     log_raw_snippet("Invalid JSON from provider", text)
     raise InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
   end
@@ -2853,9 +2992,10 @@ class AiService
   # A refusal always raises, after the usage row is written: the provider
   # billed the input even though it returned no text.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
-                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], allow_truncated: false)
+                   read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false, single_attempt: false)
     result = call(system: system, prompt: prompt, cache_system: cache_system,
-                  read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose)
+                  read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,
+                  response_schema: response_schema, single_attempt: single_attempt)
     log_usage(user, result, purpose: purpose)
 
     raise RefusalError, "Claude declined this request (#{result[:refusal]})" if result[:refusal]

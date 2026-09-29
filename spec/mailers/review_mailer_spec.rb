@@ -38,6 +38,16 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(mail.subject).to eq("Your Code Gym review — Friday, July 10")
     end
 
+    it "shows the rewritten prose and never the grader's original kept for audit" do
+      daily_response.update!(ai_review: { "code_review" => daily_response.ai_review["code_review"].merge(
+        "missed" => [ "Rewritten point." ], "graded_prose" => { "missed" => [ "SENTINEL-ORIGINAL" ] }
+      ) })
+      body = ReviewMailer.send_review(daily_response).body.decoded
+
+      expect(body).to include("Rewritten point.")
+      expect(body).not_to include("SENTINEL-ORIGINAL")
+    end
+
     it "renders every populated field with its label" do
       body = mail.body.encoded
       expect(body).to include("Code review")
