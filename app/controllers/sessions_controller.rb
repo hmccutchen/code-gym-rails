@@ -89,6 +89,7 @@ class SessionsController < ApplicationController
       destination = start_new_session_for(user)
       redirect_to destination || root_path, notice: "Welcome back, #{user.name}!"
     else
+      @code_rejected = true
       # No pending state renders no code field to try again in — see
       # new.html.erb's gate on pending_login_email — so the message can't
       # tell everyone to retry.

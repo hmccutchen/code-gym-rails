@@ -2,12 +2,21 @@
   Enter the 6-digit code we emailed you.
 </p>
 
+<%# The field takes focus on arrival, so a screen reader starts there and
+    skips the flash above it. Describing the field by that flash is what makes
+    a wrong-code error, or the code's expiry time, reach someone who cannot
+    see it. An alert from the "request a new code" form below says nothing
+    about the code, so only one from checking the code is tied to the field. %>
+<% code_alert = flash[:alert].present? && action_name == "verify_code" %>
+<% flash_ids = [ ("flash-alert" if code_alert), ("flash-notice" if flash[:notice].present?) ].compact %>
 <%= form_with url: verify_login_code_path, method: :post do |f| %>
   <div class="form-field">
     <%= f.label :code, "6-digit code from the email" %>
     <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6,
                      autocomplete: "one-time-code", placeholder: "123456",
-                     required: true, autofocus: true %>
+                     required: true, autofocus: true,
+                     aria: { describedby: [ *flash_ids, "pending-message" ].join(" "),
+                             invalid: @code_rejected || nil } %>
   </div>
   <%= f.submit "Verify code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
 <% end %>
