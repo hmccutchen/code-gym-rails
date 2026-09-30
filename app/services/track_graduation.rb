@@ -18,6 +18,11 @@ class TrackGraduation
   Step = Data.define(:kind, :from, :to, :results_at_level)
   Proposal = Data.define(:basis, :steps)
 
+  def self.for(user)
+    proposal(levels: user.section_kind_levels, locked: user.locked_section_kinds,
+             results: Evidence.for(user).results, cutoffs: user.track_evidence_cutoffs)
+  end
+
   def self.proposal(levels:, locked:, results:, cutoffs:)
     new(levels: levels, locked: locked, results: results, cutoffs: cutoffs).proposal
   end
