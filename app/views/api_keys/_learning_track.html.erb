@@ -1,0 +1,26 @@
+<div class="form-field mix-note" id="learning-track" data-profile-url="<%= profile_path %>"
+     data-left-text="<%= t("learning_track.setup.left") %>">
+  <p class="hint"><%= t("learning_track.setup.on_track") %></p>
+  <button type="button" class="btn btn-ghost btn-sm" id="leave-learning-track"><%= t("learning_track.setup.leave") %></button>
+  <p class="hint"><%= t("learning_track.setup.leave_hint") %></p>
+</div>
+<script>
+  (function () {
+    const box = document.getElementById("learning-track");
+    const button = document.getElementById("leave-learning-track");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      const result = await window.CodeGymSaveStatus.save("PATCH", box.dataset.profileUrl,
+        { user: { learning_track: "none" } }, "learning_track");
+      // A reload could cancel the Exercise mix's delayed save or hide its failure.
+      if (result && result.ok) {
+        const line = document.createElement("p");
+        line.className = "hint";
+        line.textContent = box.dataset.leftText;
+        box.replaceChildren(line);
+      } else {
+        button.disabled = false;
+      }
+    });
+  })();
+</script>

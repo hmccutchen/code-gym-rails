@@ -32,6 +32,9 @@
 <div class="setup-wrap">
   <h1>Add your API key</h1>
   <p>Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency.</p>
+  <% if current_user.on_learning_track? && !current_user.daily_exercises.exists? %>
+    <%= render "api_keys/key_guide" %>
+  <% end %>
 
   <%= form_with url: setup_path, method: :patch do |f| %>
     <div class="form-field">
@@ -76,6 +79,9 @@
     <p class="hint">Shorter sets after days you don't finish, back to a full set as you do. Off means always a full set.</p>
   </div>
 
+  <% if current_user.on_learning_track? %>
+    <%= render "api_keys/learning_track" %>
+  <% end %>
   <details class="form-field" id="exercise-mix">
     <summary><%= t("exercise_mix.summary") %></summary>
     <p class="hint"><%= t("exercise_mix.intro") %></p>

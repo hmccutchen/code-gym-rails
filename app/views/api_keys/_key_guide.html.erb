@@ -1,0 +1,30 @@
+<%# No cost figure: ApiUsage does not record the model (#237). %>
+<section class="key-guide mix-note">
+  <strong><%= t("learning_track.setup.key_guide.title") %></strong>
+  <p class="hint"><%= t("learning_track.setup.key_guide.intro") %></p>
+
+  <p class="hint"><strong><%= t("learning_track.setup.key_guide.anthropic") %></strong></p>
+  <ol class="hint">
+    <li><%= t("learning_track.setup.key_guide.anthropic_guide_html",
+              link: link_to(t("learning_track.setup.key_guide.anthropic_guide_link"), "https://platform.claude.com/docs/en/get-api-key", target: "_blank", rel: "noopener")) %></li>
+    <li><%= t("learning_track.setup.key_guide.anthropic_credits_html",
+              link: link_to(t("learning_track.setup.key_guide.anthropic_credits_link"), "https://support.claude.com/en/articles/8977456-how-do-i-pay-for-my-claude-api-usage", target: "_blank", rel: "noopener")) %></li>
+    <li><%= t("learning_track.setup.key_guide.anthropic_paste_html", prefix: tag.code("sk-ant-")) %></li>
+  </ol>
+
+  <p class="hint"><strong><%= t("learning_track.setup.key_guide.gemini") %></strong></p>
+  <ol class="hint">
+    <li><%= t("learning_track.setup.key_guide.gemini_guide_html",
+              link: link_to(t("learning_track.setup.key_guide.gemini_guide_link"), "https://ai.google.dev/gemini-api/docs/quickstart", target: "_blank", rel: "noopener")) %></li>
+    <li><%= t("learning_track.setup.key_guide.gemini_paste_html", prefix: tag.code("AQ.")) %></li>
+  </ol>
+
+  <p class="hint"><strong><%= t("learning_track.setup.key_guide.gemini_caveats") %></strong></p>
+  <ul class="hint">
+    <li><%= t("learning_track.setup.key_guide.gemini_limits") %></li>
+    <li><%= t("learning_track.setup.key_guide.gemini_privacy") %></li>
+    <li><%= t("learning_track.setup.key_guide.gemini_quality") %></li>
+  </ul>
+
+  <p class="hint"><strong><%= t("learning_track.setup.key_guide.cost_heading") %></strong> <%= t("learning_track.setup.key_guide.cost") %></p>
+</section>
