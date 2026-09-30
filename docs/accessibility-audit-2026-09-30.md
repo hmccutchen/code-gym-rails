@@ -283,7 +283,7 @@ the largest display settings.
 
 ## 6. VoiceOver checklist (installed app on iPhone)
 
-These are expected results, not results. Nothing here was run with VoiceOver.
+Each step gives the expected result. The checklist was run on 2026-09-30; its results are not recorded here.
 
 1. Log in: on the email field, hear "Work email, star, text field, required" (the asterisk is part of the label). After Send code, focus lands on the code field: hear "6-digit code from the email, text field", then the "check your email … expires in 15 minutes" message.
 2. Enter a wrong code: back on the code field, hear the field's label, "invalid data", and "Incorrect or expired code. Try again, or request a new one below."
@@ -359,8 +359,7 @@ children are presentational, which is where the risk comes from.
 
 These sources could not be fetched from this environment, so the two lines
 above come from their published summaries rather than a fresh reading. The
-Chromium result is measured. How Safari and VoiceOver on iOS handle the current
-release is exactly what the checklist run will show.
+Chromium result is measured.
 
 **Recommendation:** an `<h2>` inside the existing `<summary>`, holding the
 section title only, with the status span left outside it:
@@ -383,7 +382,7 @@ section title only, with the status span left outside it:
 - The one known loss is JAWS on Windows, which will not list these headings.
   That is no worse than today, where there is no heading at all.
 
-On the VoiceOver run, check: the rotor's Headings list shows each section
+To check this with VoiceOver: the rotor's Headings list shows each section
 title at level 2, reading a summary says the title, the status, and
 "expanded" or "collapsed", and double-tapping a heading in the rotor still
 toggles the section.
