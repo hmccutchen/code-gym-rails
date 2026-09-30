@@ -9,8 +9,8 @@ Setup (`GET /setup`, `api_keys/edit`) already holds the preferences: the
 Exercise mix is a collapsed `<details class="form-field" id="exercise-mix">`
 that autosaves through `CodeGymSaveStatus.save("PATCH", "/profile", …)`. A
 second collapsed disclosure, `#display-preferences`, sits directly after it
-and saves the same way. Each control applies to the page on change (by
-setting the attribute on `<html>`), then saves.
+and saves through the same endpoint. Each control applies to the page on
+change (by setting the attribute on `<html>`), then saves.
 
 | Setting | Stored key | Values (default first) |
 | --- | --- | --- |
@@ -31,13 +31,23 @@ setting the attribute on `<html>`), then saves.
   unknown value) with a 422 before strong parameters can drop it. This is the
   same guard shape as the weights.
 - Sparse: a default value stores no key, so a user who picks Dark again ends
-  with `{}`. The client posts the whole object each time. The last write
-  wins, with no version check.
+  with `{}`. The client posts the whole object each time.
+- Saves are chained, one request in flight at a time, the way the Exercise
+  mix chains its own (`inFlight` in `api_keys/edit`). `CodeGymSaveStatus`
+  ignores a stale response, but it cannot stop an older request from reaching
+  Rails last, and since each request carries the whole object, parallel
+  requests could leave an earlier choice stored. With one request at a time,
+  the most recent choice is always the last one written. Across tabs the last
+  write wins, with no version check.
 
 ## First paint
 
 - The layout renders `data-theme`, `data-text-size`, `data-line-spacing` and
   `data-font` on `<html>`, only for keys the user has set.
+- Signed-out pages render `data-theme="device"`. They have no stored
+  preference, and the light rules are scoped to the attribute, so without it
+  login would stay dark. Login's HTML therefore changes, by that attribute and
+  the stylesheet link.
 - The light theme, text sizes, spacing and fonts live in one stylesheet,
   `app/assets/stylesheets/display.css`. The layout links it only when the user
   has a stored preference, on the Setup page (so a change can apply before it
@@ -73,10 +83,11 @@ setting the attribute on `<html>`), then saves.
 ## Text size and line spacing
 
 - `html[data-text-size="125"] { font-size: 125% }`, a percentage of the
-  browser's own default, so a user's browser setting still counts. Every
-  `font-size` in the app is already in `rem`/`em`, and none is in `px`.
-  `--input-font-size: max(1rem, 16px)` is unchanged, so inputs never drop
-  below 16px.
+  browser's own default, so a user's browser setting still counts. No
+  `font-size` declaration uses a `px` literal: each is in `rem`/`em` or reads
+  `--input-font-size`. That variable, `max(1rem, 16px)`, is the one `px` size
+  and it is intentional. It stays unchanged, so inputs never drop below 16px
+  and grow with the text above it.
 - The `px` values that remain are borders, radii, 1–4px decorative lines, the
   600px breakpoints and the column `max-width`s (400/480/800/1200px). At
   larger text the columns simply hold fewer words per line, and none of them
@@ -102,8 +113,9 @@ setting the attribute on `<html>`), then saves.
   family, so nobody else fetches it. No external request is made.
 - The font applies to prose only: questions, scenarios, plan excerpts,
   problem statements, teaching notes, reviews, references and Learn content.
-  `pre`, `code`, `.hljs`, the code and pseudocode answer fields, and the email
-  field on Account stay monospace, with an explicit rule and a system spec.
+  `pre`, `code`, `.hljs`, the code and pseudocode answer fields, and the
+  address shown on Account (`.account-id .email`, a `<span>`) stay monospace,
+  with an explicit rule and a system spec.
 - Weights 400 and 700, Latin only. Italic is synthesized, since prose italics
   are rare and code comments stay monospace.
 
@@ -137,7 +149,9 @@ has no Reserved Font Name, so Fontsource's subset is fine for it.
 - Plan: explicit Light renders `default` and a light `theme-color`. Dark and
   Device keep `black`, which is readable under both themes. The copy under
   the theme control says "In the installed app, the bar at the top of the
-  screen changes the next time you open the app."
+  screen changes after you fully close the app and open it again." Bringing
+  a running app back to the front does not reread the value, so the copy
+  names the action that does.
 
 ## Reduced motion
 
@@ -152,12 +166,15 @@ covers it as a view-level stylesheet once it is added to the files it reads.
   - partial storage stays sparse;
   - no-preference HTML has no new attributes and no stylesheet link;
   - a stored preference renders its attributes;
-  - light renders `logo.png` and `default`.
+  - light renders `logo.png` and `default`;
+  - a signed-out page renders `data-theme="device"`.
 - **Model:** validations and the value object's defaults.
 - **Palette:** the light palette meets AA on every background, as the dark
   one does now.
 - **System:**
   - change each setting, reload, still applied;
+  - two changes made while the first save is held back: the later one is
+    what is stored;
   - the light theme shows the plain logo;
   - a reading font leaves `pre` and code answers monospace;
   - at 140% and 390px wide, no page scrolls sideways and the sticky bar does
