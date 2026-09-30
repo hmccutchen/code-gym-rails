@@ -2,9 +2,11 @@
 
 The WCAG 2.2 AA items left after the 2026-09-29 audit: semantics, touch
 targets, zoom and reflow, the login code, and text spacing, plus a VoiceOver
-checklist to run by hand. Two things are fixed in this branch: page titles and
-the login code field's error and expiry messages. Everything else is reported
-here with a recommendation, awaiting a decision.
+checklist to run by hand. The first pass fixed page titles and the login code
+field's error and expiry messages. The second pass, approved on 2026-09-30,
+fixed the reflow, target size, landmark and heading findings below, the duck
+and follow-up fields' labels, and the sliders' spoken values. Section 7 covers
+the one item still on hold: a real heading for each dashboard section.
 
 How it was checked: a throwaway system spec, not committed, seeded a
 fake-provider user (today's answer form, Setup, Learn, Progress, Account) and a
@@ -25,10 +27,10 @@ covers it. No migration and no new dependency.
 | --- | --- |
 | `<html lang>` | `lang="en"` on every page. No change needed. |
 | Page titles | **Every page was titled "Code Gym".** Fixed: each page now names itself, for example "History – Code Gym" and "N plus one – Learn – Code Gym". |
-| `<main>` | **Missing on every page.** Content sits in `div.container`. |
+| `<main>` | Was missing on every page. **Fixed:** `<main id="main-content">` inside the layout's `div.container`. |
 | `<header>` | None. The brand and menu live inside `<nav>`, which is fine as long as `<main>` exists. |
 | `<nav>` | Present on every page, the login page included. |
-| Skip link | **None.** The first stop on a signed-in page is the brand link, then the menu. |
+| Skip link | Was missing. **Fixed:** "Skip to content" is the first Tab stop on every page that shows the nav. It shows only when focused and moves focus to `<main>`. |
 | One `<h1>` per page | Yes, on every page. |
 
 Heading order:
@@ -37,27 +39,40 @@ Heading order:
 | --- | --- | --- |
 | Login, Setup, Account, Learn concept, Progress | h1, then h2 where present | none |
 | Learn index | h1, h2 per bucket, h3 per group | none |
-| Dashboard, answer form | h1 only. Section titles are the fold `<summary>`s, not headings | **No way to jump between sections by heading** |
-| Dashboard, submitted | h1 "Today's Workout", h3 "Claude's Review", h4 per section | **h1 to h3** |
-| History | h1, h2 per day, h4 per reviewed section | **h2 to h4** |
+| Dashboard, answer form | h1 only. Section titles are the fold `<summary>`s, not headings | **No way to jump between sections by heading.** On hold, see section 7. |
+| Dashboard, submitted | h1 "Today's Workout", h2 "Claude's Review", h3 per section | Was h1 to h3. **Fixed.** |
+| History | h1, h2 per day, h3 per reviewed section | Was h2 to h4. **Fixed.** |
 
 The fix: `page_title` in `ApplicationHelper` sets the page's name, and the
 layout's `<title>` renders it through `document_title`, so a page without one
 still reads "Code Gym". `spec/requests/page_titles_spec.rb` covers each page.
 
-Recommendations, awaiting approval:
+What changed:
 
-- Wrap the layout's `div.container` in `<main id="main">`. This changes the
-  markup only.
-- Add a skip link, visually hidden until focused, as the first element in
-  `<body>`, pointing at `#main`. On a phone it matters little, but it removes
-  six Tab stops on every signed-in page for a keyboard user.
-- Give each answer-form section a heading inside its `<summary>` (an `<h2>`
-  holding the existing label text) so VoiceOver's heading rotor reaches each
-  section. Styles stay the same. This is the most useful of the heading fixes.
-- Make "Claude's Review" an `<h2>` and its per-section headings `<h3>` on the
-  dashboard, and make history's per-section review headings `<h3>`. Both keep
-  their current look through their existing classes.
+- The layout wraps the flash messages and each page's content in
+  `<main id="main-content" tabindex="-1">`, inside `div.container`. The
+  `tabindex` lets the skip link move focus there as well as scroll. Main shows
+  no focus ring, since a ring around the whole page would read as an error.
+- The skip link sits before `<nav>`. It is off screen until focused, then
+  appears at the top left, fixed, so the nav does not move.
+- "Claude's Review" on the submitted dashboard is an `<h2>`, and each
+  section's review heading (`shared/_ai_review`, used by the dashboard and by
+  History) is an `<h3>`. Sizes come from the same inline style and the
+  `.review-block h3` rule, so they look as before.
+
+Checked in Chromium at 390px on the answer form: Tab from the top of the page
+lands on the skip link (visible, 47px tall). Enter moves focus to `<main>`, and
+the next Tab goes to "Generate new set", the page's first control, not back to
+the nav. The jump leaves `<main>`'s top at 56px, exactly the
+`scroll-padding-top` the dashboard sets for its sticky progress bar (the bar's
+height plus the focus ring's reach). The bar sits lower on the page at that
+point, so nothing covers the target. `[data-pull-content]` is still the
+`div.container`, now holding `<main>`, so pull-to-refresh moves the same area;
+its system spec passes unchanged.
+
+Specs: `spec/requests/page_structure_spec.rb` (landmark, skip link target,
+heading order on both pages, labels, slider values) and
+`spec/system/small_screen_layout_spec.rb` (skip link focus).
 
 ## 2. Touch targets (390px wide)
 
@@ -69,13 +84,13 @@ terms inside a sentence are exempt. Measured sizes are width by height.
 
 | Element | Size | Where | Passes by exception? |
 | --- | --- | --- | --- |
-| Exercise mix "Exclude" checkboxes | 13 × 13 (label 72 × 22) | Setup | **No.** Too close to the slider and the lock box. |
-| Exercise mix "Lock at this level" checkboxes | 13 × 13 (label 316 × 22) | Setup | **No** |
-| "Adjust set size to my recent completion" checkbox | 13 × 13 (label 342 × 22) | Setup | **No** |
-| Exercise mix difficulty radios | 13 × 13 (label 187 × 22) | Setup | Yes, by spacing |
+| Exercise mix "Exclude" checkboxes | 13 × 13 (label 72 × 22) | Setup | **No.** Too close to the slider and the lock box. **Fixed:** label 24 tall. |
+| Exercise mix "Lock at this level" checkboxes | 13 × 13 (label 316 × 22) | Setup | **No. Fixed:** label 24 tall. |
+| "Adjust set size to my recent completion" checkbox | 13 × 13 (label 342 × 22) | Setup | **No. Fixed:** label 24 tall. |
+| Exercise mix difficulty radios | 13 × 13 (label 187 × 22) | Setup | Yes, by spacing. Label now 24 tall too. |
 | Learn "Only ones I've seen" checkbox | 13 × 13 (label 157 × 26) | Learn index | Yes, and its label is 26 tall |
-| Section fold summaries ("1 — Code Review") | 358 × 19 | Dashboard | Yes, by spacing |
-| "← All concepts" link | 106 × 17 | Learn concept | **No.** Sits against the next control. |
+| Section fold summaries ("1 — Code Review") | 358 × 19 | Dashboard | Yes, by spacing. **Now 44 tall.** |
+| "← All concepts" link | 106 × 17 | Learn concept | **No.** Sits against the next control. **Fixed:** 25 tall. |
 | Glossary terms | 91–114 × 18 | Dashboard, history | Yes, inline in a sentence |
 | Setup's provider links (console.anthropic.com, aistudio.google.com) | 114–128 × 15 | Setup | Yes, inline in a sentence |
 
@@ -86,9 +101,9 @@ the box, still leaves the lock, exclude and set-size rows 22px tall.
 
 | Element | Size | Where |
 | --- | --- | --- |
-| Rating buttons | 111 × 33 | Dashboard |
-| Submit answers | 169 × 32 | Dashboard |
-| Menu button | 40 × 40 | Every signed-in page |
+| Rating buttons | 111 × 33, **now 44 tall** | Dashboard |
+| Submit answers | 169 × 32, **now 44 tall** | Dashboard |
+| Menu button | 40 × 40, **now 44 × 44** | Every signed-in page |
 | Duck toggle ("Stuck? Talk it through") | 181 × 27 | Dashboard |
 | Generate new set | 134 × 27 | Dashboard |
 | Email me this review | 154 × 27 | Submitted dashboard |
@@ -111,17 +126,40 @@ The slider thumb is the browser's own. The app never sizes it, so Chromium
 draws about 16px and iOS draws its larger native thumb. The thumb is not the
 only target, though: a tap anywhere on the 39px-tall track moves the value.
 
-Recommendations, awaiting approval:
+What changed:
 
-- **Fix the three failures.** Give the Setup checkboxes and radios a 24px box
-  (`width`/`height` on the input, or pad the label to 24px tall), and pad
-  "← All concepts" to 24px tall. The look stays the same apart from slightly
-  larger boxes.
-- **Bring the primary controls to 44px tall:** rating buttons, Submit answers,
-  the menu button (40 to 44), and the section fold summaries, which are what
-  someone taps most. Padding only; widths stay as they are.
-- Leave the rest between 24 and 44. They pass AA, and raising every button to
-  44px would change the page's density, which is closer to a redesign.
+- **The Setup checkboxes and radios.** Their labels (`.mix-exclude`,
+  `.mix-lock`, the difficulty radios' labels, and the set-size label) get
+  `min-height: 24px`. A tap on the label toggles the box, so the label is the
+  target. The boxes themselves are unchanged, so they look the same; each row
+  is 2px taller.
+- **"← All concepts"** is `inline-block` with 4px of vertical padding, 25px
+  tall. Its line was already that tall, so nothing moves.
+- **Rating buttons and Submit answers** get more vertical padding, to 44px.
+  Widths, font and colors are unchanged. Padding in rem plus a fixed amount, so
+  at larger text sizes they grow past 44 with their text, as before.
+- **The section fold summaries** get 12.5px of padding above and below (44px
+  tall), with matching negative margins, so the label stays exactly where it
+  was and the target grows into the space around it. A system spec checks
+  that a folded section's label still sits at the section's top padding.
+- **The menu button** is 44 × 44px, set in px rather than rem. See section 3
+  for why. At the default text size it was 40px; at the largest it was 56px
+  and is now 44px.
+
+Added vertical space at 390px, answer form, measured before and after:
+
+| | Before | After | Added |
+| --- | --- | --- | --- |
+| Section summary | 19 | 44 | 0 (negative margins) |
+| Rating row | 33 | 44 | 11 per section |
+| Submit answers | 32 | 44 | 12, once per page |
+| Folded section | 61 | 61 | 0 |
+| Whole page, 4 sections | 3363 | 3419 | 56 |
+
+So each open section is 11px taller, from the rating row alone. At 1024px the
+page grows by the same 56px.
+
+The rest between 24 and 44 are left as they were.
 
 ## 3. Zoom and reflow
 
@@ -130,28 +168,61 @@ interactive-widget=resizes-content`. It sets no `user-scalable=no` and no
 `maximum-scale`, so pinch zoom works. The iOS input-zoom fix uses a 16px input
 font size (`--input-font-size`) and does not restrict zoom.
 
-Horizontal scrolling at 320px (the same as 400% zoom on a 1280px window):
+Horizontal scrolling found in the first pass, at 320px (the same as 400% zoom
+on a 1280px window):
 
 | Page | Default display settings | Largest display settings | Cause |
 | --- | --- | --- | --- |
-| Login | none | none | |
-| Every signed-in page | **scrolls, 344px wide** | **scrolls, 373px wide** | The brand logo and name leave no room for the menu button, which ends up half off screen. Reaching the menu means scrolling sideways first. |
-| Submitted dashboard | **scrolls, 458px wide** | **scrolls, 638px wide** | `.submit-row` is a one-line flex row: the Submitted badge, one rating pill per section, and "Finish review" or "Get review". It does not wrap. This overflows **at 390px too**, on an ordinary phone at 100% zoom. |
-| History, largest settings | | scrolls | The follow-up input inside a review overflows its panel. |
+| Every signed-in page | scrolled, 344px wide | scrolled, 373px wide | The brand left no room for the menu button. |
+| Submitted dashboard | scrolled, 458px wide (also at 390px) | scrolled, 638px wide | `.submit-row` did not wrap. |
+| History, largest settings | | scrolled | The follow-up input overflowed its panel. |
 
-The 390px run found no other overflow. Code blocks scroll inside their own box,
-which reflow allows.
+What changed:
 
-Recommendations, awaiting approval:
+- **`.submit-row` wraps.** With four sections at 1024px the row does not
+  fit on one line either, so before this change the browser squeezed each
+  rating pill until its text broke over two lines ("Pattern: just / right").
+  Now the "Finish review" button moves to a second line and each pill keeps
+  its text on one line. That is the one visible difference at wide widths. A
+  row that fits on one line, such as a two- or three-section day at desktop
+  width, looks the same as before.
+- **The nav logo shrinks** on narrow screens. Inside the nav's collapsed
+  state (the same container query that shows the menu button), the brand may
+  shrink, and the logo absorbs all of it. `object-fit: contain` keeps its
+  aspect ratio, and the nav's height does not change. The wordmark "Code Gym" keeps its size. The logo is 112px
+  wide wherever it fits; measured widths where it does not:
 
-- `.submit-row { flex-wrap: wrap; }`. This one fails at normal phone width, so
-  it is the most urgent item in this report. A one-line change, and the row
-  looks the same whenever it fits.
-- Let the brand shrink in the nav (`min-width: 0` on the brand, with a
-  `max-width` or smaller height for the logo under about 360px) so the menu
-  button always fits. It changes the logo's size on the narrowest screens only.
-- Give the review follow-up input `min-width: 0` (it sits in a flex row), so it
-  shrinks with its panel.
+  | | Default settings | Largest settings |
+  | --- | --- | --- |
+  | 390px | 112 (unchanged) | 96 |
+  | 320px | 52 | 26 |
+
+  At the largest settings on a 320px screen, the logo is 26px wide. That is
+  the room left once the 32px wordmark and the 44px button fit. The
+  alternative would be shrinking the wordmark too, which this pass did not
+  do. The menu button went from rem to px for the same reason: at 140% text
+  a 2.75rem button would be 62px and leave no room for the logo at all.
+  `image-rendering: pixelated` is not set anywhere in the app today (checked
+  in `app/`, `config/` and `lib/`), so there was nothing to keep. The browser
+  scales the logo smoothly, as it did before. Setting it would change how the
+  logo looks at every size, so it was left out.
+- **The follow-up and duck fields** get `min-width: 0`, so they shrink with
+  their row instead of overflowing it.
+- Two more overflows showed up only at 320px with the largest settings plus
+  the text-spacing override, a combination the first pass did not measure:
+  Progress rows (a long concept name plus "not yet") and the email address on
+  Account. Progress rows now wrap (`flex-wrap: wrap`), so the status word drops
+  to its own line when it does not fit, and the email breaks anywhere
+  (`overflow-wrap: anywhere`).
+
+Measured again after the changes, every page at 320px and 390px, each with
+and without the text-spacing override, and the eight signed-in pages with both
+the default and the largest display settings (72 combinations over ten pages;
+the two login pages have no user to hold settings): **no page scrolls
+sideways**, no text is clipped, and no heading level is skipped. Every page
+has one `<main>` and a skip link. `spec/system/small_screen_layout_spec.rb`
+pins the menu button at 320px (both text sizes), the submitted row at 390px,
+and the 44px targets.
 
 ## 4. Login code
 
@@ -197,10 +268,10 @@ the largest display settings.
 - **No text overlaps.** The script flagged the Progress legend, where each term
   and its definition are inline, so their boxes intersect by construction. The
   screenshot shows it reading correctly.
-- The spacing makes the section 3 overflows worse. With the largest display
-  settings plus the override, the menu button is pushed off screen at 390px on
-  every signed-in page. The submitted dashboard's row reaches 734px wide. The
-  section 3 fixes cover both.
+- The spacing made the section 3 overflows worse: with the largest display
+  settings plus the override, the menu button was pushed off screen at 390px,
+  and the submitted dashboard's row reached 734px wide. After the section 3
+  fixes, no page scrolls sideways under the override at 320px or 390px.
 
 ## 6. VoiceOver checklist (installed app on iPhone)
 
@@ -212,12 +283,85 @@ These are expected results, not results. Nothing here was run with VoiceOver.
 4. Answer a section: double-tap the answer field, hear "text area". Type an answer.
 5. Rate it: hear "How hard was Code Review for you?", then "Just right, toggle button, not selected". Double-tap, hear "selected".
 6. Only if a save fails: hear the failure message read out without focus moving.
-7. Duck: double-tap "Stuck? Talk it through", hear "collapsed" change to "expanded". The text field reads as "What are you stuck on?". Ask, hear "Thinking…", then the reply read automatically.
-8. Submit: the button reads "Submit answers, right arrow". The page reloads onto the submitted state once the review is done. Rotor to Headings, expect "Claude's Review".
+7. Duck: double-tap "Stuck? Talk it through", hear "collapsed" change to "expanded". The text field reads as "What are you stuck on?, text field", and keeps that name after you start typing. Ask, hear "Thinking…", then the reply read automatically.
+8. Submit: the button reads "Submit answers, right arrow". The page reloads onto the submitted state once the review is done. Rotor to Headings, expect "Claude's Review" (heading level 2), then one level 3 heading per section.
 9. Review: swipe through a section's rating pill and feedback. "Explain this differently" announces "A different explanation was added above." when done.
-10. Setup, Exercise mix: double-tap the "Exercise mix" summary, hear "expanded". On a slider, hear the kind's name, a value, then its stop ("Much less" to "Much more"). Swipe up or down to change it.
+10. Setup, Exercise mix: double-tap the "Exercise mix" summary, hear "expanded". On a slider, hear the kind's name, then its stop word as the value ("Default, adjustable"). Swipe up or down, hear the new stop ("Less", "Much less").
 11. Tick "Exclude", hear "checkbox, checked". A save warning, if any, is announced without moving focus.
+12. Any signed-in page, with a keyboard attached: the first Tab shows "Skip to content" at the top left. Activating it moves VoiceOver to the page's first heading.
+13. Rotor to Landmarks: expect "navigation" and "main".
 
-Worth listening for in steps 7 and 10: the duck's field is named only by its
-placeholder, and the sliders set no `aria-valuetext`, so VoiceOver may read the
-position as a number or a percentage before the word. If either reads badly, both are small fixes.
+Steps 7 and 10 were fixed rather than left to listen for:
+
+- **The duck's field** was named only by its placeholder. Chrome's
+  accessibility tree gave its name as "What are you stuck on?" from the
+  `placeholder` source, the fallback that disappears for some screen readers
+  once text is typed. It now has a visually hidden `<label for>` with the same
+  words, and Chrome reports the name from the label, with the placeholder
+  superseded. The review's follow-up field had the same problem and got the
+  same fix ("Ask a follow-up about this feedback"), with an id unique per
+  response and section.
+- **The Exercise mix sliders** exposed the value 2 (of 0 to 4) and no value
+  text. The stop word reached assistive technology only as a description
+  (`aria-describedby` on the `<output>`). Each slider now renders
+  `aria-valuetext` with its stop word, and the script updates it on every
+  move. Chrome's tree reads "Coding Challenge, slider, Much less" after
+  pressing Home. The `aria-describedby` is gone, since it would repeat the
+  same word.
+
+## 7. On hold: a heading for each dashboard section
+
+Not implemented. What follows is the research asked for, to read before the
+VoiceOver checklist.
+
+**What the browser exposes.** Measured in this environment's Chromium through
+the DevTools accessibility tree, on a test page. A `<summary>` maps to the
+`DisclosureTriangle` role. An `<h2>` inside it stays in the tree as a real
+heading, level 2, a child of the disclosure triangle. The same holds for
+`<span role="heading" aria-level="2">`. The summary's accessible name is all
+its text, so a summary holding a heading and a status reads "Code Review in
+progress". HTML-AAM maps `summary` to a button role on platforms without a
+disclosure-triangle role, and to the disclosure triangle in the Mac API
+([W3C HTML-AAM](https://www.w3.org/TR/html-aam-1.0/)). A button role's
+children are presentational, which is where the risk comes from.
+
+**What screen readers do with it**, from published testing:
+
+- VoiceOver announces a heading inside `<summary>` and lets you navigate to it
+  (rotor and heading navigation). JAWS with Chrome and Firefox does not
+  ([Scott O'Hara, "The details and summary elements, again"](https://www.scottohara.me/blog/2022/09/12/details-summary.html)).
+- Browsers that expose `summary` as a plain button strip the child heading's
+  role, so it is not treated as a heading. Adding `role="button"` to the
+  summary yourself does the same in every browser, including Safari
+  ([Hassell Inclusion, "Accessible accordions part 2"](https://hassellinclusion.com/blog/accessible-accordions-part-2-using-details-summary/)).
+
+These sources could not be fetched from this environment, so the two lines
+above come from their published summaries rather than a fresh reading. The
+Chromium result is measured. How Safari and VoiceOver on iOS handle the current
+release is exactly what the checklist run will show.
+
+**Recommendation:** an `<h2>` inside the existing `<summary>`, holding the
+section title only, with the status span left outside it:
+
+```erb
+<summary class="section-label">
+  <h2 class="section-title"><%= label %></h2>
+  <span class="section-status">…</span>
+</summary>
+```
+
+- VoiceOver, the target here, keeps the heading, and the summary still works
+  as the disclosure. The layout already styles `.section-title`, so the look
+  stays the same once `h2` gets the label's font size and weight.
+- `<summary>` must stay the details' first child, so the heading cannot sit
+  outside it and still be the toggle. A heading outside, above a
+  `<details>` whose summary repeats the title, doubles every section title for
+  a screen reader and adds a second target.
+- Keep `role="button"` off the summary. It would erase the heading.
+- The one known loss is JAWS on Windows, which will not list these headings.
+  That is no worse than today, where there is no heading at all.
+
+On the VoiceOver run, check: the rotor's Headings list shows each section
+title at level 2, reading a summary says the title, the status, and
+"expanded" or "collapsed", and double-tapping a heading in the rotor still
+toggles the section.

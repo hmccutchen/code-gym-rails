@@ -10,7 +10,10 @@
   <div class="duck-body" id="duck-body-<%= field %>" hidden>
     <div class="duck-turns" aria-live="polite"></div>
     <div class="duck-form">
-      <input type="text" class="duck-input" placeholder="What are you stuck on?">
+      <%# A placeholder is not a label: it disappears once typing starts, and
+          some screen readers skip it. %>
+      <label class="visually-hidden" for="duck-input-<%= field %>">What are you stuck on?</label>
+      <input type="text" class="duck-input" id="duck-input-<%= field %>" placeholder="What are you stuck on?">
       <button type="button" class="btn btn-ghost btn-sm duck-send">Ask</button>
       <%# Sends a fixed message on the user's behalf so getting an explanation
           doesn't depend on knowing how to phrase one. It goes through the same
