@@ -244,10 +244,18 @@ field and never read why the person was there. It now does:
 - The code field's `aria-describedby` names whichever flash is on the page,
   then the "Enter the 6-digit code" line. VoiceOver reads them after the field's
   label as soon as focus lands.
-- After an error the field carries `aria-invalid="true"`.
+- After a wrong code the field carries `aria-invalid="true"`.
+- Only an alert from checking the code is tied to the field. The pending page
+  also offers "request a new code", and an error from that form (an invalid
+  address, or too many requests) says nothing about the code. It stays in the
+  flash but is not read as part of the code field, and the field is not marked
+  invalid. Refusing a code attempt for being over the limit is tied to the
+  field, since it is about that form, but is not marked invalid, since no code
+  was checked. (Found by Copilot's second review.)
 
-Two new request specs in `spec/requests/sessions_spec.rb` cover the error and
-the notice.
+Request specs cover each case: the wrong code and the notice in
+`spec/requests/sessions_spec.rb`, which also covers a failed new-code request,
+and both rate limits in `spec/requests/login_rate_limit_spec.rb`.
 
 Left as is, to decide:
 

@@ -156,6 +156,19 @@ RSpec.describe "Sessions", type: :request do
       expect(field["aria-invalid"]).to be_nil
     end
 
+    # The page also offers "request a new code", whose errors say nothing
+    # about the code the person has not entered yet.
+    it "keeps an error from requesting a new code off the pending code field" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      follow_redirect!
+      post login_path, params: { email: "not-an-email" }
+
+      field = Nokogiri::HTML(response.body).at_css("input[name=code]")
+      expect(Nokogiri::HTML(response.body).at_css("#flash-alert")).to be_present
+      expect(field["aria-describedby"].split).to eq(%w[pending-message])
+      expect(field["aria-invalid"]).to be_nil
+    end
+
     it "returns nil-equivalent (no session) when there is no pending login in this browser" do
       post verify_login_code_path, params: { code: "123456" }
 
