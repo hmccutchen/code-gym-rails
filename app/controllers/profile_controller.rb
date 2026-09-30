@@ -17,6 +17,7 @@ class ProfileController < ApplicationController
     saved = save_with_preference_precondition
 
     return render_stale_preferences if saved == :stale
+    return render_invalid_learning_track if saved == :track_refused
 
     if saved
       render json: saved_body
@@ -150,19 +151,32 @@ class ProfileController < ApplicationController
   # Read and write sit inside one row lock, the same shape User#anonymize! uses:
   # unlocked they are two statements a second request can interleave with, and
   # both requests would pass a check against the version neither had bumped yet.
+  #
+  # A learning track choice takes the same lock, and is checked after the
+  # reload rather than before: "Experienced" bumps no version, so a Junior
+  # request that passed its check before another tab recorded Experienced
+  # would otherwise still pass the version check and join.
   def save_with_preference_precondition
-    posted = params.require(:user)[:section_kind_preferences_version]
-    return current_user.update(profile_params) if posted.nil?
+    user_params = params.require(:user)
+    posted = user_params[:section_kind_preferences_version]
+    return current_user.update(profile_params) if posted.nil? && !user_params.key?(:learning_track)
 
     outcome = nil
     current_user.with_lock do
-      outcome = if posted.to_s == current_user.section_kind_preferences_version.to_s
-        current_user.update(profile_params)
-      else
+      outcome = if user_params.key?(:learning_track) && !current_user.learning_track_change_allowed?(user_params[:learning_track])
+        :track_refused
+      elsif !posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s
         :stale
+      else
+        current_user.update(profile_params)
       end
     end
     outcome
+  end
+
+  def render_invalid_learning_track
+    render json: { errors: [ "That learning track change isn't available." ] },
+           status: :unprocessable_content
   end
 
   # Carries the state the refused tab does not have, so it can show what is
@@ -199,7 +213,7 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size,
+    permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size, :learning_track,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})
