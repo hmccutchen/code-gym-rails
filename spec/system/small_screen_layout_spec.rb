@@ -11,6 +11,31 @@ RSpec.describe "Small screen layout", type: :system do
     page.evaluate_script("document.documentElement.scrollWidth")
   end
 
+  LARGEST = { "text_size" => "140", "line_spacing" => "loose", "font" => "atkinson" }.freeze
+
+  # The WCAG 1.4.12 text-spacing override, the harshest case these pages meet.
+  def apply_text_spacing
+    page.execute_script(<<~JS)
+      const style = document.createElement("style");
+      style.textContent = "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }";
+      document.head.appendChild(style);
+    JS
+  end
+
+  def open_every_disclosure
+    page.execute_script("document.querySelectorAll('details').forEach(d => { d.open = true; })")
+  end
+
+  def reviewed_day_for(user)
+    GenerateDailyExercisesJob.perform_now(user_id: user.id)
+    exercise = DailyExercise.find_by!(user: user, date: Date.current)
+    keys = exercise.active_section_keys
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          answers: keys.index_with { "an answer long enough to count" },
+                          section_ratings: keys.index_with { "right_level" }, submitted_at: Time.current,
+                          ai_review: keys.index_with { { "rating" => "solid", "correct" => "Good catch." } })
+  end
+
   def heights(selector)
     page.evaluate_script("Array.from(document.querySelectorAll(#{selector.to_json})).map(el => el.getBoundingClientRect().height)")
   end
@@ -45,6 +70,65 @@ RSpec.describe "Small screen layout", type: :system do
       expect(page).to have_css(".submit-row")
       expect(page_width).to eq(390)
     end
+  end
+
+  it "keeps the review's follow-up field inside the page at 320px with the largest text" do
+    travel_to(a_weekday) do
+      user = create_fake_provider_user
+      user.update!(display_preferences: LARGEST)
+      reviewed_day_for(user)
+      resize(320)
+      visit_as(user)
+
+      expect(page).to have_css(".follow-up-input")
+      expect(page_width).to eq(320)
+    end
+  end
+
+  it "keeps the duck's field inside the page at 320px with the largest text" do
+    travel_to(a_weekday) do
+      user = create_fake_provider_user
+      user.update!(display_preferences: LARGEST)
+      resize(320)
+      visit_with_todays_set(user)
+      find(".duck-toggle", match: :first).click
+
+      expect(page).to have_css(".duck-input", visible: :visible)
+      expect(page_width).to eq(320)
+    end
+  end
+
+  it "wraps a long email on Account at 320px with the largest text and the spacing override" do
+    user = create_fake_provider_user
+    user.update!(email: "averyverylongengineeringaddress@example.com", display_preferences: LARGEST)
+    resize(320)
+    visit_as(user)
+    visit account_path
+    apply_text_spacing
+
+    expect(page).to have_text(user.email)
+    expect(page_width).to eq(320)
+  end
+
+  it "wraps Progress rows at 320px with the largest text and the spacing override" do
+    user = create_fake_provider_user
+    user.update!(display_preferences: LARGEST)
+    resize(320)
+    visit_as(user)
+    visit progress_path
+    open_every_disclosure
+    apply_text_spacing
+
+    expect(page).to have_css(".progress-entry", visible: :visible)
+    expect(page_width).to eq(320)
+  end
+
+  it "gives the Learn page's back link a 24px target" do
+    resize(390)
+    visit_as(create_fake_provider_user)
+    visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+    expect(heights(".learn-back")).to all(be >= 24)
   end
 
   it "gives the answer form's most-tapped controls a 44px target" do

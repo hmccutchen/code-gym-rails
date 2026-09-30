@@ -33,6 +33,15 @@ RSpec.describe "Page titles", type: :request do
       end
     end
 
+    it "titles the admin page" do
+      ENV["ADMIN_EMAILS"] = user.email
+      get admin_suggested_concepts_path
+
+      expect(title).to eq("Suggested concepts – Code Gym")
+    ensure
+      ENV.delete("ADMIN_EMAILS")
+    end
+
     it "titles a Learn concept page with the concept" do
       get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
