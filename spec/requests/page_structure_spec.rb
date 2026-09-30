@@ -69,6 +69,24 @@ RSpec.describe "Page structure for assistive technology", type: :request do
     expect(skipped_levels).to be_empty
   end
 
+  # VoiceOver's heading rotor is how someone jumps between sections, so each
+  # fold's title is a real heading, and nothing turns the summary into a
+  # button, which would strip it.
+  it "gives each answer-form section a level-2 heading inside its summary" do
+    travel_to(Date.new(2026, 7, 15)) do
+      reviewed_day(date: Date.current, submitted_at: nil)
+      get root_path
+    end
+
+    summaries = doc.css("details.section > summary")
+    expect(summaries.size).to eq(2)
+    summaries.each do |summary|
+      expect(summary.css("> h2.section-title").size).to eq(1)
+      expect(summary["role"]).to be_nil
+    end
+    expect(skipped_levels).to be_empty
+  end
+
   it "does not skip a heading level in History" do
     reviewed_day(date: 1.day.ago.to_date)
     get history_path

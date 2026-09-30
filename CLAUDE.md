@@ -1063,7 +1063,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `<details>`, the disclosure the reference, hint and history already use,
   so a section can be folded away by hand. Nothing folds on its own, and
   folding is available whatever the section's state. The summary carries
-  the label and a status line (`SectionStatusHelper#section_status`, mirrored
+  the label, as an `<h2>` so VoiceOver's heading rotor reaches each section
+  (never give the summary `role="button"`, which would erase it), and a
+  status line (`SectionStatusHelper#section_status`, mirrored
   by the dashboard script's `refreshStatus`): a check and the self-rating
   once answered and rated, "in progress" once answered, blank otherwise. One
   automatic reopen: editing the answer of a folded, rated section opens it,

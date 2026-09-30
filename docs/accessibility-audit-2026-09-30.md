@@ -39,7 +39,7 @@ Heading order:
 | --- | --- | --- |
 | Login, Setup, Account, Learn concept, Progress | h1, then h2 where present | none |
 | Learn index | h1, h2 per bucket, h3 per group | none |
-| Dashboard, answer form | h1 only. Section titles are the fold `<summary>`s, not headings | **No way to jump between sections by heading.** On hold, see section 7. |
+| Dashboard, answer form | h1, then an h2 per section, inside its fold `<summary>` | Was h1 only, with no way to jump between sections by heading. **Fixed**, see section 7. |
 | Dashboard, submitted | h1 "Today's Workout", h2 "Claude's Review", h3 per section | Was h1 to h3. **Fixed.** |
 | History | h1, h2 per day, h3 per reviewed section | Was h2 to h4. **Fixed.** |
 
@@ -317,10 +317,24 @@ Steps 7 and 10 were fixed rather than left to listen for:
   pressing Home. The `aria-describedby` is gone, since it would repeat the
   same word.
 
-## 7. On hold: a heading for each dashboard section
+## 7. A heading for each dashboard section
 
-Not implemented. What follows is the research asked for, to read before the
-VoiceOver checklist.
+Implemented after the VoiceOver checklist was run, with the markup
+recommended below: each answer-form section's title is an
+`<h2 class="section-title">` inside its `<summary>`, and the status line stays
+outside the heading. `.section-label .section-title` resets the heading's
+font and margin to the label's, and screenshots of the section header before
+and after are pixel-identical at 390px and 1024px, with the default and the
+largest display settings. Chrome's accessibility tree now lists each section
+as a level-2 heading under "Today's Workout", and each summary's name is
+unchanged. `spec/requests/page_structure_spec.rb` holds each summary to one
+`h2` and no `role`, and the answer form to no skipped heading level.
+
+The submitted day's read-only render is unchanged: its labels are still plain
+text. That render is shared with History, where a section heading would sit
+at level 3 rather than 2, so it needs its own decision.
+
+The research that led to the recommendation follows.
 
 **What the browser exposes.** Measured in this environment's Chromium through
 the DevTools accessibility tree, on a test page. A `<summary>` maps to the
