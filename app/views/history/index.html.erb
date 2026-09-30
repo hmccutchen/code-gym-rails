@@ -6,15 +6,15 @@
   .history-entry { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
   .history-entry h2 { font-size: 1.05rem; margin-bottom: .5rem; }
   .history-meta { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
-  .history-tag { border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; padding: .15rem .5rem; font-size: .8rem; }
+  .history-tag { border: 1px solid var(--accent); color: var(--accent-text); border-radius: 4px; padding: .15rem .5rem; font-size: .8rem; }
 
-  details.review summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+  details.review summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
   details.review summary::before { content: "▶ "; }
   details.review[open] summary::before { content: "▼ "; }
   .no-review { font-size: .85rem; color: var(--muted); }
 
   details.answers { margin: .75rem 0; }
-  details.answers summary { cursor: pointer; font-size: .85rem; color: var(--accent); padding: .4rem 0; list-style: none; }
+  details.answers summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
   details.answers summary::before { content: "▶ "; }
   details.answers[open] summary::before { content: "▼ "; }
   details.answers .section { margin-top: 1rem; }
@@ -39,7 +39,7 @@
     }
   }
   .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 2rem 0 1rem; font-size: .9rem; }
-  .pagination a { color: var(--accent); text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: .4rem .7rem; }
+  .pagination a { color: var(--accent-text); text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: .4rem .7rem; }
   .pagination a[aria-disabled="true"] { color: var(--muted); opacity: .5; pointer-events: none; }
   .pagination span { color: var(--muted); }
 </style>

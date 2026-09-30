@@ -5,19 +5,28 @@
   .page-header .streak { margin-left: .5rem; }
 
   textarea.answer { width: 100%; min-height: 120px; background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: var(--input-font-size); font-family: inherit; resize: vertical; line-height: 1.6; }
-  textarea.answer:focus { outline: none; border-color: var(--accent); }
+  textarea.answer:focus { border-color: var(--accent); }
   textarea.code-answer { font-family: "Fira Code", "Cascadia Code", monospace; font-size: var(--input-font-size); min-height: 160px; }
 
   .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 1.5rem; }
   .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+  @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
   .progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
-  .progress-sticky { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  /* The bar's height is fixed so the page can keep a focused field clear of
+     it: a browser that scrolls a field to the top edge stops at
+     scroll-padding-top, which reads the same variable. The focus ring's reach
+     is added because the ring sits outside the field. */
+  :root { --progress-sticky-height: 3.25rem; }
+  html:has(.progress-sticky) {
+    scroll-padding-top: calc(var(--progress-sticky-height) + var(--focus-ring-width) + var(--focus-ring-offset));
+  }
+  .progress-sticky { position: sticky; top: 0; z-index: 10; height: var(--progress-sticky-height); background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
   .progress-sticky .progress-bar { margin-bottom: 0; }
 
   .rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
   .rating-btn { flex: 1; padding: .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
   .rating-btn:hover { border-color: var(--accent); }
-  .rating-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .rating-btn.active { background: var(--button-bg); border-color: var(--button-bg); color: #fff; }
   #rating-nudge { margin-top: .5rem; margin-bottom: 1.5rem; }
 </style>
 

@@ -59,7 +59,7 @@
     <% turns = response.review_follow_ups.select { |t| t.section == section }.sort_by { |t| [ t.created_at, t.id ] } %>
     <% asked = turns.count { |t| t.role_user? } %>
     <div class="follow-ups" data-section="<%= section %>">
-      <div class="follow-up-thread">
+      <div class="follow-up-thread" aria-live="polite">
         <% turns.each do |turn| %>
           <p class="follow-up-turn follow-up-<%= turn.role %>"><%= turn.content %></p>
         <% end %>
@@ -122,7 +122,11 @@
         p.className = "alternate-item";
         p.textContent = data.alternate;
         container.insertBefore(p, button);
-        status.textContent = "";
+        // Set, never cleared: the explanation lands outside this live region,
+        // the same pattern the concept reference's alternates use.
+        status.textContent = data.remaining > 0
+          ? "A different explanation was added above."
+          : "A different explanation was added above — that was the last one.";
         if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
       } catch (e) {
         status.textContent = e.message || "Couldn't generate that — try again";

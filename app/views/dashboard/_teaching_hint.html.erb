@@ -1,11 +1,23 @@
 <%# Locals: note, field, submitted, response. The lock uses DailyResponse#answered?
     rather than its own length check, so the hint unlocks on exactly the rule the
     progress bar and history use — scaffold labels the user didn't type don't
-    count toward it. %>
+    count toward it.
+
+    A locked hint is a plain line, and the disclosure is not in the document at
+    all: it waits in the <template>, so no key, click or assistive technology can
+    open it before the section is attempted. The dashboard script swaps the two
+    whenever the answer crosses the threshold, in either direction. %>
 <% if note.present? %>
   <% locked = !submitted && !response.answered?(field) %>
-  <details class="hint<%= " locked" if locked %>" data-hint-for="<%= field %>">
-    <summary>Need a nudge? 💡</summary>
-    <div class="hint-body"><%= note %></div>
-  </details>
+  <% disclosure = capture do %>
+    <details class="hint">
+      <summary>Need a nudge? 💡</summary>
+      <div class="hint-body"><%= note %></div>
+    </details>
+  <% end %>
+  <div class="hint-slot" data-hint-for="<%= field %>">
+    <p class="hint-locked"<%= " hidden" unless locked %>>Available after you attempt this section</p>
+    <%= disclosure unless locked %>
+    <% unless submitted %><template><%= disclosure %></template><% end %>
+  </div>
 <% end %>

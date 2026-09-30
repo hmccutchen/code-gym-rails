@@ -20,13 +20,19 @@
     window.CodeGymSaveStatus existing by the time it runs. The dashboard's and
     /setup's scripts are inline in the page body instead, which runs first:
     they reach it lazily, and register watch() probes on DOMContentLoaded. %>
-<p id="save-status" class="save-status" role="status" aria-live="polite" hidden></p>
+<p id="save-status" class="save-status" hidden></p>
+<%# The banner above is toggled with `hidden`, and screen readers often stay
+    silent about a live region that appears with its text already in it. This
+    copy is always in the page, so a failed save is always announced, and
+    assertively, since the engineer's work did not reach the server. %>
+<p id="save-status-announcer" class="visually-hidden" role="alert"></p>
 
 <script>
   window.CodeGymSaveStatus = (function () {
     const GENERIC = <%= t("save_status.generic").to_json.html_safe %>;
     const SIGNED_OUT = <%= t("save_status.signed_out").to_json.html_safe %>;
     const banner = document.getElementById("save-status");
+    const announcer = document.getElementById("save-status-announcer");
 
     // Keyed by control rather than held as one flag: /setup saves three
     // different things to one URL, and without a key a successful time-zone
@@ -59,10 +65,12 @@
       if (messages.length === 0) {
         banner.hidden = true;
         banner.textContent = "";
+        announcer.textContent = "";
         return;
       }
 
       banner.textContent = messages[messages.length - 1];
+      announcer.textContent = banner.textContent;
       banner.hidden = false;
     }
 

@@ -11,9 +11,11 @@
 <%# The answer form wraps each section in its own open <details>, the same
     disclosure the reference and history use, so a section can be folded away
     by hand; nothing folds on its own. The read-only render stays a plain
-    div. The label is the summary in both, so the two read the same. %>
+    div. The label is the summary in both, so the two read the same. It gets
+    no glossary terms: a focusable term inside a summary is a control nested in
+    a control, so terms are wrapped in the body text below it instead. %>
 <% label = capture do %>
-  <%= slot %> — <%= t("sections.#{key}.name") %><% if kind.titled_label? %>: <%= glossary_wrap(data["title"]) %><% end %>
+  <%= slot %> — <%= t("sections.#{key}.name") %><% if kind.titled_label? %>: <%= data["title"] %><% end %>
 <% end %>
 <% if submitted %>
 <div class="section">
@@ -49,9 +51,12 @@
         exercise: exercise, response: response, submitted: submitted %>
 
   <% unless submitted %>
-    <div class="rating-row" data-rating-for="<%= key %>">
+    <div class="rating-row" data-rating-for="<%= key %>" role="group"
+         aria-label="<%= t("dashboard.rating_group", section: t("sections.#{key}.name")) %>">
       <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
-        <button type="button" class="rating-btn<%= " active" if response.self_rating_for(key) == value %>" data-rating-for="<%= key %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
+        <% selected = response.self_rating_for(key) == value %>
+        <button type="button" class="rating-btn<%= " active" if selected %>" aria-pressed="<%= selected %>"
+                data-rating-for="<%= key %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
       <% end %>
     </div>
     <%= render "shared/duck_thread", field: key %>

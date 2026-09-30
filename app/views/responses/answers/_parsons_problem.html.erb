@@ -157,7 +157,7 @@
           // the arrows gone this is the only input on a phone. Mouse dragging
           // is unaffected.
           Sortable.create(list, {
-            animation: 150,
+            animation: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 150,
             delay: 150,
             delayOnTouchOnly: true,
             onEnd: () => list.parsonsSync?.()
