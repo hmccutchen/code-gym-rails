@@ -161,7 +161,9 @@ has no Reserved Font Name, so Fontsource's subset is fine for it.
   changes in the page. Changing it needs the app to be fully closed and
   reopened, not reinstalled. That is reported behavior; no device was
   available here to confirm it.
-- Explicit Light renders `default` and a light `theme-color`. Dark and
+- Explicit Light renders `default`. The browser's `theme-color` follows the
+  palette on its own: a light tag carrying the palette's `media` value comes
+  first, and the dark one after it as the fallback. Dark and
   Device keep `black`, which is readable under both themes. The copy under
   the theme control says "In the installed app, the bar at the top of the
   screen changes after you fully close the app and open it again." Bringing

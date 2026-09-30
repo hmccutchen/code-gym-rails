@@ -35,6 +35,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     choose_display("font", "atkinson")
 
     expect(html_attribute("data-theme")).to eq("light")
+    expect(page.evaluate_script(%(document.querySelector('meta[name="theme-color"]').media))).to eq("all")
     expect(html_attribute("data-text-size")).to eq("125")
     expect(page.evaluate_script("getComputedStyle(document.body).backgroundColor")).to eq("rgb(245, 245, 250)")
 

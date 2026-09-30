@@ -22,7 +22,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="<%= display_preferences.status_bar_style %>">
   <meta name="apple-mobile-web-app-title" content="Code Gym">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta name="theme-color" content="<%= display_preferences.theme_color %>">
+  <% if display_stylesheets? %>
+    <%= tag.meta(name: "theme-color", content: DisplayPreferences::LIGHT_THEME_COLOR,
+                 media: display_preferences.light_palette_media, data: { light_palette_media: true }) %>
+  <% end %>
+  <meta name="theme-color" content="<%= DisplayPreferences::DARK_THEME_COLOR %>">
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
   <style>
@@ -443,7 +447,7 @@
   </style>
   <%# After the inline styles, so equal-specificity rules here win. The light
       palette's media attribute is DisplayPreferences#light_palette_media, the
-      same value the brand logo's <source> carries. %>
+      same value the brand logo's <source> and the light theme-color carry. %>
   <% if display_stylesheets? %>
     <%= stylesheet_link_tag "display" %>
     <%= stylesheet_link_tag "display_light", media: display_preferences.light_palette_media, data: { light_palette_media: true } %>

@@ -1548,7 +1548,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   a user with a stored choice, on Setup, and on signed-out pages, which follow
   the device. The light palette is unscoped, and its `<link>`'s `media`
   (`DisplayPreferences#light_palette_media`) decides where it applies; the
-  logo's `<source>` carries the same value, so the two cannot disagree.
+  logo's `<source>` and a light `theme-color` tag carry the same value, so none
+  of the three can disagree. The dark `theme-color` follows as the fallback.
 
   **The nav's collapse is a container query**, `@container (max-width:
   37.5em)` on `nav`: 600px at the default size, and it moves out as the text

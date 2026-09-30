@@ -128,7 +128,7 @@ RSpec.describe "palette contrast" do
     end
 
     it "gives iOS and Android the light surface as the theme color" do
-      expect(DisplayPreferences::THEME_COLORS["light"]).to eq(vars["surface"])
+      expect(DisplayPreferences::LIGHT_THEME_COLOR).to eq(vars["surface"])
     end
   end
 end

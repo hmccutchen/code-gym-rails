@@ -32,8 +32,6 @@
     const DEFAULTS     = <%= raw DisplayPreferences::OPTIONS.transform_values(&:first).to_json %>;
     const PALETTE      = <%= raw DisplayPreferences::LIGHT_PALETTE_MEDIA.to_json %>;
     const PALETTE_OFF  = <%= raw DisplayPreferences::LIGHT_PALETTE_OFF.to_json %>;
-    const THEME_COLORS = <%= raw DisplayPreferences::THEME_COLORS.to_json %>;
-    const DEFAULT_THEME_COLOR = <%= raw DisplayPreferences.new({}).theme_color.to_json %>;
     const root = document.documentElement;
 
     const chosen = () => {
@@ -52,8 +50,6 @@
       });
       const media = PALETTE[values.theme] || PALETTE_OFF;
       document.querySelectorAll("[data-light-palette-media]").forEach((element) => { element.media = media; });
-      const themeColor = document.querySelector('meta[name="theme-color"]');
-      if (themeColor) themeColor.content = THEME_COLORS[values.theme] || DEFAULT_THEME_COLOR;
     };
 
     // One save in flight at a time, each sending what is chosen when it goes

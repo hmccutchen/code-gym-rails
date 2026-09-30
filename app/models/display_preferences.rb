@@ -16,7 +16,12 @@ class DisplayPreferences
   # bar with white text above the page, readable under either theme, so only
   # an explicit light choice asks for the white bar.
   STATUS_BAR_STYLES = { "light" => "default" }.freeze
-  THEME_COLORS      = { "light" => "#ffffff" }.freeze
+
+  # The browser's toolbar color. The dark one is always rendered, as the
+  # fallback; the light one goes first and carries the light palette's media,
+  # so a browser picks it exactly where the light palette applies.
+  DARK_THEME_COLOR  = "#1a1a2e"
+  LIGHT_THEME_COLOR = "#ffffff"
 
   # Where the light palette applies, as the media attribute of its <link>.
   LIGHT_PALETTE_MEDIA = { "light" => "all", "device" => "(prefers-color-scheme: light)" }.freeze
@@ -76,9 +81,5 @@ class DisplayPreferences
 
   def status_bar_style
     STATUS_BAR_STYLES.fetch(self["theme"], "black")
-  end
-
-  def theme_color
-    THEME_COLORS.fetch(self["theme"], "#1a1a2e")
   end
 end

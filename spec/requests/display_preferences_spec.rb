@@ -10,6 +10,10 @@ RSpec.describe "Display preferences in the layout", type: :request do
     response.body[/<html[^>]*>/]
   end
 
+  def theme_colors
+    Nokogiri::HTML5(response.body).css('meta[name="theme-color"]').map { |meta| [ meta["content"], meta["media"] ] }
+  end
+
   def display_links
     Nokogiri::HTML5(response.body).css('link[rel="stylesheet"]').select { |link| link["href"].include?("display") }
   end
@@ -25,7 +29,7 @@ RSpec.describe "Display preferences in the layout", type: :request do
       expect(display_links).to be_empty
       expect(response.body).not_to include("<picture>")
       expect(response.body).to include('<meta name="apple-mobile-web-app-status-bar-style" content="black">')
-      expect(response.body).to include('<meta name="theme-color" content="#1a1a2e">')
+      expect(theme_colors).to eq([ [ "#1a1a2e", nil ] ])
     end
   end
 
@@ -51,7 +55,7 @@ RSpec.describe "Display preferences in the layout", type: :request do
       expect(source["srcset"]).not_to include("outlined")
       expect(source["media"]).to eq("all")
       expect(response.body).to include('<meta name="apple-mobile-web-app-status-bar-style" content="default">')
-      expect(response.body).to include('<meta name="theme-color" content="#ffffff">')
+      expect(theme_colors).to eq([ [ "#ffffff", "all" ], [ "#1a1a2e", nil ] ])
     end
   end
 
@@ -62,6 +66,7 @@ RSpec.describe "Display preferences in the layout", type: :request do
 
     light = display_links.find { |link| link["href"].include?("display_light") }
     expect(light["media"]).to eq("(prefers-color-scheme: light)")
+    expect(theme_colors).to eq([ [ "#ffffff", "(prefers-color-scheme: light)" ], [ "#1a1a2e", nil ] ])
     expect(response.body).to include('<meta name="apple-mobile-web-app-status-bar-style" content="black">')
   end
 
@@ -70,6 +75,7 @@ RSpec.describe "Display preferences in the layout", type: :request do
 
     expect(html_tag).to eq('<html lang="en" data-theme="device">')
     expect(display_links.map { |link| link["media"] }).to include("(prefers-color-scheme: light)")
+    expect(theme_colors.first).to eq([ "#ffffff", "(prefers-color-scheme: light)" ])
   end
 
   it "links the stylesheets on Setup with the light palette off, so a choice there applies at once" do
