@@ -196,6 +196,18 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.attributes.except("learning_track", "updated_at")).to eq(original)
     end
 
+    it "answers a Leave after a mix save already ended the track with success and no change" do
+      patch_profile(section_kind_levels: ExerciseSection.keys.index_with { "senior" },
+                    section_kind_preferences_version: user.reload.section_kind_preferences_version)
+      expect(user.reload.learning_track).to eq("none")
+      original = user.attributes.except("updated_at")
+
+      patch_profile(learning_track: "none")
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.attributes.except("updated_at")).to eq(original)
+    end
+
     it "refuses an Apply against a stale version" do
       original = user.reload.attributes
 

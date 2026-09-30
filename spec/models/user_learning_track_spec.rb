@@ -109,8 +109,15 @@ RSpec.describe User, "learning track", type: :model do
       expect(user.learning_track_change_allowed?("none")).to be true
       user.update!(learning_track: "none")
       expect(user.learning_track_change_allowed?("junior")).to be false
-      expect(user.learning_track_change_allowed?("none")).to be false
       expect(user.section_kind_levels).to eq(LearningTrack.preset_levels)
+    end
+
+    # Setup's Leave control can outlive the track: a mix save that moves the
+    # last junior kind up ends it without re-rendering the control.
+    it "accepts a repeat leave from a user already off the track" do
+      user = on_track
+      user.update!(learning_track: "none")
+      expect(user.learning_track_change_allowed?("none")).to be true
     end
 
     it "refuses anything outside the closed list" do

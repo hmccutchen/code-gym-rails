@@ -266,7 +266,9 @@ class User < ApplicationRecord
   def learning_track_change_allowed?(value)
     case value
     when LearningTrack::ON then first_run?
-    when LearningTrack::OFF then first_run? || on_learning_track?
+    # A repeat leave is accepted: Setup's Leave control can outlive a track
+    # that a mix save already ended.
+    when LearningTrack::OFF then first_run? || on_learning_track? || learning_track == LearningTrack::OFF
     else false
     end
   end
