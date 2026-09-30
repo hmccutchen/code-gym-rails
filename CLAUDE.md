@@ -337,8 +337,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `created_at >= LearningTrack::INTRODUCED_AT`, and no exercise ever created.
   Dashboard and Setup send that account to `/welcome`. Junior sets every
   registered kind to `junior` through `PATCH /profile` with the existing
-  preference version; the new-account targets are unlocked so ordinary easing
-  still applies. `skill_level` stays untouched: targets already express the
+  preference version. Under the user-row lock, the endpoint requires both
+  that version and the exact registry-derived preset; an incomplete or
+  mismatched choice saves nothing. The new-account targets are unlocked so
+  ordinary easing still applies. `skill_level` stays untouched: targets already express the
   choice without changing the profile's separate scale. Experienced records
   `"none"` without changing targets. Existing accounts are not enrolled or
   prompted, and joining after the first-run choice is refused.

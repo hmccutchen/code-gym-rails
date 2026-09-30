@@ -145,8 +145,8 @@ class ProfileController < ApplicationController
 
   # The mix controls post the version they last saw, so a tab whose DOM predates
   # another tab's save is refused instead of overwriting it. Absent version
-  # means no precondition, the way an absent If-Match does — the other autosaves
-  # on this page send none and are unaffected.
+  # means no precondition except when joining the learning track — the other
+  # autosaves on this page send none and are unaffected.
   #
   # Read and write sit inside one row lock, the same shape User#anonymize! uses:
   # unlocked they are two statements a second request can interleave with, and
@@ -163,7 +163,7 @@ class ProfileController < ApplicationController
 
     outcome = nil
     current_user.with_lock do
-      outcome = if user_params.key?(:learning_track) && !current_user.learning_track_change_allowed?(user_params[:learning_track])
+      outcome = if invalid_learning_track_change?(user_params)
         :track_refused
       elsif !posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s
         :stale
@@ -172,6 +172,16 @@ class ProfileController < ApplicationController
       end
     end
     outcome
+  end
+
+  def invalid_learning_track_change?(user_params)
+    return false unless user_params.key?(:learning_track)
+    return true unless current_user.learning_track_change_allowed?(user_params[:learning_track])
+    return false unless user_params[:learning_track] == LearningTrack::ON
+    return true if user_params[:section_kind_preferences_version].nil?
+
+    levels = user_params[:section_kind_levels]
+    !levels.respond_to?(:to_unsafe_h) || levels.to_unsafe_h != LearningTrack.preset_levels
   end
 
   def render_invalid_learning_track

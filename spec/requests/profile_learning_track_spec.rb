@@ -50,6 +50,51 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(response.parsed_body).to eq("name" => user.name, "time_zone" => "UTC", "adaptive_set_size" => true)
     end
 
+    it "refuses Junior without levels, saving nothing" do
+      original = user.reload.attributes
+
+      patch_profile(learning_track: "junior", name: "Not saved",
+                    section_kind_preferences_version: user.section_kind_preferences_version)
+
+      expect_track_refused
+      expect(user.reload.attributes).to eq(original)
+    end
+
+    [ {}, { "pattern" => "junior" } ].each do |levels|
+      it "refuses Junior with incomplete levels #{levels.inspect}, saving nothing" do
+        original = user.reload.attributes
+
+        patch_profile(learning_track: "junior", name: "Not saved", section_kind_levels: levels,
+                      section_kind_preferences_version: user.section_kind_preferences_version)
+
+        expect_track_refused
+        expect(user.reload.attributes).to eq(original)
+      end
+    end
+
+    it "refuses Junior with a complete but mismatched preset, saving nothing" do
+      original = user.reload.attributes
+
+      patch_profile(learning_track: "junior", name: "Not saved",
+                    section_kind_levels: LearningTrack.preset_levels.merge("pattern" => "senior"),
+                    section_kind_preferences_version: user.section_kind_preferences_version)
+
+      expect_track_refused
+      expect(user.reload.attributes).to eq(original)
+    end
+
+    [ {}, { section_kind_preferences_version: nil } ].each do |version|
+      it "refuses Junior with an absent or null version #{version.inspect}, saving nothing" do
+        original = user.reload.attributes
+
+        patch_profile({ learning_track: "junior", name: "Not saved",
+                        section_kind_levels: LearningTrack.preset_levels }.merge(version))
+
+        expect_track_refused
+        expect(user.reload.attributes).to eq(original)
+      end
+    end
+
     [ "senior", "", nil, [], { "value" => "junior" }, true ].each do |value|
       it "refuses an invalid track #{value.inspect} without saving the other fields" do
         original = user.reload.attributes
@@ -99,7 +144,8 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       login_as(user)
       original = user.reload.attributes
 
-      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+                    section_kind_preferences_version: user.section_kind_preferences_version)
 
       expect_track_refused
       expect(user.reload.attributes).to eq(original)
@@ -112,7 +158,8 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       login_as(user)
       original = user.reload.attributes
 
-      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
+      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+                    section_kind_preferences_version: user.section_kind_preferences_version)
 
       expect_track_refused
       expect(user.reload.attributes).to eq(original)
