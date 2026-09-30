@@ -13,6 +13,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     false
   end
 
+  def self.leads_learning_track?
+    true
+  end
+
   def self.judge_task
     "Find the one planted issue in the snippet and say how to fix it."
   end
