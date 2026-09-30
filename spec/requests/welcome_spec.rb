@@ -33,7 +33,7 @@ RSpec.describe "Welcome", type: :request do
 
     expect(response).to have_http_status(:ok)
     document = Nokogiri::HTML(response.body)
-    expect(document.at_css("title").text).to eq("Before you start — Code Gym")
+    expect(document.at_css("title").text).to eq("Code Gym")
     expect(document.at_css("h1").text).to eq("Before you start")
     expect(document.css("[data-track]").map { |button| button["data-track"] }).to eq(%w[junior none])
     expect(response.body).to include("Early in my career", "Experienced")
@@ -57,7 +57,10 @@ RSpec.describe "Welcome", type: :request do
 
   %w[junior none].each do |track|
     it "stops asking once the account has chosen #{track}" do
-      login_as(new_account(learning_track: track))
+      levels = track == "junior" ? LearningTrack.preset_levels : {}
+      user = new_account(learning_track: track, section_kind_levels: levels)
+      expect(user.reload.learning_track).to eq(track)
+      login_as(user)
 
       get "/welcome"
       expect(response).to redirect_to(root_path)
