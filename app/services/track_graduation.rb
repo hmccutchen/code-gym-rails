@@ -27,6 +27,14 @@ class TrackGraduation
     new(levels: levels, locked: locked, results: results, cutoffs: cutoffs).proposal
   end
 
+  def self.cutoff_date(entry, level:)
+    return unless entry.is_a?(Hash) && entry["level"] == level
+
+    Date.iso8601(entry["through"].to_s)
+  rescue Date::Error
+    nil
+  end
+
   def initialize(levels:, locked:, results:, cutoffs:)
     @levels = levels
     @locked = locked
@@ -108,11 +116,6 @@ class TrackGraduation
   end
 
   def cut_off_through(key)
-    entry = @cutoffs[key]
-    return unless entry.is_a?(Hash) && entry["level"] == @levels[key]
-
-    Date.iso8601(entry["through"].to_s)
-  rescue Date::Error
-    nil
+    self.class.cutoff_date(@cutoffs[key], level: @levels[key])
   end
 end

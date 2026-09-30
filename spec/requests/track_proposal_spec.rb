@@ -273,6 +273,78 @@ RSpec.describe "Learning track proposals", type: :request do
       )
     end
 
+    it "keeps a newer same-kind dismissal when an older evidence read finishes last" do
+      user = track_user
+      reviewed_day(user, Date.current - 3, { "code_review" => "junior" })
+      login_as(user)
+      other_tab = ActionDispatch::Integration::Session.new(Rails.application)
+      other_tab.post login_path, params: { email: user.email }
+      other_tab.post verify_login_code_path, params: { code: user.generate_login_code! }
+      advanced = false
+      allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
+        evidence = original.call(*args)
+        unless advanced
+          advanced = true
+          [ 2, 1, 0 ].each { |ago| reviewed_day(user, Date.current - ago, { "code_review" => "junior" }) }
+          other_tab.post learning_track_dismissal_path, params: { kinds: [ "code_review" ] }.to_json, headers: json
+          expect(other_tab.response).to have_http_status(:ok)
+          expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
+        end
+        evidence
+      end
+
+      dismiss([ "code_review" ])
+
+      expect(response).to have_http_status(:ok)
+      aggregate_failures do
+        expect(user.reload.track_evidence_cutoffs.dig("code_review", "through")).to eq(Date.current.iso8601)
+        expect(TrackGraduation.for(user)).to be_nil
+      end
+    end
+
+    it "keeps a level-change cutoff later than the latest review" do
+      user = track_user
+      reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
+      login_as(user)
+      apply_levels(user, user.section_kind_levels.merge("pattern" => "senior"))
+
+      dismiss([ "pattern" ])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq(
+        "level" => "senior", "through" => Date.current.iso8601
+      )
+    end
+
+    it "advances an older cutoff at the same level" do
+      user = track_user
+      user.update!(track_evidence_cutoffs: { "pattern" => { "level" => "junior", "through" => "2026-10-12" } })
+      reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
+      login_as(user)
+
+      dismiss([ "pattern" ])
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
+    end
+
+    [ nil, "junk", [], {}, { "through" => "2099-01-01" }, { "level" => "junior" },
+      { "level" => "junior", "through" => "not a date" },
+      { "level" => "junior", "through" => "2099-02-30" },
+      { "level" => "senior", "through" => "2099-01-01" } ].each do |entry|
+      it "replaces an inapplicable historical cutoff #{entry.inspect}" do
+        user = track_user
+        user.update!(track_evidence_cutoffs: { "pattern" => entry })
+        reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
+        login_as(user)
+
+        dismiss([ "pattern" ])
+
+        expect(response).to have_http_status(:ok)
+        expect(user.reload.track_evidence_cutoffs["pattern"]).to eq("level" => "junior", "through" => "2026-10-13")
+      end
+    end
+
     it "rechecks membership after another request leaves the track" do
       user = track_user
       login_as(user)
@@ -290,6 +362,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
     it "uses a target another request changed before taking the lock" do
       user = track_user
+      reviewed_day(user, Date.current - 1, { "code_review" => "junior" })
       login_as(user)
       allow(TrackGraduation::Evidence).to receive(:for).and_wrap_original do |original, *args|
         fresh = User.find(user.id)
@@ -301,6 +374,7 @@ RSpec.describe "Learning track proposals", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(user.reload.track_evidence_cutoffs.dig("pattern", "level")).to eq("senior")
+      expect(user.track_evidence_cutoffs.dig("pattern", "through")).to eq(Date.current.iso8601)
     end
   end
 end

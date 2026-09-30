@@ -377,8 +377,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   user's zone. Evidence through that date is ignored at that level; a
   lead-based proposal after a cutoff also needs three fresh favourable lead
   results. The profile join check and versioned level changes run under the
-  user-row lock; dismissal merges into the reloaded map under that same lock,
-  so concurrent dismissals or level saves do not lose each other's cutoffs.
+  user-row lock; dismissal merges into the reloaded map under that same lock
+  and keeps a later valid cutoff at the current level. Its earlier evidence
+  read cannot undo a newer dismissal or level-change cutoff. A different-level
+  or malformed entry is replaced; `TrackGraduation.cutoff_date` is the shared
+  reader for dismissal and proposal filtering.
 
   **Setup and dashboard saves settle in place.** Apply changes only listed
   bundle members through the existing versioned profile endpoint, then
