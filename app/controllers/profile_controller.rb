@@ -12,6 +12,7 @@ class ProfileController < ApplicationController
     return render_invalid_exclusion if invalid_excluded_section_kinds?
     return render_invalid_level     if invalid_section_kind_levels?
     return render_invalid_lock      if invalid_locked_section_kinds?
+    return render_invalid_display   if invalid_display_preferences?
 
     saved = save_with_preference_precondition
 
@@ -124,6 +125,23 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
+  # Same reasoning as the weights guard, checked against the raw param before
+  # strong parameters can drop a bad entry and report the request a success.
+  def invalid_display_preferences?
+    user_params = params.require(:user)
+    return false unless user_params.key?(:display_preferences)
+
+    values = user_params[:display_preferences]
+    return true unless values.respond_to?(:to_unsafe_h)
+
+    DisplayPreferences.problems_with(values.to_unsafe_h).any?
+  end
+
+  def render_invalid_display
+    render json: { errors: [ "Display preferences must use the listed options" ] },
+           status: :unprocessable_content
+  end
+
   # The mix controls post the version they last saw, so a tab whose DOM predates
   # another tab's save is refused instead of overwriting it. Absent version
   # means no precondition, the way an absent If-Match does — the other autosaves
@@ -183,11 +201,12 @@ class ProfileController < ApplicationController
   def profile_params
     permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size,
                                              section_kind_weights: {}, excluded_section_kinds: [],
-                                             section_kind_levels: {}, locked_section_kinds: [])
+                                             section_kind_levels: {}, locked_section_kinds: [],
+                                             display_preferences: {})
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
     # permit(x: {}) yields Parameters, which a jsonb column cannot serialize.
-    %i[section_kind_weights section_kind_levels].each do |key|
+    %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)
     end
     permitted

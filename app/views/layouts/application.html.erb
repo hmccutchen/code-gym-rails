@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<%= html_display_attributes %>>
 <head>
   <meta charset="UTF-8">
   <%# interactive-widget=resizes-content is spec-correct and included for
@@ -13,15 +13,20 @@
   <%# iOS reads the manifest's display:standalone only from 17.4, so
       apple-mobile-web-app-capable is what actually drops Safari's address bar,
       reload and "aA" buttons on a home-screen launch; mobile-web-app-capable is
-      the standardised spelling of the same declaration. status-bar-style "black"
-      keeps the app's content below the status bar, so nothing here needs
-      viewport-fit=cover or safe-area insets. %>
+      the standardised spelling of the same declaration. Both status-bar-style
+      values DisplayPreferences uses, "black" and "default", keep the app's
+      content below the status bar, so nothing here needs viewport-fit=cover or
+      safe-area insets. %>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="<%= display_preferences.status_bar_style %>">
   <meta name="apple-mobile-web-app-title" content="Code Gym">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta name="theme-color" content="#1a1a2e">
+  <% if display_stylesheets? %>
+    <%= tag.meta(name: "theme-color", content: DisplayPreferences::LIGHT_THEME_COLOR,
+                 media: display_preferences.light_palette_media, data: { light_palette_media: true }) %>
+  <% end %>
+  <meta name="theme-color" content="<%= DisplayPreferences::DARK_THEME_COLOR %>">
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
   <style>
@@ -87,8 +92,11 @@
 
     .container { max-width: 800px; margin: 0 auto; padding: 0 1.5rem; }
 
-    /* Positioned, because the collapsed menu below hangs off it. */
-    nav { position: relative; background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
+    /* Positioned, because the collapsed menu below hangs off it. A query
+       container, so the collapse below can measure the nav in its own text
+       size; containment makes nav a stacking context, and the z-index keeps
+       the open menu above the dashboard's sticky progress bar. */
+    nav { position: relative; z-index: 20; container-type: inline-size; background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
     /* Wider than the page column, so on a desktop the brand sits apart from
        the links instead of crowding them inside the same 800px. */
     nav .inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; }
@@ -108,8 +116,9 @@
 
     /* Below this width the row cannot hold the brand and four destinations at
        once, so the destinations fold behind the button and the row keeps the
-       brand whole. */
-    @media (max-width: 600px) {
+       brand whole. Measured in em against the nav's own text, so a larger text
+       size moves the fold out with it: 37.5em is 600px at the default size. */
+    @container (max-width: 37.5em) {
       nav .nav-toggle {
         display: flex; flex-direction: column; justify-content: center; gap: 4px;
         width: 2.5rem; height: 2.5rem; padding: 0 .6rem; flex-shrink: 0;
@@ -436,6 +445,13 @@
                    border-radius: 6px; color: var(--text); font-size: .85rem;
                    box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
   </style>
+  <%# After the inline styles, so equal-specificity rules here win. The light
+      palette's media attribute is DisplayPreferences#light_palette_media, the
+      same value the brand logo's <source> and the light theme-color carry. %>
+  <% if display_stylesheets? %>
+    <%= stylesheet_link_tag "display" %>
+    <%= stylesheet_link_tag "display_light", media: display_preferences.light_palette_media, data: { light_palette_media: true } %>
+  <% end %>
 </head>
 <body>
   <%# A page declaring :hide_nav authenticates the session without meaning to
@@ -445,7 +461,7 @@
   <% unless content_for?(:hide_nav) %>
   <nav>
     <div class="container inner">
-      <% brand = capture do %><%= image_tag "logo-outlined.png", alt: "Code Gym", class: "brand-mark", width: 930, height: 654 %><span aria-hidden="true">Code Gym</span><% end %>
+      <% brand = capture do %><%= brand_mark %><span aria-hidden="true">Code Gym</span><% end %>
       <% if logged_in? %>
         <%= link_to brand, root_path, class: "brand" %>
       <% else %>

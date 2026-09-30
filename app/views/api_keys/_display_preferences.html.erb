@@ -1,0 +1,72 @@
+<%# The Display disclosure. Asking for :display_controls makes the layout link
+    the display stylesheets on this page even for a user who has chosen
+    nothing, so a choice made here applies before it is saved. %>
+<% content_for :display_controls, "1" %>
+<% preferences = DisplayPreferences.for(current_user) %>
+<details class="form-field" id="display-preferences">
+  <summary><%= t("display.summary") %></summary>
+  <p class="hint"><%= t("display.intro") %></p>
+
+  <% DisplayPreferences::OPTIONS.each do |setting, values| %>
+    <fieldset class="display-group">
+      <legend><%= t("display.#{setting}.legend") %></legend>
+      <% values.each do |value| %>
+        <label>
+          <input type="radio" name="display_<%= setting %>" value="<%= value %>" data-setting="<%= setting %>"
+                 <%= "checked" if preferences[setting] == value %>>
+          <%= t("display.#{setting}.options.#{value}") %>
+        </label>
+      <% end %>
+      <% if (hint = t("display.#{setting}.hint", default: nil)) %>
+        <p class="hint display-hint"><%= hint %></p>
+      <% end %>
+    </fieldset>
+  <% end %>
+</details>
+
+<script>
+  (function () {
+    const box = document.getElementById("display-preferences");
+    if (!box) return;
+
+    const DEFAULTS     = <%= raw DisplayPreferences::OPTIONS.transform_values(&:first).to_json %>;
+    const PALETTE      = <%= raw DisplayPreferences::LIGHT_PALETTE_MEDIA.to_json %>;
+    const PALETTE_OFF  = <%= raw DisplayPreferences::LIGHT_PALETTE_OFF.to_json %>;
+    const root = document.documentElement;
+
+    const chosen = () => {
+      const values = {};
+      box.querySelectorAll("input[type=radio]:checked").forEach((radio) => { values[radio.dataset.setting] = radio.value; });
+      return values;
+    };
+
+    // The same attributes the layout renders from what is stored, so the page
+    // looks now the way it will after a reload.
+    const apply = (values) => {
+      Object.entries(values).forEach(([setting, value]) => {
+        const attribute = "data-" + setting.replace(/_/g, "-");
+        if (value === DEFAULTS[setting]) root.removeAttribute(attribute);
+        else root.setAttribute(attribute, value);
+      });
+      const media = PALETTE[values.theme] || PALETTE_OFF;
+      document.querySelectorAll("[data-light-palette-media]").forEach((element) => { element.media = media; });
+    };
+
+    // One save in flight at a time, each sending what is chosen when it goes
+    // out. Every request carries the whole object, so two in parallel could
+    // reach the server out of order and leave the earlier choice stored.
+    let inFlight = Promise.resolve();
+    let queued = 0;
+    // After load: this inline script runs before the layout defines CodeGymSaveStatus.
+    document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queued > 0));
+
+    box.addEventListener("change", () => {
+      apply(chosen());
+      queued++;
+      inFlight = inFlight
+        .then(() => window.CodeGymSaveStatus.save("PATCH", "<%= profile_path %>",
+                                                  { user: { display_preferences: chosen() } }, "display_preferences"))
+        .then(() => { queued--; });
+    });
+  })();
+</script>

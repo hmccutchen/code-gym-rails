@@ -407,4 +407,51 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.adaptive_set_size).to be(false)
     end
   end
+
+  describe "PATCH /profile with display preferences" do
+    def save_display(values)
+      patch profile_path,
+            params: { user: { display_preferences: values } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+    end
+
+    before { login_as(user) }
+
+    it "stores the chosen settings and nothing for the defaults" do
+      save_display("theme" => "light", "text_size" => "125", "line_spacing" => "default", "font" => "atkinson")
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.display_preferences).to eq("theme" => "light", "text_size" => "125", "font" => "atkinson")
+    end
+
+    it "stores an empty object when every setting is back at its default" do
+      user.update!(display_preferences: { "theme" => "light" })
+
+      save_display("theme" => "dark", "text_size" => "100", "line_spacing" => "default", "font" => "default")
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.display_preferences).to eq({})
+    end
+
+    it "refuses an unknown value, an unknown setting and a non-object without saving" do
+      user.update!(display_preferences: { "theme" => "light" })
+
+      [ { "theme" => "neon" }, { "contrast" => "high" }, { "text_size" => 125 }, [ "light" ], "light" ].each do |values|
+        save_display(values)
+
+        expect(response).to have_http_status(:unprocessable_content), values.inspect
+        expect(user.reload.display_preferences).to eq("theme" => "light")
+      end
+    end
+
+    it "does not touch the display preferences when the request does not name them" do
+      user.update!(display_preferences: { "font" => "atkinson" })
+
+      patch profile_path,
+            params: { user: { name: "Renamed" } }.to_json,
+            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+
+      expect(user.reload.display_preferences).to eq("font" => "atkinson")
+    end
+  end
 end

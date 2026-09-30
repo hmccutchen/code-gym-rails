@@ -23,6 +23,10 @@
   .mix-difficulty label { margin-bottom: 0; }
   .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
   .mix-coverage { flex-basis: 100%; margin-top: 0; }
+  .display-group { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
+  .display-group legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
+  .display-group label { margin-bottom: 0; color: var(--text); }
+  .display-hint { flex-basis: 100%; margin-top: 0; }
 </style>
 
 <div class="setup-wrap">
@@ -140,6 +144,8 @@
       <p class="hint" id="mix-ladder-cost"><%= t("exercise_mix.ladders_cost") %></p>
     </div>
   </details>
+
+  <%= render "api_keys/display_preferences" %>
 
   <script>
     (function () {

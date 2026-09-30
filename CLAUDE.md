@@ -1530,6 +1530,38 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `display-mode`, so `spec/requests/pwa_spec.rb` pins the stylesheet rule and
   `spec/system/pull_to_refresh_spec.rb` forces that rule on to drive the
   gesture.
+- **Display preferences**: theme (dark, light, match my device), text size
+  (100/112/125/140%), line spacing and a reading font (Atkinson Hyperlegible;
+  OpenDyslexic is deferred to #235, pending its license's rule on renamed and
+  converted copies). They live in a Display disclosure on Setup and save
+  through `PATCH /profile`. `DisplayPreferences` is the one list of choices,
+  defaults first. `users.display_preferences` is sparse jsonb, since a default
+  stores no key, and `User` plus `ProfileController` refuse anything outside
+  the lists. Saves are chained one at a time because each carries the whole
+  object.
+
+  **A user who has chosen nothing gets nothing new**: no attribute on
+  `<html>`, no stylesheet link, the same outlined logo, the same `black`
+  status bar. A chosen value renders as a `data-*` attribute on `<html>` for
+  the first paint. `display.css` holds text size, spacing and the font;
+  `display_light.css` holds the light palette. The layout links both only for
+  a user with a stored choice, on Setup, and on signed-out pages, which follow
+  the device. The light palette is unscoped, and its `<link>`'s `media`
+  (`DisplayPreferences#light_palette_media`) decides where it applies; the
+  logo's `<source>` and a light `theme-color` tag carry the same value, so none
+  of the three can disagree. The dark `theme-color` follows as the fallback.
+
+  **The nav's collapse is a container query**, `@container (max-width:
+  37.5em)` on `nav`: 600px at the default size, and it moves out as the text
+  grows. It stays one rule rather than a copy per text size. Containment makes
+  `nav` a stacking context, hence its `z-index`. The reading font and line
+  spacing apply to prose only (`p`, `li`, `dd` and the named prose
+  containers), never code. iOS reads the status bar style when the installed
+  app launches, so only an explicit Light asks for the white bar, and the copy
+  says to fully close and reopen the app. Mermaid already draws with its light
+  theme, so the light palette needs nothing for it. `palette_contrast_spec`
+  holds both palettes to WCAG AA. Design:
+  `docs/superpowers/specs/2026-09-30-display-preferences-design.md`.
 - **Push reminders**: an optional notification each weekday when the day's set
   is ready, and an optional afternoon nudge on days it is left unfinished,
   turned on and off on the Account page.
@@ -1789,6 +1821,9 @@ always pull in the full suite — is stated once, in
 - `app/jobs/send_push_reminder_job.rb` — both reminder kinds, fanned out over one user's endpoints: `:ready` on the tick that generates the set, `:nudge` on later ticks of the same hourly cron, each enqueued by `GenerateDailyExercisesJob`'s cron branch rather than scheduled separately. Owns the nudge's copy, which varies with how far through the day is — untouched, partway, answered but unrated, or ready to submit
 - `app/services/push_nudge_plan.rb` — the one authority for whether an hourly tick nudges: level, window, the not-submitted stopping rule, and the quiet period that keeps a half-finished day from being nudged while it is still being worked on. Pure, so its specs need no database
 - `app/controllers/push_subscriptions_controller.rb` — enrol (JSON, since only script can call it) and un-enrol (an ordinary form post, so turning it off never depends on the machinery that turns it on)
+- `app/models/display_preferences.rb` — `DisplayPreferences`: the closed lists of display choices, and what the layout renders for them (`<html>` attributes, the light palette's media, status bar and theme color)
+- `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
+- `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
