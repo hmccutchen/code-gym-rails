@@ -39,7 +39,7 @@ Heading order:
 | --- | --- | --- |
 | Login, Setup, Account, Learn concept, Progress | h1, then h2 where present | none |
 | Learn index | h1, h2 per bucket, h3 per group | none |
-| Dashboard, answer form | h1 only. Section titles are the fold `<summary>`s, not headings | **No way to jump between sections by heading.** On hold, see section 7. |
+| Dashboard, answer form | h1, then an h2 per section, inside its fold `<summary>` | Was h1 only, with no way to jump between sections by heading. **Fixed**, see section 7. |
 | Dashboard, submitted | h1 "Today's Workout", h2 "Claude's Review", h3 per section | Was h1 to h3. **Fixed.** |
 | History | h1, h2 per day, h3 per reviewed section | Was h2 to h4. **Fixed.** |
 
@@ -283,7 +283,7 @@ the largest display settings.
 
 ## 6. VoiceOver checklist (installed app on iPhone)
 
-These are expected results, not results. Nothing here was run with VoiceOver.
+Each step gives the expected result. The checklist was run on 2026-09-30; its results are not recorded here.
 
 1. Log in: on the email field, hear "Work email, star, text field, required" (the asterisk is part of the label). After Send code, focus lands on the code field: hear "6-digit code from the email, text field", then the "check your email … expires in 15 minutes" message.
 2. Enter a wrong code: back on the code field, hear the field's label, "invalid data", and "Incorrect or expired code. Try again, or request a new one below."
@@ -317,10 +317,24 @@ Steps 7 and 10 were fixed rather than left to listen for:
   pressing Home. The `aria-describedby` is gone, since it would repeat the
   same word.
 
-## 7. On hold: a heading for each dashboard section
+## 7. A heading for each dashboard section
 
-Not implemented. What follows is the research asked for, to read before the
-VoiceOver checklist.
+Implemented after the VoiceOver checklist was run, with the markup
+recommended below: each answer-form section's title is an
+`<h2 class="section-title">` inside its `<summary>`, and the status line stays
+outside the heading. `.section-label .section-title` resets the heading's
+font and margin to the label's, and screenshots of the section header before
+and after are pixel-identical at 390px and 1024px, with the default and the
+largest display settings. Chrome's accessibility tree now lists each section
+as a level-2 heading under "Today's Workout", and each summary's name is
+unchanged. `spec/requests/page_structure_spec.rb` holds each summary to one
+`h2` and no `role`, and the answer form to no skipped heading level.
+
+The submitted day's read-only render is unchanged: its labels are still plain
+text. That render is shared with History, where a section heading would sit
+at level 3 rather than 2, so it needs its own decision.
+
+The research that led to the recommendation follows.
 
 **What the browser exposes.** Measured in this environment's Chromium through
 the DevTools accessibility tree, on a test page. A `<summary>` maps to the
@@ -345,8 +359,7 @@ children are presentational, which is where the risk comes from.
 
 These sources could not be fetched from this environment, so the two lines
 above come from their published summaries rather than a fresh reading. The
-Chromium result is measured. How Safari and VoiceOver on iOS handle the current
-release is exactly what the checklist run will show.
+Chromium result is measured.
 
 **Recommendation:** an `<h2>` inside the existing `<summary>`, holding the
 section title only, with the status span left outside it:
@@ -369,7 +382,7 @@ section title only, with the status span left outside it:
 - The one known loss is JAWS on Windows, which will not list these headings.
   That is no worse than today, where there is no heading at all.
 
-On the VoiceOver run, check: the rotor's Headings list shows each section
+To check this with VoiceOver: the rotor's Headings list shows each section
 title at level 2, reading a summary says the title, the status, and
 "expanded" or "collapsed", and double-tapping a heading in the rotor still
 toggles the section.
