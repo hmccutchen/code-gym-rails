@@ -28,6 +28,14 @@
 #       enabled: "ON"
 
 en:
+  learning_track:
+    welcome:
+      title: "Before you start"
+      question: "How much experience do you have as a software engineer?"
+      junior: "Early in my career"
+      junior_hint: "Exercises start at a junior level. As your reviews show you're ready, Code Gym suggests moving each kind of exercise up. You decide each time."
+      experienced: "Experienced"
+      experienced_hint: "Exercises follow the regular difficulty. You can change difficulty per section later in Setup."
   hello: "Hello world"
   providers:
     anthropic: "Claude"

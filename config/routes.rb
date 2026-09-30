@@ -37,6 +37,8 @@ Rails.application.routes.draw do
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
 
+  get "welcome", to: "welcome#show"
+
   # Account page: log out or permanently delete (anonymize) the account.
   # Singular resource — a user has exactly one.
   resource :account, only: [ :show, :destroy ] do

@@ -12,7 +12,9 @@ class ApiKeysController < ApplicationController
   }.freeze
 
   # GET /setup
-  def edit; end
+  def edit
+    redirect_to welcome_path if current_user.first_run?
+  end
 
   # PATCH /setup
   def update

@@ -1,0 +1,49 @@
+<% content_for :title, t("learning_track.welcome.title") %>
+<style>
+  .welcome-wrap { max-width: 480px; margin: 5rem auto; }
+  .welcome-wrap h1 { margin-bottom: .5rem; }
+  .welcome-choice { display: block; width: 100%; text-align: left; margin-top: 1rem; }
+  .welcome-choice .hint { display: block; font-size: .8rem; color: var(--muted); margin-top: .3rem; font-weight: normal; }
+</style>
+
+<div class="welcome-wrap" id="welcome"
+     data-profile-url="<%= profile_path %>"
+     data-setup-url="<%= setup_path %>"
+     data-preset="<%= LearningTrack.preset_levels.to_json %>"
+     data-version="<%= current_user.section_kind_preferences_version %>">
+  <h1><%= t("learning_track.welcome.title") %></h1>
+  <p><%= t("learning_track.welcome.question") %></p>
+
+  <button type="button" class="btn btn-primary welcome-choice" data-track="junior">
+    <%= t("learning_track.welcome.junior") %>
+    <span class="hint"><%= t("learning_track.welcome.junior_hint") %></span>
+  </button>
+  <button type="button" class="btn btn-ghost welcome-choice" data-track="none">
+    <%= t("learning_track.welcome.experienced") %>
+    <span class="hint"><%= t("learning_track.welcome.experienced_hint") %></span>
+  </button>
+</div>
+
+<script>
+  (function () {
+    const box = document.getElementById("welcome");
+    box.querySelectorAll("[data-track]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        box.querySelectorAll("[data-track]").forEach((b) => { b.disabled = true; });
+        const choice = button.dataset.track;
+        const user = choice === "junior"
+          ? { learning_track: "junior",
+              section_kind_levels: JSON.parse(box.dataset.preset),
+              section_kind_preferences_version: Number(box.dataset.version) }
+          : { learning_track: "none" };
+
+        const result = await window.CodeGymSaveStatus.save("PATCH", box.dataset.profileUrl, { user }, "learning_track");
+        if (result && result.ok) {
+          window.location = box.dataset.setupUrl;
+        } else {
+          box.querySelectorAll("[data-track]").forEach((b) => { b.disabled = false; });
+        }
+      });
+    });
+  })();
+</script>
