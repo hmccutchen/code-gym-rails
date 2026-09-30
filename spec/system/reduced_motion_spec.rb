@@ -14,7 +14,8 @@ RSpec.describe "Reduced motion", type: :system do
       document.body.insertAdjacentHTML("beforeend",
         '<span class="spinner" id="t-spinner"></span>' +
         '<button class="btn btn-loading" id="t-loading">Working</button>' +
-        '<div class="pull-refresh is-refreshing is-settling" id="t-pull"><span class="spinner"></span></div>');
+        '<div class="pull-refresh is-refreshing is-settling" id="t-pull"><span class="spinner"></span></div>' +
+        '<div class="pull-settling" id="t-content"></div>');
     JS
   end
 
@@ -22,7 +23,7 @@ RSpec.describe "Reduced motion", type: :system do
     page.evaluate_script(script)
   end
 
-  it "stops the spinners and the pull-to-refresh settle when the OS asks for less motion" do
+  it "stops the spinners and the pull-to-refresh settle, indicator and page content, when the OS asks for less motion" do
     prefer_reduced_motion
     visit_as(user)
     visit learn_path
@@ -32,6 +33,7 @@ RSpec.describe "Reduced motion", type: :system do
     expect(computed("getComputedStyle(document.getElementById('t-loading'), '::before').animationName")).to eq("none")
     expect(computed("getComputedStyle(document.querySelector('#t-pull .spinner')).animationName")).to eq("none")
     expect(computed("getComputedStyle(document.getElementById('t-pull')).transitionDuration")).to eq("0s")
+    expect(computed("getComputedStyle(document.getElementById('t-content')).transitionDuration")).to eq("0s")
   end
 
   it "leaves the motion in place otherwise" do
@@ -44,6 +46,7 @@ RSpec.describe "Reduced motion", type: :system do
     expect(computed("getComputedStyle(document.getElementById('t-loading'), '::before').animationName")).to eq("spin")
     expect(computed("getComputedStyle(document.querySelector('#t-pull .spinner')).animationName")).to eq("spin")
     expect(computed("getComputedStyle(document.getElementById('t-pull')).transitionDuration")).not_to eq("0s")
+    expect(computed("getComputedStyle(document.getElementById('t-content')).transitionDuration")).not_to eq("0s")
   end
 
   it "fills the dashboard progress bar without sliding" do

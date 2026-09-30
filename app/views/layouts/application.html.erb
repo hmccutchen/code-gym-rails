@@ -187,7 +187,7 @@
        after every rule it overrides, since it relies on source order. */
     @media (prefers-reduced-motion: reduce) {
       .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
-      .pull-refresh.is-settling { transition: none; }
+      .pull-refresh.is-settling, .pull-settling { transition: none; }
     }
 
     /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only

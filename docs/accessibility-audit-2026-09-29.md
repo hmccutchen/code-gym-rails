@@ -23,7 +23,7 @@ Every animation and transition in the app:
 | `.spinner` (dashboard "generating" state) | ring spins | stops turning |
 | `.btn-loading::before` (buttons while a request runs) | ring spins | stops turning |
 | `.pull-refresh.is-refreshing .spinner` | ring spins while reloading | stops turning |
-| `.pull-refresh.is-settling` | indicator slides and fades | moves instantly |
+| `.pull-refresh.is-settling`, `.pull-settling` | indicator and page content slide back after a pull | move instantly |
 | `.progress-fill` (dashboard progress bar) | width slides over .3s | changes instantly |
 | Parsons drag (SortableJS `animation: 150`) | blocks slide into place | no slide (`animation: 0`) |
 
