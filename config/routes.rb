@@ -79,6 +79,9 @@ Rails.application.routes.draw do
   # Inline name autosave (JSON)
   patch "profile", to: "profile#update", as: :profile
 
+  # "Not now" on a learning track proposal (JSON).
+  post "learning_track/dismissal", to: "learning_track_dismissals#create", as: :learning_track_dismissal
+
   # Manually re-run today's exercise generation (capped at once/day in the controller)
   post "regenerate", to: "daily_exercises#regenerate"
 

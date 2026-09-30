@@ -40,6 +40,9 @@
 <% if submitted %>
   <%= render "responses/answered_sections", exercise: exercise, response: response %>
   <%= render "responses/submission", response: response %>
+  <% if @track_proposal %>
+    <%= render "dashboard/track_proposal", proposal: @track_proposal %>
+  <% end %>
 <% else %>
   <%= render "shared/syntax_highlighting_script" %>
   <%# Progress bar (sticky so progress stays visible while scrolling the three
