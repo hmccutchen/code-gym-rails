@@ -21,6 +21,21 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
+    # The earlier requests left a code pending, so the page still shows the
+    # code field. The limit is about requesting codes, not the one pending.
+    it "keeps the refused request's message off the pending code field" do
+      5.times do
+        post login_path, params: { email: "dev@example.com", name: "Dev" }
+        follow_redirect!
+      end
+      post login_path, params: { email: "dev@example.com" }
+
+      expect(response).to have_http_status(:too_many_requests)
+      field = Nokogiri::HTML(response.body).at_css("input[name=code]")
+      expect(field["aria-describedby"].split).to eq(%w[pending-message])
+      expect(field["aria-invalid"]).to be_nil
+    end
+
     # Keyed on the address, not the browser: the whole point is to cap how
     # many fresh codes one target can be made to generate.
     it "counts requests for one address across separate sessions" do
@@ -92,6 +107,18 @@ RSpec.describe "Login rate limits", type: :request do
       expect(flash[:alert]).to match(/too many/i)
       expect(response).to have_http_status(:too_many_requests)
       expect(response.body).to include('name="email"')
+    end
+
+    # The refusal is about this form, so the field that takes focus carries
+    # it; nothing was checked, so the code is not marked invalid.
+    it "describes the code field by the refusal without marking the code invalid" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      11.times { post verify_login_code_path, params: { code: "000000" } }
+
+      expect(response).to have_http_status(:too_many_requests)
+      field = Nokogiri::HTML(response.body).at_css("input[name=code]")
+      expect(field["aria-describedby"].split).to eq(%w[flash-alert pending-message])
+      expect(field["aria-invalid"]).to be_nil
     end
   end
 

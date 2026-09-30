@@ -7,7 +7,7 @@
       implement it yet — it is NOT what keeps iOS from zooming on focus.
       That's --input-font-size below, on every focusable control's rule. %>
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
-  <title>Code Gym</title>
+  <title><%= document_title %></title>
   <link rel="manifest" href="<%= pwa_manifest_path %>">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <%# iOS reads the manifest's display:standalone only from 17.4, so
@@ -115,16 +115,27 @@
     nav .nav-toggle { display: none; }
 
     /* Below this width the row cannot hold the brand and four destinations at
-       once, so the destinations fold behind the button and the row keeps the
-       brand whole. Measured in em against the nav's own text, so a larger text
+       once, so the destinations fold behind the button and the brand stays on
+       one line. Measured in em against the nav's own text, so a larger text
        size moves the fold out with it: 37.5em is 600px at the default size. */
     @container (max-width: 37.5em) {
+      /* 44px in px rather than rem: a button that grew with the text size left
+         no room for the logo beside it on a 320px screen. */
       nav .nav-toggle {
         display: flex; flex-direction: column; justify-content: center; gap: 4px;
-        width: 2.5rem; height: 2.5rem; padding: 0 .6rem; flex-shrink: 0;
+        width: 44px; height: 44px; padding: 0 11px; flex-shrink: 0;
         background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
       }
       nav .nav-toggle .bar { height: 2px; background: var(--muted); border-radius: 1px; }
+      /* On the narrowest phones the brand and the button no longer fit side by
+         side. The mark gives up width so the button always stays on screen;
+         the wordmark keeps its size. When the light palette wraps the mark in
+         a picture element, that element is the flex item, so it shrinks and
+         the mark follows it through max-width. */
+      nav .inner { gap: .5rem; }
+      nav .brand { flex-shrink: 1; min-width: 0; }
+      nav .brand > picture { min-width: 0; }
+      nav .brand .brand-mark { min-width: 0; max-width: 100%; object-fit: contain; }
       /* Only .nav-links itself ever carries a display here, never a child: the
          standalone block above hides the name editor through
          `nav .nav-links .name-editor`, and any rule of higher specificity in
@@ -228,7 +239,7 @@
     .hljs-built_in, .hljs-title { color: #7dd3fc; }
     .hljs-variable { color: var(--text); }
     .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .75rem; }
-    .review-block h4 { color: var(--accent-text); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+    .review-block h3 { color: var(--accent-text); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
     .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
     .difficulty-note { font-size: .8rem; line-height: 1.6; color: var(--muted); margin-top: .3rem; }
     .review-item { font-size: .9rem; line-height: 1.7; margin-top: .4rem; }
@@ -243,7 +254,7 @@
     .follow-up-user { color: var(--muted); }
     .follow-up-assistant { border-left-color: var(--accent); }
     .follow-up-form { display: flex; gap: .5rem; flex-wrap: wrap; }
-    .follow-up-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
+    .follow-up-input { flex: 1; min-width: 0; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
     .follow-up-capped { font-size: .78rem; color: var(--muted); font-style: italic; }
     .follow-up-status { font-size: .75rem; color: var(--muted); }
 
@@ -254,8 +265,15 @@
     .duck-user { color: var(--muted); }
     .duck-assistant { border-left-color: var(--accent); }
     .duck-form { display: flex; gap: .5rem; flex-wrap: wrap; }
-    .duck-input { flex: 1; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
+    .duck-input { flex: 1; min-width: 0; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
     .duck-status { display: block; font-size: .75rem; color: var(--muted); margin-top: .4rem; }
+    /* Off screen until focused, so it is the first stop for a keyboard and
+       invisible to everyone else. Fixed, so showing it never shifts the nav. */
+    .skip-link { position: fixed; top: .5rem; left: .5rem; z-index: 30; padding: .6rem 1rem; background: var(--surface); color: var(--accent-text); border: 1px solid var(--accent); border-radius: 6px; transform: translateY(-200%); }
+    .skip-link:focus { transform: none; }
+    /* Focused only as the skip link's target; a ring around the whole page
+       would read as an error. */
+    #main-content:focus { outline: none; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
     /* Shared submission-rendering styles. Used by responses/_section (and the
@@ -269,6 +287,12 @@
     details.section > summary::before { content: "▼ "; }
     details.section:not([open]) > summary::before { content: "▶ "; }
     details.section:not([open]) > summary { margin-bottom: 0; }
+    /* The most-tapped control on the page, so it gets a 44px target. The
+       negative margins give back exactly what the padding adds, so the label
+       stays where it was and the target grows into the space around it. */
+    details.section > summary { padding-block: 12.5px; margin-top: -12.5px; margin-bottom: calc(.95rem - 12.5px); }
+    details.section:not([open]) > summary { margin-bottom: -12.5px; }
+    .section-label .section-title { font: inherit; letter-spacing: inherit; margin: 0; }
     .section-status { font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: auto; }
     .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
     .section-scenario { font-size: .95rem; color: var(--muted); margin-bottom: .75rem; }
@@ -351,7 +375,7 @@
     }
     .gloss-term.gloss-open::after, .gloss-term:focus-visible::after { display: block; }
 
-    .submit-row { display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem; }
+    .submit-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 1.5rem; }
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
     .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
     .review-section { margin-top: 1.5rem; }
@@ -386,6 +410,7 @@
     .learn-entry[hidden] { display: none; }
     .learn-seen { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; }
     .learn-ungenerated { font-size: .75rem; color: var(--muted); }
+    .learn-back { display: inline-block; padding-block: 4px; }
     .learn-intro, .learn-bucket-label, .learn-no-guide, .learn-empty { color: var(--muted); }
     .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
     .learn-prepare { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
@@ -409,7 +434,7 @@
     .rung-bar span { display: block; height: 100%; background: var(--rung); }
     .progress-counts { font-size: .8rem; color: var(--muted); }
     .progress-list { list-style: none; margin: .8rem 0 .2rem; padding: 0; }
-    .progress-entry { display: flex; align-items: baseline; gap: .6rem; padding: .25rem 0; }
+    .progress-entry { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; padding: .25rem 0; }
     .progress-rungs { display: inline-flex; gap: .2rem; }
     .progress-rung { width: .5rem; height: .5rem; border-radius: 999px; border: 1px solid var(--muted); }
     .progress-rung.held { background: var(--rung); border-color: var(--rung); }
@@ -459,6 +484,7 @@
       forward; what it must not grow is the full app nav, which is what would
       turn it into a second app instance. See sessions/verify. %>
   <% unless content_for?(:hide_nav) %>
+  <a class="skip-link" href="#main-content"><%= t("nav.skip_to_content") %></a>
   <nav>
     <div class="container inner">
       <% brand = capture do %><%= brand_mark %><span aria-hidden="true">Code Gym</span><% end %>
@@ -601,14 +627,16 @@
   <% end %>
 
   <div class="container" data-pull-content>
+    <main id="main-content" tabindex="-1">
     <% if flash[:notice] %>
-      <div class="flash notice"><%= flash[:notice] %></div>
+      <div class="flash notice" id="flash-notice"><%= flash[:notice] %></div>
     <% end %>
     <% if flash[:alert] %>
-      <div class="flash alert"><%= flash[:alert] %></div>
+      <div class="flash alert" id="flash-alert"><%= flash[:alert] %></div>
     <% end %>
 
     <%= yield %>
+    </main>
   </div>
   <%# Loading feedback for plain form POSTs. Turbo JS is not loaded in this
       app, so button_to forms are full-page submissions — Turbo attributes

@@ -2,7 +2,7 @@
 <% response.ai_review.each do |section, fb| %>
   <% next unless fb.is_a?(Hash) %>
   <div class="review-block">
-    <h4><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h4>
+    <h3><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h3>
     <%# Directly under the grade badge, because it is context for reading that
         grade and nothing else. Never a badge of its own: a second pill beside
         the first would read as a second score about the engineer, which is the
@@ -66,7 +66,8 @@
       </div>
       <% if asked < DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %>
         <div class="follow-up-form">
-          <input type="text" class="follow-up-input" placeholder="Ask a follow-up about this feedback…"
+          <label class="visually-hidden" for="follow-up-input-<%= response.id %>-<%= section %>">Ask a follow-up about this feedback</label>
+          <input type="text" class="follow-up-input" id="follow-up-input-<%= response.id %>-<%= section %>" placeholder="Ask a follow-up about this feedback…"
                  data-url="<%= follow_ups_response_path(response) %>" data-section="<%= section %>">
           <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
         </div>

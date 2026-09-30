@@ -1465,7 +1465,7 @@ RSpec.describe "Dashboard section folding", type: :request do
 
     body = response.body
     expect(body.scan(/<details class="section"[^>]*\bopen\b/).size).to eq(2)
-    expect(body).to match(%r{<summary[^>]*><span class="section-title">\s*1 — Code Review\s*</span>}m)
+    expect(body).to match(%r{<summary[^>]*><h2 class="section-title">\s*1 — Code Review\s*</h2>}m)
     expect(body).to match(%r{data-status-for="code_review"})
   end
 

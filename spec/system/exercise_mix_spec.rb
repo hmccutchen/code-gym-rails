@@ -55,6 +55,31 @@ RSpec.describe "Exercise mix", type: :system do
     expect(weights_after_save({ "challenge" => 0.25 })).to eq("challenge" => 0.25)
   end
 
+  it "announces a moved slider's stop word as its value" do
+    visit_as(user)
+    visit setup_path
+
+    find("#exercise-mix summary").click
+    find("#weight-challenge").set(0)
+
+    expect(page).to have_css('#weight-challenge[aria-valuetext="Much less"]')
+  end
+
+  # WCAG 2.5.8: a tap on the label toggles the box, so the label is the target.
+  it "gives every checkbox and difficulty radio a label at least 24px tall" do
+    visit_as(user)
+    visit setup_path
+    find("#exercise-mix summary").click
+
+    heights = page.evaluate_script(<<~JS)
+      Array.from(document.querySelectorAll(".mix-exclude, .mix-lock, .mix-difficulty label, label[for=adaptive-set-size]"))
+        .map(label => label.getBoundingClientRect().height)
+    JS
+
+    expect(heights.size).to be > 3
+    expect(heights).to all(be >= 24)
+  end
+
   # The two-tab clobber from the original report. The second tab's save is a
   # write against a version this page has not seen, which is what user.update!
   # produces here — the same bump a real save in another tab makes, without a

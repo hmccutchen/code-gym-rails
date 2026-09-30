@@ -13,7 +13,9 @@
     by hand; nothing folds on its own. The read-only render stays a plain
     div. The label is the summary in both, so the two read the same. It gets
     no glossary terms: a focusable term inside a summary is a control nested in
-    a control, so terms are wrapped in the body text below it instead. %>
+    a control, so terms are wrapped in the body text below it instead. The
+    title is an <h2> so VoiceOver's heading rotor reaches each section; the
+    summary must never take role="button", which would erase that heading. %>
 <% label = capture do %>
   <%= slot %> — <%= t("sections.#{key}.name") %><% if kind.titled_label? %>: <%= data["title"] %><% end %>
 <% end %>
@@ -22,7 +24,7 @@
   <div class="section-label"><%= label %></div>
 <% else %>
 <details class="section" open data-section-fold="<%= key %>">
-  <summary class="section-label"><span class="section-title"><%= label %></span>
+  <summary class="section-label"><h2 class="section-title"><%= label %></h2>
     <span class="section-status" data-status-for="<%= key %>"><%= section_status(response, key) %></span>
   </summary>
 <% end %>

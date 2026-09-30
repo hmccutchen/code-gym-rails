@@ -1,3 +1,4 @@
+<% page_title "Settings" %>
 <style>
   .setup-wrap { max-width: 480px; margin: 5rem auto; }
   .setup-wrap h1 { margin-bottom: .5rem; }
@@ -17,6 +18,9 @@
   .mix-row output { font-size: .8rem; color: var(--muted); }
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
+  /* A tap on the label toggles its box, so the label is the target, and 24px
+     is the WCAG 2.5.8 minimum for it. */
+  .mix-exclude, .mix-lock, .mix-difficulty label, label[for="adaptive-set-size"] { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
   .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
   .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
@@ -127,7 +131,7 @@
             <label for="weight-<%= kind.key %>"><%= t("sections.#{kind.key}.name") %></label>
             <input type="range" id="weight-<%= kind.key %>" min="0" max="<%= KindPreferences::MULTIPLIERS.size - 1 %>" step="1"
                    value="<%= index %>" <%= "disabled" if excluded %>
-                   aria-describedby="weight-label-<%= kind.key %>">
+                   aria-valuetext="<%= t("exercise_mix.stops")[index] %>">
             <output id="weight-label-<%= kind.key %>"><%= t("exercise_mix.stops")[index] %></output>
             <label class="mix-exclude" for="exclude-<%= kind.key %>">
               <input type="checkbox" id="exclude-<%= kind.key %>" class="mix-exclude-box" <%= "checked" if excluded %>>
@@ -172,6 +176,13 @@
       const STOPS  = <%= raw KindPreferences::MULTIPLIERS.to_json %>;
       const DEFAULT_STOP = <%= raw KindPreferences::DEFAULT_MULTIPLIER.to_json %>;
       const LABELS = <%= raw t("exercise_mix.stops").to_json %>;
+      // aria-valuetext is what a screen reader reads as the slider's value;
+      // without it the stop word is lost and only the index is announced.
+      const showStop = (slider, output) => {
+        const stopLabel = LABELS[Number(slider.value)];
+        output.textContent = stopLabel;
+        slider.setAttribute("aria-valuetext", stopLabel);
+      };
       const mix    = document.getElementById("exercise-mix");
 
       if (mix) {
@@ -271,7 +282,7 @@
             const index = STOPS.indexOf(stop);
 
             slider.value = index === -1 ? STOPS.indexOf(DEFAULT_STOP) : index;
-            row.querySelector("output").textContent = LABELS[Number(slider.value)];
+            showStop(slider, row.querySelector("output"));
             box.checked = excluded.indexOf(kind) !== -1;
             slider.disabled = box.checked;
           });
@@ -345,7 +356,7 @@
           const label = row.querySelector("output");
 
           slider.addEventListener("input", () => {
-            label.textContent = LABELS[Number(slider.value)];
+            showStop(slider, label);
             saveMix();
           });
 
