@@ -7,7 +7,9 @@
               applied_text: t("learning_track.proposal.applied"),
               dismissed_text: t("learning_track.proposal.dismissed") } do %>
   <% if proposal.basis == :led %>
-    <p><%= t("learning_track.proposal.led_heading", kind: name.call(ExerciseSection.learning_track_lead.key)) %></p>
+    <% lead = ExerciseSection.learning_track_lead.key %>
+    <p><%= t("learning_track.proposal.led_heading", kind: name.call(lead),
+             level: t("exercise_mix.levels.#{current_user.section_kind_levels[lead]}").downcase) %></p>
     <ul>
       <% proposal.steps.each do |step| %>
         <li data-step data-kind="<%= step.kind %>" data-to="<%= step.to %>">

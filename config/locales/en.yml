@@ -32,7 +32,7 @@ en:
     proposal:
       own: "Your last three %{kind} sections were reviewed solid or better and none felt too hard. Move %{kind} up to senior?"
       struggling: "Most of your recent %{kind} sections at senior felt too hard. Move %{kind} back to junior?"
-      led_heading: "Your %{kind} sections moved up to senior. These can move up with them:"
+      led_heading: "Your %{kind} sections are now set to %{level}. These can move up to senior:"
       led_no_results: "%{kind} — not enough sections to judge on its own yet"
       led_with_results: "%{kind} — none of your recent sections felt too hard"
       remove: "Keep at junior"
