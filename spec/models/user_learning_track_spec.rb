@@ -1,8 +1,11 @@
 require "rails_helper"
 
 RSpec.describe User, "learning track", type: :model do
+  # Whole seconds, like the real constant. Linux clocks carry nanoseconds and
+  # a stored timestamp keeps only microseconds, so an account created "at" an
+  # unrounded value would read back as created just before it.
   def new_account(**attrs)
-    stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago)
+    stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago.floor)
     User.create!({ email: "new-#{SecureRandom.hex(3)}@example.com", name: "New", time_zone: "UTC" }.merge(attrs))
   end
 
