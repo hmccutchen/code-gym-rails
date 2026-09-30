@@ -23,6 +23,11 @@ module ViewStyles
     style_blocks(source).flat_map { |css| rules_in(css.gsub(%r{/\*.*?\*/}m, "")) }
   end
 
+  # The same, for a plain .css file rather than a view's <style> blocks.
+  def stylesheet_rules(path)
+    rules_in(File.read(path).gsub(%r{/\*.*?\*/}m, ""))
+  end
+
   # Walks the braces, keeping the enclosing at-rule preludes so a rule inside
   # `@media (prefers-reduced-motion: reduce)` knows it is there.
   def rules_in(css)
@@ -48,9 +53,11 @@ module ViewStyles
     rules
   end
 
-  # The custom properties the layout's :root block declares, as name => value.
-  def root_variables(source)
-    root = rules(source).find { |rule| rule.selectors == [ ":root" ] && rule.media.empty? }
+  # The custom properties a :root block declares, as name => value. Takes a
+  # view's source, or rules already read from a stylesheet.
+  def root_variables(source_or_rules)
+    all = source_or_rules.is_a?(String) ? rules(source_or_rules) : source_or_rules
+    root = all.find { |rule| rule.selectors == [ ":root" ] && rule.media.empty? }
     root.declarations.scan(/--([\w-]+)\s*:\s*([^;]+)/).to_h { |name, value| [ name, value.strip ] }
   end
 end

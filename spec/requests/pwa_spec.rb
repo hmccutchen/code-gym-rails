@@ -93,11 +93,12 @@ RSpec.describe "PWA", type: :request do
     # it stays an element of its own, apart from the wordmark, so a future
     # squeeze can hide either one with a stylesheet. Its alt text names the
     # brand, so the wordmark is hidden from screen readers rather than read
-    # twice. This is the logged-out brand; dashboard_spec's "brand title link"
-    # covers the linked one.
+    # twice. This is the logged-out brand, which follows the device theme and
+    # so sits in a <picture> with a light source; dashboard_spec's "brand title
+    # link" covers the linked one.
     it "keeps the brand's logo separately addressable from the wordmark" do
       expect(response.body).to match(
-        %r{<span class="brand"><img alt="Code Gym" class="brand-mark"[^>]*/><span aria-hidden="true">Code Gym</span></span>}
+        %r{<span class="brand"><picture><source [^>]*><img alt="Code Gym" class="brand-mark"[^>]*/></picture><span aria-hidden="true">Code Gym</span></span>}
       )
     end
   end

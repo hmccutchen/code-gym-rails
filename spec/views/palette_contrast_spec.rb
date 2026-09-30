@@ -1,13 +1,15 @@
 require "rails_helper"
 
-# The layout's shared colors against every background they sit on, read from
-# the stylesheet itself so a palette edit is checked against the values that
-# actually ship. WCAG AA: 4.5:1 for text, 3:1 for a focus indicator.
-# docs/accessibility-audit-2026-09-29.md has the audit these pairs come from.
+# The shared colors against every background they sit on, read from the
+# stylesheets themselves so a palette edit is checked against the values that
+# actually ship. WCAG AA: 4.5:1 for text, 3:1 for a focus indicator or a
+# field's border. The dark palette is the layout's :root; the light one is
+# display_light.css layered over it, the way the browser applies it.
+# docs/accessibility-audit-2026-09-29.md has the audit the dark pairs come from.
 RSpec.describe "palette contrast" do
   let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
-  let(:vars) { ViewStyles.root_variables(layout) }
   let(:rules) { ViewStyles.rules(layout) }
+  let(:light_rules) { ViewStyles.stylesheet_rules(Rails.root.join("app/assets/stylesheets/display_light.css")) }
 
   def rgb(color)
     if (hex = color[/\A#(\h{3}|\h{6})\z/, 1])
@@ -37,16 +39,20 @@ RSpec.describe "palette contrast" do
     (lighter + 0.05) / (darker + 0.05)
   end
 
-  def background_of(selector)
-    rules.find { |rule| rule.selectors.include?(selector) }.declaration("background")
+  def declared(rule_list, selector, property)
+    rule_list.find { |rule| rule.selectors.include?(selector) }.declaration(property)
   end
 
-  let(:text_backgrounds) do
+  def background_of(selector)
+    declared(rules, selector, "background")
+  end
+
+  def text_backgrounds(vars, code_background)
     review_block = over(background_of(".review-block"), vars["surface"])
     {
       "page" => vars["bg"],
       "surface" => vars["surface"],
-      "code and fields" => background_of("pre.snippet"),
+      "code and fields" => code_background,
       "why-box" => over(background_of(".why-box"), vars["surface"]),
       "review block" => review_block,
       "rating pill on the surface" => over(background_of(".review-rating"), vars["surface"]),
@@ -54,26 +60,75 @@ RSpec.describe "palette contrast" do
     }
   end
 
-  %w[text accent-text muted].each do |name|
-    it "keeps --#{name} at 4.5:1 or more on every background it sits on" do
-      ratios = text_backgrounds.transform_values { |background| contrast(vars[name], background).round(2) }
+  def ratios(color, backgrounds)
+    backgrounds.transform_values { |background| contrast(color, background).round(2) }
+  end
 
-      expect(ratios.values).to all(be >= 4.5), ratios.inspect
+  shared_examples "an accessible palette" do
+    %w[text accent-text muted].each do |name|
+      it "keeps --#{name} at 4.5:1 or more on every background it sits on" do
+        result = ratios(vars[name], text_backgrounds(vars, code_background))
+
+        expect(result.values).to all(be >= 4.5), result.inspect
+      end
+    end
+
+    it "keeps white text at 4.5:1 or more on the button fill, at rest and on hover" do
+      expect(contrast("#ffffff", vars["button-bg"])).to be >= 4.5
+      expect(contrast("#ffffff", vars["button-bg-hover"])).to be >= 4.5
+    end
+
+    it "keeps the focus ring at 3:1 or more against the backgrounds around a field" do
+      [ vars["bg"], vars["surface"], code_background ].each do |background|
+        expect(contrast(vars["focus-ring"], background)).to be >= 3
+      end
+    end
+
+    it "keeps --muted visibly dimmer than body text" do
+      expect(contrast(vars["text"], vars["muted"])).to be >= 1.5
     end
   end
 
-  it "keeps white text at 4.5:1 or more on the button fill, at rest and on hover" do
-    expect(contrast("#ffffff", vars["button-bg"])).to be >= 4.5
-    expect(contrast("#ffffff", vars["button-bg-hover"])).to be >= 4.5
+  context "dark, the default" do
+    let(:vars) { ViewStyles.root_variables(layout) }
+    let(:code_background) { background_of("pre.snippet") }
+
+    it_behaves_like "an accessible palette"
   end
 
-  it "keeps the focus ring at 3:1 or more against the backgrounds around a field" do
-    [ vars["bg"], vars["surface"], background_of("pre.snippet") ].each do |background|
-      expect(contrast(vars["focus-ring"], background)).to be >= 3
+  context "light" do
+    let(:vars) { ViewStyles.root_variables(layout).merge(ViewStyles.root_variables(light_rules)) }
+    let(:code_background) { vars["code-bg"] }
+
+    it_behaves_like "an accessible palette"
+
+    it "keeps the status colors at 4.5:1 or more, including on their own tinted flash" do
+      backgrounds = text_backgrounds(vars, code_background)
+      %w[green red].each do |name|
+        backgrounds["#{name} flash"] = over(declared(rules, ".flash.#{name == 'green' ? 'notice' : 'alert'}", "background"), vars["bg"])
+      end
+
+      %w[green red yellow].each do |name|
+        result = ratios(vars[name], backgrounds)
+        expect(result.values).to all(be >= 4.5), "#{name}: #{result.inspect}"
+      end
     end
-  end
 
-  it "keeps --muted visibly dimmer than body text" do
-    expect(contrast(vars["text"], vars["muted"])).to be >= 1.5
+    it "keeps a field's border at 3:1 or more, since the border is what marks the field" do
+      [ vars["bg"], vars["surface"], code_background ].each do |background|
+        expect(contrast(vars["field-border"], background)).to be >= 3
+      end
+    end
+
+    it "keeps the two literal highlighting colors at 4.5:1 or more on code" do
+      %w[.hljs-symbol .hljs-built_in].each do |selector|
+        color = light_rules.find { |rule| rule.selectors.any? { |s| s.include?(selector) } }.declaration("color")
+        expect(contrast(color, code_background)).to be >= 4.5
+      end
+    end
+
+    it "gives iOS and Android the light surface as the theme color" do
+      expect(DisplayPreferences::THEME_COLORS["light"]).to eq(vars["surface"])
+    end
   end
 end

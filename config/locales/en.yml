@@ -171,6 +171,35 @@ en:
       - "Default"
       - "More"
       - "Much more"
+  display:
+    summary: "Display"
+    intro: "How pages look for you. Each change applies right away and is saved."
+    theme:
+      legend: "Theme"
+      hint: "In the installed app, the bar at the top of the screen changes after you fully close the app and open it again."
+      options:
+        dark: "Dark"
+        light: "Light"
+        device: "Match my device"
+    text_size:
+      legend: "Text size"
+      options:
+        "100": "100%"
+        "112": "112%"
+        "125": "125%"
+        "140": "140%"
+    line_spacing:
+      legend: "Line spacing"
+      options:
+        default: "Default"
+        relaxed: "Relaxed"
+        loose: "Loose"
+    font:
+      legend: "Reading font"
+      hint: "Used for problems, hints, reviews, references and Learn pages. Code keeps its monospace font."
+      options:
+        default: "Default"
+        atkinson: "Atkinson Hyperlegible"
   sections:
     code_review:
       name: "Code Review"

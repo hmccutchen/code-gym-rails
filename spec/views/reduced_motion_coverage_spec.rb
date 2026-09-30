@@ -56,8 +56,9 @@ RSpec.describe "reduced motion coverage" do
     expect(unhandled_motion(source)).to eq([ "animation: 150," ])
   end
 
-  Rails.root.glob("app/views/**/*.erb").each do |view|
-    source = view.read
+  # A stylesheet is read as if it were one <style> block in a view.
+  Rails.root.glob("{app/views/**/*.erb,app/assets/stylesheets/*.css}").each do |view|
+    source = view.extname == ".css" ? "<style>#{view.read}</style>" : view.read
     next unless source.match?(MOTION)
 
     it "gives every motion in #{view.relative_path_from(Rails.root)} a reduced-motion rule" do

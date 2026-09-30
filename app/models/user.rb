@@ -33,6 +33,9 @@ class User < ApplicationRecord
   validate :section_kind_levels_name_section_kinds,      if: :section_kind_levels_changed?
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
   validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
+  validate :display_preferences_name_known_options, if: :display_preferences_changed?
+
+  normalizes :display_preferences, with: ->(values) { DisplayPreferences.sparse(values) }
 
   before_save { email.downcase! }
 
@@ -663,6 +666,10 @@ class User < ApplicationRecord
     (locked_section_kinds - section_kind_levels.keys).each do |key|
       errors.add(:locked_section_kinds, "locks #{key} without a difficulty target")
     end
+  end
+
+  def display_preferences_name_known_options
+    DisplayPreferences.problems_with(display_preferences).each { |problem| errors.add(:display_preferences, problem) }
   end
 
   # Derived from the slot roster rather than naming third and fourth, so a

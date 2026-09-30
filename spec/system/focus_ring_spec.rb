@@ -76,10 +76,21 @@ RSpec.describe "Focus ring", type: :system do
     expect(ring_pixels_around_focused_slider).to be > 20
   end
 
-  it "rings the login fields" do
+  # Login has no stored preference and follows the device, so each palette's
+  # ring is checked under the scheme that selects it.
+  it "rings the login fields in the dark palette" do
+    page.driver.with_playwright_page { |pw| pw.emulate_media(colorScheme: "dark") }
     visit login_path
     tab_to("input[type='email']")
 
     expect(outline_of_focused).to eq([ "solid", "2px", ring_color, "2px" ])
+  end
+
+  it "rings the login fields in the light palette when the device asks for it" do
+    page.driver.with_playwright_page { |pw| pw.emulate_media(colorScheme: "light") }
+    visit login_path
+    tab_to("input[type='email']")
+
+    expect(outline_of_focused).to eq([ "solid", "2px", "rgb(75, 55, 194)", "2px" ])
   end
 end

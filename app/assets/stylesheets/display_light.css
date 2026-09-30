@@ -1,0 +1,39 @@
+/* The light theme. Its <link> carries the media attribute that decides where
+   it applies (DisplayPreferences#light_palette_media): "all" for Light, the
+   prefers-color-scheme query for Match my device, "not all" otherwise. So the
+   rules here are unscoped and stated once for both.
+
+   The same variables as the layout's :root, then the layout's hardcoded dark
+   colors by selector. Those overrides are prefixed with `html` so they also
+   beat the per-page <style> blocks, which come later in the document.
+   spec/views/palette_contrast_spec.rb holds every text color here to WCAG AA
+   on the backgrounds it sits on. */
+:root {
+  color-scheme: light;
+  --bg: #f5f5fa; --surface: #ffffff; --border: #d6d6e4;
+  --accent: #5b47d6; --text: #1c1c2e; --muted: #5b5b70;
+  --accent-text: #4b37c2;
+  --button-bg: #5b47d6; --button-bg-hover: #4a37bd;
+  --focus-ring: #4b37c2;
+  --green: #116530; --red: #b42318; --yellow: #8a5a00;
+  --code-bg: #f0f0f6;
+  /* Form fields are identified by their border, so it has to reach 3:1. */
+  --field-border: #7a7a92;
+}
+
+html :is(pre.snippet, .plan-excerpt, .problem-statement, .pseudocode-code pre, .ref-body,
+  .answer-display, textarea.answer),
+html .gloss-term::after { background: var(--code-bg); }
+
+/* Not while focused, so each page's own accent border on focus still shows. */
+html :is(textarea, select, .form-field input:not([type="checkbox"], [type="radio"], [type="range"]),
+  .duck-input, .follow-up-input, .learn-filter input[type="search"]):not(:focus) { border-color: var(--field-border); }
+
+html :is(.hljs-symbol, .hljs-attr, .hljs-params) { color: #6d28d9; }
+html :is(.hljs-built_in, .hljs-title) { color: #0b6394; }
+
+html .rung-principal_engineer { --rung: var(--accent); }
+html .rung-senior { --rung: #15803d; }
+html .rung-junior { --rung: #16a34a; }
+
+html .save-status { box-shadow: 0 4px 16px rgba(0, 0, 0, .15); }
