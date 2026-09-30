@@ -133,6 +133,29 @@ RSpec.describe "Sessions", type: :request do
       expect(user.reload.login_code_digest).to be_nil
     end
 
+    # The code field takes focus when the page loads, so a screen reader
+    # starts there and never reaches the flash above it on its own.
+    it "describes the code field by the error after a wrong code, and marks it invalid" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      follow_redirect!
+      post verify_login_code_path, params: { code: wrong_code_for(User.find_by!(email: "dev@example.com").generate_login_code!) }
+
+      field = Nokogiri::HTML(response.body).at_css("input[name=code]")
+      expect(Nokogiri::HTML(response.body).at_css("#flash-alert").text).to match(/incorrect or expired/i)
+      expect(field["aria-describedby"].split).to eq(%w[flash-alert pending-message])
+      expect(field["aria-invalid"]).to eq("true")
+    end
+
+    it "describes the code field by the expiry notice after a code is sent" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      follow_redirect!
+
+      field = Nokogiri::HTML(response.body).at_css("input[name=code]")
+      expect(Nokogiri::HTML(response.body).at_css("#flash-notice").text).to match(/expires in/i)
+      expect(field["aria-describedby"].split).to eq(%w[flash-notice pending-message])
+      expect(field["aria-invalid"]).to be_nil
+    end
+
     it "returns nil-equivalent (no session) when there is no pending login in this browser" do
       post verify_login_code_path, params: { code: "123456" }
 
