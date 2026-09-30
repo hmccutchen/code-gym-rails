@@ -47,6 +47,14 @@ RSpec.describe "Pull to refresh", type: :system do
     page.evaluate_script("document.getElementById('pull-refresh').#{script}")
   end
 
+  def content(script)
+    page.evaluate_script("document.querySelector('[data-pull-content]').#{script}")
+  end
+
+  def top_of(selector)
+    page.evaluate_script("document.querySelector('#{selector}').getBoundingClientRect().top")
+  end
+
   def mark_page
     page.execute_script("window.__beforePull = true")
   end
@@ -75,7 +83,40 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(page).to have_current_path(learn_path)
   end
 
-  it "cancels a pull released before the threshold, putting the indicator away" do
+  it "drags the page content down under a nav that stays put, revealing the spinner between them" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+    nav_top = top_of("body > nav")
+    content_top = top_of("[data-pull-content]")
+
+    touch([ [ "touchstart", 100 ], [ "touchmove", 200 ], [ "touchmove", 300 ] ])
+
+    expect(top_of("body > nav")).to eq(nav_top)
+    expect(top_of("[data-pull-content]")).to be > content_top + 60
+    spinner = page.evaluate_script("document.getElementById('pull-refresh').getBoundingClientRect().toJSON()")
+    expect(spinner["top"]).to be >= page.evaluate_script("document.querySelector('body > nav').getBoundingClientRect().bottom")
+    expect(spinner["bottom"]).to be <= top_of("[data-pull-content]")
+    expect(indicator("classList.contains('is-ready')")).to be(true)
+  end
+
+  it "resists the pull the further it goes, like a native rubber band" do
+    launch_standalone
+    visit_as(user)
+    visit learn_path
+
+    rest = top_of("[data-pull-content]")
+    touch([ [ "touchstart", 100 ], [ "touchmove", 200 ] ])
+    after_first_hundred = top_of("[data-pull-content]")
+    touch([ [ "touchmove", 300 ] ])
+    after_second_hundred = top_of("[data-pull-content]")
+    touch([ [ "touchcancel", 300 ] ])
+
+    expect(after_first_hundred - rest).to be < 100
+    expect(after_second_hundred - after_first_hundred).to be < after_first_hundred - rest
+  end
+
+  it "cancels a pull released before the threshold, putting the content back" do
     launch_standalone
     visit_as(user)
     visit learn_path
@@ -86,6 +127,7 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(still_the_same_page?).to be(true)
     expect(indicator("classList.contains('is-ready')")).to be(false)
     expect(indicator("style.transform")).to eq("")
+    expect(content("style.transform")).to eq("")
   end
 
   it "does nothing in a browser tab, which has its own pull to refresh" do
@@ -135,7 +177,7 @@ RSpec.describe "Pull to refresh", type: :system do
     touch([ [ "touchstart", 300, 2 ], [ "touchend", 300 ] ])
 
     expect(indicator("classList.contains('is-ready')")).to be(false)
-    expect(indicator("style.transform")).to eq("")
+    expect(content("style.transform")).to eq("")
     expect(still_the_same_page?).to be(true)
   end
 
@@ -170,7 +212,7 @@ RSpec.describe "Pull to refresh", type: :system do
 
     expect(still_the_same_page?).to be(true)
     expect(indicator("classList.contains('is-refreshing')")).to be(true)
-    expect(indicator("style.transform")).to eq("translateY(24px)")
+    expect(content("style.transform")).to eq("translateY(64px)")
 
     page.execute_script("window.__saving = false")
 
@@ -179,7 +221,7 @@ RSpec.describe "Pull to refresh", type: :system do
 
   # The page the spinner was drawn on is replaced by the reload, so the new
   # page has to pick the spinner up for the refresh to read as one.
-  it "opens the reloaded page with the spinner turning, then tucks it away" do
+  it "opens the reloaded page with the content held down and the spinner turning, then settles" do
     launch_standalone
     visit_as(user)
     visit learn_path
@@ -188,8 +230,10 @@ RSpec.describe "Pull to refresh", type: :system do
     visit learn_path
 
     expect(indicator("classList.contains('is-refreshing')")).to be(true)
+    expect(content("style.transform")).to eq("translateY(64px)")
     Timeout.timeout(5) { sleep 0.1 while indicator("classList.contains('is-refreshing')") }
     expect(indicator("style.transform")).to eq("")
+    expect(content("style.transform")).to eq("")
     expect(page.evaluate_script("sessionStorage.getItem('codegym:pull-refreshed') === null")).to be(true)
   end
 
