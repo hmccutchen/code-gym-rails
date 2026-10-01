@@ -46,7 +46,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(response).to have_http_status(:ok)
       expect(user.reload.learning_track).to eq("none")
       expect(user.attributes.except("learning_track", "updated_at")).to eq(original)
-      expect(response.parsed_body).to eq("name" => user.name, "time_zone" => "UTC", "adaptive_set_size" => true)
+      expect(response.parsed_body).to eq("name" => user.name, "time_zone" => "UTC", "daily_section_count" => nil)
     end
 
     it "refuses Junior without levels, saving nothing" do
@@ -148,7 +148,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
     end
 
     it "refuses Junior when another tab recorded Experienced first" do
-      allow_any_instance_of(ProfileController).to receive(:invalid_adaptive_set_size?).and_wrap_original do |original, *args|
+      allow_any_instance_of(ProfileController).to receive(:invalid_daily_section_count?).and_wrap_original do |original, *args|
         User.find(user.id).update_column(:learning_track, "none")
         original.call(*args)
       end

@@ -17,7 +17,7 @@ RSpec.describe "Profile", type: :request do
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).to eq("name" => "Renamed", "time_zone" => "UTC", "adaptive_set_size" => true)
+      expect(JSON.parse(response.body)).to eq("name" => "Renamed", "time_zone" => "UTC", "daily_section_count" => nil)
       expect(user.reload.name).to eq("Renamed")
     end
 
@@ -206,7 +206,7 @@ RSpec.describe "Profile", type: :request do
 
         patch_profile(name: "Renamed")
 
-        expect(response.parsed_body.keys).to contain_exactly("name", "time_zone", "adaptive_set_size")
+        expect(response.parsed_body.keys).to contain_exactly("name", "time_zone", "daily_section_count")
       end
 
       # Deliberate coupling: weights and difficulty share one version, so a
@@ -368,43 +368,65 @@ RSpec.describe "Profile", type: :request do
     end
   end
 
-  describe "PATCH /profile with the adaptive set size preference" do
-    it "saves the preference and echoes it back" do
-      login_as(user)
-
+  describe "PATCH /profile with the Daily sections setting" do
+    def save_daily_sections(value)
       patch profile_path,
-            params: { user: { adaptive_set_size: false } }.to_json,
+            params: { user: { daily_section_count: value } }.to_json,
             headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
-
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["adaptive_set_size"]).to be(false)
-      expect(user.reload.adaptive_set_size).to be(false)
     end
 
-    # The column is NOT NULL and Active Record's cast turns "" and null into
-    # nil, so without a boundary check these are a 500 rather than a rejection.
-    it "rejects a value that is not a boolean instead of crashing or guessing" do
+    it "saves each fixed count and echoes it back" do
       login_as(user)
 
-      [ nil, "", "banana", 2 ].each do |value|
-        patch profile_path,
-              params: { user: { adaptive_set_size: value } }.to_json,
-              headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      User::DAILY_SECTION_COUNTS.each do |count|
+        save_daily_sections(count.to_s)
 
-        expect(response).to have_http_status(:unprocessable_content), "#{value.inspect} was accepted"
-        expect(user.reload.adaptive_set_size).to be(true)
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body["daily_section_count"]).to eq(count)
+        expect(user.reload.daily_section_count).to eq(count)
       end
     end
 
-    it "still accepts the string forms a form post would send" do
+    it "accepts a count sent as a JSON number" do
       login_as(user)
 
-      patch profile_path,
-            params: { user: { adaptive_set_size: "0" } }.to_json,
-            headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
+      save_daily_sections(3)
 
       expect(response).to have_http_status(:ok)
-      expect(user.reload.adaptive_set_size).to be(false)
+      expect(user.reload.daily_section_count).to eq(3)
+    end
+
+    it "saves automatic as no fixed count" do
+      user.update!(daily_section_count: 3)
+      login_as(user)
+
+      save_daily_sections("automatic")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["daily_section_count"]).to be_nil
+      expect(user.reload.daily_section_count).to be_nil
+    end
+
+    # Active Record's integer cast turns "", "abc" and null into nil, which
+    # here means Automatic, and "2.5" into 2, so each would otherwise save a
+    # choice the request never made.
+    it "refuses anything else and changes nothing" do
+      user.update!(daily_section_count: 3)
+      login_as(user)
+
+      [ "abc", "", nil, "1", "5", "2.5", 2.5, 1, 5, "Automatic", [ 2 ], { "count" => 2 } ].each do |value|
+        save_daily_sections(value)
+
+        expect(response).to have_http_status(:unprocessable_content), "#{value.inspect} was accepted"
+        expect(response.parsed_body["errors"]).to be_present
+        expect(user.reload.daily_section_count).to eq(3)
+      end
+    end
+
+    it "leaves the preference version alone, since the setting is not part of the Exercise mix" do
+      login_as(user)
+
+      expect { save_daily_sections("2") }.not_to(change { user.reload.section_kind_preferences_version })
     end
   end
 

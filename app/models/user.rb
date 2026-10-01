@@ -9,10 +9,17 @@ class User < ApplicationRecord
   # credentials to be set (standard Rails setup).
   encrypts :api_key
 
+  # Old code keeps serving while the pre-deploy migration runs, so the column
+  # stays until a later migration drops it.
+  self.ignored_columns += [ "adaptive_set_size" ]
+
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = %w[beginner developing solid strong].freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
+
+  # nil is Automatic: SectionCount sizes the day from recent completion.
+  DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
@@ -21,6 +28,7 @@ class User < ApplicationRecord
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
   validates :learning_track, inclusion: { in: LearningTrack::VALUES }, allow_nil: true
+  validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS }, allow_nil: true
   validate :time_zone_must_be_loadable
   # Only on change, because these read a registry that moves. Unconditional,
   # a kind retired from ExerciseSection would make every user still naming it

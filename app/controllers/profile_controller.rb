@@ -7,7 +7,7 @@ class ProfileController < ApplicationController
 
   # PATCH /profile — inline profile autosave (JSON)
   def update
-    return render_invalid_boolean   if invalid_adaptive_set_size?
+    return render_invalid_daily_section_count if invalid_daily_section_count?
     return render_invalid_weight    if invalid_section_kind_weights?
     return render_invalid_exclusion if invalid_excluded_section_kinds?
     return render_invalid_level     if invalid_section_kind_levels?
@@ -30,23 +30,24 @@ class ProfileController < ApplicationController
 
   private
 
-  # adaptive_set_size backs a `null: false` column, and Active Record's cast is
-  # too forgiving for a request boundary: "" and null become nil (a 500 from
-  # the database), and any other string — "banana" included — becomes true,
-  # silently flipping the preference a malformed request got wrong. Only these
-  # literal values are accepted.
-  BOOLEAN_VALUES = [ true, false, "true", "false", "1", "0", 1, 0 ].freeze
+  # Active Record's integer cast is too forgiving for a request boundary: "",
+  # null and "abc" become nil, which means Automatic, and "2.5" becomes 2, so a
+  # malformed request would save a choice it never made. Only the literal
+  # "automatic" or a listed count, as a number or its string, is accepted.
+  AUTOMATIC_SECTION_COUNT = "automatic".freeze
+  DAILY_SECTION_COUNT_VALUES = [ AUTOMATIC_SECTION_COUNT,
+                                 *User::DAILY_SECTION_COUNTS, *User::DAILY_SECTION_COUNTS.map(&:to_s) ].freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
 
-  def invalid_adaptive_set_size?
+  def invalid_daily_section_count?
     user_params = params.require(:user)
 
-    user_params.key?(:adaptive_set_size) &&
-      BOOLEAN_VALUES.exclude?(user_params[:adaptive_set_size])
+    user_params.key?(:daily_section_count) &&
+      DAILY_SECTION_COUNT_VALUES.exclude?(user_params[:daily_section_count])
   end
 
-  def render_invalid_boolean
-    render json: { errors: [ "Adaptive set size must be true or false" ] },
+  def render_invalid_daily_section_count
+    render json: { errors: [ "Daily sections must be #{AUTOMATIC_SECTION_COUNT} or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}" ] },
            status: :unprocessable_content
   end
 
@@ -234,7 +235,7 @@ class ProfileController < ApplicationController
   # the body every other caller sees is byte-identical to before.
   def saved_body
     body = { name: current_user.name, time_zone: current_user.time_zone,
-             adaptive_set_size: current_user.adaptive_set_size }
+             daily_section_count: current_user.daily_section_count }
     return body unless preference_update?
 
     body.merge(section_kind_preferences_version: current_user.section_kind_preferences_version,
@@ -247,12 +248,13 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size, :learning_track, :skill_level,
+    permitted = params.require(:user).permit(:name, :time_zone, :daily_section_count, :learning_track, :skill_level,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
+    permitted[:daily_section_count] = nil if permitted[:daily_section_count] == AUTOMATIC_SECTION_COUNT
     # permit(x: {}) yields Parameters, which a jsonb column cannot serialize.
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)

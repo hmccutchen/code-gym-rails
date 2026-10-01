@@ -20,17 +20,17 @@
   .mix-exclude { font-size: .8rem; color: var(--muted); }
   /* A tap on the label toggles its box, so the label is the target, and 24px
      is the WCAG 2.5.8 minimum for it. */
-  .mix-exclude, .mix-lock, .mix-difficulty label, label[for="adaptive-set-size"] { min-height: 24px; }
+  .mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
   .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
   .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
   .mix-difficulty label { margin-bottom: 0; }
   .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
   .mix-coverage { flex-basis: 100%; margin-top: 0; }
-  .display-group { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
-  .display-group legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
-  .display-group label { margin-bottom: 0; color: var(--text); }
-  .display-hint { flex-basis: 100%; margin-top: 0; }
+  .display-group, .daily-sections { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
+  .display-group legend, .daily-sections legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
+  .display-group label, .daily-sections label { margin-bottom: 0; color: var(--text); }
+  .display-hint, .daily-sections .hint { flex-basis: 100%; margin-top: 0; }
 </style>
 
 <div class="setup-wrap">
@@ -76,11 +76,20 @@
   </div>
 
   <div class="form-field">
-    <label for="adaptive-set-size">
-      <%= check_box_tag "adaptive_set_size", "1", current_user.adaptive_set_size, id: "adaptive-set-size" %>
-      Adjust set size to my recent completion
-    </label>
-    <p class="hint">Shorter sets after days you don't finish, back to a full set as you do. Off means always a full set.</p>
+    <fieldset class="daily-sections" id="daily-sections">
+      <legend><%= t("daily_sections.legend") %></legend>
+      <label>
+        <input type="radio" name="daily_section_count" value="automatic" <%= "checked" if current_user.daily_section_count.nil? %>>
+        <%= t("daily_sections.automatic") %>
+      </label>
+      <% User::DAILY_SECTION_COUNTS.each do |count| %>
+        <label>
+          <input type="radio" name="daily_section_count" value="<%= count %>" <%= "checked" if current_user.daily_section_count == count %>>
+          <%= count %>
+        </label>
+      <% end %>
+      <p class="hint"><%= t("daily_sections.hint") %></p>
+    </fieldset>
   </div>
 
   <div class="form-field">
@@ -191,8 +200,23 @@
       const tz = document.getElementById("tz-select");
       if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
 
-      const adaptive = document.getElementById("adaptive-set-size");
-      if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }, "adaptive_set_size"));
+      // Chained like the skill level below, so a slow older save cannot land
+      // last and store a count the page no longer shows.
+      const dailySections = document.getElementById("daily-sections");
+      if (dailySections) {
+        let sectionSaves = Promise.resolve();
+        let queuedSectionSaves = 0;
+        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSectionSaves > 0));
+
+        dailySections.addEventListener("change", (event) => {
+          const count = event.target.value;
+          queuedSectionSaves++;
+          sectionSaves = sectionSaves.then(async () => {
+            await save({ daily_section_count: count }, "daily_section_count");
+            queuedSectionSaves--;
+          });
+        });
+      }
 
       // Chained like the Exercise mix's saves: sent in parallel, a slow older
       // request could land last and store a level the page no longer shows.

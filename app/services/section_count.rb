@@ -13,8 +13,8 @@ class SectionCount
   # An early return, not a default fed through the rule below: with no path
   # from the sizing logic to the result, the override stays correct if that
   # logic is later rewritten.
-  def self.for(history, adaptive: true)
-    return ceiling unless adaptive
+  def self.for(history, fixed: nil)
+    return fixed if fixed
 
     window = capped_window(history)
     return ceiling if window.size < MIN_SESSIONS

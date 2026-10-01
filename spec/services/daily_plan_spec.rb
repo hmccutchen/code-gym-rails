@@ -38,7 +38,7 @@ RSpec.describe DailyPlan do
 
   describe "retention check selection" do
     it "releases the fourth slot after a skipped due check and leaves a not-yet-due repeat unchanged" do
-      user.update!(adaptive_set_size: false)
+      user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       first, second = AiService::PLAN_REVIEW_CONCEPTS.first(2)
       held = user.concept_masteries.create!(concept: first, language: "plan_review",
@@ -553,13 +553,21 @@ RSpec.describe DailyPlan do
     end
   end
 
-  describe "adaptive_set_size off" do
+  describe "the Daily sections setting" do
     # A user with no history already gets the full set through SectionCount's
     # own MIN_SESSIONS floor, so asserting only the section count would still
     # pass with the preference unwired.
-    it "gives a user who turned adaptive sizing off the full set" do
-      user = User.create!(email: "off@example.com", name: "Off", adaptive_set_size: false)
-      expect(SectionCount).to receive(:for).with(anything, adaptive: false).and_call_original
+    it "passes a fixed choice through to SectionCount" do
+      user = User.create!(email: "fixed@example.com", name: "Fixed", daily_section_count: 2)
+      expect(SectionCount).to receive(:for).with(anything, fixed: 2).and_call_original
+
+      plan = described_class.for(user, language: "ruby_rails")
+
+      expect([ plan.pattern, plan.third, plan.fourth ].compact.size).to eq(1)
+    end
+
+    it "gives a user who chose the largest day every slot" do
+      user = User.create!(email: "full@example.com", name: "Full", daily_section_count: ExerciseSection::MAX_SECTIONS)
 
       plan = described_class.for(user, language: "ruby_rails")
 
@@ -567,9 +575,9 @@ RSpec.describe DailyPlan do
       expect([ plan.pattern, plan.third, plan.fourth ].compact.size).to eq(optional_slots)
     end
 
-    it "leaves adaptive sizing on for a user who never turned it off" do
-      user = User.create!(email: "on@example.com", name: "On")
-      expect(SectionCount).to receive(:for).with(anything, adaptive: true).and_call_original
+    it "leaves sizing Automatic for a user who never chose" do
+      user = User.create!(email: "auto@example.com", name: "Auto")
+      expect(SectionCount).to receive(:for).with(anything, fixed: nil).and_call_original
 
       described_class.for(user, language: "ruby_rails")
     end

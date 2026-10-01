@@ -101,7 +101,7 @@ class DailyPlan
   def self.for(user, language:)
     history       = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
     rotation      = SectionRotation.for(history,
-                                        count: SectionCount.for(history, adaptive: user.adaptive_set_size?),
+                                        count: SectionCount.for(history, fixed: user.daily_section_count),
                                         preferences: KindPreferences.for(user))
     kinds         = ExerciseSection.for_plan(**rotation)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)

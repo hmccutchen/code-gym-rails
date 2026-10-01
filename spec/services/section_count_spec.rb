@@ -52,12 +52,25 @@ RSpec.describe SectionCount do
     expect(described_class.for(history(nil, 4, nil, 4, nil, 4))).to eq(3)
   end
 
-  describe "the hard override" do
-    it "returns the full set without consulting history" do
-      history = spy("history")
+  describe "a fixed daily section count" do
+    it "returns each fixed choice without consulting history" do
+      (described_class::FLOOR..ExerciseSection::MAX_SECTIONS).each do |fixed|
+        history = spy("history")
 
-      expect(described_class.for(history, adaptive: false)).to eq(ExerciseSection::MAX_SECTIONS)
-      expect(history).not_to have_received(:first)
+        expect(described_class.for(history, fixed: fixed)).to eq(fixed)
+        expect(history).not_to have_received(:filter_map)
+        expect(history).not_to have_received(:first)
+      end
+    end
+
+    it "overrides a history that would size the day differently" do
+      expect(described_class.for(history(4, 4, 4, 4, 4), fixed: 2)).to eq(2)
+      expect(described_class.for(history(0, 0, 0, 0, 0), fixed: 4)).to eq(4)
+    end
+
+    it "sizes from history when the choice is Automatic" do
+      expect(described_class.for(history(2, 2, 2, 2, 2), fixed: nil)).to eq(3)
+      expect(described_class.for(history(2, 2, 2, 2, 2))).to eq(3)
     end
   end
 

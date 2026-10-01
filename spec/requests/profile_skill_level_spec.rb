@@ -22,7 +22,7 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
   it "returns the same body other profile saves do" do
     patch_profile(skill_level: "solid")
 
-    expect(response.parsed_body).to eq("name" => "Dev", "time_zone" => "UTC", "adaptive_set_size" => true)
+    expect(response.parsed_body).to eq("name" => "Dev", "time_zone" => "UTC", "daily_section_count" => nil)
   end
 
   it "leaves the preference version alone, since skill level is not part of the Exercise mix" do
