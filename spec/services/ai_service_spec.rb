@@ -62,6 +62,17 @@ RSpec.describe AiService do
         .to be >= stages.sum { |timeout| AiService.worst_case_call_seconds(timeout) }
     end
 
+    # A batch tick finds no set while a judged generation is still running, so
+    # a generation that outlasted the hourly schedule would be started again
+    # and billed twice.
+    it "keeps a judged generation shorter than the interval between batch ticks" do
+      require "fugit"
+      schedule = YAML.load_file(Rails.root.join("config/recurring.yml"))
+                     .fetch("production").fetch("generate_daily_exercises").fetch("schedule")
+
+      expect(AiService::JUDGED_GENERATION_BUDGET).to be < Fugit::Cron.parse(schedule).rough_frequency
+    end
+
     it "keeps the provider budget below the review claim window" do
       expect(provider_review_budget_seconds).to be < DailyResponse::REVIEW_CLAIM_STALE_AFTER.to_i
     end
