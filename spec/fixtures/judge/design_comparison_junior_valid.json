@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "junior",
+  "locked": false,
+  "expected": "keep",
+  "principle": null,
+  "expected_better": "a",
+  "section": {
+    "title": "Where shipping rates come from",
+    "scenario": "A checkout service quotes shipping for each order. Each carrier has its own rate rule.",
+    "question": "The team adds a new carrier every month. Which piece fits this system better, and which fact decides it?",
+    "piece_a": "class ShippingQuote\n  RATES = {\n    \"ups\"   => UpsRate,\n    \"fedex\" => FedexRate\n  }.freeze\n\n  def initialize(carrier)\n    @rate = RATES.fetch(carrier).new\n  end\n\n  def cost_cents(order)\n    @rate.cost_cents(order)\n  end\nend",
+    "piece_b": "class ShippingQuote\n  def initialize(carrier)\n    @carrier = carrier\n  end\n\n  def cost_cents(order)\n    case @carrier\n    when \"ups\"   then UpsRate.new.cost_cents(order)\n    when \"fedex\" then FedexRate.new.cost_cents(order)\n    else raise KeyError, @carrier\n    end\n  end\nend",
+    "concept": "open_closed"
+  }
+}

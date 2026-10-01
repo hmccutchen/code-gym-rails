@@ -1,0 +1,15 @@
+{
+  "kind": "design_comparison",
+  "rung": "junior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "underdetermined",
+  "section": {
+    "title": "Formatting a price",
+    "scenario": "A shop shows prices on its product pages.",
+    "question": "Prices are shown in one currency today. Which piece fits better?",
+    "piece_a": "class Price\n  def initialize(cents)\n    @cents = cents\n  end\n\n  def to_s\n    format(\"$%.2f\", @cents / 100.0)\n  end\nend",
+    "piece_b": "module PriceFormatter\n  def self.call(cents)\n    format(\"$%.2f\", cents / 100.0)\n  end\nend",
+    "concept": "primitive_obsession"
+  }
+}

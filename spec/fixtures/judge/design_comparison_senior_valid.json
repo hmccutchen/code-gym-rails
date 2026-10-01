@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "senior",
+  "locked": false,
+  "expected": "keep",
+  "principle": null,
+  "expected_better": "b",
+  "section": {
+    "title": "Loading the orders page",
+    "scenario": "The account orders page lists every order an account placed this quarter, which is 200 orders for a typical account, each row showing the customer's name. Both versions render the same table.",
+    "question": "Which piece should this page use, and which stated fact decides it?",
+    "piece_a": "class OrdersController < ApplicationController\n  def index\n    @orders = current_account.orders\n                .order(created_at: :desc)\n  end\nend\n\n# index.html.erb\n<% @orders.each do |order| %>\n  <td><%= order.number %></td>\n  <td><%= order.customer.name %></td>\n<% end %>",
+    "piece_b": "class OrdersController < ApplicationController\n  def index\n    @orders = current_account.orders\n                .includes(:customer)\n                .order(created_at: :desc)\n  end\nend\n\n# index.html.erb\n<% @orders.each do |order| %>\n  <td><%= order.number %></td>\n  <td><%= order.customer.name %></td>\n<% end %>",
+    "concept": "n_plus_one"
+  }
+}

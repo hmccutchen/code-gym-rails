@@ -1,3 +1,5 @@
+require_relative "solve_agreement"
+
 # Runs one stored input through two Claude models and prints both results
 # side by side, for a person to read and judge. Nothing in app/ loads this.
 #
@@ -18,6 +20,10 @@ class ModelComparison
   }.freeze
 
   REVIEW_FIELDS = %w[rating missed next_step].freeze
+
+  # A judge fixture's expected status: "reject", "keep_or_edit", or "keep",
+  # which an edit does not satisfy.
+  SOUND_EXPECTATIONS = %w[keep keep_or_edit].freeze
   VERDICT_FIELDS = %w[status issues principle evidence reason].freeze
 
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
@@ -116,9 +122,10 @@ class ModelComparison
       pinned_service(CANDIDATES.fetch("generate").first, []).send(:draft_exercise, user, language: language, blocking: true)
     end
 
-    compare("judge", heading: "user #{user.id}, #{language}") do |service|
+    runs = compare("judge", heading: "user #{user.id}, #{language}") do |service|
       judge_draft(service, user, draft, difficulty)
     end
+    runs.each { |run| SolveAgreement.new(draft_solve_rows(run, draft, difficulty, user), out: @out).print(run.route[:model]) }
   end
 
   # Runs every fixture under spec/fixtures/judge through each judge candidate
@@ -183,14 +190,36 @@ class ModelComparison
     end.to_h
   end
 
+  # The solve is reported as match or mismatch against the drafted key, never
+  # as the piece the judge picked, so the output never names the answer.
   def judge_drafted_section(service, user, kind, section, difficulty)
     verdict = service.judge_section(
       user, kind, section,
       rung: difficulty.rung_for(kind, skill_level: user.skill_level), locked: difficulty.locked?(kind)
     )
-    VERDICT_FIELDS.index_with { |field| verdict.public_send(field) }
+    fields = VERDICT_FIELDS.index_with { |field| verdict.public_send(field) }
+    verdict.solve ? fields.merge("solve" => kind.solve_matches_key?(section, verdict.solve) ? "match" : "mismatch") : fields
   rescue JudgeVerdict::Invalid, AiService::Error => e
     "#{e.class}: #{e.message}"
+  end
+
+  def draft_solve_rows(run, draft, difficulty, user)
+    return [] unless run.output.is_a?(Hash)
+
+    run.output.filter_map do |key, result|
+      kind = ExerciseSection.for(key)
+      next unless kind.judge_solve_options
+
+      { rung: difficulty.rung_for(kind, skill_level: user.skill_level), concept: draft.problem_set.dig(key, "concept"),
+        **drafted_solve_outcome(result), false_reject: false }
+    end
+  end
+
+  def drafted_solve_outcome(result)
+    return { status: result["status"], matched: result.key?("solve") ? result["solve"] == "match" : nil } if result.is_a?(Hash)
+
+    invalid = result.start_with?(JudgeVerdict::Invalid.name, AiService::InvalidResponseError.name)
+    { status: invalid ? :invalid : :error, matched: nil }
   end
 
   def print_fixture_table(route, fixtures, user)
@@ -201,13 +230,29 @@ class ModelComparison
     @out.puts "=== judge_fixtures: #{route[:model]} ==="
     rows.each { |row| print_fixture_row(row) }
     print_fixture_totals(route, rows, usage)
+    SolveAgreement.new(fixture_solve_rows(rows), out: @out).print(route[:model])
     @out.puts
+  end
+
+  def fixture_solve_rows(rows)
+    rows.select { |row| row[:expects_solve] }.map do |row|
+      status = %i[invalid error].include?(row[:classification]) ? row[:classification] : row[:status]
+      { rung: row[:rung], concept: row[:concept], status: status, matched: row[:solve_matched],
+        false_reject: row[:classification] == :false_reject }
+    end
   end
 
   def print_fixture_row(row)
     @out.puts "#{row[:name]}: expected=#{row[:expected]} got=#{row[:status] || row[:classification]} " \
-              "classification=#{row[:classification]} principle=#{row[:principle]} #{row[:ms]}ms" \
+              "classification=#{row[:classification]} principle=#{row[:principle]}#{fixture_solve_label(row)} #{row[:ms]}ms" \
               "#{fixture_row_detail(row)}"
+  end
+
+  # Match or mismatch only: printing the judge's pick would print the answer.
+  def fixture_solve_label(row)
+    return "" if row[:solve_matched].nil?
+
+    " solve=#{row[:solve_matched] ? 'match' : 'MISMATCH'}"
   end
 
   def fixture_row_detail(row)
@@ -219,7 +264,8 @@ class ModelComparison
 
   def print_fixture_totals(route, rows, usage)
     broken        = rows.select { |row| row[:expected] == "reject" }
-    sound         = rows.select { |row| row[:expected] == "keep_or_edit" }
+    sound         = rows.select { |row| SOUND_EXPECTATIONS.include?(row[:expected]) }
+    keeps         = rows.select { |row| row[:expected] == "keep" }
     valid         = rows.reject { |row| %i[invalid error].include?(row[:classification]) }
     detected      = broken.count { |row| row[:classification] == :detected }
     false_rejects = sound.count { |row| row[:classification] == :false_reject }
@@ -228,6 +274,7 @@ class ModelComparison
 
     @out.puts "valid: #{valid.size}/#{rows.size} · detected: #{detected}/#{broken.size} · " \
               "false rejections: #{false_rejects}/#{sound.size} · " \
+              "kept unedited where keep was expected: #{keeps.count { |row| row[:classification] == :ok }}/#{keeps.size} · " \
               "#{rows.sum { |row| row[:ms] }}ms · #{tokens_in} in / #{tokens_out} out · " \
               "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out))}"
     print_detection_per_principle(broken)
@@ -266,8 +313,9 @@ class ModelComparison
   end
 
   def fixture_result(fixture, verdict)
+    solve_matched = verdict.solve == fixture["expected_better"] if fixture["expected_better"] && verdict.solve
     fixture_identity(fixture).merge(status: verdict.status, principle: verdict.principle, issues: verdict.issues,
-                                    classification: classify_fixture(fixture, verdict))
+                                    classification: classify_fixture(fixture, verdict), solve_matched: solve_matched)
   end
 
   def fixture_failure(fixture, classification, error)
@@ -275,16 +323,24 @@ class ModelComparison
   end
 
   def fixture_identity(fixture)
-    { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"] }
+    { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"],
+      rung: fixture["rung"], concept: fixture.dig("section", "concept"), expects_solve: fixture.key?("expected_better") }
   end
 
   # detected/wrong_principle/missed for a fixture whose section is meant to be
-  # caught; ok/false_reject for one that's meant to survive.
+  # caught; ok/false_reject for one that's meant to survive, plus edited for a
+  # "keep" fixture the judge rewrote, since rewriting a deliberately sound
+  # section is not keeping it.
   def classify_fixture(fixture, verdict)
-    if fixture["expected"] == "reject"
+    case fixture["expected"]
+    when "reject"
       return :missed unless verdict.reject?
 
       verdict.principle == fixture["principle"] ? :detected : :wrong_principle
+    when "keep"
+      return :false_reject if verdict.reject?
+
+      verdict.edit? ? :edited : :ok
     else
       verdict.reject? ? :false_reject : :ok
     end

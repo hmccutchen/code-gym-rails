@@ -195,7 +195,60 @@ RSpec.describe ModelComparison do
     ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
     expect(out.string.scan(/^thread_prerequisite: .*got=error .*AiService::RateLimitError: slow down/).size)
       .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
-    expect(out.string).to include("valid: 10/11")
+    fixture_count = Dir[Rails.root.join("spec/fixtures/judge/*.json")].size
+    expect(out.string).to include("valid: #{fixture_count - 1}/#{fixture_count}")
+  end
+
+  # A solve is a verdict field only for the kind the judge solves blind.
+  def keep_verdict(kind, solve: "b")
+    JudgeVerdict.new(status: :keep, solve: (solve if kind.judge_solve_options))
+  end
+
+  it "judge_fixtures counts an edit of a keep fixture as not kept, and accepts it for keep_or_edit" do
+    allow_any_instance_of(ClaudeService).to receive(:judge_section) do |_service, _user, kind, _section, **|
+      JudgeVerdict.new(status: :edit, issues: [ { type: "padding", evidence: "x" } ], fields: { "question" => "q" },
+                       solve: (kind.judge_solve_options && "a"))
+    end
+
+    comparison.judge_fixtures
+
+    keeps = Dir[Rails.root.join("spec/fixtures/judge/*.json")].count { |path| JSON.parse(File.read(path))["expected"] == "keep" }
+    expect(keeps).to be >= 2
+    expect(out.string).to match(/^design_comparison_junior_valid: expected=keep got=edit classification=edited/)
+    expect(out.string).to match(/^design_comparison_principal_tradeoff: expected=keep_or_edit got=edit classification=ok/)
+    expect(out.string).to include("kept unedited where keep was expected: 0/#{keeps}")
+  end
+
+  it "judge_fixtures reports blind-solve agreement per rung and concept without printing a solve or a key" do
+    expected = Dir[Rails.root.join("spec/fixtures/judge/*.json")].map { |path| JSON.parse(File.read(path)) }
+                                                                 .select { |fixture| fixture.key?("expected_better") }
+    allow_any_instance_of(ClaudeService).to receive(:judge_section) do |_service, _user, kind, section, **|
+      fixture = expected.find { |each| each["section"] == section }
+      keep_verdict(kind, solve: fixture ? fixture["expected_better"] : "a")
+    end
+
+    comparison.judge_fixtures
+
+    with_key = expected.size
+    attempted = Dir[Rails.root.join("spec/fixtures/judge/*.json")].count { |path| JSON.parse(File.read(path))["kind"] == "design_comparison" }
+    expect(out.string).to include("blind solve, claude-sonnet-5-5: valid-solve agreement #{with_key}/#{with_key} · " \
+                                  "matches of attempted #{with_key}/#{with_key}")
+    expect(out.string).to include("  rung junior: ", "  concept n_plus_one: ")
+    expect(out.string).to include("solve=match")
+    expect(out.string).not_to include("better", "expected_better")
+    expect(attempted).to be > with_key
+  end
+
+  it "judge mode reports each candidate's blind-solve agreement against the drafted key" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+
+    comparison.judge(user.id)
+
+    ModelComparison::CANDIDATES.fetch("judge").each do |route|
+      expect(out.string).to include("blind solve, #{route[:model]}: valid-solve agreement 1/1 · matches of attempted 1/1")
+    end
+    expect(out.string).to include("\"solve\": \"match\"")
+    expect(out.string).not_to include("\"better\"", "answer_key")
   end
 
   it "judge_fixtures prints each edit's issues with the text they quote" do
