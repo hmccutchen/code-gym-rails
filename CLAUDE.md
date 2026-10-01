@@ -285,7 +285,7 @@ Every page load, any day of the week:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, adaptive_set_size (boolean, default true), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, pattern, a rotating third key, a rotating fourth key), language, generated_at, regenerated_at |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date                                                             |
@@ -331,6 +331,95 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
 ## Key Design Decisions
 
+- **Junior learning track**: an optional first-run preset and suggestions to
+  change existing difficulty targets, with no separate generation policy.
+  `User#first_run?` requires a saved, undecided account (`learning_track:
+  nil`) with no exercise ever created. Dashboard and Setup send that account
+  to `/welcome`. Junior sets every
+  registered kind to `junior` through `PATCH /profile` with the existing
+  preference version. Under the user-row lock, the endpoint requires both
+  that version and the exact registry-derived preset; an incomplete or
+  mismatched choice saves nothing. The new-account targets are unlocked so
+  ordinary easing still applies. `skill_level` stays untouched: targets already express the
+  choice without changing the profile's separate scale. Experienced records
+  `"none"` without changing targets. Existing accounts are not enrolled or
+  prompted, and joining after the first-run choice is refused.
+
+  **Existing accounts are told apart by a backfill, not a date.**
+  `AddLearningTrackToUsers` adds the nullable string with no default and the
+  jsonb map; `BackfillLearningTrackForExistingUsers` then sets every row it
+  finds to `"none"`, so an account that predates the track is never asked. A
+  `"none"` posted by an account already at `"none"` is accepted and changes
+  nothing, so a repeat Leave does not error; joining stays refused. The backfill
+  cannot be undone, since its rows look like any other `"none"`. The exercise
+  check in `first_run?` is what keeps the preview app's seeded account, created
+  after migrations run, from being asked. One gap is accepted: an account
+  created while the migration has run but the old code still serves arrives
+  as `nil` with no exercises and is asked once the new code is live, which is
+  right for an account that new. In specs, `create_user_with_key` and
+  `create_fake_provider_user` default to `"none"`, standing for backfilled
+  accounts; a first-run spec passes `learning_track: nil`.
+
+  **Suggestions use reviewed work, not mastery tiers.** `TrackGraduation`
+  checks unlocked kinds in registry order: first a step back from senior when
+  at least two of the latest three senior results are `too_hard` (two of two
+  qualifies), then a step forward after three consecutive favourable junior results.
+  Favourable means both the existing AI and self-rating rules agree. Otherwise,
+  a lead already targeted above junior can propose the remaining junior kinds
+  as one removable bundle. `ExerciseSection.leads_learning_track?` owns which
+  kind leads (currently code review); any unfavourable result in a member's
+  latest three junior results vetoes that member. No own results is allowed.
+  Locked kinds are omitted; exclusions remain a scheduling preference.
+
+  `TrackGraduation::Evidence` preloads exercises for the latest 60 submitted
+  responses with stored review data. Only reviewed responses and answered,
+  un-eased sections with a `pitched_at` stamp and an AI rating contribute.
+  Historical unstamped work contributes nothing. The read cap bounds queries;
+  rare kinds may need the lead-based suggestion. The AI rating's calibration
+  for these moves is unverified, and a higher lead target is not proof of
+  ability in another kind. Suggestions require an explicit Apply.
+
+  **A cutoff prevents the same work immediately proposing another move.**
+  Not now records each kind's current level and the newest reviewed response
+  date, falling back to the user's today. Moving between junior and senior in
+  either direction records the destination level and today's date in the
+  user's zone. Evidence through that date is ignored at that level; a
+  lead-based proposal after a cutoff also needs three fresh favourable lead
+  results. The profile join check and versioned level changes run under the
+  user-row lock; dismissal merges into the reloaded map under that same lock
+  and keeps a later valid cutoff at the current level. Its earlier evidence
+  read cannot undo a newer dismissal or level-change cutoff. A different-level
+  or malformed entry is replaced; `TrackGraduation.cutoff_date` is the shared
+  reader for dismissal and proposal filtering.
+
+  **Setup and dashboard saves settle in place.** Apply changes only listed
+  bundle members through the existing versioned profile endpoint, then
+  dismisses removed members separately. That second request is tracked as
+  pending, but the two writes are not atomic: its failure leaves the applied
+  levels saved and the shared save error visible. Not now dismisses the whole
+  original bundle. A stale Apply (409) reloads only after pending saves clear;
+  a save still pending after ten seconds cancels the reload. Leaving on Setup
+  preserves targets, locks, exclusions and pending Exercise mix edits.
+  No junior targets remaining automatically records `"none"`; the track
+  does not keep proposing steps back after completion or leaving.
+
+  Generation, review, both judges and `ConceptMastery` never read track state;
+  `spec/services/learning_track_isolation_spec.rb` pins that separation and
+  byte-identical generation/judge calls for equal difficulty settings.
+  The key guide appears only for a track account with no exercises. Its approved
+  copy remains scrollable: in Chromium at 390×844, the guide is about 732px
+  tall at default text, 1,123px at 125%, and 1,340px at 140%. Even at default
+  size it extends below the initial viewport; enlarged text needs vertical
+  scrolling. There is no unconditional one-screen promise or hidden content.
+
+  **Operator preparation rewrites shared wording.** Run
+  `bin/rails runner script/prepare_junior_ladders.rb <operator_user_id>` first
+  for per-kind coverage and deduplicated gaps across both languages.
+  It writes nothing. Adding `--run` queues missing ladders through
+  `GenerateConceptReferenceJob` with `refresh: true`, billed to that active
+  operator's own key. A refresh rewrites the whole shared reference and guide,
+  including rows that already have a guide, for every user. Production coverage,
+  billed cost and completion remain unmeasured until this runs there.
 - **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass, not editing the base.
 - **Per-purpose model routing**: each provider picks its model from its own
@@ -1785,6 +1874,14 @@ always pull in the full suite — is stated once, in
 
 ## File Map
 
+- `app/models/learning_track.rb` — track values and preset levels.
+- `app/services/track_graduation.rb` — pure proposal rules: own-result moves, struggling moves and a lead-based bundle.
+- `app/services/track_graduation/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered results.
+- `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
+- `app/controllers/learning_track_dismissals_controller.rb` — records Not now cutoffs for the current user under the user-row lock.
+- `app/views/dashboard/_track_proposal.html.erb` — submitted-day proposal, removable bundle and in-place Apply/Not now saves.
+- `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.
+- `spec/requests/existing_account_pages_spec.rb` — exact pre-track Dashboard, Setup, Account and History snapshots. `UPDATE_PAGE_SNAPSHOTS=1` intentionally rewrites fixtures; never use it to conceal a learning-track regression.
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt, the single-section retry call, and the two-stage entry point: `#generate_judged_exercise` drafts, then hands the draft to `JudgedGeneration`
 - `app/services/judged_generation.rb` — `JudgedGeneration`: the two-stage path after the draft. Fans the judge out a section at a time, retries a rejection once with its concept fixed, drops a second rejection, and hands the final set to `AiService`'s shared logging tail. It reaches the provider only through `JudgedGeneration::Provider` (`judge_section` and `retry_section`, as callables built fresh per call), so its specs need no provider subclass
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, and rejects an unusable ambiguity-hunt answer key, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.

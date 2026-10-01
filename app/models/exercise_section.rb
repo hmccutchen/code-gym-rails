@@ -26,6 +26,10 @@ class ExerciseSection
     all.map(&:key)
   end
 
+  def self.learning_track_lead
+    all.find(&:leads_learning_track?)
+  end
+
   # Precedence order, NOT enumeration order: a problem_set holding more than one
   # third key (a provider returning both) resolves the way it always has —
   # architecture first, then security_review, then challenge, then
@@ -210,6 +214,10 @@ class ExerciseSection
     # section it rejected twice. A day reads fine without any one of these.
     def droppable?
       true
+    end
+
+    def leads_learning_track?
+      false
     end
 
     # ── What the judge measures against ─────────────────────────────────────

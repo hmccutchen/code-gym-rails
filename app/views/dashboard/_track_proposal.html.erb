@@ -1,0 +1,119 @@
+<%# One learning track proposal. Local: proposal (TrackGraduation::Proposal). %>
+<% name = ->(key) { t("sections.#{key}.name") } %>
+<%= tag.div id: "track-proposal", class: "mix-note track-proposal",
+      data: { levels: current_user.section_kind_levels.to_json,
+              version: current_user.section_kind_preferences_version,
+              profile_url: profile_path, dismiss_url: learning_track_dismissal_path,
+              applied_text: t("learning_track.proposal.applied"),
+              dismissed_text: t("learning_track.proposal.dismissed"),
+              stranded_text: t("learning_track.proposal.stranded"),
+              reload_label: t("learning_track.proposal.reload") } do %>
+  <% if proposal.basis == :led %>
+    <% lead = ExerciseSection.learning_track_lead.key %>
+    <p><%= t("learning_track.proposal.led_heading", kind: name.call(lead),
+             level: t("exercise_mix.levels.#{current_user.section_kind_levels[lead]}").downcase) %></p>
+    <ul>
+      <% proposal.steps.each do |step| %>
+        <li data-step data-kind="<%= step.kind %>" data-to="<%= step.to %>">
+          <%= t(step.results_at_level.zero? ? "learning_track.proposal.led_no_results" : "learning_track.proposal.led_with_results",
+                kind: name.call(step.kind)) %>
+          <button type="button" class="btn btn-ghost btn-sm" data-remove-step
+                  aria-label="<%= t("learning_track.proposal.remove_label", kind: name.call(step.kind)) %>"><%= t("learning_track.proposal.remove") %></button>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <% step = proposal.steps.first %>
+    <p data-step data-kind="<%= step.kind %>" data-to="<%= step.to %>">
+      <%= t("learning_track.proposal.#{proposal.basis}", kind: name.call(step.kind)) %>
+    </p>
+  <% end %>
+  <button type="button" class="btn btn-primary btn-sm" data-apply><%= t("learning_track.proposal.apply") %></button>
+  <button type="button" class="btn btn-ghost btn-sm" data-not-now><%= t("learning_track.proposal.not_now") %></button>
+<% end %>
+
+<script>
+  (() => {
+    const box = document.getElementById("track-proposal");
+    if (!box || box.dataset.wired) return;
+    box.dataset.wired = "1";
+
+    const SAVE_POLL_MS = 200;
+    const SAVE_WAIT_LIMIT_MS = 10000;
+    const steps = () => Array.from(box.querySelectorAll("[data-step]"));
+    const listed = () => steps().filter((element) => !element.hidden);
+    const removed = () => steps().filter((element) => element.hidden).map((element) => element.dataset.kind);
+    const apply = box.querySelector("[data-apply]");
+    const setBusy = (busy) => {
+      box.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
+      apply.disabled = busy || listed().length === 0;
+    };
+
+    // The buttons that had focus are gone, so the confirmation takes it and
+    // a screen reader reads it out.
+    const settle = (text, ...extra) => {
+      const line = document.createElement("p");
+      line.setAttribute("role", "status");
+      line.tabIndex = -1;
+      line.textContent = text;
+      box.replaceChildren(line, ...extra);
+      line.focus();
+    };
+
+    // A save still running at the limit is not reloaded over, but the page
+    // must not stay stuck on a proposal the server refused: the reload
+    // becomes the user's call.
+    const stranded = () => {
+      const reload = document.createElement("button");
+      reload.type = "button";
+      reload.className = "btn btn-ghost btn-sm";
+      reload.textContent = box.dataset.reloadLabel;
+      reload.addEventListener("click", () => window.location.reload());
+      settle(box.dataset.strandedText, reload);
+    };
+
+    // Only a conflict reloads, after other saves finish; a hung save must
+    // never cost an edit by forcing a reload at the time limit.
+    const reloadWhenSaved = (waited = 0) => {
+      if (!window.CodeGymSaveStatus.pending()) return window.location.reload();
+      if (waited >= SAVE_WAIT_LIMIT_MS) return stranded();
+      setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
+    };
+
+    const dismiss = (kinds) => kinds.length === 0
+      ? Promise.resolve({ ok: true })
+      : window.CodeGymSaveStatus.save("POST", box.dataset.dismissUrl, { kinds }, "track_dismissal");
+
+    box.querySelectorAll("[data-remove-step]").forEach((button) => {
+      button.addEventListener("click", () => {
+        button.closest("[data-step]").hidden = true;
+        apply.disabled = listed().length === 0;
+      });
+    });
+
+    apply.addEventListener("click", async () => {
+      setBusy(true);
+      const levels = JSON.parse(box.dataset.levels);
+      listed().forEach((element) => { levels[element.dataset.kind] = element.dataset.to; });
+      const setAside = removed();
+      const result = await window.CodeGymSaveStatus.save("PATCH", box.dataset.profileUrl,
+        { user: { section_kind_levels: levels, section_kind_preferences_version: Number(box.dataset.version) } },
+        "track_apply");
+
+      if (result && result.ok) {
+        settle(box.dataset.appliedText);
+        dismiss(setAside);
+        return;
+      }
+      if (result && result.status === 409) return reloadWhenSaved();
+      setBusy(false);
+    });
+
+    box.querySelector("[data-not-now]").addEventListener("click", async () => {
+      setBusy(true);
+      const result = await dismiss(steps().map((element) => element.dataset.kind));
+      if (result && result.ok) return settle(box.dataset.dismissedText);
+      setBusy(false);
+    });
+  })();
+</script>

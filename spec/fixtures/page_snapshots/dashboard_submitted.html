@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+  <title>Today&#39;s Workout – Code Gym</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Code Gym">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#1a1a2e">
+  
+  
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f1a; --surface: #1a1a2e; --border: #2a2a4a;
+      --accent: #7c6af7; --text: #e0e0f0; --muted: #999;
+      /* --accent is too dark to read as text on the surface colors (4.27:1 on
+         --surface), so text takes a lighter shade of the same hue and --accent
+         stays for borders and fills. White on --button-bg is 5.07:1. */
+      --accent-text: #988bf9;
+      --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
+      --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
+      --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
+      /* iOS auto-zooms a focused input below 16px, which shifts the layout and
+         doesn't cleanly restore. max() keeps the floor without overriding a
+         user who has set a larger default. */
+      --input-font-size: max(1rem, 16px);
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
+    /* Browser behaviours that read as "web page" rather than "app" once the
+       chrome around them is gone: the rubber-band bounce past the end of a
+       page, and the grey flash on tap. Scoped to the installed app rather than
+       applied everywhere, so a Safari tab keeps its pull-to-refresh and its
+       tap feedback.
+
+       The nav name editor goes with them, for space rather than for feel: the
+       installed app has no browser chrome above the nav, so the row is at its
+       tightest exactly where the brand and the links matter most. The whole
+       .name-editor, not just its input — the status readout it flashes has
+       nothing to report once the field it belongs to is gone. This is the only
+       way to rename yourself in the app, so in the installed app there is no
+       way to; a deliberate trade, and renaming is unchanged in a browser tab.
+       This media query is the app's one standalone-mode test (it is also what
+       the two rules above are scoped by) — a second mechanism could disagree
+       with it. The pull-to-refresh script reads its answer from whether
+       .pull-refresh is displayed, for the same reason; `body` outranks that
+       element's hidden base rule further down, as .nav-links does here. Selected through .nav-links to outrank `nav .name-editor`,
+       which sets a display of its own further down the sheet: a media query
+       adds no specificity, so the later rule would otherwise win. */
+    @media (display-mode: standalone) {
+      html, body { overscroll-behavior-y: none; }
+      body { -webkit-tap-highlight-color: transparent; }
+      nav .nav-links .name-editor { display: none; }
+      body .pull-refresh { display: flex; }
+    }
+    a { color: var(--accent-text); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* The one focus ring for fields and sliders. Offset, so it sits on the
+       background around the control rather than on the control's own border.
+       A slider's ring goes on its thumb, the part the arrow keys move. The
+       thumb selectors each get a rule of their own because a browser drops a
+       whole selector list when it doesn't know one vendor pseudo-element. */
+    input:not([type="checkbox"], [type="radio"], [type="range"]):focus-visible,
+    textarea:focus-visible, select:focus-visible,
+    .parsons-block:focus-visible, .gloss-term:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset);
+    }
+    input[type="range"]:focus-visible::-webkit-slider-thumb { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+    input[type="range"]:focus-visible::-moz-range-thumb { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+    input[type="range"]:focus-visible { outline: none; }
+
+    .container { max-width: 800px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* Positioned, because the collapsed menu below hangs off it. A query
+       container, so the collapse below can measure the nav in its own text
+       size; containment makes nav a stacking context, and the z-index keeps
+       the open menu above the dashboard's sticky progress bar. */
+    nav { position: relative; z-index: 20; container-type: inline-size; background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
+    /* Wider than the page column, so on a desktop the brand sits apart from
+       the links instead of crowding them inside the same 800px. */
+    nav .inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; }
+    /* The brand refuses to shrink or wrap: squeezed against the name editor in
+       a wide browser tab, it otherwise broke into three lines (the bolt, then
+       "Code", then "Gym"). The name editor absorbs the squeeze instead — a
+       truncated name still reads and still edits, a stacked wordmark reads as
+       broken. min-width: 0 all the way down is what lets it: a flex item will
+       not shrink below its content otherwise. */
+    nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 2rem; color: var(--accent-text); white-space: nowrap; flex-shrink: 0; }
+    /* The alt text names the link, which is why the wordmark beside it is
+       hidden from screen readers. */
+    nav .brand-mark { height: 5rem; width: 7rem; }
+    nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
+    nav .name-editor { display: flex; align-items: center; min-width: 0; }
+    nav .nav-toggle { display: none; }
+
+    /* Below this width the row cannot hold the brand and four destinations at
+       once, so the destinations fold behind the button and the brand stays on
+       one line. Measured in em against the nav's own text, so a larger text
+       size moves the fold out with it: 37.5em is 600px at the default size. */
+    @container (max-width: 37.5em) {
+      /* 44px in px rather than rem: a button that grew with the text size left
+         no room for the logo beside it on a 320px screen. */
+      nav .nav-toggle {
+        display: flex; flex-direction: column; justify-content: center; gap: 4px;
+        width: 44px; height: 44px; padding: 0 11px; flex-shrink: 0;
+        background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+      }
+      nav .nav-toggle .bar { height: 2px; background: var(--muted); border-radius: 1px; }
+      /* On the narrowest phones the brand and the button no longer fit side by
+         side. The mark gives up width so the button always stays on screen;
+         the wordmark keeps its size. When the light palette wraps the mark in
+         a picture element, that element is the flex item, so it shrinks and
+         the mark follows it through max-width. */
+      nav .inner { gap: .5rem; }
+      nav .brand { flex-shrink: 1; min-width: 0; }
+      nav .brand > picture { min-width: 0; }
+      nav .brand .brand-mark { min-width: 0; max-width: 100%; object-fit: contain; }
+      /* Only .nav-links itself ever carries a display here, never a child: the
+         standalone block above hides the name editor through
+         `nav .nav-links .name-editor`, and any rule of higher specificity in
+         this block would put it back in the installed app. */
+      nav .nav-links { display: none; }
+      nav .nav-links[data-open] {
+        display: flex; flex-direction: column; align-items: stretch; gap: .25rem;
+        position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+        background: var(--surface); border-bottom: 1px solid var(--border);
+        padding: .5rem 1.5rem 1rem;
+      }
+      nav .nav-links[data-open] a { padding: .75rem 0; }
+      nav .nav-links[data-open] .name-editor-input { width: 100%; }
+    }
+
+    .flash { padding: .75rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: .9rem; }
+    .flash.notice { background: rgba(74, 222, 128, .1); border: 1px solid var(--green); color: var(--green); }
+    .flash.alert  { background: rgba(248, 113, 113, .1); border: 1px solid var(--red); color: var(--red); }
+
+    .btn { display: inline-block; padding: .5rem 1.25rem; border-radius: 6px; font-size: .9rem; font-weight: 600; cursor: pointer; border: none; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--button-bg); color: #fff; }
+    .btn-primary:hover { background: var(--button-bg-hover); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent-text); }
+    .btn-sm { padding: .3rem .8rem; font-size: .8rem; }
+    /* Loading state for buttons whose click starts a wait. Two consumers:
+       forms tagged data-loading-form (shared script at the bottom of this
+       layout) and the fetch-driven submit/review handlers, which toggle the
+       class themselves. pointer-events guards the gap before `disabled`
+       lands (it is applied a tick late — see the shared script). */
+    .btn-loading { opacity: .6; pointer-events: none; }
+    .btn-loading::before {
+      content: ""; display: inline-block; width: .8em; height: .8em;
+      margin-right: .5em; vertical-align: -.1em;
+      border: 2px solid currentColor; border-top-color: transparent;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    .spinner {
+      display: inline-block; width: 2rem; height: 2rem;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* The installed app's replacement for the pull-to-refresh a Safari tab has
+       natively. Shown only by the standalone block above; shared/_pull_to_refresh
+       slides [data-pull-content] down and centres this in the gap it opens.
+       z-index -1 keeps it beneath the nav and the content, so it shows only
+       where the content has moved out of the way. */
+    .pull-refresh {
+      display: none; position: fixed; top: 0; left: 50%; z-index: -1;
+      width: 2rem; height: 2rem; margin-left: -1rem;
+      align-items: center; justify-content: center; pointer-events: none;
+      opacity: 0;
+    }
+    .pull-refresh .spinner {
+      width: 1.75rem; height: 1.75rem; border-width: 3px; animation: none; opacity: .6;
+      border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+      border-top-color: var(--accent); border-right-color: var(--accent);
+    }
+    .pull-refresh.is-ready .spinner, .pull-refresh.is-refreshing .spinner { opacity: 1; }
+    .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
+    .pull-refresh.is-settling, .pull-settling { transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s ease; }
+
+    /* For anyone whose OS asks for less motion. A spinner stops turning rather
+       than disappearing: each one sits beside text that already says the work
+       is under way, and a still ring beside it keeps the same meaning. Kept
+       after every rule it overrides, since it relies on source order. */
+    @media (prefers-reduced-motion: reduce) {
+      .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
+      .pull-refresh.is-settling, .pull-settling { transition: none; }
+    }
+
+    /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
+       allows breaks at spaces/newlines, so snippets wrap on phones instead of
+       forcing horizontal scroll. */
+    pre.snippet { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+    /* Plan-review excerpts are prose, not code — a left-border quote block
+       instead of the monospace snippet treatment, so multi-paragraph text
+       reads as an excerpt from a doc rather than malformed code. */
+    .plan-excerpt { background: #0d0d1a; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    /* The pseudocode_to_code rounds. Here rather than in a per-page block for
+       the same reason .answer-display is: _answered_sections renders these on
+       the dashboard's submitted state AND on every history entry. */
+    .problem-statement { background: #0d0d1a; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    .pseudocode-rounds { margin-top: .75rem; }
+    .pseudocode-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .pseudocode-status { font-size: .8rem; color: var(--muted); }
+    .pseudocode-critique-label { font-size: .85rem; color: var(--muted); margin: .6rem 0 .2rem; }
+    .pseudocode-critique ul { margin: 0 0 .4rem 1.1rem; font-size: .9rem; }
+    .pseudocode-critique li { margin-bottom: .25rem; }
+    .pseudocode-code pre { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .85rem; overflow-x: auto; white-space: pre; margin: .6rem 0 .2rem; }
+    .pseudocode-caption { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
+    .hljs { color: var(--text); }
+    .hljs-keyword, .hljs-title.function_, .hljs-title.class_ { color: var(--accent-text); }
+    .hljs-string, .hljs-regexp { color: var(--green); }
+    .hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+    .hljs-number, .hljs-literal { color: var(--yellow); }
+    .hljs-symbol, .hljs-attr, .hljs-params { color: #a78bfa; }
+    .hljs-built_in, .hljs-title { color: #7dd3fc; }
+    .hljs-variable { color: var(--text); }
+    .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .75rem; }
+    .review-block h3 { color: var(--accent-text); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+    .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
+    .difficulty-note { font-size: .8rem; line-height: 1.6; color: var(--muted); margin-top: .3rem; }
+    .review-item { font-size: .9rem; line-height: 1.7; margin-top: .4rem; }
+    .review-points { margin: .3rem 0 0 1.1rem; padding: 0; }
+    .review-points li { font-size: .9rem; line-height: 1.6; margin-top: .3rem; }
+    .alternates { margin-top: .75rem; }
+    .alternate-item { font-size: .9rem; line-height: 1.7; border-left: 2px solid var(--accent); padding-left: .6rem; margin-bottom: .5rem; }
+    .alternate-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
+    .concept-alternates { margin-top: .9rem; }
+    .follow-ups { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .75rem; }
+    .follow-up-turn { font-size: .88rem; line-height: 1.65; margin-bottom: .5rem; padding-left: .6rem; border-left: 2px solid var(--border); }
+    .follow-up-user { color: var(--muted); }
+    .follow-up-assistant { border-left-color: var(--accent); }
+    .follow-up-form { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .follow-up-input { flex: 1; min-width: 0; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
+    .follow-up-capped { font-size: .78rem; color: var(--muted); font-style: italic; }
+    .follow-up-status { font-size: .75rem; color: var(--muted); }
+
+    .duck-thread { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .75rem; }
+    .duck-body { margin-top: .6rem; }
+    .duck-turns { margin-bottom: .5rem; }
+    .duck-turn { font-size: .88rem; line-height: 1.65; margin-bottom: .5rem; padding-left: .6rem; border-left: 2px solid var(--border); }
+    .duck-user { color: var(--muted); }
+    .duck-assistant { border-left-color: var(--accent); }
+    .duck-form { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .duck-input { flex: 1; min-width: 0; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
+    .duck-status { display: block; font-size: .75rem; color: var(--muted); margin-top: .4rem; }
+    /* Off screen until focused, so it is the first stop for a keyboard and
+       invisible to everyone else. Fixed, so showing it never shifts the nav. */
+    .skip-link { position: fixed; top: .5rem; left: .5rem; z-index: 30; padding: .6rem 1rem; background: var(--surface); color: var(--accent-text); border: 1px solid var(--accent); border-radius: 6px; transform: translateY(-200%); }
+    .skip-link:focus { transform: none; }
+    /* Focused only as the skip link's target; a ring around the whole page
+       would read as an error. */
+    #main-content:focus { outline: none; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+    /* Shared submission-rendering styles. Used by responses/_section (and the
+       per-kind partials it renders), responses/_answered_sections, and
+       responses/_submission — all of which render on BOTH the dashboard and the
+       history page, so these cannot live in a per-page <style> block. */
+    .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin-bottom: .95rem; }
+    details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+    details.section > summary::-webkit-details-marker { display: none; }
+    details.section > summary::before { content: "▼ "; }
+    details.section:not([open]) > summary::before { content: "▶ "; }
+    details.section:not([open]) > summary { margin-bottom: 0; }
+    /* The most-tapped control on the page, so it gets a 44px target. The
+       negative margins give back exactly what the padding adds, so the label
+       stays where it was and the target grows into the space around it. */
+    details.section > summary { padding-block: 12.5px; margin-top: -12.5px; margin-bottom: calc(.95rem - 12.5px); }
+    details.section:not([open]) > summary { margin-bottom: -12.5px; }
+    .section-label .section-title { font: inherit; letter-spacing: inherit; margin: 0; }
+    .section-status { font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: auto; }
+    .section h2 { font-size: 1.1rem; margin-bottom: .75rem; }
+    .section-scenario { font-size: .95rem; color: var(--muted); margin-bottom: .75rem; }
+    .question { font-size: 1rem; line-height: 1.7; margin-bottom: 1.25rem; }
+    .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
+    .arch-options { margin: 0 0 1.25rem 1.25rem; font-size: .95rem; line-height: 1.8; }
+
+    /* Scoped to .section rather than zeroing .container's padding, which would
+       drag the nav and every page heading flush against the screen edge. The
+       -1.5rem tracks .container's padding and must change with it. */
+    @media (max-width: 600px) {
+      .section {
+        margin-inline: -1.5rem;
+        padding: 1.25rem 1rem;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+      }
+    }
+
+    .parsons-list { list-style: none; margin: 0 0 1.25rem; padding: 0; }
+    .parsons-block { display: flex; align-items: flex-start; gap: .5rem; margin-bottom: .4rem; }
+    .parsons-block pre.snippet { flex: 1; margin: 0; padding: .55rem .75rem; }
+    .parsons-controls { display: flex; flex-direction: column; gap: .2rem; }
+    .parsons-keyhint, .parsons-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .parsons-list:focus-within + .parsons-keyhint { position: static; width: auto; height: auto; clip-path: none; font-size: .8rem; color: var(--muted); margin: -.75rem 0 1rem; }
+    .parsons-list:not(.parsons-list-readonly) .parsons-block { cursor: grab; }
+    .parsons-correct pre.snippet { border-color: #2f7d5a; }
+    .parsons-misplaced pre.snippet { border-color: #a4453f; }
+
+    details.ref { margin-bottom: 1rem; }
+    details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
+    details.ref summary::before { content: "▶ "; }
+    details.ref[open] summary::before { content: "▼ "; }
+    .ref-body { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
+    /* Hides only the diagram box itself while it's still empty (before render
+       fills it) — the enclosing <details> summary/triangle stays visible and
+       clickable regardless, since that's the point of the disclosure. A
+       genuine failure (bad diagram, blocked/slow CDN) is handled separately:
+       the module script below removes the WHOLE disclosure it owns, not just
+       this div, so a failed diagram never leaves an empty box behind either. */
+    .mermaid-diagram:empty { display: none; }
+    .mermaid-diagram { margin-top: .9rem; overflow-x: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; }
+    .mermaid-diagram svg { max-width: 100%; height: auto; }
+
+    details.hint { margin-bottom: 1rem; }
+    details.hint summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
+    details.hint summary::before { content: "▶ "; }
+    details.hint[open] summary::before { content: "▼ "; }
+    .hint-locked { font-size: .85rem; color: var(--muted); padding: .4rem 0; margin-bottom: 1rem; }
+    .hint-body { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; border-radius: 0 6px 6px 0; margin-top: .5rem; line-height: 1.6; }
+
+    .gloss-term { border-bottom: 1px dotted var(--muted); cursor: help; position: relative; }
+    .gloss-term::after {
+      content: attr(data-definition);
+      position: absolute; left: 0; bottom: 100%; margin-bottom: .35rem;
+      width: max-content; max-width: 16rem;
+      background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px;
+      padding: .5rem .65rem; font-size: .8rem; line-height: 1.5; color: var(--text);
+      white-space: normal; z-index: 10;
+      display: none;
+    }
+    /* Below this breakpoint .section breaks out of .container
+       (margin-inline: -1.5rem) and sets its own padding, so the panel is
+       measured against the section — not the container — to line up with the
+       text it defines. Every fallback equals the desktop value, so the paths
+       that reveal the panel without running the script (:focus-visible, hover
+       on a hover-capable pointer, or no script at all) stay capped as before.
+       max-width reuses --gloss-width so that it is a no-op once the script has
+       set an explicit width, which the 16rem cap would otherwise clamp. */
+    @media (max-width: 600px) {
+      .gloss-term::after {
+        left: var(--gloss-shift, 0);
+        width: var(--gloss-width, max-content);
+        max-width: var(--gloss-width, 16rem);
+      }
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .gloss-term:hover::after { display: block; }
+    }
+    .gloss-term.gloss-open::after, .gloss-term:focus-visible::after { display: block; }
+
+    .submit-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 1.5rem; }
+    .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
+    .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
+    .review-section { margin-top: 1.5rem; }
+    .history-pill { border: 1px solid var(--border); border-radius: 4px; padding: .15rem .5rem; font-size: .85rem; color: var(--muted); }
+
+    .name-editor-input {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      font-size: var(--input-font-size);
+      font-family: inherit;
+      padding: .15rem .3rem;
+      width: 9rem;
+      min-width: 0;
+      border-radius: 6px;
+    }
+    .name-editor-input:focus {
+      background: rgba(124, 106, 247, .06);
+      border-color: var(--border);
+    }
+    .name-editor-status { font-size: .75rem; color: var(--muted); margin-left: .4rem; }
+
+    .learn-filter { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .learn-filter input[type="search"] { flex: 1 1 16rem; padding: .5rem; border: 1px solid var(--border); border-radius: 4px; }
+    .learn-bucket { margin-bottom: 2rem; }
+    .learn-group { font-size: .95rem; color: var(--muted); margin: 1rem 0 .5rem; }
+    .learn-list { list-style: none; padding: 0; }
+    .learn-group-block { margin-bottom: 1rem; }
+    .learn-entry { padding: .35rem 0; display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+    /* `hidden` alone cannot hide a flex item — .learn-entry's own display beats
+       the UA's [hidden] rule, so the filter needs this to bite. */
+    .learn-entry[hidden] { display: none; }
+    .learn-seen { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; }
+    .learn-ungenerated { font-size: .75rem; color: var(--muted); }
+    .learn-back { display: inline-block; padding-block: 4px; }
+    .learn-intro, .learn-bucket-label, .learn-no-guide, .learn-empty { color: var(--muted); }
+    .learn-status { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
+    .learn-prepare { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
+    .learn-drilling { font-size: .75rem; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 999px; padding: 0 .5rem; }
+    .progress-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; font-size: .85rem; color: var(--muted); margin: 1rem 0 1.5rem; }
+    .progress-legend dt { display: inline; font-weight: 600; color: var(--text); }
+    .progress-legend dd { display: inline; margin: 0 0 0 .3rem; }
+    .progress-note { font-size: .8rem; color: var(--muted); margin-bottom: 1.5rem; }
+    details.progress-group { border: 1px solid var(--border); border-radius: 6px; padding: .6rem .9rem; margin-bottom: .6rem; }
+    details.progress-group summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+    details.progress-group summary::-webkit-details-marker { display: none; }
+    details.progress-group summary::before { content: "▶"; color: var(--accent-text); font-size: .8rem; }
+    details.progress-group[open] summary::before { content: "▼"; }
+    .progress-group-name { font-weight: 600; min-width: 9rem; }
+    /* Each standing sets --rung once; the bar segments and the held dots read it. */
+    .rung-principal_engineer { --rung: #7c6af7; }
+    .rung-senior { --rung: #4ade80; }
+    .rung-junior { --rung: #86efac; }
+    .rung-not_yet, .rung-not_offered { --rung: transparent; }
+    .rung-bar { display: flex; flex: 1 1 8rem; height: .55rem; border-radius: 999px; overflow: hidden; background: var(--border); }
+    .rung-bar span { display: block; height: 100%; background: var(--rung); }
+    .progress-counts { font-size: .8rem; color: var(--muted); }
+    .progress-list { list-style: none; margin: .8rem 0 .2rem; padding: 0; }
+    .progress-entry { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; padding: .25rem 0; }
+    .progress-rungs { display: inline-flex; gap: .2rem; }
+    .progress-rung { width: .5rem; height: .5rem; border-radius: 999px; border: 1px solid var(--muted); }
+    .progress-rung.held { background: var(--rung); border-color: var(--rung); }
+    .progress-word { font-size: .8rem; color: var(--muted); margin-left: auto; }
+    .learn-drill, .learn-drills { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
+    .learn-drills form, .learn-group-head form { display: inline-block; margin-right: .5rem; }
+    .learn-drill-paused { color: var(--accent-text); }
+    .learn-group-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .learn-group-head h3 { margin: 0; }
+    .learn-worked-example { white-space: pre-wrap; }
+    .learn-recognition { border: 1px solid var(--border); border-radius: 6px; padding: .5rem 1rem; margin: .5rem 0 1rem; }
+    .learn-recognition summary { cursor: pointer; color: var(--muted); }
+    .learn-recognition-label { font-size: .85rem; font-weight: 600; margin: .75rem 0 .25rem; }
+
+    /* shared/_featured_concept renders on BOTH the Learn tab and the dashboard,
+       so like the submission-rendering styles above it cannot live in a
+       per-page <style> block. .featured-compact is the dashboard's wrapper;
+       it dials the same block down rather than giving it a second markup. */
+    .featured-concept { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .featured-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin-bottom: .5rem; }
+    .featured-title { font-size: 1.25rem; margin-bottom: .25rem; }
+    .featured-bucket, .featured-tagline { color: var(--muted); font-size: .9rem; }
+    .featured-tagline { margin-top: .5rem; }
+    .featured-compact { margin-top: 2rem; }
+    .featured-compact .featured-concept { padding: .9rem 1rem; margin-bottom: 0; }
+    .featured-compact .featured-title { font-size: 1rem; }
+    /* Fixed rather than inline: the dashboard's autosave fires while the
+       engineer is typing far down a long page, and a message rendered at the
+       top would report the failure somewhere they cannot see. */
+    .save-status { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
+                   z-index: 50; max-width: min(90vw, 32rem); margin: 0; padding: .7rem 1rem;
+                   background: var(--surface); border: 1px solid #a33; border-left: 3px solid #a33;
+                   border-radius: 6px; color: var(--text); font-size: .85rem;
+                   box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <nav>
+    <div class="container inner">
+      
+        <a class="brand" href="/"><img alt="Code Gym" class="brand-mark" width="930" height="654" src="/assets/logo-outlined-444354ae.png" /><span aria-hidden="true">Code Gym</span></a>
+        <button type="button" class="nav-toggle" id="nav-toggle"
+                aria-expanded="false" aria-controls="nav-links"
+                aria-label="Menu">
+          <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
+        </button>
+        <div class="nav-links" id="nav-links">
+          <span class="name-editor">
+            <input type="text"
+                   id="nav-name-input"
+                   class="name-editor-input"
+                   value="Existing"
+                   aria-label="Your display name">
+            <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
+          </span>
+          <script>
+            (function () {
+              const input  = document.getElementById("nav-name-input");
+              const status = document.getElementById("nav-name-status");
+              if (!input) return;
+
+              let lastSaved = input.value;
+              const savedText = "Saved ✓";
+              const errorText = "Couldn\&#39;t save";
+              let statusTimer;
+
+              function flash(message) {
+                status.textContent = message;
+                clearTimeout(statusTimer);
+                statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
+              }
+
+              input.addEventListener("blur", async () => {
+                const name = input.value.trim();
+                if (name === lastSaved) return;
+                if (name === "") { input.value = lastSaved; return; }
+
+                try {
+                  const response = await fetch("/profile", {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Accept": "application/json",
+                      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ user: { name } })
+                  });
+
+                  if (response.ok) {
+                    const data = await response.json();
+                    input.value = data.name;
+                    lastSaved = data.name;
+                    flash(savedText);
+                  } else {
+                    input.value = lastSaved;
+                    flash(errorText);
+                  }
+                } catch {
+                  input.value = lastSaved;
+                  flash(errorText);
+                }
+              });
+            })();
+          </script>
+          <a href="/learn">Learn</a>
+          <a href="/progress">Progress</a>
+          <a href="/history">History</a>
+          <a href="/account">Account</a>
+        </div>
+        <script>
+          (function () {
+            const toggle = document.getElementById("nav-toggle");
+            const links  = document.getElementById("nav-links");
+            if (!toggle || !links) return;
+
+            function closeMenu() {
+              links.removeAttribute("data-open");
+              toggle.setAttribute("aria-expanded", "false");
+            }
+
+            toggle.addEventListener("click", (event) => {
+              event.stopPropagation();
+              if (links.hasAttribute("data-open")) { closeMenu(); return; }
+              links.setAttribute("data-open", "");
+              toggle.setAttribute("aria-expanded", "true");
+            });
+
+            document.addEventListener("click", (event) => {
+              if (!links.hasAttribute("data-open")) return;
+              if (links.contains(event.target)) return;
+              closeMenu();
+            });
+
+            document.addEventListener("keydown", (event) => {
+              if (event.key !== "Escape") return;
+              if (!links.hasAttribute("data-open")) return;
+              closeMenu();
+              toggle.focus();
+            });
+          })();
+        </script>
+    </div>
+  </nav>
+
+  <div class="container" data-pull-content>
+    <main id="main-content" tabindex="-1">
+      <div class="flash notice" id="flash-notice">Welcome back, Existing!</div>
+
+    <style>
+  .page-header { margin-bottom: 2rem; }
+  .page-header h1 { font-size: 1.5rem; }
+  .page-header .date { color: var(--muted); font-size: .9rem; }
+  .page-header .streak { margin-left: .5rem; }
+
+  textarea.answer { width: 100%; min-height: 120px; background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; color: var(--text); font-size: var(--input-font-size); font-family: inherit; resize: vertical; line-height: 1.6; }
+  textarea.answer:focus { border-color: var(--accent); }
+  textarea.code-answer { font-family: "Fira Code", "Cascadia Code", monospace; font-size: var(--input-font-size); min-height: 160px; }
+
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 1.5rem; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+  @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
+  .progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
+  /* The bar's height is fixed so the page can keep a focused field clear of
+     it: a browser that scrolls a field to the top edge stops at
+     scroll-padding-top, which reads the same variable. The focus ring's reach
+     is added because the ring sits outside the field. */
+  :root { --progress-sticky-height: 3.25rem; }
+  html:has(.progress-sticky) {
+    scroll-padding-top: calc(var(--progress-sticky-height) + var(--focus-ring-width) + var(--focus-ring-offset));
+  }
+  .progress-sticky { position: sticky; top: 0; z-index: 10; height: var(--progress-sticky-height); background: var(--bg); padding: .75rem 0 .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .progress-sticky .progress-bar { margin-bottom: 0; }
+
+  .rating-row { display: flex; gap: .75rem; margin-top: 1rem; }
+  .rating-btn { flex: 1; padding: calc(.5rem + 5.5px) .5rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: .85rem; text-align: center; }
+  #submit-answers { padding-block: calc(.5rem + 6px); }
+  .rating-btn:hover { border-color: var(--accent); }
+  .rating-btn.active { background: var(--button-bg); border-color: var(--button-bg); color: #fff; }
+  #rating-nudge { margin-top: .5rem; margin-bottom: 1.5rem; }
+</style>
+
+<div class="page-header">
+  <h1>Today's Workout</h1>
+  <div class="date">
+    Tuesday, September 29
+      <span class="streak">🔥 1-day streak</span>
+  </div>
+</div>
+
+<div id="dashboard-content">
+    
+<div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+  <div>
+      <p class="hint">Today's set has been reviewed, so it can't be replaced — tomorrow's set builds on it.</p>
+  </div>
+
+</div>
+
+  
+  <div class="section">
+  <div class="section-label">  1 — Code Review
+</div>
+  
+  <div class="question">Find the bug</div>
+
+  <pre class="snippet"><code data-hljs="ruby">def a; end</code></pre>
+
+  
+
+
+  
+
+    <div class="answer-display">aaaaaaaaaaaaaaaaaaaa</div>
+
+
+</div>
+
+  <div class="section">
+  <div class="section-label">  2 — Pattern of the Month: Service Objects
+</div>
+  
+  <div class="question">When?</div>
+
+  <div class="why-box"><strong>Why it exists:</strong> Because</div>
+
+  
+
+
+  
+
+    <div class="answer-display">bbbbbbbbbbbbbbbbbbbb</div>
+
+
+</div>
+
+  <div class="section">
+  <div class="section-label">  3 — Coding Challenge
+</div>
+  
+  <div class="question">Implement X</div>
+
+  
+  
+
+
+  
+
+    <div class="answer-display">cccccccccccccccccccc</div>
+
+
+</div>
+
+
+
+  <div class="submit-row">
+  <span class="submitted-badge">✓ Submitted</span>
+    <span class="history-pill">Pattern: just right</span>
+    <span class="history-pill">Challenge: too easy</span>
+    <span class="history-pill">Code review: just right</span>
+</div>
+
+  <div class="review-section" id="ai-review">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <h2 style="font-size:1rem">Claude&#39;s Review</h2>
+      <form class="button_to" method="post" action="/responses/900001/email_review"><button class="btn btn-ghost btn-sm" type="submit">Email me this review</button></form>
+    </div>
+      <div class="review-block">
+    <h3>Pattern<span class="review-rating">solid</span></h3>
+          <div class="review-item">
+            <strong>What you got right:</strong>
+            <ul class="review-points">
+              <li>Right</li>
+            </ul>
+          </div>
+    <div class="alternates" data-section="pattern">
+        <button type="button" class="btn btn-ghost btn-sm explain-differently"
+                data-url="/responses/900001/explain_differently"
+                data-section="pattern">Explain this differently</button>
+      <span class="alternate-status" aria-live="polite"></span>
+    </div>
+    <div class="follow-ups" data-section="pattern">
+      <div class="follow-up-thread" aria-live="polite">
+      </div>
+        <div class="follow-up-form">
+          <label class="visually-hidden" for="follow-up-input-900001-pattern">Ask a follow-up about this feedback</label>
+          <input type="text" class="follow-up-input" id="follow-up-input-900001-pattern" placeholder="Ask a follow-up about this feedback…"
+                 data-url="/responses/900001/follow_ups" data-section="pattern">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+        </div>
+      <span class="follow-up-status" aria-live="polite"></span>
+    </div>
+  </div>
+  <div class="review-block">
+    <h3>Challenge<span class="review-rating">solid</span></h3>
+          <div class="review-item">
+            <strong>What you got right:</strong>
+            <ul class="review-points">
+              <li>Right</li>
+            </ul>
+          </div>
+    <div class="alternates" data-section="challenge">
+        <button type="button" class="btn btn-ghost btn-sm explain-differently"
+                data-url="/responses/900001/explain_differently"
+                data-section="challenge">Explain this differently</button>
+      <span class="alternate-status" aria-live="polite"></span>
+    </div>
+    <div class="follow-ups" data-section="challenge">
+      <div class="follow-up-thread" aria-live="polite">
+      </div>
+        <div class="follow-up-form">
+          <label class="visually-hidden" for="follow-up-input-900001-challenge">Ask a follow-up about this feedback</label>
+          <input type="text" class="follow-up-input" id="follow-up-input-900001-challenge" placeholder="Ask a follow-up about this feedback…"
+                 data-url="/responses/900001/follow_ups" data-section="challenge">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+        </div>
+      <span class="follow-up-status" aria-live="polite"></span>
+    </div>
+  </div>
+  <div class="review-block">
+    <h3>Code review<span class="review-rating">solid</span></h3>
+          <div class="review-item">
+            <strong>What you got right:</strong>
+            <ul class="review-points">
+              <li>Right</li>
+            </ul>
+          </div>
+    <div class="alternates" data-section="code_review">
+        <button type="button" class="btn btn-ghost btn-sm explain-differently"
+                data-url="/responses/900001/explain_differently"
+                data-section="code_review">Explain this differently</button>
+      <span class="alternate-status" aria-live="polite"></span>
+    </div>
+    <div class="follow-ups" data-section="code_review">
+      <div class="follow-up-thread" aria-live="polite">
+      </div>
+        <div class="follow-up-form">
+          <label class="visually-hidden" for="follow-up-input-900001-code_review">Ask a follow-up about this feedback</label>
+          <input type="text" class="follow-up-input" id="follow-up-input-900001-code_review" placeholder="Ask a follow-up about this feedback…"
+                 data-url="/responses/900001/follow_ups" data-section="code_review">
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+        </div>
+      <span class="follow-up-status" aria-live="polite"></span>
+    </div>
+  </div>
+
+
+
+
+  </div>
+
+<script>
+// The review call is synchronous — the request blocks for as long as the
+// provider takes. Disable the button and swap its label so the wait reads as
+// progress rather than a dead click. This partial renders once per page today,
+// but the querySelectorAll + :not([data-review-wired]) guard stays: Turbo
+// re-executes this inline script whenever it replaces #dashboard-content on a
+// broadcast, and the guard stops a form that's already wired from being wired
+// (and its listeners duplicated) again. Inline script, matching the gym-form
+// convention; Stimulus is not wired in this app.
+//
+// button_to (with Rails 8's button_to_generates_button_tag default) renders a
+// <button type="submit">, not an <input type="submit"> — the two need
+// different properties for their label, so read/write whichever is present.
+(() => {
+  document.querySelectorAll("form.review-form:not([data-review-wired])").forEach(form => {
+    form.dataset.reviewWired = "1";
+
+    const button = form.querySelector('button[type="submit"], input[type="submit"]');
+    if (!button) return;
+
+    const isButtonTag = button.tagName === "BUTTON";
+    const originalLabel = isButtonTag ? button.textContent : button.value;
+    const setLabel = (text) => { if (isButtonTag) { button.textContent = text; } else { button.value = text; } };
+
+    form.addEventListener("submit", () => {
+      // Deferred a tick: disabling synchronously inside the submit handler can
+      // cancel the submission in some browsers.
+      setTimeout(() => {
+        button.disabled = true;
+        button.classList.add("btn-loading");
+        setLabel("Generating review…");
+      }, 0);
+    });
+
+    // Every exit from #review redirects to root_path. If the user then
+    // navigates Back, some browsers restore the page from bfcache exactly as
+    // it was — button disabled, label swapped, data-review-wired already set —
+    // and this script does not run again on its own, leaving the button dead
+    // until a manual reload. Reset it on a bfcache restore.
+    window.addEventListener("pageshow", (event) => {
+      if (!event.persisted) return;
+      button.disabled = false;
+      button.classList.remove("btn-loading");
+      setLabel(originalLabel);
+    });
+  });
+})();
+</script>
+
+
+</div>
+
+
+    </main>
+  </div>
+  <script>
+    (() => {
+      document.querySelectorAll("form[data-loading-form]").forEach(form => {
+        const button = form.querySelector('button[type="submit"], input[type="submit"]');
+        if (!button) return;
+
+        // button_to (with Rails 8's button_to_generates_button_tag default)
+        // renders a <button>, not an <input> — the two need different
+        // properties for their label, so read/write whichever is present.
+        const isButtonTag = button.tagName === "BUTTON";
+        const originalLabel = isButtonTag ? button.textContent : button.value;
+        const setLabel = (text) => { if (isButtonTag) { button.textContent = text; } else { button.value = text; } };
+
+        form.addEventListener("submit", (event) => {
+          const message = form.dataset.confirmMessage;
+          if (message && !window.confirm(message)) { event.preventDefault(); return; }
+
+          // Deferred a tick: disabling synchronously inside the submit
+          // handler can cancel the submission in some browsers.
+          setTimeout(() => {
+            button.disabled = true;
+            button.classList.add("btn-loading");
+            if (form.dataset.loadingLabel) setLabel(form.dataset.loadingLabel);
+          }, 0);
+        });
+
+        // A bfcache Back-restore would resurrect the page mid-"loading" —
+        // button dead until a manual reload (same hazard the review button
+        // handles). Reset to idle.
+        window.addEventListener("pageshow", (event) => {
+          if (!event.persisted) return;
+          button.disabled = false;
+          button.classList.remove("btn-loading");
+          setLabel(originalLabel);
+        });
+      });
+    })();
+  </script>
+  <script>
+    (() => {
+      const positionPanel = (term) => {
+        const box = term.closest(".section, .container");
+        if (!box) return;
+        const rect = box.getBoundingClientRect();
+        const pad = parseFloat(getComputedStyle(box).paddingLeft) || 0;
+        term.style.setProperty("--gloss-width", `${rect.width - pad * 2}px`);
+        term.style.setProperty("--gloss-shift", `${rect.left + pad - term.getBoundingClientRect().left}px`);
+      };
+
+      const toggleTerm = (term) => {
+        document.querySelectorAll(".gloss-term.gloss-open").forEach((el) => {
+          if (el !== term) el.classList.remove("gloss-open");
+        });
+        if (term && term.classList.toggle("gloss-open")) positionPanel(term);
+      };
+
+      document.addEventListener("click", (event) => {
+        toggleTerm(event.target.closest(".gloss-term"));
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        const term = event.target.closest(".gloss-term");
+        if (!term) return;
+        event.preventDefault();
+        toggleTerm(term);
+      });
+
+      // :focus-visible and :hover reveal the panel through CSS alone, without
+      // ever toggling .gloss-open, so those paths have to be measured too — the
+      // width cap bounds the panel but does not keep it on screen.
+      const positionFromEvent = (event) => {
+        const term = event.target.closest && event.target.closest(".gloss-term");
+        if (term) positionPanel(term);
+      };
+      document.addEventListener("focusin", positionFromEvent);
+      document.addEventListener("pointerover", positionFromEvent);
+
+      window.addEventListener("resize", () => {
+        const open = document.querySelector(".gloss-term.gloss-open");
+        if (open) positionPanel(open);
+      });
+    })();
+  </script>
+  
+  <p id="save-status" class="save-status" hidden></p>
+<p id="save-status-announcer" class="visually-hidden" role="alert"></p>
+
+<script>
+  window.CodeGymSaveStatus = (function () {
+    const GENERIC = "Couldn't save your last change. It hasn't reached the server — check your connection and try again.";
+    const SIGNED_OUT = "Couldn't save your last change — you've been signed out. Reload the page and sign in again.";
+    const banner = document.getElementById("save-status");
+    const announcer = document.getElementById("save-status-announcer");
+
+    // Keyed by control rather than held as one flag: /setup saves three
+    // different things to one URL, and without a key a successful time-zone
+    // save would clear a warning the exercise-mix save had just earned, while
+    // the rejected checkbox sat there still looking saved.
+    const failures = new Map();
+    // Guards against two saves of the SAME control finishing out of order,
+    // where a slow failure would otherwise overwrite the result of the newer
+    // save that succeeded after it.
+    const issued = new Map();
+    let counter = 0;
+
+    // Work the page shows but the server has not stored yet: a request on the
+    // wire, or a delayed save a page registered through watch(). Pull-to-refresh
+    // waits on pending() so a reload cannot drop an edit mid-save.
+    let requests = 0;
+    const probes = [];
+
+    function watch(probe) {
+      probes.push(probe);
+    }
+
+    function pending() {
+      return requests > 0 || probes.some((probe) => probe());
+    }
+
+    function render() {
+      const messages = Array.from(failures.values());
+
+      if (messages.length === 0) {
+        banner.hidden = true;
+        banner.textContent = "";
+        announcer.textContent = "";
+        return;
+      }
+
+      banner.textContent = messages[messages.length - 1];
+      announcer.textContent = banner.textContent;
+      banner.hidden = false;
+    }
+
+    function fail(key, message) {
+      failures.delete(key);
+      failures.set(key, message);
+      render();
+    }
+
+    function succeed(key) {
+      failures.delete(key);
+      render();
+    }
+
+    // Optional-chained for the same reason api_keys/edit's script was: with
+    // forgery protection off, Rails renders no csrf meta tag at all, and a
+    // throw here would stop the save silently — the exact failure this file
+    // exists to surface.
+    function csrf() {
+      return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
+    }
+
+    function save(method, url, body, key) {
+      const ticket = ++counter;
+      issued.set(key, ticket);
+
+      const current = () => issued.get(key) === ticket;
+
+      requests++;
+      return fetch(url, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-CSRF-Token": csrf()
+        },
+        body: JSON.stringify(body)
+      }).then(async (response) => {
+        // Resolves with { ok, status, data } so a caller able to act on a
+        // particular refusal can. Callers that cannot simply ignore it —
+        // reporting the failure has already happened by then either way.
+        if (!current()) return { ok: false };
+
+        // fetch follows redirects, so a request made after the session expired
+        // arrives here as the login page: 200, and `ok` true, for a save that
+        // stored nothing. Neither endpoint redirects on success, so a redirect
+        // can only mean the write did not happen.
+        if (response.redirected) { fail(key, SIGNED_OUT); return { ok: false }; }
+        if (response.ok) {
+          succeed(key);
+          return { ok: true, data: await response.json().catch(() => null) };
+        }
+
+        // A failure can answer with an HTML error page rather than JSON, and
+        // parsing that throws — hence the inner catch. Only a message the
+        // server actually wrote is shown; anything else falls back to GENERIC,
+        // which is why the rejection path below ignores its own error. A
+        // dropped connection rejects with a browser string ("Failed to fetch"),
+        // and that is a developer's sentence, not one to hand an engineer.
+        const data = await response.json().catch(() => null);
+        fail(key, (data && data.errors && data.errors[0]) || GENERIC);
+        return { ok: false, status: response.status, data: data };
+      }).catch(() => {
+        if (current()) fail(key, GENERIC);
+        return { ok: false };
+      }).finally(() => { requests--; });
+    }
+
+    return { save: save, watch: watch, pending: pending };
+  })();
+</script>
+
+  <div class="pull-refresh" id="pull-refresh" aria-hidden="true"><span class="spinner"></span></div>
+<script>
+  (() => {
+    const indicator = document.getElementById("pull-refresh");
+    const content = document.querySelector("[data-pull-content]");
+    if (!content || getComputedStyle(indicator).display === "none") return;
+
+    // UIScrollView's rubber band: travel approaches MAX_TRAVEL but never
+    // reaches it, so the content keeps giving a little under a longer pull.
+    const MAX_TRAVEL = 160;
+    const THRESHOLD = 64;
+    const HOLD = 64;
+    const MIN_SPIN_MS = 500;
+    const SETTLE_AFTER_LOAD_MS = 400;
+    const SAVE_POLL_MS = 100;
+    const SAVE_WAIT_LIMIT_MS = 10000;
+    const RELOADED_KEY = "codegym:pull-refreshed";
+    const nav = document.querySelector("body > nav");
+    const spinner = indicator.querySelector(".spinner");
+    let startY = null;
+    let ready = false;
+    let refreshing = false;
+    let gap = null;
+
+    function isEditable(element) {
+      return element instanceof Element && element.matches("input, textarea, select, [contenteditable]");
+    }
+
+    // Pulling inside an inner area that is scrolled down scrolls that area,
+    // not the page, so it is not a refresh.
+    function insideScrolledArea(element) {
+      for (let node = element; node instanceof Element; node = node.parentElement) {
+        if (node.scrollTop > 0) return true;
+      }
+      return false;
+    }
+
+    function canStart(event) {
+      return event.touches.length === 1 &&
+             window.scrollY <= 0 &&
+             !isEditable(document.activeElement) &&
+             !isEditable(event.target) &&
+             !document.querySelector("form[inert]") &&
+             !insideScrolledArea(event.target);
+    }
+
+    // Read while the content is at rest, so the gap is the layout's own.
+    function measureGap() {
+      const top = nav ? nav.getBoundingClientRect().bottom : 0;
+      gap = { top, height: content.getBoundingClientRect().top - top };
+    }
+
+    function rubberBand(distance) {
+      return distance * MAX_TRAVEL / (distance + MAX_TRAVEL);
+    }
+
+    function setSettling(settling) {
+      indicator.classList.toggle("is-settling", settling);
+      content.classList.toggle("pull-settling", settling);
+    }
+
+    function moveTo(travel) {
+      const middle = gap.top + (gap.height + travel) / 2;
+      content.style.transform = travel > 0 ? `translateY(${travel}px)` : "";
+      indicator.style.transform = `translateY(${middle - indicator.offsetHeight / 2}px)`;
+    }
+
+    function show(distance) {
+      const travel = rubberBand(distance);
+      setSettling(false);
+      moveTo(travel);
+      indicator.style.opacity = Math.min(travel / THRESHOLD, 1);
+      spinner.style.transform = `rotate(${travel * 4}deg)`;
+      ready = travel >= THRESHOLD;
+      indicator.classList.toggle("is-ready", ready);
+    }
+
+    function spin() {
+      refreshing = true;
+      spinner.style.transform = "";
+      indicator.classList.add("is-refreshing");
+      moveTo(HOLD);
+      indicator.style.opacity = 1;
+    }
+
+    // sessionStorage throws in some private modes; the spinner is only polish.
+    function remember(key, value) {
+      try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value); } catch {}
+    }
+
+    function recall(key) {
+      try { return sessionStorage.getItem(key); } catch { return null; }
+    }
+
+    function reload() {
+      remember(RELOADED_KEY, "1");
+      window.location.reload();
+    }
+
+    function reset() {
+      startY = null;
+      ready = false;
+      refreshing = false;
+      setSettling(true);
+      indicator.classList.remove("is-refreshing", "is-ready");
+      content.style.transform = "";
+      indicator.style.transform = "";
+      indicator.style.opacity = "";
+    }
+
+    // Absent on signed-out pages, which have nothing to save.
+    function savesPending() {
+      return window.CodeGymSaveStatus?.pending() ?? false;
+    }
+
+    // A save still pending at the limit is treated as hung: the pull is
+    // cancelled rather than reloading over it, and can be tried again.
+    function reloadWhenSaved(waited = 0) {
+      if (!savesPending()) return reload();
+      if (waited >= SAVE_WAIT_LIMIT_MS) return reset();
+      setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
+    }
+
+    // A second finger, or any touch that cannot start a pull, ends the one
+    // already showing rather than leaving the content pulled down.
+    document.addEventListener("touchstart", (event) => {
+      if (refreshing) return;
+      if (startY !== null) reset();
+      if (!canStart(event)) return;
+      measureGap();
+      startY = event.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener("touchmove", (event) => {
+      if (startY === null) return;
+      const distance = event.touches[0].clientY - startY;
+      if (distance <= 0 || window.scrollY > 0) return reset();
+      show(distance);
+    }, { passive: true });
+
+    document.addEventListener("touchend", () => {
+      if (startY === null) return;
+      if (!ready) return reset();
+
+      startY = null;
+      setSettling(true);
+      spin();
+      setTimeout(reloadWhenSaved, MIN_SPIN_MS);
+    });
+
+    document.addEventListener("touchcancel", () => { if (startY !== null) reset(); });
+
+    if (recall(RELOADED_KEY)) {
+      remember(RELOADED_KEY, null);
+      measureGap();
+      spin();
+      const settle = () => setTimeout(reset, SETTLE_AFTER_LOAD_MS);
+      if (document.readyState === "complete") settle();
+      else window.addEventListener("load", settle, { once: true });
+    }
+  })();
+</script>
+
+      <script type="module">
+      // Version pinned exactly (not "@11"), matching the Mermaid CDN import's
+      // reasoning: a highlight.js release can't change behavior under us without
+      // a deliberate bump. Core + only the two grammars actually used, not the
+      // ~35-language "common" bundle.
+      //
+      // Degradation is simpler than Mermaid's: the code is already fully correct,
+      // readable plain text before this script runs — highlighting is a pure
+      // enhancement, not something the page depends on. A blocked CDN or a parse
+      // failure just leaves every block exactly as it renders without this script.
+      try {
+        // Bail before fetching anything if this page has no highlightable block
+        // at all (e.g. an architecture-only concept reference, whose pseudocode
+        // never gets a data-hljs attribute) — mirrors the Mermaid script's own
+        // presence check (`arch.dig("reference", "diagram").present?`), just
+        // evaluated client-side since this guard's render call is unconditional
+        // across all four call sites rather than gated per-site on content.
+        if (document.querySelector("code[data-hljs]:not([data-hljs-done])")) {
+          // highlight.js's own jsDelivr "es/" build re-exports from its CJS
+          // "lib/core.js" (see https://github.com/highlightjs/highlight.js/blob/main/es/core.js) —
+          // that CJS-to-ESM interop only works in Node/bundlers, not a native
+          // browser `import()`, where it throws "does not provide an export
+          // named 'default'" and silently disables highlighting on every page.
+          // esm.sh re-transpiles the same CJS source into real ESM, so it
+          // works here. Version pinned exactly, same reasoning as before.
+          const [{ default: hljs }, { default: ruby }, { default: javascript }] = await Promise.all([
+            import("https://esm.sh/highlight.js@11.11.1/lib/core"),
+            import("https://esm.sh/highlight.js@11.11.1/lib/languages/ruby"),
+            import("https://esm.sh/highlight.js@11.11.1/lib/languages/javascript"),
+          ]);
+          hljs.registerLanguage("ruby", ruby);
+          hljs.registerLanguage("javascript", javascript);
+
+          for (const el of document.querySelectorAll("code[data-hljs]:not([data-hljs-done])")) {
+            el.dataset.hljsDone = "1";
+            const lang = el.dataset.hljs;
+            if (!hljs.getLanguage(lang)) continue;
+            // el.textContent reads the already-rendered, already-escaped source out
+            // rather than re-parsing HTML. hljs.highlight()'s .value output is
+            // guaranteed pre-escaped by the library, so it's safe to set as innerHTML.
+            const { value } = hljs.highlight(el.textContent, { language: lang });
+            el.innerHTML = value;
+            el.classList.add("hljs");
+          }
+        }
+      } catch {
+        // CDN unreachable or a module failed to load — blocks stay plain text,
+        // exactly as they render without this script at all.
+      }
+    </script>
+    <script>
+// This script is emitted once (see the guard above) but wires controls
+// across every review-block on the page, so the :not([data-*-wired]) guards
+// are what keep a control from being wired — and its listener duplicated —
+// when new matching elements appear.
+// Inline script matching the app's convention; Stimulus is not wired here.
+(() => {
+  document.querySelectorAll(".explain-differently:not([data-alt-wired])").forEach(button => {
+    button.dataset.altWired = "1";
+    const container = button.parentElement;
+    const status = container.querySelector(".alternate-status");
+
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(button.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: button.dataset.section })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        const p = document.createElement("p");
+        p.className = "alternate-item";
+        p.textContent = data.alternate;
+        container.insertBefore(p, button);
+        // Set, never cleared: the explanation lands outside this live region,
+        // the same pattern the concept reference's alternates use.
+        status.textContent = data.remaining > 0
+          ? "A different explanation was added above."
+          : "A different explanation was added above — that was the last one.";
+        if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't generate that — try again";
+        button.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll(".follow-up-send:not([data-fu-wired])").forEach(button => {
+    button.dataset.fuWired = "1";
+    const container = button.closest(".follow-ups");
+    const input = container.querySelector(".follow-up-input");
+    const thread = container.querySelector(".follow-up-thread");
+    const status = container.querySelector(".follow-up-status");
+
+    const addTurn = (role, text) => {
+      const p = document.createElement("p");
+      p.className = "follow-up-turn follow-up-" + role;
+      p.textContent = text;
+      thread.appendChild(p);
+    };
+
+    const send = async () => {
+      const question = input.value.trim();
+      if (!question) return;
+      button.disabled = true;
+      input.disabled = true;
+      status.textContent = "Thinking…";
+      try {
+        const res = await fetch(input.dataset.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({ section: input.dataset.section, question: question })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+
+        addTurn("user", question);
+        addTurn("assistant", data.answer);
+        input.value = "";
+        status.textContent = "";
+        if (data.remaining > 0) {
+          button.disabled = false;
+          input.disabled = false;
+        } else {
+          container.querySelector(".follow-up-form").remove();
+          const capped = document.createElement("p");
+          capped.className = "follow-up-capped";
+          capped.textContent = "You've used all 3 follow-ups for this section.";
+          container.insertBefore(capped, status);
+        }
+      } catch (e) {
+        status.textContent = e.message || "Couldn't send that — try again";
+        button.disabled = false;
+        input.disabled = false;
+      }
+    };
+
+    button.addEventListener("click", send);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); send(); }
+    });
+  });
+})();
+    </script>
+
+</body>
+</html>

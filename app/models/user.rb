@@ -20,6 +20,7 @@ class User < ApplicationRecord
   validates :skill_level, inclusion: { in: SKILL_LEVELS }
   validates :provider, inclusion: { in: %w[anthropic gemini fake] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
+  validates :learning_track, inclusion: { in: LearningTrack::VALUES }, allow_nil: true
   validate :time_zone_must_be_loadable
   # Only on change, because these read a registry that moves. Unconditional,
   # a kind retired from ExerciseSection would make every user still naming it
@@ -45,6 +46,8 @@ class User < ApplicationRecord
   # levels and locks share one version on purpose: the Exercise mix is one save
   # boundary, so a stale tab is refused whichever half it touched.
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
+  before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
+  before_save :finish_learning_track, if: :on_learning_track?
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -251,6 +254,26 @@ class User < ApplicationRecord
   # ── API key ───────────────────────────────────────────────────────────────
   def api_key_present?
     api_key.present?
+  end
+
+  def on_learning_track? = learning_track == LearningTrack::ON
+
+  # Accounts that existed when the track shipped were backfilled to "none", so
+  # nil means an account created since. The exercise check covers the preview
+  # app's seeded account, which is created after migrations run but arrives
+  # with exercises.
+  def first_run?
+    persisted? && learning_track.nil? && !daily_exercises.exists?
+  end
+
+  def learning_track_change_allowed?(value)
+    case value
+    when LearningTrack::ON then first_run?
+    # A repeat leave is accepted: Setup's Leave control can outlive a track
+    # that a mix save already ended.
+    when LearningTrack::OFF then first_run? || on_learning_track? || learning_track == LearningTrack::OFF
+    else false
+    end
   end
 
   # ── Recent performance for prompt context ─────────────────────────────────
@@ -613,6 +636,29 @@ class User < ApplicationRecord
 
   def bump_section_kind_preferences_version
     self.section_kind_preferences_version += 1
+  end
+
+  # Without a cutoff, results that justified a move could immediately propose
+  # its opposite. Use the user's day even when the caller runs in another zone.
+  def record_track_level_changes
+    return if learning_track_changed?
+
+    before = section_kind_levels_in_database || {}
+    moved = section_kind_levels.select do |key, level|
+      before[key] != level && LearningTrack::LEVELS.include?(level) && LearningTrack::LEVELS.include?(before[key])
+    end
+    return if moved.empty?
+
+    through = Time.use_zone(effective_time_zone) { Date.current }.iso8601
+    self.track_evidence_cutoffs = track_evidence_cutoffs.merge(
+      moved.to_h { |key, level| [ key, { "level" => level, "through" => through } ] }
+    )
+  end
+
+  def finish_learning_track
+    return if section_kind_levels.values.include?(LearningTrack::START_LEVEL)
+
+    self.learning_track = LearningTrack::OFF
   end
 
   def rotatable_keys

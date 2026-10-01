@@ -37,6 +37,8 @@ Rails.application.routes.draw do
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
 
+  get "welcome", to: "welcome#show"
+
   # Account page: log out or permanently delete (anonymize) the account.
   # Singular resource — a user has exactly one.
   resource :account, only: [ :show, :destroy ] do
@@ -76,6 +78,9 @@ Rails.application.routes.draw do
 
   # Inline name autosave (JSON)
   patch "profile", to: "profile#update", as: :profile
+
+  # "Not now" on a learning track proposal (JSON).
+  post "learning_track/dismissal", to: "learning_track_dismissals#create", as: :learning_track_dismissal
 
   # Manually re-run today's exercise generation (capped at once/day in the controller)
   post "regenerate", to: "daily_exercises#regenerate"

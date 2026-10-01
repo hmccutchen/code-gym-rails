@@ -17,6 +17,7 @@ class ProfileController < ApplicationController
     saved = save_with_preference_precondition
 
     return render_stale_preferences if saved == :stale
+    return render_invalid_learning_track if saved == :track_refused
 
     if saved
       render json: saved_body
@@ -144,25 +145,56 @@ class ProfileController < ApplicationController
 
   # The mix controls post the version they last saw, so a tab whose DOM predates
   # another tab's save is refused instead of overwriting it. Absent version
-  # means no precondition, the way an absent If-Match does — the other autosaves
-  # on this page send none and are unaffected.
+  # means no precondition except when joining the learning track — the other
+  # autosaves on this page send none and are unaffected.
   #
   # Read and write sit inside one row lock, the same shape User#anonymize! uses:
   # unlocked they are two statements a second request can interleave with, and
   # both requests would pass a check against the version neither had bumped yet.
+  #
+  # A learning track choice takes the same lock, and is checked after the
+  # reload rather than before: "Experienced" bumps no version, so a Junior
+  # request that passed its check before another tab recorded Experienced
+  # would otherwise still pass the version check and join.
   def save_with_preference_precondition
-    posted = params.require(:user)[:section_kind_preferences_version]
-    return current_user.update(profile_params) if posted.nil?
+    user_params = params.require(:user)
+    posted = user_params[:section_kind_preferences_version]
+    return current_user.update(profile_params) if posted.nil? && !user_params.key?(:learning_track)
 
     outcome = nil
     current_user.with_lock do
-      outcome = if posted.to_s == current_user.section_kind_preferences_version.to_s
-        current_user.update(profile_params)
-      else
+      outcome = if invalid_learning_track_change?(user_params)
+        :track_refused
+      elsif !posted.nil? && posted.to_s != current_user.section_kind_preferences_version.to_s
         :stale
+      else
+        current_user.update(profile_params)
       end
     end
     outcome
+  end
+
+  # A track choice writes the preset or the choice and nothing else, so a lock,
+  # weight or target sent with it is refused rather than saved alongside it.
+  TRACK_CHOICE_KEYS = {
+    LearningTrack::ON  => %w[learning_track section_kind_levels section_kind_preferences_version],
+    LearningTrack::OFF => %w[learning_track]
+  }.freeze
+
+  def invalid_learning_track_change?(user_params)
+    return false unless user_params.key?(:learning_track)
+    return true unless current_user.learning_track_change_allowed?(user_params[:learning_track])
+    return true if (user_params.keys - TRACK_CHOICE_KEYS.fetch(user_params[:learning_track])).any?
+    return false unless user_params[:learning_track] == LearningTrack::ON
+    return true if user_params[:section_kind_preferences_version].nil?
+
+    levels = user_params[:section_kind_levels]
+    !levels.respond_to?(:to_unsafe_h) || levels.to_unsafe_h != LearningTrack.preset_levels
+  end
+
+  def render_invalid_learning_track
+    render json: { errors: [ "That learning track change isn't available." ] },
+           status: :unprocessable_content
   end
 
   # Carries the state the refused tab does not have, so it can show what is
@@ -199,7 +231,7 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size,
+    permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size, :learning_track,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})

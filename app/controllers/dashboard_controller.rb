@@ -8,6 +8,8 @@ class DashboardController < ApplicationController
   before_action :no_store, only: :show
 
   def show
+    return redirect_to(welcome_path) if current_user.first_run?
+
     # Rendered in every state below, weekends and pauses included: it is the one
     # thing this page always has to offer. #status deliberately does not ask —
     # the poller reads generation progress, and a pick is not that.
@@ -25,6 +27,7 @@ class DashboardController < ApplicationController
     end
     @response = @exercise&.daily_response ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
+    @track_proposal = TrackGraduation.for(current_user) if current_user.on_learning_track? && @response&.submitted?
 
     if @exercise&.regenerating?
       @generating = true

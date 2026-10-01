@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "ApiKeys", type: :request do
-  let(:user) { User.create!(email: "dev@example.com", name: "Dev") }
+  let(:user) { User.create!(email: "dev@example.com", name: "Dev", learning_track: "none") }
 
   describe "PATCH /setup" do
     it "saves a valid Anthropic key, encrypted, and detects the provider" do
