@@ -1,0 +1,14 @@
+{
+  "model": "gpt-6.1-sol",
+  "instructions": "SYSTEM TEXT",
+  "input": [
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "store": false,
+  "reasoning": {
+    "effort": "medium"
+  }
+}

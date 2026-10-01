@@ -142,7 +142,7 @@ RSpec.describe "Leaving the learning track on Setup", type: :system, with_csrf: 
       puts "Task 6 key guide at #{size}%: #{measurement.to_json}"
       expect(measurement["documentWidth"]).to be <= 390
       expect(measurement["fontSize"].to_f).to be >= 12.8
-      expect(page).to have_css(".key-guide li", count: 8)
+      expect(page).to have_css(".key-guide li", count: 12)
       expect(page).to have_css(".key-guide p", text: "What it costs.")
     end
   end

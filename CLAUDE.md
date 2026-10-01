@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic or Gemini), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections and rate difficulty before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
+A team Rails app for daily personalized coding exercises. Each engineer logs in (emailed 6-digit code, no passwords), adds their own AI provider API key (Anthropic, Gemini or OpenAI), and gets an AI-generated problem set each morning tailored to their performance history. They answer sections and rate difficulty before submitting. Submission requests an inline AI review; the submitted work and review feed into the next day's problem generation.
 
 ## Git Workflow
 
@@ -204,12 +204,12 @@ advisory signal; it is not evidence that anything was verified.
 
 ```
 User logs in (emailed 6-digit code)
-  └→ enters their own Anthropic or Gemini API key (stored encrypted per-user;
+  └→ enters their own Anthropic, Gemini or OpenAI API key (stored encrypted per-user;
      the key's prefix determines user.provider)
 
 8am weekdays (Solid Queue cron via config/recurring.yml):
   GenerateDailyExercisesJob
-    └→ AiService.for(user) → ClaudeService | GeminiService
+    └→ AiService.for(user) → ClaudeService | GeminiService | OpenaiService
          reads: user.recent_performance (last 10 sessions + ratings + concepts)
          calls: the user's provider with a personalized prompt, in the user's
                 chosen language (user.language_for_today)
@@ -406,9 +406,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Generation, review, both judges and `ConceptMastery` never read track state;
   `spec/services/learning_track_isolation_spec.rb` pins that separation and
   byte-identical generation/judge calls for equal difficulty settings.
-  The key guide appears only for a track account with no exercises. Its approved
-  copy remains scrollable: in Chromium at 390×844, the guide is about 732px
-  tall at default text, 1,123px at 125%, and 1,340px at 140%. Even at default
+  The key guide appears only for a track account with no exercises. Its
+  copy remains scrollable: in Chromium at 390×844, the guide is about 893px
+  tall at default text, 1,321px at 125%, and 1,681px at 140%, measured in an
+  older headless Chromium once the OpenAI section was added (the same build
+  measured the guide without it at 711, 1,069 and 1,340). Even at default
   size it extends below the initial viewport; enlarged text needs vertical
   scrolling. There is no unconditional one-screen promise or hidden content.
 
@@ -420,13 +422,19 @@ concept-specific difficulty descriptions for future generation, not a new set.
   operator's own key. A refresh rewrites the whole shared reference and guide,
   including rows that already have a guide, for every user. Production coverage,
   billed cost and completion remain unmeasured until this runs there.
-- **Per-user API keys**: Each user provides their own Anthropic or Gemini key. Zero shared cost. The key's prefix (`sk-ant-` vs `AIza`/`AQ.`) selects `user.provider`; `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
+- **Per-user API keys**: Each user provides their own Anthropic, Gemini or OpenAI key. Zero shared cost. The key's prefix (`sk-ant-`, `AIza`/`AQ.`, or `sk-proj-`/`sk-svcacct-`/legacy `sk-`) selects `user.provider`; the OpenAI pattern requires alphanumerics straight after a bare `sk-`, so it can never claim an Anthropic key whatever order the patterns are tried in. `AiService.for(user)` dispatches to the right subclass. Stored encrypted with `encrypts :api_key` (ActiveRecord Encryption) in the `users.api_key` column. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass, not editing the base.
 - **Per-purpose model routing**: each provider picks its model from its own
   `MODEL_FOR_PURPOSE`, keyed by the same `purpose` string `ApiUsage` records,
   and falls back to its `DEFAULT_ROUTE` for any purpose not listed. The tables
-  are per provider because the two share no model names and turn thinking down
-  differently (`effort` on Claude, `thinking_level` on Gemini). `call_and_log`
+  are per provider because the providers share no model names and turn thinking down
+  differently (`effort` on Claude, `thinking_level` on Gemini,
+  `reasoning.effort` on OpenAI). OpenAI routes generation and its retry to
+  `gpt-6.1-sol` at `high` effort and everything else to the same model at an
+  explicit `medium`; none of those routes has been compared against another
+  model. A capped OpenAI call sends effort `none` from
+  `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`; GPT-6
+  Astra has no `none`, so like Opus 5.5 it cannot take a capped purpose. `call_and_log`
   hands `purpose:` to `#call` for this. Because an unlisted purpose falls back
   silently, `spec/services/model_routing_spec.rb` fails on a key that no call
   site logs, so a typo cannot quietly route nothing.
@@ -534,8 +542,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   What the turn conversion itself buys is that a user typing `You:` into the
   duck box can no longer forge an assistant
-  turn — but only on the Claude path, where `history` reaches the provider as
-  real `messages`. This is the bullet's second Claude/Gemini asymmetry:
+  turn — but only on the Claude and OpenAI paths, where `history` reaches the
+  provider as real turns (`messages` on Claude, `input` items on OpenAI's
+  Responses API). This is the bullet's second Claude/Gemini asymmetry:
   `GeminiService` still goes through `#flatten_history`, which re-renders the
   same `You:`/`Them:` lines into `input` that made the forgery possible before
   role-tagged turns existed, so the vector is unchanged for Gemini users. This
@@ -775,6 +784,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   lists `.parse` checks, and `.parse` stays the boundary, since the schema
   cannot bound string length. `GeminiService` accepts the keyword and does not
   send it yet (#228), so a Gemini judge reply is held only by its prompt.
+  `OpenaiService` answers the keyword with JSON mode (`text.format:
+  json_object`) rather than the schema: OpenAI's strict schemas need an object
+  at the root and every property required, and `VerdictSchema` builds an
+  `anyOf` with optional fields. JSON mode guarantees a parseable reply, and
+  `.parse` holds the shape.
   `response_schema:` is the fourth additive keyword on `#call`, after
   `cache_system:`, `max_tokens:` and `history:`; `judge_section` and
   `judge_review_prose` (`ReviewProseVerdict.schema`) pass it, and every other
@@ -1321,7 +1335,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Claude only.** `AiService.judges_review_prose?` is false on the base class
   and true on `ClaudeService` (and `FakeService`, for specs), because the
   judge relies on structured output, which `GeminiService` does not send yet
-  (#228). A Gemini user is never judged.
+  (#228). A Gemini user is never judged. Neither is an OpenAI user: its JSON
+  mode does not hold the reply to the schema, and the comparison script that
+  gates the switch runs only Claude models.
 
   **Logging.** The `[review_judge]` line records status, issue types, merge
   indexes and timing, never review text, and the reply is parsed with
@@ -1942,7 +1958,7 @@ always pull in the full suite — is stated once, in
 - `app/controllers/progress_controller.rb` — the `/progress` page: Learn's grouping, `RungLedger`'s standings, `ConceptHosts` for what is offered
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt); one class per kind answers which are thirds, which are fourths, which vocabulary they draw from, which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns the language config; it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
-- `app/services/claude_service.rb` / `gemini_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
+- `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
 - `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read
 - `app/models/review_prose_verdict.rb` — `ReviewProseVerdict`: the prose judge's reply held to its closed lists, the structured-output schema, the projection the judge reads, and `#apply`, which stores the grader's original prose under `graded_prose`. Pure; its specs need no database
 - `app/services/review_prose_judge.rb` — `ReviewProseJudge.enabled?`: the deployment-wide `REVIEW_PROSE_JUDGE` switch, off unless exactly `"1"`

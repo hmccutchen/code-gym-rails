@@ -17,11 +17,13 @@ RSpec.describe "Setup for a learning track user", type: :request do
     expect(guide).to be_present
     expect(guide.text).to include("Getting an API key", "about 20 requests a day", "A normal day here uses about 10",
                                 "people at Google may read it", "works less reliably on Gemini",
-                                "doesn't run on Gemini yet", "the API is prepaid", "sk-ant-", "AQ.")
+                                "doesn't run on Gemini yet", "the API is prepaid", "sk-ant-", "AQ.",
+                                "sk-proj-", "doesn't run on OpenAI yet")
     expect(guide.css("a").map { |link| link["href"] }).to eq([
       "https://platform.claude.com/docs/en/get-api-key",
       "https://support.claude.com/en/articles/8977456-how-do-i-pay-for-my-claude-api-usage",
-      "https://ai.google.dev/gemini-api/docs/quickstart"
+      "https://ai.google.dev/gemini-api/docs/quickstart",
+      "https://platform.openai.com/api-keys"
     ])
     guide.css("a").each do |link|
       expect(link["target"]).to eq("_blank")

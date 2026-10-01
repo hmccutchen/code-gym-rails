@@ -8,7 +8,11 @@ class ApiKeysController < ApplicationController
   # entirely in September 2026) -- accept both during the overlap.
   PROVIDER_PATTERNS = {
     "anthropic" => /\Ask-ant-/,
-    "gemini"    => /\A(AIza|AQ\.)/
+    "gemini"    => /\A(AIza|AQ\.)/,
+    # Project and service-account keys, plus the legacy sk-<random> form. The
+    # legacy branch needs alphanumerics straight after "sk-", so it can never
+    # match an Anthropic key's "sk-ant-".
+    "openai"    => /\Ask-(proj-|svcacct-|[A-Za-z0-9]{20})/
   }.freeze
 
   # GET /setup
@@ -24,7 +28,7 @@ class ApiKeysController < ApplicationController
     provider = PROVIDER_PATTERNS.find { |_, pattern| key.match?(pattern) }&.first
 
     unless provider
-      flash.now[:alert] = "We don't recognize this key format — currently supporting Anthropic and Gemini keys."
+      flash.now[:alert] = "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
       render :edit, status: :unprocessable_content
       return
     end

@@ -18,7 +18,7 @@ class User < ApplicationRecord
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
   validates :skill_level, inclusion: { in: SKILL_LEVELS }
-  validates :provider, inclusion: { in: %w[anthropic gemini fake] }, allow_nil: true
+  validates :provider, inclusion: { in: %w[anthropic gemini openai fake] }, allow_nil: true
   validates :language, inclusion: { in: LANGUAGES }
   validates :learning_track, inclusion: { in: LearningTrack::VALUES }, allow_nil: true
   validate :time_zone_must_be_loadable

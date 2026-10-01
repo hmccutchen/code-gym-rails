@@ -29,8 +29,9 @@ class AiService
   # it's unfinished.
   class TruncatedResponseError < InvalidResponseError; end
 
-  # The provider's safety classifier declined the request: a 200 with
-  # stop_reason "refusal" and no text. Named so it does not surface as an
+  # The provider's safety classifier declined the request: a 200 with no
+  # text and a refusal in its place (Claude's stop_reason "refusal", OpenAI's
+  # refusal content or content filter). Named so it does not surface as an
   # empty-response parse error pointing at the prompt.
   class RefusalError < Error; end
 
@@ -131,8 +132,8 @@ class AiService
   # attempt: the judge never retries.
   REVIEW_JUDGE_READ_TIMEOUT = 30
 
-  # Both providers configure the same retry policy (see ClaudeService::RETRY_OPTIONS /
-  # GeminiService::RETRY_OPTIONS), so how many attempts and how long the backoff
+  # Every provider configures the same retry policy (see each subclass's
+  # RETRY_OPTIONS), so how many attempts and how long the backoff
   # can grow are base-class facts, not per-provider ones — a caller computing a
   # timeout budget from these reads one number, not two duplicated literals.
   RETRY_MAX          = 2
@@ -1002,13 +1003,14 @@ class AiService
 
   # ── Dispatch to the right provider for this user ─────────────────────────
   # "fake" is never reachable through the app — ApiKeysController derives
-  # provider from a two-entry key-format allowlist — so a fake-provider user in
+  # provider from a key-format allowlist — so a fake-provider user in
   # production could only come from a console/DB mistake, where silently serving
   # canned exercises would be worse than failing loudly.
   def self.for(user)
     case user.provider
     when "anthropic" then ClaudeService.new(user.api_key)
     when "gemini"    then GeminiService.new(user.api_key)
+    when "openai"    then OpenaiService.new(user.api_key)
     when "fake"
       raise Error, "User #{user.id} has the test-only fake provider outside a local environment" unless Rails.env.local?
 
@@ -2893,8 +2895,8 @@ class AiService
   # one is available, so users see actionable detail (e.g. "credit balance
   # too low") instead of a bare status code. Falls back to `fallback`
   # whenever the body isn't parseable JSON or lacks the expected shape (5xx
-  # HTML error pages, empty bodies, unrecognized formats). Both Anthropic
-  # and Gemini nest their error detail the same way:
+  # HTML error pages, empty bodies, unrecognized formats). Every provider
+  # nests its error detail the same way:
   # {"error": {"type": "...", "message": "..."}}.
   def extract_provider_message(body, fallback:)
     parsed  = JSON.parse(body.to_s)
@@ -3000,7 +3002,7 @@ class AiService
                   response_schema: response_schema, single_attempt: single_attempt)
     log_usage(user, result, purpose: purpose)
 
-    raise RefusalError, "Claude declined this request (#{result[:refusal]})" if result[:refusal]
+    raise RefusalError, "The provider declined this request (#{result[:refusal]})" if result[:refusal]
 
     if result[:truncated] && !allow_truncated
       raise TruncatedResponseError,

@@ -26,5 +26,14 @@
     <li><%= t("learning_track.setup.key_guide.gemini_quality") %></li>
   </ul>
 
+  <p class="hint"><strong><%= t("learning_track.setup.key_guide.openai") %></strong></p>
+  <ol class="hint">
+    <li><%= t("learning_track.setup.key_guide.openai_guide_html",
+              link: link_to(t("learning_track.setup.key_guide.openai_guide_link"), "https://platform.openai.com/api-keys", target: "_blank", rel: "noopener")) %></li>
+    <li><%= t("learning_track.setup.key_guide.openai_credits") %></li>
+    <li><%= t("learning_track.setup.key_guide.openai_paste_html", prefix: tag.code("sk-proj-")) %></li>
+    <li><%= t("learning_track.setup.key_guide.openai_quality") %></li>
+  </ol>
+
   <p class="hint"><strong><%= t("learning_track.setup.key_guide.cost_heading") %></strong> <%= t("learning_track.setup.key_guide.cost") %></p>
 </section>
