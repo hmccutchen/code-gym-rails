@@ -6,10 +6,10 @@ class LadderCoverage
     def gaps = pairs - grounded
   end
 
-  # Which pairs each kind can offer is ConceptHosts' answer; this adds only
-  # which of them already carry a ladder.
+  # Which pairs each kind can offer is ConceptHosts' answer, at each targeted
+  # kind's own level; this adds only which of them already carry a ladder.
   def self.for(user)
-    pairs_by_kind = ConceptHosts.for(user).pairs_by_kind
+    pairs_by_kind = ConceptHosts.for(user, difficulty: KindDifficulty.for(user)).pairs_by_kind
     grounded = laddered_pairs(pairs_by_kind.values.flatten(1).uniq)
 
     new(pairs_by_kind.to_h { |kind, pairs| [ kind, Entry.new(kind: kind, pairs: pairs, grounded: pairs & grounded) ] })

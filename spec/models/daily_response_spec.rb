@@ -128,10 +128,11 @@ RSpec.describe DailyResponse, type: :model do
       exercise = DailyExercise.create!(user: User.create!(email: "eight-key@example.com", name: "Eight"),
                                        date: Date.current, generated_at: Time.current,
                                        problem_set: ExerciseSection.keys.index_with { {} })
+      answer = ->(key) { key == "design_comparison" ? ExerciseSection::DesignComparison.encode_answer("a", "a" * 40) : "a" * 20 }
       response = DailyResponse.new(daily_exercise: exercise,
-                                   answers: exercise.active_section_keys.index_with { "a" * 20 })
+                                   answers: exercise.active_section_keys.index_with(&answer))
 
-      expect(exercise.active_section_keys.size).to eq(4)
+      expect(exercise.active_section_keys.size).to eq(ExerciseSection::MAX_SECTIONS)
       expect(response.completeness).to eq(100)
     end
 

@@ -1,7 +1,8 @@
 # Turns a parsed provider problem set into one that is safe to persist:
 # concepts held to their closed vocabulary, scaffolds and diagrams bounded,
 # parsons blocks scrambled for display, and each resolved section held to its
-# kind's own check (ExerciseSection.reject_unusable!). This is the generation
+# kind's own check and arranged by it (ExerciseSection.reject_unusable!,
+# .arrange!). This is the generation
 # boundary — the one place provider output is checked before anything
 # downstream is allowed to assume it is clean.
 #
@@ -179,12 +180,14 @@ class ProblemSetIngest
     reject_missing_sections!
     warn_unrequested_sections!
     prune_retry_extras!
+    prune_unplanned_slots!
     reject_unusable_sections!
     enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
     shuffle_parsons_blocks!
+    arrange_sections!
     strip_current_schemas!
     strip_server_stamps!
     ground_code_review!
@@ -198,7 +201,7 @@ class ProblemSetIngest
   # A silently short set would make sections_total under-report, which feeds
   # recent_performance, which sizes tomorrow's set — the day's own provider
   # glitch nudging future days shorter. Extra sections are fine: FakeService
-  # returns all eight, and only the resolved ones are ever rendered.
+  # returns every kind, and only the resolved ones are ever rendered.
   def reject_missing_sections!
     missing = @expected_keys.reject { |key| ExerciseSection.present?(@problem_set, key) }
     return if missing.empty?
@@ -232,6 +235,25 @@ class ProblemSetIngest
     return if @fixed_concepts.empty?
 
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
+  end
+
+  # There are more slots than a day holds, so a payload with a shape in every
+  # slot resolves past ExerciseSection::MAX_SECTIONS, and the cap in
+  # ExerciseSection.resolved_keys would then cut whichever slot comes last,
+  # requested or not. Dropping the slots the plan left empty first means the
+  # cap only ever trims what nobody asked for. Below the cap an extra section
+  # is kept, as warn_unrequested_sections! describes.
+  def prune_unplanned_slots!
+    return if resolved_slot_count <= ExerciseSection::MAX_SECTIONS
+
+    ExerciseSection.slots.each_value do |kinds|
+      keys = kinds.map(&:key)
+      @problem_set = @problem_set.except(*keys) if (keys & @expected_keys).empty?
+    end
+  end
+
+  def resolved_slot_count
+    ExerciseSection.slots.values.count { |kinds| ExerciseSection.resolved_key(@problem_set, kinds) }
   end
 
   # Only the sections the set resolves to: a provider that returns two fourth
@@ -382,6 +404,14 @@ class ProblemSetIngest
 
       section["pitched_at"] = @pitched_at.fetch(key)
       section["eased"] = true if @eased_for.fetch(key, []).include?(section["concept"])
+    end
+  end
+
+  # Runs on resolved sections only, after reject_unusable_sections! has
+  # accepted them, for the same reason that step does.
+  def arrange_sections!
+    ExerciseSection.resolved_keys(@problem_set).each do |key|
+      ExerciseSection.for(key).arrange!(@problem_set[key])
     end
   end
 

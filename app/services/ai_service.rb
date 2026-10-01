@@ -1639,6 +1639,8 @@ class AiService
       ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
       ("The problem to plan:\n#{data["problem_statement"]}" if data["problem_statement"].present?),
       ("Feature request:\n#{data["request"]}" if data["request"].present?),
+      ("Piece A:\n#{data["piece_a"]}" if data["piece_a"].present?),
+      ("Piece B:\n#{data["piece_b"]}" if data["piece_b"].present?),
       duck_parsons_blocks(data)
     ].compact.join("\n")
   end
@@ -1757,10 +1759,10 @@ class AiService
   # hosts only the rest. pattern and the language-vocabulary thirds are
   # unscoped, which is what keeps a due data-modeling concept reachable on a
   # non-schema day.
-  def annotate_retention_concept(cm, kinds, language, code_review_mode)
+  def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
-      kind.key if can_host?(cm, kind.key, language, mode: mode)
+      kind.key if can_host?(cm, kind.key, language, mode: mode, rung: rungs[kind])
     end
 
     # nil, not "concept ()": with every line derived, a day can present no
@@ -1786,7 +1788,8 @@ class AiService
   # exclusion, which is exactly what adding a second concept group did.
   #
   # `mode` is passed only for code_review, the one kind whose selectable
-  # vocabulary depends on it; the third slot is never code_review.
+  # vocabulary depends on it; the third slot is never code_review. `rung` is
+  # the level the section is pitched at, which a kind may narrow by.
   #
   # `language` is the day's actual generation language, deliberately not
   # `cm.language`: for an architecture-bucket concept the two diverge
@@ -1796,8 +1799,8 @@ class AiService
   # kinds against that entry's vocabulary instead of the day's real one,
   # falsely reporting code_review/pattern as hosts for an architecture
   # concept.
-  def can_host?(cm, section_key, language, mode: nil)
-    ProblemSetIngest.selectable_vocabulary_for(section_key, language, mode: mode).include?(cm.concept)
+  def can_host?(cm, section_key, language, mode: nil, rung: nil)
+    ProblemSetIngest.selectable_vocabulary_for(section_key, language, mode: mode, rung: rung).include?(cm.concept)
   end
 
   # Delivery is advisory, so the only way to know whether retention checks actually
@@ -1906,7 +1909,7 @@ class AiService
     return {} if targeted.empty?
 
     per_kind = targeted.to_h do |kind|
-      vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode)
+      vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: difficulty.level_for(kind))
       grounded   = vocabulary & ladders.fetch(difficulty.level_for(kind), {}).keys
       chosen     = problem_set.dig(kind.key, "concept")
       [ kind.key, { level: difficulty.level_for(kind), locked: difficulty.locked?(kind),
@@ -2037,7 +2040,8 @@ class AiService
     # filter_map, not map: a due concept no section can host today annotates as
     # nil and is dropped, so the block disappears entirely rather than listing
     # a concept the prompt cannot ask for.
-    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode) }
+    rungs = kinds.index_with { |kind| difficulty.rung_for(kind, skill_level: user.skill_level) }
+    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode, rungs) }
 
     retention_block =
       if annotated_due_checks.any?
@@ -2127,7 +2131,7 @@ class AiService
     # it and the rest absorb it, which is what the uniform context is for.
     sections_guidance = kinds.map { |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
-      generation_guidance_for(kind, language, mode: mode, source: code_review_source)
+      generation_guidance_for(kind, language, mode: mode, source: code_review_source, rung: rungs[kind])
     }.join("\n")
 
     <<~PROMPT
@@ -2218,7 +2222,8 @@ class AiService
       "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
       "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
       "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
-      "migration to review."
+      "migration to review; a design_comparison shows two working ways to model the relationship and asks " \
+      "which one the stated access pattern should use."
   end
 
   # The meta-skill concepts name a way of reasoning, which makes them the one
@@ -2248,7 +2253,9 @@ class AiService
       "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
       "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
       "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
-      "section's own idiom: on a test-file code_review, a god_object is a bloated test class. The challenge " \
+      "section's own idiom: on a test-file code_review, a god_object is a bloated test class; a " \
+      "design_comparison shows one piece with the smell and one without it, behaving the same, and the " \
+      "scenario states how the code changes, which decides what the smell costs. The challenge " \
       "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
       "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
       "restructure it, so writing the better shape IS the answer rather than describing it."
@@ -2269,7 +2276,9 @@ class AiService
       "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
       "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
       "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
-      "costs; on a test-file code_review the planted test smell must BE the violation rather than sit beside it, " \
+      "costs; a design_comparison shows one piece that follows the principle and one that breaks it, behaving " \
+      "the same, and the scenario states the change that makes the difference matter; " \
+      "on a test-file code_review the planted test smell must BE the violation rather than sit beside it, " \
       "which every principle in the group can express — a dependency_inversion violation is a test that can only " \
       "reach its subject by stubbing one hard-coded collaborator, an open_closed violation is a conditional " \
       "inside the test that gains a branch for every case added, and a composition_over_inheritance violation is " \
@@ -2296,7 +2305,8 @@ class AiService
       "forwards its arguments to one collaborator; on a test-file code_review, a shallow_module is a test helper " \
       "whose setup arguments spell out the very state it claims to hide; a pattern, which shows no code, " \
       "describes a module's interface and asks what it actually hides and what it forces every caller to know " \
-      "anyway. The challenge section is " \
+      "anyway; a design_comparison shows a deep and a shallow version of the same interface, behaving the " \
+      "same, and the scenario states how callers use it. The challenge section is " \
       "the exception to the answer shape, since its answer is code: there the starter_code exhibits the shape — " \
       "for temporal_decomposition, a flow split into objects that exist only because they run in that order — and " \
       "the question asks for the version organized around information instead, so writing the deeper module IS " \
@@ -2355,7 +2365,9 @@ class AiService
       "owns the set, or a caller reaching past the owner to update a member directly; it is never about whether a " \
       "transaction was opened, which is transaction_safety, nor about which service owns the data, which is " \
       "data_ownership. Express it in the host section's own idiom: a pattern, which shows no code, describes the " \
-      "model in the domain's words and asks which name is overloaded or which writes must not be separable; on a " \
+      "model in the domain's words and asks which name is overloaded or which writes must not be separable; a " \
+      "design_comparison shows two models with the same behavior, only one named or bounded the way the stated " \
+      "domain is; on a " \
       "test-file code_review the planted test smell must BE the instance rather than sit beside it — a test whose " \
       "own setup names the same thing two ways, or one that builds a member row the aggregate's rules forbid on " \
       "its own. The challenge section is the exception to the answer shape, since its answer is code: there " \
@@ -2375,7 +2387,8 @@ class AiService
 
     requests = targeted.map do |kind|
       { level: difficulty.level_for(kind), bucket: ConceptBucket.for(kind.key, language),
-        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode) }
+        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode,
+                                                             rung: difficulty.level_for(kind)) }
     end
     pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
 
@@ -2462,16 +2475,17 @@ class AiService
   # one lived here for code_review's mode arguments, which put per-kind
   # knowledge back into the shared assembler that .generation_guidance exists
   # to keep it out of.
-  def generation_guidance_for(kind, language, mode: nil, source: nil)
+  def generation_guidance_for(kind, language, mode: nil, source: nil, rung: nil)
     config = config_for(language)
 
     kind.generation_guidance(
-      vocabulary:     ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode),
+      vocabulary:     ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: rung),
       label:          config[:label],
       mode:           mode,
       artifact:       config[:schema_artifact],
       test_framework: config[:test_framework],
-      source:         source
+      source:         source,
+      rung:           rung
     )
   end
 

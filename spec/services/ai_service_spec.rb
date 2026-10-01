@@ -198,10 +198,16 @@ RSpec.describe AiService do
   # placeholder — satisfying whichever outcome an unstubbed roll picks, without
   # pinning it. Overrides replace a placeholder with the content a test cares
   # about; #present? only requires a Hash, so an untouched placeholder is inert.
+  # The design comparison is the exception: it is in every day and its
+  # boundary check refuses an empty object, so it gets real content.
   def full_problem_set(overrides = {})
-    base = { "code_review" => {}, "pattern" => {} }
-    (ExerciseSection.thirds + ExerciseSection.fourths).each { |kind| base[kind.key] = {} }
+    base = ExerciseSection.keys.index_with { {} }
+    base["design_comparison"] = design_comparison_section
     base.merge(overrides)
+  end
+
+  def design_comparison_section
+    FakeService::EXERCISE_PROBLEM_SET["design_comparison"].deep_dup
   end
 
   # The single-shot purposes must never acquire conversational turns without
@@ -435,7 +441,7 @@ RSpec.describe AiService do
 
     it "defaults to the challenge third and the plan_review fourth" do
       schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails"))
-      expect(schema.keys).to eq(%w[code_review pattern challenge plan_review])
+      expect(schema.keys).to eq(%w[code_review design_comparison pattern challenge plan_review])
     end
 
     # The kinds assert their own label interpolation; this asserts AiService
@@ -451,7 +457,7 @@ RSpec.describe AiService do
 
     it "assembles the rolled third and fourth in slot order" do
       schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :architecture, fourth: :ambiguity_hunt))
-      expect(schema.keys).to eq(%w[code_review pattern architecture ambiguity_hunt])
+      expect(schema.keys).to eq(%w[code_review design_comparison pattern architecture ambiguity_hunt])
     end
   end
 
@@ -462,7 +468,7 @@ RSpec.describe AiService do
       schema = JSON.parse(service.send(:exercise_schema_for, "ruby_rails", third: :challenge,
                                        fourth: nil, pattern: nil))
 
-      expect(schema.keys).to eq(%w[code_review challenge])
+      expect(schema.keys).to eq(%w[code_review design_comparison challenge])
     end
 
     it "writes no fourth-section reinforcement line when there is no fourth" do
@@ -1528,7 +1534,7 @@ RSpec.describe AiService do
                                     code_review_mode: mode, code_review_source: excerpt, scenario_flavor: flavor,
                                     reinforcement: [], due_checks: [ due ])
 
-              expect(prompt).to include("Retention checks due today: #{concept} (code_review, pattern, or challenge)")
+              expect(prompt).to include("Retention checks due today: #{concept} (code_review, design_comparison, pattern, or challenge)")
               expect(prompt).to include("new business domain, new class and method names")
               expect(prompt).to include("A retention check may use this excerpt")
               expect(prompt).to include("make the planted flaw a fresh application of the chosen concept")
@@ -1835,7 +1841,7 @@ RSpec.describe AiService do
       # anywhere — memoization is also in RAILS_CONCEPTS and printed in every
       # ruby_rails prompt's vocabulary bullet, so a looser assertion would pass
       # even if due_checks were ignored entirely.
-      expect(prompt).to include("Retention checks due today: memoization (code_review, pattern, or challenge)")
+      expect(prompt).to include("Retention checks due today: memoization (code_review, design_comparison, pattern, or challenge)")
       expect(prompt).to match(/retention check/i)
       expect(prompt).to match(/fresh/i)
       expect(prompt).to match(/full difficulty|do not (ease|simplify)/i)
@@ -1854,7 +1860,7 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :architecture,
                             reinforcement: [], due_checks: [ cm ])
 
-      expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
+      expect(prompt).to include("Retention checks due today: memoization (code_review, design_comparison, or pattern)")
     end
 
     it "annotates a language-bucket concept as code_review/pattern-only for the security_review third when the concept isn't a security concept" do
@@ -1864,7 +1870,7 @@ RSpec.describe AiService do
       prompt = service.send(:build_exercise_prompt, user, "ruby_rails", third: :security_review,
                             reinforcement: [], due_checks: [ cm ])
 
-      expect(prompt).to include("Retention checks due today: memoization (code_review or pattern)")
+      expect(prompt).to include("Retention checks due today: memoization (code_review, design_comparison, or pattern)")
     end
 
     it "annotates a security concept as legal in security_review too" do
@@ -1892,33 +1898,45 @@ RSpec.describe AiService do
     # architecture-bucket concept's bucket is the pseudo-language
     # "architecture" instead, so those call sites pass the day's real
     # language explicitly.
-    def annotation(concept, language:, third:, mode:, day_language: language)
+    def annotation(concept, language:, third:, mode:, day_language: language, rungs: {})
       cm = ConceptMastery.new(user: user, concept: concept, language: language,
                               tier: :standard, next_retention_check_on: Date.current,
                               retention_interval_days: 7)
       kinds = ExerciseSection.for_plan(third: third, fourth: nil)
-      service.send(:annotate_retention_concept, cm, kinds, day_language, mode)
+      service.send(:annotate_retention_concept, cm, kinds, day_language, mode, rungs)
     end
 
     it "offers code_review for a data-modeling concept only on a schema-review day" do
       expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :schema_review))
-        .to eq("missing_index (code_review, pattern, or challenge)")
+        .to eq("missing_index (code_review, design_comparison, pattern, or challenge)")
       expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :application_code))
-        .to eq("missing_index (pattern or challenge)")
+        .to eq("missing_index (design_comparison, pattern, or challenge)")
     end
 
     it "withholds code_review from an ordinary concept on a schema-review day" do
       expect(annotation("n_plus_one", language: "ruby_rails", third: :challenge, mode: :schema_review))
-        .to eq("n_plus_one (pattern or challenge)")
+        .to eq("n_plus_one (design_comparison, pattern, or challenge)")
+    end
+
+    it "offers design_comparison a tradeoff concept only when it is pitched at principal_engineer" do
+      principal = { ExerciseSection::DesignComparison => "principal_engineer" }
+      senior    = { ExerciseSection::DesignComparison => "senior" }
+
+      expect(annotation("denormalization_tradeoffs", language: "ruby_rails", third: :challenge,
+                        mode: :application_code, rungs: principal))
+        .to eq("denormalization_tradeoffs (design_comparison, pattern, or challenge)")
+      expect(annotation("denormalization_tradeoffs", language: "ruby_rails", third: :challenge,
+                        mode: :application_code, rungs: senior))
+        .to eq("denormalization_tradeoffs (pattern or challenge)")
     end
 
     it "is unchanged for an ordinary concept on a non-schema day" do
       expect(annotation("n_plus_one", language: "ruby_rails", third: :challenge, mode: :application_code))
-        .to eq("n_plus_one (code_review, pattern, or challenge)")
+        .to eq("n_plus_one (code_review, design_comparison, pattern, or challenge)")
       expect(annotation("n_plus_one", language: "ruby_rails", third: :architecture, mode: :application_code))
-        .to eq("n_plus_one (code_review or pattern)")
+        .to eq("n_plus_one (code_review, design_comparison, or pattern)")
       expect(annotation("memoization", language: "ruby_rails", third: :security_review, mode: :application_code))
-        .to eq("memoization (code_review or pattern)")
+        .to eq("memoization (code_review, design_comparison, or pattern)")
       expect(annotation("sql_injection_prevention", language: "ruby_rails", third: :security_review, mode: :application_code))
         .to eq("sql_injection_prevention (code_review, pattern, or security_review)")
     end
@@ -1938,14 +1956,14 @@ RSpec.describe AiService do
       allow(ExerciseSection::Pattern).to receive(:excluded_vocabulary_keys).and_return([ :data_modeling ])
 
       expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :schema_review))
-        .to eq("missing_index (code_review or challenge)")
+        .to eq("missing_index (code_review, design_comparison, or challenge)")
     end
 
     it "drops code_review once its kind excludes the concept's group" do
       allow(ExerciseSection::CodeReview).to receive(:excluded_vocabulary_keys).and_return([ :data_modeling ])
 
       expect(annotation("missing_index", language: "ruby_rails", third: :challenge, mode: :schema_review))
-        .to eq("missing_index (pattern or challenge)")
+        .to eq("missing_index (design_comparison, pattern, or challenge)")
     end
 
     # Deriving all three lines removed the old unconditional `pattern`, and with
@@ -1973,7 +1991,7 @@ RSpec.describe AiService do
     # derive through #can_host?, so the same drift cannot return to any of them.
     it "withholds a parsons_problem third for a group that kind excludes" do
       expect(annotation("missing_index", language: "ruby_rails", third: :parsons_problem, mode: :application_code))
-        .to eq("missing_index (pattern)")
+        .to eq("missing_index (design_comparison or pattern)")
       expect(annotation("reading_for_intent", language: "ruby_rails", third: :parsons_problem, mode: :application_code))
         .to eq("reading_for_intent (code_review or pattern)")
     end
@@ -2003,14 +2021,14 @@ RSpec.describe AiService do
     it "annotates an architecture concept to the architecture section when the day has one" do
       kinds = ExerciseSection.for_plan(third: :architecture, fourth: nil)
 
-      expect(service.send(:annotate_retention_concept, concept, kinds, "ruby_rails", :application_code))
+      expect(service.send(:annotate_retention_concept, concept, kinds, "ruby_rails", :application_code, {}))
         .to include("architecture")
     end
 
     it "drops an architecture concept on a day with no architecture section" do
       kinds = ExerciseSection.for_plan(third: :challenge, fourth: nil)
 
-      expect(service.send(:annotate_retention_concept, concept, kinds, "ruby_rails", :application_code)).to be_nil
+      expect(service.send(:annotate_retention_concept, concept, kinds, "ruby_rails", :application_code, {})).to be_nil
     end
   end
 
@@ -2146,15 +2164,16 @@ RSpec.describe AiService do
       # every one of them (not a proxy over rung payload alone) can find the
       # true maximum. Fails when a vocabulary grows past the budget, so the
       # decision to shorten rungs or change delivery is made on purpose.
-      def largest_block_for(language, mode, third, fourth)
-        kinds = ExerciseSection.for_plan(pattern: :pattern, third: third, fourth: fourth)
-        vocab = kinds.to_h { |kind| [ kind, ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) ] }
-
+      #
+      # Each kind's vocabulary is read at the level it is assigned, as ladders_for
+      # reads it, since a kind may offer more concepts at one rung than another.
+      def largest_block_for(language, mode, kinds)
         KindDifficulty::LEVELS.repeated_permutation(kinds.size).map do |levels|
           placed = kinds.zip(levels)
           difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
           ladders = placed.each_with_object({}) do |(kind, level), acc|
-            (acc[level] ||= {}).merge!(vocab[kind].index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
+            vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: level)
+            (acc[level] ||= {}).merge!(vocabulary.index_with { "x" * AiService::MAX_LADDER_RUNG_LENGTH })
           end
 
           service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
@@ -2171,17 +2190,32 @@ RSpec.describe AiService do
           service.send(:locked_difficulty_line, locked) ].compact.sum { |line| line.length + 1 }
       end
 
+      # Every day shape a plan can produce: there are more slots than a day
+      # holds, so only the combinations of at most MAX_SECTIONS kinds are days.
+      def day_shapes
+        patterns = [ :pattern, nil ]
+        thirds   = ExerciseSection.thirds.map { |kind| kind.key.to_sym } + [ nil ]
+        fourths  = ExerciseSection.fourths.map { |kind| kind.key.to_sym } + [ nil ]
+
+        patterns.product(thirds, fourths)
+          .map { |pattern, third, fourth| ExerciseSection.for_plan(pattern: pattern, third: third, fourth: fourth) }
+          .select { |kinds| kinds.size <= ExerciseSection::MAX_SECTIONS }
+      end
+
       it "holds the largest block any day can render" do
-        shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys,
-                                                  ExerciseSection.thirds.map { |kind| kind.key.to_sym },
-                                                  ExerciseSection.fourths.map { |kind| kind.key.to_sym })
+        shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys, day_shapes)
 
         expect(shapes.map { |shape| largest_block_for(*shape) }.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
       end
 
+      it "counts only day shapes a plan can produce" do
+        expect(day_shapes.map(&:size).max).to eq(ExerciseSection::MAX_SECTIONS)
+        expect(day_shapes).to all(include(*ExerciseSection.fixed))
+      end
+
       it "includes mixed locks that render more instructions than locking every kind" do
-        kinds = ExerciseSection.for_plan(pattern: :pattern, third: :challenge, fourth: :pseudocode_to_code)
-        levels = { "code_review" => "junior", "pattern" => "senior",
+        kinds = ExerciseSection.for_plan(pattern: nil, third: :challenge, fourth: :pseudocode_to_code)
+        levels = { "code_review" => "junior", "design_comparison" => "senior",
                    "challenge" => "principal_engineer", "pseudocode_to_code" => "junior" }
         ladders = kinds.each_with_object({}) do |kind, acc|
           vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, "javascript", mode: :application_code)
@@ -2190,11 +2224,11 @@ RSpec.describe AiService do
         difficulty = KindDifficulty.new(levels: levels, locked: [ "code_review" ])
         mixed = service.send(:kind_difficulty_guidance, kinds, difficulty, ladders).length
 
-        expect(largest_block_for("javascript", :application_code, :challenge, :pseudocode_to_code)).to be >= mixed
+        expect(largest_block_for("javascript", :application_code, kinds)).to be >= mixed
       end
 
       it "isolates lock overhead from every level assignment in the rendered block" do
-        kinds = ExerciseSection.for_plan(pattern: :pattern, third: :challenge, fourth: :pseudocode_to_code)
+        kinds = ExerciseSection.for_plan(pattern: nil, third: :challenge, fourth: :pseudocode_to_code)
         rungs = KindDifficulty::LEVELS.index_with { { "example" => "x" * AiService::MAX_LADDER_RUNG_LENGTH } }
 
         KindDifficulty::LEVELS.repeated_permutation(kinds.size).each do |levels|
@@ -2444,9 +2478,9 @@ RSpec.describe AiService do
     end
 
     it "leaves problem sets without a parsons_problem section untouched" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :architecture, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
-      set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => {},
+      set = { "code_review" => { "concept" => "n_plus_one" }, "design_comparison" => design_comparison_section,
               "architecture" => {}, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
 
@@ -2497,7 +2531,7 @@ RSpec.describe AiService do
     it "threads the rolled third-section kind into the exercise prompt" do
       set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = double_class.new(canned_text: set.to_json)
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :architecture, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :architecture, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
       expect(svc).to receive(:build_exercise_prompt).with(user, anything, hash_including(third: :architecture)).and_call_original
       svc.generate_exercise(user)
@@ -2540,7 +2574,7 @@ RSpec.describe AiService do
       end
       set = full_problem_set("code_review" => { "concept" => "n_plus_one" })
       svc = spy_class.new(canned_text: set.to_json)
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc.generate_exercise(user, language: "ruby_rails")
@@ -2675,7 +2709,7 @@ RSpec.describe AiService do
       set = full_problem_set("plan_review" => { "concept" => "scope_creep" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       logged = []
@@ -2700,7 +2734,7 @@ RSpec.describe AiService do
     end
 
     it "logs what was requested and what was delivered on every generation" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       set = full_problem_set("code_review" => { "concept" => "memoization", "title" => "t", "question" => "q" })
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "reduced" } ])
@@ -2724,14 +2758,16 @@ RSpec.describe AiService do
       expect(payload["requested"]).to have_key("due_checks")
       expect(payload["requested"]).to have_key("established")
       expect(payload["requested"]).to have_key("recent_performance")
-      expect(payload["requested"]["pattern"]).to eq("pattern")
+      expect(payload["requested"]["pattern"]).to be_nil
       expect(payload["requested"]["third"]).to eq("challenge")
       expect(payload["requested"]["fourth"]).to eq("plan_review")
       expect(payload["requested"]["section_count"]).to eq(4)
-      # Ingest stamps the rung each presented section was pitched at, so the
-      # delivered record carries it; everything else is the set as returned.
+      # Ingest stamps the rung each presented section was pitched at, drops
+      # the slot the plan left empty, and places the design comparison's
+      # pieces; everything else is the set as returned.
       without_stamps = payload["delivered"].transform_values { |section| section.is_a?(Hash) ? section.except("pitched_at", "eased") : section }
-      expect(without_stamps).to eq(JSON.parse(set.to_json))
+      expect(without_stamps.except("design_comparison")).to eq(JSON.parse(set.except("pattern", "design_comparison").to_json))
+      expect(without_stamps["design_comparison"]).to include("piece_a", "piece_b")
       expect(payload["delivered"]["code_review"]["pitched_at"]).to eq("junior")
     end
 
@@ -2765,6 +2801,7 @@ RSpec.describe AiService do
     # This is the only place a whole problem_set is serialized, so it is the
     # only place the ambiguity hunt's answer key could reach log storage.
     it "redacts the ambiguity hunt's planted answer key from the delivered payload" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :ambiguity_hunt)
       planted = Array.new(ExerciseSection::AmbiguityHunt::PLANTED_COUNT) { |i| "secret ambiguity #{i}" }
       set = full_problem_set(
         "code_review"    => { "concept" => "n_plus_one" },
@@ -2790,6 +2827,31 @@ RSpec.describe AiService do
       expect(problem_set["ambiguity_hunt"]["planted_ambiguities"]).to eq(planted)
     end
 
+    # The design comparison's key holds the correct position and the prose
+    # that explains it; none of it may reach the log, but the pieces may.
+    it "redacts the design comparison's answer key from the delivered payload" do
+      key = { "deciding_fact" => "secret deciding fact", "principle" => "secret principle",
+              "why_other_fails" => "secret other cost" }
+      set = full_problem_set("code_review" => { "concept" => "n_plus_one" },
+                             "design_comparison" => design_comparison_section.merge("answer_key" => key))
+      svc = double_class.new(canned_text: set.to_json)
+      allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+
+      logged = []
+      allow(Rails.logger).to receive(:info) { |msg| logged << msg }
+      allow(Rails.logger).to receive(:warn) { |msg| logged << msg }
+
+      problem_set = svc.generate_exercise(user, language: "ruby_rails")
+
+      expect(logged.join("\n")).not_to include("secret")
+      expect(logged.join("\n")).not_to include("\"better\"")
+      diagnostics = logged.find { |msg| msg.to_s.start_with?("[difficulty_diagnostics]") }
+      delivered = JSON.parse(diagnostics.delete_prefix("[difficulty_diagnostics] "))["delivered"]["design_comparison"]
+      expect(delivered).not_to have_key("answer_key")
+      expect(delivered).to include("piece_a", "piece_b")
+      expect(problem_set["design_comparison"]["answer_key"]).to include(key)
+    end
+
     # Every other code_review_mode example in this file calls
     # build_exercise_prompt directly, which defaults code_review_mode to
     # :application_code — so none of them would notice if generate_exercise
@@ -2797,7 +2859,7 @@ RSpec.describe AiService do
     # on the real #generate_exercise path: it proves the rolled mode reaches
     # both the prompt the provider receives and the logged payload.
     it "threads the rolled mode into both the prompt and the diagnostics payload" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:schema_review)
 
       set = full_problem_set("code_review" => { "concept" => "missing_index" })
@@ -2822,7 +2884,7 @@ RSpec.describe AiService do
     # directly, so only this one proves the plan's excerpt reaches all three
     # of the prompt, the stamped set, and the logged payload.
     it "threads a grounded code_review into the prompt, the stamped set, and the diagnostics payload" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
       allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:real)
       excerpt = RealSource::APPLICATION_CODE.first
@@ -2851,7 +2913,7 @@ RSpec.describe AiService do
     # proves the flavor reaches both ends, since every other flavor example
     # drives build_exercise_prompt directly.
     it "threads the day's scenario flavor into the prompt and the diagnostics payload" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:game_and_animation)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       svc = double_class.new(canned_text: full_problem_set.to_json)
@@ -2863,7 +2925,7 @@ RSpec.describe AiService do
     end
 
     it "omits difficulty fields when nothing targeted is on the plan" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       user.update!(section_kind_levels: { "architecture" => "senior" })
 
@@ -2874,7 +2936,7 @@ RSpec.describe AiService do
     end
 
     it "logs level, lock, coverage, the chosen concept, and the block's length" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       pin_code_review_mode(:application_code)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       user.update!(section_kind_levels: { "challenge" => "principal_engineer" }, locked_section_kinds: [ "challenge" ])
@@ -4072,6 +4134,24 @@ RSpec.describe AiService do
       end
     end
 
+    # The duck sees what the engineer sees: both pieces, never which one is
+    # better or why.
+    it "sends a design comparison's scenario, question and both pieces, and never its answer key" do
+      comparison = DailyExercise.new(language: "ruby_rails", problem_set: {
+        "design_comparison" => { "title" => "Rates", "scenario" => "A carrier a month.", "question" => "Which fits?",
+                                 "piece_a" => "class PieceA; end", "piece_b" => "class PieceB; end",
+                                 "answer_key" => { "better" => "b", "deciding_fact" => "SECRET fact",
+                                                   "principle" => "SECRET principle", "why_other_fails" => "SECRET cost" } }
+      })
+      svc = duck_spy_class.new(canned_text: "Which change does the scenario say happens often?")
+
+      svc.duck_response(user, comparison, section: "design_comparison", message: "hm")
+
+      expect(svc.last_system).to include("A carrier a month.", "Which fits?", "Piece A:\nclass PieceA; end", "Piece B:\nclass PieceB; end")
+      expect(svc.last_system).not_to include("SECRET")
+      expect(svc.last_system).not_to include("better")
+    end
+
     it "sends the section's question/scenario/snippet in system, the prior thread as history, and the new message in prompt" do
       thread = [
         { role: "user",      content: "What's slow here?" },
@@ -4894,12 +4974,12 @@ RSpec.describe AiService do
     # and the assertion would hold no matter which kind was rolled.
     it "asks the provider for a fourth section matching the plan's rolled kind" do
       allow(DailyPlan).to receive(:for).and_call_original
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :ambiguity_hunt)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :ambiguity_hunt)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
       svc = double_class.new(canned_text: {
         "code_review" => { "question" => "q", "concept" => "n_plus_one" },
-        "pattern"     => { "question" => "q", "concept" => "memoization" },
+        "design_comparison" => design_comparison_section,
         "challenge"   => { "question" => "q", "concept" => "idempotency" },
         "ambiguity_hunt" => {
           "title" => "t", "scenario" => "s", "request" => "r",
@@ -5618,7 +5698,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
   # day: a drop assertion needs the kind it drops to have been scheduled, and
   # a retention assertion needs code_review's concept to be hostable there.
   before do
-    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
     allow(WeightedRoll).to receive(:pick).and_call_original
     allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
     # Restored after the and_call_original above, which drops the suite-wide pin.

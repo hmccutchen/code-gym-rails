@@ -1,0 +1,69 @@
+<%# The answer area for design_comparison, in both states. The pick and the
+    reason are two controls but one stored answer ("pick:a\n" + reason), so
+    the script below writes them into the hidden field the shared autosave
+    and submit gate read, and sets its data-answer-complete.
+
+    The answer key renders only once this section has been reviewed: before
+    then it is the answer.
+
+    Locals: kind, key, data, exercise, response, submitted. %>
+<% if submitted %>
+  <% pick, reason = kind.parse_answer(response.answer_for(key)) %>
+  <div class="answer-display"><% if pick %><strong><%= t("sections.design_comparison.picked", piece: pick.upcase) %></strong>
+<%= reason %><% else %>(skipped)<% end %></div>
+  <% answer_key = data["answer_key"] %>
+  <% if response.ai_review.is_a?(Hash) && response.ai_review[key].is_a?(Hash) && answer_key.is_a?(Hash) %>
+    <div class="comparison-key">
+      <h3><%= t("sections.design_comparison.key_heading") %></h3>
+      <p><strong><%= t("sections.design_comparison.key_better", piece: answer_key["better"].to_s.upcase) %></strong> <%= answer_key["deciding_fact"] %></p>
+      <p><%= answer_key["principle"] %></p>
+      <p><%= answer_key["why_other_fails"] %></p>
+    </div>
+  <% end %>
+<% else %>
+  <% pick, reason = kind.parse_answer(response.answers[key]) %>
+  <div class="comparison-answer" data-comparison-answer="<%= key %>">
+    <fieldset class="comparison-pick">
+      <legend><%= t("sections.design_comparison.pick_legend") %></legend>
+      <% ExerciseSection::DesignComparison::PIECES.each do |piece| %>
+        <label>
+          <input type="radio" name="comparison-pick-<%= key %>" value="<%= piece %>" <%= "checked" if pick == piece %>>
+          <%= t("sections.design_comparison.piece", piece: piece.upcase) %>
+        </label>
+      <% end %>
+    </fieldset>
+    <label class="comparison-reason-label" for="comparison-reason-<%= key %>"><%= t("sections.design_comparison.reason_label") %></label>
+    <textarea id="comparison-reason-<%= key %>" class="<%= kind.answer_class %>" data-comparison-reason
+              placeholder="<%= t("sections.#{key}.placeholder") %>"><%= reason %></textarea>
+    <textarea name="response[answers][<%= key %>]" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>"
+              data-min-reason="<%= ExerciseSection::DesignComparison::MIN_REASON_LENGTH %>" hidden><%= response.answers[key] %></textarea>
+  </div>
+<% end %>
+<% unless submitted || @design_comparison_script_emitted %>
+  <% @design_comparison_script_emitted = true %>
+  <% content_for :page_scripts do %>
+    <script>
+    (() => {
+      document.querySelectorAll("[data-comparison-answer]").forEach(area => {
+        const field  = area.querySelector("textarea[data-field]");
+        const reason = area.querySelector("textarea[data-comparison-reason]");
+        const prefix = <%= ExerciseSection::DesignComparison::PICK_PREFIX.to_json.html_safe %>;
+
+        // The same encoding and floor as DesignComparison.encode_answer and
+        // .answered?. A reason with no pick keeps its own line, so a reload
+        // still shows what was typed.
+        function compose() {
+          const pick = area.querySelector("input[type=radio]:checked")?.value;
+          const text = reason.value.trim();
+          field.value = pick || text ? `${pick ? prefix + pick : ""}\n${reason.value}` : "";
+          field.dataset.answerComplete = String(Boolean(pick) && text.length >= Number(field.dataset.minReason));
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        area.querySelectorAll("input[type=radio]").forEach(radio => radio.addEventListener("change", compose));
+        reason.addEventListener("input", compose);
+      });
+    })();
+    </script>
+  <% end %>
+<% end %>

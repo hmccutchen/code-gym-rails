@@ -15,6 +15,20 @@ RSpec.describe ConceptHosts do
     expect(hosts.kinds_for("wrong_cardinality", "ruby_rails").map(&:key)).to include("code_review")
   end
 
+  # Every rung, so a concept the design comparison takes only at
+  # principal_engineer still counts as one it could ever be offered.
+  it "hosts a tradeoff concept in design_comparison across every rung" do
+    expect(hosts.kinds_for("denormalization_tradeoffs", "ruby_rails").map(&:key)).to include("design_comparison")
+  end
+
+  it "narrows a targeted kind to its own level when handed the user's difficulty" do
+    difficulty = KindDifficulty.new(levels: { "design_comparison" => "senior" }, locked: [])
+    narrowed = described_class.for(user, difficulty: difficulty)
+
+    expect(narrowed.kinds_for("denormalization_tradeoffs", "ruby_rails").map(&:key)).not_to include("design_comparison")
+    expect(narrowed.kinds_for("open_closed", "ruby_rails").map(&:key)).to include("design_comparison")
+  end
+
   it "hosts an architecture concept only in the architecture third" do
     expect(hosts.kinds_for("sync_vs_async", "architecture").map(&:key)).to eq([ "architecture" ])
   end

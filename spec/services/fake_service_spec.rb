@@ -20,13 +20,15 @@ RSpec.describe FakeService do
   end
 
   describe "#generate_exercise" do
-    it "returns a problem set covering every ExerciseSection kind with valid, non-'other' concepts" do
+    it "answers with every ExerciseSection kind, and delivers sections with valid, non-'other' concepts" do
       problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
 
       # Derived from the registry rather than restated: this example's whole
       # claim is "every kind", and a hardcoded list quietly stops meaning that
-      # the moment a kind is added.
-      expect(problem_set.keys).to match_array(ExerciseSection.keys)
+      # the moment a kind is added. Ingest then prunes the slots the day's
+      # plan left empty, since every kind at once is more than a day holds.
+      expect(described_class::EXERCISE_PROBLEM_SET.keys).to match_array(ExerciseSection.keys)
+      expect(ExerciseSection.resolved_keys(problem_set)).to include(*ExerciseSection.fixed.map(&:key))
       problem_set.each_value do |section|
         expect(section["concept"]).to be_present
         expect(section["concept"]).not_to eq("other")
@@ -50,12 +52,15 @@ RSpec.describe FakeService do
       expect(exercise.third_key).to eq("architecture")
     end
 
-    it "resolves to the plan_review fourth section when persisted, since plan_review has top precedence" do
-      problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
-      exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: problem_set,
-                                        language: "ruby_rails", generated_at: Time.current)
+    it "resolves its fourth shapes to plan_review, since plan_review has top precedence" do
+      expect(ExerciseSection.resolved_fourth_key(described_class::EXERCISE_PROBLEM_SET)).to eq("plan_review")
+    end
 
-      expect(exercise.fourth_key).to eq("plan_review")
+    it "delivers no more sections than a day holds" do
+      problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
+      exercise = DailyExercise.new(problem_set: problem_set)
+
+      expect(exercise.active_section_keys.size).to be <= ExerciseSection::MAX_SECTIONS
     end
 
     it "logs API usage with zero cost" do

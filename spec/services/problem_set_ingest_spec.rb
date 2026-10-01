@@ -985,3 +985,84 @@ RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
     expect(result.keys).to eq([ "challenge" ])
   end
 end
+
+RSpec.describe ProblemSetIngest, "with the second fixed kind" do
+  describe "a design comparison" do
+    def comparison(overrides = {})
+      FakeService::EXERCISE_PROBLEM_SET.fetch("design_comparison").deep_dup.merge(overrides)
+    end
+
+    def ingested(problem_set)
+      described_class.call(problem_set, language: "ruby_rails", expected_keys: problem_set.keys).problem_set
+    end
+
+    def roll_better(position)
+      allow(WeightedRoll).to receive(:pick).with(ExerciseSection::DesignComparison::POSITION_WEIGHTS).and_return(position)
+    end
+
+    it "shows the provider's pieces in the rolled order and records the position only in the answer key" do
+      roll_better("a")
+      section = ingested({ "design_comparison" => comparison })["design_comparison"]
+
+      expect(section["piece_a"]).to eq(comparison["better_piece"])
+      expect(section["piece_b"]).to eq(comparison["other_piece"])
+      expect(section["answer_key"]["better"]).to eq("a")
+      expect(section).not_to have_key("better_piece")
+      expect(section).not_to have_key("other_piece")
+    end
+
+    it "overwrites pieces the provider placed itself" do
+      roll_better("b")
+      forged = comparison("piece_a" => "forged", "piece_b" => "forged")
+      section = ingested({ "design_comparison" => forged })["design_comparison"]
+
+      expect(section["piece_b"]).to eq(comparison["better_piece"])
+      expect(section["piece_a"]).to eq(comparison["other_piece"])
+    end
+
+    it "refuses the set when a piece or the answer key is unusable" do
+      expect { ingested({ "design_comparison" => comparison("other_piece" => "") }) }
+        .to raise_error(AiService::InvalidResponseError, /other_piece/)
+      expect { ingested({ "design_comparison" => comparison("answer_key" => {}) }) }
+        .to raise_error(AiService::InvalidResponseError, /answer key/)
+    end
+
+    it "holds the concept to the language vocabulary like any other section" do
+      expect(ingested({ "design_comparison" => comparison("concept" => "invented") })["design_comparison"]["concept"]).to eq("other")
+    end
+  end
+
+  describe "a payload with a shape in every slot" do
+    # Every kind at once resolves to one section per slot, which is one more
+    # than a day holds.
+    let(:every_kind) { FakeService::EXERCISE_PROBLEM_SET.deep_dup }
+
+    it "drops the slots the plan left empty, so no requested section is cut" do
+      expected = %w[code_review design_comparison challenge plan_review]
+      result = described_class.call(every_kind, language: "ruby_rails", expected_keys: expected).problem_set
+
+      expect(result.keys).not_to include("pattern")
+      expect(ExerciseSection.resolved_keys(result)).to eq(%w[code_review design_comparison architecture plan_review])
+      expect(ExerciseSection.resolved_keys(result).size).to eq(ExerciseSection::MAX_SECTIONS)
+    end
+
+    it "never delivers more than MAX_SECTIONS, whatever the plan asked for" do
+      plans = [ %w[code_review design_comparison], %w[code_review design_comparison pattern],
+                %w[code_review design_comparison pattern challenge], %w[code_review design_comparison ambiguity_hunt] ]
+
+      plans.each do |expected|
+        result = described_class.call(FakeService::EXERCISE_PROBLEM_SET.deep_dup, language: "ruby_rails",
+                                      expected_keys: expected).problem_set
+        expect(ExerciseSection.resolved_keys(result).size).to be <= ExerciseSection::MAX_SECTIONS
+        expect(ExerciseSection.resolved_keys(result).first(2)).to eq(%w[code_review design_comparison])
+      end
+    end
+
+    it "keeps an unrequested extra when the day still has room" do
+      set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } }
+      result = described_class.call(set, language: "ruby_rails", expected_keys: [ "code_review" ]).problem_set
+
+      expect(result.keys).to eq(%w[code_review pattern])
+    end
+  end
+end

@@ -14,7 +14,7 @@ class FakeService < AiService
   # So specs can drive the judged review path; the fake always keeps.
   def self.judges_review_prose? = true
 
-  # All nine ExerciseSection kinds populated at once. DailyExercise#third_key
+  # Every ExerciseSection kind populated at once. DailyExercise#third_key
   # resolves by precedence over whichever keys are present hashes
   # (ExerciseSection.thirds: architecture, security_review, challenge,
   # parsons_problem) — architecture wins here every time, regardless of
@@ -42,6 +42,48 @@ class FakeService < AiService
       "concept" => "n_plus_one",
       "scenario" => "a nightly loyalty-tier recalculation job",
       "diagram" => "flowchart TD\n  A[\"Nightly job\"] --> B[\"loyalty_tier\"]\n  B --> C[(\"orders\")]"
+    },
+    "design_comparison" => {
+      "title" => "Where shipping rates come from",
+      "scenario" => "A checkout service quotes shipping for each order. The team adds a new carrier about once a month, and each carrier has its own rate rule.",
+      "question" => "Which piece fits this system better, and which stated fact decides it?",
+      "better_piece" => <<~RUBY.strip,
+        class ShippingQuote
+          RATES = {
+            "ups"   => UpsRate,
+            "fedex" => FedexRate
+          }.freeze
+
+          def initialize(carrier)
+            @rate = RATES.fetch(carrier).new
+          end
+
+          def cost_cents(order)
+            @rate.cost_cents(order)
+          end
+        end
+      RUBY
+      "other_piece" => <<~RUBY.strip,
+        class ShippingQuote
+          def initialize(carrier)
+            @carrier = carrier
+          end
+
+          def cost_cents(order)
+            case @carrier
+            when "ups"   then UpsRate.new.cost_cents(order)
+            when "fedex" then FedexRate.new.cost_cents(order)
+            else raise KeyError, @carrier
+            end
+          end
+        end
+      RUBY
+      "answer_key" => {
+        "deciding_fact" => "A new carrier is added about once a month.",
+        "principle" => "Open for extension, closed for modification: a new carrier should be a new class, not an edit to existing code.",
+        "why_other_fails" => "Every new carrier means editing the case statement in cost_cents, so each monthly change touches code that already works."
+      },
+      "concept" => "open_closed"
     },
     "pattern" => {
       "title" => "Service Object",
@@ -311,12 +353,20 @@ class FakeService < AiService
       when /TRANSCRIBER, not a reviewer/
         PSEUDOCODE_TRANSLATION
       when /checking one section of a generated coding exercise/
-        { "status" => "keep" }.to_json
+        judge_verdict(prompt).to_json
       else
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end
 
     { text: text, input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0 }
+  end
+
+  # A kind the judge solves blind must carry its solve, or the verdict is
+  # invalid output and every judged design comparison would fall back.
+  def judge_verdict(prompt)
+    kind = ExerciseSection.find(prompt[/^Section kind: (\w+)$/, 1])
+    solve = kind&.judge_solve_options&.last
+    { "status" => "keep", "better" => solve }.compact
   end
 
   # Unlike REVIEW_SECTION, which is one flat hash reused for every section, the

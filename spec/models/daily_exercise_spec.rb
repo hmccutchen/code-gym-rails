@@ -114,14 +114,21 @@ RSpec.describe DailyExercise, type: :model do
       expect(exercise.active_section_keys).to eq(%w[code_review pattern architecture plan_review])
     end
 
+    it "presents both fixed kinds first on a day that holds them" do
+      exercise = DailyExercise.new(problem_set: {
+        "design_comparison" => {}, "code_review" => {}, "challenge" => {}, "plan_review" => {}
+      })
+      expect(exercise.active_section_keys).to eq(%w[code_review design_comparison challenge plan_review])
+    end
+
     it "returns three for an exercise generated before the fourth slot existed" do
       exercise = DailyExercise.new(problem_set: { "code_review" => {}, "pattern" => {}, "challenge" => {} })
       expect(exercise.active_section_keys).to eq(%w[code_review pattern challenge])
     end
 
     # The count the user sees is the count of sections on screen, not of raw
-    # payload keys — FakeService persists all nine deliberately, and a real
-    # provider can return an extra alternate third or fourth.
+    # payload keys — FakeService answers with every kind deliberately, and a
+    # real provider can return an extra alternate third or fourth.
     it "counts only the precedence-resolved third and fourth when a payload holds several" do
       exercise = DailyExercise.new(problem_set: {
         "code_review"     => {}, "pattern"        => {},
@@ -140,7 +147,7 @@ RSpec.describe DailyExercise, type: :model do
       exercise = DailyExercise.new(problem_set: FakeService::EXERCISE_PROBLEM_SET)
 
       expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
-      expect(exercise.active_section_keys).to eq(%w[code_review pattern architecture plan_review])
+      expect(exercise.active_section_keys).to eq(%w[code_review design_comparison pattern architecture])
     end
   end
 

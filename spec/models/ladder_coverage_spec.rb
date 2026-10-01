@@ -24,6 +24,18 @@ RSpec.describe LadderCoverage do
     end
   end
 
+  # A kind narrowed by rung offers what its target level allows, which is what
+  # generation will ask for.
+  it "reads a targeted kind's pairs at its target level" do
+    pairs = ->(level) do
+      user.update!(section_kind_levels: { "design_comparison" => level })
+      described_class.for(user.reload).for_kind(ExerciseSection::DesignComparison).pairs.map(&:first)
+    end
+
+    expect(pairs.call("principal_engineer")).to include("denormalization_tradeoffs")
+    expect(pairs.call("senior")).not_to include("denormalization_tradeoffs")
+  end
+
   it "counts a laddered row as grounded and both a missing and a ladderless row as gaps" do
     laddered("n_plus_one", "ruby_rails")
     ConceptReference.create!(concept: "caching", language: "ruby_rails", tagline: "no ladder")

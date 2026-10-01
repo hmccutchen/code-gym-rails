@@ -69,11 +69,13 @@ RSpec.describe ModelComparison do
       .to eq(ModelComparison::CANDIDATES.fetch("generate").map { |route| route[:effort] && { "effort" => route[:effort] } })
   end
 
-  it "never prints the ambiguity hunt's answer key" do
+  it "never prints any kind's answer key" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :ambiguity_hunt)
     comparison.generate(user.id)
 
-    expect(out.string).to include("ambiguity_hunt")
+    expect(out.string).to include("ambiguity_hunt", "design_comparison")
     ExerciseSection.all_answer_key_fields.each { |field| expect(out.string).not_to include(field) }
+    expect(out.string).not_to include(*FakeService::EXERCISE_PROBLEM_SET.dig("design_comparison", "answer_key").values)
   end
 
   it "prints a malformed provider response as that model's result rather than losing both" do
