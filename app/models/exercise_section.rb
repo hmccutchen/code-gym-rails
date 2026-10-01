@@ -273,14 +273,6 @@ class ExerciseSection
       nil
     end
 
-    # Whether the judge may drop this kind from the day rather than ship a
-    # section whose last retry it rejected. True for every kind: with two fixed
-    # kinds a day without either one is still a day, and a day with nothing
-    # left is a generation failure (AiService::AllSectionsRejectedError).
-    def droppable?
-      true
-    end
-
     def leads_learning_track?
       false
     end

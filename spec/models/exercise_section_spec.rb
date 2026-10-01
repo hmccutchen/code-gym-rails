@@ -23,12 +23,6 @@ RSpec.describe ExerciseSection do
     end
   end
 
-  describe ".droppable?" do
-    it "is true for every kind, fixed ones included, since two fixed kinds leave a day without either one" do
-      expect(described_class.all.map(&:droppable?)).to all(be(true))
-    end
-  end
-
   describe ".thirds" do
     # Precedence, not enumeration order — DailyExercise#third_key relies on
     # architecture winning over security_review over challenge.

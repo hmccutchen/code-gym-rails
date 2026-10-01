@@ -91,6 +91,18 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.last_generation_error).to eq("boom")
   end
 
+  it "persists a failure and writes no day when the judge rejects every section" do
+    allow_any_instance_of(ClaudeService).to receive(:generate_judged_exercise).and_raise(AiService::AllSectionsRejectedError)
+    allow_any_instance_of(ClaudeService).to receive(:generate_exercise).and_raise(AiService::AllSectionsRejectedError)
+    allow(Rails.logger).to receive(:error)
+
+    described_class.new.perform(user_id: user.id)
+
+    user.reload
+    expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
+    expect(user.last_generation_error).to eq(AiService::AllSectionsRejectedError.new.message)
+  end
+
   it "persists the failure date in the user's own time zone" do
     pac = User.create!(email: "pac2@example.com", name: "Pac", provider: "anthropic",
                        api_key: "sk-ant-test", time_zone: "America/Los_Angeles")

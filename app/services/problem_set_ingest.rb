@@ -20,10 +20,11 @@
 class ProblemSetIngest
   # Facts about a section that the server knows and the provider does not: the
   # rung asked for, whether the prompt was told to ease it, which real excerpt
-  # it was grounded in, and whether the judge rejected its last retry and it
-  # shipped anyway. A provider copy of any of them is stripped from every section on
-  # every call, so none can be forged. `anchored` is stamped after ingest, by
-  # the judged path, and is listed here because the strip is the guarantee.
+  # it was grounded in, and, on older rows, whether the judge rejected its
+  # last retry and it shipped anyway. A provider copy of any of them is
+  # stripped from every section on every call, so none can be forged.
+  # `anchored` is no longer written, since every kind is now dropped after its
+  # last rejected retry; it stays listed so a provider still cannot forge it.
   #
   # They describe how the section was made, not what it asks, so nothing that
   # serializes a section to a model may include them — AiService#judge_section

@@ -88,5 +88,51 @@ RSpec.describe JudgeVerdict do
     it "closes every object" do
       expect(objects_in(schema)).to all(include("additionalProperties" => false))
     end
+
+    it "asks for no solve from a kind the judge does not solve" do
+      shapes.each_value { |shape| expect(shape["properties"]).not_to have_key("better") }
+    end
+
+    it "requires the blind solve on every status for a kind the judge solves" do
+      comparison = described_class.schema_for(ExerciseSection::DesignComparison)["anyOf"]
+
+      comparison.each do |shape|
+        expect(shape.dig("properties", "better")).to eq("type" => "string", "enum" => %w[a b])
+        expect(shape["required"]).to include("better")
+      end
+      expect(objects_in(comparison)).to all(include("additionalProperties" => false))
+    end
+  end
+
+  describe "the blind solve" do
+    let(:comparison) { ExerciseSection::DesignComparison }
+
+    it "reads the solve on every status" do
+      expect(described_class.parse({ "status" => "keep", "better" => "a" }, kind: comparison).solve).to eq("a")
+      edit = { "status" => "edit", "better" => "b", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+               "fields" => { "question" => "Which fits?" } }
+      expect(described_class.parse(edit, kind: comparison).solve).to eq("b")
+      reject = { "status" => "reject", "better" => "a", "principle" => "underdetermined", "evidence" => "x", "reason" => "r" }
+      expect(described_class.parse(reject, kind: comparison).solve).to eq("a")
+    end
+
+    it "refuses a verdict whose solve is missing or outside the options, without quoting it" do
+      [ nil, "zebra-solve", "B" ].each do |solve|
+        expect { described_class.parse({ "status" => "keep", "better" => solve }.compact, kind: comparison) }
+          .to raise_error(described_class::Invalid) { |error| expect(error.message).not_to include(solve.to_s) if solve }
+      end
+    end
+
+    it "carries no solve for a kind the judge does not solve" do
+      expect(described_class.parse({ "status" => "keep", "better" => "a" }, kind: kind).solve).to be_nil
+    end
+
+    it "never lets an edit rewrite either piece or the answer key" do
+      %w[piece_a piece_b answer_key].each do |field|
+        raw = { "status" => "edit", "better" => "a", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                "fields" => { field => "rewritten" } }
+        expect { described_class.parse(raw, kind: comparison) }.to raise_error(described_class::Invalid, /#{field}/)
+      end
+    end
   end
 end

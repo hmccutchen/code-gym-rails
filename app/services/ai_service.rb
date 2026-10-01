@@ -41,6 +41,15 @@ class AiService
   # show the engineer a try-again message rather than an error page.
   class UnsupportedRouteError < Error; end
 
+  # The judge rejected every section of a drafted day, retries included. No
+  # empty day is written; the job records this like any other failed
+  # generation, so its message is what the dashboard shows.
+  class AllSectionsRejectedError < Error
+    def initialize(message = "Every section of today's draft failed its quality check, so no set was saved. Try generating again.")
+      super
+    end
+  end
+
   # Faraday sets no timeout by default, so without one a call made from a
   # request thread would tie up a Puma thread indefinitely and outlive
   # ResponsesController#review's claim on the row, letting a second review
@@ -165,11 +174,13 @@ class AiService
   end
 
   # How long a judged generation can run before it lands or fails: the draft,
-  # then the judge fan-out, the retry fan-out and the re-judge fan-out, each
-  # waiting on its slowest thread.
+  # then the judge fan-out, then one retry fan-out and one re-judge fan-out
+  # for each retry the most-retried kind gets, each waiting on its slowest
+  # thread.
   JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
-                             worst_case_call_seconds(RETRY_READ_TIMEOUT) +
-                             (2 * worst_case_call_seconds(READ_TIMEOUT))
+                             worst_case_call_seconds(READ_TIMEOUT) +
+                             (ExerciseSection.all.map(&:judge_retries).max *
+                               (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT)))
 
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the
@@ -1385,6 +1396,9 @@ class AiService
   # they say what the day intended, which is the one thing a judge that judges
   # the section as written must not be told. The rung and lock state reach it
   # as stated arguments instead, since a level is what it measures against.
+  #
+  # A kind the judge solves blind gets its reply parsed without logging it on
+  # failure: the solve is an answer candidate.
   def judge_section(user, kind, section, rung:, locked:)
     visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
     result  = call_and_log(
@@ -1393,7 +1407,8 @@ class AiService
       system: JUDGE_SYSTEM_PROMPT,
       prompt: judge_prompt(kind, visible, rung: rung, locked: locked)
     )
-    JudgeVerdict.parse(parse_json_object(result[:text], subject: "#{kind.key} verdict"), kind: kind)
+    raw = parse_json_object(result[:text], subject: "#{kind.key} verdict", log_raw: kind.judge_solve_options.nil?)
+    JudgeVerdict.parse(raw, kind: kind)
   end
 
   # Handed the review alone, as the page renders it, plus the section's kind
@@ -3010,8 +3025,17 @@ class AiService
     unreadable_envelope!(body, provider)
   end
 
+  # A body that starts like JSON is most likely a reply cut off in transit,
+  # and a reply can carry an answer the logs must not (a judge's blind solve,
+  # an engineer's review), so only its size is logged. Anything else, such as
+  # a proxy's HTML page, is logged as a snippet for diagnosis.
   def unreadable_envelope!(body, provider)
-    log_raw_snippet("Unreadable #{provider} response body", body)
+    text = body.to_s
+    if text.lstrip.start_with?("{", "[")
+      Rails.logger.error("Unreadable #{provider} response body: #{text.bytesize} bytes of cut-off JSON, withheld")
+    else
+      log_raw_snippet("Unreadable #{provider} response body", text)
+    end
     raise InvalidResponseError, "#{provider} returned an unreadable response"
   end
 
