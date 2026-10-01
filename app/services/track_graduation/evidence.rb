@@ -4,6 +4,10 @@ class TrackGraduation
     # and eased sections do not count, so a rare kind can still need the led path.
     RESPONSE_WINDOW = 60
 
+    # The AI rating is provider output; one outside the closed list is not a
+    # judgment the rules can read.
+    RATINGS = (DailyResponse::AI_RATING_FAVORABLE + DailyResponse::AI_RATING_UNFAVORABLE).freeze
+
     attr_reader :results, :newest_date
 
     def self.for(user)
@@ -26,7 +30,7 @@ class TrackGraduation
       response.answered_sections.filter_map do |section|
         data = problem_set[section]
         rating = response.ai_rating_for(section)
-        next unless data.is_a?(Hash) && data["pitched_at"].present? && !data["eased"] && rating
+        next unless data.is_a?(Hash) && data["pitched_at"].present? && !data["eased"] && RATINGS.include?(rating)
 
         [ section, Result.new(date: response.date, level: data["pitched_at"], ai_rating: rating,
                               self_rating: response.self_rating_for(section)) ]

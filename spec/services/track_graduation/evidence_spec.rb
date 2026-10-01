@@ -56,6 +56,17 @@ RSpec.describe TrackGraduation::Evidence do
     expect(described_class.for(user).results["code_review"].size).to eq(1)
   end
 
+  # The AI rating is provider output. One outside the closed list is not a
+  # judgment the rules can read, so it is not evidence, and its too_hard
+  # self-rating cannot drive a back step on its own.
+  [ "excellent", "SOLID", { "level" => "solid" }, 3 ].each do |rating|
+    it "ignores an AI rating outside the closed list: #{rating.inspect}" do
+      day(1, { "code_review" => { rung: "senior", ai: rating, self: "too_hard" } })
+
+      expect(described_class.for(user).results).to eq({})
+    end
+  end
+
   it "ignores missing AI ratings even when the self-rating says too_hard" do
     day(1, { "code_review" => { rung: "senior", ai: nil, self: "too_hard" } })
 
