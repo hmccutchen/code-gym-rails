@@ -1,7 +1,7 @@
 # Deterministic, zero-cost AiService provider for tests. Supplies provider
 # metadata and the two transport hooks (#call, #build_connection) —
 # exercise processing (DailyPlan, log_usage, normalize_concepts,
-# log_retention, shuffle_parsons_blocks!, override_parsons_section_rating!)
+# log_retention, shuffle_parsons_blocks!, ParsonsProblem.fixed_rating)
 # runs unmodified against this fake's output, so tests exercise the same
 # control flow a real provider triggers. #call dispatches on the literal
 # `system:` string each AiService caller passes; the review path further
@@ -175,7 +175,8 @@ class FakeService < AiService
     "missed" => [ "Didn't mention the specific fix." ],
     "better_questions" => [ "What would happen under concurrent access?" ],
     "next_step" => "Review the referenced concept material once more.",
-    "improved_code" => ""
+    "improved_code" => "",
+    "essential_gaps" => []
   }.freeze
 
   # One sentence, reused for every section: the fake's job is to make the note

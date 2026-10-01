@@ -72,6 +72,11 @@ class ExerciseSection::CodeReview < ExerciseSection
     SCHEMA
   end
 
+  def self.grading_note(section:, answer:)
+    "Main point: the one planted issue — the defect in the snippet, the smell in the test file, or the flaw in the migration.\n" \
+    "Essential pieces: why it is a problem in this code, and a fix that would work as written."
+  end
+
   def self.review_context(section:, answer:, rating:)
     [
       "Code Review question: #{section["question"]}",

@@ -23,6 +23,11 @@ class ExerciseSection::Challenge < ExerciseSection
     GUIDANCE
   end
 
+  def self.grading_note(section:, answer:)
+    "Main point: code that does the task the question asks for.\n" \
+    "Essential pieces: each requirement and behavior the question states. Naming, style and idiom are not essential unless the question asks for them."
+  end
+
   def self.schema_fragment(label:)
     <<~SCHEMA.chomp
       "challenge": {

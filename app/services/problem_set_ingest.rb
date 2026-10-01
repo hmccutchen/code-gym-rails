@@ -31,7 +31,8 @@ class ProblemSetIngest
   #
   # They describe how the section was made, not what it asks, so nothing that
   # serializes a section to a model may include them — AiService#judge_section
-  # reads this list for exactly that. `current_schema` is server-owned too and
+  # reads this list for exactly that. The review prompt states `pitched_at` as
+  # a named line instead, because the rubric rates against that level. `current_schema` is server-owned too and
   # deliberately absent: it is the table the engineer is shown, and the judge
   # has to read it to tell whether the question is answerable.
   SERVER_STAMPS = %w[pitched_at eased source anchored].freeze

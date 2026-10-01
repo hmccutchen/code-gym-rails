@@ -1,0 +1,16 @@
+{
+  "kind": "code_review",
+  "language": "ruby_rails",
+  "section": {
+    "pitched_at": "junior",
+    "concept": "n_plus_one",
+    "scenario": "account orders page",
+    "question": "This page got slow as accounts grew. What is wrong with it, and how would you fix it?",
+    "snippet": "class OrdersController < ApplicationController\n  def index\n    @orders = current_account.orders.order(created_at: :desc).limit(50)\n  end\nend\n\n# app/views/orders/index.html.erb\n<% @orders.each do |order| %>\n  <tr>\n    <td><%= order.number %></td>\n    <td><%= order.customer.name %></td>\n  </tr>\n<% end %>"
+  },
+  "answers": {
+    "complete": "Each row calls order.customer, and nothing loaded the customers, so Rails runs one query for the orders and then one more per row: up to 51 queries for 50 orders. That is an N+1, and it grows with the page size. Preload the customers in the controller: current_account.orders.includes(:customer).order(created_at: :desc).limit(50). Then it is two queries however many rows there are.",
+    "partial": "The view calls order.customer for every row, which runs a separate query each time, an N+1. That is why the page slows down as there are more orders.",
+    "miss": "Fifty rows is too many for one page. I would paginate to 20 per page and add an index on orders.created_at so the sort is faster."
+  }
+}

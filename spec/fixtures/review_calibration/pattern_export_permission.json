@@ -1,0 +1,16 @@
+{
+  "kind": "pattern",
+  "language": "ruby_rails",
+  "section": {
+    "pitched_at": "senior",
+    "concept": "policy_objects",
+    "title": "One rule for who may export a report",
+    "question": "A reporting app decides who may export a report in three places: the controller action, a background job that emails scheduled exports, and the API. The rule is that the report's owner or an account admin may export, but not while the account is suspended. Each place has its own copy of the check, and last month two of them drifted apart. How would you structure this so the rule lives in one place?",
+    "answer_scaffold": ["Approach:", "Interface:", "What's easy to get wrong:"]
+  },
+  "answers": {
+    "complete": "Approach: put the rule in one policy object, ReportExportPolicy, and have the controller, the job and the API all ask it instead of keeping their own copies.\nInterface: ReportExportPolicy.new(user, report).allowed? returns true when the user owns the report or is an admin of its account, and false whenever the account is suspended. The job passes the user who scheduled the export, so a later suspension still blocks it when the job runs.\nWhat's easy to get wrong: checking the rule only when the export is scheduled rather than when it runs, and letting one caller add its own extra condition, which is how they drifted before. A spec that runs all three callers against the same policy cases keeps them in line.",
+    "partial": "Approach: move the check into a policy object, ReportExportPolicy, and call it from the controller, the job and the API.\nInterface: ReportExportPolicy.new(user, report).allowed?, true for the owner or an admin.\nWhat's easy to get wrong: making sure all three places actually call it.",
+    "miss": "Approach: add a before_action to the controller that checks the user is the owner or an admin.\nInterface: a private method can_export? in ReportsController.\nWhat's easy to get wrong: forgetting to add it to new actions."
+  }
+}

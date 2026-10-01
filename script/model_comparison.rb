@@ -11,7 +11,10 @@ class ModelComparison
     "duck"      => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
     "translate" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
     "judge"     => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
-    "review_prose" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ]
+    "review_prose" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
+    # The route production grades with, so the run measures the rubric as
+    # deployed rather than a candidate.
+    "review_calibration" => [ ClaudeService::MODEL_FOR_PURPOSE.fetch("review_response", ClaudeService::DEFAULT_ROUTE) ]
   }.freeze
 
   REVIEW_FIELDS = %w[rating missed next_step].freeze
@@ -19,6 +22,15 @@ class ModelComparison
 
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
   REVIEW_PROSE_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_judge")
+  REVIEW_CALIBRATION_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_calibration")
+
+  # What AiService::RATING_RUBRIC should give each answer a calibration
+  # fixture carries, in descending order of quality.
+  CALIBRATION_EXPECTED = {
+    "complete" => %w[solid strong],
+    "partial"  => %w[developing],
+    "miss"     => %w[beginner]
+  }.freeze
 
   # List prices as of writing, per million tokens; read nowhere in app/ — this
   # is what #judge_fixtures prices a candidate's run against, for a person
@@ -28,7 +40,12 @@ class ModelComparison
     "claude-haiku-4-5"  => { input: 1.0, output: 5.0 }
   }.freeze
 
-  Run = Data.define(:route, :output, :seconds, :tokens_in, :tokens_out)
+  # Anthropic's five-minute cache: a write costs 1.25x ordinary input and a
+  # read 0.1x. Priced separately because Claude's input_tokens excludes both.
+  CACHE_WRITE_PRICE_FACTOR = 1.25
+  CACHE_READ_PRICE_FACTOR  = 0.1
+
+  Run = Data.define(:route, :output, :seconds, :tokens_in, :tokens_out, :cache_read, :cache_write)
 
   # One judge call's outcome for one model and one input: :keep or :edit with
   # its verdict, :invalid when the reply was not a usable verdict, :error when
@@ -138,6 +155,21 @@ class ModelComparison
     end
   end
 
+  # Grades each calibration fixture's complete, partial and missed answers
+  # through the real review prompt. A fixture passes when the three ratings
+  # fall in rank order; the expected ratings are printed beside the actual
+  # ones for a person to read.
+  def review_calibration
+    user     = User.new(skill_level: "developing")
+    fixtures = Dir[REVIEW_CALIBRATION_FIXTURE_DIR.join("*.json")].sort.map { |path| load_fixture(path) }
+
+    CANDIDATES.fetch("review_calibration").each do |route|
+      @out.puts "=== review_calibration: #{route[:model]} ==="
+      rows = fixtures.map { |fixture| calibration_row(route, user, fixture) }
+      print_calibration_summary(route, rows)
+    end
+  end
+
   private
 
   def load_fixture(path)
@@ -209,9 +241,10 @@ class ModelComparison
     end
   end
 
-  def fixture_cost(model, tokens_in, tokens_out)
+  def fixture_cost(model, tokens_in, tokens_out, cache_read: 0, cache_write: 0)
     price = LIST_PRICE_PER_MILLION.fetch(model)
-    (tokens_in * price[:input] + tokens_out * price[:output]) / 1_000_000.0
+    input = tokens_in + cache_write * CACHE_WRITE_PRICE_FACTOR + cache_read * CACHE_READ_PRICE_FACTOR
+    (input * price[:input] + tokens_out * price[:output]) / 1_000_000.0
   end
 
   # A provider failure is an error row, not invalid output, so one fixture's
@@ -274,7 +307,8 @@ class ModelComparison
     end
 
     Run.new(route: route, output: output, seconds: Process.clock_gettime(Process::CLOCK_MONOTONIC) - started,
-            tokens_in: usage.sum { |row| row[:tokens_in] }, tokens_out: usage.sum { |row| row[:tokens_out] })
+            tokens_in: usage.sum { |row| row[:tokens_in] }, tokens_out: usage.sum { |row| row[:tokens_out] },
+            cache_read: usage.sum { |row| row[:cache_read] }, cache_write: usage.sum { |row| row[:cache_write] })
   end
 
   # A subclass per route rather than an instance setting, because the review
@@ -290,7 +324,10 @@ class ModelComparison
 
       define_method(:route_for) { |_purpose| route }
       define_method(:log_usage) do |_user, result, purpose:|
-        lock.synchronize { usage << { tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i } }
+        lock.synchronize do
+          usage << { tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i,
+                     cache_read: result[:cache_read_tokens].to_i, cache_write: result[:cache_write_tokens].to_i }
+        end
       end
       define_method(:record_suggested_concept) { |_suggestion| }
       private :route_for, :log_usage, :record_suggested_concept
@@ -411,12 +448,66 @@ class ModelComparison
     end.join(", ")
   end
 
+  def calibration_row(route, user, fixture)
+    graded = CALIBRATION_EXPECTED.keys.to_h { |quality| [ quality, grade_calibration_answer(route, user, fixture, quality) ] }
+    ranks  = graded.values.map { |run| ConceptMastery::AI_RATING_RANK[run.output["rating"]] if run.output.is_a?(Hash) }
+    ordered = ranks.all? && ranks.each_cons(2).all? { |better, worse| better > worse }
+
+    @out.puts "--- #{fixture['name']} (#{fixture['kind']}, #{fixture.dig('section', 'pitched_at')}) · #{ordered ? 'in order' : 'OUT OF ORDER'} ---"
+    graded.each { |quality, run| @out.puts calibration_line(quality, run) }
+    { ordered: ordered, graded: graded }
+  end
+
+  def grade_calibration_answer(route, user, fixture, quality)
+    kind     = fixture["kind"]
+    exercise = DailyExercise.new(user: user, language: fixture["language"], problem_set: { kind => fixture["section"] })
+    response = DailyResponse.new(user: user, daily_exercise: exercise, answers: { kind => fixture.dig("answers", quality) },
+                                 section_ratings: { kind => "right_level" })
+
+    timed_run(route) { |service| graded_review(service, response, exercise, kind) }
+  end
+
+  def calibration_line(quality, run)
+    return "  #{quality.ljust(8)} error: #{run.output}" unless run.output.is_a?(Hash)
+
+    review   = run.output
+    expected = CALIBRATION_EXPECTED.fetch(quality)
+    check    = RubricCheck.new(review)
+    "  #{quality.ljust(8)} #{review['rating'].to_s.ljust(10)} expected #{expected.join('/').ljust(13)}" \
+      "#{expected.include?(review['rating']) ? 'match' : 'MISMATCH'} · essential #{check.essential_gaps&.size || '?'}" \
+      " of #{check.missed_count} missed · rubric #{check.agrees?.nil? ? 'unchecked' : (check.agrees? ? 'agrees' : 'DISAGREES')}" \
+      " · #{format('%.1f', run.seconds)}s"
+  end
+
+  def print_calibration_summary(route, rows)
+    runs       = rows.flat_map { |row| row[:graded].to_a }
+    graded     = runs.select { |_quality, run| run.output.is_a?(Hash) }
+    matched    = graded.count { |quality, run| CALIBRATION_EXPECTED.fetch(quality).include?(run.output["rating"]) }
+    agreeing   = graded.count { |_quality, run| RubricCheck.new(run.output).agrees? }
+    tokens_in  = runs.sum { |_quality, run| run.tokens_in }
+    tokens_out = runs.sum { |_quality, run| run.tokens_out }
+    cache      = { cache_read: runs.sum { |_quality, run| run.cache_read }, cache_write: runs.sum { |_quality, run| run.cache_write } }
+
+    @out.puts "in order: #{rows.count { |row| row[:ordered] }}/#{rows.size} · matched expected: #{matched}/#{runs.size} · " \
+              "rating agrees with essential gaps: #{agreeing}/#{graded.size} · " \
+              "complete answers rated solid or better: #{graded.count { |quality, run| quality == 'complete' && CALIBRATION_EXPECTED.fetch('complete').include?(run.output['rating']) }}/#{rows.size} · " \
+              "#{tokens_in} in / #{cache[:cache_write]} cache write / #{cache[:cache_read]} cache read / #{tokens_out} out · " \
+              "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out, **cache))}"
+    @out.puts
+  end
+
   def review_section(service, response, exercise, section)
+    review = graded_review(service, response, exercise, section)
+    review.is_a?(Hash) ? review.slice(*REVIEW_FIELDS) : review
+  end
+
+  # The whole review grade_section produced, or its failure as a line to print.
+  def graded_review(service, response, exercise, section)
     coach   = service.send(:config_for, exercise.language)[:coach]
     context = service.send(:build_review_day_context, coach, exercise, response)
     _, result = service.send(:grade_section, response.user, exercise, response, section, context)
 
-    result[:ok] ? result[:review].slice(*REVIEW_FIELDS) : "#{result[:error_code]}: #{result[:message]}"
+    result[:ok] ? result[:review] : "#{result[:error_code]}: #{result[:message]}"
   end
 
   # A real review translates pseudocode before grading it and saves the result.

@@ -911,7 +911,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Excluding grounded sections from retention would reduce available hosts;
   requiring an unseen excerpt would need a separate eligibility policy.
   Neither scheduling change is part of this fix.
-- **Meta-skill concepts**: `AiService::META_SKILL_CONCEPTS` (`reading_for_intent`, `spotting_unstated_assumptions`, `separating_symptom_from_cause`) name reasoning skills rather than technical topics, so `ConceptReference` delivers "how to think about this" on a real problem instead of on a tips page. They sit in both `RAILS_CONCEPTS` and `JS_CONCEPTS` like the data-modeling concepts, and for a structural reason rather than a preference: `ConceptBucket` dispatches on section key and never on concept, so a bucket of their own would require a section kind. Per-language mastery is the accepted cost; being outside `LANGUAGE_AGNOSTIC_VOCABULARIES` is the gain, since their reference then shows real code. Their hosts are `code_review` (non-schema modes), `pattern`, and `challenge` — every other kind draws a disjoint vocabulary and is excluded without an exclusion being written, and `parsons_problem` excludes them explicitly (`excluded_vocabulary_keys`) because a sequencing format has nothing to read. Because these are fuzzier than `n_plus_one`, `AiService#meta_skill_framing_guidance` adds one prompt line — stated once for all sections, named from the constant — requiring the section to still contain one findable issue that the concept only *frames*. No grading note changed; the generic rubric grades these, and it needs something missable to have been there. `AiService#can_host?` (given the concept, section key, and the day's generation language) derives third-slot retention hosting from `ProblemSetIngest.selectable_vocabulary_for` rather than restating it, so this exclusion — and the data-modeling one — is correct by construction rather than by coincidence.
+- **Meta-skill concepts**: `AiService::META_SKILL_CONCEPTS` (`reading_for_intent`, `spotting_unstated_assumptions`, `separating_symptom_from_cause`) name reasoning skills rather than technical topics, so `ConceptReference` delivers "how to think about this" on a real problem instead of on a tips page. They sit in both `RAILS_CONCEPTS` and `JS_CONCEPTS` like the data-modeling concepts, and for a structural reason rather than a preference: `ConceptBucket` dispatches on section key and never on concept, so a bucket of their own would require a section kind. Per-language mastery is the accepted cost; being outside `LANGUAGE_AGNOSTIC_VOCABULARIES` is the gain, since their reference then shows real code. Their hosts are `code_review` (non-schema modes), `pattern`, and `challenge` — every other kind draws a disjoint vocabulary and is excluded without an exclusion being written, and `parsons_problem` excludes them explicitly (`excluded_vocabulary_keys`) because a sequencing format has nothing to read. Because these are fuzzier than `n_plus_one`, `AiService#meta_skill_framing_guidance` adds one prompt line — stated once for all sections, named from the constant — requiring the section to still contain one findable issue that the concept only *frames*. Their hosts' grading notes name a planted issue or stated requirement as the main point, and grading needs something missable to have been there. `AiService#can_host?` (given the concept, section key, and the day's generation language) derives third-slot retention hosting from `ProblemSetIngest.selectable_vocabulary_for` rather than restating it, so this exclusion — and the data-modeling one — is correct by construction rather than by coincidence.
 - **Alternate framings of a concept reference**: `ConceptReference` auto-expands
   on a concept's true first exposure so a beginner has a foothold before
   attempting anything — but it is one auto-generated explanation with no
@@ -1087,9 +1087,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   adjusted, and only a lock makes it exact. Provider copies of both stamps
   are stripped from every section first. A drilled concept at reduced tier is
   annotated `(reduced, drilled)`, and the prompt's easing rule names that form
-  too, so its `eased` stamp records what was actually asked. Neither stamp
-  reaches a prompt, the review or the duck. Those build their text from named
-  fields, and the judge, the one prompt that serializes a whole section,
+  too, so its `eased` stamp records what was actually asked. `eased` reaches
+  no prompt, the review or the duck. `pitched_at` reaches one: each graded
+  section's review prompt states the rung it was pitched at, because the
+  rubric rates against that level (see "Grading rubric"). The others build
+  their text from named fields, and the judge, the one prompt that serializes a whole section,
   strips every `ProblemSetIngest::SERVER_STAMPS` field first. The
   diagnostics log serializes whole sections too and keeps the stamps, since
   it is read by a person rather than a model. The Progress page does read them, which
@@ -1320,6 +1322,64 @@ concept-specific difficulty descriptions for future generation, not a new set.
   can reach it even in principle, since `ai_review` does not exist until a
   *submitted* response is reviewed. Display-only: nothing about tier
   transitions, retention scheduling, or generation guidance changed.
+- **Grading rubric**: `AiService::RATING_RUBRIC` is the one definition of
+  the four review ratings, stated once in the review's shared day context.
+  A rating describes how the answer meets the level its section was pitched
+  at, so `solid` means the same at junior and senior: beginner missed the
+  main point, developing found it but missed or misexplained an essential
+  piece, solid has no essential misses, and strong is solid plus something
+  the question did not ask for, such as a tradeoff or a consequence. A gap is
+  essential when, left as written, the code or decision would behave wrongly
+  or a stated requirement would go unmet. Each kind's grading note names its
+  own main point and essential pieces and never restates the levels; a spec
+  holds every grader-rated kind to that. Parsons is the exception: its
+  `fixed_rating` hook computes the rating in Ruby from how many blocks are
+  out of place and replaces the grader's, except when the stored section has
+  no blocks to compute from. The hook is the only statement of that rule;
+  shared grading code calls it for every kind.
+
+  **The grader is told the pitched level.** `build_review_section_prompt`
+  states the section's `pitched_at` rung and its
+  `KindDifficulty::LEVEL_DEFINITIONS` sentence, falling back to
+  `KindDifficulty#rung_for` (target included) for an unstamped section.
+  `eased` is never passed; the rubric instead says a problem simpler than
+  its level's description is graded on what it actually asks. The day context no
+  longer calls the engineer "junior/mid", which would contradict a senior
+  pitch.
+
+  **The rubric is checked, never enforced.** The grader also returns
+  `essential_gaps`, the positions in "missed" it counts as essential.
+  `RubricCheck` reads them against the rating (solid and strong list none,
+  beginner and developing at least one) and `[rubric_check]` logs counts and
+  `agrees=true|false|unknown` for every section whose rating the grader
+  chose, never review text; a computed rating is not checked.
+  Positions it cannot read are dropped rather than stored, and are counted
+  against "missed" as the grader returned it, blanks included. Nothing
+  rewrites a rating from this; the log is how the rubric's adherence is
+  measured. The check runs before the prose judge, and when the judge
+  rewrites a review the positions move into `graded_prose`, beside the list
+  they number.
+
+  **`AiService::RUBRIC_VERSION`** is stamped into every review the prompt
+  grades (`ai_review[section]["rubric"]`, server-owned). A review without it
+  was graded with no rubric, so its rating answers a different question; an
+  evidence reader that compares ratings to a bar reads only stamped reviews.
+  A stamp rather than a cutoff date, because grading knows which prompt it
+  ran and a date misfiles a review retried across a deploy. Only the
+  competency gate will read it; `ConceptMastery`, `RungLedger` and
+  `TrackGraduation` read all history on purpose. Going forward, a concept's
+  first post-rubric review is compared with a pre-rubric `last_rating`, so
+  that one comparison can read as improving or stagnant because the scale
+  moved rather than the engineer.
+
+  **Calibration.** `script/compare_models.rb review_calibration` grades the
+  complete, partial and missed answers in `spec/fixtures/review_calibration/`
+  through the production review route and reports whether each fixture's
+  three ratings fall in rank order, how many complete answers reach solid,
+  and the run's cost including cache writes. At introduction it ran 5/5 in
+  order and 15/15 at the expected rating on Claude, about $0.21. The fixtures are deliberately
+  clear-cut: they show the levels separate, not where a borderline answer
+  lands.
 - **Review prose judge**: an optional second pass over each graded review,
   for readability only. `AiService#judge_review_prose` reads the review as the
   page renders it (`ReviewProseVerdict.project`) and may reword its prose
@@ -2016,7 +2076,9 @@ always pull in the full suite — is stated once, in
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
 - `app/models/ai_provider.rb` — closed provider registry for dispatch, key detection and user validation; provider classes own the key patterns and environment restrictions
-- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read
+- `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read. `review_calibration` grades the fixtures in `spec/fixtures/review_calibration/` on the production review route (see "Grading rubric")
+- `app/models/rubric_check.rb` — `RubricCheck`: whether a graded review's rating agrees with the essential gaps it lists, under `AiService::RATING_RUBRIC`. Log-only and pure
+- `spec/fixtures/review_calibration/` — sections with a complete, a partial and a missed answer each, read by `ModelComparison#review_calibration`
 - `app/models/review_prose_verdict.rb` — `ReviewProseVerdict`: the prose judge's reply held to its closed lists, the structured-output schema, the projection the judge reads, and `#apply`, which stores the grader's original prose under `graded_prose`. Pure; its specs need no database
 - `app/services/review_prose_judge.rb` — `ReviewProseJudge.enabled?`: the deployment-wide `REVIEW_PROSE_JUDGE` switch, off unless exactly `"1"`
 - `spec/fixtures/review_judge/` — stored reviews that `ModelComparison#review_prose_fixtures` reads to compare candidates for the prose judge

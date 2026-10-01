@@ -50,8 +50,9 @@ class ExerciseSection::SecurityReview < ExerciseSection
   end
 
   def self.grading_note(section:, answer:)
-    "Evaluate on whether they correctly identified a real, exploitable vulnerability and whether their " \
-    "proposed mitigation is sound — not against one single expected answer. Give partial credit in " \
-    "\"missed\" for identifying the vulnerability without a complete mitigation, or vice versa."
+    "Main point: a real, exploitable vulnerability in this code.\n" \
+    "Essential pieces: how it would be exploited here, and a mitigation that actually closes it. Judge against " \
+    "any sound answer, not one expected wording. Finding the vulnerability without a complete mitigation, or the " \
+    "reverse, earns partial credit: name the missing half in \"missed\"."
   end
 end

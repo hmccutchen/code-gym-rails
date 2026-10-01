@@ -178,10 +178,10 @@ class ExerciseSection
       "Their self-rating: #{rating.presence || '(none given)'}"
     end
 
-    # What the reviewer needs beyond the generic rubric to grade this kind —
-    # how to weigh the answer, and what its improved_code must hold. Defaulted
-    # rather than abstract: the generic rubric grades most kinds on its own,
-    # and a kind with nothing extra to say should not have to say so.
+    # What the reviewer needs beyond AiService::RATING_RUBRIC to grade this
+    # kind: its main point and essential pieces, which the rubric's levels are
+    # read against, and what its improved_code must hold. The rubric itself is
+    # never restated here.
     def grading_note(section:, answer:)
       ""
     end
@@ -208,6 +208,12 @@ class ExerciseSection
 
     def improved_code?
       true
+    end
+
+    # The rating this kind computes for itself, replacing the grader's, or nil
+    # when the grader chooses one under AiService::RATING_RUBRIC.
+    def fixed_rating(section:, answer:)
+      nil
     end
 
     # Whether the judge may drop this kind from the day rather than ship a

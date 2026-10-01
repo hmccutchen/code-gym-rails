@@ -326,6 +326,29 @@ class AiService
     Calibration: too informal ("This is a total game-changer!") and too formal/overwrought ("The interface undergoes a paradigmatic transformation") are both wrong; aim for the plain middle ("This changes how the interface works").
   STANDARD
 
+  # The one definition of what each review rating means, stated once in the
+  # review's shared day context. A rating describes how the answer meets the
+  # level its section was pitched at, so "solid" means the same at junior and
+  # senior. Each kind's grading note names its own main point and essential
+  # pieces; none restates these levels. RubricCheck reads the essential_gaps
+  # the grader returns against them.
+  RATING_RUBRIC = <<~RUBRIC.chomp.freeze
+    How to choose "rating": rate the answer against the level its section was pitched at, which the grading instruction states on its "Pitched at" line, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
+    - "beginner": missed the main point of the section.
+    - "developing": found the main point, but missed or misexplained at least one essential piece.
+    - "solid": no essential misses.
+    - "strong": solid, plus something the question did not ask for that matters here, such as a tradeoff or a consequence.
+    The rating must agree with "missed": when "missed" names an essential gap, the rating is not "solid" or "strong". When a section's grading note says its rating is already fixed, that note wins.
+  RUBRIC
+
+  # Stamped into every review this prompt grades (ai_review[section]["rubric"]).
+  # A review without it was graded with no rubric, so its rating answers a
+  # different question; an evidence reader that compares ratings to a bar
+  # reads only stamped reviews. A stamp rather than a date because grading
+  # knows which prompt it ran, and a date misfiles a review retried after a
+  # deploy. Raise it when RATING_RUBRIC changes what a rating means.
+  RUBRIC_VERSION = 1
+
   PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT = <<~PROMPT.chomp
     You are reviewing an engineer's PSEUDOCODE plan before any code exists. They
     have not submitted or been graded. Your job is to point out genuine gaps in
@@ -2194,10 +2217,10 @@ class AiService
 
   # The meta-skill concepts name a way of reasoning, which makes them the one
   # group that can quietly cost a section its grade: code_review and challenge
-  # have no section_grading_note and are graded by the generic rubric, and that
-  # rubric has nothing to put in "missed" if the question had no wrong answer
-  # to begin with. So the concept is confined to framing here, once for every
-  # section, rather than restated into each kind's guidance — like
+  # are graded on the planted issue or stated requirement their grading notes
+  # name, and there is nothing to put in "missed" if the question had no wrong
+  # answer to begin with. So the concept is confined to framing here, once for
+  # every section, rather than restated into each kind's guidance — like
   # data_modeling_idiom_guidance, it is a rule about the concept, not the kind.
   def meta_skill_framing_guidance
     "- The meta-skill concepts (#{META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
@@ -2227,8 +2250,8 @@ class AiService
 
   # A principle is a rule, not a thing to find, which makes this the group most
   # likely to produce a section with no wrong answer in it: code_review and
-  # challenge have no section_grading_note and are graded by the generic
-  # rubric, which has nothing to put in "missed" if nothing was missable. So
+  # challenge are graded on the planted issue or stated requirement their
+  # grading notes name, so nothing goes in "missed" if nothing was missable. So
   # the requirement here is the same one meta_skill_framing_guidance enforces —
   # the concept frames the question, it never replaces the findable issue.
   # Stated once for every section, like the other group rules, because it
@@ -2254,8 +2277,8 @@ class AiService
   # Depth is a property of an interface, not a defect in a result, which makes
   # this the group most able to produce a section with nothing missable in it —
   # the same failure oo_design_violation_guidance and meta_skill_framing_guidance
-  # each guard against, since code_review and challenge carry no
-  # section_grading_note and the generic rubric has nothing to put in "missed".
+  # each guard against, since code_review and challenge are graded on a
+  # planted issue or stated requirement and nothing else goes in "missed".
   # Stated once for every section, like the other four group rules, because it
   # is a rule about the concept and not about any one kind.
   def module_design_depth_guidance
@@ -2309,10 +2332,10 @@ class AiService
   # Both concepts are judgments about the MODEL rather than about a result, so
   # this group shares the failure mode the design principles and module-design
   # concepts have: a section with nothing missable in it. code_review and
-  # challenge carry no section_grading_note and the generic rubric has nothing
-  # to put in "missed". Stated once for every section, like the other five
-  # group rules, because it is a rule about the concept and not about any one
-  # kind.
+  # challenge are graded on a planted issue or stated requirement, so such a
+  # section leaves nothing to put in "missed". Stated once for every section,
+  # like the other five group rules, because it is a rule about the concept
+  # and not about any one kind.
   def domain_modeling_guidance
     "- The domain-modeling concepts (#{DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
       "which things must change together, not a defect in what the code computes. A section tagged with one must " \
@@ -2470,7 +2493,9 @@ class AiService
       end
 
     <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on a junior/mid engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
+      You are a senior #{coach} engineer giving direct, specific feedback on an engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only as context, since each section is rated against its own pitched level. Be honest and constructive. Return JSON.
+
+      #{RATING_RUBRIC}
 
       #{PLAIN_LANGUAGE_STANDARD}
 
@@ -2481,6 +2506,7 @@ class AiService
   def build_review_section_prompt(exercise, daily_response, section)
     <<~PROMPT
       Grade ONLY the "#{section}" section from the day's context above.
+      Pitched at: #{pitch_line(exercise, daily_response, section)}
 
       #{section_grading_note(exercise, daily_response, section)}
 
@@ -2488,6 +2514,7 @@ class AiService
       - "rating": "beginner" | "developing" | "solid" | "strong"
       - "correct": array of strings — each entry one distinct thing they got right
       - "missed": array of strings — each entry one distinct thing they missed or got wrong
+      - "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
       - "better_questions": array of strings — each entry one question they should have asked themselves
       - "next_step": string — one specific thing to study
       - "improved_code": string — #{improved_code_instruction(section)}
@@ -2497,6 +2524,20 @@ class AiService
       — separate ideas belong in separate entries. Use an empty array when there is nothing to
       say for that field.
     PROMPT
+  end
+
+  # The rung only, never `eased`; the rubric grades an eased problem on what
+  # it actually asks. A section generated before stamps existed falls back to
+  # the rung generation would pick for it today.
+  def pitch_line(exercise, daily_response, section)
+    stamped = exercise.problem_set.dig(section, "pitched_at")
+    rung = KindDifficulty::LEVELS.include?(stamped) ? stamped : current_rung(daily_response.user, section)
+    "#{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}"
+  end
+
+  def current_rung(user, section)
+    difficulty = user ? KindDifficulty.for(user) : KindDifficulty.none
+    difficulty.rung_for(ExerciseSection.for(section), skill_level: user&.skill_level)
   end
 
   def improved_code_instruction(section)
@@ -2642,13 +2683,48 @@ class AiService
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
       cache_system: true, read_timeout: REVIEW_READ_TIMEOUT
     )
-    # graded_prose is server-owned: only the prose judge's edit writes it.
-    review = service.send(:parse_json_object, result[:text], subject: "#{section} review").except(ReviewProseVerdict::ORIGINAL_KEY)
-    review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-    review = service.send(:judged_review, user, exercise, section, review)
+    # graded_prose and the rubric stamp are server-owned: only the prose
+    # judge's edit writes the first, and only this line the second.
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+                    .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
+    review = service.send(:rated, user, exercise, daily_response, section, review)
+    review = service.send(:gaps_beside_their_prose, service.send(:judged_review, user, exercise, section, review))
     [ section, { ok: true, review: review } ]
   rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+  end
+
+  # A kind that computes its own rating replaces the grader's, and the
+  # grader's essential_gaps then describe a rating nobody kept. Every other
+  # rating is checked against the rubric.
+  def rated(user, exercise, daily_response, section, review)
+    fixed = ExerciseSection.for(section).fixed_rating(
+      section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
+    )
+    return review.merge("rating" => fixed).except("essential_gaps") if fixed
+
+    checked_against_rubric(user, section, review)
+  end
+
+  # Runs before the prose judge, whose merges would renumber "missed".
+  # Positions it cannot read are dropped rather than stored. The log carries
+  # counts and vocabulary words only.
+  def checked_against_rubric(user, section, review)
+    check  = RubricCheck.new(review)
+    rating = ConceptMastery::AI_RATING_RANK.key?(review["rating"]) ? review["rating"] : "invalid"
+    Rails.logger.info("[rubric_check] user=#{user.id} section=#{section} rating=#{rating} " \
+                      "essential=#{check.essential_gaps&.size || 'unknown'} missed=#{check.missed_count} " \
+                      "agrees=#{check.agrees?.nil? ? 'unknown' : check.agrees?}")
+    check.essential_gaps ? review.merge("essential_gaps" => check.essential_gaps) : review.except("essential_gaps")
+  end
+
+  # The positions index the grader's "missed", so when the prose judge
+  # rewrote that list they move into graded_prose beside the one they number.
+  def gaps_beside_their_prose(review)
+    original = review[ReviewProseVerdict::ORIGINAL_KEY]
+    return review unless original.is_a?(Hash) && review.key?("essential_gaps") && original["missed"] != review["missed"]
+
+    review.except("essential_gaps").merge(ReviewProseVerdict::ORIGINAL_KEY => original.merge("essential_gaps" => review["essential_gaps"]))
   end
 
   # Its own rescue, so a judge failure returns the grade the provider already
@@ -2946,22 +3022,6 @@ class AiService
     snippet = text.byteslice(0, RAW_SNIPPET_LIMIT).scrub
     snippet += "... (truncated, #{text.bytesize} bytes total)" if text.bytesize > RAW_SNIPPET_LIMIT
     Rails.logger.error("#{label}: #{snippet}")
-  end
-
-  # Parsons correctness is decided in Ruby, never by the model — whatever rating it returned
-  # is discarded and replaced. Skipped when the stored section has no blocks, since there is
-  # nothing to grade against and the grader would report a spurious perfect score. Operates on
-  # a single un-nested section hash — the shape #review_sections works with.
-  def override_parsons_section_rating!(review, exercise, daily_response)
-    parsons = exercise.parsons_problem
-    return review unless parsons.is_a?(Hash)
-
-    blocks = Array(parsons["blocks"])
-    return review if blocks.empty?
-
-    submitted = ExerciseSection::ParsonsProblem.submitted_order(daily_response.answer_for("parsons_problem"), blocks.size)
-    review["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
-    review
   end
 
   # Never allowed to break generation — a bug here is a lost analytics
