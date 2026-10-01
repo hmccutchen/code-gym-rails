@@ -2876,11 +2876,19 @@ class AiService
   end
 
   # The HTTP envelope of a successful call, as opposed to the model's reply
-  # inside it. Callers rescue AiService::Error, so a body that is not JSON (a
-  # proxy's HTML page, a cut-off response) has to arrive as one.
+  # inside it. Callers rescue AiService::Error, so a body that is not a JSON
+  # object (a proxy's HTML page, a cut-off response, a bare array) has to
+  # arrive as one.
   def parse_provider_envelope(body, provider:)
-    JSON.parse(body.to_s)
+    parsed = JSON.parse(body.to_s)
+    return parsed if parsed.is_a?(Hash)
+
+    unreadable_envelope!(body, provider)
   rescue JSON::ParserError
+    unreadable_envelope!(body, provider)
+  end
+
+  def unreadable_envelope!(body, provider)
     log_raw_snippet("Unreadable #{provider} response body", body)
     raise InvalidResponseError, "#{provider} returned an unreadable response"
   end

@@ -33,6 +33,15 @@ RSpec.describe ClaudeService do
       .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
   end
 
+  # Valid JSON of the wrong shape would otherwise reach a hash lookup and
+  # escape every AiService::Error rescue as a TypeError.
+  it "raises InvalidResponseError when a successful response body is not a JSON object" do
+    service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
+
+    expect { service.send(:call, system: "sys", prompt: "p") }
+      .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
+  end
+
   describe "#build_connection" do
     it "sets Anthropic auth headers" do
       conn = service.send(:build_connection)
