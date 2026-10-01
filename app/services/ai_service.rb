@@ -2959,6 +2959,9 @@ class AiService
         user:       user,
         tokens_in:  result[:input_tokens].to_i,
         tokens_out: result[:output_tokens].to_i,
+        model:      result[:model],
+        cache_read_tokens:  result[:cache_read_tokens],
+        cache_write_tokens: result[:cache_write_tokens],
         purpose:    purpose,
         date:       Date.current
       )
@@ -3002,7 +3005,8 @@ class AiService
 
     if result[:truncated] && !allow_truncated
       raise TruncatedResponseError,
-            "Provider stopped generating at its output token limit (#{result[:output_tokens].to_i} tokens)"
+            "Provider stopped generating at its output token limit " \
+            "(#{result[:output_tokens].to_i} output tokens, thinking included)"
     end
 
     result

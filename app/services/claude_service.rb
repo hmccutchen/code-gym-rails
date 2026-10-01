@@ -111,6 +111,10 @@ class ClaudeService < AiService
       text:          text_block&.dig("text"),
       input_tokens:  usage["input_tokens"],
       output_tokens: usage["output_tokens"],
+      model:         route[:model],
+      # input_tokens excludes both, and each is billed at its own rate.
+      cache_read_tokens:  usage["cache_read_input_tokens"].to_i,
+      cache_write_tokens: usage["cache_creation_input_tokens"].to_i,
       truncated:     parsed["stop_reason"] == "max_tokens",
       # Reported as data, like truncation, so call_and_log records the billed
       # usage before it raises: a refused request still charges its input.

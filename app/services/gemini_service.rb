@@ -97,11 +97,20 @@ class GeminiService < AiService
     text_parts   = Array(model_output && model_output["content"]).select { |c| c["type"] == "text" }.map { |c| c["text"] }
     usage        = parsed["usage"] || {}
     output_tokens = usage["total_output_tokens"]
+    cached_tokens = usage["total_cached_tokens"].to_i
 
     {
       text:          text_parts.join,
-      input_tokens:  usage["total_input_tokens"],
-      output_tokens: output_tokens,
+      # total_input_tokens includes the cached part, unlike Claude's
+      # input_tokens; subtracting it keeps tokens_in the uncached input on
+      # both providers, so a cached token is never priced twice.
+      input_tokens:  usage["total_input_tokens"].to_i - cached_tokens,
+      # Thinking is billed as output but reported apart from it: a live
+      # response gave total_tokens = input + output + thought.
+      output_tokens: output_tokens.to_i + usage["total_thought_tokens"].to_i,
+      model:         body[:model],
+      cache_read_tokens:  cached_tokens,
+      cache_write_tokens: 0,
       # The Interactions API response carries no explicit stop/finish-reason
       # field (unlike Claude's stop_reason) — without this, call_and_log's
       # truncation check is silently always false here. A capped call (e.g.

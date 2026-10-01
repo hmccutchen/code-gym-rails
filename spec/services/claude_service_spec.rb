@@ -252,7 +252,25 @@ RSpec.describe ClaudeService do
       end
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
-      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false, refusal: nil)
+      expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false, refusal: nil,
+                           model: ClaudeService::DEFAULT_ROUTE[:model], cache_read_tokens: 0, cache_write_tokens: 0)
+    end
+
+    # input_tokens excludes cached tokens, and reads and writes are billed at
+    # different rates, so each is kept separately for a row's cost to be
+    # worked out.
+    it "reports cache reads and writes separately from input tokens" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "content" => [ { "type" => "text", "text" => "hello" } ],
+          "usage"   => { "input_tokens" => 10, "output_tokens" => 20,
+                         "cache_read_input_tokens" => 900, "cache_creation_input_tokens" => 1_100 }
+        }.to_json)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      result = service.send(:call, system: "sys", prompt: "p")
+
+      expect(result).to include(input_tokens: 10, cache_read_tokens: 900, cache_write_tokens: 1_100)
     end
 
     it "finds the text block even when a thinking block precedes it" do

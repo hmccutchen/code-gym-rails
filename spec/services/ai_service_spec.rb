@@ -309,6 +309,29 @@ RSpec.describe AiService do
     end
   end
 
+  describe "usage rows" do
+    it "records the model and both cache counts the provider reported" do
+      svc = double_class.new
+      allow(svc).to receive(:call).and_return(
+        text: "{}", input_tokens: 120, output_tokens: 80, truncated: false,
+        model: "claude-sonnet-5-5", cache_read_tokens: 900, cache_write_tokens: 1_100
+      )
+
+      svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p")
+
+      expect(ApiUsage.last).to have_attributes(
+        purpose: "duck_thread", model: "claude-sonnet-5-5", tokens_in: 120, tokens_out: 80,
+        cache_read_tokens: 900, cache_write_tokens: 1_100
+      )
+    end
+
+    # Rows written before these columns existed stay null: unknown, rather than
+    # a zero that would read as an uncached call on a model nobody recorded.
+    it "accepts a row with no model or cache counts" do
+      expect(ApiUsage.new(user: user, purpose: "duck_thread", date: Date.current, tokens_in: 1, tokens_out: 1)).to be_valid
+    end
+  end
+
   # A truncated response is still a billed response, so the usage row has to
   # be written before the failure propagates — otherwise cost tracking
   # silently under-counts exactly the calls that burn a full output budget.
@@ -341,7 +364,7 @@ RSpec.describe AiService do
 
       expect {
         svc.generate_exercise(user)
-      }.to raise_error(AiService::TruncatedResponseError, /output token limit/i)
+      }.to raise_error(AiService::TruncatedResponseError, /output token limit \(\d+ output tokens, thinking included\)/i)
     end
 
     it "records usage before raising on a prose entry point too" do
