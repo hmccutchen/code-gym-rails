@@ -4,6 +4,9 @@ require "faraday/retry"
 class ClaudeService < AiService
   API_URL = "https://api.anthropic.com/v1/messages"
 
+  def self.provider_key = "anthropic"
+  def self.key_pattern = /\Ask-ant-/
+
   # Not yet measured: script/compare_models.rb's review_prose modes measure it,
   # and that has to happen before this switch is turned on.
   def self.judges_review_prose? = true

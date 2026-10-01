@@ -4,6 +4,9 @@ require "faraday/retry"
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
+  def self.provider_key = "gemini"
+  def self.key_pattern = /\A(AIza|AQ\.)/
+
   # Keyed by the ApiUsage purpose string, like ClaudeService's. Generation and
   # its single-section retry share the default route explicitly so route
   # coverage can pin both usage labels.

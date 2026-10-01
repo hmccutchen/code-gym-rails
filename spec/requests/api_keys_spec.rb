@@ -56,7 +56,7 @@ RSpec.describe "ApiKeys", type: :request do
     # Both start with "sk-", so a pattern loose enough to catch every OpenAI
     # key could claim an Anthropic one.
     it "never mistakes an Anthropic key for an OpenAI key" do
-      expect(ApiKeysController::PROVIDER_PATTERNS["openai"]).not_to match("sk-ant-api03-Ab8RN6J5yPUsY9SwLxAS2DYq")
+      expect(OpenaiService.key_pattern).not_to match("sk-ant-api03-Ab8RN6J5yPUsY9SwLxAS2DYq")
     end
 
     it "saves a valid language preference alongside the API key" do

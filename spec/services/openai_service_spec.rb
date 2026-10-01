@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe OpenaiService do
+  include AuthHelpers
+
   let(:service) { described_class.new("sk-proj-TestKey") }
 
   # A connection with the service's real retry configuration but a Faraday
@@ -46,6 +48,61 @@ RSpec.describe OpenaiService do
   end
 
   let(:hello) { reply(output: [ message({ "type" => "output_text", "text" => "hello" }) ]) }
+
+  describe "shared response handling" do
+    let(:user) { create_user_with_key }
+
+    def logged_call(body, **options)
+      service.instance_variable_set(:@conn, recording_connection([], body))
+      service.send(:call_and_log, user, purpose: "duck_thread", system: "sys", prompt: "p", **options)
+    end
+
+    %w[failed cancelled queued in_progress unknown].push(nil).each do |status|
+      it "rejects status #{status.inspect} after recording billed usage, even when partial prose is allowed" do
+        body = reply(status: status, output: [ message({ "type" => "output_text", "text" => "Unfinished prose" }) ],
+                     error: { "message" => "private provider detail" })
+
+        expect {
+          expect { logged_call(body, allow_truncated: true) }
+            .to raise_error(AiService::Error, "OpenAI did not complete its response. Try again.")
+        }.to change { ApiUsage.count }.by(1)
+        expect(ApiUsage.last).to have_attributes(tokens_in: 1, tokens_out: 1)
+      end
+    end
+
+    it "records all billed token categories on the user's local date" do
+      body = hello.merge("usage" => { "input_tokens" => 10_000, "output_tokens" => 900,
+                                    "input_tokens_details" => { "cached_tokens" => 4_000, "cache_write_tokens" => 5_000 } })
+
+      Time.use_zone("Pacific/Honolulu") do
+        logged_call(body)
+        expect(ApiUsage.last).to have_attributes(tokens_in: 1_000, tokens_out: 900,
+                                                cache_read_tokens: 4_000, cache_write_tokens: 5_000,
+                                                model: OpenaiService::DEFAULT_ROUTE[:model], date: Date.current)
+      end
+    end
+
+    it "records usage before refusing filtered output, even when partial prose is allowed" do
+      body = reply(status: "incomplete", output: [], incomplete_details: { "reason" => "content_filter" })
+
+      expect {
+        expect { logged_call(body, allow_truncated: true) }.to raise_error(AiService::RefusalError)
+      }.to change { ApiUsage.count }.by(1)
+    end
+
+    it "records usage before rejecting an uncapped incomplete reply" do
+      body = hello.merge("status" => "incomplete")
+
+      expect {
+        expect { logged_call(body) }.to raise_error(AiService::TruncatedResponseError)
+      }.to change { ApiUsage.count }.by(1)
+    end
+
+    it "preserves incomplete prose for callers that explicitly allow it" do
+      expect(logged_call(hello.merge("status" => "incomplete"), allow_truncated: true))
+        .to include(text: "hello", truncated: true)
+    end
+  end
 
   it "raises InvalidResponseError when a successful response body is not JSON" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
@@ -98,13 +155,25 @@ RSpec.describe OpenaiService do
       expect(responses.size).to eq(1)
     end
 
-    it "raises AuthenticationError with the provider's message on a 401, without retrying" do
+    it "raises AuthenticationError with safe guidance on a 401, without retrying" do
       responses = [ [ 401, { "error" => { "message" => "Incorrect API key provided" } }.to_json ], [ 200, hello.to_json ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))
 
       expect { service.send(:call, system: "sys", prompt: "p") }
-        .to raise_error(AiService::AuthenticationError, "Incorrect API key provided")
+        .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.")
       expect(responses.size).to eq(1)
+    end
+
+    [ 401, 403 ].each do |status|
+      it "keeps credentials out of logs and errors on HTTP #{status}" do
+        body = { error: { message: "Incorrect API key provided: sk-proj-TestKey (sk-proj-Te***Key)" } }.to_json
+        service.instance_variable_set(:@conn, stubbed_connection([ [ status, body ] ]))
+        allow(Rails.logger).to receive(:error)
+
+        expect { service.send(:call, system: "sys", prompt: "p") }
+          .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.")
+        expect(Rails.logger).not_to have_received(:error).with(/sk-proj-/)
+      end
     end
 
     it "makes one request for a single-attempt call" do
@@ -179,6 +248,16 @@ RSpec.describe OpenaiService do
       result = call_with(reply(output: [ message({ "type" => "output_text", "text" => "x" }) ], usage: usage)).last
 
       expect(result).to include(input_tokens: 6_028, cache_read_tokens: 8_171, output_tokens: 900)
+    end
+
+    it "records cache writes separately from ordinary input and cache reads" do
+      usage = { "input_tokens" => 10_000,
+                "input_tokens_details" => { "cached_tokens" => 4_000, "cache_write_tokens" => 5_000 },
+                "output_tokens" => 900 }
+      result = call_with(reply(output: [], usage: usage)).last
+
+      expect(result).to include(input_tokens: 1_000, cache_read_tokens: 4_000,
+                               cache_write_tokens: 5_000, output_tokens: 900)
     end
 
     it "reports an incomplete reply as truncated" do

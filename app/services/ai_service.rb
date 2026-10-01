@@ -1001,24 +1001,18 @@ class AiService
     @conn    = build_connection
   end
 
-  # ── Dispatch to the right provider for this user ─────────────────────────
-  # "fake" is never reachable through the app — ApiKeysController derives
-  # provider from a key-format allowlist — so a fake-provider user in
-  # production could only come from a console/DB mistake, where silently serving
-  # canned exercises would be worse than failing loudly.
   def self.for(user)
-    case user.provider
-    when "anthropic" then ClaudeService.new(user.api_key)
-    when "gemini"    then GeminiService.new(user.api_key)
-    when "openai"    then OpenaiService.new(user.api_key)
-    when "fake"
-      raise Error, "User #{user.id} has the test-only fake provider outside a local environment" unless Rails.env.local?
-
-      FakeService.new(user.api_key)
-    else
-      raise Error, "User #{user.id} has no recognized AI provider configured"
+    provider = AiProvider.find(user.provider)
+    raise Error, "User #{user.id} has no recognized AI provider configured" unless provider
+    unless provider.available?
+      raise Error, "User #{user.id} has the test-only #{provider.provider_key} provider outside a local environment"
     end
+
+    provider.new(user.api_key)
   end
+
+  def self.available? = true
+  def self.key_pattern = nil
 
   # Whether this provider can hold the prose judge's reply to a schema. The
   # base answers false; a provider that can opts in. Turning the judge on is
@@ -2988,7 +2982,7 @@ class AiService
   #
   # #log_usage checks out its own connection after the provider call and
   # rescues a failed checkout or write, so a busy pool never discards a result
-  # the provider already billed. A refusal or truncation still raises below.
+  # the provider already billed. A failure, refusal or truncation still raises below.
   #
   # `allow_truncated:` hands a cut-off reply back with its `truncated` flag
   # instead of raising. Only a prose caller may ask for it: a JSON body that
@@ -3002,6 +2996,7 @@ class AiService
                   response_schema: response_schema, single_attempt: single_attempt)
     log_usage(user, result, purpose: purpose)
 
+    raise Error, result[:error] if result[:error]
     raise RefusalError, "The provider declined this request (#{result[:refusal]})" if result[:refusal]
 
     if result[:truncated] && !allow_truncated

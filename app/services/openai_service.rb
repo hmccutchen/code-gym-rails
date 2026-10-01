@@ -4,6 +4,11 @@ require "faraday/retry"
 class OpenaiService < AiService
   API_URL = "https://api.openai.com/v1/responses"
 
+  def self.provider_key = "openai"
+
+  # The legacy branch cannot claim an Anthropic key's "sk-ant-" prefix.
+  def self.key_pattern = /\Ask-(proj-|svcacct-|[A-Za-z0-9]{20})/
+
   # Keyed by the ApiUsage purpose string, like ClaudeService's. No route has
   # been compared against another model yet. Effort is stated even where it is
   # the model's default, so a change to that default cannot move a route
@@ -79,10 +84,15 @@ class OpenaiService < AiService
   end
 
   def raise_for_status(resp)
+    # OpenAI's authentication errors can echo the key, including masked fragments.
+    if [ 401, 403 ].include?(resp.status)
+      Rails.logger.error("OpenAI authentication failed (HTTP #{resp.status})")
+      raise AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings."
+    end
+
     log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
     message     = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")
     error_class = case resp.status
-    when 401, 403 then AiService::AuthenticationError
     when 429      then AiService::RateLimitError
     else               AiService::Error
     end
@@ -90,21 +100,31 @@ class OpenaiService < AiService
   end
 
   def read_result(parsed, route)
+    usage = read_usage(parsed["usage"] || {}, route)
+    unless %w[completed incomplete].include?(parsed["status"])
+      return usage.merge(error: "OpenAI did not complete its response. Try again.")
+    end
+
     content = Array(parsed["output"]).select { |item| item["type"] == "message" }.flat_map { |item| Array(item["content"]) }
-    usage   = parsed["usage"] || {}
+    usage.merge(
+      text:      content.select { |part| part["type"] == "output_text" }.map { |part| part["text"] }.join,
+      truncated: parsed["status"] == "incomplete" && !filtered?(parsed),
+      refusal:   refusal_category(parsed, content)
+    )
+  end
+
+  def read_usage(usage, route)
     cached_tokens = usage.dig("input_tokens_details", "cached_tokens").to_i
+    cache_write_tokens = usage.dig("input_tokens_details", "cache_write_tokens").to_i
 
     {
-      text:          content.select { |part| part["type"] == "output_text" }.map { |part| part["text"] }.join,
-      # input_tokens includes the cached part, as Gemini's does.
-      input_tokens:  usage["input_tokens"].to_i - cached_tokens,
+      # OpenAI includes both cache reads and writes in input_tokens.
+      input_tokens:  usage["input_tokens"].to_i - cached_tokens - cache_write_tokens,
       # Reasoning tokens are already inside output_tokens.
       output_tokens: usage["output_tokens"],
       model:         route[:model],
       cache_read_tokens:  cached_tokens,
-      cache_write_tokens: 0,
-      truncated:     parsed["status"] == "incomplete" && !filtered?(parsed),
-      refusal:       refusal_category(parsed, content)
+      cache_write_tokens: cache_write_tokens
     }
   end
 

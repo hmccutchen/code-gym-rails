@@ -1,6 +1,6 @@
-# Deterministic, zero-cost AiService provider for tests. Overrides only the
-# two hooks every real provider implements (#call, #build_connection) —
-# every other AiService method (DailyPlan, log_usage, normalize_concepts,
+# Deterministic, zero-cost AiService provider for tests. Supplies provider
+# metadata and the two transport hooks (#call, #build_connection) —
+# exercise processing (DailyPlan, log_usage, normalize_concepts,
 # log_retention, shuffle_parsons_blocks!, override_parsons_section_rating!)
 # runs unmodified against this fake's output, so tests exercise the same
 # control flow a real provider triggers. #call dispatches on the literal
@@ -8,6 +8,9 @@
 # reads which section to grade out of `prompt:`, since #review_sections
 # sends the same shared system context to every section's call.
 class FakeService < AiService
+  def self.provider_key = "fake"
+  def self.available? = Rails.env.local?
+
   # So specs can drive the judged review path; the fake always keeps.
   def self.judges_review_prose? = true
 
