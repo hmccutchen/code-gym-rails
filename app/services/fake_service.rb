@@ -312,7 +312,7 @@ class FakeService < AiService
         raise "FakeService received an unrecognized system prompt: #{system.inspect}"
       end
 
-    { text: text, input_tokens: 0, output_tokens: 0 }
+    { text: text, input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0 }
   end
 
   # Unlike REVIEW_SECTION, which is one flat hash reused for every section, the

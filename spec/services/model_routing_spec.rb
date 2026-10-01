@@ -5,6 +5,30 @@ RSpec.describe "per-purpose model routing" do
     File.read(Rails.root.join("app/services/ai_service.rb")).scan(/purpose: "(\w+)"/).flatten.uniq
   end
 
+  # The model a call reports is the one it routed to, so a usage row names the
+  # model whose prices apply to it.
+  [ ClaudeService, GeminiService ].each do |service_class|
+    it "reports the model #{service_class} routed each purpose to" do
+      purposes = service_class::MODEL_FOR_PURPOSE.keys + [ "an_unlisted_purpose" ]
+
+      purposes.each do |purpose|
+        expected = service_class::MODEL_FOR_PURPOSE.fetch(purpose, service_class::DEFAULT_ROUTE)[:model]
+        expect(result_for(service_class, purpose: purpose)[:model]).to eq(expected), "purpose #{purpose}"
+      end
+    end
+  end
+
+  def result_for(service_class, **kwargs)
+    service = service_class.new("test-key")
+    conn = Faraday.new do |f|
+      f.adapter :test do |stub|
+        stub.post(service_class::API_URL) { [ 200, {}, success_body_for(service_class) ] }
+      end
+    end
+    service.instance_variable_set(:@conn, conn)
+    service.send(:call, system: "sys", prompt: "p", **kwargs)
+  end
+
   def posted_body(service_class, **kwargs)
     bodies = []
     service = service_class.new("test-key")

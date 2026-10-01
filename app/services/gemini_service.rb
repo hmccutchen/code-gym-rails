@@ -101,7 +101,12 @@ class GeminiService < AiService
     {
       text:          text_parts.join,
       input_tokens:  usage["total_input_tokens"],
-      output_tokens: output_tokens,
+      # Thinking is billed as output but reported apart from it: a live
+      # response gave total_tokens = input + output + thought.
+      output_tokens: output_tokens.to_i + usage["total_thought_tokens"].to_i,
+      model:         body[:model],
+      cache_read_tokens:  usage["total_cached_tokens"].to_i,
+      cache_write_tokens: 0,
       # The Interactions API response carries no explicit stop/finish-reason
       # field (unlike Claude's stop_reason) — without this, call_and_log's
       # truncation check is silently always false here. A capped call (e.g.
