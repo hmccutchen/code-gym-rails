@@ -2975,10 +2975,9 @@ class AiService
   end
 
   # Every provider entry point funnels through here so usage is recorded on
-  # exactly one path. A truncated response is still a billed response — and
-  # the most expensive kind, since it burned the whole output budget — so the
-  # usage row has to be written before the failure propagates, or cost
-  # tracking under-counts precisely the calls that cost the most.
+  # exactly one path. A truncated response is still a billed response, often
+  # a long one, so the usage row has to be written before the failure
+  # propagates, or cost tracking under-counts the calls that failed.
   #
   # Providers report truncation as data (`truncated:`) rather than raising it
   # themselves: recognizing a stop reason is provider-specific, but deciding
@@ -3005,7 +3004,7 @@ class AiService
 
     if result[:truncated] && !allow_truncated
       raise TruncatedResponseError,
-            "Provider stopped generating at its output token limit " \
+            "Provider did not finish its reply " \
             "(#{result[:output_tokens].to_i} output tokens, thinking included)"
     end
 
