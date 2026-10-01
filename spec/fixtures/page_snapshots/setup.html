@@ -481,108 +481,107 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   <nav>
     <div class="container inner">
-      
-        <a class="brand" href="/"><picture><source srcset="/assets/logo-3fe33b7b.png" media="not all" data-light-palette-media="true"><img alt="Code Gym" class="brand-mark" width="930" height="654" src="/assets/logo-outlined-444354ae.png" /></picture><span aria-hidden="true">Code Gym</span></a>
-        <button type="button" class="nav-toggle" id="nav-toggle"
-                aria-expanded="false" aria-controls="nav-links"
-                aria-label="Menu">
-          <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
-        </button>
-        <div class="nav-links" id="nav-links">
-          <span class="name-editor">
-            <input type="text"
-                   id="nav-name-input"
-                   class="name-editor-input"
-                   value="Existing"
-                   aria-label="Your display name">
-            <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
-          </span>
-          <script>
-            (function () {
-              const input  = document.getElementById("nav-name-input");
-              const status = document.getElementById("nav-name-status");
-              if (!input) return;
+      <a class="brand" href="/"><picture><source srcset="/assets/logo-3fe33b7b.png" media="not all" data-light-palette-media="true"><img alt="Code Gym" class="brand-mark" width="930" height="654" src="/assets/logo-outlined-444354ae.png" /></picture><span aria-hidden="true">Code Gym</span></a>
+      <button type="button" class="nav-toggle" id="nav-toggle"
+              aria-expanded="false" aria-controls="nav-links"
+              aria-label="Menu">
+        <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
+      </button>
+      <div class="nav-links" id="nav-links">
+        <span class="name-editor">
+          <input type="text"
+                 id="nav-name-input"
+                 class="name-editor-input"
+                 value="Existing"
+                 aria-label="Your display name">
+          <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
+        </span>
+        <script>
+          (function () {
+            const input  = document.getElementById("nav-name-input");
+            const status = document.getElementById("nav-name-status");
+            if (!input) return;
 
-              let lastSaved = input.value;
-              const savedText = "Saved ✓";
-              const errorText = "Couldn\&#39;t save";
-              let statusTimer;
+            let lastSaved = input.value;
+            const savedText = "Saved ✓";
+            const errorText = "Couldn\&#39;t save";
+            let statusTimer;
 
-              function flash(message) {
-                status.textContent = message;
-                clearTimeout(statusTimer);
-                statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
-              }
+            function flash(message) {
+              status.textContent = message;
+              clearTimeout(statusTimer);
+              statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
+            }
 
-              input.addEventListener("blur", async () => {
-                const name = input.value.trim();
-                if (name === lastSaved) return;
-                if (name === "") { input.value = lastSaved; return; }
+            input.addEventListener("blur", async () => {
+              const name = input.value.trim();
+              if (name === lastSaved) return;
+              if (name === "") { input.value = lastSaved; return; }
 
-                try {
-                  const response = await fetch("/profile", {
-                    method: "PATCH",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Accept": "application/json",
-                      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ user: { name } })
-                  });
+              try {
+                const response = await fetch("/profile", {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+                  },
+                  body: JSON.stringify({ user: { name } })
+                });
 
-                  if (response.ok) {
-                    const data = await response.json();
-                    input.value = data.name;
-                    lastSaved = data.name;
-                    flash(savedText);
-                  } else {
-                    input.value = lastSaved;
-                    flash(errorText);
-                  }
-                } catch {
+                if (response.ok) {
+                  const data = await response.json();
+                  input.value = data.name;
+                  lastSaved = data.name;
+                  flash(savedText);
+                } else {
                   input.value = lastSaved;
                   flash(errorText);
                 }
-              });
-            })();
-          </script>
-          <a href="/learn">Learn</a>
-          <a href="/progress">Progress</a>
-          <a href="/history">History</a>
-          <a href="/account">Account</a>
-        </div>
-        <script>
-          (function () {
-            const toggle = document.getElementById("nav-toggle");
-            const links  = document.getElementById("nav-links");
-            if (!toggle || !links) return;
-
-            function closeMenu() {
-              links.removeAttribute("data-open");
-              toggle.setAttribute("aria-expanded", "false");
-            }
-
-            toggle.addEventListener("click", (event) => {
-              event.stopPropagation();
-              if (links.hasAttribute("data-open")) { closeMenu(); return; }
-              links.setAttribute("data-open", "");
-              toggle.setAttribute("aria-expanded", "true");
-            });
-
-            document.addEventListener("click", (event) => {
-              if (!links.hasAttribute("data-open")) return;
-              if (links.contains(event.target)) return;
-              closeMenu();
-            });
-
-            document.addEventListener("keydown", (event) => {
-              if (event.key !== "Escape") return;
-              if (!links.hasAttribute("data-open")) return;
-              closeMenu();
-              toggle.focus();
+              } catch {
+                input.value = lastSaved;
+                flash(errorText);
+              }
             });
           })();
         </script>
+        <a href="/learn">Learn</a>
+        <a href="/progress">Progress</a>
+        <a href="/history">History</a>
+        <a href="/account">Account</a>
+      </div>
+      <script>
+        (function () {
+          const toggle = document.getElementById("nav-toggle");
+          const links  = document.getElementById("nav-links");
+          if (!toggle || !links) return;
+
+          function closeMenu() {
+            links.removeAttribute("data-open");
+            toggle.setAttribute("aria-expanded", "false");
+          }
+
+          toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (links.hasAttribute("data-open")) { closeMenu(); return; }
+            links.setAttribute("data-open", "");
+            toggle.setAttribute("aria-expanded", "true");
+          });
+
+          document.addEventListener("click", (event) => {
+            if (!links.hasAttribute("data-open")) return;
+            if (links.contains(event.target)) return;
+            closeMenu();
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            if (!links.hasAttribute("data-open")) return;
+            closeMenu();
+            toggle.focus();
+          });
+        })();
+      </script>
     </div>
   </nav>
 
