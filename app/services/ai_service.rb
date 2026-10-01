@@ -2217,8 +2217,8 @@ class AiService
   # group that can quietly cost a section its grade: code_review and challenge
   # are graded on the planted issue or stated requirement their grading notes
   # name, and there is nothing to put in "missed" if the question had no wrong
-  # answer to begin with. So the concept is confined to framing here, once for every
-  # section, rather than restated into each kind's guidance — like
+  # answer to begin with. So the concept is confined to framing here, once for
+  # every section, rather than restated into each kind's guidance — like
   # data_modeling_idiom_guidance, it is a rule about the concept, not the kind.
   def meta_skill_framing_guidance
     "- The meta-skill concepts (#{META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
@@ -2331,9 +2331,9 @@ class AiService
   # this group shares the failure mode the design principles and module-design
   # concepts have: a section with nothing missable in it. code_review and
   # challenge are graded on a planted issue or stated requirement, so such a
-  # section leaves nothing to put in "missed". Stated once for every section, like the other five
-  # group rules, because it is a rule about the concept and not about any one
-  # kind.
+  # section leaves nothing to put in "missed". Stated once for every section,
+  # like the other five group rules, because it is a rule about the concept
+  # and not about any one kind.
   def domain_modeling_guidance
     "- The domain-modeling concepts (#{DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
       "which things must change together, not a defect in what the code computes. A section tagged with one must " \
@@ -2693,12 +2693,14 @@ class AiService
 
   # Runs before the prose judge, whose merges would renumber "missed"; an
   # edited review's positions therefore refer to its graded_prose. Positions it
-  # cannot read are dropped rather than stored. The log carries counts only.
+  # cannot read are dropped rather than stored, and so are any on a kind that
+  # computes its own rating. The log carries counts and vocabulary words only.
   def checked_against_rubric(user, section, review)
-    return review if ExerciseSection.for(section).rating_fixed?
+    return review.except("essential_gaps") if ExerciseSection.for(section).rating_fixed?
 
-    check = RubricCheck.new(review)
-    Rails.logger.info("[rubric_check] user=#{user.id} section=#{section} rating=#{review['rating']} " \
+    check  = RubricCheck.new(review)
+    rating = ConceptMastery::AI_RATING_RANK.key?(review["rating"]) ? review["rating"] : "invalid"
+    Rails.logger.info("[rubric_check] user=#{user.id} section=#{section} rating=#{rating} " \
                       "essential=#{check.essential_gaps&.size || 'unknown'} missed=#{check.missed_count} " \
                       "agrees=#{check.agrees?.nil? ? 'unknown' : check.agrees?}")
     check.essential_gaps ? review.merge("essential_gaps" => check.essential_gaps) : review.except("essential_gaps")

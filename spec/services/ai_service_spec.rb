@@ -6576,10 +6576,18 @@ RSpec.describe AiService, "the grading rubric" do
       expect(logged.string).not_to include("SECRET-M")
     end
 
-    it "skips a kind whose rating is computed rather than graded" do
-      graded(base.merge("essential_gaps" => []), section: "parsons_problem")
+    it "logs a rating outside the vocabulary as invalid rather than echoing it" do
+      graded(base.merge("rating" => "SECRET-M excellent", "essential_gaps" => []))
+
+      expect(logged.string).to include("rating=invalid")
+      expect(logged.string).not_to include("SECRET-M")
+    end
+
+    it "skips a kind whose rating is computed, dropping any positions the grader sent" do
+      result = graded(base.merge("essential_gaps" => [ 0 ]), section: "parsons_problem")
 
       expect(logged.string).not_to include("[rubric_check]")
+      expect(result[:review]).not_to have_key("essential_gaps")
     end
   end
 end
