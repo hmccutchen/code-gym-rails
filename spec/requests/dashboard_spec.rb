@@ -1048,6 +1048,25 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body.index('data-block-id="2"')).to be < response.body.index('data-block-id="0"')
     end
 
+    # Every move already records the order, so the button is only for a single
+    # block, which has nothing to move and could not be answered without it.
+    { 1 => true, 2 => false, 3 => false }.each do |count, shown|
+      it "#{shown ? "shows" : "hides"} the Use this order button for #{count} block#{"s" unless count == 1}" do
+        create_exercise(problem_set: {
+          "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+          "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+          "parsons_problem" => {
+            "title" => "Sort names", "question" => "Arrange these blocks",
+            "blocks" => Array.new(count) { |i| "block #{i}" },
+            "display_order" => (0...count).to_a.reverse, "concept" => "n_plus_one"
+          }
+        })
+        get root_path
+
+        expect(response.body.include?("data-parsons-confirm>Use this order")).to eq(shown)
+      end
+    end
+
     it "falls back to the stored order when display_order is missing, rather than rendering nothing" do
       create_exercise(problem_set: {
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
