@@ -333,9 +333,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
 - **Junior learning track**: an optional first-run preset and suggestions to
   change existing difficulty targets, with no separate generation policy.
-  `User#first_run?` requires an undecided account (`learning_track: nil`),
-  `created_at >= LearningTrack::INTRODUCED_AT`, and no exercise ever created.
-  Dashboard and Setup send that account to `/welcome`. Junior sets every
+  `User#first_run?` requires a saved, undecided account (`learning_track:
+  nil`) with no exercise ever created. Dashboard and Setup send that account
+  to `/welcome`. Junior sets every
   registered kind to `junior` through `PATCH /profile` with the existing
   preference version. Under the user-row lock, the endpoint requires both
   that version and the exact registry-derived preset; an incomplete or
@@ -345,13 +345,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `"none"` without changing targets. Existing accounts are not enrolled or
   prompted, and joining after the first-run choice is refused.
 
-  **Release blocker: `INTRODUCED_AT` is PROVISIONAL at
-  `Time.utc(2026, 10, 9, 18)`.** Production timing is unconfirmed. Before merge,
-  confirm deployment and put the cutoff at least an hour after it. An earlier
-  cutoff could prompt accounts created under the old code; accounts created
-  between deployment and a later cutoff keep the regular experience.
+  **Existing accounts are told apart by a backfill, not a date.**
   `AddLearningTrackToUsers` adds the nullable string with no default and the
-  jsonb map with no data backfill; existing rows remain undecided.
+  jsonb map; `BackfillLearningTrackForExistingUsers` then sets every row it
+  finds to `"none"`, so an account that predates the track is never asked. A
+  `"none"` posted by an account already at `"none"` is accepted and changes
+  nothing, so a repeat Leave does not error; joining stays refused. The backfill
+  cannot be undone, since its rows look like any other `"none"`. The exercise
+  check in `first_run?` is what keeps the preview app's seeded account, created
+  after migrations run, from being asked. One gap is accepted: an account
+  created while the migration has run but the old code still serves arrives
+  as `nil` with no exercises and is asked once the new code is live, which is
+  right for an account that new. In specs, `create_user_with_key` and
+  `create_fake_provider_user` default to `"none"`, standing for backfilled
+  accounts; a first-run spec passes `learning_track: nil`.
 
   **Suggestions use reviewed work, not mastery tiers.** `TrackGraduation`
   checks unlocked kinds in registry order: first a step back from senior when
@@ -1867,7 +1874,7 @@ always pull in the full suite — is stated once, in
 
 ## File Map
 
-- `app/models/learning_track.rb` — track values, preset levels and the provisional first-run release cutoff.
+- `app/models/learning_track.rb` — track values and preset levels.
 - `app/services/track_graduation.rb` — pure proposal rules: own-result moves, struggling moves and a lead-based bundle.
 - `app/services/track_graduation/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered results.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.

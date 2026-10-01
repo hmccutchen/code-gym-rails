@@ -8,8 +8,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
   end
 
   def new_account
-    stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago)
-    create_user_with_key
+    create_user_with_key(learning_track: nil)
   end
 
   def expect_track_refused
@@ -138,9 +137,8 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
   end
 
   context "join guard for an existing account" do
-    it "refuses junior from an account created before INTRODUCED_AT, saving nothing" do
-      stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago)
-      user = create_user_with_key.tap { |account| account.update_column(:created_at, 1.year.ago) }
+    it "refuses junior from a backfilled account, saving nothing" do
+      user = create_user_with_key
       login_as(user)
       original = user.reload.attributes
 
@@ -165,16 +163,15 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.reload.attributes).to eq(original)
     end
 
-    it "refuses none from an existing account too" do
-      stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago)
-      user = create_user_with_key.tap { |account| account.update_column(:created_at, 1.year.ago) }
+    it "accepts none from a backfilled account without changing anything" do
+      user = create_user_with_key
       login_as(user)
-      original = user.reload.attributes
+      original = user.reload.attributes.except("updated_at")
 
       patch_profile(learning_track: "none")
 
-      expect_track_refused
-      expect(user.reload.attributes).to eq(original)
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.attributes.except("updated_at")).to eq(original)
     end
   end
 

@@ -258,9 +258,12 @@ class User < ApplicationRecord
 
   def on_learning_track? = learning_track == LearningTrack::ON
 
+  # Accounts that existed when the track shipped were backfilled to "none", so
+  # nil means an account created since. The exercise check covers the preview
+  # app's seeded account, which is created after migrations run but arrives
+  # with exercises.
   def first_run?
-    learning_track.nil? && created_at.present? && created_at >= LearningTrack::INTRODUCED_AT &&
-      !daily_exercises.exists?
+    persisted? && learning_track.nil? && !daily_exercises.exists?
   end
 
   def learning_track_change_allowed?(value)

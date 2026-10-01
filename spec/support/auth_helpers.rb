@@ -1,6 +1,8 @@
 module AuthHelpers
-  def create_user_with_key(email: "dev@example.com", name: "Dev", time_zone: "UTC")
-    user = User.create!(email: email, name: name, time_zone: time_zone)
+  # Both builders stand for accounts that already exist, which the learning
+  # track backfill marked "none". A first-run spec passes learning_track: nil.
+  def create_user_with_key(email: "dev@example.com", name: "Dev", time_zone: "UTC", learning_track: LearningTrack::OFF)
+    user = User.create!(email: email, name: name, time_zone: time_zone, learning_track: learning_track)
     user.update!(api_key: "sk-ant-test-key", provider: "anthropic")
     user
   end
@@ -8,11 +10,12 @@ module AuthHelpers
   # Test-only infrastructure, not demo content — deliberately not seeded via
   # PreviewSeed/db/seeds.rb. Every system spec logs in as one of these, never
   # a real-key user, so no system spec ever needs (or can reach) a real API key.
-  def create_fake_provider_user(email: nil, name: "Fake User", time_zone: "UTC")
+  def create_fake_provider_user(email: nil, name: "Fake User", time_zone: "UTC", learning_track: LearningTrack::OFF)
     User.create!(
       email: email || "fake-user-#{SecureRandom.hex(4)}@example.com",
       name: name,
       time_zone: time_zone,
+      learning_track: learning_track,
       api_key: "fake-test-key",
       provider: "fake"
     )

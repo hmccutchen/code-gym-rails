@@ -51,9 +51,13 @@ RSpec.describe "Setup for a learning track user", type: :request do
     expect(page_html.css("#learning-track, #exercise-mix").map { |node| node["id"] }).to eq(%w[learning-track exercise-mix])
   end
 
+  # A nil account reaches setup only once it has an exercise; before that it
+  # is a first run and is sent to the question.
   [ nil, "none" ].each do |track|
     it "shows neither control for learning_track #{track.inspect}" do
-      user.update!(learning_track: track, created_at: LearningTrack::INTRODUCED_AT - 1.day)
+      user.update!(learning_track: track)
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                            problem_set: { "code_review" => { "question" => "q", "snippet" => "s" } })
       login_as(user)
       get setup_path
 

@@ -1,8 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Welcome", type: :request do
-  before { stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago) }
-
   def new_account(**attrs)
     User.create!(email: "new@example.com", name: "New", **attrs)
   end
@@ -44,8 +42,8 @@ RSpec.describe "Welcome", type: :request do
     expect(box["data-setup-url"]).to eq(setup_path)
   end
 
-  it "never asks a pre-existing account with no exercises" do
-    login_as(new_account(created_at: 1.year.ago))
+  it "never asks a backfilled account with no exercises" do
+    login_as(new_account(learning_track: "none", created_at: 1.year.ago))
 
     get setup_path
     expect(response).to have_http_status(:ok)

@@ -1,16 +1,13 @@
 require "rails_helper"
 
 RSpec.describe User, "learning track", type: :model do
-  # Whole seconds, like the real constant. Linux clocks carry nanoseconds and
-  # a stored timestamp keeps only microseconds, so an account created "at" an
-  # unrounded value would read back as created just before it.
   def new_account(**attrs)
-    stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago.floor)
     User.create!({ email: "new-#{SecureRandom.hex(3)}@example.com", name: "New", time_zone: "UTC" }.merge(attrs))
   end
 
+  # What the learning track backfill left every account that predates it.
   def old_account
-    new_account(created_at: 1.year.ago)
+    new_account(learning_track: "none", created_at: 1.year.ago)
   end
 
   def on_track(levels = LearningTrack.preset_levels, **attrs)
@@ -55,17 +52,11 @@ RSpec.describe User, "learning track", type: :model do
   end
 
   describe "#first_run?" do
-    it "is true after INTRODUCED_AT with no exercise and no decision" do
+    it "is true with no exercise and no decision" do
       expect(new_account.first_run?).to be true
     end
 
-    it "includes an account created at INTRODUCED_AT" do
-      user = new_account
-      user.update!(created_at: LearningTrack::INTRODUCED_AT)
-      expect(user.first_run?).to be true
-    end
-
-    it "is false before INTRODUCED_AT without querying exercises" do
+    it "is false for a backfilled account without querying exercises" do
       user = old_account
       expect(user).not_to receive(:daily_exercises)
       expect(user.first_run?).to be false
@@ -97,10 +88,12 @@ RSpec.describe User, "learning track", type: :model do
       expect(user.learning_track_change_allowed?("none")).to be true
     end
 
-    it "refuses both values for a pre-existing account" do
+    # "none" is what the backfill already stored, so accepting it changes
+    # nothing; joining is what must stay closed.
+    it "refuses joining from a backfilled account and accepts its stored none as a no-op" do
       user = old_account
       expect(user.learning_track_change_allowed?("junior")).to be false
-      expect(user.learning_track_change_allowed?("none")).to be false
+      expect(user.learning_track_change_allowed?("none")).to be true
     end
 
     it "lets a track user leave but not rejoin" do

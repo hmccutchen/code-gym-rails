@@ -4,7 +4,6 @@ RSpec.describe "Learning track proposals", type: :request do
   let(:json) { { "Content-Type" => "application/json", "Accept" => "application/json" } }
 
   def track_user(levels = LearningTrack.preset_levels)
-    stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago)
     create_user_with_key.tap { |user| user.update!(learning_track: "junior", section_kind_levels: levels) }
   end
 

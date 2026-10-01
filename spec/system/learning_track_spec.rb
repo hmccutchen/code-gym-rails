@@ -6,7 +6,6 @@ RSpec.describe "Leaving the learning track", type: :system do
   around { |example| travel_to(a_weekday + 12.hours) { example.run } }
 
   before do
-    stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago)
     user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
     visit_as(user)
     visit setup_path

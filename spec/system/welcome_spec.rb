@@ -1,9 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Welcome choices", type: :system do
-  let(:user) { create_fake_provider_user }
-
-  before { stub_const("LearningTrack::INTRODUCED_AT", 1.day.ago) }
+  let(:user) { create_fake_provider_user(learning_track: nil) }
 
   it "saves the junior preset before continuing to setup" do
     visit_as(user)
