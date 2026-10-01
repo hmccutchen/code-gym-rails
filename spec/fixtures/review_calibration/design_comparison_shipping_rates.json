@@ -18,7 +18,7 @@
   },
   "answers": {
     "complete": "pick:b\nThe scenario says a new carrier arrives about once a month. With B, adding one is a new rate class plus one line in RATES, and cost_cents never changes, so it is open for extension and closed for modification. With A, every carrier means editing the case statement that already works for UPS and FedEx.",
-    "partial": "pick:b\nB is better because a new carrier is added every month, and with B you only add a line to the RATES hash instead of editing a method.",
+    "partial": "pick:b\nB is better, because the team signs a new carrier about once a month.",
     "miss": "pick:a\nA is easier to read because all the carriers are listed in one method and there is no constant to look up, so a new teammate can follow it."
   },
   "extra_answers": [
