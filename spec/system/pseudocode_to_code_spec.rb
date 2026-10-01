@@ -62,14 +62,14 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       open_dashboard(user)
 
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect(page).not_to have_button("Translate to code")
 
       write_plan(PLAN)
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
 
       rate_section("pseudocode_to_code")
-      expect(page).to have_button("Submit answers →", disabled: false)
+      expect(page).to have_button("Submit answers", disabled: false)
     end
   end
 
@@ -84,7 +84,7 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
       write_plan(PLAN)
       all("button.rating-btn[data-rating='right_level']").each(&:click)
 
-      click_button "Submit answers →"
+      click_button "Submit answers"
 
       expect(page).to have_content("def merge_ranges", wait: 20)
       expect(page).to have_content(/implemented literally — gaps and all/i)

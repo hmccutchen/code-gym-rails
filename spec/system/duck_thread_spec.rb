@@ -197,7 +197,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
         with: "It re-runs the loyalty_tier query inside the loop — precompute it once outside."
       )
       rate_all_sections
-      click_button "Submit answers →"
+      click_button "Submit answers"
 
       # Submitting chains into the review, which lands back on the dashboard's
       # submitted state — where the duck thread must no longer be offered.

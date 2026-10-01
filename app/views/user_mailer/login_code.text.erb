@@ -1,11 +1,9 @@
-Hi <%= @user.name %>,
+<%= t("user_mailer.login_code.greeting", name: @user.name) %>
 
-Your Code Gym login code is:
+<%= t("user_mailer.login_code.intro") %>
 
 <%= @raw_code %>
 
-Enter it in the browser where you requested it — the code will not work
-anywhere else. It expires in <%= User.login_code_expiry_in_words %>. If you
-didn't request this, you can ignore it.
+<%= t("user_mailer.login_code.where_and_when", expiry: User.login_code_expiry_in_words) %>
 
-— Code Gym
+<%= t("user_mailer.login_code.sign_off") %>

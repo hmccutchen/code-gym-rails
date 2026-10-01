@@ -37,10 +37,10 @@ module AuthHelpers
   def visit_as(user)
     visit login_path
     fill_in "Work email *", with: user.email
-    click_button "Send code →"
+    click_button "Send code"
 
     fill_in "6-digit code from the email", with: user.generate_login_code!
-    click_button "Verify code →"
+    click_button "Verify code"
   end
 
   # The generated code is random, so a hardcoded "wrong" code can occasionally
