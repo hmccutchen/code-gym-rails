@@ -107,6 +107,33 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
 
     # This write lands after authentication loaded current_user, but before
     # the save's row lock reloads it. Experienced moves no preference version.
+    # A track choice sets the preset or the choice and nothing else, so a
+    # lock, weight or target riding along with it is refused, not saved.
+    {
+      "a lock" => { locked_section_kinds: [ "pattern" ] },
+      "a weight" => { section_kind_weights: { "challenge" => 2.0 } },
+      "an exclusion" => { excluded_section_kinds: [ "challenge" ] }
+    }.each do |label, extra|
+      it "refuses Junior carrying #{label}, saving nothing" do
+        original = user.reload.attributes
+
+        patch_profile({ learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+                        section_kind_preferences_version: user.section_kind_preferences_version }.merge(extra))
+
+        expect_track_refused
+        expect(user.reload.attributes).to eq(original)
+      end
+    end
+
+    it "refuses Experienced carrying difficulty targets, saving nothing" do
+      original = user.reload.attributes
+
+      patch_profile(learning_track: "none", section_kind_levels: { "pattern" => "senior" })
+
+      expect_track_refused
+      expect(user.reload.attributes).to eq(original)
+    end
+
     it "refuses Junior when another tab recorded Experienced first" do
       allow_any_instance_of(ProfileController).to receive(:invalid_adaptive_set_size?).and_wrap_original do |original, *args|
         User.find(user.id).update_column(:learning_track, "none")
@@ -127,7 +154,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
     it "refuses a valid first-run choice with a stale preference version without saving anything" do
       original = user.reload.attributes
 
-      patch_profile(learning_track: "junior", name: "Not saved", section_kind_levels: LearningTrack.preset_levels,
+      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
                     section_kind_preferences_version: user.section_kind_preferences_version - 1)
 
       expect(response).to have_http_status(:conflict)
@@ -191,6 +218,16 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.reload.learning_track).to eq("none")
       expect(user.section_kind_levels).to eq(LearningTrack.preset_levels)
       expect(user.attributes.except("learning_track", "updated_at")).to eq(original)
+    end
+
+    it "refuses a Leave carrying other preferences, keeping the targets" do
+      original = user.reload.attributes
+
+      patch_profile(learning_track: "none", section_kind_levels: { "pattern" => "senior" },
+                    section_kind_weights: { "challenge" => 2.0 })
+
+      expect_track_refused
+      expect(user.reload.attributes).to eq(original)
     end
 
     it "answers a Leave after a mix save already ended the track with success and no change" do
