@@ -345,8 +345,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   ordinary easing still applies. Junior also sets `skill_level` to
   `LearningTrack::START_SKILL_LEVEL` (`beginner`), and the endpoint refuses a
   junior choice without it, like any other mismatch with the preset. Targets
-  already decide every kind's rung, so the skill level changes only the
-  generation prompt's profile line. Nothing resets it: after a kind steps up to
+  already decide every kind's rung, so the skill level changes the generation
+  prompt's profile line and which scenario pools the day rolls from (see
+  "Scenario flavor" below), never a rung. Nothing resets it: after a kind steps up to
   senior, or after leaving the track, the profile still says beginner until
   the user changes it on Setup. Experienced records
   `"none"` without changing targets. Existing accounts are not enrolled or
@@ -845,9 +846,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   rather than restating them, so the prompt cannot offer a verdict the
   boundary would refuse.
 - **Scenario flavor**: the business setting every section's `scenario` is dressed
-  in comes from one prompt line, and that line now offers one of two pools
-  (`AiService::SCENARIO_POOLS`): the general, job-adjacent `SCENARIO_DOMAINS`
-  or `GAME_AND_ANIMATION_SCENARIO_DOMAINS` — a platformer's save-state store,
+  in comes from one prompt line, and that line offers one pool from
+  `AiService::SCENARIO_POOLS`. Most days choose between two: the general,
+  job-adjacent `SCENARIO_DOMAINS` and `GAME_AND_ANIMATION_SCENARIO_DOMAINS` — a platformer's save-state store,
   a level editor's undo stack, an animation timeline's keyframe editor.
   `DailyPlan` rolls which pool once per day (`SCENARIO_FLAVOR_WEIGHTS`, 70%
   game and animation) and carries it on `Result#scenario_flavor`; the prompt
@@ -1124,8 +1125,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
 - **Skill level control**: Setup's "Skill level" select is the only page
   that edits `User#skill_level`, and it autosaves through `PATCH /profile`,
   which refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
-  profile's prompt line and, through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`,
-  the rung of every kind without its own target. Joining the junior track
+  profile's prompt line, the rung of every kind without its own target
+  (through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`), and, for `beginner`, the
+  scenario pools the day rolls from
+  (`DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL`). Joining the junior track
   sets it to `beginner`; nothing else changes it automatically, and daily
   ratings still nudge each set around it. It is not
   part of the Exercise mix, so it does not bump

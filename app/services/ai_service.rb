@@ -857,10 +857,11 @@ class AiService
 
   # What the scenario bullet says under each flavor: which pool, how the pool
   # is introduced, one example of adapting a setting to the day's stack, and
-  # any rule the flavor needs stated. Keyed by the flavor
-  # DailyPlan::SCENARIO_FLAVOR_WEIGHTS rolls; a spec holds the two key sets
-  # equal, so a flavor cannot be rolled that has no pool or listed that is
-  # never rolled. Data rather than a branch, so a third flavor is an entry.
+  # any rule the flavor needs stated. Keyed by every flavor DailyPlan can
+  # roll, from SCENARIO_FLAVOR_WEIGHTS or a per-skill-level table; a spec holds
+  # these keys equal to that union, so a flavor cannot be rolled that has no
+  # pool or listed that is never rolled. Data rather than a branch, so a new
+  # flavor is an entry.
   SCENARIO_POOLS = {
     general: {
       domains:    SCENARIO_DOMAINS,
