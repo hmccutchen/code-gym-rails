@@ -342,8 +342,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   preference version. Under the user-row lock, the endpoint requires both
   that version and the exact registry-derived preset; an incomplete or
   mismatched choice saves nothing. The new-account targets are unlocked so
-  ordinary easing still applies. `skill_level` stays untouched: targets already express the
-  choice without changing the profile's separate scale. Experienced records
+  ordinary easing still applies. Junior also sets `skill_level` to
+  `LearningTrack::START_SKILL_LEVEL` (`beginner`), and the endpoint refuses a
+  junior choice without it, like any other mismatch with the preset. Targets
+  already decide every kind's rung, so the skill level changes only the
+  generation prompt's profile line. Nothing resets it: after a kind steps up to
+  senior, or after leaving the track, the profile still says beginner until
+  the user changes it on Setup. Experienced records
   `"none"` without changing targets. Existing accounts are not enrolled or
   prompted, and joining after the first-run choice is refused.
 
@@ -1106,8 +1111,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   that edits `User#skill_level`, and it autosaves through `PATCH /profile`,
   which refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
   profile's prompt line and, through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`,
-  the rung of every kind without its own target; nothing changes it
-  automatically, and daily ratings still nudge each set around it. It is not
+  the rung of every kind without its own target. Joining the junior track
+  sets it to `beginner`; nothing else changes it automatically, and daily
+  ratings still nudge each set around it. It is not
   part of the Exercise mix, so it does not bump
   `section_kind_preferences_version`. No migration set a value: existing
   accounts keep the `developing` default until they choose otherwise, since a

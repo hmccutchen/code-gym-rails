@@ -9,6 +9,7 @@
      data-profile-url="<%= profile_path %>"
      data-setup-url="<%= setup_path %>"
      data-preset="<%= LearningTrack.preset_levels.to_json %>"
+     data-skill-level="<%= LearningTrack::START_SKILL_LEVEL %>"
      data-version="<%= current_user.section_kind_preferences_version %>">
   <h1><%= t("learning_track.welcome.title") %></h1>
   <p><%= t("learning_track.welcome.question") %></p>
@@ -33,6 +34,7 @@
         const user = choice === "junior"
           ? { learning_track: "junior",
               section_kind_levels: JSON.parse(box.dataset.preset),
+              skill_level: box.dataset.skillLevel,
               section_kind_preferences_version: Number(box.dataset.version) }
           : { learning_track: "none" };
 
