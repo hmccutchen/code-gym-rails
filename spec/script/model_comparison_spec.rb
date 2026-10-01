@@ -265,13 +265,16 @@ RSpec.describe ModelComparison do
   describe "review calibration" do
     let(:fixtures) { Dir[ModelComparison::REVIEW_CALIBRATION_FIXTURE_DIR.join("*.json")] }
 
-    it "grades every fixture's three answers once per candidate and prints a summary" do
+    let(:answer_count) do
+      fixtures.sum { |path| ModelComparison::CALIBRATION_EXPECTED.size + Array(JSON.parse(File.read(path))["extra_answers"]).size }
+    end
+
+    it "grades every fixture's answers, extra ones included, once per candidate and prints a summary" do
       comparison.review_calibration
 
-      expect(posted.size).to eq(fixtures.size * ModelComparison::CALIBRATION_EXPECTED.size *
-                                ModelComparison::CANDIDATES.fetch("review_calibration").size)
+      expect(posted.size).to eq(answer_count * ModelComparison::CANDIDATES.fetch("review_calibration").size)
       expect(out.string).to include("=== review_calibration: #{ClaudeService::DEFAULT_ROUTE[:model]} ===")
-        .and match(%r{in order: \d+/#{fixtures.size} · matched expected: \d+/#{fixtures.size * 3}})
+        .and match(%r{in order: \d+/#{fixtures.size} · matched expected: \d+/#{answer_count}})
         .and include("complete answers rated solid or better:").and include("cache write")
     end
 
@@ -286,6 +289,32 @@ RSpec.describe ModelComparison do
     it "grades with the route production uses for reviews" do
       expect(ModelComparison::CANDIDATES.fetch("review_calibration"))
         .to eq([ ClaudeService::MODEL_FOR_PURPOSE.fetch("review_response", ClaudeService::DEFAULT_ROUTE) ])
+    end
+
+    # FakeService grades every answer "solid", which no extra case here expects.
+    it "prints each extra answer beside its own expected ratings" do
+      comparison.review_calibration
+
+      expect(out.string).to match(%r{^  vague_correct_pick solid +expected beginner/developing +MISMATCH})
+      expect(out.string).to match(%r{^  other_pick_sound_reason solid +expected developing +MISMATCH})
+    end
+
+    it "grades a design comparison's extra cases from the decoded answer and the key" do
+      comparison.review_calibration
+
+      prompts = posted.map { |body| body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"] }
+      expect(prompts.join).to include("Picked: A. Reason: The scenario says carriers are added monthly")
+      expect(prompts.join).not_to include("pick:a")
+    end
+
+    it "every extra answer carries a label, an answer and its own expected ratings" do
+      extras = fixtures.flat_map { |path| Array(JSON.parse(File.read(path))["extra_answers"]) }
+
+      expect(extras.size).to be >= 2
+      extras.each do |extra|
+        expect(extra.keys).to contain_exactly("label", "answer", "expected")
+        expect(extra["expected"] - ConceptMastery::AI_RATING_RANK.keys).to be_empty
+      end
     end
 
     it "every fixture names a registered kind, a stamped rung and an answer for each quality" do

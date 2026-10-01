@@ -31,7 +31,10 @@ class ModelComparison
   REVIEW_CALIBRATION_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_calibration")
 
   # What AiService::RATING_RUBRIC should give each answer a calibration
-  # fixture carries, in descending order of quality.
+  # fixture carries, in descending order of quality. A fixture may also carry
+  # "extra_answers", each with a label, an answer and its own expected
+  # ratings, for cases outside that ladder; they are graded and matched but
+  # take no part in the rank-order check.
   CALIBRATION_EXPECTED = {
     "complete" => %w[solid strong],
     "partial"  => %w[developing],
@@ -504,49 +507,53 @@ class ModelComparison
     end.join(", ")
   end
 
+  # Each graded answer is [label, expected ratings, run]; the first three are
+  # the quality ladder, in order.
   def calibration_row(route, user, fixture)
-    graded = CALIBRATION_EXPECTED.keys.to_h { |quality| [ quality, grade_calibration_answer(route, user, fixture, quality) ] }
-    ranks  = graded.values.map { |run| ConceptMastery::AI_RATING_RANK[run.output["rating"]] if run.output.is_a?(Hash) }
+    answers = CALIBRATION_EXPECTED.map { |quality, expected| [ quality, expected, fixture.dig("answers", quality) ] } +
+              Array(fixture["extra_answers"]).map { |extra| extra.values_at("label", "expected", "answer") }
+    graded  = answers.map { |label, expected, answer| [ label, expected, grade_calibration_answer(route, user, fixture, answer) ] }
+    ranks   = graded.first(CALIBRATION_EXPECTED.size).map { |_, _, run| ConceptMastery::AI_RATING_RANK[run.output["rating"]] if run.output.is_a?(Hash) }
     ordered = ranks.all? && ranks.each_cons(2).all? { |better, worse| better > worse }
 
     @out.puts "--- #{fixture['name']} (#{fixture['kind']}, #{fixture.dig('section', 'pitched_at')}) · #{ordered ? 'in order' : 'OUT OF ORDER'} ---"
-    graded.each { |quality, run| @out.puts calibration_line(quality, run) }
+    graded.each { |label, expected, run| @out.puts calibration_line(label, expected, run) }
     { ordered: ordered, graded: graded }
   end
 
-  def grade_calibration_answer(route, user, fixture, quality)
+  def grade_calibration_answer(route, user, fixture, answer)
     kind     = fixture["kind"]
     exercise = DailyExercise.new(user: user, language: fixture["language"], problem_set: { kind => fixture["section"] })
-    response = DailyResponse.new(user: user, daily_exercise: exercise, answers: { kind => fixture.dig("answers", quality) },
+    response = DailyResponse.new(user: user, daily_exercise: exercise, answers: { kind => answer },
                                  section_ratings: { kind => "right_level" })
 
     timed_run(route) { |service| graded_review(service, response, exercise, kind) }
   end
 
-  def calibration_line(quality, run)
-    return "  #{quality.ljust(8)} error: #{run.output}" unless run.output.is_a?(Hash)
+  def calibration_line(label, expected, run)
+    return "  #{label.ljust(8)} error: #{run.output}" unless run.output.is_a?(Hash)
 
     review   = run.output
-    expected = CALIBRATION_EXPECTED.fetch(quality)
     check    = RubricCheck.new(review)
-    "  #{quality.ljust(8)} #{review['rating'].to_s.ljust(10)} expected #{expected.join('/').ljust(13)}" \
+    "  #{label.ljust(8)} #{review['rating'].to_s.ljust(10)} expected #{expected.join('/').ljust(20)}" \
       "#{expected.include?(review['rating']) ? 'match' : 'MISMATCH'} · essential #{check.essential_gaps&.size || '?'}" \
       " of #{check.missed_count} missed · rubric #{check.agrees?.nil? ? 'unchecked' : (check.agrees? ? 'agrees' : 'DISAGREES')}" \
       " · #{format('%.1f', run.seconds)}s"
   end
 
   def print_calibration_summary(route, rows)
-    runs       = rows.flat_map { |row| row[:graded].to_a }
-    graded     = runs.select { |_quality, run| run.output.is_a?(Hash) }
-    matched    = graded.count { |quality, run| CALIBRATION_EXPECTED.fetch(quality).include?(run.output["rating"]) }
-    agreeing   = graded.count { |_quality, run| RubricCheck.new(run.output).agrees? }
-    tokens_in  = runs.sum { |_quality, run| run.tokens_in }
-    tokens_out = runs.sum { |_quality, run| run.tokens_out }
-    cache      = { cache_read: runs.sum { |_quality, run| run.cache_read }, cache_write: runs.sum { |_quality, run| run.cache_write } }
+    runs       = rows.flat_map { |row| row[:graded] }
+    graded     = runs.select { |_label, _expected, run| run.output.is_a?(Hash) }
+    matched    = graded.count { |_label, expected, run| expected.include?(run.output["rating"]) }
+    agreeing   = graded.count { |_label, _expected, run| RubricCheck.new(run.output).agrees? }
+    tokens_in  = runs.sum { |_label, _expected, run| run.tokens_in }
+    tokens_out = runs.sum { |_label, _expected, run| run.tokens_out }
+    cache      = { cache_read: runs.sum { |_label, _expected, run| run.cache_read },
+                   cache_write: runs.sum { |_label, _expected, run| run.cache_write } }
 
     @out.puts "in order: #{rows.count { |row| row[:ordered] }}/#{rows.size} · matched expected: #{matched}/#{runs.size} · " \
               "rating agrees with essential gaps: #{agreeing}/#{graded.size} · " \
-              "complete answers rated solid or better: #{graded.count { |quality, run| quality == 'complete' && CALIBRATION_EXPECTED.fetch('complete').include?(run.output['rating']) }}/#{rows.size} · " \
+              "complete answers rated solid or better: #{graded.count { |label, expected, run| label == 'complete' && expected.include?(run.output['rating']) }}/#{rows.size} · " \
               "#{tokens_in} in / #{cache[:cache_write]} cache write / #{cache[:cache_read]} cache read / #{tokens_out} out · " \
               "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out, **cache))}"
     @out.puts

@@ -1,0 +1,41 @@
+{
+  "kind": "design_comparison",
+  "language": "ruby_rails",
+  "section": {
+    "pitched_at": "senior",
+    "concept": "open_closed",
+    "title": "Where shipping rates come from",
+    "scenario": "A checkout service quotes shipping for each order. The team signs a new carrier about once a month, and each carrier has its own rate rule.",
+    "question": "Which piece fits this system better, and which stated fact decides it?",
+    "piece_a": "class ShippingQuote\n  def initialize(carrier)\n    @carrier = carrier\n  end\n\n  def cost_cents(order)\n    case @carrier\n    when \"ups\"   then UpsRate.new.cost_cents(order)\n    when \"fedex\" then FedexRate.new.cost_cents(order)\n    else raise KeyError, @carrier\n    end\n  end\nend",
+    "piece_b": "class ShippingQuote\n  RATES = {\n    \"ups\"   => UpsRate,\n    \"fedex\" => FedexRate\n  }.freeze\n\n  def initialize(carrier)\n    @rate = RATES.fetch(carrier).new\n  end\n\n  def cost_cents(order)\n    @rate.cost_cents(order)\n  end\nend",
+    "answer_key": {
+      "better": "b",
+      "deciding_fact": "A new carrier is added about once a month.",
+      "principle": "Open for extension, closed for modification: a new carrier should be a new rate class and one registry line, not an edit to working code.",
+      "why_other_fails": "Every new carrier means editing the case statement in cost_cents, so each monthly change touches code that already works for the other carriers."
+    }
+  },
+  "answers": {
+    "complete": "pick:b\nThe scenario says a new carrier arrives about once a month. With B, adding one is a new rate class plus one line in RATES, and cost_cents never changes, so it is open for extension and closed for modification. With A, every carrier means editing the case statement that already works for UPS and FedEx.",
+    "partial": "pick:b\nB is better because a new carrier is added every month, and with B you only add a line to the RATES hash instead of editing a method.",
+    "miss": "pick:a\nA is easier to read because all the carriers are listed in one method and there is no constant to look up, so a new teammate can follow it."
+  },
+  "extra_answers": [
+    {
+      "label": "vague_correct_pick",
+      "answer": "pick:b\nB looks cleaner and more professional, and it is the more modern way to write this kind of class.",
+      "expected": [
+        "beginner",
+        "developing"
+      ]
+    },
+    {
+      "label": "other_pick_sound_reason",
+      "answer": "pick:a\nThe scenario says carriers are added monthly, so what matters is how cheap a new one is. A keeps every rule in one case statement, so a new carrier is one when line in one file, which I think is cheaper than adding a class and a registry entry.",
+      "expected": [
+        "developing"
+      ]
+    }
+  ]
+}
