@@ -83,6 +83,15 @@
     <p class="hint">Shorter sets after days you don't finish, back to a full set as you do. Off means always a full set.</p>
   </div>
 
+  <div class="form-field">
+    <label for="skill-level">Skill level</label>
+    <%= select_tag "skill_level",
+          options_for_select(User::SKILL_LEVELS.map { |level| [ level.capitalize, level ] }, current_user.skill_level),
+          id: "skill-level",
+          data: { label_template: t("exercise_mix.level_default", skill_level: "__LEVEL__") } %>
+    <p class="hint">How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Your ratings still nudge each day's set up or down.</p>
+  </div>
+
   <% if current_user.on_learning_track? %>
     <%= render "api_keys/learning_track" %>
   <% end %>
@@ -172,6 +181,18 @@
 
       const adaptive = document.getElementById("adaptive-set-size");
       if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }, "adaptive_set_size"));
+
+      // The Exercise mix's default options name the stored skill level, so
+      // they change only once the server has it.
+      const skill = document.getElementById("skill-level");
+      if (skill) skill.addEventListener("change", async () => {
+        const level = skill.value;
+        const result = await save({ skill_level: level }, "skill_level");
+        if (!result || !result.ok) return;
+        document.querySelectorAll("[data-skill-level-label]").forEach((label) => {
+          label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", level);
+        });
+      });
 
       const STOPS  = <%= raw KindPreferences::MULTIPLIERS.to_json %>;
       const DEFAULT_STOP = <%= raw KindPreferences::DEFAULT_MULTIPLIER.to_json %>;

@@ -13,6 +13,7 @@ class ProfileController < ApplicationController
     return render_invalid_level     if invalid_section_kind_levels?
     return render_invalid_lock      if invalid_locked_section_kinds?
     return render_invalid_display   if invalid_display_preferences?
+    return render_invalid_skill_level if invalid_skill_level?
 
     saved = save_with_preference_precondition
 
@@ -143,6 +144,20 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
+  # Checked against the raw param for the same reason as the others: an array
+  # or object would otherwise be dropped by strong parameters and reported as
+  # a successful save.
+  def invalid_skill_level?
+    user_params = params.require(:user)
+
+    user_params.key?(:skill_level) && User::SKILL_LEVELS.exclude?(user_params[:skill_level])
+  end
+
+  def render_invalid_skill_level
+    render json: { errors: [ "Skill level must be one of #{User::SKILL_LEVELS.join(', ')}" ] },
+           status: :unprocessable_content
+  end
+
   # The mix controls post the version they last saw, so a tab whose DOM predates
   # another tab's save is refused instead of overwriting it. Absent version
   # means no precondition except when joining the learning track — the other
@@ -231,7 +246,7 @@ class ProfileController < ApplicationController
   end
 
   def profile_params
-    permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size, :learning_track,
+    permitted = params.require(:user).permit(:name, :time_zone, :adaptive_set_size, :learning_track, :skill_level,
                                              section_kind_weights: {}, excluded_section_kinds: [],
                                              section_kind_levels: {}, locked_section_kinds: [],
                                              display_preferences: {})

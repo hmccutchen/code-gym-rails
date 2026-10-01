@@ -6,7 +6,7 @@
   <legend><%= t("exercise_mix.difficulty_legend") %></legend>
   <label>
     <input type="radio" name="level-<%= kind.key %>" value="" <%= "checked" if level.nil? %> <%= "disabled" if excluded %>>
-    <%= t("exercise_mix.level_default", skill_level: current_user.skill_level) %>
+    <span data-skill-level-label><%= t("exercise_mix.level_default", skill_level: current_user.skill_level) %></span>
   </label>
   <% KindDifficulty::LEVELS.each do |option| %>
     <label>
