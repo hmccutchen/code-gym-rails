@@ -563,7 +563,7 @@ RSpec.describe DailyPlan do
 
       plan = described_class.for(user, language: "ruby_rails")
 
-      expect([ plan.pattern, plan.third, plan.fourth ].compact.size).to eq(1)
+      expect([ plan.pattern, plan.third, plan.fourth ].compact.size).to eq(2 - ExerciseSection.fixed.size)
     end
 
     it "gives a user who chose the largest day every slot" do
