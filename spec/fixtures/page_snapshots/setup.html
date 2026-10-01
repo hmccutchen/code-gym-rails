@@ -1161,8 +1161,8 @@
     (function () {
       // CodeGymSaveStatus owns the request, the CSRF token, and what happens
       // when the server refuses — see shared/_save_status.
-      // The key is per control, not per URL: all three of these PATCH the same
-      // path, and a shared key would let one control's success clear another's
+      // The key is per control, not per URL: every control here PATCHes the
+      // same path, and a shared key would let one control's success clear another's
       // warning while the rejected state stayed on screen.
       const save = (payload, key) =>
         window.CodeGymSaveStatus.save("PATCH", "/profile", { user: payload }, key);
