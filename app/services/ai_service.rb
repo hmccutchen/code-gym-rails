@@ -1386,7 +1386,7 @@ class AiService
   # the section as written must not be told. The rung and lock state reach it
   # as stated arguments instead, since a level is what it measures against.
   def judge_section(user, kind, section, rung:, locked:)
-    visible = section.except(ProblemSetIngest::ANSWER_KEY_FIELD, *ProblemSetIngest::SERVER_STAMPS)
+    visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
     result  = call_and_log(
       user, purpose: "judge_section", max_tokens: JUDGE_MAX_TOKENS,
       response_schema: JudgeVerdict.schema_for(kind),
@@ -1911,15 +1911,15 @@ class AiService
     { kind_difficulty: per_kind, kind_difficulty_chars: kind_difficulty_guidance(kinds, difficulty, ladders).length }
   end
 
-  # Log storage is not one of the places the ambiguity hunt's answer key is
-  # allowed to reach. Every other consumer of a problem_set renders a closed
-  # enumeration of named fields; this is the only one that serializes the whole
-  # thing, so the exclusion lives here rather than in a rule the next
-  # whole-payload logger would have to remember. Returns a copy — the caller's
-  # problem_set is what gets persisted.
+  # Log storage is not one of the places a kind's answer key is allowed to
+  # reach (see ExerciseSection.all_answer_key_fields). Every other consumer of
+  # a problem_set renders a closed enumeration of named fields; this is the
+  # only one that serializes the whole thing, so the exclusion lives here
+  # rather than in a rule the next whole-payload logger would have to
+  # remember. Returns a copy — the caller's problem_set is what gets persisted.
   def without_answer_key(problem_set)
     problem_set.transform_values do |section|
-      section.is_a?(Hash) ? section.except(ProblemSetIngest::ANSWER_KEY_FIELD) : section
+      section.is_a?(Hash) ? section.except(*ExerciseSection.all_answer_key_fields) : section
     end
   end
 

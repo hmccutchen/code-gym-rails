@@ -1,8 +1,9 @@
 # Turns a parsed provider problem set into one that is safe to persist:
 # concepts held to their closed vocabulary, scaffolds and diagrams bounded,
-# parsons blocks scrambled for display, and the ambiguity hunt's answer key
-# validated. This is the generation boundary — the one place provider output
-# is checked before anything downstream is allowed to assume it is clean.
+# parsons blocks scrambled for display, and each resolved section held to its
+# kind's own check (ExerciseSection.reject_unusable!). This is the generation
+# boundary — the one place provider output is checked before anything
+# downstream is allowed to assume it is clean.
 #
 # Takes an already-parsed Hash rather than raw text: AiService#parse_json_object
 # is shared with the review and concept-reference paths, so parsing belongs
@@ -16,12 +17,6 @@
 # tests need no database for the same reason. The module is not side-effect
 # free, though: warn_unrequested_sections! logs.
 class ProblemSetIngest
-  # The one field in a problem set that is answer-key data rather than exercise
-  # content. Two places know it by name: the validation below that guarantees
-  # it is usable, and AiService#without_answer_key, the diagnostics log that
-  # must never carry it.
-  ANSWER_KEY_FIELD = "planted_ambiguities".freeze
-
   # Facts about a section that the server knows and the provider does not: the
   # rung asked for, whether the prompt was told to ease it, which real excerpt
   # it was grounded in, and whether the judge rejected it twice and it shipped
@@ -181,8 +176,7 @@ class ProblemSetIngest
     reject_missing_sections!
     warn_unrequested_sections!
     prune_retry_extras!
-    reject_unusable_answer_key!
-    reject_unusable_problem_statement!
+    reject_unusable_sections!
     enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
@@ -237,64 +231,14 @@ class ProblemSetIngest
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
 
-  # Unlike every other step, this one rejects rather than repairs. The planted
-  # list is the ambiguity hunt's entire grading ground truth — the review
-  # prompt grades coverage against it and nothing else — so an empty or
-  # unusable list doesn't degrade the section, it silently turns coverage
-  # grading back into the freehand judgement the kind exists to replace, and
-  # there is no fallback to fall back to. InvalidResponseError is already a
-  # surfaced, retryable generation failure
-  # (GenerateDailyExercisesJob#persist_failure), so failing costs the user a
-  # retry rather than a day of ungrounded grading.
-  #
-  # A WRONG COUNT IS NOT A FAILURE, though. The prompt asks for exactly
-  # ExerciseSection::AmbiguityHunt::PLANTED_COUNT, but nothing downstream reads
-  # that number, so a list of 3 or 5 grades exactly as well — and rejecting it
-  # would throw away the rest of the day's sections over the likeliest
-  # deviation an LLM makes on a counted list. Only the empty case is fatal;
-  # the long case is truncated.
-  #
-  # Scoped to the RESOLVED fourth section, not to the mere presence of the key:
-  # a provider that returns both fourth shapes leaves an ambiguity_hunt nothing
-  # downstream will ever render or grade (plan_review wins the slot), and
-  # discarding a good day over an answer key no one reads would be a strictly
+  # Only the sections the set resolves to: a provider that returns two fourth
+  # shapes leaves one that nothing downstream will render or grade, and
+  # discarding a good day over a section no one reads would be a strictly
   # worse outcome than ignoring it.
-  def reject_unusable_answer_key!
-    return unless ExerciseSection.resolved_fourth_key(@problem_set) == "ambiguity_hunt"
-
-    section = @problem_set["ambiguity_hunt"]
-
-    # Shape is held to the schema even though count isn't: a bare string here
-    # is not four ambiguities, it's a provider that ignored the field's type,
-    # and Array() would quietly launder it into a single-entry answer key.
-    raw     = section[ANSWER_KEY_FIELD]
-    planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []
-    if planted.empty?
-      raise AiService::InvalidResponseError,
-            "Ambiguity hunt returned no usable #{ANSWER_KEY_FIELD} to grade coverage against"
+  def reject_unusable_sections!
+    ExerciseSection.resolved_keys(@problem_set).each do |key|
+      ExerciseSection.for(key).reject_unusable!(@problem_set[key])
     end
-
-    section[ANSWER_KEY_FIELD] = planted.first(ExerciseSection::AmbiguityHunt::MAX_PLANTED)
-  end
-
-  # problem_statement is the entire task for a pseudocode_to_code day: it is the
-  # only thing telling the engineer what to plan, it is interpolated into both
-  # round prompts, and it reaches glossary_wrap in the view — where a non-string
-  # raises. A section with nothing to plan is not a section, so this rejects
-  # rather than repairs, the same call reject_unusable_answer_key! makes and for
-  # the same reason. Bounded too, since it is provider text going into a prompt.
-  def reject_unusable_problem_statement!
-    kind = ExerciseSection::PseudocodeToCode
-    return unless ExerciseSection.resolved_fourth_key(@problem_set) == kind.key
-
-    section   = @problem_set[kind.key]
-    statement = section["problem_statement"].is_a?(String) ? section["problem_statement"].strip : ""
-    if statement.empty?
-      raise AiService::InvalidResponseError,
-            "Pseudocode section returned no usable problem_statement to plan against"
-    end
-
-    section["problem_statement"] = statement.truncate(kind::MAX_PROBLEM_STATEMENT_LENGTH)
   end
 
   # A single-section retry names the concept the day's plan already placed at

@@ -88,6 +88,12 @@ class ExerciseSection
     slots.size
   end
 
+  # Every field any kind keeps as answer key: data the grader reads and
+  # nothing before submission may show, log or send to a model.
+  def self.all_answer_key_fields
+    all.flat_map(&:answer_key_fields).uniq
+  end
+
   # Which kinds a user can bias or exclude. A slot holding one candidate has no
   # choice to bias — its roll returns that kind at any weight — so a control
   # there would be one that provably does nothing.
@@ -172,6 +178,18 @@ class ExerciseSection
     # what to ask for.
     def excluded_vocabulary_keys
       []
+    end
+
+    # Fields of this kind's section that are answer key rather than exercise
+    # content. See ExerciseSection.all_answer_key_fields.
+    def answer_key_fields
+      []
+    end
+
+    # The provider boundary's check on one resolved section of this kind:
+    # raises AiService::InvalidResponseError when the section cannot be used,
+    # and may bound its fields in place. Most kinds have nothing to refuse.
+    def reject_unusable!(section)
     end
 
     # This kind's entry in the generation schema — the JSON object the provider

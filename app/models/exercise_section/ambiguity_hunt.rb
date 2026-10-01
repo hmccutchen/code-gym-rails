@@ -23,15 +23,46 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
   # that lands on 3 or 5 has still produced a gradable section, and only the
   # runaway case needs bounding — this is provider text going into another
   # prompt.
-  #
-  # Lives beside PLANTED_COUNT rather than beside the normalizer that enforces
-  # it, the same way MAX_SCAFFOLD_LABELS sits on ExerciseSection while
-  # ProblemSetIngest#normalize_answer_scaffolds! enforces that one. Splitting a
-  # constant from the constant it derives from is how the two drift.
   MAX_PLANTED = PLANTED_COUNT * 2
+
+  PLANTED_FIELD = "planted_ambiguities".freeze
 
   def self.vocabulary_key
     :ambiguity_hunt
+  end
+
+  def self.answer_key_fields
+    [ PLANTED_FIELD ]
+  end
+
+  # Unlike most boundary checks, this one rejects rather than repairs. The
+  # planted list is the ambiguity hunt's entire grading ground truth — the
+  # review prompt grades coverage against it and nothing else — so an empty or
+  # unusable list doesn't degrade the section, it silently turns coverage
+  # grading back into the freehand judgement the kind exists to replace, and
+  # there is no fallback to fall back to. InvalidResponseError is already a
+  # surfaced, retryable generation failure
+  # (GenerateDailyExercisesJob#persist_failure), so failing costs the user a
+  # retry rather than a day of ungrounded grading.
+  #
+  # A WRONG COUNT IS NOT A FAILURE, though. Nothing downstream reads
+  # PLANTED_COUNT, so a list of 3 or 5 grades exactly as well — and rejecting
+  # it would throw away the rest of the day's sections over the likeliest
+  # deviation an LLM makes on a counted list. Only the empty case is fatal;
+  # the long case is truncated.
+  #
+  # Shape is held to the schema even though count isn't: a bare string here
+  # is not four ambiguities, it's a provider that ignored the field's type,
+  # and Array() would quietly launder it into a single-entry answer key.
+  def self.reject_unusable!(section)
+    raw     = section[PLANTED_FIELD]
+    planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []
+    if planted.empty?
+      raise AiService::InvalidResponseError,
+            "Ambiguity hunt returned no usable #{PLANTED_FIELD} to grade coverage against"
+    end
+
+    section[PLANTED_FIELD] = planted.first(MAX_PLANTED)
   end
 
   def self.improved_code?

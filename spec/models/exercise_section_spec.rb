@@ -582,6 +582,23 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".all_answer_key_fields" do
+    it "is the union of every kind's answer key, which today is the ambiguity hunt's planted list" do
+      expect(described_class.all_answer_key_fields).to eq(%w[planted_ambiguities])
+      expect((described_class.all - [ ExerciseSection::AmbiguityHunt ]).map(&:answer_key_fields)).to all(eq([]))
+    end
+  end
+
+  describe ".reject_unusable!" do
+    it "leaves a section of a kind with nothing to refuse untouched" do
+      section = { "question" => "" }
+
+      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode ]).each do |kind|
+        expect { kind.reject_unusable!(section) }.not_to change { section }
+      end
+    end
+  end
+
   describe ".schema_fragment" do
     RUBY_LABEL = "Ruby/Rails".freeze
     JS_LABEL   = "JavaScript/React".freeze
