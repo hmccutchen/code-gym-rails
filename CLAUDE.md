@@ -430,11 +430,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   are per provider because the providers share no model names and turn thinking down
   differently (`effort` on Claude, `thinking_level` on Gemini,
   `reasoning.effort` on OpenAI). OpenAI routes generation and its retry to
-  `gpt-6.1-sol` at `high` effort and everything else to the same model at an
+  `gpt-6.1-sol` at `high` effort and everything else to `gpt-6-sol` at an
   explicit `medium`; none of those routes has been compared against another
   model. A capped OpenAI call sends effort `none` from
-  `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`; GPT-6
-  Astra has no `none`, so like Opus 5.5 it cannot take a capped purpose. `call_and_log`
+  `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`. GPT-6.1
+  Sol and GPT-6 Astra have no `none`, so like Opus 5.5 neither can take a
+  capped purpose, which is why only uncapped generation goes to 6.1 Sol. `call_and_log`
   hands `purpose:` to `#call` for this. Because an unlisted purpose falls back
   silently, `spec/services/model_routing_spec.rb` fails on a key that no call
   site logs, so a typo cannot quietly route nothing.

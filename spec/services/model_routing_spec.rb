@@ -144,17 +144,17 @@ RSpec.describe "per-purpose model routing" do
   end
 
   describe OpenaiService do
-    it "sends generation to Sol at high effort" do
+    it "sends generation to 6.1 Sol at high effort" do
       body = posted_body(OpenaiService, purpose: "generate_exercise")
 
       expect(body["model"]).to eq("gpt-6.1-sol")
       expect(body["reasoning"]).to eq("effort" => "high")
     end
 
-    it "sends the default route to Sol at an explicit medium effort" do
+    it "sends the default route to 6 Sol at an explicit medium effort" do
       body = posted_body(OpenaiService, purpose: "review_response")
 
-      expect(body["model"]).to eq("gpt-6.1-sol")
+      expect(body["model"]).to eq("gpt-6-sol")
       expect(body["reasoning"]).to eq("effort" => "medium")
     end
 

@@ -7,19 +7,21 @@ class OpenaiService < AiService
   # Keyed by the ApiUsage purpose string, like ClaudeService's. No route has
   # been compared against another model yet. Effort is stated even where it is
   # the model's default, so a change to that default cannot move a route
-  # silently.
-  DEFAULT_ROUTE = { model: "gpt-6.1-sol", effort: "medium" }.freeze
+  # silently. Generation is never capped, so it can take 6.1 Sol, which cannot
+  # turn reasoning off; every other purpose may be capped, so the default is
+  # 6 Sol, which can.
+  DEFAULT_ROUTE = { model: "gpt-6-sol", effort: "medium" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "gpt-6.1-sol", effort: "high" }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
   # max_output_tokens caps reasoning and reply together, so a capped call turns
-  # reasoning off or the model can spend the cap before it answers. Astra has no
-  # "none" effort, so it has no entry and a capped call routed to it raises
-  # before sending.
+  # reasoning off or the model can spend the cap before it answers. 6.1 Sol and
+  # Astra have no "none" effort, so they have no entry and a capped call routed
+  # to either raises before sending.
   REASONING_OFF = {
-    "gpt-6.1-sol" => "none",
-    "gpt-6-luna"  => "none"
+    "gpt-6-sol"  => "none",
+    "gpt-6-luna" => "none"
   }.freeze
 
   # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
@@ -43,6 +45,21 @@ class OpenaiService < AiService
 
   def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     route = route_for(purpose)
+    body  = request_body(route, system: system, prompt: prompt, history: history, max_tokens: max_tokens, response_schema: response_schema)
+
+    resp = @conn.post(API_URL, body.to_json) do |req|
+      req.options.timeout = read_timeout
+      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
+    end
+    raise_for_status(resp) unless resp.success?
+
+    read_result(parse_provider_envelope(resp.body, provider: "OpenAI"), route)
+  rescue Faraday::Error => e
+    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
+    raise error_class, "Network error calling OpenAI: #{e.message}"
+  end
+
+  def request_body(route, system:, prompt:, history:, max_tokens:, response_schema:)
     body = {
       model:        route[:model],
       instructions: system,
@@ -58,24 +75,21 @@ class OpenaiService < AiService
     # verdict's .parse still holds the shape. It also needs "JSON" in the
     # prompt, which both judge prompts say.
     body[:text] = { format: { type: "json_object" } } if response_schema
+    body
+  end
 
-    resp = @conn.post(API_URL, body.to_json) do |req|
-      req.options.timeout = read_timeout
-      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
+  def raise_for_status(resp)
+    log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
+    message     = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")
+    error_class = case resp.status
+    when 401, 403 then AiService::AuthenticationError
+    when 429      then AiService::RateLimitError
+    else               AiService::Error
     end
+    raise error_class, message
+  end
 
-    unless resp.success?
-      log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
-      message      = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")
-      error_class  = case resp.status
-      when 401, 403 then AiService::AuthenticationError
-      when 429      then AiService::RateLimitError
-      else               AiService::Error
-      end
-      raise error_class, message
-    end
-
-    parsed  = parse_provider_envelope(resp.body, provider: "OpenAI")
+  def read_result(parsed, route)
     content = Array(parsed["output"]).select { |item| item["type"] == "message" }.flat_map { |item| Array(item["content"]) }
     usage   = parsed["usage"] || {}
     cached_tokens = usage.dig("input_tokens_details", "cached_tokens").to_i
@@ -92,9 +106,6 @@ class OpenaiService < AiService
       truncated:     parsed["status"] == "incomplete" && !filtered?(parsed),
       refusal:       refusal_category(parsed, content)
     }
-  rescue Faraday::Error => e
-    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
-    raise error_class, "Network error calling OpenAI: #{e.message}"
   end
 
   def route_for(purpose)

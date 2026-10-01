@@ -150,11 +150,10 @@ RSpec.describe OpenaiService do
     end
 
     it "refuses a capped call routed to a model that cannot turn reasoning off" do
-      stub_const("OpenaiService::DEFAULT_ROUTE", { model: "gpt-6-astra", effort: "medium" })
       service.instance_variable_set(:@conn, stubbed_connection([]))
 
-      expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 250) }
-        .to raise_error(AiService::UnsupportedRouteError, /gpt-6-astra/)
+      expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 250, purpose: "generate_exercise") }
+        .to raise_error(AiService::UnsupportedRouteError, /gpt-6.1-sol/)
     end
 
     it "asks for JSON mode when the caller holds the reply to a schema" do
