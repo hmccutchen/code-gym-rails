@@ -83,6 +83,15 @@
     <p class="hint">Shorter sets after days you don't finish, back to a full set as you do. Off means always a full set.</p>
   </div>
 
+  <div class="form-field">
+    <label for="skill-level">Skill level</label>
+    <%= select_tag "skill_level",
+          options_for_select(User::SKILL_LEVELS.map { |level| [ level.capitalize, level ] }, current_user.skill_level),
+          id: "skill-level",
+          data: { label_template: t("exercise_mix.level_default", skill_level: "__LEVEL__") } %>
+    <p class="hint">How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Your ratings still nudge each day's set up or down.</p>
+  </div>
+
   <% if current_user.on_learning_track? %>
     <%= render "api_keys/learning_track" %>
   <% end %>
@@ -161,8 +170,8 @@
     (function () {
       // CodeGymSaveStatus owns the request, the CSRF token, and what happens
       // when the server refuses — see shared/_save_status.
-      // The key is per control, not per URL: all three of these PATCH the same
-      // path, and a shared key would let one control's success clear another's
+      // The key is per control, not per URL: every control here PATCHes the
+      // same path, and a shared key would let one control's success clear another's
       // warning while the rejected state stayed on screen.
       const save = (payload, key) =>
         window.CodeGymSaveStatus.save("PATCH", "<%= profile_path %>", { user: payload }, key);
@@ -172,6 +181,30 @@
 
       const adaptive = document.getElementById("adaptive-set-size");
       if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }, "adaptive_set_size"));
+
+      // Chained like the Exercise mix's saves: sent in parallel, a slow older
+      // request could land last and store a level the page no longer shows.
+      // The Exercise mix's default options name the stored skill level, so
+      // they change only once the server has it.
+      const skill = document.getElementById("skill-level");
+      if (skill) {
+        let skillSaves = Promise.resolve();
+        let queuedSkillSaves = 0;
+        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSkillSaves > 0));
+
+        skill.addEventListener("change", () => {
+          const level = skill.value;
+          queuedSkillSaves++;
+          skillSaves = skillSaves.then(async () => {
+            const result = await save({ skill_level: level }, "skill_level");
+            queuedSkillSaves--;
+            if (!result || !result.ok) return;
+            document.querySelectorAll("[data-skill-level-label]").forEach((label) => {
+              label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", level);
+            });
+          });
+        });
+      }
 
       const STOPS  = <%= raw KindPreferences::MULTIPLIERS.to_json %>;
       const DEFAULT_STOP = <%= raw KindPreferences::DEFAULT_MULTIPLIER.to_json %>;

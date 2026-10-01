@@ -645,6 +645,15 @@
     <p class="hint">Shorter sets after days you don't finish, back to a full set as you do. Off means always a full set.</p>
   </div>
 
+  <div class="form-field">
+    <label for="skill-level">Skill level</label>
+    <select name="skill_level" id="skill-level" data-label-template="Your skill level (__LEVEL__)"><option value="beginner">Beginner</option>
+<option selected="selected" value="developing">Developing</option>
+<option value="solid">Solid</option>
+<option value="strong">Strong</option></select>
+    <p class="hint">How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Your ratings still nudge each day's set up or down.</p>
+  </div>
+
   <details class="form-field" id="exercise-mix">
     <summary>Exercise mix</summary>
     <p class="hint">Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that&#39;s the setting above. Changes save automatically.</p>
@@ -669,7 +678,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-code_review" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-code_review" value="junior"  >
@@ -700,7 +709,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-pattern" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-pattern" value="junior"  >
@@ -744,7 +753,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-architecture" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-architecture" value="junior"  >
@@ -783,7 +792,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-security_review" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-security_review" value="junior"  >
@@ -822,7 +831,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-challenge" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-challenge" value="junior"  >
@@ -861,7 +870,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-parsons_problem" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-parsons_problem" value="junior"  >
@@ -906,7 +915,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-plan_review" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-plan_review" value="junior"  >
@@ -945,7 +954,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-ambiguity_hunt" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-ambiguity_hunt" value="junior"  >
@@ -984,7 +993,7 @@
   <legend>Difficulty target</legend>
   <label>
     <input type="radio" name="level-pseudocode_to_code" value="" checked >
-    Your skill level (developing)
+    <span data-skill-level-label>Your skill level (developing)</span>
   </label>
     <label>
       <input type="radio" name="level-pseudocode_to_code" value="junior"  >
@@ -1152,8 +1161,8 @@
     (function () {
       // CodeGymSaveStatus owns the request, the CSRF token, and what happens
       // when the server refuses — see shared/_save_status.
-      // The key is per control, not per URL: all three of these PATCH the same
-      // path, and a shared key would let one control's success clear another's
+      // The key is per control, not per URL: every control here PATCHes the
+      // same path, and a shared key would let one control's success clear another's
       // warning while the rejected state stayed on screen.
       const save = (payload, key) =>
         window.CodeGymSaveStatus.save("PATCH", "/profile", { user: payload }, key);
@@ -1163,6 +1172,30 @@
 
       const adaptive = document.getElementById("adaptive-set-size");
       if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }, "adaptive_set_size"));
+
+      // Chained like the Exercise mix's saves: sent in parallel, a slow older
+      // request could land last and store a level the page no longer shows.
+      // The Exercise mix's default options name the stored skill level, so
+      // they change only once the server has it.
+      const skill = document.getElementById("skill-level");
+      if (skill) {
+        let skillSaves = Promise.resolve();
+        let queuedSkillSaves = 0;
+        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSkillSaves > 0));
+
+        skill.addEventListener("change", () => {
+          const level = skill.value;
+          queuedSkillSaves++;
+          skillSaves = skillSaves.then(async () => {
+            const result = await save({ skill_level: level }, "skill_level");
+            queuedSkillSaves--;
+            if (!result || !result.ok) return;
+            document.querySelectorAll("[data-skill-level-label]").forEach((label) => {
+              label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", level);
+            });
+          });
+        });
+      }
 
       const STOPS  = [0.25,0.5,1.0,2.0,4.0];
       const DEFAULT_STOP = 1.0;
