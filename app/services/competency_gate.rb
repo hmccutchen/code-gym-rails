@@ -1,7 +1,8 @@
 # How many sections a day may hold, earned from reviewed work. Folds over
 # past days oldest first, so its answer is a pure function of stored evidence
-# and an earlier day's answer never changes when a later day is added. Pure:
-# plain values in, a Plan out, no database.
+# and an earlier day's answer never changes when a later day is added. The
+# fold is pure, plain values in and a Plan out; only .for reads the database,
+# through Evidence.
 #
 # These thresholds are a starting policy, not values validated against
 # history: the AI rating's level calibration is unverified, which is why a
@@ -44,6 +45,10 @@ class CompetencyGate
   # The longest window any rule reads; older results in a run can never matter.
   RUN_MEMORY = [ *GROWTH, BRAKE ].map(&:of).max
   private_constant :RUN_MEMORY
+
+  def self.for(user)
+    plan(Evidence.new(user), fixed_kinds: ExerciseSection.fixed.map(&:key))
+  end
 
   def self.plans(days, fixed_kinds:)
     gate = new(fixed_kinds: fixed_kinds)
