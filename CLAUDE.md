@@ -1484,6 +1484,47 @@ concept-specific difficulty descriptions for future generation, not a new set.
   locale names (`sections.<key>.name`, listed from `ExerciseSection.fixed`)
   and says "from different sides", so neither line nor prompt assumes how
   many fixed kinds there are.
+- **Competency gate (built, not yet wired)**: `CompetencyGate` decides how
+  many sections a day may hold from reviewed work, but nothing calls it yet.
+  `DailyPlan` still sizes every day with `SectionCount`; the wiring, the
+  diagnostics lines and the dashboard copy come later in the stack.
+
+  **The rule.** The gate starts at two and folds over the user's reviewed
+  days, oldest first. After each day: two `too_hard` self-ratings among the
+  latest four results of any kind (`BRAKE`) return it to two; otherwise, at
+  two, 4 favourable of the latest 5 fixed-kind results (`GROW_TO_THREE`)
+  grow it to three; at three, 8 of the latest 10 (`GROW_TO_FOUR`) grow it to
+  four, but only when the optional sections were all answered on each of the
+  last `OPTIONAL_RUN` days that had any. Otherwise it holds. A window with
+  fewer results than its size never meets its rule, and the gate moves at
+  most one step a day. Favourable means an AI rating at or above `BAR`
+  (`solid`) together with a favourable self-rating, the same co-favourable
+  shape `RungLedger` uses, because the AI rating's level calibration is
+  unverified. These values are a starting policy, not thresholds history
+  has validated.
+
+  **Levels come from the evidence, as of each day.** A kind's level is the
+  `pitched_at` of its latest result so far, never today's target applied
+  backwards. When it changes, that kind's earlier results leave the windows,
+  even if it later returns to a level it held before. The earned count and
+  other kinds' results stay, so a level change alone never takes back a size.
+  Because the fold is pure and runs forward, adding a day cannot change how
+  an earlier day was decided.
+
+  **Evidence.** `ReviewedSectionResults` is the shared rule for which
+  sections count: answered, graded from the closed rating list, stamped with
+  a rung, and not eased. `TrackGraduation::Evidence` delegates to it with its
+  60-response cap and results unchanged, so generation code never names track
+  code. `CompetencyGate::Evidence` asks it to require the current
+  `RUBRIC_VERSION` stamp and reads every rubric-stamped day with no cap, in
+  batches ordered by date and id. A cap would forget a size whose earning days
+  had aged out; the batches bound memory, not history, so the query grows
+  with post-rubric history. A day graded before the rubric adds neither
+  results nor optional-section history. Each day reaches the fold as a
+  `CompetencyGate::Day` whose `optional` is `:none`, `:incomplete` or
+  `:complete`. Each `Plan` carries the window counts it read (required,
+  available, AI-bar and favourable counts, per-kind counts and levels) for the
+  diagnostics the wiring will log.
 - **Pausing generation**: `User#paused_generation_at` (nullable timestamp; nil is active) suppresses only generation the user didn't ask for — the cron batch (`GenerateDailyExercisesJob`'s no-arg branch) and `DashboardController#show`'s auto-trigger. It never gates submitting or reviewing: `ResponsesController` has no pause check, so once a row exists for today the submit → review chain runs regardless of pause state or weekday. The toggle is `PATCH /account/toggle_generation` on the Account page — the one control for this column; a second one anywhere else would be a second pause mechanism. Each button posts the state it wants (`paused=0`/`1`) rather than asking for a flip, so a double-tapped Resume stays a resume instead of the second request re-reading an already-unpaused user and pausing it again; with no param posted the endpoint still flips, keeping its original contract. Days fully inside a pause create no `DailyExercise` row at all, so they are non-events to `User#recent_exercise_history` and `#current_streak` rather than skips. The one day that *does* leave a row is the day the pause began (or an explicit `/generate` while paused). **A set left unfinished when the pause began follows the user forward**: `DashboardController#show` calls `User#carry_held_set_forward!` on a day with no set, which re-dates the held, still-unsubmitted exercise — and the draft `DailyResponse` autosave left on it, which must move too or `#create` would build a second response for the same exercise — to `Date.current`, so the pause gives time to finish rather than hiding the set at midnight. Once it is submitted, `#held_exercise` finds nothing, the paused day stays empty and nothing generates, which is what the pause is for. `User#resume_generation!` performs the same recovery (`#recover_held_set`, shared) and then lifts the pause. The row lock also settles the race against a concurrent generation, and does it through the foreign key rather than directly: inserting today's exercise needs a FOR KEY SHARE lock on the same `users` row that `with_lock` holds FOR UPDATE, so a generator either committed before the lock (and the `exists?` check sees it) or blocks until after it and loses its own set to the unique index, which `GenerateDailyExercisesJob` already treats as "generated concurrently". Resume wins, which is the right way round — the held set carries the user's draft answers and a fresh one would not. The move locks the exercise, then its response, and writes in that order — the order `RegenerateExerciseJob` takes, so the two serialize but cannot deadlock — and re-reads the response under its lock, since `#held_exercise` read it outside any lock and a submit can commit in between; a submitted response ends the move, so a finished session keeps its day. It still sits in a SAVEPOINT catching both `RecordNotUnique` and a `date`-taken `RecordInvalid` (uniqueness is enforced twice, and the model validation raises first), so that were it ever to fail it rolls back only itself and the pause still lifts. Recovering the set also clears a same-day `last_generation_error`, since `/generate` is not pause-gated and a failed attempt while the held set sat at an earlier date would otherwise leave "Couldn't generate a new set" rendered above it — the banner `persist_failure` exists to avoid. The whole method runs in the user's own zone rather than the caller's, unlike the read-only history and streak readers, since it writes a date that has to be the user's today. That move both makes the set reachable (every "today's exercise" lookup is `for_date`, so at its original date it renders nowhere and `#create` 404s) and drops it out of both signals at once, since `recent_exercise_history` filters `date: ...Date.current` and `#current_streak` exempts today — no separate "exclude paused days" rule exists or is needed. Scoped to exercises dated on or after the pause, so a day abandoned *before* pausing stays abandoned; skipped entirely if an exercise already exists for today, so an explicit `/generate` while paused is never overwritten. Both regeneration columns clear on the move, because they describe the row's *day* rather than the set: `regenerated_at` would hide the Generate-new-set button behind a claim the dashboard states outright and that is no longer true ("You've already generated a new set today"), and a leftover `regenerating_since` is worse than cosmetic — `RegenerateExerciseJob` gates on `exercise&.regenerating_since` after resolving `for_date`, and re-checks that claim under the exercise row lock before it writes, by value rather than presence (the claim's timestamp is the worker's token, so a later click's claim is not mistaken for its own) — a claim `carry_forward` cleared mid-call means the generated set is discarded, and every release is guarded the same way, so a retry stranded from the pause day cannot replace the carried-forward `problem_set` or destroy the draft response the move preserved. **At most one set can ever be carried forward**, because `[user_id, date]` is unique — so a user who stranded several (paused Monday, clicked `/generate` on Tuesday, resumed Wednesday) gets the newest one back and the older ones stay where they are — **still breaking `#current_streak`**, not merely counting as skips: a past weekday holding an unsubmitted exercise hits that method's `exercised.include?(day)` break. Recovering one set does not repair a streak an older stray still zeroes. That is a limit of re-dating rather than a gap to close: two sets cannot both be today. Re-pausing does not move the floor `#held_exercise` searches from — `AccountsController` stamps a pause only when one isn't already running — so a second Pause cannot walk that floor past the set the first pause stranded. The same limit is why the move is skipped outright when today already holds an exercise. **Accepted consequence:** finishing a carried-forward set counts toward the completion-window signal and the streak for the resume day, not the day it was generated.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, and concept tags. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `User#concept_exposure_index` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule under "One finish action."
 
@@ -2356,6 +2397,9 @@ always pull in the full suite — is stated once, in
 - `app/models/learning_track.rb` — track values and preset levels.
 - `app/services/track_graduation.rb` — pure proposal rules: own-result moves, struggling moves and a lead-based bundle.
 - `app/services/track_graduation/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered results.
+- `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `TrackGraduation::Evidence` and `CompetencyGate::Evidence`.
+- `app/services/competency_gate.rb` — `CompetencyGate`: the pure fold that earns a day's size from reviewed days, with the brake. Built but not yet called by `DailyPlan`.
+- `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
 - `app/controllers/learning_track_dismissals_controller.rb` — records Not now cutoffs for the current user under the user-row lock.
 - `app/views/dashboard/_track_proposal.html.erb` — submitted-day proposal, removable bundle and in-place Apply/Not now saves.
