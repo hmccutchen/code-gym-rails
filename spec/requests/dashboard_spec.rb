@@ -522,6 +522,18 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).to match(%r{<a class="brand" href="/"><img alt="Code Gym" class="brand-mark"[^>]*src="/assets/logo-outlined-[0-9a-f]+\.png" />})
     end
+
+    # The logo stays an element of its own, apart from the wordmark, so a
+    # future squeeze can hide either one with a stylesheet. Its alt text names
+    # the brand, so the wordmark is hidden from screen readers rather than read
+    # twice.
+    it "keeps the brand's logo separately addressable from the wordmark" do
+      login_as(user)
+
+      get root_path
+
+      expect(response.body).to match(%r{<a class="brand" href="/"><img alt="Code Gym" class="brand-mark"[^>]*/><span aria-hidden="true">Code Gym</span></a>})
+    end
   end
 
   describe "mobile section gutter" do

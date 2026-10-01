@@ -58,6 +58,15 @@ RSpec.describe "Sessions", type: :request do
       expect(response.body).not_to include("Name *")
     end
 
+    it "renders no app nav, since its brand and links only mean anything once logged in" do
+      get login_path
+
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css("nav")).to be_nil
+      expect(document.at_css(".brand-mark")).to be_nil
+      expect(document.at_css(".skip-link")).to be_nil
+    end
+
     it "offers the code form as soon as a login is pending" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
 

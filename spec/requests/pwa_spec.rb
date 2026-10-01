@@ -87,20 +87,6 @@ RSpec.describe "PWA", type: :request do
       expect(response.body).to include(%(<link rel="apple-touch-icon" href="/apple-touch-icon.png">))
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
-
-    # The logo renders at every width now that the nav's destinations fold
-    # behind a menu button and the row has room. What this still pins is that
-    # it stays an element of its own, apart from the wordmark, so a future
-    # squeeze can hide either one with a stylesheet. Its alt text names the
-    # brand, so the wordmark is hidden from screen readers rather than read
-    # twice. This is the logged-out brand, which follows the device theme and
-    # so sits in a <picture> with a light source; dashboard_spec's "brand title
-    # link" covers the linked one.
-    it "keeps the brand's logo separately addressable from the wordmark" do
-      expect(response.body).to match(
-        %r{<span class="brand"><picture><source [^>]*><img alt="Code Gym" class="brand-mark"[^>]*/></picture><span aria-hidden="true">Code Gym</span></span>}
-      )
-    end
   end
 
   # The nav's name editor is hidden in the installed app and nowhere else, so

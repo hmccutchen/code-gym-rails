@@ -499,149 +499,138 @@
   <% if display_preferences["background_pattern"] == "on" %>
     <div id="background-pattern" aria-hidden="true"></div>
   <% end %>
-  <%# A page declaring :hide_nav authenticates the session without meaning to
-      run the app in this tab. It may still offer a single deliberate way
-      forward; what it must not grow is the full app nav, which is what would
-      turn it into a second app instance. See sessions/verify. %>
-  <% unless content_for?(:hide_nav) %>
+  <% if logged_in? %>
   <a class="skip-link" href="#main-content"><%= t("nav.skip_to_content") %></a>
   <nav>
     <div class="container inner">
-      <% brand = capture do %><%= brand_mark %><span aria-hidden="true">Code Gym</span><% end %>
-      <% if logged_in? %>
-        <%= link_to brand, root_path, class: "brand" %>
-      <% else %>
-        <span class="brand"><%= brand %></span>
-      <% end %>
-      <% if logged_in? %>
-        <button type="button" class="nav-toggle" id="nav-toggle"
-                aria-expanded="false" aria-controls="nav-links"
-                aria-label="<%= t("nav.menu") %>">
-          <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
-        </button>
-        <div class="nav-links" id="nav-links">
-          <span class="name-editor">
-            <input type="text"
-                   id="nav-name-input"
-                   class="name-editor-input"
-                   value="<%= current_user.name %>"
-                   aria-label="<%= t("profile.name.aria_label") %>">
-            <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
-          </span>
-          <%# Inline autosave: this app loads no Stimulus/importmap JS (the layout
-              emits no javascript_importmap_tags), so the working convention here is
-              an inline script, same as the answer autosave in dashboard/_exercise.
-              Copy still comes from I18n; the CSRF token comes from the meta tag. %>
-          <script>
-            (function () {
-              const input  = document.getElementById("nav-name-input");
-              const status = document.getElementById("nav-name-status");
-              if (!input) return;
+      <%= link_to root_path, class: "brand" do %><%= brand_mark %><span aria-hidden="true">Code Gym</span><% end %>
+      <button type="button" class="nav-toggle" id="nav-toggle"
+              aria-expanded="false" aria-controls="nav-links"
+              aria-label="<%= t("nav.menu") %>">
+        <span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span><span class="bar" aria-hidden="true"></span>
+      </button>
+      <div class="nav-links" id="nav-links">
+        <span class="name-editor">
+          <input type="text"
+                 id="nav-name-input"
+                 class="name-editor-input"
+                 value="<%= current_user.name %>"
+                 aria-label="<%= t("profile.name.aria_label") %>">
+          <span id="nav-name-status" class="name-editor-status" aria-live="polite"></span>
+        </span>
+        <%# Inline autosave: this app loads no Stimulus/importmap JS (the layout
+            emits no javascript_importmap_tags), so the working convention here is
+            an inline script, same as the answer autosave in dashboard/_exercise.
+            Copy still comes from I18n; the CSRF token comes from the meta tag. %>
+        <script>
+          (function () {
+            const input  = document.getElementById("nav-name-input");
+            const status = document.getElementById("nav-name-status");
+            if (!input) return;
 
-              let lastSaved = input.value;
-              const savedText = "<%= j t("profile.name.saved") %>";
-              const errorText = "<%= j t("profile.name.error") %>";
-              let statusTimer;
+            let lastSaved = input.value;
+            const savedText = "<%= j t("profile.name.saved") %>";
+            const errorText = "<%= j t("profile.name.error") %>";
+            let statusTimer;
 
-              function flash(message) {
-                status.textContent = message;
-                clearTimeout(statusTimer);
-                statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
-              }
+            function flash(message) {
+              status.textContent = message;
+              clearTimeout(statusTimer);
+              statusTimer = setTimeout(() => { status.textContent = ""; }, 2000);
+            }
 
-              input.addEventListener("blur", async () => {
-                const name = input.value.trim();
-                if (name === lastSaved) return;
-                if (name === "") { input.value = lastSaved; return; }
+            input.addEventListener("blur", async () => {
+              const name = input.value.trim();
+              if (name === lastSaved) return;
+              if (name === "") { input.value = lastSaved; return; }
 
-                try {
-                  const response = await fetch("<%= profile_path %>", {
-                    method: "PATCH",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Accept": "application/json",
-                      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ user: { name } })
-                  });
-
-                  if (response.ok) {
-                    const data = await response.json();
-                    input.value = data.name;
-                    lastSaved = data.name;
-                    flash(savedText);
-                  } else {
-                    input.value = lastSaved;
-                    flash(errorText);
-                  }
-                } catch {
-                  input.value = lastSaved;
-                  flash(errorText);
-                }
-              });
-            })();
-          </script>
-          <% if current_user.time_zone.blank? %>
-            <%# One-shot: only rendered while the zone is unset, so it never
-                clobbers a later manual choice. Posts the browser's IANA zone. %>
-            <script>
-              (function () {
-                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                if (!tz) return;
-                fetch("<%= profile_path %>", {
+              try {
+                const response = await fetch("<%= profile_path %>", {
                   method: "PATCH",
                   headers: {
                     "Content-Type": "application/json",
                     "Accept": "application/json",
                     "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
                   },
-                  body: JSON.stringify({ user: { time_zone: tz } })
+                  body: JSON.stringify({ user: { name } })
                 });
-              })();
-            </script>
-          <% end %>
-          <%= link_to t("learn.title"), learn_path %>
-          <%= link_to t("progress.title"), progress_path %>
-          <%= link_to "History", history_path %>
-          <%= link_to "Account", account_path %>
-        </div>
-        <%# Inline script, same convention as the name editor above. The panel's
-            collapsed state is CSS, so above the breakpoint the button is gone
-            and data-open means nothing — nothing here has to undo itself on a
-            resize. %>
-        <script>
-          (function () {
-            const toggle = document.getElementById("nav-toggle");
-            const links  = document.getElementById("nav-links");
-            if (!toggle || !links) return;
 
-            function closeMenu() {
-              links.removeAttribute("data-open");
-              toggle.setAttribute("aria-expanded", "false");
-            }
-
-            toggle.addEventListener("click", (event) => {
-              event.stopPropagation();
-              if (links.hasAttribute("data-open")) { closeMenu(); return; }
-              links.setAttribute("data-open", "");
-              toggle.setAttribute("aria-expanded", "true");
-            });
-
-            document.addEventListener("click", (event) => {
-              if (!links.hasAttribute("data-open")) return;
-              if (links.contains(event.target)) return;
-              closeMenu();
-            });
-
-            document.addEventListener("keydown", (event) => {
-              if (event.key !== "Escape") return;
-              if (!links.hasAttribute("data-open")) return;
-              closeMenu();
-              toggle.focus();
+                if (response.ok) {
+                  const data = await response.json();
+                  input.value = data.name;
+                  lastSaved = data.name;
+                  flash(savedText);
+                } else {
+                  input.value = lastSaved;
+                  flash(errorText);
+                }
+              } catch {
+                input.value = lastSaved;
+                flash(errorText);
+              }
             });
           })();
         </script>
-      <% end %>
+        <% if current_user.time_zone.blank? %>
+          <%# One-shot: only rendered while the zone is unset, so it never
+              clobbers a later manual choice. Posts the browser's IANA zone. %>
+          <script>
+            (function () {
+              const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              if (!tz) return;
+              fetch("<%= profile_path %>", {
+                method: "PATCH",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({ user: { time_zone: tz } })
+              });
+            })();
+          </script>
+        <% end %>
+        <%= link_to t("learn.title"), learn_path %>
+        <%= link_to t("progress.title"), progress_path %>
+        <%= link_to "History", history_path %>
+        <%= link_to "Account", account_path %>
+      </div>
+      <%# Inline script, same convention as the name editor above. The panel's
+          collapsed state is CSS, so above the breakpoint the button is gone
+          and data-open means nothing — nothing here has to undo itself on a
+          resize. %>
+      <script>
+        (function () {
+          const toggle = document.getElementById("nav-toggle");
+          const links  = document.getElementById("nav-links");
+          if (!toggle || !links) return;
+
+          function closeMenu() {
+            links.removeAttribute("data-open");
+            toggle.setAttribute("aria-expanded", "false");
+          }
+
+          toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (links.hasAttribute("data-open")) { closeMenu(); return; }
+            links.setAttribute("data-open", "");
+            toggle.setAttribute("aria-expanded", "true");
+          });
+
+          document.addEventListener("click", (event) => {
+            if (!links.hasAttribute("data-open")) return;
+            if (links.contains(event.target)) return;
+            closeMenu();
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            if (!links.hasAttribute("data-open")) return;
+            closeMenu();
+            toggle.focus();
+          });
+        })();
+      </script>
     </div>
   </nav>
   <% end %>
