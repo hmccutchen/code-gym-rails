@@ -76,7 +76,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
   def self.grading_note(section:, answer:)
     "Grade coverage against the PLANTED ambiguities listed in the context above (the \"Planted ambiguities\" line) — do not invent your own list.\n" \
     "Main point: at least one planted ambiguity identified.\n" \
-    "Essential pieces: each planted ambiguity. In \"missed\", name each one the engineer did not identify. In \"correct\", credit each one they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted; an extra one like that is the kind of addition the rubric credits beyond solid.\n" \
+    "Essential pieces: the planted ambiguities that would most likely get the feature built wrong if nobody asked. In \"missed\", name every planted ambiguity the engineer did not identify, but list only those as essential gaps, so the rating does not depend on how many were planted. In \"correct\", credit each one they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted; an extra one like that is the kind of addition the rubric credits beyond solid.\n" \
     "For this section \"improved_code\" must be an empty string."
   end
 end

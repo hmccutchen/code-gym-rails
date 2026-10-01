@@ -6380,6 +6380,16 @@ RSpec.describe AiService, "judging graded reviews" do
       expect(logged.string).to match(/\[review_judge\] user=#{user.id} section=code_review status=edit issues=verbosity merges=\{"missed":\[\[0,1\]\]\}/)
     end
 
+    it "keeps the gap positions in place when the edit left missed alone" do
+      next_step_only = { "status" => "edit", "issues" => [ { "type" => "verbosity", "evidence" => "Review the referenced" } ],
+                         "fields" => { "next_step" => "Reread the concept." } }.to_json
+      result, = graded(judge_reply: next_step_only)
+
+      expect(result[:review]["next_step"]).to eq("Reread the concept.")
+      expect(result[:review]["essential_gaps"]).to eq(grade["essential_gaps"])
+      expect(result[:review]["graded_prose"]).not_to have_key("essential_gaps")
+    end
+
     it "keeps the sanitized grade on keep, dropping a forged graded_prose" do
       result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
       expect(result[:review]).to eq(stamped)
@@ -6478,6 +6488,20 @@ RSpec.describe AiService, "the grading rubric" do
 
   it "no longer tells the grader who it is grading, since the pitched level says that" do
     expect(service.send(:build_review_day_context, "Rails", exercise, response)).not_to include("junior/mid")
+  end
+
+  # Each section has its own level, so a single bar held across the day
+  # would contradict the rubric.
+  it "points the grader at each section's own level rather than one bar for the day" do
+    context = service.send(:build_review_day_context, "Rails", exercise, response)
+
+    expect(context).not_to include("consistent across the whole day")
+    expect(AiService::RATING_RUBRIC).to include('"Pitched at" line')
+  end
+
+  it "keeps the ambiguity hunt's rating independent of how many ambiguities were planted" do
+    expect(ExerciseSection::AmbiguityHunt.grading_note(section: {}, answer: nil))
+      .to include("does not depend on how many were planted")
   end
 
   it "states the level the section was pitched at, with what that level means" do

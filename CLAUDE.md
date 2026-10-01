@@ -1351,7 +1351,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `essential_gaps`, the positions in "missed" it counts as essential.
   `RubricCheck` reads them against the rating (solid and strong list none,
   beginner and developing at least one) and `[rubric_check]` logs counts and
-  `agrees=true|false|unknown` for every graded section, never review text.
+  `agrees=true|false|unknown` for every section whose rating the grader
+  chose, never review text; a computed rating is not checked.
   Positions it cannot read are dropped rather than stored, and are counted
   against "missed" as the grader returned it, blanks included. Nothing
   rewrites a rating from this; the log is how the rubric's adherence is

@@ -333,7 +333,7 @@ class AiService
   # pieces; none restates these levels. RubricCheck reads the essential_gaps
   # the grader returns against them.
   RATING_RUBRIC = <<~RUBRIC.chomp.freeze
-    How to choose "rating": rate the answer against the level its section was pitched at, which is stated with the section, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
+    How to choose "rating": rate the answer against the level its section was pitched at, which the grading instruction states on its "Pitched at" line, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
     - "beginner": missed the main point of the section.
     - "developing": found the main point, but missed or misexplained at least one essential piece.
     - "solid": no essential misses.
@@ -2493,7 +2493,7 @@ class AiService
       end
 
     <<~CONTEXT
-      You are a senior #{coach} engineer giving direct, specific feedback on an engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only so your calibration of "developing" vs. "solid" stays consistent across the whole day. Be honest and constructive. Return JSON.
+      You are a senior #{coach} engineer giving direct, specific feedback on an engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only as context, since each section is rated against its own pitched level. Be honest and constructive. Return JSON.
 
       #{RATING_RUBRIC}
 
@@ -2531,7 +2531,7 @@ class AiService
   # the rung generation would pick for it today.
   def pitch_line(exercise, daily_response, section)
     stamped = exercise.problem_set.dig(section, "pitched_at")
-    rung = KindDifficulty::LEVELS.include?(stamped) ? stamped : current_rung(daily_response.user || exercise.user, section)
+    rung = KindDifficulty::LEVELS.include?(stamped) ? stamped : current_rung(daily_response.user, section)
     "#{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}"
   end
 
@@ -2719,10 +2719,10 @@ class AiService
   end
 
   # The positions index the grader's "missed", so when the prose judge
-  # rewrote it they move into graded_prose beside the list they number.
+  # rewrote that list they move into graded_prose beside the one they number.
   def gaps_beside_their_prose(review)
     original = review[ReviewProseVerdict::ORIGINAL_KEY]
-    return review unless original.is_a?(Hash) && review.key?("essential_gaps")
+    return review unless original.is_a?(Hash) && review.key?("essential_gaps") && original["missed"] != review["missed"]
 
     review.except("essential_gaps").merge(ReviewProseVerdict::ORIGINAL_KEY => original.merge("essential_gaps" => review["essential_gaps"]))
   end

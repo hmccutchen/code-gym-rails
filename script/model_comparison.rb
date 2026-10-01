@@ -464,11 +464,7 @@ class ModelComparison
     response = DailyResponse.new(user: user, daily_exercise: exercise, answers: { kind => fixture.dig("answers", quality) },
                                  section_ratings: { kind => "right_level" })
 
-    timed_run(route) do |service|
-      context = service.send(:build_review_day_context, coach_for(fixture["language"]), exercise, response)
-      _, result = service.send(:grade_section, user, exercise, response, kind, context)
-      result[:ok] ? result[:review] : "#{result[:error_code]}: #{result[:message]}"
-    end
+    timed_run(route) { |service| graded_review(service, response, exercise, kind) }
   end
 
   def calibration_line(quality, run)
@@ -494,18 +490,24 @@ class ModelComparison
 
     @out.puts "in order: #{rows.count { |row| row[:ordered] }}/#{rows.size} · matched expected: #{matched}/#{runs.size} · " \
               "rating agrees with essential gaps: #{agreeing}/#{graded.size} · " \
-              "complete answers rated solid or better: #{graded.count { |quality, run| quality == 'complete' && %w[solid strong].include?(run.output['rating']) }}/#{rows.size} · " \
+              "complete answers rated solid or better: #{graded.count { |quality, run| quality == 'complete' && CALIBRATION_EXPECTED.fetch('complete').include?(run.output['rating']) }}/#{rows.size} · " \
               "#{tokens_in} in / #{cache[:cache_write]} cache write / #{cache[:cache_read]} cache read / #{tokens_out} out · " \
               "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out, **cache))}"
     @out.puts
   end
 
   def review_section(service, response, exercise, section)
+    review = graded_review(service, response, exercise, section)
+    review.is_a?(Hash) ? review.slice(*REVIEW_FIELDS) : review
+  end
+
+  # The whole review grade_section produced, or its failure as a line to print.
+  def graded_review(service, response, exercise, section)
     coach   = service.send(:config_for, exercise.language)[:coach]
     context = service.send(:build_review_day_context, coach, exercise, response)
     _, result = service.send(:grade_section, response.user, exercise, response, section, context)
 
-    result[:ok] ? result[:review].slice(*REVIEW_FIELDS) : "#{result[:error_code]}: #{result[:message]}"
+    result[:ok] ? result[:review] : "#{result[:error_code]}: #{result[:message]}"
   end
 
   # A real review translates pseudocode before grading it and saves the result.

@@ -72,7 +72,7 @@ class ExerciseSection::Architecture < ExerciseSection
 
   def self.grading_note(section:, answer:)
     "Main point: a decision that addresses the constraints the scenario states.\n" \
-    "Essential pieces: the tradeoffs between the options, weighed rather than asserted, and each stated constraint (scale, team, reliability, tech debt). " \
+    "Essential pieces: the tradeoffs between the options, weighed rather than asserted, and each constraint the scenario actually states (such as scale, team, reliability or tech debt); a constraint it never mentions is not a miss. " \
     "There is no single correct option, so a different defensible choice with sound reasoning is not a miss. " \
     "Considering alternatives the question did not list is the kind of addition the rubric credits beyond solid."
   end
