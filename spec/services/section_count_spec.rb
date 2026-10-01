@@ -15,7 +15,7 @@ RSpec.describe SectionCount do
   end
 
   it "gives a new user the full set until there is evidence" do
-    expect(described_class.for(history(4, 4))).to eq(ExerciseSection.slot_count)
+    expect(described_class.for(history(4, 4))).to eq(ExerciseSection::MAX_SECTIONS)
   end
 
   it "keeps a consistent finisher at the full set" do
@@ -56,7 +56,7 @@ RSpec.describe SectionCount do
     it "returns the full set without consulting history" do
       history = spy("history")
 
-      expect(described_class.for(history, adaptive: false)).to eq(ExerciseSection.slot_count)
+      expect(described_class.for(history, adaptive: false)).to eq(ExerciseSection::MAX_SECTIONS)
       expect(history).not_to have_received(:first)
     end
   end

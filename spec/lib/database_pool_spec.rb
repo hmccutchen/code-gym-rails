@@ -13,13 +13,13 @@ RSpec.describe DatabasePool do
   end
 
   it "holds every worker thread's judge fan-out with nothing set in the environment" do
-    needed = queue_worker_threads * (1 + ExerciseSection.slot_count) + DatabasePool::SOLID_QUEUE_OWN_CONNECTIONS
+    needed = queue_worker_threads * (1 + ExerciseSection::MAX_SECTIONS) + DatabasePool::SOLID_QUEUE_OWN_CONNECTIONS
 
     expect(configured_pool({})).to be >= needed
   end
 
-  it "reads the fan-out from the section registry's count" do
-    expect(DatabasePool::SECTIONS_PER_DAY).to eq(ExerciseSection.slot_count)
+  it "reads the fan-out from the most sections a day can hold" do
+    expect(DatabasePool::SECTIONS_PER_DAY).to eq(ExerciseSection::MAX_SECTIONS)
   end
 
   it "lets RAILS_MAX_THREADS raise the pool but never lower it below the fan-out" do

@@ -14,6 +14,10 @@ class ExerciseSection
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80
 
+  # The most sections one day holds. Its own fact rather than slot_count:
+  # a second fixed kind adds a slot without making a day longer.
+  MAX_SECTIONS = 4
+
   # Enumeration order, matching the order these keys have always been listed in
   # (strong params, concept tagging, scenario collection) so anything deriving a
   # Hash or Array from it keeps the ordering it already had.
@@ -30,6 +34,11 @@ class ExerciseSection
     all.find(&:leads_learning_track?)
   end
 
+  # The kinds every day is built around, each in a slot of its own.
+  def self.fixed
+    all.select(&:fixed?)
+  end
+
   # Precedence order, NOT enumeration order: a problem_set holding more than one
   # third key (a provider returning both) resolves the way it always has —
   # architecture first, then security_review, then challenge, then
@@ -40,16 +49,11 @@ class ExerciseSection
 
   # Precedence order for the fourth slot, mirroring .thirds: if a provider
   # somehow returned more than one fourth-shaped key, plan_review wins, then
-  # ambiguity_hunt.
+  # ambiguity_hunt, then pseudocode_to_code.
   def self.fourths
     [ PlanReview, AmbiguityHunt, PseudocodeToCode ]
   end
 
-  # Which fourth-slot key a raw problem_set resolves to, by .fourths
-  # precedence — nil when it holds none. Lives here rather than on
-  # DailyExercise because the generation-time normalizers have to resolve the
-  # same slot on a payload that isn't a row yet, and two copies of a
-  # precedence rule is one copy too many.
   # A provider can emit a key holding null or a bare string alongside the real
   # section; only a Hash is a section anything downstream can render.
   def self.present?(problem_set, key)
@@ -57,13 +61,27 @@ class ExerciseSection
   end
 
   def self.resolved_fourth_key(problem_set)
-    fourths.map(&:key).find { |key| present?(problem_set, key) }
+    resolved_key(problem_set, fourths)
   end
 
-  # The day's shape, in slot order. Every slot but code_review may be nil,
+  # The first of `kinds` the payload holds, by their precedence order, or nil.
+  def self.resolved_key(problem_set, kinds)
+    kinds.map(&:key).find { |key| present?(problem_set, key) }
+  end
+
+  # The keys a problem set presents, in slot order: each slot's resolved kind,
+  # kept only when the payload holds it. DailyExercise#active_section_keys
+  # reads this for a stored row; ingest reads it for a payload that is not a
+  # row yet.
+  def self.resolved_keys(problem_set)
+    slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }
+  end
+
+  # The day's shape, in slot order. Every slot but a fixed kind's may be nil,
   # meaning the day does not include it.
   def self.slots
-    { code_review: [ CodeReview ], pattern: [ Pattern ], third: thirds, fourth: fourths }
+    fixed.to_h { |kind| [ kind.key.to_sym, [ kind ] ] }
+      .merge(pattern: [ Pattern ], third: thirds, fourth: fourths)
   end
 
   def self.slot_count
@@ -77,8 +95,8 @@ class ExerciseSection
     slots.values.select { |kinds| kinds.size > 1 }.flatten
   end
 
-  # DailyExercise#active_section_keys answers the same question after the fact;
-  # this one works from DailyPlan's rolled symbols, before a row exists.
+  # .resolved_keys answers the same question from a payload; this one works
+  # from DailyPlan's rolled symbols, before the provider is contacted.
   def self.for_plan(third:, fourth:, pattern: :pattern)
     slot_kinds(third: third, fourth: fourth, pattern: pattern).values.compact
   end
@@ -88,7 +106,8 @@ class ExerciseSection
   # kind left — so reading a slot out of it by position names the wrong kind on
   # any day that omits one.
   def self.slot_kinds(third:, fourth:, pattern: :pattern)
-    chosen = { code_review: :code_review, pattern: pattern, third: third, fourth: fourth }
+    chosen = fixed.to_h { |kind| [ kind.key.to_sym, kind.key.to_sym ] }
+      .merge(pattern: pattern, third: third, fourth: fourth)
 
     slots.to_h { |slot, eligible| [ slot, slot_kind(chosen.fetch(slot), eligible) ] }
   end
@@ -129,6 +148,10 @@ class ExerciseSection
 
     def fourth?
       ExerciseSection.fourths.include?(self)
+    end
+
+    def fixed?
+      false
     end
 
     # Names which vocabulary this kind's concept is validated against. AiService

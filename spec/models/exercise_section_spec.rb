@@ -534,6 +534,54 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe "MAX_SECTIONS" do
+    it "is four, as many as a fully populated plan holds today" do
+      expect(described_class::MAX_SECTIONS).to eq(4)
+      expect(described_class::MAX_SECTIONS).to eq(described_class.for_plan(third: :challenge, fourth: :plan_review).size)
+    end
+  end
+
+  describe ".fixed" do
+    it "holds code_review alone" do
+      expect(described_class.fixed).to eq([ ExerciseSection::CodeReview ])
+      expect((described_class.all - described_class.fixed).map(&:fixed?)).to all(be(false))
+    end
+  end
+
+  describe ".slots" do
+    it "gives each fixed kind its own slot ahead of pattern, third and fourth" do
+      expect(described_class.slots).to eq(
+        code_review: [ ExerciseSection::CodeReview ], pattern: [ ExerciseSection::Pattern ],
+        third: described_class.thirds, fourth: described_class.fourths
+      )
+    end
+  end
+
+  describe ".resolved_keys" do
+    it "resolves FakeService's every-kind set to one key per slot, by precedence" do
+      expect(described_class.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
+        .to eq(%w[code_review pattern architecture plan_review])
+    end
+
+    it "skips a key whose value is not a section" do
+      set = { "code_review" => { "q" => "?" }, "pattern" => "a bare string", "architecture" => nil,
+              "challenge" => { "q" => "?" }, "plan_review" => [ "not a hash" ], "ambiguity_hunt" => { "q" => "?" } }
+
+      expect(described_class.resolved_keys(set)).to eq(%w[code_review challenge ambiguity_hunt])
+    end
+
+    it "keeps the third's precedence over a provider's extra alternates" do
+      set = { "code_review" => { "q" => "?" }, "parsons_problem" => { "q" => "?" }, "challenge" => { "q" => "?" },
+              "security_review" => { "q" => "?" } }
+
+      expect(described_class.resolved_keys(set)).to eq(%w[code_review security_review])
+    end
+
+    it "is empty for a set holding no section at all" do
+      expect(described_class.resolved_keys({ "code_review" => nil, "bogus" => { "q" => "?" } })).to eq([])
+    end
+  end
+
   describe ".schema_fragment" do
     RUBY_LABEL = "Ruby/Rails".freeze
     JS_LABEL   = "JavaScript/React".freeze

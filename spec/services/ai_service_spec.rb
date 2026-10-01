@@ -5120,13 +5120,13 @@ RSpec.describe AiService do
     # 160 is the rounded per-section output observed there (319 tokens across
     # two sections).
     it "budgets at least 160 tokens per section a day can hold" do
-      floor = ExerciseSection.slot_count * 160
+      floor = ExerciseSection::MAX_SECTIONS * 160
 
       expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= floor
     end
 
     it "grows with the reason length a day's sections may use" do
-      longest_valid_reasons = ExerciseSection.slot_count * DailyResponse::MAX_DIFFICULTY_REASON_LENGTH /
+      longest_valid_reasons = ExerciseSection::MAX_SECTIONS * DailyResponse::MAX_DIFFICULTY_REASON_LENGTH /
                               AiService::DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN
 
       expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= longest_valid_reasons

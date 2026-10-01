@@ -11,13 +11,16 @@
 class ConceptDrills
   # Counted in drills rather than concepts, where a whole group is one: a
   # group is one self-noticed gap, and a cap counted in concepts would refuse
-  # a large group outright. One fewer than the non-fourth slots, which is
-  # where every drill but a fourth-bucket one competes, so on the fullest day
+  # a large group outright. Kept below the non-fourth hosts on the fullest
+  # day, which is where every drill but a fourth-bucket one competes, so
   # single-concept drills still leave one host for evidence-driven
-  # reinforcement or an overdue retention check. A fourth-bucket drill counts
+  # reinforcement or an overdue retention check. Stated rather than derived
+  # from the slot roster: a second fixed slot would raise the derived value
+  # without making a day longer, and DailyPlan.share_hosts already keeps a
+  # host for evidence when drills outnumber them. A fourth-bucket drill counts
   # against the same cap while occupying only the fourth: the cap bounds how
   # many gaps are worked at once, not how many hosts they take.
-  MAX_CONCURRENT = ExerciseSection.slots.count { |_slot, kinds| kinds.none?(&:fourth?) } - 1
+  MAX_CONCURRENT = 2
 
   LimitReached = Class.new(StandardError)
 

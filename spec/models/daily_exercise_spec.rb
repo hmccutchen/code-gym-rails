@@ -135,6 +135,13 @@ RSpec.describe DailyExercise, type: :model do
       exercise = DailyExercise.new(problem_set: { "code_review" => "junk", "pattern" => {}, "challenge" => {} })
       expect(exercise.active_section_keys).to eq(%w[pattern challenge])
     end
+
+    it "reads the same keys ExerciseSection.resolved_keys does for FakeService's every-kind set" do
+      exercise = DailyExercise.new(problem_set: FakeService::EXERCISE_PROBLEM_SET)
+
+      expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern architecture plan_review])
+    end
   end
 
   describe "#third_key" do

@@ -45,7 +45,7 @@ class DailyExercise < ApplicationRecord
   # per-key readers it replaced (`problem_set["architecture"]&.with_indifferent_access`)
   # raised outright on a non-Hash value rather than falling through.
   def third_key
-    ExerciseSection.thirds.map(&:key).find { |key| ExerciseSection.present?(problem_set, key) } || "challenge"
+    ExerciseSection.resolved_key(problem_set, ExerciseSection.thirds) || "challenge"
   end
 
   # Which fourth-slot shape this exercise's problem_set holds, resolved the
@@ -58,23 +58,21 @@ class DailyExercise < ApplicationRecord
     ExerciseSection.resolved_fourth_key(problem_set)
   end
 
-  # The sections this exercise actually presents: code_review, pattern, and the
-  # resolved third and fourth keys, keeping only those the payload holds. This
+  # The sections this exercise actually presents: each slot's resolved key
+  # (ExerciseSection.resolved_keys), keeping only those the payload holds. This
   # reads the payload, not the plan — the plan is gone by the time anything
   # asks — so a section the provider added unasked for still counts here if it
   # resolves (ProblemSetIngest logs that case; see warn_unrequested_sections!).
-  # A planned day holds 2-4 of them, and a judged one can hold fewer: every
-  # kind but code_review is droppable, so a day the judge rejected its way
-  # through can arrive with code_review alone.
+  # A planned day holds 2 to ExerciseSection::MAX_SECTIONS of them, and a
+  # judged one can hold fewer: every kind but code_review is droppable, so a
+  # day the judge rejected its way through can arrive with code_review alone.
   #
   # NOT `problem_set.keys`. A payload can hold more than one third- or
-  # fourth-shaped key — FakeService persists all eight deliberately, and a real
+  # fourth-shaped key — FakeService persists all nine deliberately, and a real
   # provider can return an extra alternate — but only the resolved one is ever
   # rendered, answerable, or rateable. Every "N of M sections" denominator
   # derives from this, so a count can never exceed what is on screen.
   def active_section_keys
-    ([ "code_review", "pattern" ] + [ third_key, fourth_key ])
-      .compact
-      .select { |key| ExerciseSection.present?(problem_set, key) }
+    ExerciseSection.resolved_keys(problem_set)
   end
 end

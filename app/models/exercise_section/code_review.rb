@@ -17,6 +17,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
+  def self.fixed?
+    true
+  end
+
   def self.judge_task
     "Find the one planted issue in the snippet and say how to fix it."
   end

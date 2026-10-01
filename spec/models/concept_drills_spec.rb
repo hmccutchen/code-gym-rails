@@ -205,11 +205,15 @@ RSpec.describe ConceptDrills do
   end
 
   describe "MAX_CONCURRENT" do
-    it "is one fewer than the slots that can host a drilled concept" do
-      hosting_slots = ExerciseSection.slots.count { |_slot, kinds| kinds.none?(&:fourth?) }
-
-      expect(described_class::MAX_CONCURRENT).to eq(hosting_slots - 1)
+    it "is two" do
       expect(described_class::MAX_CONCURRENT).to eq(2)
+    end
+
+    it "leaves a non-fourth host free on the fullest possible day" do
+      non_fourth_slots = ExerciseSection.slots.count { |_slot, kinds| kinds.none?(&:fourth?) }
+      fullest_day_hosts = [ non_fourth_slots, ExerciseSection::MAX_SECTIONS ].min
+
+      expect(described_class::MAX_CONCURRENT).to be < fullest_day_hosts
     end
   end
 
