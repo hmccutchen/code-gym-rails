@@ -68,6 +68,8 @@ class ExerciseSection::PlanReview < ExerciseSection
   end
 
   def self.grading_note(section:, answer:)
-    "Evaluate on whether they correctly identified the planted flaws (a technical anti-pattern, a scope-creep item, an unflagged behavior change) and whether their pushback is well-reasoned — not against one exact expected wording. \"improved_code\" for this section is a revised version of the plan that addresses what they missed."
+    "Main point: at least one of the planted flaws, recognized and explained.\n" \
+    "Essential pieces: each planted flaw (a technical anti-pattern, a scope-creep item, an unflagged behavior change), with pushback that says why. Judge whether the reasoning is sound, not whether it matches one exact wording.\n" \
+    "\"improved_code\" for this section is a revised version of the plan that addresses what they missed."
   end
 end

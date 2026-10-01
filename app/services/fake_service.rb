@@ -175,7 +175,8 @@ class FakeService < AiService
     "missed" => [ "Didn't mention the specific fix." ],
     "better_questions" => [ "What would happen under concurrent access?" ],
     "next_step" => "Review the referenced concept material once more.",
-    "improved_code" => ""
+    "improved_code" => "",
+    "essential_gaps" => []
   }.freeze
 
   # One sentence, reused for every section: the fake's job is to make the note

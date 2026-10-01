@@ -1,0 +1,16 @@
+{
+  "kind": "security_review",
+  "language": "ruby_rails",
+  "section": {
+    "pitched_at": "junior",
+    "concept": "sql_injection_prevention",
+    "title": "Customer search",
+    "question": "What vulnerability does this search action have, and how would you fix it?",
+    "snippet": "def index\n  @customers = current_account.customers\n    .where(\"name LIKE '%#{params[:q]}%'\")\n    .limit(25)\nend"
+  },
+  "answers": {
+    "complete": "params[:q] is interpolated straight into the SQL string, so it is SQL injection. A search like ' OR 1=1 OR name LIKE ' closes the quote and changes the query, and a UNION could read columns from other tables. Pass the value as a bound parameter and escape the LIKE wildcards: current_account.customers.where(\"name LIKE ?\", \"%#{Customer.sanitize_sql_like(params[:q].to_s)}%\").limit(25).",
+    "partial": "This is SQL injection, because the search text goes straight into the query string. Someone could type SQL into the search box.",
+    "miss": "The search has no pagination beyond limit(25), and LIKE with a leading wildcard can't use an index, so it will be slow on big accounts. Add a trigram index."
+  }
+}

@@ -10,6 +10,11 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
+    # Scored in Ruby from how many blocks are out of place (see .grade).
+    def rating_fixed?
+      true
+    end
+
     def judge_task
       "Arrange the blocks into the working order."
     end

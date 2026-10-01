@@ -207,6 +207,44 @@ RSpec.describe ModelComparison do
     expect(out.string).to include("issues=padding: \"Once upon a time\"")
   end
 
+  describe "review calibration" do
+    let(:fixtures) { Dir[ModelComparison::REVIEW_CALIBRATION_FIXTURE_DIR.join("*.json")] }
+
+    it "grades every fixture's three answers once per candidate and prints a summary" do
+      comparison.review_calibration
+
+      expect(posted.size).to eq(fixtures.size * ModelComparison::CALIBRATION_EXPECTED.size *
+                                ModelComparison::CANDIDATES.fetch("review_calibration").size)
+      expect(out.string).to include("=== review_calibration: #{ClaudeService::DEFAULT_ROUTE[:model]} ===")
+        .and match(%r{in order: \d+/#{fixtures.size} · matched expected: \d+/#{fixtures.size * 3}})
+        .and include("complete answers rated solid or better:")
+    end
+
+    # FakeService grades every answer "solid", so no fixture can come out in
+    # order; the run must say so rather than pass it.
+    it "reports a fixture whose ratings do not fall in rank order" do
+      comparison.review_calibration
+
+      expect(out.string).to include("OUT OF ORDER").and include("in order: 0/#{fixtures.size}")
+    end
+
+    it "grades with the route production uses for reviews" do
+      expect(ModelComparison::CANDIDATES.fetch("review_calibration"))
+        .to eq([ ClaudeService::MODEL_FOR_PURPOSE.fetch("review_response", ClaudeService::DEFAULT_ROUTE) ])
+    end
+
+    it "every fixture names a registered kind, a stamped rung and an answer for each quality" do
+      expect(fixtures.size).to be >= 5
+      fixtures.each do |path|
+        fixture = JSON.parse(File.read(path))
+        expect(ExerciseSection.keys).to include(fixture["kind"]), path
+        expect(KindDifficulty::LEVELS).to include(fixture.dig("section", "pitched_at")), path
+        expect(fixture["answers"].keys).to match_array(ModelComparison::CALIBRATION_EXPECTED.keys), path
+        expect(ProblemSetIngest.vocabulary_for(fixture["kind"], fixture["language"])).to include(fixture.dig("section", "concept")), path
+      end
+    end
+  end
+
   describe "review prose measurement" do
     let(:section_review) do
       { "rating" => "solid", "correct" => [ "Spotted it." ],

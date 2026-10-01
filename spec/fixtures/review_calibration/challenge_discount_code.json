@@ -1,0 +1,16 @@
+{
+  "kind": "challenge",
+  "language": "ruby_rails",
+  "section": {
+    "pitched_at": "senior",
+    "concept": "validations",
+    "scenario": "checkout discount codes",
+    "question": "Implement Order#apply_discount(code). Look the code up with DiscountCode.find_by(code: code). Return false and leave total_cents unchanged when the code is unknown or expired (expires_at in the past). Otherwise reduce total_cents by the code's percent_off, never below zero, save the order, and return true.",
+    "starter_code": "class Order < ApplicationRecord\n  def apply_discount(code)\n    # TODO\n  end\nend"
+  },
+  "answers": {
+    "complete": "def apply_discount(code)\n  discount = DiscountCode.find_by(code: code)\n  return false if discount.nil? || discount.expires_at.past?\n\n  reduction = (total_cents * discount.percent_off / 100.0).round\n  self.total_cents = [total_cents - reduction, 0].max\n  save!\n  true\nend",
+    "partial": "def apply_discount(code)\n  discount = DiscountCode.find_by(code: code)\n  return false if discount.nil?\n\n  self.total_cents = total_cents - (total_cents * discount.percent_off / 100)\n  save!\n  true\nend",
+    "miss": "def apply_discount(code)\n  self.discount_code = code\n  save\nend"
+  }
+}

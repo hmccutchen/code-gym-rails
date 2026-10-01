@@ -632,9 +632,9 @@ RSpec.describe AiService do
       expect(service.send(:oo_design_violation_guidance)).to include(*AiService::OO_DESIGN_CONCEPTS)
     end
 
-    # code_review and challenge have no section_grading_note and are graded by
-    # the generic rubric, which has nothing to put in "missed" unless the
-    # section planted something missable. A principle invites an essay without
+    # code_review and challenge are graded on the planted issue or stated
+    # requirement their grading notes name, so there is nothing to put in
+    # "missed" unless the section planted something missable. A principle invites an essay without
     # this constraint.
     it "requires one findable violation the section can be graded against" do
       guidance = service.send(:oo_design_violation_guidance)
@@ -729,8 +729,8 @@ RSpec.describe AiService do
 
     # Depth is a property of an interface rather than a defect in a result, so
     # this is the group most able to produce a section with nothing missable in
-    # it — and code_review and challenge are graded by the generic rubric,
-    # which then has nothing to put in "missed".
+    # it — and code_review and challenge are graded on a planted issue, so
+    # such a section leaves nothing to put in "missed".
     it "requires one findable instance the section can be graded against" do
       guidance = service.send(:module_design_depth_guidance)
 
@@ -948,9 +948,9 @@ RSpec.describe AiService do
     end
 
     # The failure mode this group shares with the design principles and the
-    # module-design concepts: code_review and challenge carry no
-    # section_grading_note, so the generic rubric has nothing to put in
-    # "missed" unless the section contains something missable.
+    # module-design concepts: code_review and challenge are graded on a
+    # planted issue, so there is nothing to put in "missed" unless the
+    # section contains something missable.
     it "requires one specific findable instance rather than a topic to discuss" do
       guidance = service.send(:domain_modeling_guidance)
 
@@ -1603,8 +1603,8 @@ RSpec.describe AiService do
       expect(service.send(:build_exercise_prompt, user)).to include("Where no code is shown (pattern)")
     end
 
-    # challenge is a third host for a meta-skill concept, graded by the same
-    # generic rubric as code_review and pattern — this is its worked example.
+    # challenge is a third host for a meta-skill concept, graded under the same
+    # rubric as code_review and pattern — this is its worked example.
     it "gives a worked example for a meta-skill concept hosted by challenge" do
       prompt = service.send(:build_exercise_prompt, user)
 
@@ -3081,10 +3081,10 @@ RSpec.describe AiService do
       expect(note).to match(/revised/i)
     end
 
-    # The registry answers every per-kind question; a kind with nothing extra
-    # to say gets the generic rubric rather than a branch at the call site.
-    it "is empty for a kind the generic rubric already grades" do
-      expect(ExerciseSection::Challenge.grading_note(section: {}, answer: nil)).to eq("")
+    # The registry answers every per-kind question, so challenge names its
+    # own main point rather than the call site branching on it.
+    it "names challenge's main point in its own note" do
+      expect(ExerciseSection::Challenge.grading_note(section: {}, answer: nil)).to include("Main point: code that does the task")
     end
   end
 
@@ -6450,5 +6450,136 @@ RSpec.describe AiService, ".judge_fallback_reason" do
   it "is the table both judges read" do
     expect(JudgedGeneration.private_instance_methods).not_to include(:judge_fallback_reason)
     expect(AiService.private_instance_methods).not_to include(:review_judge_fallback_reason)
+  end
+end
+
+RSpec.describe AiService, "the grading rubric" do
+  let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_key: "fake-test-key", skill_level: "solid") }
+  let(:service) { FakeService.new("key") }
+  let(:problem_set) do
+    { "code_review" => { "question" => "cr?", "snippet" => "code", "pitched_at" => "principal_engineer" },
+      "pattern"     => { "title" => "P", "question" => "pat?" } }
+  end
+  let(:exercise) { DailyExercise.new(user: user, language: "ruby_rails", problem_set: problem_set) }
+  let(:response) { DailyResponse.new(user: user, daily_exercise: exercise, answers: {}) }
+
+  it "states the rubric once, in the day context every grading call shares" do
+    context = service.send(:build_review_day_context, "Rails", exercise, response)
+    prompt  = service.send(:build_review_section_prompt, exercise, response, "code_review")
+
+    expect(context.scan(AiService::RATING_RUBRIC).size).to eq(1)
+    expect(prompt).not_to include(AiService::RATING_RUBRIC)
+  end
+
+  it "defines every rating the review may return, in the order they rank" do
+    positions = ConceptMastery::AI_RATING_RANK.keys.map { |rating| AiService::RATING_RUBRIC.index("\"#{rating}\":") }
+
+    expect(positions).to all(be_an(Integer))
+    expect(positions).to eq(positions.sort)
+  end
+
+  it "no longer tells the grader who it is grading, since the pitched level says that" do
+    expect(service.send(:build_review_day_context, "Rails", exercise, response)).not_to include("junior/mid")
+  end
+
+  it "states the level the section was pitched at, with what that level means" do
+    prompt = service.send(:build_review_section_prompt, exercise, response, "code_review")
+
+    expect(prompt).to include("Pitched at: principal_engineer — #{KindDifficulty::LEVEL_DEFINITIONS.fetch('principal_engineer')}")
+  end
+
+  it "falls back to the profile's rung for a section generated before stamps existed" do
+    prompt = service.send(:build_review_section_prompt, exercise, response, "pattern")
+
+    expect(prompt).to include("Pitched at: senior — #{KindDifficulty::LEVEL_DEFINITIONS.fetch('senior')}")
+  end
+
+  it "never tells the grader the section was eased" do
+    problem_set["code_review"]["eased"] = true
+
+    expect(service.send(:build_review_section_prompt, exercise, response, "code_review")).not_to match(/eased/i)
+  end
+
+  it "asks for the positions of the essential gaps in missed" do
+    expect(service.send(:build_review_section_prompt, exercise, response, "code_review"))
+      .to include('"essential_gaps": array of integers')
+  end
+
+  it "has every kind whose rating the grader chooses name its main point and essential pieces" do
+    ExerciseSection.all.reject(&:rating_fixed?).each do |kind|
+      note = kind.grading_note(section: {}, answer: nil)
+      expect(note).to include("Main point:"), kind.key
+      expect(note).to include("Essential pieces:"), kind.key
+    end
+  end
+
+  it "treats only parsons as computing its own rating" do
+    expect(ExerciseSection.all.select(&:rating_fixed?)).to eq([ ExerciseSection::ParsonsProblem ])
+  end
+
+  it "dates the rubric so evidence readers can choose to read only what it graded" do
+    expect(AiService::RUBRIC_INTRODUCED_AT).to be_a(Time)
+  end
+
+  describe "the essential-gap check on each graded section" do
+    let(:logged) { StringIO.new }
+    let(:saved_exercise) do
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                            problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
+    end
+    let(:saved_response) do
+      DailyResponse.create!(user: user, daily_exercise: saved_exercise, date: Date.current,
+                            answers: { "code_review" => "The query runs once per row, so preload it." }, submitted_at: Time.current)
+    end
+
+    around do |example|
+      original = Rails.logger
+      Rails.logger = ActiveSupport::Logger.new(logged)
+      example.run
+    ensure
+      Rails.logger = original
+    end
+
+    def graded(review, section: "code_review")
+      allow(service).to receive(:call).and_return(text: review.to_json, input_tokens: 1, output_tokens: 1)
+      allow(FakeService).to receive(:new).and_return(service)
+      context = service.send(:build_review_day_context, "Rails", saved_exercise, saved_response)
+      service.send(:grade_section, user, saved_exercise, saved_response, section, context).last
+    end
+
+    let(:base) { { "rating" => "solid", "correct" => [], "missed" => [ "SECRET-M polish note." ], "better_questions" => [], "next_step" => "x", "improved_code" => "" } }
+
+    it "logs agreement and keeps the checked positions" do
+      result = graded(base.merge("essential_gaps" => []))
+
+      expect(result[:review]["essential_gaps"]).to eq([])
+      expect(logged.string).to include("[rubric_check] user=#{user.id} section=code_review rating=solid essential=0 missed=1 agrees=true")
+    end
+
+    it "logs a solid rating that lists an essential gap, and leaves the rating alone" do
+      result = graded(base.merge("essential_gaps" => [ 0 ]))
+
+      expect(result[:review]["rating"]).to eq("solid")
+      expect(logged.string).to include("rating=solid essential=1 missed=1 agrees=false")
+    end
+
+    it "drops positions it cannot read rather than storing them, and logs that it could not check" do
+      result = graded(base.merge("essential_gaps" => [ 7 ]))
+
+      expect(result[:review]).not_to have_key("essential_gaps")
+      expect(logged.string).to include("rating=solid essential=unknown missed=1 agrees=unknown")
+    end
+
+    it "never logs review text" do
+      graded(base.merge("essential_gaps" => []))
+
+      expect(logged.string).not_to include("SECRET-M")
+    end
+
+    it "skips a kind whose rating is computed rather than graded" do
+      graded(base.merge("essential_gaps" => []), section: "parsons_problem")
+
+      expect(logged.string).not_to include("[rubric_check]")
+    end
   end
 end

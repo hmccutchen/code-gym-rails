@@ -1,0 +1,23 @@
+{
+  "kind": "ambiguity_hunt",
+  "language": "ruby_rails",
+  "section": {
+    "pitched_at": "senior",
+    "concept": "unspecified_edge_cases",
+    "title": "Export workout history",
+    "scenario": "fitness tracking app",
+    "request": "Users keep asking to get their data out. Add a button on the profile page that exports a user's workout history.",
+    "question": "List what you would need clarified before building this.",
+    "planted_ambiguities": [
+      "Which file format the export uses (CSV, JSON, PDF)",
+      "Whether the export covers all history or a chosen date range",
+      "Whether deleted or archived workouts are included",
+      "Which time zone workout times are shown in"
+    ]
+  },
+  "answers": {
+    "complete": "1. What format do people want: CSV for spreadsheets, JSON, or a PDF summary?\n2. All history, or can they pick a date range? Some accounts have years of data.\n3. Do deleted or archived workouts count as their data here?\n4. Which time zone should workout times be in, the user's current zone or where each workout happened?\n5. For a very large history, do we email a link when it is ready instead of making them wait on the page?",
+    "partial": "1. What file format, CSV or something else?\n2. Do they get everything or only a date range?",
+    "miss": "I would build it as a background job that writes a CSV to Active Storage and emails a download link, with a rate limit so nobody runs it in a loop."
+  }
+}

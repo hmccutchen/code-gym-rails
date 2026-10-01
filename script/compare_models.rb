@@ -8,6 +8,7 @@
 #   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb judge_fixtures
 #   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_prose USER_ID [LIMIT]
 #   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_prose_fixtures
+#   ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb review_calibration
 require_relative "model_comparison"
 
 mode, id, *rest = ARGV
@@ -17,7 +18,7 @@ known_modes = ModelComparison::CANDIDATES.keys + %w[judge_fixtures review_prose_
 
 abort("ANTHROPIC_API_KEY is not set. Calls are billed to it, never to a user's stored key.\n\n#{usage}") unless api_key
 abort(usage) unless known_modes.include?(mode)
-abort(usage) if %w[judge_fixtures review_prose_fixtures].exclude?(mode) && id.blank?
+abort(usage) if %w[judge_fixtures review_prose_fixtures review_calibration].exclude?(mode) && id.blank?
 
 comparison = ModelComparison.new(api_key: api_key)
 
@@ -28,6 +29,7 @@ when "translate"      then comparison.translate(id)
 when "judge"          then comparison.judge(id)
 when "judge_fixtures" then comparison.judge_fixtures
 when "review_prose_fixtures" then comparison.review_prose_fixtures
+when "review_calibration" then comparison.review_calibration
 when "review_prose"
   limit = rest.first ? Integer(rest.first, exception: false) : 5
   abort("LIMIT must be a positive integer.\n\n#{usage}") unless limit&.positive?

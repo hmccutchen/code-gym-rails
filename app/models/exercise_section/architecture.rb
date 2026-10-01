@@ -71,9 +71,9 @@ class ExerciseSection::Architecture < ExerciseSection
   end
 
   def self.grading_note(section:, answer:)
-    "Evaluate the architecture answer on the DEPTH of its reasoning, not a single correct answer:\n" \
-    "- Did they weigh real tradeoffs between the options?\n" \
-    "- Did they address the stated constraints (scale, team, reliability, tech debt)?\n" \
-    "- Did they consider alternatives rather than asserting one option?"
+    "Main point: a decision that addresses the constraints the scenario states.\n" \
+    "Essential pieces: the tradeoffs between the options, weighed rather than asserted, and each stated constraint (scale, team, reliability, tech debt). " \
+    "There is no single correct option, so a different defensible choice with sound reasoning is not a miss. " \
+    "Considering alternatives the question did not list is the kind of addition the rubric credits beyond solid."
   end
 end
