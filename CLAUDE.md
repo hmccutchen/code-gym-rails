@@ -1126,9 +1126,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Parsons instead needs an explicitly saved complete permutation of its
   stored blocks, regardless of encoded length. One- and two-block exercises
   are supported; the generation prompt's five-to-eight target is not an
-  ingest bound. An untouched control stays unanswered. Moving blocks or
-  clicking "Use this order" records the arrangement, including a one-block
-  exercise with nothing to move. The kind's control supplies
+  ingest bound. An untouched control stays unanswered. Moving a block records
+  the arrangement. A one-block exercise has nothing to move, so only it shows a
+  "Use this order" button; with two or more blocks the scramble never starts in
+  the correct order and every move already saves. The kind's control supplies
   `data-answer-complete`, initially computed by the server and updated on
   interaction; the shared browser gate reads that state without knowing the
   kind. Prose controls still share the server's threshold and scaffold labels.

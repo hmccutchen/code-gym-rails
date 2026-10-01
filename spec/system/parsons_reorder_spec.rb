@@ -79,7 +79,12 @@ RSpec.describe "Parsons reorder controls", type: :system do
         expect(page).to have_button("Submit answers →", disabled: true)
         rate_section("parsons_problem")
         expect(page).to have_button("Submit answers →", disabled: true)
-        click_button "Use this order"
+        if count == 1
+          click_button "Use this order"
+        else
+          expect(page).to have_no_button("Use this order")
+          find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys([ :control, :down ])
+        end
 
         expect(page).to have_content("1 of 3 answered")
         expect(page).to have_css('.hint-slot[data-hint-for="parsons_problem"] > details.hint')

@@ -39,7 +39,12 @@
       </li>
     <% end %>
   </ol>
-  <button type="button" class="btn btn-ghost btn-sm" data-parsons-confirm>Use this order</button>
+  <%# Every move already records the order, and the scramble never starts in the
+      correct order, so the button only matters when there is nothing to move:
+      without it a one-block exercise could never be answered. %>
+  <% if blocks.size == 1 %>
+    <button type="button" class="btn btn-ghost btn-sm" data-parsons-confirm>Use this order</button>
+  <% end %>
   <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
       not using a mouse. The hint is clipped until a block takes focus, which
       keeps it out of the way of the people who will never need it. %>
@@ -133,7 +138,7 @@
         list.parsonsSync = () => syncHiddenField(list);
         list.parsonsAddControls = () => addControls(list);
         list.addEventListener("keydown", event => handleKey(list, event));
-        list.parentElement.querySelector("[data-parsons-confirm]").addEventListener("click", () => {
+        list.parentElement.querySelector("[data-parsons-confirm]")?.addEventListener("click", () => {
           syncHiddenField(list);
           list.parentElement.querySelector(".parsons-status").textContent = "Order recorded.";
         });
