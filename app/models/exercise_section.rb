@@ -180,6 +180,14 @@ class ExerciseSection
       []
     end
 
+    # The last say over what generation may offer this kind, handed the
+    # vocabulary left after excluded_vocabulary_keys. `rung` is the level the
+    # section is pitched at, or nil when the caller does not know it, in which
+    # case a kind that narrows by level returns its strictest list.
+    def narrow_vocabulary(vocabulary, rung: nil)
+      vocabulary
+    end
+
     # Fields of this kind's section that are answer key rather than exercise
     # content. See ExerciseSection.all_answer_key_fields.
     def answer_key_fields

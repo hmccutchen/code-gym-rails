@@ -163,6 +163,25 @@ RSpec.describe ProblemSetIngest do
   end
 
   describe ".selectable_vocabulary_for" do
+    it "hands the kind's own hook what the excluded groups left, with the rung" do
+      after_exclusions = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
+      allow(ExerciseSection::ParsonsProblem).to receive(:narrow_vocabulary).and_return(%w[n_plus_one])
+
+      vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails", rung: "senior")
+
+      expect(vocabulary).to eq(%w[n_plus_one])
+      expect(ExerciseSection::ParsonsProblem).to have_received(:narrow_vocabulary)
+        .with(after_exclusions, rung: "senior")
+    end
+
+    it "passes no rung when the caller names none" do
+      allow(ExerciseSection::Pattern).to receive(:narrow_vocabulary).and_call_original
+
+      described_class.selectable_vocabulary_for("pattern", "ruby_rails")
+
+      expect(ExerciseSection::Pattern).to have_received(:narrow_vocabulary).with(AiService::RAILS_CONCEPTS, rung: nil)
+    end
+
     # Parsons grades by positional diff against one correct sequence, and
     # neither the data-modeling nor the meta-skill concepts are sequential —
     # see ExerciseSection::ParsonsProblem.excluded_vocabulary_keys.

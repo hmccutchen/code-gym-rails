@@ -589,6 +589,17 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".narrow_vocabulary" do
+    it "returns the vocabulary unchanged for every kind, at any rung or none" do
+      vocabulary = %w[n_plus_one memoization]
+
+      described_class.all.each do |kind|
+        expect(kind.narrow_vocabulary(vocabulary)).to equal(vocabulary)
+        KindDifficulty::LEVELS.each { |rung| expect(kind.narrow_vocabulary(vocabulary, rung: rung)).to equal(vocabulary) }
+      end
+    end
+  end
+
   describe ".reject_unusable!" do
     it "leaves a section of a kind with nothing to refuse untouched" do
       section = { "question" => "" }

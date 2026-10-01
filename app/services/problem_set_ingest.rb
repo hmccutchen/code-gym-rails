@@ -93,11 +93,13 @@ class ProblemSetIngest
   end
 
   # What the generation prompt may offer a section, which is the validation
-  # vocabulary minus two narrowings:
+  # vocabulary minus three narrowings:
   #
   #   - code_review's content mode, which swaps the list wholesale
   #   - the kind's own excluded group, for concepts whose shape its format
   #     cannot express (see ExerciseSection.excluded_vocabulary_keys)
+  #   - the kind's own last say, which may depend on the rung
+  #     (see ExerciseSection.narrow_vocabulary)
   #
   # The narrowing is always a subset of what validation accepts, so no caller
   # can name a list ingest would then reject a concept from. Two callers rely
@@ -105,7 +107,7 @@ class ProblemSetIngest
   # section, and AiService#can_host?, for which sections a due retention check
   # may be annotated toward. Anything reading this must be asking what may be
   # *requested* — never what is valid on arrival, which is .vocabulary_for.
-  def self.selectable_vocabulary_for(section_key, language, mode: nil)
+  def self.selectable_vocabulary_for(section_key, language, mode: nil, rung: nil)
     vocabulary =
       if mode && section_key == ExerciseSection::CodeReview.key
         code_review_vocabulary(language, mode)
@@ -114,7 +116,8 @@ class ProblemSetIngest
       end
 
     excluded = excluded_concepts_for(section_key)
-    excluded.empty? ? vocabulary : vocabulary - excluded
+    remaining = excluded.empty? ? vocabulary : vocabulary - excluded
+    ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung)
   end
 
   # Only code_review's mode narrows this way. Subtracting the data-modeling
