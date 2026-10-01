@@ -16,6 +16,8 @@
   --button-bg: #5b47d6; --button-bg-hover: #4a37bd;
   --focus-ring: #4b37c2;
   --green: #116530; --red: #b42318; --yellow: #8a5a00;
+  --pattern-mask: url("gym-pattern-tile.png");
+  --pattern-tint: rgb(52, 97, 154); --pattern-opacity: .07;
   --code-bg: #f0f0f6;
   /* Form fields are identified by their border, so it has to reach 3:1. */
   --field-border: #7a7a92;

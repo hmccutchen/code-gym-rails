@@ -1,6 +1,16 @@
 require "rails_helper"
 
 RSpec.describe DisplayPreferences do
+  it "defaults the background pattern on and stores only an explicit off" do
+    expect(described_class.new({})["background_pattern"]).to eq("on")
+    expect(described_class.new(nil)["background_pattern"]).to eq("on")
+    expect(described_class.new("background_pattern" => "invalid")["background_pattern"]).to eq("on")
+    expect(described_class.sparse("background_pattern" => "on")).to eq({})
+    expect(described_class.sparse("background_pattern" => "off")).to eq("background_pattern" => "off")
+    expect(described_class.problems_with("background_pattern" => "off")).to be_empty
+    expect(described_class.problems_with("background_pattern" => false)).not_to be_empty
+  end
+
   it "lists each setting's default first, as the value an untouched user reads" do
     preferences = described_class.new({})
 

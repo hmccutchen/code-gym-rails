@@ -3,9 +3,8 @@ module DisplayPreferencesHelper
     @display_preferences ||= logged_in? ? DisplayPreferences.for(current_user) : DisplayPreferences.signed_out
   end
 
-  # A user who has chosen nothing gets none of the display machinery, so their
-  # pages stay exactly as they were. Setup always gets it, so a choice made
-  # there can apply before it is saved.
+  # Setup always links the optional stylesheets so a choice applies before
+  # it is saved. The default-on pattern's base styles live in the layout.
   def display_stylesheets?
     display_preferences.any? || content_for?(:display_controls)
   end

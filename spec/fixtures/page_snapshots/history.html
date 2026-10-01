@@ -26,12 +26,29 @@
       --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
       --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
       --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
+      --pattern-mask: url("/assets/gym-pattern-tile-dark-4382d7e8.png");
+      --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .08;
       /* iOS auto-zooms a focused input below 16px, which shifts the layout and
          doesn't cleanly restore. max() keeps the floor without overriding a
          user who has set a larger default. */
       --input-font-size: max(1rem, 16px);
     }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
+    /* Below the refresh indicator, outside the content it translates. */
+    #background-pattern {
+      display: none; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+      background-color: var(--pattern-tint); opacity: var(--pattern-opacity);
+      -webkit-mask-image: var(--pattern-mask); mask-image: var(--pattern-mask);
+      -webkit-mask-size: 288px; mask-size: 288px;
+      -webkit-mask-repeat: repeat; mask-repeat: repeat;
+      image-rendering: pixelated;
+    }
+    @supports (mask-image: url("")) or (-webkit-mask-image: url("")) {
+      #background-pattern { display: block; }
+    }
+    @media (prefers-contrast: more), (forced-colors: active) {
+      #background-pattern { display: none; }
+    }
     /* Browser behaviours that read as "web page" rather than "app" once the
        chrome around them is gone: the rubber-band bounce past the end of a
        page, and the grey flash on tap. Scoped to the installed app rather than
@@ -457,6 +474,7 @@
   </style>
 </head>
 <body>
+    <div id="background-pattern" aria-hidden="true"></div>
   <a class="skip-link" href="#main-content">Skip to content</a>
   <nav>
     <div class="container inner">

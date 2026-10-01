@@ -247,6 +247,11 @@ en:
       options:
         default: "Default"
         atkinson: "Atkinson Hyperlegible"
+    background_pattern:
+      legend: "Background pattern"
+      options:
+        "on": "On"
+        "off": "Off"
   sections:
     code_review:
       name: "Code Review"

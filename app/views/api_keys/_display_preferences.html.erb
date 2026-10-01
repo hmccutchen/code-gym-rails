@@ -50,6 +50,14 @@
       });
       const media = PALETTE[values.theme] || PALETTE_OFF;
       document.querySelectorAll("[data-light-palette-media]").forEach((element) => { element.media = media; });
+      const pattern = document.getElementById("background-pattern");
+      if (values.background_pattern === "off") pattern?.remove();
+      else if (!pattern) {
+        const layer = document.createElement("div");
+        layer.id = "background-pattern";
+        layer.setAttribute("aria-hidden", "true");
+        document.body.prepend(layer);
+      }
     };
 
     // One save in flight at a time, each sending what is chosen when it goes
