@@ -288,8 +288,14 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     JS
   end
 
+  # A design comparison's stored answer is written by its own pick and reason
+  # controls, so it is answered through them, as a person would.
   def fill_in_answer(field, text)
-    find(%(textarea[data-field="#{field}"])).fill_in(with: text)
+    comparison = first(%([data-comparison-answer="#{field}"]), minimum: 0)
+    return find(%(textarea[data-field="#{field}"])).fill_in(with: text) unless comparison
+
+    comparison.choose("Piece A")
+    comparison.find("textarea[data-comparison-reason]").fill_in(with: text)
   end
 
   def wait_for_saved_answer(user, field, text)
