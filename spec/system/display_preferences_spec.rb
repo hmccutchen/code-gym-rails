@@ -147,8 +147,11 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
 
     choose_display("theme", "light")
     expect(page).to have_css("nav .brand-mark")
-    Timeout.timeout(5) { sleep 0.05 while logo.call.include?("outlined") }
-    expect(logo.call).to match(%r{/logo-[0-9a-f]+\.png})
+    # currentSrc reads empty while the new source loads, so wait for the plain
+    # logo itself rather than for the outlined one to go.
+    plain_logo = %r{/logo-[0-9a-f]+\.png}
+    Timeout.timeout(5) { sleep 0.05 until logo.call.match?(plain_logo) }
+    expect(logo.call).to match(plain_logo)
 
     choose_display("theme", "dark")
     Timeout.timeout(5) { sleep 0.05 until logo.call.include?("outlined") }
