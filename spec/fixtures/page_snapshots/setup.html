@@ -27,12 +27,29 @@
       --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
       --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
       --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
+      --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .06;
       /* iOS auto-zooms a focused input below 16px, which shifts the layout and
          doesn't cleanly restore. max() keeps the floor without overriding a
          user who has set a larger default. */
       --input-font-size: max(1rem, 16px);
     }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
+    /* Below the refresh indicator, outside the content it translates. */
+    #background-pattern {
+      display: none; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+      background-color: var(--pattern-tint); opacity: var(--pattern-opacity);
+      -webkit-mask-image: url("/assets/gym-pattern-tile-bf068485.png");
+      mask-image: url("/assets/gym-pattern-tile-bf068485.png");
+      -webkit-mask-size: 288px; mask-size: 288px;
+      -webkit-mask-repeat: repeat; mask-repeat: repeat;
+      image-rendering: pixelated;
+    }
+    @supports (mask-image: url("")) or (-webkit-mask-image: url("")) {
+      #background-pattern { display: block; }
+    }
+    @media (prefers-contrast: more), (forced-colors: active) {
+      #background-pattern { display: none; }
+    }
     /* Browser behaviours that read as "web page" rather than "app" once the
        chrome around them is gone: the rubber-band bounce past the end of a
        page, and the grey flash on tap. Scoped to the installed app rather than
@@ -457,9 +474,10 @@
                    box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
   </style>
     <link rel="stylesheet" href="/assets/display-720262ba.css" />
-    <link rel="stylesheet" href="/assets/display_light-de3a1969.css" media="not all" data-light-palette-media="true" />
+    <link rel="stylesheet" href="/assets/display_light-a0f73cc1.css" media="not all" data-light-palette-media="true" />
 </head>
 <body>
+    <div id="background-pattern" aria-hidden="true"></div>
   <a class="skip-link" href="#main-content">Skip to content</a>
   <nav>
     <div class="container inner">
@@ -1107,6 +1125,19 @@
         </label>
         <p class="hint display-hint">Used for problems, hints, reviews, references and Learn pages. Code keeps its monospace font.</p>
     </fieldset>
+    <fieldset class="display-group">
+      <legend>Background pattern</legend>
+        <label>
+          <input type="radio" name="display_background_pattern" value="on" data-setting="background_pattern"
+                 checked>
+          On
+        </label>
+        <label>
+          <input type="radio" name="display_background_pattern" value="off" data-setting="background_pattern"
+                 >
+          Off
+        </label>
+    </fieldset>
 </details>
 
 <script>
@@ -1114,7 +1145,7 @@
     const box = document.getElementById("display-preferences");
     if (!box) return;
 
-    const DEFAULTS     = {"theme":"dark","text_size":"100","line_spacing":"default","font":"default"};
+    const DEFAULTS     = {"theme":"dark","text_size":"100","line_spacing":"default","font":"default","background_pattern":"on"};
     const PALETTE      = {"light":"all","device":"(prefers-color-scheme: light)"};
     const PALETTE_OFF  = "not all";
     const root = document.documentElement;
@@ -1135,6 +1166,14 @@
       });
       const media = PALETTE[values.theme] || PALETTE_OFF;
       document.querySelectorAll("[data-light-palette-media]").forEach((element) => { element.media = media; });
+      const pattern = document.getElementById("background-pattern");
+      if (values.background_pattern === "off") pattern?.remove();
+      else if (!pattern) {
+        const layer = document.createElement("div");
+        layer.id = "background-pattern";
+        layer.setAttribute("aria-hidden", "true");
+        document.body.prepend(layer);
+      }
     };
 
     // One save in flight at a time, each sending what is chosen when it goes

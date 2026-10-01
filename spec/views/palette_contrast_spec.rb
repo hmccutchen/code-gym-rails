@@ -65,6 +65,21 @@ RSpec.describe "palette contrast" do
   end
 
   shared_examples "an accessible palette" do
+    it "keeps text and focus indicators legible over a fully opaque pattern outline" do
+      tint = rgb(vars.fetch("pattern-tint")).join(",")
+      backdrop = over("rgba(#{tint},#{vars.fetch('pattern-opacity')})", vars["bg"])
+      backgrounds = {
+        "pattern" => backdrop,
+        "notice over pattern" => over(background_of(".flash.notice"), backdrop),
+        "alert over pattern" => over(background_of(".flash.alert"), backdrop)
+      }
+      %w[text accent-text muted green red yellow].each do |name|
+        result = ratios(vars[name], backgrounds)
+        expect(result.values).to all(be >= 4.5), "#{name}: #{result.inspect}"
+      end
+      expect(contrast(vars["focus-ring"], backdrop)).to be >= 3
+    end
+
     %w[text accent-text muted].each do |name|
       it "keeps --#{name} at 4.5:1 or more on every background it sits on" do
         result = ratios(vars[name], text_backgrounds(vars, code_background))

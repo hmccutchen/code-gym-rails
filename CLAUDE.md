@@ -1666,8 +1666,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `display-mode`, so `spec/requests/pwa_spec.rb` pins the stylesheet rule and
   `spec/system/pull_to_refresh_spec.rb` forces that rule on to drive the
   gesture.
-- **Display preferences**: theme (dark, light, match my device), text size
-  (100/112/125/140%), line spacing and a reading font (Atkinson Hyperlegible;
+- **Display preferences**: theme (dark, light, match my device), background
+  pattern (on/off), text size (100/112/125/140%), line spacing and a reading
+  font (Atkinson Hyperlegible;
   OpenDyslexic is deferred to #235, pending its license's rule on renamed and
   converted copies). They live in a Display disclosure on Setup and save
   through `PATCH /profile`. `DisplayPreferences` is the one list of choices,
@@ -1676,7 +1677,19 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the lists. Saves are chained one at a time because each carries the whole
   object.
 
-  **A user who has chosen nothing gets nothing new**: no attribute on
+  **The background pattern is deliberately on by default**, an exception to
+  display changes requiring an opt-in. The white, alpha-channel artwork in
+  `gym-pattern-tile.png` masks a fixed layer at a 288px repeat size, tinted
+  at 6% on dark and 5% on light. It sits outside `[data-pull-content]` and
+  below the refresh indicator, so neither scrolling nor the pull gesture
+  moves it. Off omits the layer from the response; Setup adds or removes it
+  immediately. High contrast and forced colors hide it, as does missing
+  mask support. Both standard and `-webkit-` mask declarations are present.
+  No migration: only an explicit `"background_pattern": "off"` is stored
+  in the existing sparse jsonb. `palette_contrast_spec` checks a fully
+  opaque outline, including through tinted backgrounds.
+
+  **The other display defaults remain unchanged**: no attribute on
   `<html>`, no stylesheet link, the same outlined logo, the same `black`
   status bar. A chosen value renders as a `data-*` attribute on `<html>` for
   the first paint. `display.css` holds text size, spacing and the font;

@@ -1,6 +1,6 @@
 # A user's display choices as plain values, and what the layout renders for
 # them. Each setting lists its default first. A default is never stored, so a
-# user who has changed nothing stores {} and the layout renders nothing new.
+# user who has changed nothing stores {}. The background pattern is on by default.
 #
 # Total by construction: a stored value outside OPTIONS reads as the default,
 # so bad data can never reach an attribute on <html>.
@@ -9,7 +9,8 @@ class DisplayPreferences
     "theme"        => %w[dark light device],
     "text_size"    => %w[100 112 125 140],
     "line_spacing" => %w[default relaxed loose],
-    "font"         => %w[default atkinson]
+    "font"         => %w[default atkinson],
+    "background_pattern" => %w[on off]
   }.freeze
 
   # The iOS home-screen app reads these when it launches. "black" is a solid

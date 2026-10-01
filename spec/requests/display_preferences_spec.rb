@@ -1,10 +1,36 @@
 require "rails_helper"
 
 # What the layout renders from a user's display preferences. A user who has
-# chosen nothing must get the page exactly as before: no attribute on <html>,
+# chosen nothing keeps the existing display defaults: no attribute on <html>,
 # no display stylesheet, the dark status bar and the outlined logo.
 RSpec.describe "Display preferences in the layout", type: :request do
   let(:user) { create_user_with_key }
+
+  it "renders the decorative pattern outside the moving content by default, including when signed out" do
+    [ login_path, history_path ].each do |path|
+      login_as(user) if path == history_path
+      get path
+      document = Nokogiri::HTML5(response.body)
+      expect(document.css("body > #background-pattern[aria-hidden='true']").size).to eq(1)
+      expect(document.css("[data-pull-content] #background-pattern")).to be_empty
+      expect(response.body).to match(%r{url\(["']?/assets/gym-pattern-tile-[a-f0-9]+\.png})
+    end
+  end
+
+  it "accepts off through the profile boundary and omits the layer even on Setup" do
+    login_as(user)
+    patch profile_path, params: { user: { display_preferences: { background_pattern: "off" } } }, as: :json
+    expect(response).to have_http_status(:ok)
+    expect(user.reload.display_preferences).to eq("background_pattern" => "off")
+    [ history_path, setup_path ].each do |path|
+      get path
+      expect(Nokogiri::HTML5(response.body).css("#background-pattern")).to be_empty
+    end
+
+    patch profile_path, params: { user: { display_preferences: { background_pattern: "on" } } }, as: :json
+    expect(response).to have_http_status(:ok)
+    expect(user.reload.display_preferences).to eq({})
+  end
 
   def html_tag
     response.body[/<html[^>]*>/]

@@ -26,6 +26,50 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     user.reload.display_preferences
   end
 
+  it "removes the pattern immediately and can restore it from an initially off page" do
+    open_display
+    expect(page).to have_css("#background-pattern", visible: :all)
+    choose_display("background_pattern", "off")
+    expect(page).to have_no_css("#background-pattern", visible: :all)
+    expect(stored { |values| values["background_pattern"] == "off" }).to eq("background_pattern" => "off")
+
+    visit setup_path
+    expect(page).to have_no_css("#background-pattern", visible: :all)
+    find("#display-preferences summary").click
+    choose_display("background_pattern", "on")
+    expect(page).to have_css("body > #background-pattern[aria-hidden='true']", visible: :all)
+    expect(stored(&:empty?)).to eq({})
+    visit history_path
+    expect(page).to have_css("#background-pattern", visible: :all)
+  end
+
+  it "keeps the mask fixed, repeated and below the refresh indicator without intercepting input" do
+    open_display
+    properties = page.evaluate_script(<<~JS)
+      (() => {
+        const s = getComputedStyle(document.getElementById("background-pattern"));
+        return [s.position, s.pointerEvents, s.zIndex, s.maskSize, s.maskRepeat, s.imageRendering, s.maskImage];
+      })()
+    JS
+    expect(properties.first(6)).to eq([ "fixed", "none", "-2", "288px", "repeat", "pixelated" ])
+    expect(properties.last).to include("gym-pattern-tile-")
+    page.execute_script("window.scrollTo(0, 400)")
+    expect(page.evaluate_script("document.getElementById('background-pattern').getBoundingClientRect().top")).to eq(0)
+    expect(page.evaluate_script("document.getElementById('background-pattern').closest('[data-pull-content]') === null")).to be(true)
+  end
+
+  it "hides the pattern when the device asks for more contrast or forced colors" do
+    open_display
+    page.driver.with_playwright_page do |pw|
+      pw.emulate_media(contrast: "more")
+      expect(page.evaluate_script("getComputedStyle(document.getElementById('background-pattern')).display")).to eq("none")
+      pw.emulate_media(contrast: "no-preference", forcedColors: "active")
+      expect(page.evaluate_script("getComputedStyle(document.getElementById('background-pattern')).display")).to eq("none")
+      pw.emulate_media(forcedColors: "none")
+      expect(page.evaluate_script("getComputedStyle(document.getElementById('background-pattern')).display")).to eq("block")
+    end
+  end
+
   it "applies each choice at once, saves it, and keeps it after a reload" do
     open_display
 
