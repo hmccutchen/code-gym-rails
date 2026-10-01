@@ -21,8 +21,8 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
 
     before { login_as(user) }
 
-    it "applies the preset: junior everywhere, unlocked, version bumped, nothing else touched" do
-      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+    it "applies the preset: junior everywhere, beginner skill, unlocked, version bumped, nothing else touched" do
+      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version)
 
       expect(response).to have_http_status(:ok)
@@ -32,7 +32,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.locked_section_kinds).to eq([])
       expect(user.section_kind_preferences_version).to eq(1)
       expect(response.parsed_body["section_kind_preferences_version"]).to eq(1)
-      expect(user.skill_level).to eq("developing")
+      expect(user.skill_level).to eq("beginner")
       expect(user.section_kind_weights).to eq({})
       expect(user.excluded_section_kinds).to eq([])
       expect(user.track_evidence_cutoffs).to eq({})
@@ -63,8 +63,20 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       it "refuses Junior with incomplete levels #{levels.inspect}, saving nothing" do
         original = user.reload.attributes
 
-        patch_profile(learning_track: "junior", name: "Not saved", section_kind_levels: levels,
+        patch_profile(learning_track: "junior", name: "Not saved", section_kind_levels: levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                       section_kind_preferences_version: user.section_kind_preferences_version)
+
+        expect_track_refused
+        expect(user.reload.attributes).to eq(original)
+      end
+    end
+
+    [ {}, { skill_level: "developing" }, { skill_level: "strong" } ].each do |skill|
+      it "refuses Junior without the beginner skill level #{skill.inspect}, saving nothing" do
+        original = user.reload.attributes
+
+        patch_profile({ learning_track: "junior", name: "Not saved", section_kind_levels: LearningTrack.preset_levels,
+                        section_kind_preferences_version: user.section_kind_preferences_version }.merge(skill))
 
         expect_track_refused
         expect(user.reload.attributes).to eq(original)
@@ -76,6 +88,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
 
       patch_profile(learning_track: "junior", name: "Not saved",
                     section_kind_levels: LearningTrack.preset_levels.merge("pattern" => "senior"),
+                    skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version)
 
       expect_track_refused
@@ -87,7 +100,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
         original = user.reload.attributes
 
         patch_profile({ learning_track: "junior", name: "Not saved",
-                        section_kind_levels: LearningTrack.preset_levels }.merge(version))
+                        section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL }.merge(version))
 
         expect_track_refused
         expect(user.reload.attributes).to eq(original)
@@ -98,7 +111,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       it "refuses an invalid track #{value.inspect} without saving the other fields" do
         original = user.reload.attributes
 
-        patch_profile(learning_track: value, name: "Not saved", section_kind_levels: LearningTrack.preset_levels)
+        patch_profile(learning_track: value, name: "Not saved", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL)
 
         expect_track_refused
         expect(user.reload.attributes).to eq(original)
@@ -117,7 +130,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       it "refuses Junior carrying #{label}, saving nothing" do
         original = user.reload.attributes
 
-        patch_profile({ learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+        patch_profile({ learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                         section_kind_preferences_version: user.section_kind_preferences_version }.merge(extra))
 
         expect_track_refused
@@ -140,7 +153,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
         original.call(*args)
       end
 
-      patch_profile(learning_track: "junior", name: "Not saved", section_kind_levels: LearningTrack.preset_levels,
+      patch_profile(learning_track: "junior", name: "Not saved", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version)
 
       expect_track_refused
@@ -154,7 +167,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
     it "refuses a valid first-run choice with a stale preference version without saving anything" do
       original = user.reload.attributes
 
-      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version - 1)
 
       expect(response).to have_http_status(:conflict)
@@ -169,7 +182,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       login_as(user)
       original = user.reload.attributes
 
-      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version)
 
       expect_track_refused
@@ -183,7 +196,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       login_as(user)
       original = user.reload.attributes
 
-      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels,
+      patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version)
 
       expect_track_refused
@@ -204,7 +217,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
 
   context "on the track" do
     let(:user) do
-      new_account.tap { |account| account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels) }
+      new_account.tap { |account| account.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL) }
     end
 
     before { login_as(user) }
@@ -246,6 +259,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       original = user.reload.attributes
 
       patch_profile(section_kind_levels: LearningTrack.preset_levels.merge("pattern" => "senior"),
+                    skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version - 1)
 
       expect(response).to have_http_status(:conflict)
@@ -259,6 +273,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
         version = user.section_kind_preferences_version
 
         patch_profile(section_kind_levels: LearningTrack.preset_levels.merge("pattern" => "senior"),
+                    skill_level: LearningTrack::START_SKILL_LEVEL,
                       section_kind_preferences_version: version)
 
         expect(response).to have_http_status(:ok)

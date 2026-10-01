@@ -192,7 +192,7 @@ class ProfileController < ApplicationController
   # A track choice writes the preset or the choice and nothing else, so a lock,
   # weight or target sent with it is refused rather than saved alongside it.
   TRACK_CHOICE_KEYS = {
-    LearningTrack::ON  => %w[learning_track section_kind_levels section_kind_preferences_version],
+    LearningTrack::ON  => %w[learning_track section_kind_levels skill_level section_kind_preferences_version],
     LearningTrack::OFF => %w[learning_track]
   }.freeze
 
@@ -202,6 +202,7 @@ class ProfileController < ApplicationController
     return true if (user_params.keys - TRACK_CHOICE_KEYS.fetch(user_params[:learning_track])).any?
     return false unless user_params[:learning_track] == LearningTrack::ON
     return true if user_params[:section_kind_preferences_version].nil?
+    return true unless user_params[:skill_level] == LearningTrack::START_SKILL_LEVEL
 
     levels = user_params[:section_kind_levels]
     !levels.respond_to?(:to_unsafe_h) || levels.to_unsafe_h != LearningTrack.preset_levels

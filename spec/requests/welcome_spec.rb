@@ -37,6 +37,7 @@ RSpec.describe "Welcome", type: :request do
     expect(response.body).to include("Early in my career", "Experienced")
     box = document.at_css("#welcome")
     expect(JSON.parse(box["data-preset"])).to eq(LearningTrack.preset_levels)
+    expect(box["data-skill-level"]).to eq("beginner")
     expect(box["data-version"]).to eq(user.section_kind_preferences_version.to_s)
     expect(box["data-profile-url"]).to eq(profile_path)
     expect(box["data-setup-url"]).to eq(setup_path)

@@ -440,8 +440,30 @@ RSpec.describe DailyPlan do
     end
   end
 
+  describe "SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL" do
+    # Exact for the same reason as the default: a beginner's 70/30 everyday
+    # and game split is the decision, with no job-adjacent days at all.
+    it "gives a beginner 70% everyday and 30% game and animation" do
+      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL).to eq("beginner" => { everyday: 0.7, game_and_animation: 0.3 })
+    end
+
+    it "keeps every other skill level on the default weights" do
+      (User::SKILL_LEVELS - %w[beginner]).each do |level|
+        expect(DailyPlan.scenario_flavor_weights_for(level)).to equal(DailyPlan::SCENARIO_FLAVOR_WEIGHTS)
+      end
+    end
+  end
+
   describe "#scenario_flavor on the plan" do
     let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
+
+    it "rolls a beginner's flavor from the beginner weights" do
+      user.update!(skill_level: "beginner")
+      allow(WeightedRoll).to receive(:pick).and_call_original
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.fetch("beginner")).and_return(:everyday)
+
+      expect(DailyPlan.for(user, language: "ruby_rails").scenario_flavor).to eq(:everyday)
+    end
 
     it "is carried on the Result from its own roll, on any language" do
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)

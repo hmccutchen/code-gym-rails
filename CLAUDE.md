@@ -342,8 +342,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   preference version. Under the user-row lock, the endpoint requires both
   that version and the exact registry-derived preset; an incomplete or
   mismatched choice saves nothing. The new-account targets are unlocked so
-  ordinary easing still applies. `skill_level` stays untouched: targets already express the
-  choice without changing the profile's separate scale. Experienced records
+  ordinary easing still applies. Junior also sets `skill_level` to
+  `LearningTrack::START_SKILL_LEVEL` (`beginner`), and the endpoint refuses a
+  junior choice without it, like any other mismatch with the preset. Targets
+  already decide every kind's rung, so the skill level changes the generation
+  prompt's profile line and which scenario pools the day rolls from (see
+  "Scenario flavor" below), never a rung. Nothing resets it: after a kind steps up to
+  senior, or after leaving the track, the profile still says beginner until
+  the user changes it on Setup. Experienced records
   `"none"` without changing targets. Existing accounts are not enrolled or
   prompted, and joining after the first-run choice is refused.
 
@@ -840,9 +846,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   rather than restating them, so the prompt cannot offer a verdict the
   boundary would refuse.
 - **Scenario flavor**: the business setting every section's `scenario` is dressed
-  in comes from one prompt line, and that line now offers one of two pools
-  (`AiService::SCENARIO_POOLS`): the general, job-adjacent `SCENARIO_DOMAINS`
-  or `GAME_AND_ANIMATION_SCENARIO_DOMAINS` — a platformer's save-state store,
+  in comes from one prompt line, and that line offers one pool from
+  `AiService::SCENARIO_POOLS`. Most days choose between two: the general,
+  job-adjacent `SCENARIO_DOMAINS` and `GAME_AND_ANIMATION_SCENARIO_DOMAINS` — a platformer's save-state store,
   a level editor's undo stack, an animation timeline's keyframe editor.
   `DailyPlan` rolls which pool once per day (`SCENARIO_FLAVOR_WEIGHTS`, 70%
   game and animation) and carries it on `Result#scenario_flavor`; the prompt
@@ -852,6 +858,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   decide or record it. The 30% is a floor, not a placeholder — an exclusive
   pool relocates the staleness this fixes into a smaller fixed pool, and a
   familiar setting starts to predict the bug.
+
+  **A beginner gets everyday settings instead of job-adjacent ones.**
+  `DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL` gives `beginner` 70%
+  `EVERYDAY_SCENARIO_DOMAINS` (a shared grocery list, a gym workout log, a
+  library checkout) and 30% game and animation, and never the general pool:
+  webhooks, tenants and invoice runs assume someone already works in
+  software, which a career changer does not. Every other skill level keeps the
+  default weights. The everyday pool's own rule asks for plain words with no
+  back-office terms, and it carries no legacy GraphQL clause, the one piece of
+  industry framing the other two pools share. It is keyed on skill level, a
+  difficulty setting, because generation never reads learning-track state;
+  joining the junior track is what sets beginner. A spec holds the pool's
+  entries clear of back-office words, as it holds the game pool clear of
+  game internals.
 
   **Flavor is setting only, never a source of concepts.** The tagged concept
   and the planted issue still come from each section's own vocabulary, and
@@ -1105,9 +1125,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
 - **Skill level control**: Setup's "Skill level" select is the only page
   that edits `User#skill_level`, and it autosaves through `PATCH /profile`,
   which refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
-  profile's prompt line and, through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`,
-  the rung of every kind without its own target; nothing changes it
-  automatically, and daily ratings still nudge each set around it. It is not
+  profile's prompt line, the rung of every kind without its own target
+  (through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`), and, for `beginner`, the
+  scenario pools the day rolls from
+  (`DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL`). Joining the junior track
+  sets it to `beginner`; nothing else changes it automatically, and daily
+  ratings still nudge each set around it. It is not
   part of the Exercise mix, so it does not bump
   `section_kind_preferences_version`. No migration set a value: existing
   accounts keep the `developing` default until they choose otherwise, since a
