@@ -24,15 +24,15 @@ class SectionCount
     (mean.round + STRETCH).clamp(FLOOR, ceiling)
   end
 
-  # A drop counts only when every delivered section was answered, so a dropped
-  # section never stands in for one the engineer saw and skipped.
+  # A drop fills in for an unanswered delivered section, up to the delivered
+  # count, so the judge removing a section does not shorten tomorrow. A day
+  # with nothing answered earns nothing: a drop cannot turn an untouched day
+  # into finished work.
   def self.credited_sections(entry)
     answered = entry.answered.to_i
-    delivered = entry.delivered_section_keys.size
+    return 0 if answered.zero?
 
-    return answered unless answered >= delivered
-
-    [ answered + entry.dropped, delivered ].min
+    [ answered + entry.dropped, entry.delivered_section_keys.size ].min
   end
   private_class_method :credited_sections
 

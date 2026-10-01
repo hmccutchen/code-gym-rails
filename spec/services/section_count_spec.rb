@@ -62,11 +62,11 @@ RSpec.describe SectionCount do
   end
 
   describe "with dropped sections" do
-    it "counts only answered sections when a delivered section was left unanswered" do
+    it "lets a drop stand in for a delivered section left unanswered" do
       partial = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
         delivered_section_keys: %w[code_review pattern challenge], answered: 2, dropped: 1)
 
-      expect(described_class.send(:credited_sections, partial)).to eq(2)
+      expect(described_class.send(:credited_sections, partial)).to eq(3)
     end
 
     it "credits a drop when every delivered section was answered" do
@@ -83,11 +83,19 @@ RSpec.describe SectionCount do
       expect(described_class.send(:credited_sections, no_response)).to eq(0)
     end
 
-    it "counts only the answered section when some delivered sections were dropped" do
+    it "treats a day with nothing answered as zero credit even when sections were dropped" do
+      untouched = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
+        delivered_section_keys: %w[code_review pattern challenge], answered: 0, dropped: 1)
+
+      expect(described_class.send(:credited_sections, untouched)).to eq(0)
+    end
+
+    it "never credits more than the delivered sections" do
       capped = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
         delivered_section_keys: %w[code_review pattern], answered: 1, dropped: 2)
 
-      expect(described_class.for([ capped, capped, capped ])).to eq(2)
+      expect(described_class.send(:credited_sections, capped)).to eq(2)
+      expect(described_class.for([ capped, capped, capped ])).to eq(3)
     end
 
     it "can shorten tomorrow when more sections were dropped than the engineer left unanswered" do
@@ -97,14 +105,14 @@ RSpec.describe SectionCount do
       expect(described_class.for([ half_delivered, half_delivered, half_delivered ])).to eq(3)
     end
 
-    it "can lower tomorrow when dropped sections no longer mask skipped delivered work" do
+    it "sizes a day with a drop and one skipped section like a fully answered one" do
       full  = exercise_history_entry(section_keys: %w[code_review pattern challenge],
         delivered_section_keys: %w[code_review pattern challenge],
         answered: 3, dropped: 0)
       short = exercise_history_entry(section_keys: %w[code_review pattern challenge plan_review],
         delivered_section_keys: %w[code_review pattern challenge], answered: 2, dropped: 1)
 
-      expect(described_class.for([ short, short, full ])).to be < described_class.for([ full, full, full ])
+      expect(described_class.for([ short, short, full ])).to eq(described_class.for([ full, full, full ]))
     end
 
     it "lets no-response rows count as zero in tomorrow's section count" do
