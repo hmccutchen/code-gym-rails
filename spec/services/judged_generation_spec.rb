@@ -175,6 +175,10 @@ RSpec.describe JudgedGeneration do
 
     expect(retry_calls.map { |call| call[3] }).to eq(%w[pattern pattern])
     expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 2, dropped: false)
+    # The first retry was rejected; nothing of that attempt may describe the
+    # section that shipped.
+    expect(judged.outcomes["pattern"]).to include(retry_principle: nil)
+    expect(judged.outcomes["pattern"]).not_to include(:retry_evidence, :retry_reason)
   end
 
   it "drops a section once every retry its kind allows is rejected" do

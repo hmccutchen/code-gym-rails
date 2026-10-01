@@ -526,11 +526,19 @@ RSpec.describe ExerciseSection do
     end
   end
 
-  describe ".slot_count" do
-    it "matches a fully populated plan, so the ceiling and the roster cannot drift" do
-      full = described_class.for_plan(third: :challenge, fourth: :plan_review)
+  describe ".slots" do
+    # A kind in two slots would resolve twice and count twice in every
+    # denominator.
+    it "places each kind in exactly one slot" do
+      expect(described_class.slots.values.flatten).to match_array(described_class.all)
+    end
+  end
 
-      expect(described_class.slot_count).to eq(full.size)
+  describe ".resolved_keys" do
+    it "never presents more sections than a day holds, even when the provider returns every shape" do
+      every_shape = described_class.keys.index_with { {} }
+
+      expect(described_class.resolved_keys(every_shape).size).to be <= described_class::MAX_SECTIONS
     end
   end
 

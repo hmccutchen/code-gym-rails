@@ -14,7 +14,7 @@ class ExerciseSection
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80
 
-  # The most sections one day holds. Its own fact rather than slot_count:
+  # The most sections one day holds. Its own fact rather than the slot count:
   # a second fixed kind adds a slot without making a day longer.
   MAX_SECTIONS = 4
 
@@ -82,10 +82,6 @@ class ExerciseSection
   def self.slots
     fixed.to_h { |kind| [ kind.key.to_sym, [ kind ] ] }
       .merge(pattern: [ Pattern ], third: thirds, fourth: fourths)
-  end
-
-  def self.slot_count
-    slots.size
   end
 
   # Every field any kind keeps as answer key: data the grader reads and
@@ -266,7 +262,7 @@ class ExerciseSection
     end
 
     # Whether the judge may drop this kind from the day rather than ship a
-    # section it rejected twice. A day reads fine without any one of these.
+    # section whose last retry it rejected. A day reads fine without any one of these.
     def droppable?
       true
     end

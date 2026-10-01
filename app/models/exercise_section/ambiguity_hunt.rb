@@ -98,7 +98,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     <<~CONTEXT.chomp
       Ambiguity Hunt (#{section["title"]}): #{section["question"]}
       Request: #{section["request"]}
-      Planted ambiguities (hidden from the engineer, known here for grading): #{Array(section["planted_ambiguities"]).join('; ')}
+      Planted ambiguities (hidden from the engineer, known here for grading): #{Array(section[PLANTED_FIELD]).join('; ')}
       #{answer_lines(answer, rating)}
     CONTEXT
   end

@@ -19,8 +19,8 @@
 class ProblemSetIngest
   # Facts about a section that the server knows and the provider does not: the
   # rung asked for, whether the prompt was told to ease it, which real excerpt
-  # it was grounded in, and whether the judge rejected it twice and it shipped
-  # anyway. A provider copy of any of them is stripped from every section on
+  # it was grounded in, and whether the judge rejected its last retry and it
+  # shipped anyway. A provider copy of any of them is stripped from every section on
   # every call, so none can be forged. `anchored` is stamped after ingest, by
   # the judged path, and is listed here because the strip is the guarantee.
   #
@@ -117,7 +117,7 @@ class ProblemSetIngest
 
     excluded = excluded_concepts_for(section_key)
     remaining = excluded.empty? ? vocabulary : vocabulary - excluded
-    ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung)
+    ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung) & remaining
   end
 
   # Only code_review's mode narrows this way. Subtracting the data-modeling

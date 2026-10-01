@@ -139,9 +139,12 @@ class JudgedGeneration
 
   # Returns [section, outcome, settled]; settled is false only when the judge
   # rejected the retry.
+  # Each attempt starts from a clean retry record, so an outcome never mixes
+  # one attempt's principle with another's issues.
   def rejudge(kind, retried, outcome)
     verdict, latency = judge_with_fallback(kind, retried)
-    outcome = outcome.merge(retries: outcome[:retries] + 1, latency_ms: outcome[:latency_ms] + latency)
+    outcome = outcome.except(:retry_issues, :retry_evidence, :retry_reason)
+                     .merge(retry_principle: nil, retries: outcome[:retries] + 1, latency_ms: outcome[:latency_ms] + latency)
     return [ retried, outcome.merge(status: :keep, fallback: verdict), true ] if verdict.is_a?(String)
 
     summary = judgment(verdict)
