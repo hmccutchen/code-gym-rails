@@ -13,11 +13,17 @@
       const result = await window.CodeGymSaveStatus.save("PATCH", box.dataset.profileUrl,
         { user: { learning_track: "none" } }, "learning_track");
       // A reload could cancel the Exercise mix's delayed save or hide its failure.
+      // The key guide renders only for a track user, so it goes too, and the
+      // confirmation takes focus because the button that had it is removed.
       if (result && result.ok) {
+        document.querySelector(".key-guide")?.remove();
         const line = document.createElement("p");
         line.className = "hint";
+        line.setAttribute("role", "status");
+        line.tabIndex = -1;
         line.textContent = box.dataset.leftText;
         box.replaceChildren(line);
+        line.focus();
       } else {
         button.disabled = false;
       }

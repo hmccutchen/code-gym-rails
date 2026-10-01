@@ -70,6 +70,18 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(proposed_kinds).to match_array(ExerciseSection.keys - [ "code_review" ])
   end
 
+  it "names each section in its keep-at-junior button's accessible name" do
+    user = track_user(LearningTrack.preset_levels.merge("code_review" => "senior"))
+    reviewed_day(user, Date.current, { "code_review" => "senior" })
+    login_as(user)
+
+    get root_path
+
+    labels = Nokogiri::HTML(response.body).css("#track-proposal [data-remove-step]").map { |button| button["aria-label"] }
+    expected = (ExerciseSection.keys - [ "code_review" ]).map { |key| "Keep #{I18n.t("sections.#{key}.name")} at junior" }
+    expect(labels).to match_array(expected)
+  end
+
   it "derives the led heading from the registry rather than a named kind" do
     user = track_user(LearningTrack.preset_levels.merge("pattern" => "senior"))
     reviewed_day(user, Date.current, { "code_review" => "junior" })

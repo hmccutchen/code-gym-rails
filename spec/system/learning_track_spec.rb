@@ -41,6 +41,24 @@ RSpec.describe "Leaving the learning track", type: :system do
     end
   end
 
+  def focused(attribute)
+    page.evaluate_script("document.activeElement.getAttribute(#{attribute.to_json})")
+  end
+
+  # The guide renders only for a track user, so it goes with the track, and
+  # the confirmation takes focus because the button that had it is removed.
+  it "removes the key guide and moves focus to an announced confirmation" do
+    expect(page).to have_css(".key-guide")
+
+    click_button "Leave the track"
+
+    expect(page).to have_css("#learning-track [role='status']", text: "You've left the junior track")
+    expect(page).not_to have_css(".key-guide")
+    expect(focused("role")).to eq("status")
+    expect(page.evaluate_script("document.activeElement.textContent")).to include("You've left the junior track")
+    expect_same_page
+  end
+
   it "reports a failed leave without navigating or changing stored settings" do
     page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
 

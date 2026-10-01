@@ -55,6 +55,17 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect_same_page
   end
 
+  def focused_text
+    page.evaluate_script("document.activeElement.getAttribute('role') + ': ' + document.activeElement.textContent")
+  end
+
+  # The buttons that had focus are removed, so the confirmation takes it.
+  it "moves focus to an announced confirmation after Apply" do
+    within("#track-proposal") { click_button "Apply" }
+    expect(page).to have_css("#track-proposal [role='status']", text: "Done. Your next sets use the new level.")
+    expect(focused_text).to eq("status: Done. Your next sets use the new level.")
+  end
+
   it "sets aside the whole original bundle without changing levels or navigating" do
     original_levels = user.section_kind_levels
     remove("architecture")
@@ -62,6 +73,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     within("#track-proposal") { click_button "Not now" }
 
     expect(page).to have_css("#track-proposal", text: "Okay. This comes back once there's more to go on.")
+    expect(focused_text).to eq("status: Okay. This comes back once there's more to go on.")
     expect(user.reload.section_kind_levels).to eq(original_levels)
     expect(user.track_evidence_cutoffs.keys).to match_array(ExerciseSection.keys - [ "code_review" ])
     expect_same_page
@@ -89,6 +101,28 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect(page).to have_button("Not now", disabled: false)
     expect(page).to have_button("Apply", disabled: true)
     expect_same_page
+  end
+
+  # A save that never finishes must not strand the proposal with every button
+  # disabled. Timers run at once so the ten-second wait passes immediately.
+  it "offers a manual reload when another save is still pending at the wait limit" do
+    page.execute_script(<<~JS)
+      window.CodeGymSaveStatus.watch(() => true);
+      const originalSetTimeout = window.setTimeout;
+      window.setTimeout = (callback, _delay, ...args) => originalSetTimeout(callback, 0, ...args);
+    JS
+    user.update!(locked_section_kinds: [ "pattern" ])
+
+    within("#track-proposal") { click_button "Apply" }
+
+    expect(page).to have_css("#track-proposal [role='status']", text: "Your settings changed in another tab")
+    expect(page).to have_button("Reload", disabled: false)
+    expect(page.evaluate_script("document.activeElement.getAttribute('role')")).to eq("status")
+    expect_same_page
+
+    click_button "Reload"
+    page.driver.with_playwright_page { |pw| pw.wait_for_function("window.proposalPage === undefined") }
+    expect(page).to have_css("#track-proposal")
   end
 
   it "waits for registered pending saves before reloading a stale Apply" do

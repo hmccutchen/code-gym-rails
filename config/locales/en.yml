@@ -36,10 +36,13 @@ en:
       led_no_results: "%{kind} — not enough sections to judge on its own yet"
       led_with_results: "%{kind} — none of your recent sections felt too hard"
       remove: "Keep at junior"
+      remove_label: "Keep %{kind} at junior"
       apply: "Apply"
       not_now: "Not now"
       applied: "Done. Your next sets use the new level."
       dismissed: "Okay. This comes back once there's more to go on."
+      stranded: "Your settings changed in another tab, and another save on this page is still running. Reload once it finishes to see the current suggestion."
+      reload: "Reload"
       invalid: "Those sections can't be set aside."
     welcome:
       title: "Before you start"
