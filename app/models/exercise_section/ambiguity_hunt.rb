@@ -10,10 +10,9 @@
 # leaves unsaid is the whole exercise, and an unfamiliar business setting
 # would add a second thing to work out first — the burden this kind removes.
 class ExerciseSection::AmbiguityHunt < ExerciseSection
-  # Fixed, not a range: the review prompt must always know exactly how many
-  # ambiguities were planted to grade coverage against. 4 sits at the
-  # midpoint of the 3-5 range considered — few enough to find in one sitting,
-  # enough to force real coverage judgment.
+  # The generator's target, not a bound: 4 sits at the midpoint of the 3-5
+  # range considered — few enough to find in one sitting, enough to force
+  # real coverage judgment.
   PLANTED_COUNT = 4
 
   # What the planted list is bounded to on ingest, as opposed to what the

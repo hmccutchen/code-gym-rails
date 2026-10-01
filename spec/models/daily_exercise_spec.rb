@@ -120,7 +120,7 @@ RSpec.describe DailyExercise, type: :model do
     end
 
     # The count the user sees is the count of sections on screen, not of raw
-    # payload keys — FakeService persists all eight deliberately, and a real
+    # payload keys — FakeService persists all nine deliberately, and a real
     # provider can return an extra alternate third or fourth.
     it "counts only the precedence-resolved third and fourth when a payload holds several" do
       exercise = DailyExercise.new(problem_set: {

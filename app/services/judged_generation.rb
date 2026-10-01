@@ -5,9 +5,8 @@
 # to the kind's judge_retries regenerations of that section, unless the
 # drafted concept normalized to "other", which is rejected directly rather
 # than spending a retry on an unusable tag. Rejecting the last retry drops the
-# section. A judge that fails or
-# answers invalidly leaves the draft unedited: the judge is never why a day
-# has no set. The finish step runs last so its logs describe the final set.
+# section. A judge that fails or answers invalidly leaves the draft unedited:
+# the judge is never why a day has no set. The finish step runs last so its logs describe the final set.
 #
 # The retries fan out the way the judging does, so a day with three of them
 # waits for the slowest rather than their sum — serially they ran a full
