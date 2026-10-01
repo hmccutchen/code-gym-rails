@@ -352,48 +352,41 @@ RSpec.describe GeminiService do
       service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
     end
 
-    # The Interactions API response has no stop/finish-reason field to read
-    # (unlike Claude's stop_reason), so without this call_and_log's
-    # truncation check would be silently always-false for Gemini — a capped
-    # call that actually got cut off would come back as a normal, un-flagged
-    # response instead of raising AiService::TruncatedResponseError.
-    it "reports truncated when a capped call's output lands at or past the requested ceiling" do
-      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
-        body: {
-          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "cut off mid" } ] } ],
-          "usage" => { "total_output_tokens" => 150 }
-        }.to_json)
-      fake_conn = instance_double(Faraday::Connection, post: fake_response)
-      service.instance_variable_set(:@conn, fake_conn)
-
-      result = service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
-      expect(result[:truncated]).to be(true)
+    # Truncation comes from the interaction's own status. The API documents
+    # "incomplete" as completed with incomplete results, hitting max_tokens
+    # being one cause. Token counts are not read at all: a live call capped at
+    # 60 stopped at 56 output tokens with status "incomplete", which the old
+    # output-reached-the-cap rule reported as complete.
+    def gemini_reply(status:, output_tokens:)
+      body = {
+        "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "a reply" } ] } ],
+        "usage" => { "total_output_tokens" => output_tokens }
+      }
+      body["status"] = status if status
+      instance_double(Faraday::Response, success?: true, status: 200, body: body.to_json)
     end
 
-    it "does not report truncated when a capped call finishes under the ceiling" do
-      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
-        body: {
-          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "a short reply" } ] } ],
-          "usage" => { "total_output_tokens" => 40 }
-        }.to_json)
-      fake_conn = instance_double(Faraday::Connection, post: fake_response)
-      service.instance_variable_set(:@conn, fake_conn)
-
-      result = service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
-      expect(result[:truncated]).to be(false)
+    def truncated_for(status:, output_tokens:, max_tokens: nil)
+      reply = gemini_reply(status: status, output_tokens: output_tokens)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: reply))
+      service.send(:call, system: "sys", prompt: "p", max_tokens: max_tokens)[:truncated]
     end
 
-    it "never reports truncated on an uncapped call, regardless of output size" do
-      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
-        body: {
-          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "a very long reply" } ] } ],
-          "usage" => { "total_output_tokens" => 50_000 }
-        }.to_json)
-      fake_conn = instance_double(Faraday::Connection, post: fake_response)
-      service.instance_variable_set(:@conn, fake_conn)
+    it "reports an incomplete reply as truncated even below the cap" do
+      expect(truncated_for(status: "incomplete", output_tokens: 56, max_tokens: 60)).to be(true)
+    end
 
-      result = service.send(:call, system: "sys", prompt: "p")
-      expect(result[:truncated]).to be(false)
+    it "does not report a completed reply as truncated even at or above the cap" do
+      expect(truncated_for(status: "completed", output_tokens: 60, max_tokens: 60)).to be(false)
+      expect(truncated_for(status: "completed", output_tokens: 75, max_tokens: 60)).to be(false)
+    end
+
+    it "reports an uncapped incomplete reply as truncated" do
+      expect(truncated_for(status: "incomplete", output_tokens: 50_000)).to be(true)
+    end
+
+    it "does not fall back to token counts when the status is missing" do
+      expect(truncated_for(status: nil, output_tokens: 60, max_tokens: 60)).to be(false)
     end
 
     it "raises AiService::Error on a non-success response" do

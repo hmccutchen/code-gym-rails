@@ -111,15 +111,11 @@ class GeminiService < AiService
       model:         body[:model],
       cache_read_tokens:  cached_tokens,
       cache_write_tokens: 0,
-      # The Interactions API response carries no explicit stop/finish-reason
-      # field (unlike Claude's stop_reason) — without this, call_and_log's
-      # truncation check is silently always false here. A capped call (e.g.
-      # AiService::DUCK_RESPONSE_MAX_TOKENS) that actually hits its ceiling
-      # is inferred from output landing at or past what was requested, so a
-      # Gemini user gets the same clean truncation error a Claude user would
-      # instead of a silently cut-off reply. Uncapped calls (max_tokens nil)
-      # never flag truncated, matching their pre-existing behavior.
-      truncated: max_tokens.present? && output_tokens.to_i >= max_tokens
+      # The API documents "incomplete" as completed with incomplete results,
+      # hitting max_tokens being one cause, so the status decides and token
+      # counts are not consulted: a live call capped at 60 stopped at 56
+      # output tokens with this status.
+      truncated: parsed["status"] == "incomplete"
     }
   rescue Faraday::Error => e
     error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error

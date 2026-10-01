@@ -364,7 +364,7 @@ RSpec.describe AiService do
 
       expect {
         svc.generate_exercise(user)
-      }.to raise_error(AiService::TruncatedResponseError, /output token limit \(\d+ output tokens, thinking included\)/i)
+      }.to raise_error(AiService::TruncatedResponseError, /did not finish its reply \(\d+ output tokens, thinking included\)/i)
     end
 
     it "records usage before raising on a prose entry point too" do
