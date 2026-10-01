@@ -60,7 +60,7 @@ class ExerciseSection::Pattern < ExerciseSection
 
   def self.grading_note(section:, answer:)
     "Main point: the structure the problem calls for.\n" \
-    "Essential pieces: each part the answer scaffold names, such as the interface and what is easy to get wrong.\n" \
+    "Essential pieces: each part this problem's answer scaffold names (#{scaffold_labels(section).map { |label| label.delete_suffix(':') }.join('; ')}), whether or not the answer kept the labels.\n" \
     "For \"pattern\", improved_code must show the refactored structure that addresses what they missed — " \
     "the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \
     "structural; show enough of the shape to make the structure obvious."

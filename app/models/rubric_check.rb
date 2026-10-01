@@ -7,9 +7,9 @@ class RubricCheck
   GAPPED_RATINGS   = DailyResponse::AI_RATING_UNFAVORABLE
 
   def initialize(review)
-    @rating = review["rating"]
-    @missed = DailyResponse.review_points(review["missed"])
-    @raw    = review["essential_gaps"]
+    @rating       = review["rating"]
+    @missed_count = missed_entries(review["missed"])
+    @raw          = review["essential_gaps"]
   end
 
   # Sorted, distinct positions in "missed", or nil when the grader's list
@@ -31,11 +31,22 @@ class RubricCheck
     end
   end
 
-  def missed_count = @missed.size
+  attr_reader :missed_count
 
   private
 
+  # Counted as the grader returned it, blanks included, since its positions
+  # number that list and that list is what is stored. An older review's single
+  # string is one entry.
+  def missed_entries(missed)
+    case missed
+    when Array  then missed.size
+    when String then missed.strip.empty? ? 0 : 1
+    else 0
+    end
+  end
+
   def readable_gaps?
-    @raw.is_a?(Array) && @raw.all? { |position| position.is_a?(Integer) && position.between?(0, @missed.size - 1) }
+    @raw.is_a?(Array) && @raw.all? { |position| position.is_a?(Integer) && position.between?(0, @missed_count - 1) }
   end
 end

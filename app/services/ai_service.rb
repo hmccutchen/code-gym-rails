@@ -333,7 +333,7 @@ class AiService
   # pieces; none restates these levels. RubricCheck reads the essential_gaps
   # the grader returns against them.
   RATING_RUBRIC = <<~RUBRIC.chomp.freeze
-    How to choose "rating": rate the answer against the level its section was pitched at, which is stated with the section, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Each section's grading note says what its main point and its essential pieces are.
+    How to choose "rating": rate the answer against the level its section was pitched at, which is stated with the section, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
     - "beginner": missed the main point of the section.
     - "developing": found the main point, but missed or misexplained at least one essential piece.
     - "solid": no essential misses.
@@ -341,11 +341,13 @@ class AiService
     The rating must agree with "missed": when "missed" names an essential gap, the rating is not "solid" or "strong". When a section's grading note says its rating is already fixed, that note wins.
   RUBRIC
 
-  # Reviews graded before this point had no rubric, so their ratings answer a
-  # different question. Evidence readers that compare ratings to a bar opt in
-  # by reading only responses submitted at or after it; ConceptMastery,
-  # RungLedger and TrackGraduation deliberately read all history.
-  RUBRIC_INTRODUCED_AT = Time.utc(2026, 10, 2, 12).freeze
+  # Stamped into every review this prompt grades (ai_review[section]["rubric"]).
+  # A review without it was graded with no rubric, so its rating answers a
+  # different question; an evidence reader that compares ratings to a bar
+  # reads only stamped reviews. A stamp rather than a date because grading
+  # knows which prompt it ran, and a date misfiles a review retried after a
+  # deploy. Raise it when RATING_RUBRIC changes what a rating means.
+  RUBRIC_VERSION = 1
 
   PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT = <<~PROMPT.chomp
     You are reviewing an engineer's PSEUDOCODE plan before any code exists. They
@@ -2524,18 +2526,18 @@ class AiService
     PROMPT
   end
 
-  # The rung only, never `eased`: the rubric rates against the level, and an
-  # eased section was still pitched at its rung. A section generated before
-  # stamps existed falls back to the profile's rung, read with the same
-  # lowest-rung default KindDifficulty#rung_for uses.
+  # The rung only, never `eased`; the rubric grades an eased problem on what
+  # it actually asks. A section generated before stamps existed falls back to
+  # the rung generation would pick for it today.
   def pitch_line(exercise, daily_response, section)
     stamped = exercise.problem_set.dig(section, "pitched_at")
-    rung = KindDifficulty::LEVELS.include?(stamped) ? stamped : profile_rung(daily_response.user || exercise.user)
+    rung = KindDifficulty::LEVELS.include?(stamped) ? stamped : current_rung(daily_response.user || exercise.user, section)
     "#{rung} — #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}"
   end
 
-  def profile_rung(user)
-    KindDifficulty::RUNG_FOR_SKILL_LEVEL.fetch(user&.skill_level, KindDifficulty::LEVELS.first)
+  def current_rung(user, section)
+    difficulty = user ? KindDifficulty.for(user) : KindDifficulty.none
+    difficulty.rung_for(ExerciseSection.for(section), skill_level: user&.skill_level)
   end
 
   def improved_code_instruction(section)
@@ -2681,29 +2683,48 @@ class AiService
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
       cache_system: true, read_timeout: REVIEW_READ_TIMEOUT
     )
-    # graded_prose is server-owned: only the prose judge's edit writes it.
-    review = service.send(:parse_json_object, result[:text], subject: "#{section} review").except(ReviewProseVerdict::ORIGINAL_KEY)
-    review = service.send(:override_parsons_section_rating!, review, exercise, daily_response) if section == "parsons_problem"
-    review = service.send(:checked_against_rubric, user, section, review)
-    review = service.send(:judged_review, user, exercise, section, review)
+    # graded_prose and the rubric stamp are server-owned: only the prose
+    # judge's edit writes the first, and only this line the second.
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+                    .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
+    review = service.send(:rated, user, exercise, daily_response, section, review)
+    review = service.send(:gaps_beside_their_prose, service.send(:judged_review, user, exercise, section, review))
     [ section, { ok: true, review: review } ]
   rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
   end
 
-  # Runs before the prose judge, whose merges would renumber "missed"; an
-  # edited review's positions therefore refer to its graded_prose. Positions it
-  # cannot read are dropped rather than stored, and so are any on a kind that
-  # computes its own rating. The log carries counts and vocabulary words only.
-  def checked_against_rubric(user, section, review)
-    return review.except("essential_gaps") if ExerciseSection.for(section).rating_fixed?
+  # A kind that computes its own rating replaces the grader's, and the
+  # grader's essential_gaps then describe a rating nobody kept. Every other
+  # rating is checked against the rubric.
+  def rated(user, exercise, daily_response, section, review)
+    fixed = ExerciseSection.for(section).fixed_rating(
+      section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
+    )
+    return review.merge("rating" => fixed).except("essential_gaps") if fixed
 
+    checked_against_rubric(user, section, review)
+  end
+
+  # Runs before the prose judge, whose merges would renumber "missed".
+  # Positions it cannot read are dropped rather than stored. The log carries
+  # counts and vocabulary words only.
+  def checked_against_rubric(user, section, review)
     check  = RubricCheck.new(review)
     rating = ConceptMastery::AI_RATING_RANK.key?(review["rating"]) ? review["rating"] : "invalid"
     Rails.logger.info("[rubric_check] user=#{user.id} section=#{section} rating=#{rating} " \
                       "essential=#{check.essential_gaps&.size || 'unknown'} missed=#{check.missed_count} " \
                       "agrees=#{check.agrees?.nil? ? 'unknown' : check.agrees?}")
     check.essential_gaps ? review.merge("essential_gaps" => check.essential_gaps) : review.except("essential_gaps")
+  end
+
+  # The positions index the grader's "missed", so when the prose judge
+  # rewrote it they move into graded_prose beside the list they number.
+  def gaps_beside_their_prose(review)
+    original = review[ReviewProseVerdict::ORIGINAL_KEY]
+    return review unless original.is_a?(Hash) && review.key?("essential_gaps")
+
+    review.except("essential_gaps").merge(ReviewProseVerdict::ORIGINAL_KEY => original.merge("essential_gaps" => review["essential_gaps"]))
   end
 
   # Its own rescue, so a judge failure returns the grade the provider already
@@ -3001,22 +3022,6 @@ class AiService
     snippet = text.byteslice(0, RAW_SNIPPET_LIMIT).scrub
     snippet += "... (truncated, #{text.bytesize} bytes total)" if text.bytesize > RAW_SNIPPET_LIMIT
     Rails.logger.error("#{label}: #{snippet}")
-  end
-
-  # Parsons correctness is decided in Ruby, never by the model — whatever rating it returned
-  # is discarded and replaced. Skipped when the stored section has no blocks, since there is
-  # nothing to grade against and the grader would report a spurious perfect score. Operates on
-  # a single un-nested section hash — the shape #review_sections works with.
-  def override_parsons_section_rating!(review, exercise, daily_response)
-    parsons = exercise.parsons_problem
-    return review unless parsons.is_a?(Hash)
-
-    blocks = Array(parsons["blocks"])
-    return review if blocks.empty?
-
-    submitted = ExerciseSection::ParsonsProblem.submitted_order(daily_response.answer_for("parsons_problem"), blocks.size)
-    review["rating"] = ExerciseSection::ParsonsProblem.grade(submitted, blocks.size)[:rating]
-    review
   end
 
   # Never allowed to break generation — a bug here is a lost analytics

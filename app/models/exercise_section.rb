@@ -210,10 +210,10 @@ class ExerciseSection
       true
     end
 
-    # Whether this kind computes its own rating rather than letting the grader
-    # choose one under AiService::RATING_RUBRIC.
-    def rating_fixed?
-      false
+    # The rating this kind computes for itself, replacing the grader's, or nil
+    # when the grader chooses one under AiService::RATING_RUBRIC.
+    def fixed_rating(section:, answer:)
+      nil
     end
 
     # Whether the judge may drop this kind from the day rather than ship a

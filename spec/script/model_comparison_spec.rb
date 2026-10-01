@@ -217,7 +217,7 @@ RSpec.describe ModelComparison do
                                 ModelComparison::CANDIDATES.fetch("review_calibration").size)
       expect(out.string).to include("=== review_calibration: #{ClaudeService::DEFAULT_ROUTE[:model]} ===")
         .and match(%r{in order: \d+/#{fixtures.size} · matched expected: \d+/#{fixtures.size * 3}})
-        .and include("complete answers rated solid or better:")
+        .and include("complete answers rated solid or better:").and include("cache write")
     end
 
     # FakeService grades every answer "solid", so no fixture can come out in

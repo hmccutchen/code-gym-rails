@@ -53,7 +53,16 @@ RSpec.describe RubricCheck do
     expect(described_class.new(review(rating: "great", gaps: [])).agrees?).to be_nil
   end
 
-  it "counts missed entries the way the page renders them" do
+  # The grader numbers the list it returned, so a blank entry still holds a
+  # position; skipping it would shift every later one.
+  it "numbers missed entries as returned, blanks included" do
+    check = described_class.new(review(rating: "developing", missed: [ "a", "", "b" ], gaps: [ 2 ]))
+
+    expect(check.essential_gaps).to eq([ 2 ])
+    expect(check.missed_count).to eq(3)
+  end
+
+  it "counts an older review's single missed string as one entry" do
     check = described_class.new(review(rating: "developing", missed: "One string from an older review.", gaps: [ 0 ]))
 
     expect(check.essential_gaps).to eq([ 0 ])

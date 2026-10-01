@@ -2901,11 +2901,10 @@ RSpec.describe AiService do
           problem_set: { "parsons_problem" => { "blocks" => Array.new(count) { |i| "block #{i}" } } })
         response = DailyResponse.new(daily_exercise: exercise,
           answers: { "parsons_problem" => "order:#{(0...count).to_a.join(',')}" })
-        review = { "rating" => "beginner" }
+        rating = ExerciseSection::ParsonsProblem.fixed_rating(section: exercise.problem_set["parsons_problem"],
+                                                              answer: response.answer_for("parsons_problem"))
 
-        service.send(:override_parsons_section_rating!, review, exercise, response)
-
-        expect(review["rating"]).to eq("strong")
+        expect(rating).to eq("strong")
         expect(service.send(:section_grading_note, exercise, response, "parsons_problem"))
           .to include("0 block(s) out of place")
       end
@@ -3157,8 +3156,13 @@ RSpec.describe AiService do
     end
   end
 
-  describe "#override_parsons_section_rating!" do
-    it "always uses the locally computed rating, discarding whatever the model returned" do
+  describe "ExerciseSection::ParsonsProblem.fixed_rating" do
+    def fixed_rating_for(exercise, response)
+      ExerciseSection::ParsonsProblem.fixed_rating(section: exercise.problem_set["parsons_problem"],
+                                                   answer: response.answer_for("parsons_problem"))
+    end
+
+    it "computes the rating locally from the submitted order" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: {
@@ -3171,11 +3175,7 @@ RSpec.describe AiService do
         user: user, daily_exercise: exercise, date: Date.current,
         answers: { "parsons_problem" => "order:0,1,2,3,4" }
       )
-      review = { "rating" => "beginner" }
-
-      service.send(:override_parsons_section_rating!, review, exercise, response)
-
-      expect(review["rating"]).to eq("strong")
+      expect(fixed_rating_for(exercise, response)).to eq("strong")
     end
 
     # The stored answer is a free-form permitted param, so a correct
@@ -3193,14 +3193,10 @@ RSpec.describe AiService do
         user: user, daily_exercise: exercise, date: Date.current,
         answers: { "parsons_problem" => "order:0,1,2,3,4,999" }
       )
-      review = { "rating" => "solid" }
-
-      service.send(:override_parsons_section_rating!, review, exercise, response)
-
-      expect(review["rating"]).to eq("beginner")
+      expect(fixed_rating_for(exercise, response)).to eq("beginner")
     end
 
-    it "does nothing when the exercise's parsons_problem has no blocks" do
+    it "leaves the rating to the grader when the exercise's parsons_problem has no blocks" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: {
@@ -3210,11 +3206,7 @@ RSpec.describe AiService do
         }
       )
       response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: {})
-      review = { "rating" => "developing" }
-
-      service.send(:override_parsons_section_rating!, review, exercise, response)
-
-      expect(review["rating"]).to eq("developing")
+      expect(fixed_rating_for(exercise, response)).to be_nil
     end
   end
 
@@ -3345,8 +3337,9 @@ RSpec.describe AiService do
       results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
 
       expect(results.keys).to match_array(%w[code_review pattern])
-      expect(results["code_review"]).to eq(ok: true, review: review)
-      expect(results["pattern"]).to eq(ok: true, review: review)
+      stamped = review.merge("rubric" => AiService::RUBRIC_VERSION)
+      expect(results["code_review"]).to eq(ok: true, review: stamped)
+      expect(results["pattern"]).to eq(ok: true, review: stamped)
     end
 
     it "logs one ApiUsage row per requested section" do
@@ -3499,8 +3492,9 @@ RSpec.describe AiService do
       expect { results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern]) }
         .not_to raise_error
 
-      expect(results["code_review"]).to eq(ok: true, review: review)
-      expect(results["pattern"]).to eq(ok: true, review: review)
+      stamped = review.merge("rubric" => AiService::RUBRIC_VERSION)
+      expect(results["code_review"]).to eq(ok: true, review: stamped)
+      expect(results["pattern"]).to eq(ok: true, review: stamped)
     end
 
     # Regression for a pool-exhaustion bug: each review thread used to hold a
@@ -3553,7 +3547,7 @@ RSpec.describe AiService do
       expect(results["code_review"][:error_code]).to eq("authentication")
     end
 
-    it "applies override_parsons_section_rating! only when parsons_problem is requested and succeeds" do
+    it "replaces the grader's rating with the kind's computed one" do
       exercise = DailyExercise.create!(
         user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
         problem_set: {
@@ -6320,6 +6314,9 @@ RSpec.describe AiService, "judging graded reviews" do
   end
   let(:logged) { StringIO.new }
   let(:grade) { FakeService::REVIEW_SECTION.deep_stringify_keys.merge("missed" => [ "SENTINEL-G one.", "SENTINEL-G two." ]) }
+  let(:stamped) { grade.merge("rubric" => AiService::RUBRIC_VERSION) }
+  # The grader's essential_gaps move beside the prose they number on an edit.
+  let(:graded_prose) { grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys, "essential_gaps") }
 
   around do |example|
     original_logger = Rails.logger
@@ -6360,12 +6357,12 @@ RSpec.describe AiService, "judging graded reviews" do
     it "makes no judge call and returns the grade as returned" do
       result, calls = graded
       expect(calls).to eq(0)
-      expect(result).to eq(ok: true, review: grade)
+      expect(result).to eq(ok: true, review: stamped)
     end
 
     it "removes a provider-supplied graded_prose" do
       result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
-      expect(result[:review]).to eq(grade)
+      expect(result[:review]).to eq(stamped)
     end
   end
 
@@ -6378,18 +6375,19 @@ RSpec.describe AiService, "judging graded reviews" do
       expect(result[:ok]).to be(true)
       expect(result[:review]["missed"]).to eq([ "One query per row." ])
       expect(result[:review]["rating"]).to eq(grade["rating"])
-      expect(result[:review]["graded_prose"]).to eq(grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys))
+      expect(result[:review]["graded_prose"]).to eq(graded_prose)
+      expect(result[:review]).not_to have_key("essential_gaps")
       expect(logged.string).to match(/\[review_judge\] user=#{user.id} section=code_review status=edit issues=verbosity merges=\{"missed":\[\[0,1\]\]\}/)
     end
 
     it "keeps the sanitized grade on keep, dropping a forged graded_prose" do
       result, = graded(grader: grade.merge("graded_prose" => { "missed" => "forged" }))
-      expect(result[:review]).to eq(grade)
+      expect(result[:review]).to eq(stamped)
     end
 
     it "replaces a forged graded_prose with its own on edit" do
       result, = graded(judge_reply: edit_reply, grader: grade.merge("graded_prose" => { "missed" => "forged" }))
-      expect(result[:review]["graded_prose"]).to eq(grade.slice(*DailyResponse::AI_REVIEW_FIELDS.keys))
+      expect(result[:review]["graded_prose"]).to eq(graded_prose)
     end
 
     {
@@ -6406,7 +6404,7 @@ RSpec.describe AiService, "judging graded reviews" do
     }.each do |name, (reply, reason)|
       it "falls back to the sanitized grade on #{name}, logging a code and no review text" do
         result, = graded(judge_reply: reply, grader: grade.merge("graded_prose" => "forged"))
-        expect(result).to eq(ok: true, review: grade)
+        expect(result).to eq(ok: true, review: stamped)
         expect(logged.string).to include("[review_judge_fallback] user=#{user.id} section=code_review reason=#{reason}")
         expect(logged.string).not_to include("SENTINEL-G")
       end
@@ -6423,7 +6421,7 @@ RSpec.describe AiService, "judging graded reviews" do
     it "never judges for a provider that does not judge" do
       result, calls = graded(provider: GeminiService)
       expect(calls).to eq(0)
-      expect(result[:review]).to eq(grade)
+      expect(result[:review]).to eq(stamped)
     end
   end
 end
@@ -6506,20 +6504,32 @@ RSpec.describe AiService, "the grading rubric" do
   end
 
   it "has every kind whose rating the grader chooses name its main point and essential pieces" do
-    ExerciseSection.all.reject(&:rating_fixed?).each do |kind|
+    graded_by_rubric = ExerciseSection.all.select { |kind| kind.method(:fixed_rating).owner == ExerciseSection.singleton_class }
+
+    graded_by_rubric.each do |kind|
       note = kind.grading_note(section: {}, answer: nil)
       expect(note).to include("Main point:"), kind.key
       expect(note).to include("Essential pieces:"), kind.key
     end
   end
 
-  it "treats only parsons as computing its own rating" do
-    expect(ExerciseSection.all.select(&:rating_fixed?)).to eq([ ExerciseSection::ParsonsProblem ])
-  end
+it "treats only parsons as computing its own rating" do
+  blocks  = { "blocks" => %w[a b] }
+  fixed   = ExerciseSection.all.select { |kind| kind.fixed_rating(section: blocks, answer: "order:0,1") }
 
-  it "dates the rubric so evidence readers can choose to read only what it graded" do
-    expect(AiService::RUBRIC_INTRODUCED_AT).to be_a(Time)
-  end
+  expect(fixed).to eq([ ExerciseSection::ParsonsProblem ])
+end
+
+it "reads an unstamped section's rung the way generation would, target included" do
+  user.update!(section_kind_levels: { "pattern" => "principal_engineer" })
+  prompt = service.send(:build_review_section_prompt, exercise, response, "pattern")
+
+  expect(prompt).to include("Pitched at: principal_engineer — ")
+end
+
+it "tells the grader a problem simpler than its level is graded on what it asks" do
+  expect(AiService::RATING_RUBRIC).to include("graded on what it actually asks")
+end
 
   describe "the essential-gap check on each graded section" do
     let(:logged) { StringIO.new }
@@ -6582,6 +6592,27 @@ RSpec.describe AiService, "the grading rubric" do
       expect(logged.string).to include("rating=invalid")
       expect(logged.string).not_to include("SECRET-M")
     end
+
+it "stamps the rubric version on every graded review, replacing any copy the provider sent" do
+  result = graded(base.merge("essential_gaps" => [], "rubric" => 99))
+
+  expect(result[:review]["rubric"]).to eq(AiService::RUBRIC_VERSION)
+end
+
+it "stamps a computed rating too, since the same prompt graded its prose" do
+  result = graded(base.merge("essential_gaps" => []), section: "parsons_problem")
+
+  expect(result[:review]["rubric"]).to eq(AiService::RUBRIC_VERSION)
+end
+
+it "checks the grader's own rating when a parsons section has no blocks to compute from" do
+  saved_exercise.problem_set["parsons_problem"].delete("blocks")
+  saved_exercise.save!
+
+  graded(base.merge("essential_gaps" => []), section: "parsons_problem")
+
+  expect(logged.string).to include("[rubric_check] user=#{user.id} section=parsons_problem rating=solid")
+end
 
     it "skips a kind whose rating is computed, dropping any positions the grader sent" do
       result = graded(base.merge("essential_gaps" => [ 0 ]), section: "parsons_problem")

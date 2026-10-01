@@ -10,9 +10,15 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
-    # Scored in Ruby from how many blocks are out of place (see .grade).
-    def rating_fixed?
-      true
+    # Correctness is decided here, never by the model: whatever the grader
+    # returned is replaced. nil when the stored section has no blocks, since
+    # there is nothing to grade against and the score would read as a
+    # spurious perfect one.
+    def fixed_rating(section:, answer:)
+      blocks = Array(section["blocks"])
+      return if blocks.empty?
+
+      grade(submitted_order(answer, blocks.size), blocks.size)[:rating]
     end
 
     def judge_task
