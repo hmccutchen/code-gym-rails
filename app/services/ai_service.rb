@@ -3005,7 +3005,8 @@ class AiService
 
     if result[:truncated] && !allow_truncated
       raise TruncatedResponseError,
-            "Provider stopped generating at its output token limit (#{result[:output_tokens].to_i} tokens)"
+            "Provider stopped generating at its output token limit " \
+            "(#{result[:output_tokens].to_i} output tokens, thinking included)"
     end
 
     result

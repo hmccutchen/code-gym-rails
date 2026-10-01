@@ -253,33 +253,35 @@ RSpec.describe GeminiService do
     # live response reported total_tokens 736 = 25 input + 193 output + 518
     # thought. Recording only total_output_tokens under-counted that call by
     # three quarters.
+    # Unlike Claude's input_tokens, total_input_tokens includes the cached
+    # part: a live repeat of a 14,199-token prompt reported total_input_tokens
+    # 14,199 with total_cached_tokens 8,171. Subtracting keeps tokens_in the
+    # uncached input on both providers, so no token is priced twice.
+    it "keeps cached tokens out of tokens_in, as Claude does" do
+      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
+        body: {
+          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "OK" } ] } ],
+          "usage" => { "total_input_tokens" => 14_199, "total_cached_tokens" => 8_171, "total_output_tokens" => 1 }
+        }.to_json)
+      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
+
+      result = service.send(:call, system: "sys", prompt: "p")
+
+      expect(result).to include(input_tokens: 6_028, cache_read_tokens: 8_171)
+    end
+
     it "counts thought tokens as output and records cached tokens" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
           "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "17" } ] } ],
-          "usage" => { "total_input_tokens" => 25, "total_output_tokens" => 193,
-                       "total_thought_tokens" => 518, "total_cached_tokens" => 40, "total_tokens" => 736 }
+          "usage" => { "total_input_tokens" => 65, "total_output_tokens" => 193,
+                       "total_thought_tokens" => 518, "total_cached_tokens" => 40, "total_tokens" => 776 }
         }.to_json)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
       result = service.send(:call, system: "sys", prompt: "p")
 
       expect(result).to include(input_tokens: 25, output_tokens: 711, cache_read_tokens: 40, cache_write_tokens: 0)
-    end
-
-    # The cap applies to the visible reply, so thinking must not turn a reply
-    # that finished under it into a truncation.
-    it "judges truncation on the visible reply, not on thought tokens" do
-      fake_response = instance_double(Faraday::Response, success?: true, status: 200,
-        body: {
-          "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "a short reply" } ] } ],
-          "usage" => { "total_output_tokens" => 40, "total_thought_tokens" => 500 }
-        }.to_json)
-      service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
-
-      result = service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
-
-      expect(result).to include(truncated: false, output_tokens: 540)
     end
 
     # generation_config is the single key carrying BOTH the cap and the thinking
