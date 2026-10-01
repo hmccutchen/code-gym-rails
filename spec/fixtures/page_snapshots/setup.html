@@ -27,7 +27,8 @@
       --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
       --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
       --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
-      --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .06;
+      --pattern-mask: url("/assets/gym-pattern-tile-dark-4382d7e8.png");
+      --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .08;
       /* iOS auto-zooms a focused input below 16px, which shifts the layout and
          doesn't cleanly restore. max() keeps the floor without overriding a
          user who has set a larger default. */
@@ -38,8 +39,7 @@
     #background-pattern {
       display: none; position: fixed; inset: 0; z-index: -2; pointer-events: none;
       background-color: var(--pattern-tint); opacity: var(--pattern-opacity);
-      -webkit-mask-image: url("/assets/gym-pattern-tile-bf068485.png");
-      mask-image: url("/assets/gym-pattern-tile-bf068485.png");
+      -webkit-mask-image: var(--pattern-mask); mask-image: var(--pattern-mask);
       -webkit-mask-size: 288px; mask-size: 288px;
       -webkit-mask-repeat: repeat; mask-repeat: repeat;
       image-rendering: pixelated;
@@ -474,7 +474,7 @@
                    box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
   </style>
     <link rel="stylesheet" href="/assets/display-720262ba.css" />
-    <link rel="stylesheet" href="/assets/display_light-a0f73cc1.css" media="not all" data-light-palette-media="true" />
+    <link rel="stylesheet" href="/assets/display_light-1e3933f4.css" media="not all" data-light-palette-media="true" />
 </head>
 <body>
     <div id="background-pattern" aria-hidden="true"></div>

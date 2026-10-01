@@ -20,6 +20,18 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     page.evaluate_script("document.documentElement.getAttribute(#{name.to_json})")
   end
 
+  def expect_pattern(tile, tint)
+    values = page.evaluate_script(<<~JS)
+      (() => {
+        const s = getComputedStyle(document.getElementById("background-pattern"));
+        return [s.maskImage, s.webkitMaskImage, s.backgroundColor];
+      })()
+    JS
+    expect(values.first).to match(%r{/#{Regexp.escape(tile)}-[a-f0-9]+\.png})
+    expect(values[1]).to eq(values.first)
+    expect(values.last).to eq(tint)
+  end
+
   def stored(timeout: 5)
     deadline = Time.current + timeout
     sleep 0.1 until yield(user.reload.display_preferences) || Time.current > deadline
@@ -67,6 +79,36 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
       expect(page.evaluate_script("getComputedStyle(document.getElementById('background-pattern')).display")).to eq("none")
       pw.emulate_media(forcedColors: "none")
       expect(page.evaluate_script("getComputedStyle(document.getElementById('background-pattern')).display")).to eq("block")
+    end
+  end
+
+  it "switches the mask and tint with the chosen theme, including live device changes" do
+    open_display
+    expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
+    choose_display("theme", "light")
+    expect_pattern("gym-pattern-tile", "rgb(52, 97, 154)")
+    choose_display("theme", "dark")
+    expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
+
+    choose_display("theme", "device")
+    page.driver.with_playwright_page do |pw|
+      pw.emulate_media(colorScheme: "light")
+      expect_pattern("gym-pattern-tile", "rgb(52, 97, 154)")
+      pw.emulate_media(colorScheme: "dark")
+      expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
+    end
+    expect(stored { |values| values["theme"] == "device" }).to eq("theme" => "device")
+    visit history_path
+    expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
+  end
+
+  it "follows the device's mask and tint on a signed-out page" do
+    visit login_path
+    page.driver.with_playwright_page do |pw|
+      pw.emulate_media(colorScheme: "light")
+      expect_pattern("gym-pattern-tile", "rgb(52, 97, 154)")
+      pw.emulate_media(colorScheme: "dark")
+      expect_pattern("gym-pattern-tile-dark", "rgb(190, 205, 240)")
     end
   end
 

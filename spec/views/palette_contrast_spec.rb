@@ -65,7 +65,7 @@ RSpec.describe "palette contrast" do
   end
 
   shared_examples "an accessible palette" do
-    it "keeps text and focus indicators legible over a fully opaque pattern outline" do
+    it "keeps text and focus indicators legible over a fully opaque pattern pixel" do
       tint = rgb(vars.fetch("pattern-tint")).join(",")
       backdrop = over("rgba(#{tint},#{vars.fetch('pattern-opacity')})", vars["bg"])
       backgrounds = {

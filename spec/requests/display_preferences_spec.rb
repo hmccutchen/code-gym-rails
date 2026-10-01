@@ -13,7 +13,7 @@ RSpec.describe "Display preferences in the layout", type: :request do
       document = Nokogiri::HTML5(response.body)
       expect(document.css("body > #background-pattern[aria-hidden='true']").size).to eq(1)
       expect(document.css("[data-pull-content] #background-pattern")).to be_empty
-      expect(response.body).to match(%r{url\(["']?/assets/gym-pattern-tile-[a-f0-9]+\.png})
+      expect(response.body).to match(%r{url\(["']?/assets/gym-pattern-tile-dark-[a-f0-9]+\.png})
     end
   end
 

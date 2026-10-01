@@ -1678,16 +1678,21 @@ concept-specific difficulty descriptions for future generation, not a new set.
   object.
 
   **The background pattern is deliberately on by default**, an exception to
-  display changes requiring an opt-in. The white, alpha-channel artwork in
-  `gym-pattern-tile.png` masks a fixed layer at a 288px repeat size, tinted
-  at 6% on dark and 5% on light. It sits outside `[data-pull-content]` and
+  display changes requiring an opt-in. Two white, alpha-channel tiles mask a
+  fixed layer at a 288px repeat size: `gym-pattern-tile.png` emphasizes
+  outlines on light, and `gym-pattern-tile-dark.png` emphasizes fills on dark.
+  The layout sets `--pattern-mask`, tint and opacity for dark; the existing
+  light stylesheet overrides all three, so its media rule also selects the
+  artwork for "Match my device" without another theme switch. Light uses
+  the logo's shirt blue, `rgb(52, 97, 154)`, at 7%; dark uses
+  `rgb(190, 205, 240)` at 8%. The layer sits outside `[data-pull-content]` and
   below the refresh indicator, so neither scrolling nor the pull gesture
   moves it. Off omits the layer from the response; Setup adds or removes it
   immediately. High contrast and forced colors hide it, as does missing
   mask support. Both standard and `-webkit-` mask declarations are present.
   No migration: only an explicit `"background_pattern": "off"` is stored
   in the existing sparse jsonb. `palette_contrast_spec` checks a fully
-  opaque outline, including through tinted backgrounds.
+  opaque mask pixel, including through tinted backgrounds.
 
   **The other display defaults remain unchanged**: no attribute on
   `<html>`, no stylesheet link, the same outlined logo, the same `black`
