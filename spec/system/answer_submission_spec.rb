@@ -18,7 +18,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       # dashboard_generation_spec.rb for the full explanation.
       expect(page).to have_content(/Code Review/i, wait: 10)
 
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
 
       # Answer every section the page actually holds (the count varies with
       # the day's plan), so "one left unrated" is the only thing blocking.
@@ -28,13 +28,13 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       # Rate every section but the last: with one answered section left
       # unrated, the gate must still be blocked.
       fields[0..-2].each { |field| rate_section(field) }
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect(page).to have_selector("#progress-label", exact_text: "✓ All answered")
       expect(page).to have_content("Rate each section you answered to finish up.")
       rate_section(fields.last)
 
-      expect(page).to have_button("Submit answers →", disabled: false)
-      click_button "Submit answers →"
+      expect(page).to have_button("Submit answers", disabled: false)
+      click_button "Submit answers"
 
       # A successful submit chains into the review, which lands back on the
       # dashboard's submitted state. review_request_spec covers the chain
@@ -59,9 +59,9 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       wait_for_saved_answer(user, "pattern", "")
       visit root_path
 
-      expect(page).to have_button("Submit answers →", disabled: false)
+      expect(page).to have_button("Submit answers", disabled: false)
       expect(page).to have_selector('button[data-rating-for="pattern"][data-rating="too_hard"].active')
-      click_button "Submit answers →"
+      click_button "Submit answers"
 
       expect(page).to have_content("Review ready!", wait: 10)
       expect(user.daily_responses.reload.sole.section_ratings).to eq("code_review" => "right_level")
@@ -77,22 +77,22 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       visit_with_todays_set(user)
       expect(page).to have_content(/Code Review/i, wait: 10)
 
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect(page).to have_content("Answer at least one section to finish up.")
 
       fill_in_answer("code_review", "It re-runs the loyalty_tier query inside the loop — precompute it once outside the loop.")
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect(page).to have_content("Rate each section you answered to finish up.")
 
       rate_section("code_review")
-      expect(page).to have_button("Submit answers →", disabled: false)
+      expect(page).to have_button("Submit answers", disabled: false)
 
       fill_in_answer("pattern", "A service object because checkout has three unrelated responsibilities.")
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
 
       rate_section("pattern")
-      expect(page).to have_button("Submit answers →", disabled: false)
-      click_button "Submit answers →"
+      expect(page).to have_button("Submit answers", disabled: false)
+      click_button "Submit answers"
 
       expect(page).to have_content("Review ready!", wait: 10)
       response = user.daily_responses.sole
@@ -141,13 +141,13 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
         page.execute_script("window.finishSubmit()")
         expect(page).to have_no_selector("#gym-form[inert]")
-        expect(page).to have_button("Submit answers →", disabled: false)
+        expect(page).to have_button("Submit answers", disabled: false)
         wait_for_saved_answer(user, "code_review", final)
         expect(user.daily_responses.reload.sole).not_to be_submitted
         visit root_path
         expect(find('textarea[data-field="code_review"]').value).to eq(final)
         fill_in_answer("code_review", "")
-        expect(page).to have_button("Submit answers →", disabled: true)
+        expect(page).to have_button("Submit answers", disabled: true)
       end
     end
   end
@@ -175,7 +175,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         };
       JS
 
-      click_button "Submit answers →"
+      click_button "Submit answers"
 
       expect(page).to have_content("✓ Submitted", wait: 10)
       expect(page).to have_no_selector("#gym-form")
@@ -202,7 +202,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         };
       JS
 
-      click_button "Submit answers →"
+      click_button "Submit answers"
 
       expect(page).to have_content("✓ Submitted", wait: 10)
       expect(page).to have_no_selector("#gym-form")
@@ -223,12 +223,12 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_content(/Code Review/i, wait: 10)
       rate_section("code_review")
       fill_in_answer("code_review", "🦆" * DailyResponse::ANSWER_MIN_LENGTH)
-      expect(page).to have_button("Submit answers →", disabled: true)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect(page).to have_content("Answer at least one section to finish up.")
 
       fill_in_answer("code_review", "🦆" * (DailyResponse::ANSWER_MIN_LENGTH + 1))
-      expect(page).to have_button("Submit answers →", disabled: false)
-      click_button "Submit answers →"
+      expect(page).to have_button("Submit answers", disabled: false)
+      click_button "Submit answers"
       expect(page).to have_content("Review ready!", wait: 10)
       expect(user.daily_responses.sole.answered_sections).to eq([ "code_review" ])
     end
@@ -248,7 +248,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_selector("#gym-form[data-autosave-queued]")
 
       fill_in_answer("pattern", "")
-      click_button "Submit answers →"
+      click_button "Submit answers"
       expect(page).to have_selector("#gym-form[data-submit-stored]")
       page.execute_script("window.releaseAutosave()")
       expect(page).to have_selector('#gym-form[data-autosave-returned="true"]')

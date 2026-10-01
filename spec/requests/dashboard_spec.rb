@@ -491,8 +491,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("Get Gemini review →")
-      expect(response.body).not_to include("Get Claude review →")
+      expect(response.body).to include("Get Gemini review")
+      expect(response.body).not_to include("Get Claude review")
     end
   end
 

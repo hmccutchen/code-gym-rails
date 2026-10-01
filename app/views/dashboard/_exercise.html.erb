@@ -68,7 +68,7 @@
                          unrated:    "Rate each section you answered to finish up." } %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
-      <%= f.button "Submit answers →", type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: submit_blocker.present? %>
+      <%= f.button "Submit answers", type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: submit_blocker.present? %>
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
     <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge",
@@ -273,7 +273,7 @@
         if (!reviewRequested && !submissionSaved) {
           form.inert = false;
           submitButton.classList.remove("btn-loading");
-          submitButton.textContent = "Submit answers →";
+          submitButton.textContent = "Submit answers";
           refreshSubmit();
           autoSave();
         }

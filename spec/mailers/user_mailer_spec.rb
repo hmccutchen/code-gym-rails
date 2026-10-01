@@ -20,6 +20,13 @@ RSpec.describe UserMailer, type: :mailer do
       expect(mail.body.encoded).to match(/browser where you requested it/i)
     end
 
+    it "greets the user and states when the code expires" do
+      body = mail.body.encoded
+
+      expect(body).to include("Hi Dev,")
+      expect(body).to include("It expires in #{User.login_code_expiry_in_words}.")
+    end
+
     it "carries no login link" do
       expect(mail.body.encoded).not_to include("/auth/verify")
     end

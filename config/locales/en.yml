@@ -81,6 +81,41 @@ en:
         openai_quality: "The step that tidies up review wording doesn't run on OpenAI yet."
         cost_heading: "What it costs."
         cost: "It depends on how many sections your day has, how often you use Learn, follow-up questions and the thinking partner, and your provider's current prices."
+  app_name: "Code Gym"
+  sessions:
+    new:
+      page_title: "Log in"
+      intro_html: "Daily dev exercises.<br>Enter your email to get a login code."
+      resend_prompt: "Didn't get the email? Request a new code below, or use a different address."
+      name_label: "Name (first time only)"
+      name_placeholder: "Your name"
+      email_label: "Work email *"
+      email_placeholder: "you@company.com"
+      submit: "Send code"
+    pending:
+      message: "Enter the 6-digit code we emailed you."
+      code_label: "6-digit code from the email"
+      code_placeholder: "123456"
+      submit: "Verify code"
+    code_sent: "Check your email for a 6-digit login code. It expires in %{expiry}."
+    welcome_back: "Welcome back, %{name}!"
+    code_rejected_retry: "Incorrect or expired code. Try again, or request a new one below."
+    code_rejected_request_new: "Incorrect or expired code. Request a new one below."
+    logged_out: "Logged out."
+    rate_limited:
+      code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
+      code_requests: "Too many code requests. Try again in a few minutes."
+      code_attempts: "Too many attempts. Try again in a few minutes."
+  user_mailer:
+    login_code:
+      subject: "Your Code Gym login code"
+      greeting: "Hi %{name},"
+      intro: "Your Code Gym login code is:"
+      where_and_when: |-
+        Enter it in the browser where you requested it — the code will not work
+        anywhere else. It expires in %{expiry}. If you
+        didn't request this, you can ignore it.
+      sign_off: "— Code Gym"
   hello: "Hello world"
   providers:
     anthropic: "Claude"
@@ -295,8 +330,8 @@ en:
     caption: "This is your plan implemented literally — gaps and all. It was not corrected."
     working: "Working…"
   review:
-    get_button: "Get %{provider} review →"
-    finish_button: "Finish review →"
+    get_button: "Get %{provider} review"
+    finish_button: "Finish review"
     generating_label: "Generating review…"
     heading: "%{provider}'s Review"
     history_summary: "%{provider}'s review"

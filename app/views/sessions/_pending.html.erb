@@ -1,5 +1,5 @@
 <p id="pending-message" style="color:var(--muted);margin-bottom:1.5rem;">
-  Enter the 6-digit code we emailed you.
+  <%= t("sessions.pending.message") %>
 </p>
 
 <%# The field takes focus on arrival, so a screen reader starts there and
@@ -11,12 +11,12 @@
 <% flash_ids = [ ("flash-alert" if code_alert), ("flash-notice" if flash[:notice].present?) ].compact %>
 <%= form_with url: verify_login_code_path, method: :post do |f| %>
   <div class="form-field">
-    <%= f.label :code, "6-digit code from the email" %>
+    <%= f.label :code, t("sessions.pending.code_label") %>
     <%= f.text_field :code, inputmode: "numeric", pattern: "[0-9]*", maxlength: 6,
-                     autocomplete: "one-time-code", placeholder: "123456",
+                     autocomplete: "one-time-code", placeholder: t("sessions.pending.code_placeholder"),
                      required: true, autofocus: true,
                      aria: { describedby: [ *flash_ids, "pending-message" ].join(" "),
                              invalid: @code_rejected || nil } %>
   </div>
-  <%= f.submit "Verify code →", class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
+  <%= f.submit t("sessions.pending.submit"), class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
 <% end %>

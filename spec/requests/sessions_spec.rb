@@ -67,6 +67,16 @@ RSpec.describe "Sessions", type: :request do
       expect(document.at_css(".skip-link")).to be_nil
     end
 
+    it "labels its buttons without a trailing arrow" do
+      get login_path
+      expect(Nokogiri::HTML(response.body).at_css("input[type=submit]")["value"]).to eq("Send code")
+
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      get login_path
+      expect(Nokogiri::HTML(response.body).css("input[type=submit]").map { |input| input["value"] })
+        .to eq([ "Verify code", "Send code" ])
+    end
+
     it "offers the code form as soon as a login is pending" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
 

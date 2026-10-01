@@ -20,13 +20,13 @@ class SessionsController < ApplicationController
   # #verify_code.
   rate_limit to: 5, within: User::LOGIN_CODE_EXPIRY,
              by:    -> { normalized_email },
-             with:  -> { rate_limited("Too many code requests for that address. Try again in a few minutes.") },
+             with:  -> { rate_limited(t("sessions.rate_limited.code_requests_for_address")) },
              store: RATE_LIMIT_STORE,
              name:  "code_requests",
              only:  :create
 
   rate_limit to: 10, within: User::LOGIN_CODE_EXPIRY,
-             with:  -> { rate_limited("Too many attempts. Try again in a few minutes.") },
+             with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts",
              only:  :verify_code
@@ -37,7 +37,7 @@ class SessionsController < ApplicationController
   # mail from a public, internet-reachable page. `by:` defaults to
   # request.remote_ip, which is the axis that matters here.
   rate_limit to: 20, within: User::LOGIN_CODE_EXPIRY,
-             with:  -> { rate_limited("Too many code requests. Try again in a few minutes.") },
+             with:  -> { rate_limited(t("sessions.rate_limited.code_requests")) },
              store: RATE_LIMIT_STORE,
              name:  "code_requests_by_ip",
              only:  :create
@@ -71,7 +71,7 @@ class SessionsController < ApplicationController
     session[:pending_login_at]    = Time.current.iso8601
 
     redirect_to login_path,
-                notice: "Check your email for a 6-digit login code. It expires in #{User.login_code_expiry_in_words}."
+                notice: t("sessions.code_sent", expiry: User.login_code_expiry_in_words)
   rescue ActiveRecord::RecordInvalid => e
     flash.now[:alert] = e.message
     render :new, status: :unprocessable_content
@@ -87,25 +87,21 @@ class SessionsController < ApplicationController
 
     if user
       destination = start_new_session_for(user)
-      redirect_to destination || root_path, notice: "Welcome back, #{user.name}!"
+      redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
     else
       @code_rejected = true
       # No pending state renders no code field to try again in — see
       # new.html.erb's gate on pending_login_email — so the message can't
       # tell everyone to retry.
       flash.now[:alert] =
-        if email.present?
-          "Incorrect or expired code. Try again, or request a new one below."
-        else
-          "Incorrect or expired code. Request a new one below."
-        end
+        email.present? ? t("sessions.code_rejected_retry") : t("sessions.code_rejected_request_new")
       render :new, status: :unprocessable_content
     end
   end
 
   def destroy
     reset_session
-    redirect_to login_path, notice: "Logged out."
+    redirect_to login_path, notice: t("sessions.logged_out")
   end
 
   private

@@ -790,7 +790,7 @@ What would be easy to get wrong or worth testing:
 
     <div class="submit-row" id="submit-row">
       <input autocomplete="off" value="1" type="hidden" name="submit" id="submit" />
-      <button name="button" type="submit" id="submit-answers" class="btn btn-primary" disabled="disabled">Submit answers →</button>
+      <button name="button" type="submit" id="submit-answers" class="btn btn-primary" disabled="disabled">Submit answers</button>
       <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
     </div>
     <p class="progress-label" id="rating-nudge" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up.">Answer at least one section to finish up.</p>
@@ -993,7 +993,7 @@ What would be easy to get wrong or worth testing:
         if (!reviewRequested && !submissionSaved) {
           form.inert = false;
           submitButton.classList.remove("btn-loading");
-          submitButton.textContent = "Submit answers →";
+          submitButton.textContent = "Submit answers";
           refreshSubmit();
           autoSave();
         }
