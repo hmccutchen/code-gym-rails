@@ -610,6 +610,18 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".judge_retries" do
+    it "is one for every kind" do
+      expect(described_class.all.map(&:judge_retries)).to all(eq(1))
+    end
+  end
+
+  describe ".judge_guidance" do
+    it "is absent for every kind" do
+      expect(described_class.all.map(&:judge_guidance)).to all(be_nil)
+    end
+  end
+
   describe ".schema_fragment" do
     RUBY_LABEL = "Ruby/Rails".freeze
     JS_LABEL   = "JavaScript/React".freeze

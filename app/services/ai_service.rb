@@ -1471,10 +1471,16 @@ class AiService
       Level meaning: #{KindDifficulty::LEVEL_DEFINITIONS.fetch(rung)}
       Prose fields you may rewrite: #{kind.prose_fields.join(', ')}
       Every other field is the artifact and must not change.
-
+      #{judge_guidance_block(kind)}
       The section as delivered:
       #{JSON.pretty_generate(visible)}
     PROMPT
+  end
+
+  # Stands in for the blank line above the section, so a kind with no
+  # guidance renders the prompt it always has.
+  def judge_guidance_block(kind)
+    kind.judge_guidance ? "\n#{kind.judge_guidance}\n" : ""
   end
 
   # Everything stage 1 decided, kept so the judged path can re-render the same

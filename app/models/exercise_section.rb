@@ -300,6 +300,18 @@ class ExerciseSection
       %w[title scenario question teaching_note]
     end
 
+    # How many regenerations a rejected section of this kind gets before it is
+    # dropped or anchored.
+    def judge_retries
+      1
+    end
+
+    # Extra instructions for judging this kind, added to the judge prompt when
+    # present.
+    def judge_guidance
+      nil
+    end
+
     # Whether grading this kind needs the engineer's answer translated into
     # code first (AiService#translate_before_grading). A declared per-kind fact
     # rather than a name comparison in the review path, like every other facet
