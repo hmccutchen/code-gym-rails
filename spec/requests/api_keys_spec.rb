@@ -35,6 +35,30 @@ RSpec.describe "ApiKeys", type: :request do
       expect(user.provider).to eq("gemini")
     end
 
+    it "saves an OpenAI project key and detects the provider" do
+      login_as(user)
+
+      patch setup_path, params: { api_key: "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq" }
+
+      expect(response).to redirect_to(root_path)
+      expect(user.reload.provider).to eq("openai")
+    end
+
+    it "detects OpenAI's service-account and legacy key formats" do
+      login_as(user)
+
+      [ "sk-svcacct-Ab8RN6J5yPUsY9Sw", "sk-Ab8RN6J5yPUsY9SwLxAS2DYqcYQFIhR9" ].each do |key|
+        patch setup_path, params: { api_key: key }
+        expect(user.reload.provider).to eq("openai")
+      end
+    end
+
+    # Both start with "sk-", so a pattern loose enough to catch every OpenAI
+    # key could claim an Anthropic one.
+    it "never mistakes an Anthropic key for an OpenAI key" do
+      expect(OpenaiService.key_pattern).not_to match("sk-ant-api03-Ab8RN6J5yPUsY9SwLxAS2DYq")
+    end
+
     it "saves a valid language preference alongside the API key" do
       login_as(user)
 

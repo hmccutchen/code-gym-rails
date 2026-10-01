@@ -4,6 +4,9 @@ require "faraday/retry"
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
+  def self.provider_key = "gemini"
+  def self.key_pattern = /\A(AIza|AQ\.)/
+
   # Keyed by the ApiUsage purpose string, like ClaudeService's. Generation and
   # its single-section retry share the default route explicitly so route
   # coverage can pin both usage labels.
@@ -103,7 +106,7 @@ class GeminiService < AiService
       text:          text_parts.join,
       # total_input_tokens includes the cached part, unlike Claude's
       # input_tokens; subtracting it keeps tokens_in the uncached input on
-      # both providers, so a cached token is never priced twice.
+      # every provider, so a cached token is never priced twice.
       input_tokens:  usage["total_input_tokens"].to_i - cached_tokens,
       # Thinking is billed as output but reported apart from it: a live
       # response gave total_tokens = input + output + thought.

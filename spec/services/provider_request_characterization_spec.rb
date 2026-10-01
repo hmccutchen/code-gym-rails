@@ -50,7 +50,7 @@ RSpec.describe "provider request characterization" do
       f.adapter :test do |stub|
         stub.post(service_class::API_URL) do |env|
           bodies << env.body
-          [ 200, {}, success_body_for(service_class) ]
+          [ 200, {}, provider_success_body(service_class) ]
         end
       end
     end
@@ -58,21 +58,12 @@ RSpec.describe "provider request characterization" do
     [ service, bodies ]
   end
 
-  def success_body_for(service_class)
-    if service_class == ClaudeService
-      { "content" => [ { "type" => "text", "text" => "ok" } ],
-        "usage" => { "input_tokens" => 1, "output_tokens" => 1 } }.to_json
-    else
-      { "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "ok" } ] } ],
-        "usage" => { "total_input_tokens" => 1, "total_output_tokens" => 1 } }.to_json
-    end
-  end
 
   def snapshot_path(provider, shape)
     REQUEST_SNAPSHOT_DIR.join("#{provider}__#{shape}.json")
   end
 
-  [ ClaudeService, GeminiService ].each do |service_class|
+  [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
     provider = service_class.name.sub("Service", "").downcase
 
     KEYWORD_SHAPES.each do |shape, kwargs|
@@ -106,7 +97,7 @@ RSpec.describe "provider request characterization" do
   end
 
   it "has no snapshot left behind for a shape that no longer exists" do
-    expected = [ ClaudeService, GeminiService ].flat_map { |service_class|
+    expected = [ ClaudeService, GeminiService, OpenaiService ].flat_map { |service_class|
       provider = service_class.name.sub("Service", "").downcase
       KEYWORD_SHAPES.keys.map { |shape| snapshot_path(provider, shape).basename.to_s }
     }

@@ -3,14 +3,6 @@ class ApiKeysController < ApplicationController
 
   skip_before_action :require_api_key
 
-  # Gemini keys: Google is transitioning from the legacy "AIza..." format to
-  # a new "AQ...." format (rolling out through 2026, with AIza rejected
-  # entirely in September 2026) -- accept both during the overlap.
-  PROVIDER_PATTERNS = {
-    "anthropic" => /\Ask-ant-/,
-    "gemini"    => /\A(AIza|AQ\.)/
-  }.freeze
-
   # GET /setup
   def edit
     redirect_to welcome_path if current_user.first_run?
@@ -21,10 +13,10 @@ class ApiKeysController < ApplicationController
     key = params[:api_key].to_s.strip
     return language_only_update if key.blank?
 
-    provider = PROVIDER_PATTERNS.find { |_, pattern| key.match?(pattern) }&.first
+    provider = AiProvider.detect(key)
 
     unless provider
-      flash.now[:alert] = "We don't recognize this key format — currently supporting Anthropic and Gemini keys."
+      flash.now[:alert] = "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
       render :edit, status: :unprocessable_content
       return
     end

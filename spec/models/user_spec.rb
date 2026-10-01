@@ -28,13 +28,14 @@ RSpec.describe User, type: :model do
       expect(user).to be_valid
     end
 
-    it "accepts anthropic or gemini as the provider" do
+    it "accepts anthropic, gemini or openai as the provider" do
       expect(User.new(email: "a@example.com", name: "A", provider: "anthropic")).to be_valid
       expect(User.new(email: "b@example.com", name: "B", provider: "gemini")).to be_valid
+      expect(User.new(email: "d@example.com", name: "D", provider: "openai")).to be_valid
     end
 
     it "rejects an unrecognized provider" do
-      user = User.new(email: "c@example.com", name: "C", provider: "openai")
+      user = User.new(email: "c@example.com", name: "C", provider: "mistral")
       expect(user).not_to be_valid
       expect(user.errors[:provider]).to be_present
     end
@@ -836,6 +837,12 @@ RSpec.describe User, type: :model do
       expect(user.provider_label).to eq("Gemini")
     end
 
+    it "returns GPT for the openai provider" do
+      user = create_user
+      user.provider = "openai"
+      expect(user.provider_label).to eq("GPT")
+    end
+
     it "falls back to AI when the provider is nil" do
       user = create_user
       user.provider = nil
@@ -847,7 +854,7 @@ RSpec.describe User, type: :model do
       # update_column/insert_all/raw SQL — the label must stay stable, never a
       # user-visible "translation missing".
       user = create_user
-      user.provider = "openai"
+      user.provider = "mistral"
       expect(user.provider_label).to eq("AI")
     end
   end

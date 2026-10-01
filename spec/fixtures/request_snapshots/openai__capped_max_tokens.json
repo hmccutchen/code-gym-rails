@@ -1,0 +1,15 @@
+{
+  "model": "gpt-6-sol",
+  "instructions": "SYSTEM TEXT",
+  "input": [
+    {
+      "role": "user",
+      "content": "PROMPT TEXT"
+    }
+  ],
+  "store": false,
+  "reasoning": {
+    "effort": "none"
+  },
+  "max_output_tokens": 250
+}

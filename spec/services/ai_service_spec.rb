@@ -77,9 +77,9 @@ RSpec.describe AiService do
     end
 
     # The provider retry options are what call_budget_seconds describes, so the
-    # arithmetic above holds only while both providers still read them.
+    # arithmetic above holds only while every provider still reads them.
     it "reads the retry limits call_budget_seconds assumes" do
-      [ ClaudeService, GeminiService ].each do |provider|
+      [ ClaudeService, GeminiService, OpenaiService ].each do |provider|
         expect(provider::RETRY_OPTIONS).to include(max: AiService::RETRY_MAX, max_interval: AiService::RETRY_MAX_INTERVAL)
       end
     end
@@ -88,7 +88,7 @@ RSpec.describe AiService do
     # adds its random jitter, so a sleep can exceed RETRY_MAX_INTERVAL unless
     # the largest computed backoff plus that jitter stays under it.
     it "keeps every computed backoff sleep within RETRY_MAX_INTERVAL" do
-      [ ClaudeService, GeminiService ].each do |provider|
+      [ ClaudeService, GeminiService, OpenaiService ].each do |provider|
         options = provider::RETRY_OPTIONS
         largest = options[:interval] * (options[:backoff_factor]**(AiService::RETRY_MAX - 1))
         jitter  = options[:interval_randomness] * options[:interval]
@@ -4455,6 +4455,11 @@ RSpec.describe AiService do
       expect(AiService.for(user)).to be_a(GeminiService)
     end
 
+    it "returns an OpenaiService for an openai user" do
+      user.update!(api_key: "sk-proj-test", provider: "openai")
+      expect(AiService.for(user)).to be_a(OpenaiService)
+    end
+
     it "raises AiService::Error when the user has no recognized provider" do
       expect { AiService.for(user) }.to raise_error(AiService::Error, /no recognized AI provider/)
     end
@@ -4635,7 +4640,7 @@ RSpec.describe AiService do
     # provider against a test adapter, so the request the retry guard sees is
     # what is asserted: the budget reaches the request, marks it long_running,
     # and a timeout is therefore final rather than retried into a second bill.
-    { ClaudeService => ClaudeService::API_URL, GeminiService => GeminiService::API_URL }.each do |provider_class, url|
+    [ ClaudeService, GeminiService, OpenaiService ].to_h { |provider| [ provider, provider::API_URL ] }.each do |provider_class, url|
       it "takes a timed-out #{provider_class} call as final, on the dedicated budget, with one attempt" do
         attempts = []
         service  = provider_class.new("key")
@@ -5094,7 +5099,7 @@ RSpec.describe AiService do
       expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= longest_valid_reasons
     end
 
-    it "is an Integer, since both providers serialize it straight into the request" do
+    it "is an Integer, since every provider serializes it straight into the request" do
       expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be_an(Integer)
     end
 
@@ -6251,7 +6256,8 @@ RSpec.describe AiService, "#judge_review_prose" do
   end
 
   it "says which providers judge" do
-    expect([ AiService, ClaudeService, GeminiService, FakeService ].map(&:judges_review_prose?)).to eq([ false, true, false, true ])
+    expect([ AiService, ClaudeService, GeminiService, OpenaiService, FakeService ].map(&:judges_review_prose?))
+      .to eq([ false, true, false, false, true ])
   end
 end
 
