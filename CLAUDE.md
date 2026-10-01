@@ -858,6 +858,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   pool relocates the staleness this fixes into a smaller fixed pool, and a
   familiar setting starts to predict the bug.
 
+  **A beginner gets everyday settings instead of job-adjacent ones.**
+  `DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL` gives `beginner` 70%
+  `EVERYDAY_SCENARIO_DOMAINS` (a shared grocery list, a gym workout log, a
+  library checkout) and 30% game and animation, and never the general pool:
+  webhooks, tenants and invoice runs assume someone already works in
+  software, which a career changer does not. Every other skill level keeps the
+  default weights. The everyday pool's own rule asks for plain words with no
+  back-office terms, and it carries no legacy GraphQL clause, the one piece of
+  industry framing the other two pools share. It is keyed on skill level, a
+  difficulty setting, because generation never reads learning-track state;
+  joining the junior track is what sets beginner. A spec holds the pool's
+  entries clear of back-office words, as it holds the game pool clear of
+  game internals.
+
   **Flavor is setting only, never a source of concepts.** The tagged concept
   and the planted issue still come from each section's own vocabulary, and
   the game-day line says solving a section must never require knowing how

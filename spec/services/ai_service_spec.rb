@@ -1126,9 +1126,36 @@ RSpec.describe AiService do
     end
 
     it "is rolled under exactly the flavors DailyPlan weights" do
-      expect(AiService::SCENARIO_POOLS.keys).to match_array(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.keys)
+      rolled = ([ DailyPlan::SCENARIO_FLAVOR_WEIGHTS ] + DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.values).flat_map(&:keys).uniq
+
+      expect(AiService::SCENARIO_POOLS.keys).to match_array(rolled)
       expect(AiService::SCENARIO_POOLS.dig(:general, :domains)).to equal(AiService::SCENARIO_DOMAINS)
       expect(AiService::SCENARIO_POOLS.dig(:game_and_animation, :domains)).to equal(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS)
+      expect(AiService::SCENARIO_POOLS.dig(:everyday, :domains)).to equal(AiService::EVERYDAY_SCENARIO_DOMAINS)
+    end
+  end
+
+  describe "EVERYDAY_SCENARIO_DOMAINS" do
+    it "is a frozen, non-empty pool disjoint from the other pools and every concept vocabulary" do
+      pool = AiService::EVERYDAY_SCENARIO_DOMAINS
+
+      expect(pool).to be_frozen
+      expect(pool).not_to be_empty
+      expect(pool & (AiService::SCENARIO_DOMAINS + AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS)).to be_empty
+      [ AiService::RAILS_CONCEPTS, AiService::JS_CONCEPTS, AiService::ARCHITECTURE_CONCEPTS,
+        AiService::PLAN_REVIEW_CONCEPTS, AiService::AMBIGUITY_HUNT_CONCEPTS ].each do |vocabulary|
+        expect(pool & vocabulary).to be_empty
+      end
+    end
+
+    # The pool exists so a career changer is not handed industry context
+    # first. A setting naming a back office would bring that context back.
+    it "names nothing from a company's back office" do
+      back_office = %w[invoice invoicing ledger tenant csv webhook payroll billing export graphql api]
+
+      AiService::EVERYDAY_SCENARIO_DOMAINS.each do |domain|
+        expect(domain.split("_") & back_office).to be_empty, "#{domain} names back-office context"
+      end
     end
   end
 
@@ -1767,8 +1794,20 @@ RSpec.describe AiService do
                                   "and NOT from the scenario flavors listed above")
       end
 
-      it "keeps the legacy GraphQL clause rare and concept-free under either flavor" do
-        AiService::SCENARIO_POOLS.each_key do |flavor|
+      it "offers the everyday pool, with the plain-words rule and no legacy GraphQL clause, on an everyday day" do
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: :everyday)
+
+        AiService::EVERYDAY_SCENARIO_DOMAINS.each do |domain|
+          expect(prompt).to include(domain.tr("_", " "))
+        end
+        expect(prompt).to include("everyday settings someone new to the software industry already knows from daily life like:")
+        expect(prompt).to include("no business back-office terms such as invoices")
+        expect(prompt).not_to include("background job processing")
+        expect(prompt).not_to match(/1 in every 8-10/)
+      end
+
+      it "keeps the legacy GraphQL clause rare and concept-free under the job-adjacent and game flavors" do
+        %i[general game_and_animation].each do |flavor|
           prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: flavor)
 
           expect(prompt).to match(/1 in every 8-10/)

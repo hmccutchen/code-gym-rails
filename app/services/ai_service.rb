@@ -836,8 +836,21 @@ class AiService
     animation_export_job_queue
   ].freeze
 
+  # Everyday SETTINGS for a beginner's day, used the same way as the other
+  # pools. Each names something a person outside the software industry
+  # already uses, so a career changer meets the concept without first having
+  # to learn what an invoice run or a tenant is.
+  EVERYDAY_SCENARIO_DOMAINS = %w[
+    shared_grocery_list recipe_box_and_meal_planner gym_workout_log
+    library_book_checkout pet_adoption_listings household_chore_rota
+    book_club_reading_list plant_watering_reminders event_rsvp_list
+    personal_savings_goals
+  ].freeze
+
   # Legacy GraphQL is scenario dressing at a stated rarity, the same under
-  # either flavor — a studio has a legacy layer as readily as a SaaS does.
+  # the job-adjacent and game flavors — a studio has a legacy layer as
+  # readily as a SaaS does. A beginner's everyday day leaves it out, since a
+  # legacy layer is exactly the industry context that pool avoids.
   LEGACY_GRAPHQL_SCENARIO_GUIDANCE =
     "Use a legacy GraphQL maintenance scenario (e.g. \"a legacy GraphQL layer needs a fix\") only rarely — " \
     "at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.".freeze
@@ -853,7 +866,8 @@ class AiService
       domains:    SCENARIO_DOMAINS,
       intro:      "real, job-adjacent flavors",
       adaptation: "a Rails day's \"component state management\" becomes a service/controller state concern instead",
-      rule:       nil
+      rule:       nil,
+      legacy:     LEGACY_GRAPHQL_SCENARIO_GUIDANCE
     },
     game_and_animation: {
       domains:    GAME_AND_ANIMATION_SCENARIO_DOMAINS,
@@ -861,7 +875,17 @@ class AiService
       adaptation: "a Rails day's \"platformer save-state system\" is the service that stores, versions and restores saves",
       rule:       "The setting supplies names and story only: the tagged concept and the one planted issue come from " \
                   "each section's own vocabulary as always, and solving a section must never require knowing how " \
-                  "games or animation work inside — no frame timing, physics, rendering, engine or netcode detail."
+                  "games or animation work inside — no frame timing, physics, rendering, engine or netcode detail.",
+      legacy:     LEGACY_GRAPHQL_SCENARIO_GUIDANCE
+    },
+    everyday: {
+      domains:    EVERYDAY_SCENARIO_DOMAINS,
+      intro:      "everyday settings someone new to the software industry already knows from daily life",
+      adaptation: "a Rails day's \"shared grocery list\" is the model and controller that store and update the list",
+      rule:       "Keep the setting's own words plain and familiar: no business back-office terms such as invoices, " \
+                  "ledgers, tenants, CSV exports or webhooks, and solving a section must never require knowing how " \
+                  "a company's internal systems work.",
+      legacy:     nil
     }
   }.freeze
 
@@ -2129,7 +2153,8 @@ class AiService
 
   # One bullet, whichever pool today rolled. The general flavor renders the
   # line exactly as it read before flavors existed; legacy_graphql_maintenance
-  # is dropped from every listed pool because its clause states it separately.
+  # is dropped from every listed pool because its clause, where the pool
+  # carries one, states it separately.
   # SCENARIO_POOLS.fetch, so an unknown flavor fails here rather than
   # rendering an empty list the model would fill with generic SaaS.
   def scenario_flavor_guidance(flavor)
@@ -2140,7 +2165,7 @@ class AiService
       "- Prefer drawing each section's business-domain scenario from #{pool[:intro]} like: #{flavors} " \
         "(adapt any flavor to fit the day's stack — e.g. #{pool[:adaptation]}).",
       pool[:rule],
-      LEGACY_GRAPHQL_SCENARIO_GUIDANCE
+      pool[:legacy]
     ].compact.join(" ")
   end
 
