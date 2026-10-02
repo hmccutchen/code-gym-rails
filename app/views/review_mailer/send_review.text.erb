@@ -1,13 +1,13 @@
-Hi <%= @response.user.name %>,
+<%= t("review_mailer.send_review.greeting", name: @response.user.name) %>
 
-Here's your Code Gym review from <%= @response.date.strftime("%A, %B %-d, %Y") %>.
+<%= t("review_mailer.send_review.intro", app_name: t("app_name"), date: @response.date.strftime("%A, %B %-d, %Y")) %>
 
 <% @response.ai_review.each do |section, fb| -%>
 <% next unless fb.is_a?(Hash) -%>
 == <%= section.humanize %> ==
 
 <% if fb["rating"].present? -%>
-Rating: <%= fb["rating"] %>
+<%= t("review_mailer.send_review.rating", rating: fb["rating"]) %>
 
 <% end -%>
 <% if (difficulty = @response.difficulty_for(section)) -%>
@@ -38,4 +38,4 @@ Rating: <%= fb["rating"] %>
 
 <% end -%>
 <% end -%>
-— Code Gym
+<%= t("review_mailer.send_review.sign_off", app_name: t("app_name")) %>

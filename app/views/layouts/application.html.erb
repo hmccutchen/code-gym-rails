@@ -20,7 +20,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="<%= display_preferences.status_bar_style %>">
-  <meta name="apple-mobile-web-app-title" content="Code Gym">
+  <meta name="apple-mobile-web-app-title" content="<%= t("app_name") %>">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <% if display_stylesheets? %>
     <%= tag.meta(name: "theme-color", content: DisplayPreferences::LIGHT_THEME_COLOR,
@@ -513,7 +513,7 @@
   <a class="skip-link" href="#main-content"><%= t("nav.skip_to_content") %></a>
   <nav>
     <div class="container inner">
-      <%= link_to root_path, class: "brand" do %><%= brand_mark %><span aria-hidden="true">Code Gym</span><% end %>
+      <%= link_to root_path, class: "brand" do %><%= brand_mark %><span aria-hidden="true"><%= t("app_name") %></span><% end %>
       <button type="button" class="nav-toggle" id="nav-toggle"
               aria-expanded="false" aria-controls="nav-links"
               aria-label="<%= t("nav.menu") %>">
@@ -602,8 +602,8 @@
         <% end %>
         <%= link_to t("learn.title"), learn_path %>
         <%= link_to t("progress.title"), progress_path %>
-        <%= link_to "History", history_path %>
-        <%= link_to "Account", account_path %>
+        <%= link_to t("nav.history"), history_path %>
+        <%= link_to t("nav.account"), account_path %>
       </div>
       <%# Inline script, same convention as the name editor above. The panel's
           collapsed state is CSS, so above the breakpoint the button is gone

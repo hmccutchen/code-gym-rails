@@ -410,6 +410,17 @@ en:
   nav:
     menu: "Menu"
     skip_to_content: "Skip to content"
+    history: "History"
+    account: "Account"
+  review_mailer:
+    send_review:
+      subject: "Your %{app_name} review — %{date}"
+      greeting: "Hi %{name},"
+      intro: "Here's your %{app_name} review from %{date}."
+      rating: "Rating: %{rating}"
+      sign_off: "— %{app_name}"
+  pwa:
+    description: "Daily personalized coding exercises."
   profile:
     name:
       saved: "Saved ✓"
