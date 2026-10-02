@@ -1363,8 +1363,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   optional kind can host waits, and the `[retention] waiting=` line says so.
   A fixed choice wins by design.
 - **What the plan did, on the row**: `daily_exercises.plan_notes` (jsonb,
-  default `{}`, null false) records `{"coverage" => kind_key}` and
-  `{"shared_concept" => concept}`, each only when it applied
+  default `{}`, null false) records `{"coverage" => kind_key, "coverage_reason" => "gap" |
+  "due_check"}` and `{"shared_concept" => concept}`, each only when it applied
   (`DailyPlan::Result#notes`). It is server-owned and written with the row
   from the plan that produced it, never recomputed while rendering: both
   generation paths hand it back on `AiService::JudgedSet#plan_notes`
@@ -1446,10 +1446,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `requested`.
 
   **What the dashboard says.** Two muted lines in the style of
-  `dashboard.section_left_out`, on the unsubmitted dashboard:
-  `dashboard.coverage_added` while the added kind is still in
-  `active_section_keys` (`DailyExercise#coverage_shown?`), and
-  `dashboard.shared_concept` only when both delivered fixed sections carry
+  `dashboard.section_left_out`, on the unsubmitted dashboard. While the
+  added kind is still in `active_section_keys`, `DailyExercise#coverage_shown`
+  returns the stored `plan_notes["coverage_reason"]` and the line follows it:
+  `dashboard.coverage_added.gap` ("a kind you haven't seen in a while") for a
+  gap, and `dashboard.coverage_added.due_check` ("so an idea you learned
+  earlier can come back up") for a due check, whose host may have been seen
+  last week, so the gap wording would be false for it.
+  `dashboard.shared_concept` shows only when both delivered fixed sections carry
   the planned concept (`#shared_concept_shown?`), so a dropped section or an
   ignored placement never produces a false claim. The shared line gives no
   reason: "because it has been giving you trouble" would expose the mastery

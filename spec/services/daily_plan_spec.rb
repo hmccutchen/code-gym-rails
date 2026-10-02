@@ -848,6 +848,8 @@ RSpec.describe DailyPlan::Result, "#notes" do
   it "records only what applied" do
     expect(result.notes).to eq({})
     expect(result(shared_concept: "feature_envy").notes).to eq("shared_concept" => "feature_envy")
+    gap = CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap)
+    expect(result(coverage: gap).notes).to eq("coverage" => "pattern", "coverage_reason" => "gap")
   end
 end
 
@@ -1058,7 +1060,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
     expect(plan.third).to eq(:architecture)
     expect(plan.due_checks.map(&:concept)).to eq(%w[service_boundaries])
     expect(plan.waiting_checks).to eq([])
-    expect(plan.notes).to eq("coverage" => "architecture")
+    expect(plan.notes).to eq("coverage" => "architecture", "coverage_reason" => "due_check")
   end
 
   it "adds the longest-unseen kind once the gap has run past four weeks" do

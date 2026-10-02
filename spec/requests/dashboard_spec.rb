@@ -1601,7 +1601,8 @@ end
 
 RSpec.describe "Dashboard lines about what the plan did", type: :request do
   let(:user) { create_user_with_key }
-  let(:coverage_line) { I18n.t("dashboard.coverage_added") }
+  let(:coverage_line) { I18n.t("dashboard.coverage_added.gap") }
+  let(:due_check_line) { I18n.t("dashboard.coverage_added.due_check") }
   let(:shared_line) { I18n.t("dashboard.shared_concept", sections: "Code Review and Design Comparison") }
 
   let(:comparison) do
@@ -1619,22 +1620,35 @@ RSpec.describe "Dashboard lines about what the plan did", type: :request do
 
   before { login_as(user) }
 
-  it "shows the coverage line when the added kind is on the page" do
+  it "shows the gap line when the added kind is on the page" do
     exercise_with({ "code_review" => code_review, "design_comparison" => comparison, "plan_review" => plan_review },
-                  plan_notes: { "coverage" => "plan_review" })
+                  plan_notes: { "coverage" => "plan_review", "coverage_reason" => "gap" })
 
     get root_path
 
     expect(response.body).to include(CGI.escapeHTML(coverage_line))
+    expect(response.body).not_to include(CGI.escapeHTML(due_check_line))
+  end
+
+  # A due check can pick a kind seen last week, so "haven't seen in a while"
+  # would be false for it.
+  it "shows the due-check line, not the gap line, for a section added to host a check" do
+    exercise_with({ "code_review" => code_review, "design_comparison" => comparison, "plan_review" => plan_review },
+                  plan_notes: { "coverage" => "plan_review", "coverage_reason" => "due_check" })
+
+    get root_path
+
+    expect(response.body).to include(CGI.escapeHTML(due_check_line))
+    expect(response.body).not_to include(CGI.escapeHTML(coverage_line))
   end
 
   it "says nothing about coverage once the added section was dropped" do
     exercise_with({ "code_review" => code_review, "design_comparison" => comparison },
-                  plan_notes: { "coverage" => "plan_review" }, dropped: [ "plan_review" ])
+                  plan_notes: { "coverage" => "plan_review", "coverage_reason" => "due_check" }, dropped: [ "plan_review" ])
 
     get root_path
 
-    expect(response.body).not_to include(CGI.escapeHTML(coverage_line))
+    expect(response.body).not_to include(CGI.escapeHTML(due_check_line))
     expect(response.body).to include("left out today")
   end
 
@@ -1675,6 +1689,6 @@ RSpec.describe "Dashboard lines about what the plan did", type: :request do
   end
 
   it "keeps both lines free of any reading of the engineer's standing" do
-    expect([ coverage_line, shared_line ]).to all(satisfy { |line| line !~ /tier|reduced|struggl|trouble|score|\d/i })
+    expect([ coverage_line, due_check_line, shared_line ]).to all(satisfy { |line| line !~ /tier|reduced|struggl|trouble|score|\d/i })
   end
 end

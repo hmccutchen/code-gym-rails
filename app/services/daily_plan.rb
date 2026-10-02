@@ -17,7 +17,8 @@ class DailyPlan
                         :shared_concept, :coverage, :waiting_checks) do
     # What daily_exercises.plan_notes stores for the day this plan produced.
     def notes
-      { "coverage" => coverage&.kind&.key, "shared_concept" => shared_concept }.compact
+      { "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
+        "shared_concept" => shared_concept }.compact
     end
   end
 

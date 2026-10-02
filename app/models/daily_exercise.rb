@@ -32,8 +32,10 @@ class DailyExercise < ApplicationRecord
   # plan_notes records what the plan meant to do; these say whether the
   # delivered set still shows it, so a dropped section or an ignored
   # placement never produces a false claim on the dashboard.
-  def coverage_shown?
-    active_section_keys.include?(plan_notes["coverage"])
+  # Why the plan added a section ("gap" or "due_check"), or nil when it added
+  # none or the added section is no longer on the page.
+  def coverage_shown
+    plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end
 
   def shared_concept_shown?
