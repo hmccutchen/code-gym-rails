@@ -109,7 +109,7 @@
   <div class="form-field">
     <label for="skill-level"><%= t("api_keys.edit.skill_level_label") %></label>
     <%= select_tag "skill_level",
-          options_for_select(User::SKILL_LEVELS.map { |level| [ t("api_keys.edit.skill_levels.#{level}"), level ] }, current_user.skill_level),
+          options_for_select(User::SKILL_LEVELS.map { |level| [ t("exercise_mix.levels.#{level}"), level ] }, current_user.skill_level),
           id: "skill-level",
           data: { label_template: t("exercise_mix.level_default", skill_level: "__LEVEL__") } %>
     <p class="hint"><%= t("api_keys.edit.skill_level_hint") %></p>

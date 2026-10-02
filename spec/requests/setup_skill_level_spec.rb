@@ -23,6 +23,8 @@ RSpec.describe "Setup skill level control", type: :request do
     get setup_path
 
     expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Junior", "Senior", "Principal engineer" ])
+    expect(page_html.css("select#skill-level option").map(&:text))
+      .to eq(User::SKILL_LEVELS.map { |level| I18n.t("exercise_mix.levels.#{level}") })
     expect(page_html.text).to include("Junior suits early-career developers and career changers. Your ratings")
   end
 

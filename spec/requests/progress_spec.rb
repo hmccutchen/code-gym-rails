@@ -57,6 +57,17 @@ RSpec.describe "Progress", type: :request do
     expect(legend).to eq([ "principal", "senior", "junior", "developing", "not yet", "not offered" ])
   end
 
+  # Developing toward junior means nothing is held, so the legend must not
+  # describe developing only as a step above a held rung.
+  it "describes developing for both a held rung and none held" do
+    get progress_path
+
+    developing = Nokogiri::HTML(response.body).css(".progress-legend div")
+                         .find { |row| row.at_css("dt").text == "developing" }.at_css("dd").text
+    expect(developing).to include("the next rung above the one you hold")
+    expect(developing).to include("to junior when you hold none")
+  end
+
   it "summarizes each group by rung counts rather than a percentage" do
     reviewed_session(date: Date.current - 1, concept: "n_plus_one", rung: "senior")
 
