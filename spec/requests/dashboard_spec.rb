@@ -1707,9 +1707,10 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
                                                  "why_other_fails" => "w" } } }
   end
 
-  def day(date, planned:, answered: { "code_review" => "a" * 20 }, submitted: true)
+  def day(date, planned:, answered: { "code_review" => "a" * 20 }, submitted: true, notes: {})
+    plan_notes = planned ? { "size" => planned, "size_reason" => "gate" }.merge(notes) : {}
     exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
-                                     problem_set: problem_set, plan_notes: planned ? { "size" => planned, "size_reason" => "gate" } : {})
+                                     problem_set: problem_set, plan_notes: plan_notes)
     DailyResponse.create!(user: user, daily_exercise: exercise, date: date, answers: answered,
                           section_ratings: answered.transform_values { "right_level" },
                           submitted_at: (Time.current if submitted))
@@ -1749,6 +1750,37 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     get root_path
 
     expect(response.body).to include(CGI.escapeHTML(smaller_line))
+    expect(response.body).not_to include(larger_line)
+  end
+
+  # The count comes from tomorrow's size, not from the floor.
+  it "names tomorrow's count in the smaller line" do
+    stub_gate(3, :brake)
+    day(Date.current, planned: 4)
+
+    get root_path
+
+    expect(response.body).to include(CGI.escapeHTML(I18n.t("dashboard.size_change.smaller", count: 3)))
+  end
+
+  # The size came from a fixed choice the user has since left, so a larger
+  # Automatic day tomorrow is the switch, not their answers.
+  it "says nothing when today's size came from a fixed setting" do
+    stub_gate(3, :grew)
+    day(Date.current, planned: 2, notes: { "size_reason" => "setting" })
+
+    get root_path
+
+    expect(response.body).not_to include(larger_line)
+  end
+
+  # Today showed three sections, two planned and one added for coverage.
+  it "does not promise a larger set of the size today already showed" do
+    stub_gate(3, :grew)
+    day(Date.current, planned: 2, notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
+
+    get root_path
+
     expect(response.body).not_to include(larger_line)
   end
 

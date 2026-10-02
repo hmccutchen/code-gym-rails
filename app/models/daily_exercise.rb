@@ -48,6 +48,14 @@ class DailyExercise < ApplicationRecord
   # on a row from before plans recorded it.
   def planned_size = plan_notes["size"]
 
+  # The planned size plus the one section a coverage addition brings
+  # (CoverageException adds at most one), nil when no size was recorded.
+  def planned_size_with_coverage
+    planned_size && planned_size + (plan_notes["coverage"] ? 1 : 0)
+  end
+
+  def planned_by_setting? = plan_notes["size_reason"] == "setting"
+
   def shared_concept_shown?
     ExerciseSection.fixed_sections_share?(problem_set, plan_notes["shared_concept"])
   end
