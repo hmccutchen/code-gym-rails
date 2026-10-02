@@ -225,8 +225,9 @@ User opens dashboard:
   └→ DashboardController#show
        shows today's DailyExercise, or triggers on-demand generation if missing
        (weekdays only; weekends offer a manual "generate anyway" button)
-       2-4 sections, sized from recent completion: Code Review and Design
-       Comparison are always present; Pattern of the Month, a rotating third
+       2-4 sections, sized from recent completion unless the user fixed a
+       count in Setup's Daily sections: Code Review and Design Comparison
+       are always present; Pattern of the Month, a rotating third
        (Coding Challenge / Architecture Decision / Security Review / Parsons
        Problem), and a rotating fourth (Plan Review / Ambiguity Hunt /
        Pseudocode to Code) compete for the remaining slots, which today's
@@ -1327,12 +1328,19 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the setting is not part of the Exercise mix, so it does not bump
   `section_kind_preferences_version`.
 
-  **The boundary accepts only listed values.** `ProfileController` takes the
-  literal `"automatic"` (stored as nil) or a listed count, as a JSON number or
-  its string. Anything else is a 422 that saves nothing, because Active
-  Record's integer cast would turn `""`, `null` or `"abc"` into nil, which
-  means Automatic, and `"2.5"` into 2. The model also validates the stored
-  value against the same range.
+  The lowest choice holds only the fixed kinds, and Setup's hint says so; a
+  spec holds `SectionCount::FLOOR` equal to their number for that sentence. A
+  fixed count is what the day is planned with, and the judge can still drop
+  an optional section from it.
+
+  **The boundary accepts only listed values.** `ProfileController` takes
+  `User::AUTOMATIC_SECTION_COUNT` (`"automatic"`, stored as nil, and the value
+  Setup's radio posts) or a listed count, as an Integer or its exact string.
+  Anything else is a 422 that saves nothing, because Active Record's integer
+  cast would turn `""`, `null` or `"abc"` into nil, which means Automatic, and
+  `"2.5"` into 2, and a JSON `2.0` equals 2. The model checks the same range
+  only when the value changes, like the other validations that read moving
+  constants, since `SectionRotation` clamps a stale stored count anyway.
 
   **It replaced the `adaptive_set_size` boolean, and every account reads
   Automatic.** `AddDailySectionCountToUsers` adds the column with no default
