@@ -1036,7 +1036,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
   before do
     pin_code_review_mode(:application_code)
     allow(SectionCount).to receive(:for).and_call_original
-    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(SectionCount::FLOOR)
+    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(ExerciseSection.fixed.size)
   end
 
   def two_section_day(date, plan_notes: {})
@@ -1098,7 +1098,7 @@ RSpec.describe DailyPlan, "the coverage exception" do
   end
 
   it "does not read the coverage history on a day it cannot apply to" do
-    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(SectionCount::FLOOR + 1)
+    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(ExerciseSection.fixed.size + 1)
     expect(CoverageException::History).not_to receive(:for)
     expect(CoverageException::History).not_to receive(:recent_coverage_dates)
 

@@ -25,7 +25,7 @@ class CoverageException
   Addition = Data.define(:kind, :reason)
 
   def self.applies_to_day?(count:, fixed:, brake: false)
-    fixed.nil? && count == SectionCount::FLOOR && !brake
+    fixed.nil? && count <= ExerciseSection.fixed.size && !brake
   end
 
   # `history` is a CoverageException::History. `checks` are the day's

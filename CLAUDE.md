@@ -1418,7 +1418,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
 - **Coverage exception**: at two sections a day has no optional slot, so
   `SectionRotation`'s starvation guarantee has nothing to act on.
   `CoverageException` (pure) adds one optional section when the setting is
-  Automatic, the day's count is `SectionCount::FLOOR`, the struggle brake is
+  Automatic, the day's count leaves no optional slot (`count <=
+  ExerciseSection.fixed.size`), the struggle brake is
   off (a `brake:` input that defaults to false until the competency gate
   wires it), and no exercise dated on the previous `CAP_WEEKDAYS` (4)
   weekdays carries `plan_notes["coverage"]`. It picks (a) the kind able to

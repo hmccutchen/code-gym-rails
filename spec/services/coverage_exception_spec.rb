@@ -17,7 +17,7 @@ RSpec.describe CoverageException do
     CoverageException::History.new(last_seen: seen, coverage_dates: coverage_dates, first_date: first_date)
   end
 
-  def decide(history: self.history, checks: [], count: SectionCount::FLOOR, fixed: nil, brake: false,
+  def decide(history: self.history, checks: [], count: ExerciseSection.fixed.size, fixed: nil, brake: false,
              preferences: KindPreferences.none)
     described_class.for(today: monday, count: count, fixed: fixed, history: history, checks: checks,
                         preferences: preferences, hosts: hosts, brake: brake)
@@ -105,8 +105,13 @@ RSpec.describe CoverageException do
       expect(decide(history: stale, fixed: 2)).to be_nil
     end
 
+    it "reads the day's size against the fixed kinds, the authority for having no optional slot" do
+      expect(described_class.applies_to_day?(count: ExerciseSection.fixed.size, fixed: nil)).to be(true)
+      expect(described_class.applies_to_day?(count: ExerciseSection.fixed.size + 1, fixed: nil)).to be(false)
+    end
+
     it "never fires on a day above two sections" do
-      expect(decide(history: stale, count: SectionCount::FLOOR + 1)).to be_nil
+      expect(decide(history: stale, count: ExerciseSection.fixed.size + 1)).to be_nil
     end
 
     it "never fires while the brake is on" do
