@@ -4,7 +4,8 @@
 # Each section is judged in its own thread, like grading. A rejection buys up
 # to the kind's judge_retries regenerations of that section, unless the
 # drafted concept normalized to "other", which is rejected directly rather
-# than spending a retry on an unusable tag. Rejecting the last retry drops the
+# than spending a retry on an unusable tag. A planned section ingest refused
+# as unusable counts as rejected before judging. Rejecting the last retry drops the
 # section, whichever kind it is; a day with every section dropped is a failed
 # generation (AiService::AllSectionsRejectedError), never an empty set. A judge
 # that fails or answers invalidly leaves the draft unedited: the judge alone
@@ -54,7 +55,7 @@ class JudgedGeneration
     # including the ones dropped below, which the finish step's logs and the
     # unhosted list are named after.
     set = ProblemSetIngest.prune_to_expected_keys(@draft.problem_set, expected_keys: @draft.kinds.map(&:key))
-    outcomes = judge_all(set)
+    outcomes = judge_all(set).merge(unusable_outcomes)
 
     resolve_rejections(set, outcomes).each do |key, section, outcome|
       outcomes[key] = outcome
@@ -69,6 +70,23 @@ class JudgedGeneration
 
   private
 
+  # A planned section ingest refused is treated as a rejection the judge
+  # never saw: it gets the kind's retries with its drafted concept, then drops.
+  def unusable_outcomes
+    planned = @draft.kinds.map(&:key)
+    Array(@draft.unusable_sections).select { |section| planned.include?(section.key) }.to_h do |section|
+      [ section.key, { status: :reject, issues: [], principle: nil, retries: 0, dropped: false, fallback: nil,
+                       latency_ms: 0, unusable: true } ]
+    end
+  end
+
+  # The concept a drafted section carried, including one ingest left out of
+  # the set; nil when there is none to fix a retry to.
+  def drafted_concept(key)
+    @draft.problem_set.dig(key, "concept") ||
+      Array(@draft.unusable_sections).find { |section| section.key == key }&.concept
+  end
+
   def reject_empty_day!(set, dropped)
     return if ExerciseSection.resolved_keys(set).any?
 
@@ -77,7 +95,7 @@ class JudgedGeneration
   end
 
   def finish(set, dropped, outcomes)
-    dropped_concepts = dropped.to_h { |key| [ key, @draft.problem_set.dig(key, "concept") ] }
+    dropped_concepts = dropped.to_h { |key| [ key, drafted_concept(key) ] }
     @finish.call(set, dropped_concepts: dropped_concepts, judge: outcomes, unhosted: unhosted_concepts(dropped_concepts))
   end
 
@@ -100,7 +118,7 @@ class JudgedGeneration
   def resolve_rejections(set, outcomes)
     rejected_keys(outcomes).map { |key|
       kind = ExerciseSection.find(key)
-      thread_in_caller_zone { [ key, *resolve_rejection(kind, set[key], outcomes[key]) ] }
+      thread_in_caller_zone { [ key, *resolve_rejection(kind, drafted_concept(key), outcomes[key]) ] }
     }.map(&:value)
   end
 
@@ -153,12 +171,11 @@ class JudgedGeneration
   # for the same reason it keeps a draft. Each retry field is a list with one
   # entry per judged retry, in order; a blind-solve kind carries no evidence
   # or reason lists, for the reason #judgment gives.
-  def resolve_rejection(kind, section, outcome)
+  def resolve_rejection(kind, concept, outcome)
     retry_fields = kind.judge_solve_options ? RETRY_FIELDS - %i[retry_evidence retry_reason] : RETRY_FIELDS
     outcome = outcome.merge(retries: 0, **retry_fields.index_with { [] })
-    return drop(outcome) if section["concept"] == "other"
+    return drop(outcome) if concept.nil? || concept == "other"
 
-    concept = section["concept"]
     kind.judge_retries.times do
       retried = retry_section(kind, concept)
       return drop(outcome) if retried.nil?

@@ -44,7 +44,13 @@ class ProblemSetIngest
   # under.
   Suggestion = Data.define(:bucket, :name)
 
-  Result = Data.define(:problem_set, :suggested_concepts)
+  # A resolved section its kind's boundary check refused. `concept` is the
+  # tag it carried when that tag is in the section's vocabulary, else nil,
+  # so a retry is only ever asked for a concept the plan could have placed.
+  # `reason` is the check's own message, which never quotes section text.
+  Unusable = Data.define(:key, :concept, :reason)
+
+  Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections)
 
   # Raises AiService::InvalidResponseError when the set cannot be used at all.
   # `code_review_source` is the RealSource excerpt today's code_review was
@@ -171,6 +177,7 @@ class ProblemSetIngest
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
     @suggested_concepts = []
+    @unusable_sections  = []
   end
 
   # Rejection runs before the normalizers: there is no reason to bound
@@ -194,7 +201,7 @@ class ProblemSetIngest
     ground_code_review!
     stamp_pitched_rungs!
 
-    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts)
+    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections)
   end
 
   private
@@ -261,10 +268,30 @@ class ProblemSetIngest
   # shapes leaves one that nothing downstream will render or grade, and
   # discarding a good day over a section no one reads would be a strictly
   # worse outcome than ignoring it.
+  #
+  # A refused section costs only itself: its whole slot leaves the set, so a
+  # lower-precedence shape in the same slot cannot take its place unchecked,
+  # and the refusal is reported on the Result for the caller to retry or
+  # record as dropped. The set is refused only when nothing usable remains.
   def reject_unusable_sections!
     ExerciseSection.resolved_keys(@problem_set).each do |key|
       ExerciseSection.for(key).reject_unusable!(@problem_set[key])
+    rescue AiService::InvalidResponseError => e
+      @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: e.message)
+      @problem_set = @problem_set.except(*slot_keys_for(key))
     end
+    return if ExerciseSection.resolved_keys(@problem_set).any?
+
+    raise AiService::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
+  end
+
+  def usable_concept(key)
+    concept = @problem_set.dig(key, "concept")
+    concept if self.class.vocabulary_for(key, @language).include?(concept)
+  end
+
+  def slot_keys_for(key)
+    ExerciseSection.slots.values.find { |kinds| kinds.map(&:key).include?(key) }.map(&:key)
   end
 
   # A single-section retry names the concept the day's plan already placed at

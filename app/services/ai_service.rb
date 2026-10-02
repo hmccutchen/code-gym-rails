@@ -1081,7 +1081,7 @@ class AiService
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
-                      :prompt_options, :suggested_concepts)
+                      :prompt_options, :suggested_concepts, :unusable_sections)
   private_constant :Draft
 
   # ── Generate a personalized daily exercise set ────────────────────────────
@@ -1093,9 +1093,19 @@ class AiService
   # tighter read budget (see SYNC_GENERATION_READ_TIMEOUT). Callers state their
   # constraint; the timeout policy stays here.
   def generate_exercise(user, language: user.language_for_today, blocking: false)
-    draft = draft_exercise(user, language: language, blocking: blocking)
-    finish_generation(user, language, draft, draft.problem_set)
-    draft.problem_set
+    generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
+  end
+
+  # The single-stage path with what it left out: a planned section ingest
+  # refused is dropped, as the judged path drops one it cannot repair, and
+  # its key is recorded the same way.
+  def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false)
+    draft   = draft_exercise(user, language: language, blocking: blocking)
+    planned = draft.kinds.map(&:key)
+    dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
+    finish_generation(user, language, draft, draft.problem_set,
+                      dropped_concepts: dropped.to_h { |section| [ section.key, section.concept ] })
+    JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {})
   end
 
   # ── Draft, judge, retry once, drop — the weekday batch's path ────────────
@@ -1527,9 +1537,17 @@ class AiService
       pitched_at: pitched_rungs(difficulty, user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
+    log_unusable_sections(user, ingested.unusable_sections)
     Draft.new(problem_set: ingested.problem_set, plan: plan, kinds: kinds, difficulty: difficulty,
               ladders: ladders, history: history, prompt_options: options,
-              suggested_concepts: ingested.suggested_concepts)
+              suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
+  end
+
+  # The check's own message only: the section's text could carry its answer key.
+  def log_unusable_sections(user, unusable)
+    unusable.each do |section|
+      Rails.logger.warn("[unusable_section] user=#{user.id} section=#{section.key} reason=#{section.reason}")
+    end
   end
 
   def exercise_prompt_options(plan, history, difficulty, ladders)

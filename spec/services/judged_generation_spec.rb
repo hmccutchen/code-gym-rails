@@ -4,7 +4,7 @@ require "rails_helper"
 # reaches a provider only through JudgedGeneration::Provider, so these examples
 # pin that interface as well as the keep, retry, drop and fallback rules.
 RSpec.describe JudgedGeneration do
-  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, keyword_init: true) }
+  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true) }
   let(:plan_type) { Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true) }
   let(:due_check) { Struct.new(:concept) }
 
@@ -115,6 +115,51 @@ RSpec.describe JudgedGeneration do
     expect { run }.to raise_error(AiService::AllSectionsRejectedError)
     expect(finished).to be_empty
     expect(Rails.logger).to have_received(:warn).with(/\[judge_all_rejected\] user=42/)
+  end
+
+  describe "a planned section ingest refused as unusable" do
+    let(:unusable) { [ ProblemSetIngest::Unusable.new(key: "challenge", concept: "memoization", reason: "bad") ] }
+
+    before do
+      drafted.delete("challenge")
+      draft.unusable_sections = unusable
+    end
+
+    it "is retried with its drafted concept, like a rejection, and ships when the retry is kept" do
+      retried_sections["challenge"] = { "concept" => "memoization", "question" => "Retried" }
+
+      judged = run
+
+      expect(retry_calls).to eq([ [ user, "ruby_rails", draft, "challenge", "memoization" ] ])
+      expect(judged.problem_set["challenge"]).to include("question" => "Retried")
+      expect(judged.outcomes["challenge"]).to include(unusable: true, status: :keep, retries: 1, dropped: false)
+    end
+
+    it "is dropped once its retries are rejected, and named with its concept" do
+      retried_sections["challenge"] = { "concept" => "memoization", "question" => "Retried" }
+      verdicts["challenge"] = [ reject ]
+
+      judged = run
+
+      expect(judged.dropped_sections).to eq([ "challenge" ])
+      expect(finished.sole.last[:dropped_concepts]).to include("challenge" => "memoization")
+    end
+
+    it "is dropped without a retry when it carried no usable concept" do
+      draft.unusable_sections = [ ProblemSetIngest::Unusable.new(key: "challenge", concept: nil, reason: "bad") ]
+
+      judged = run
+
+      expect(retry_calls).to be_empty
+      expect(judged.dropped_sections).to eq([ "challenge" ])
+    end
+
+    it "ignores an unusable section the day never planned" do
+      draft.unusable_sections = [ ProblemSetIngest::Unusable.new(key: "plan_review", concept: "scope_creep", reason: "bad") ]
+      drafted["challenge"] = { "concept" => "memoization", "question" => "Implement it" }
+
+      expect(run.outcomes).not_to have_key("plan_review")
+    end
   end
 
   it "drops without a retry call when the drafted concept is other" do

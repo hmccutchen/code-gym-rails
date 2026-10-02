@@ -9,9 +9,9 @@
 # submission may show, log or send to a model.
 class ExerciseSection::DesignComparison < ExerciseSection
   # Lines of code, blanks not counted: twice the prompt's lower target, the
-  # way AmbiguityHunt::MAX_PLANTED doubles PLANTED_COUNT. Exceeding it fails
-  # the whole day's generation, so it stops a runaway reply, not a long piece;
-  # unequal lengths are the judge's surface-parity check.
+  # way AmbiguityHunt::MAX_PLANTED doubles PLANTED_COUNT. Exceeding it costs
+  # the section, so it stops a runaway reply, not a long piece; unequal
+  # lengths are the judge's surface-parity check.
   MAX_PIECE_LINES = 24
 
   # About one sentence naming a fact, against prose's ten characters. A pick

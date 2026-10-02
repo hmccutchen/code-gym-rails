@@ -2317,6 +2317,25 @@ RSpec.describe AiService do
       expect(problem_set["pattern"]["diagram"]).to eq("flowchart TD\n  A --> B")
     end
 
+    # A malformed fixed section must not cost the day: it is dropped and
+    # recorded, and its log line carries the check's message, never the text.
+    it "drops a section ingest refused on the single-stage path, records it, and logs the reason only" do
+      broken = design_comparison_section.merge("other_piece" => "", "scenario" => "SECRET scenario text")
+      svc = double_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" },
+                                                           "design_comparison" => broken).to_json)
+      logged = []
+      allow(Rails.logger).to receive(:warn) { |message| logged << message }
+
+      generated = svc.generate_unjudged_exercise(user)
+
+      expect(generated.problem_set).not_to have_key("design_comparison")
+      expect(generated.dropped_sections).to eq([ "design_comparison" ])
+      expect(logged.grep(/\[unusable_section\]/).sole)
+        .to eq("[unusable_section] user=#{user.id} section=design_comparison reason=Design comparison returned no usable other_piece")
+      expect(logged.join).not_to include("SECRET")
+      expect(svc.generate_exercise(user)).not_to have_key("design_comparison")
+    end
+
     it "writes the SuggestedConcept rows ingest reports" do
       svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "Invented Concept!!" }
@@ -5685,8 +5704,8 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
   end
 
   it "keeps the draft and records the fallback" do
-    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, keyword_init: true).new(
-      problem_set: { "code_review" => section },
+    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true).new(
+      problem_set: { "code_review" => section }, unusable_sections: [],
       plan: Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true)
         .new(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
       kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none
@@ -6204,6 +6223,25 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     expect(judged.problem_set).not_to have_key("code_review")
     expect(judged.outcomes["code_review"]).to include(dropped: true, fallback: nil, retries: 2,
                                                       principle: "scope_mismatch", retry_principle: %w[scope_mismatch scope_mismatch])
+  end
+
+  it "retries a design comparison ingest refused, with its drafted concept, and ships the retry" do
+    draft = FakeService::EXERCISE_PROBLEM_SET.deep_dup
+    draft["design_comparison"]["other_piece"] = ""
+    retry_prompts = []
+    allow_any_instance_of(FakeService).to receive(:call_and_log).and_wrap_original do |m, *args, **kw|
+      next { text: draft.to_json, input_tokens: 0, output_tokens: 0 } if kw[:purpose] == "generate_exercise"
+
+      retry_prompts << kw[:prompt] if kw[:purpose] == "retry_section"
+      m.call(*args, **kw)
+    end
+    allow(Rails.logger).to receive(:warn)
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+
+    expect(retry_prompts.sole).to include("This section's concept must be exactly `open_closed`")
+    expect(judged.problem_set["design_comparison"]).to include("piece_a", "piece_b")
+    expect(judged.outcomes["design_comparison"]).to include(unusable: true, retries: 1, dropped: false)
   end
 
   it "fails the generation rather than write an empty day when every section is dropped" do

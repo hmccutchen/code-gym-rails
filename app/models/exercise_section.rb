@@ -203,7 +203,9 @@ class ExerciseSection
 
     # The provider boundary's check on one resolved section of this kind:
     # raises AiService::InvalidResponseError when the section cannot be used,
-    # and may bound its fields in place. Most kinds have nothing to refuse.
+    # and may bound its fields in place. Ingest then leaves that section out
+    # of the set rather than refusing the day. Most kinds have nothing to
+    # refuse.
     def reject_unusable!(section)
     end
 
