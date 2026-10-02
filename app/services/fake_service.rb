@@ -18,8 +18,8 @@ class FakeService < AiService
   # resolves by precedence over whichever keys are present hashes
   # (ExerciseSection.thirds: architecture, security_review, challenge,
   # parsons_problem) — architecture wins here every time, regardless of
-  # which third DailyPlan actually asked for, since normalize_concepts and
-  # ParsonsProblem.arrange! only ever touch keys that exist. Same precedence
+  # which third DailyPlan actually asked for, since resolution reads only
+  # which keys are present. Same precedence
   # story for the fourth slot (ExerciseSection.fourths): plan_review wins over
   # ambiguity_hunt and pseudocode_to_code whenever more than one is present,
   # via DailyExercise#fourth_key.
