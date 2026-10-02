@@ -84,7 +84,7 @@ group :test do
   # dependency must stay compatible with the exact playwright-core CLI version
   # pinned in spec/playwright/package.json — bump the two together.
   gem "capybara"
-  gem "capybara-playwright-driver", "~> 0.5.10"
+  gem "capybara-playwright-driver", "~> 0.5.12"
 end
 
 gem "faraday", "~> 2.14"
