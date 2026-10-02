@@ -138,10 +138,12 @@ decisions, not defaults that drifted into place:
   provider is contacted; `ProblemSetIngest` normalizes provider output and
   writes nothing, returning a `Result` instead. `ProblemSetIngest` is pure, so
   its specs need no database; `DailyPlan` composes two pure collaborators of
-  its own — `SectionCount` (how many sections) and `SectionRotation` (which
+  its own — `SectionCount` (how many sections recent completion allows) and `SectionRotation` (which
   kind fills each) — whose specs need none, even though `DailyPlan` itself
   reads concept-mastery history to decide reinforcement and retention. The
-  same holds for `CoverageException` (whether a two-section day gains a
+  same holds for `CompetencyGate` (how many sections reviewed work has
+  earned), `DaySize` (the day's planned count from the setting, completion
+  and the gate), `CoverageException` (whether a two-section day gains a
   section), `SharedConcept` (which concept both fixed sections take) and
   `DayHosts` (which kinds can tag a concept today). Keep the collaborators
   that way.
@@ -228,8 +230,8 @@ User opens dashboard:
   └→ DashboardController#show
        shows today's DailyExercise, or triggers on-demand generation if missing
        (weekdays only; weekends offer a manual "generate anyway" button)
-       2-4 sections, sized from recent completion unless the user fixed a
-       count in Setup's Daily sections: Code Review and Design Comparison
+       2-4 sections, sized from recent completion and the competency gate
+       unless the user fixed a count in Setup's Daily sections: Code Review and Design Comparison
        are always present; Pattern of the Month, a rotating third
        (Coding Challenge / Architecture Decision / Security Review / Parsons
        Problem), and a rotating fourth (Plan Review / Ambiguity Hunt /
@@ -1092,7 +1094,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   scaffold fade. It just isn't branded as a visible "rotation", consistent with
   tier state staying invisible everywhere else here.
 - **The fourth slot**: an optional fourth `problem_set` key, alongside `code_review`/`design_comparison`/`pattern`/the rotating third — `DailyPlan::NO_FOURTH_TRACK` lets a day give it up entirely, and `AiService#fourth_reinforcement_line` reads as nil-able rather than assuming the key is always present. When present, `SectionRotation` picks one of `ExerciseSection.fourths`: `plan_review` (review a flawed implementation plan), `ambiguity_hunt` (list what needs clarifying about a vague feature request) or `pseudocode_to_code`. Each has its own closed vocabulary (`AiService::PLAN_REVIEW_CONCEPTS` / `AMBIGUITY_HUNT_CONCEPTS` / `PSEUDOCODE_TO_CODE_CONCEPTS`) and its own `ConceptBucket` — language-independent, like `architecture`, so its mastery/reinforcement history never mixes with a programming-language bucket. `DailyPlan#for` decides the fourth slot's kind and its reinforcement/retention state on a track fully independent of the three-slot one, since the vocabularies can never mix. The slot holds exactly one concept (`DailyPlan::FOURTH_SLOT_CAPACITY`), so reinforcement is truncated to one and gives the slot up entirely when an overdue retention check claims it — never both. `ambiguity_hunt` also returns a hidden `planted_ambiguities` list — the answer key for grading coverage — which must never reach the rendered page, a pre-submission AI context (e.g. the duck thread), or log storage (`AiService#without_answer_key` strips it from the difficulty-diagnostics payload, the one place a whole `problem_set` is serialized); `plan_review`/`ambiguity_hunt`'s `plan_excerpt`/`request` fields are visible on screen and so are safe to include there. Since coverage grading has no meaning without that list, `ExerciseSection::AmbiguityHunt.reject_unusable!` validates it at the provider boundary and refuses the section when no usable entry came back — but only when `ambiguity_hunt` actually won the fourth slot, since an answer key nothing downstream will read is no reason to refuse anything. It is one of the per-kind boundary checks that refuse rather than repair (`PseudocodeToCode` refuses an unusable `problem_statement`, `DesignComparison` an unusable piece or answer key). A refusal costs only that section: `ProblemSetIngest` leaves the section's whole slot out of the set and reports it on `Result#unusable_sections` (key, concept when it is in the section's vocabulary, and the check's message), and raises `InvalidResponseError` only when nothing usable remains or a requested key is missing entirely. `AiService` logs `[unusable_section] user= section= reason=` with the check's message only. The judged path treats a planned unusable section as a rejection the judge never saw — the kind's retries with its drafted concept fixed, none without a concept, then a drop — and the single-stage path (`generate_unjudged_exercise`, used by weekend generation and `RegenerateExerciseJob`) drops it and records it in `dropped_sections`. Which fields are answer key is a kind facet too, `.answer_key_fields`, and `ExerciseSection.all_answer_key_fields` is the union every strip site reads. A *wrong count* is not a failure: `ExerciseSection::AmbiguityHunt::PLANTED_COUNT` is the generator's target, but nothing downstream reads it (the review prompt lists the ambiguities, never counts them), so a short list still grades and refusing it would cost the section over the likeliest deviation an LLM makes on a counted list. Long lists are truncated to `ExerciseSection::AmbiguityHunt::MAX_PLANTED`.
-- **Which sections count**: `DailyExercise#active_section_keys` — code_review and design_comparison plus whichever of pattern/third/fourth today's plan chose, precedence-resolved for third and fourth, and never more than `MAX_SECTIONS` — is the single authority for "how many sections does this day have." It delegates to `ExerciseSection.resolved_keys`, which derives the answer from `ExerciseSection.slots` and is what `ProblemSetIngest` reads for a payload that is not a row yet. A day holds 2 to `ExerciseSection::MAX_SECTIONS` (4) sections, or fewer on a judged day where sections were dropped; `SectionCount`/`SectionRotation` decide how many and which, but `active_section_keys` is still the one place anything downstream reads the answer. Every denominator (progress bar, `completeness`, history's count, the generation prompt's history line), the numerator (`DailyResponse#answered_sections`, via `DailyResponse#section_keys`), the submit gate, the answer/rating param slices, the duck-thread section guard, and the review fan-out derive from it. Never `problem_set.keys`, and never `answers.keys`: a payload can hold more third- or fourth-shaped keys than the page renders (`FakeService` answers with every kind deliberately, and a provider can return an extra alternate), and a regenerated day can leave an answer behind for a section it no longer presents — counting either reports a section count the page never showed. `active_section_keys` is unchanged by two-stage generation — it reads the delivered set, and a judged day's dropped key is gone from it. `DailyExercise#dropped_sections` is what makes a short judged day distinguishable from a short planned one: the day's shape is in `active_section_keys`, and why it is that shape is in the drop list beside it.
+- **Which sections count**: `DailyExercise#active_section_keys` — code_review and design_comparison plus whichever of pattern/third/fourth today's plan chose, precedence-resolved for third and fourth, and never more than `MAX_SECTIONS` — is the single authority for "how many sections does this day have." It delegates to `ExerciseSection.resolved_keys`, which derives the answer from `ExerciseSection.slots` and is what `ProblemSetIngest` reads for a payload that is not a row yet. A day holds 2 to `ExerciseSection::MAX_SECTIONS` (4) sections, or fewer on a judged day where sections were dropped; `DaySize` (with `CoverageException`) and `SectionRotation` decide how many and which, but `active_section_keys` is still the one place anything downstream reads the answer. Every denominator (progress bar, `completeness`, history's count, the generation prompt's history line), the numerator (`DailyResponse#answered_sections`, via `DailyResponse#section_keys`), the submit gate, the answer/rating param slices, the duck-thread section guard, and the review fan-out derive from it. Never `problem_set.keys`, and never `answers.keys`: a payload can hold more third- or fourth-shaped keys than the page renders (`FakeService` answers with every kind deliberately, and a provider can return an extra alternate), and a regenerated day can leave an answer behind for a section it no longer presents — counting either reports a section count the page never showed. `active_section_keys` is unchanged by two-stage generation — it reads the delivered set, and a judged day's dropped key is gone from it. `DailyExercise#dropped_sections` is what makes a short judged day distinguishable from a short planned one: the day's shape is in `active_section_keys`, and why it is that shape is in the drop list beside it.
 - **Section kind weight preferences**: a user's stated multiplier
   (`KindPreferences::MULTIPLIERS`, x0.25..x4, default x1) leans
   `SectionRotation#pick_kind`'s weighted roll and nothing else — it is applied
@@ -1325,12 +1327,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   or a fixed count in `User::DAILY_SECTION_COUNTS`, which runs from
   `SectionCount::FLOOR` to `ExerciseSection::MAX_SECTIONS`. Setup shows it as a
   radio group that autosaves through `PATCH /profile`. A fixed count is an
-  override of the count only: `SectionCount.for(history, fixed:)` returns it
-  before any sizing logic runs, so no change to that logic can reach a user who
-  chose one. Automatic keeps the completion rule. `SectionRotation` still picks
-  which optional kinds fill the day either way, since that is not sizing, so a
-  fixed count skips only the sizing computation and not the exercise-history
-  query. Weights, exclusions, difficulty targets and locks are unaffected, and
+  override of the count only: `DaySize.for` returns it before completion or
+  the gate is consulted, so no change to either can reach a user who chose
+  one. Automatic takes the lower of the completion rule and the competency
+  gate. `SectionRotation` still picks which optional kinds fill the day
+  either way, since that is not sizing, and the gate still runs under a fixed
+  count so the `[set_size]` line can log its evidence. Weights, exclusions, difficulty targets and locks are unaffected, and
   the setting is not part of the Exercise mix, so it does not bump
   `section_kind_preferences_version`.
 
@@ -1346,14 +1348,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   cast would turn `""` or `null` into nil, which means Automatic, `"abc"`
   into 0 and `"2.5"` into 2, and a JSON `2.0` equals 2. The model checks the
   same range only when the value changes, like the other validations that
-  read moving constants, and `SectionCount.for` clamps a stored count to the
+  read moving constants, and `DaySize.for` clamps a stored count to the
   current range on read, so a row saved under a wider range plans a day the
   set can actually hold.
 
   **It replaced the `adaptive_set_size` boolean, and every account reads
   Automatic.** `AddDailySectionCountToUsers` adds the column with no default
   and no backfill, so an account that had turned adaptive sizing off, which
-  meant a fixed full day, now gets the completion rule until it picks a count.
+  meant a fixed full day, now gets Automatic sizing until it picks a count.
   That change was deliberate. `User` lists `adaptive_set_size` in
   `ignored_columns` because the old code keeps serving while the pre-deploy
   migration runs; a later migration drops the column.
@@ -1363,9 +1365,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   optional kind can host waits, and the `[retention] waiting=` line says so.
   A fixed choice wins by design.
 - **What the plan did, on the row**: `daily_exercises.plan_notes` (jsonb,
-  default `{}`, null false) records `{"coverage" => kind_key, "coverage_reason" => "gap" |
-  "due_check"}` and `{"shared_concept" => concept}`, each only when it applied
-  (`DailyPlan::Result#notes`). It is server-owned and written with the row
+  default `{}`, null false) records `{"size" => count, "size_reason" =>
+  "setting" | "completion" | "gate" | "brake"}` on every plan, and
+  `{"coverage" => kind_key, "coverage_reason" => "gap" | "due_check"}` and
+  `{"shared_concept" => concept}`, each only when it applied
+  (`DailyPlan::Result#notes`). The size is the planned count before any
+  coverage addition, so a coverage day never reads as a larger planned size;
+  `DailyExercise#planned_size` reads it and `.planned_size_before(date)` finds
+  the latest earlier one. It is server-owned and written with the row
   from the plan that produced it, never recomputed while rendering: both
   generation paths hand it back on `AiService::JudgedSet#plan_notes`
   (`#generate_unjudged_exercise` on the single-stage path,
@@ -1374,7 +1381,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `RegenerateExerciseJob` rewrites it from the new plan, clearing it when the
   new plan recorded nothing, and carry-forward moves it with the row because
   it is on the row. No backfill: no earlier plan added a section or shared a
-  concept.
+  concept, and a row from before sizes were recorded has no `size`, which
+  the transition log and the dashboard's size lines read as nothing to
+  compare against.
 - **Shared concept on a real struggle**: when reinforcement holds a
   reduced-tier concept, drilled or not, that every fixed kind can tag,
   `SharedConcept.pick` places the first such entry in both `code_review` and
@@ -1436,8 +1445,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `CoverageException` (pure) adds one optional section when the setting is
   Automatic, the day's count leaves no optional slot (`count <=
   ExerciseSection.fixed.size`), the struggle brake is
-  off (a `brake:` input that defaults to false until the competency gate
-  wires it), and no exercise dated on the previous `CAP_WEEKDAYS` (4)
+  off (`DaySize::Decision#brake?`, true while the gate's reason is `:brake`,
+  even on a day completion alone would also have held at two), and no exercise dated on the previous `CAP_WEEKDAYS` (4)
   weekdays carries `plan_notes["coverage"]`. It picks (a) the kind able to
   host the most overdue waiting check at or past
   `ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER`, or else (b) the
@@ -1484,10 +1493,73 @@ concept-specific difficulty descriptions for future generation, not a new set.
   locale names (`sections.<key>.name`, listed from `ExerciseSection.fixed`)
   and says "from different sides", so neither line nor prompt assumes how
   many fixed kinds there are.
-- **Competency gate (built, not yet wired)**: `CompetencyGate` decides how
-  many sections a day may hold from reviewed work, but nothing calls it yet.
-  `DailyPlan` still sizes every day with `SectionCount`; the wiring, the
-  diagnostics lines and the dashboard copy come later in the stack.
+- **Competency gate**: `CompetencyGate` decides how many sections an
+  Automatic day may hold from reviewed work, and `DaySize` composes it with
+  the completion rule and the Daily sections setting.
+
+  **How a day is sized.** `DailyPlan.size_for` runs `CompetencyGate.for`
+  once per plan, since it replays every post-rubric day, and hands
+  `DaySize.for` plain values: the setting, `SectionCount.for(history)` and the
+  gate's `Plan`. A fixed setting returns its count with reason `:setting` and
+  ignores the gate, the brake and coverage. Automatic takes the lower of
+  completion and the gate, clamped to `SectionCount::FLOOR..MAX_SECTIONS`,
+  and names which bound decided: `:completion` whenever completion alone
+  would give the same count, otherwise `:gate`, or `:brake` when the gate's
+  reason is the brake. The coverage exception then adds at most one section
+  as before, with `brake: DaySize::Decision#brake?`, so `CoverageException`
+  keeps one caller (`DailyPlan.coverage_for`). The decision rides on
+  `DailyPlan::Result#size`, and its count and reason go into `plan_notes`.
+  `SectionCount` is the completion rule alone; `DaySize` owns a fixed
+  setting's precedence.
+
+  **Every account starts at two.** The gate reads rubric-stamped reviews
+  only, so an account grows past two only as favourable, rubric-graded work
+  accumulates, whatever its completion. A replay of the two active
+  production accounts' history on 2026-10-01, under these constants, gave
+  size 2 on every day: completion alone gives two, since about one section a
+  day is answered, and earlier days had no stamped evidence to grow from.
+  Every AI rating in that history predates the rubric, so the replay checked
+  completion and self-ratings, not the AI bar. Raising `RUBRIC_VERSION`
+  restarts every Automatic account at two the same way, since the gate then
+  finds no review stamped with the new version. Specs follow the
+  same start: a spec that answers an optional section asks for a full day,
+  through `create_fake_provider_user(daily_section_count:)`, the setting, or
+  by stubbing the gate open (`DailyPlanGateStubs` in `daily_plan_spec`),
+  rather than relying on a new account getting four.
+
+  **Logs.** `AiService#draft_exercise` logs `[set_size] user=… date=… {…}`
+  as soon as the plan is decided, before the provider is contacted, so fixed
+  settings, weekends, regeneration and attempts that later fail all leave
+  one. Its JSON is `DaySize::Decision#diagnostics`: count, reason, setting,
+  completion, and the gate's count, reason and evidence (`to_three` and
+  `to_four` with required, available, `bar_met` and favourable counts and
+  `by_kind`; the brake window; optional-day completion; levels). No
+  answer-key field is in it. When the latest earlier row's planned size
+  (`DailyExercise.planned_size_before`) differs, a second line records
+  `[set_size] user=… from=… to=… reason=…`; it compares planned counts and
+  never infers a change from the reason. The successful
+  `[difficulty_diagnostics]` payload carries the same decision under
+  `requested.size`, beside `coverage` and `shared_concept`.
+
+  **What the dashboard says.** In the submitted state, on Automatic only,
+  `SizeForecast` composes tomorrow's size through `DailyPlan.size_for` with
+  today's submission in the completion history and today's review in the
+  gate, and compares it with the size today's plan delivered: `plan_notes`'
+  size plus one when it records a coverage addition
+  (`DailyExercise#planned_size_with_coverage`), so a coverage day never
+  promises a larger set of the size it already showed.
+  `dashboard.size_change.larger` ("Your recent answers qualify you for a
+  larger set.") shows when tomorrow's composed count is larger, so a gate
+  increase that completion still blocks says nothing.
+  `dashboard.size_change.smaller` names tomorrow's count, which
+  `SizeForecast::Change` carries, and shows only when the brake is the
+  reason and tomorrow is smaller. Neither shows for a fixed setting, which
+  also skips the gate's query, for a day whose size came from a fixed
+  setting (`size_reason` `setting`), since a switch to Automatic is not the
+  engineer's answers, nor for a row with no recorded size. There is no score,
+  tier or badge. The forecast adds the gate's query to each submitted-state
+  load: timed at about 15 ms with 60 reviewed days and 58 ms with 250, it
+  grows linearly with post-rubric history.
 
   **The rule.** The gate starts at two and folds over the user's reviewed
   days, oldest first. After each day: two `too_hard` self-ratings among the
@@ -1503,6 +1575,19 @@ concept-specific difficulty descriptions for future generation, not a new set.
   unverified. These values are a starting policy, not thresholds history
   has validated.
 
+  **A brake restarts growth.** On every day the brake holds, the fixed-kind
+  growth windows start empty, so growing again needs a full window of
+  results that came after it. Without that, a user who struggles only on
+  optional sections would swing from three to two and straight back to
+  three on fixed-kind results earned before the struggle. The brake's own
+  window is untouched, so the reason stays `:brake` while the too-hard
+  results remain in it.
+
+  **Eased sections reach the brake only.** An eased section answered an
+  easier question than its rung, so its AI rating stays out of the growth
+  windows, but its too-hard self-rating counts toward the brake: a struggle
+  on a reduced-tier concept is the clearest one there is.
+
   **Levels come from the evidence, as of each day.** A kind's level is the
   `pitched_at` of its latest result so far, never today's target applied
   backwards. When it changes, that kind's earlier results leave the windows,
@@ -1512,19 +1597,34 @@ concept-specific difficulty descriptions for future generation, not a new set.
   an earlier day was decided.
 
   **Evidence.** `ReviewedSectionResults` is the shared rule for which
-  sections count: answered, graded from the closed rating list, stamped with
-  a rung, and not eased. `TrackGraduation::Evidence` delegates to it with its
-  60-response cap and results unchanged, so generation code never names track
-  code. `CompetencyGate::Evidence` asks it to require the current
-  `RUBRIC_VERSION` stamp and reads every rubric-stamped day with no cap, in
+  sections count: answered, graded from the closed rating list, and stamped
+  with a rung. Eased sections are left out unless a caller asks for them,
+  and each result says whether it was eased. It also states the rating
+  rules the gate and `TrackGraduation` read: `at_or_above?` reads
+  `ConceptMastery::AI_RATING_RANK`, `favourable?(bar:)` adds
+  `DailyResponse::SELF_RATING_FAVORABLE`, and `too_hard?` reads
+  `DailyResponse::SELF_RATING_UNFAVORABLE`. `TrackGraduation::Result` asks
+  the same rules with `FAVOURABLE_BAR`, the lowest favourable rating, so its
+  answers are unchanged, and `CompetencyGate::BAR` is that same constant.
+  `ConceptMastery.record_review!` and `RungLedger` predate the class and
+  still read the rating lists directly; folding them in is a separate
+  change. A row whose
+  review, answers, ratings or problem set is not a hash, or a section whose
+  review is not one, is skipped rather than raised on, since the gate runs
+  on every plan, fixed settings included. `TrackGraduation::Evidence`
+  delegates to it with its 60-response cap and results unchanged (eased
+  still left out), so generation code never names track code.
+  `CompetencyGate::Evidence` asks it for eased sections too, requires the
+  current `RUBRIC_VERSION` stamp, and reads every rubric-stamped day with no cap, in
   batches ordered by date and id. A cap would forget a size whose earning days
   had aged out; the batches bound memory, not history, so the query grows
   with post-rubric history. A day graded before the rubric adds neither
   results nor optional-section history. Each day reaches the fold as a
   `CompetencyGate::Day` whose `optional` is `:none`, `:incomplete` or
-  `:complete`. Each `Plan` carries the window counts it read (required,
-  available, AI-bar and favourable counts, per-kind counts and levels) for the
-  diagnostics the wiring will log.
+  `:complete`. The fold builds a `Plan`'s evidence (required, available,
+  AI-bar and favourable counts, per-kind counts and levels) only for a plan a
+  caller reads: `.plan` and `.for` return it for the last day, and `.plans`
+  only with `evidence: true`. The `[set_size]` line logs it.
 - **Pausing generation**: `User#paused_generation_at` (nullable timestamp; nil is active) suppresses only generation the user didn't ask for — the cron batch (`GenerateDailyExercisesJob`'s no-arg branch) and `DashboardController#show`'s auto-trigger. It never gates submitting or reviewing: `ResponsesController` has no pause check, so once a row exists for today the submit → review chain runs regardless of pause state or weekday. The toggle is `PATCH /account/toggle_generation` on the Account page — the one control for this column; a second one anywhere else would be a second pause mechanism. Each button posts the state it wants (`paused=0`/`1`) rather than asking for a flip, so a double-tapped Resume stays a resume instead of the second request re-reading an already-unpaused user and pausing it again; with no param posted the endpoint still flips, keeping its original contract. Days fully inside a pause create no `DailyExercise` row at all, so they are non-events to `User#recent_exercise_history` and `#current_streak` rather than skips. The one day that *does* leave a row is the day the pause began (or an explicit `/generate` while paused). **A set left unfinished when the pause began follows the user forward**: `DashboardController#show` calls `User#carry_held_set_forward!` on a day with no set, which re-dates the held, still-unsubmitted exercise — and the draft `DailyResponse` autosave left on it, which must move too or `#create` would build a second response for the same exercise — to `Date.current`, so the pause gives time to finish rather than hiding the set at midnight. Once it is submitted, `#held_exercise` finds nothing, the paused day stays empty and nothing generates, which is what the pause is for. `User#resume_generation!` performs the same recovery (`#recover_held_set`, shared) and then lifts the pause. The row lock also settles the race against a concurrent generation, and does it through the foreign key rather than directly: inserting today's exercise needs a FOR KEY SHARE lock on the same `users` row that `with_lock` holds FOR UPDATE, so a generator either committed before the lock (and the `exists?` check sees it) or blocks until after it and loses its own set to the unique index, which `GenerateDailyExercisesJob` already treats as "generated concurrently". Resume wins, which is the right way round — the held set carries the user's draft answers and a fresh one would not. The move locks the exercise, then its response, and writes in that order — the order `RegenerateExerciseJob` takes, so the two serialize but cannot deadlock — and re-reads the response under its lock, since `#held_exercise` read it outside any lock and a submit can commit in between; a submitted response ends the move, so a finished session keeps its day. It still sits in a SAVEPOINT catching both `RecordNotUnique` and a `date`-taken `RecordInvalid` (uniqueness is enforced twice, and the model validation raises first), so that were it ever to fail it rolls back only itself and the pause still lifts. Recovering the set also clears a same-day `last_generation_error`, since `/generate` is not pause-gated and a failed attempt while the held set sat at an earlier date would otherwise leave "Couldn't generate a new set" rendered above it — the banner `persist_failure` exists to avoid. The whole method runs in the user's own zone rather than the caller's, unlike the read-only history and streak readers, since it writes a date that has to be the user's today. That move both makes the set reachable (every "today's exercise" lookup is `for_date`, so at its original date it renders nowhere and `#create` 404s) and drops it out of both signals at once, since `recent_exercise_history` filters `date: ...Date.current` and `#current_streak` exempts today — no separate "exclude paused days" rule exists or is needed. Scoped to exercises dated on or after the pause, so a day abandoned *before* pausing stays abandoned; skipped entirely if an exercise already exists for today, so an explicit `/generate` while paused is never overwritten. Both regeneration columns clear on the move, because they describe the row's *day* rather than the set: `regenerated_at` would hide the Generate-new-set button behind a claim the dashboard states outright and that is no longer true ("You've already generated a new set today"), and a leftover `regenerating_since` is worse than cosmetic — `RegenerateExerciseJob` gates on `exercise&.regenerating_since` after resolving `for_date`, and re-checks that claim under the exercise row lock before it writes, by value rather than presence (the claim's timestamp is the worker's token, so a later click's claim is not mistaken for its own) — a claim `carry_forward` cleared mid-call means the generated set is discarded, and every release is guarded the same way, so a retry stranded from the pause day cannot replace the carried-forward `problem_set` or destroy the draft response the move preserved. **At most one set can ever be carried forward**, because `[user_id, date]` is unique — so a user who stranded several (paused Monday, clicked `/generate` on Tuesday, resumed Wednesday) gets the newest one back and the older ones stay where they are — **still breaking `#current_streak`**, not merely counting as skips: a past weekday holding an unsubmitted exercise hits that method's `exercised.include?(day)` break. Recovering one set does not repair a streak an older stray still zeroes. That is a limit of re-dating rather than a gap to close: two sets cannot both be today. Re-pausing does not move the floor `#held_exercise` searches from — `AccountsController` stamps a pause only when one isn't already running — so a second Pause cannot walk that floor past the set the first pause stranded. The same limit is why the move is skipped outright when today already holds an exercise. **Accepted consequence:** finishing a carried-forward set counts toward the completion-window signal and the streak for the resume day, not the day it was generated.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, and concept tags. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `User#concept_exposure_index` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule under "One finish action."
 
@@ -1707,7 +1807,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   evidence reader that compares ratings to a bar reads only stamped reviews.
   A stamp rather than a cutoff date, because grading knows which prompt it
   ran and a date misfiles a review retried across a deploy. Only the
-  competency gate will read it; `ConceptMastery`, `RungLedger` and
+  competency gate reads it; `ConceptMastery`, `RungLedger` and
   `TrackGraduation` read all history on purpose. Going forward, a concept's
   first post-rubric review is compared with a pre-rubric `last_rating`, so
   that one comparison can read as improving or stagnant because the scale
@@ -2398,7 +2498,9 @@ always pull in the full suite — is stated once, in
 - `app/services/track_graduation.rb` — pure proposal rules: own-result moves, struggling moves and a lead-based bundle.
 - `app/services/track_graduation/evidence.rb` — bounded, preloaded reviewed-response history projected into stamped, answered results.
 - `app/services/reviewed_section_results.rb` — `ReviewedSectionResults`: which sections of one submitted, reviewed response count as evidence of work at a rung, optionally only under the current rubric. Pure over the response it is given; shared by `TrackGraduation::Evidence` and `CompetencyGate::Evidence`.
-- `app/services/competency_gate.rb` — `CompetencyGate`: the pure fold that earns a day's size from reviewed days, with the brake. Built but not yet called by `DailyPlan`.
+- `app/services/competency_gate.rb` — `CompetencyGate`: the pure fold that earns a day's size from reviewed days, with the brake. `DailyPlan.size_for` calls it once per plan.
+- `app/services/day_size.rb` — `DaySize`: the day's planned count and its reason, from the Daily sections setting, the completion count and the gate's `Plan`. Pure; its `Decision` also answers whether the brake is on, for the coverage exception, and what the `[set_size]` line logs.
+- `app/services/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
 - `app/services/competency_gate/evidence.rb` — the gate's only query: every rubric-stamped reviewed day, oldest first, in batches, as `CompetencyGate::Day` values.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileController`.
 - `app/controllers/learning_track_dismissals_controller.rb` — records Not now cutoffs for the current user under the user-row lock.
