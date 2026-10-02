@@ -14,10 +14,13 @@ class DailyPlan
   Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
                         :code_review_mode, :code_review_source, :scenario_flavor,
-                        :shared_concept, :coverage, :waiting_checks) do
+                        :shared_concept, :coverage, :waiting_checks, :size) do
     # What daily_exercises.plan_notes stores for the day this plan produced.
+    # The size is the planned count before any coverage addition, so the next
+    # day compares against what was planned rather than what was delivered.
     def notes
-      { "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
+      { "size" => size&.count, "size_reason" => size&.reason&.to_s,
+        "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
         "shared_concept" => shared_concept }.compact
     end
   end
@@ -90,20 +93,27 @@ class DailyPlan
   # that (see AiService#log_retention).
   def self.for(user, language:)
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
-    count            = SectionCount.for(history, fixed: user.daily_section_count)
+    size             = size_for(user, history)
     preferences      = KindPreferences.for(user)
-    rotation         = SectionRotation.for(history, count: count, preferences: preferences)
+    rotation         = SectionRotation.for(history, count: size.count, preferences: preferences)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
     hosts            = DayHosts.new(language, mode: code_review_mode)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     tracks           = concept_tracks(user, language, rotation, due: due, hosts: hosts)
-    coverage, rotation, tracks = with_coverage(coverage_for(user, count, preferences, tracks.fetch(:waiting_checks), hosts),
+    coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, tracks.fetch(:waiting_checks), hosts),
                                                rotation, tracks, user, language, due: due, hosts: hosts)
 
-    Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third), **tracks, coverage: coverage,
+    Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third), **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode,
                code_review_source: code_review_source_for(user, language, code_review_mode),
                scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)))
+  end
+
+  # Public so the dashboard's forecast of tomorrow composes the size the same
+  # way. CompetencyGate.for replays every post-rubric day, so a plan calls it
+  # once.
+  def self.size_for(user, history)
+    DaySize.for(setting: user.daily_section_count, completion: SectionCount.for(history), gate: CompetencyGate.for(user))
   end
 
   # The user's slice plus the bucket of the language being generated, which
@@ -151,15 +161,15 @@ class DailyPlan
 
   # Cheapest check first: the setting and count cost nothing, the cap one
   # small query, and only a day that passes both loads the gaps.
-  def self.coverage_for(user, count, preferences, waiting, hosts)
-    return nil unless CoverageException.applies_to_day?(count: count, fixed: user.daily_section_count)
+  def self.coverage_for(user, size, preferences, waiting, hosts)
+    day = { count: size.count, fixed: size.setting, brake: size.brake? }
+    return nil unless CoverageException.applies_to_day?(**day)
 
     recent = CoverageException::History.recent_coverage_dates(user)
     return nil if CoverageException.capped?(recent, Date.current)
 
-    CoverageException.for(today: Date.current, count: count, fixed: user.daily_section_count,
-                          history: CoverageException::History.for(user, coverage_dates: recent), checks: waiting,
-                          preferences: preferences, hosts: hosts)
+    CoverageException.for(today: Date.current, **day, history: CoverageException::History.for(user, coverage_dates: recent),
+                          checks: waiting, preferences: preferences, hosts: hosts)
   end
   private_class_method :coverage_for
 

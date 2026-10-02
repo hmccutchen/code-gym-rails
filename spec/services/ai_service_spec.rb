@@ -2307,6 +2307,9 @@ RSpec.describe AiService do
   # wiring only AiService can get wrong — that generation runs ingest at all,
   # and that the suggestions it returns get written.
   describe "generation runs the ingest boundary" do
+    # A new account starts at the gate's floor, which holds only the fixed kinds.
+    before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
+
     it "runs on generation, so a bad diagram never reaches a persisted problem set" do
       svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
@@ -2513,6 +2516,9 @@ RSpec.describe AiService do
   end
 
   describe "#generate_exercise" do
+    # A new account starts at the gate's floor, which holds only the fixed kinds.
+    before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
+
     it "shuffles parsons_problem blocks into a non-identity display_order" do
       set = full_problem_set("parsons_problem" => { "blocks" => %w[a b c d e] })
       svc = double_class.new(canned_text: set.to_json)
@@ -5534,7 +5540,8 @@ RSpec.describe AiService, "rung stamps on a generated set" do
   let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "solid", provider: "fake", api_key: "fake-test-key") }
 
   it "stamps each section with its target when set, else the skill level's rung" do
-    user.update!(section_kind_levels: { "code_review" => "principal_engineer" })
+    user.update!(section_kind_levels: { "code_review" => "principal_engineer" },
+                 daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
 
@@ -5797,8 +5804,9 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
     single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
 
-    expect(judged.plan_notes).to eq("shared_concept" => "feature_envy")
-    expect(single.plan_notes).to eq("shared_concept" => "feature_envy")
+    notes = { "size" => SectionCount::FLOOR, "size_reason" => "gate", "shared_concept" => "feature_envy" }
+    expect(judged.plan_notes).to eq(notes)
+    expect(single.plan_notes).to eq(notes)
     expect(single.dropped_sections).to eq([])
   end
 
