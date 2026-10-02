@@ -338,9 +338,9 @@ class ProblemSetIngest
   # excerpt this set never showed. `current_schema` is server-owned the same
   # way, so it is stamped only from a source that has one; every provider copy
   # is already gone by now (see strip_current_schemas!).
-  # In production code_review is always present — ExerciseSection.for_plan
-  # never omits it — but ingest is also called on partial sets, and a set
-  # with no code_review has no trace to stamp.
+  # In production code_review is always present — it is a fixed kind, so
+  # every plan includes it — but ingest is also called on partial sets, and a
+  # set with no code_review has no trace to stamp.
   def ground_code_review!
     return if @code_review_source.nil?
     return unless ExerciseSection.present?(@problem_set, "code_review")

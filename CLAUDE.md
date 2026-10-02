@@ -228,8 +228,8 @@ User opens dashboard:
        2-4 sections, sized from recent completion: code_review is always
        present; Pattern of the Month, a rotating third (Coding Challenge /
        Architecture Decision / Security Review / Parsons Problem), and a
-       rotating fourth (Plan Review / Ambiguity Hunt) each fill only when
-       today's count and rotation choose them
+       rotating fourth (Plan Review / Ambiguity Hunt / Pseudocode to Code)
+       each fill only when today's count and rotation choose them
 
 User interacts:
   └→ ResponsesController#create      → auto-saves answers + difficulty rating
