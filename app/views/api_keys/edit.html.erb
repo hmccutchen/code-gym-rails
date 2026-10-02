@@ -88,7 +88,9 @@
           <%= count %>
         </label>
       <% end %>
-      <p class="hint"><%= t("daily_sections.hint") %></p>
+      <p class="hint"><%= t("daily_sections.hint",
+                            lowest: User::DAILY_SECTION_COUNTS.first,
+                            fixed_sections: ExerciseSection.fixed.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
     </fieldset>
   </div>
 
