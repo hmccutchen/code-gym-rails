@@ -85,6 +85,12 @@ class ExerciseSection::DesignComparison < ExerciseSection
       "responses/answers/design_comparison"
     end
 
+    # Its reference explains the principle that decides the pick, which is
+    # the reason the grade asks for.
+    def reference_opens_before_answer?
+      false
+    end
+
     def judge_task
       "Pick the better-designed of two working pieces of code for the stated system, and say which stated fact decides it."
     end

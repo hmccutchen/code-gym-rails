@@ -67,6 +67,21 @@ RSpec.describe "The design comparison section", type: :request do
       expect(page.at_css("textarea[data-field='design_comparison']")["data-answer-complete"]).to eq("true")
     end
 
+    # The reference names and illustrates the principle the grade asks for, so
+    # opening it on first exposure would hand over the reason.
+    it "keeps the concept reference closed on first exposure, where another kind opens it" do
+      exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "concept" => "n_plus_one" }))
+      %w[open_closed n_plus_one].each do |concept|
+        ConceptReference.create!(concept: concept, language: "ruby_rails", tagline: "t", explanation: "e",
+                                 code_example: "c", senior_lens: "l")
+      end
+
+      get root_path
+
+      expect(response.body).to match(/<details class="ref" open>\s*<summary>Reference — N plus one: how it works/)
+      expect(response.body).to match(/<details class="ref">\s*<summary>Reference — Open closed: how it works/)
+    end
+
     it "never puts the answer key in the page" do
       get root_path
 

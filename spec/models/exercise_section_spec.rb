@@ -633,6 +633,12 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".reference_opens_before_answer?" do
+    it "is false only for design_comparison, whose reference would give its reason away" do
+      expect(described_class.all.reject(&:reference_opens_before_answer?)).to eq([ ExerciseSection::DesignComparison ])
+    end
+  end
+
   describe ".judge_solve_options" do
     it "is absent for every kind but design_comparison" do
       expect((described_class.all - [ ExerciseSection::DesignComparison ]).map(&:judge_solve_options)).to all(be_nil)

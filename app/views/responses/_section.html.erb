@@ -40,7 +40,7 @@
       day's language. %>
   <% if (ref = concept_reference_for(data["concept"], bucket)) %>
     <%= render "shared/concept_reference", reference: ref,
-          open: !submitted && first_exposure?(data["concept"], bucket, exercise.date) %>
+          open: !submitted && kind.reference_opens_before_answer? && first_exposure?(data["concept"], bucket, exercise.date) %>
   <% end %>
 
   <%= render "dashboard/teaching_hint", note: data["teaching_note"], field: key,

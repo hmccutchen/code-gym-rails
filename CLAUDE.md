@@ -749,6 +749,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   rather than offering a choice between two working designs, is a
   scope_mismatch.
 
+  **The reference stays closed.** A concept's reference opens on its own on
+  first exposure for every other kind; for this one it names and illustrates
+  the principle the grade asks for, so `.reference_opens_before_answer?` is
+  false and it stays closed until the engineer opens it.
+
   **Setup.** The Exercise mix groups the fixed kinds under "In every set"
   (difficulty only), and gives pattern a group of its own.
 

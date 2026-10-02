@@ -390,6 +390,13 @@ class ExerciseSection
       "answer"
     end
 
+    # Whether a concept's reference may open on its own on first exposure,
+    # before the section is answered. False for a kind whose reference would
+    # name and illustrate what the grade asks the engineer to supply.
+    def reference_opens_before_answer?
+      true
+    end
+
     # Whether this kind's problem_set may carry a Mermaid `diagram` of the
     # structure its scenario describes. False by default: a diagram is only
     # safe pre-answer where it restates something already on screen, which is
