@@ -17,7 +17,7 @@
     title is an <h2> so VoiceOver's heading rotor reaches each section; the
     summary must never take role="button", which would erase that heading. %>
 <% label = capture do %>
-  <%= slot %> — <%= t("sections.#{key}.name") %><% if kind.titled_label? %>: <%= data["title"] %><% end %>
+  <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: t("sections.#{key}.name"), title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: t("sections.#{key}.name")) %><% end %>
 <% end %>
 <% if submitted %>
 <div class="section">

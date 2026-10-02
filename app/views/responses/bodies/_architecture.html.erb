@@ -6,7 +6,7 @@
 <% end %>
 <% if data["reference"].present? %>
   <details class="ref">
-    <summary>Reference — <%= data["title"] %>: tradeoffs</summary>
+    <summary><%= t("sections.architecture.reference_summary", title: data["title"]) %></summary>
     <div class="ref-body">
       <p style="margin-bottom:.75rem"><strong><%= data.dig("reference", "tagline") %></strong></p>
       <p style="margin-bottom:.75rem"><%= data.dig("reference", "explanation") %></p>

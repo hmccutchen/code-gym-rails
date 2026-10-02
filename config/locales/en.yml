@@ -372,12 +372,14 @@ en:
     pattern:
       name: "Pattern of the Month"
       placeholder: "Your answer…"
+      why_label: "Why it exists:"
     challenge:
       name: "Coding Challenge"
       placeholder: "# Your implementation…"
     architecture:
       name: "Architecture Decision"
       placeholder: "Your decision and why — weigh the tradeoffs…"
+      reference_summary: "Reference — %{title}: tradeoffs"
     security_review:
       name: "Security Review"
       placeholder: "What's exploitable here, and how would you mitigate it?"
@@ -399,6 +401,22 @@ en:
     no_gaps: "Your plan holds up — nothing worth flagging before you submit it."
     caption: "This is your plan implemented literally — gaps and all. It was not corrected."
     working: "Working…"
+  responses:
+    section:
+      label: "%{slot} — %{name}"
+      titled_label: "%{slot} — %{name}: %{title}"
+    answered:
+      skipped: "(skipped)"
+    submission:
+      submitted: "✓ Submitted"
+      email_button: "Email me this review"
+    parsons:
+      confirm_button: "Use this order"
+      key_hint: "Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks."
+      moved: "Block moved to position %{position} of %{total}."
+      recorded: "Order recorded."
+      move_up: "Move block up"
+      move_down: "Move block down"
   review:
     get_button: "Get %{provider} review"
     finish_button: "Finish review"
