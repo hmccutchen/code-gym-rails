@@ -23,7 +23,7 @@ class CompetencyGate
       return enum_for(:each) unless block_given?
 
       responses.find_in_batches(cursor: %i[date id], batch_size: @batch_size) do |batch|
-        batch.each { |response| yield day_for(response) }
+        batch.each { |response| yield day_for(response) if ReviewedSectionResults.readable?(response) }
       end
     end
 
@@ -38,6 +38,8 @@ class CompetencyGate
       Day.new(results: ReviewedSectionResults.for(response, require_rubric: true, include_eased: true), optional: optional_state(response))
     end
 
+    # Reads section_keys and answered_sections, which assume the row's JSON is
+    # well formed; the readable? check above is what lets it.
     def optional_state(response)
       optional = response.section_keys - @fixed_kinds
       return :none if optional.empty?

@@ -1,6 +1,6 @@
 # A user's stated bias over which rotating kinds they see, as plain values.
-# SectionRotation takes one of these rather than a User — the same shape
-# SectionCount's `fixed:` uses — so the rotation's specs need no database.
+# SectionRotation takes one of these rather than a User, so the rotation's
+# specs need no database.
 #
 # Total by construction: a stored value outside MULTIPLIERS reads as the
 # default rather than reaching WeightedRoll, where a zero would make a kind

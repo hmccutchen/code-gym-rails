@@ -24,6 +24,14 @@ RSpec.describe DaySize do
       expect(decision.reason).to eq(:setting)
     end
 
+    # The model validates the count only when it changes, so a row saved under
+    # a wider range can still hold a count outside the current one.
+    it "clamps a stored setting outside the current range" do
+      expect(size(setting: ExerciseSection::MAX_SECTIONS + 1).count).to eq(ExerciseSection::MAX_SECTIONS)
+      expect(size(setting: SectionCount::FLOOR - 1).count).to eq(SectionCount::FLOOR)
+      expect(size(setting: SectionCount::FLOOR - 1).reason).to eq(:setting)
+    end
+
     it "is not Automatic, so the coverage exception never applies" do
       expect(size(setting: 2).automatic?).to be(false)
       expect(size.automatic?).to be(true)

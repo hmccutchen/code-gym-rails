@@ -17,8 +17,9 @@ class ReviewedSectionResults
     def too_hard? = ReviewedSectionResults.too_hard?(self_rating)
   end
 
-  # The rating rules, stated once for every reader of reviewed work, including
-  # TrackGraduation's own result type.
+  # The rating rules as the competency gate and TrackGraduation read them,
+  # TrackGraduation's own result type included. ConceptMastery and RungLedger
+  # predate this class and still read the same rating lists directly.
   def self.at_or_above?(ai_rating, bar)
     rank = ConceptMastery::AI_RATING_RANK[ai_rating]
     rank.present? && rank >= ConceptMastery::AI_RATING_RANK.fetch(bar)
@@ -49,14 +50,14 @@ class ReviewedSectionResults
 
   # Rows written by older code, or edited by hand, can hold any JSON. They are
   # skipped rather than raised on, since the competency gate reads them while
-  # planning every day.
+  # planning every day. Public because the gate's evidence loader reads other
+  # fields of the same row and has to skip the same rows.
   def self.readable?(response)
     [ response.ai_review, response.answers, response.daily_exercise&.problem_set ].all?(Hash)
   end
-  private_class_method :readable?
 
   def self.counts?(data, review, require_rubric, include_eased)
-    data.is_a?(Hash) && review.is_a?(Hash) && data["pitched_at"].present? && (include_eased || !data["eased"]) &&
+    data.is_a?(Hash) && review.is_a?(Hash) && data["pitched_at"].present? && (include_eased || data["eased"].blank?) &&
       ConceptMastery::AI_RATING_RANK.key?(review["rating"]) &&
       (!require_rubric || review["rubric"] == AiService::RUBRIC_VERSION)
   end

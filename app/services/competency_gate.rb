@@ -12,7 +12,7 @@ class CompetencyGate
     def met?(window, &qualifies) = window.size == of && window.count(&qualifies) >= at_least
   end
 
-  BAR = "solid"
+  BAR = ReviewedSectionResults::FAVOURABLE_BAR
   GROW_TO_THREE = Threshold.new(at_least: 4, of: 5)
   GROW_TO_FOUR = Threshold.new(at_least: 8, of: 10)
   OPTIONAL_RUN = 2

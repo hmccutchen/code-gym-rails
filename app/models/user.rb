@@ -18,7 +18,8 @@ class User < ApplicationRecord
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
-  # nil is Automatic: SectionCount sizes the day from recent completion.
+  # nil is Automatic: DaySize sizes the day from recent completion and the
+  # competency gate.
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
   # What Setup posts for Automatic, since a radio has no nil value.
   AUTOMATIC_SECTION_COUNT = "automatic".freeze

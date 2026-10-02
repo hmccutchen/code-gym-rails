@@ -62,6 +62,16 @@ RSpec.describe CompetencyGate::Evidence do
       .to eq([ [ "code_review", false, "right_level" ], [ "pattern", true, "too_hard" ] ])
   end
 
+  # The gate runs on every plan, so a row an older worker or a hand edit left
+  # malformed must not stop the day from being built.
+  it "skips a stamped row whose answers or problem set are not objects" do
+    day(0)
+    day(1).update_columns(answers: [])
+    day(2).daily_exercise.update_columns(problem_set: [])
+
+    expect(days.map { |each_day| each_day.results.map(&:date).uniq }).to eq([ [ start ] ])
+  end
+
   it "keeps a stamped day's optional state even when none of its sections are evidence" do
     day(0, { "code_review" => { answered: false }, "pattern" => { rung: nil } })
 

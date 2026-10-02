@@ -4,6 +4,8 @@
 #
 # A fixed setting is an early return rather than a bound fed through the
 # rule below, so no change to that rule can reach a user who chose a count.
+# It is clamped because the model validates a count only when it changes, so
+# a stored row can hold one outside the current range.
 class DaySize
   Decision = Data.define(:count, :reason, :setting, :completion, :gate) do
     def automatic? = setting.nil?
@@ -20,7 +22,8 @@ class DaySize
   end
 
   def self.for(setting:, completion:, gate:)
-    decision = Decision.new(count: setting, reason: :setting, setting: setting, completion: completion, gate: gate)
+    decision = Decision.new(count: setting&.clamp(SectionCount::FLOOR, ExerciseSection::MAX_SECTIONS),
+                            reason: :setting, setting: setting, completion: completion, gate: gate)
     return decision if setting
 
     decision.with(count: [ completion, gate.count ].min.clamp(SectionCount::FLOOR, ExerciseSection::MAX_SECTIONS),
