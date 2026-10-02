@@ -1,0 +1,15 @@
+{
+  "kind": "design_comparison",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "underdetermined",
+  "section": {
+    "title": "Sending the weekly digest",
+    "scenario": "A newsletter app sends each subscriber a weekly digest of new posts.",
+    "question": "Which piece is the better design, and what decides it?",
+    "piece_a": "class WeeklyDigest\n  def deliver(subscriber)\n    posts = Post.published_since(1.week.ago)\n    DigestMailer.weekly(subscriber, posts).deliver_later\n  end\nend",
+    "piece_b": "class WeeklyDigest\n  def initialize(posts: Post.published_since(1.week.ago))\n    @posts = posts\n  end\n\n  def deliver(subscriber)\n    DigestMailer.weekly(subscriber, @posts).deliver_later\n  end\nend",
+    "concept": "dependency_inversion"
+  }
+}

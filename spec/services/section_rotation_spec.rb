@@ -7,32 +7,32 @@ RSpec.describe SectionRotation do
     end
   end
 
-  it "fills every optional slot at full size" do
+  it "fills two of the three optional slots at full size" do
     chosen = described_class.for(history, count: 4)
 
     expect(chosen.keys).to contain_exactly(:pattern, :third, :fourth)
-    expect(chosen.values).to all(be_present)
+    expect(chosen.values.compact.size).to eq(2)
   end
 
-  it "leaves slots empty when the count is short" do
+  it "fills no optional slot at the floor, which the fixed kinds already make up" do
     chosen = described_class.for(history, count: 2)
 
-    expect(chosen.values.compact.size).to eq(1)
+    expect(chosen.values.compact).to be_empty
   end
 
   it "prefers the slot whose kinds have gone longest unseen" do
-    recent = history(*Array.new(12, %w[code_review pattern plan_review]))
+    recent = history(*Array.new(12, %w[code_review design_comparison pattern plan_review]))
 
-    chosen = described_class.for(recent, count: 2)
+    chosen = described_class.for(recent, count: 3)
 
     expect(chosen[:third]).to be_present
     expect(chosen[:pattern]).to be_nil
   end
 
-  it "fills exactly two optional slots at count: 3" do
+  it "fills exactly one optional slot at count: 3" do
     chosen = described_class.for(history, count: 3)
 
-    expect(chosen.values.compact.size).to eq(2)
+    expect(chosen.values.compact.size).to eq(1)
   end
 
   it "derives its slot roster from ExerciseSection.slots rather than restating it" do
@@ -44,7 +44,7 @@ RSpec.describe SectionRotation do
 
   it "counts one mandatory slot per fixed kind" do
     expect(described_class::MANDATORY_SLOT_COUNT).to eq(ExerciseSection.fixed.size)
-    expect(described_class::MANDATORY_SLOT_COUNT).to eq(1)
+    expect(described_class::MANDATORY_SLOT_COUNT).to eq(2)
   end
 
   # The regime this is designed for: every optional kind competing for one
@@ -57,7 +57,7 @@ RSpec.describe SectionRotation do
     log  = []
 
     pool_size.times do
-      chosen = described_class.for(history(*log.reverse), count: 2)
+      chosen = described_class.for(history(*log.reverse), count: 3)
       kind   = chosen.values.compact.first
       seen << kind
       log << (ExerciseSection.fixed.map(&:key) + chosen.values.compact.map(&:to_s))
@@ -121,14 +121,15 @@ RSpec.describe SectionRotation do
       recent = history(*Array.new(12, %w[code_review pattern plan_review]))
       damped = preferences(weights: ExerciseSection.thirds.to_h { |kind| [ kind.key, 0.25 ] })
 
-      filled = ->(prefs) { described_class.for(recent, count: 2, preferences: prefs).transform_values(&:present?) }
+      filled = ->(prefs) { described_class.for(recent, count: 3, preferences: prefs).transform_values(&:present?) }
 
       expect(filled.call(damped)).to eq(filled.call(KindPreferences.none))
     end
 
     it "does not leak across the third and fourth tracks" do
       allow(WeightedRoll).to receive(:rand).and_return(0.30)
-      recent = all_thirds_fresh
+      recent = history(%w[code_review design_comparison pattern],
+                       %w[code_review architecture security_review challenge parsons_problem plan_review ambiguity_hunt])
 
       with    = described_class.for(recent, count: 4, preferences: preferences(weights: { "plan_review" => 4.0 }))
       without = described_class.for(recent, count: 4, preferences: KindPreferences.none)
@@ -139,11 +140,15 @@ RSpec.describe SectionRotation do
     # KindPreferences.none is the kwarg's own default, so calling #for with and
     # without it can never diverge — pinned literal values are what makes an
     # untouched user's unweighted behaviour an assertion instead of a tautology.
+    # Pattern and the fourths were seen a day after the thirds, so the third
+    # slot is the stalest and takes the one optional spot.
     it "matches the unweighted rotation when nothing is stated" do
       allow(WeightedRoll).to receive(:rand).and_return(0.42)
+      recent = history(%w[code_review design_comparison pattern plan_review ambiguity_hunt pseudocode_to_code],
+                       %w[code_review design_comparison architecture security_review challenge parsons_problem])
 
-      expect(described_class.for(all_thirds_fresh, count: 4))
-        .to eq(pattern: :pattern, third: :security_review, fourth: :plan_review)
+      expect(described_class.for(recent, count: 3))
+        .to eq(pattern: nil, third: :security_review, fourth: nil)
     end
   end
 
@@ -167,9 +172,9 @@ RSpec.describe SectionRotation do
     it "stops an excluded kind pulling its slot into a short day" do
       recent = history(*Array.new(12, %w[code_review pattern challenge security_review parsons_problem plan_review]))
 
-      expect(described_class.for(recent, count: 2)[:third]).to be_present
+      expect(described_class.for(recent, count: 3)[:third]).to be_present
 
-      excluded = described_class.for(recent, count: 2, preferences: preferences(excluded: [ "architecture" ]))
+      excluded = described_class.for(recent, count: 3, preferences: preferences(excluded: [ "architecture" ]))
 
       expect(excluded[:third]).to be_nil
       expect(excluded[:fourth]).to be_present

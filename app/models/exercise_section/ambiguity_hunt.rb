@@ -39,16 +39,13 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
   # review prompt grades coverage against it and nothing else — so an empty or
   # unusable list doesn't degrade the section, it silently turns coverage
   # grading back into the freehand judgement the kind exists to replace, and
-  # there is no fallback to fall back to. InvalidResponseError is already a
-  # surfaced, retryable generation failure
-  # (GenerateDailyExercisesJob#persist_failure), so failing costs the user a
-  # retry rather than a day of ungrounded grading.
+  # there is no fallback to fall back to. Refusing costs only this section:
+  # ingest leaves it out, and the caller retries or drops it.
   #
   # A WRONG COUNT IS NOT A FAILURE, though. Nothing downstream reads
-  # PLANTED_COUNT, so a list of 3 or 5 grades exactly as well — and rejecting
-  # it would throw away the rest of the day's sections over the likeliest
-  # deviation an LLM makes on a counted list. Only the empty case is fatal;
-  # the long case is truncated.
+  # PLANTED_COUNT, so a list of 3 or 5 grades exactly as well — and refusing
+  # it would cost the section over the likeliest deviation an LLM makes on a
+  # counted list. Only the empty case is refused; the long case is truncated.
   #
   # Shape is held to the schema even though count isn't: a bare string here
   # is not four ambiguities, it's a provider that ignored the field's type,

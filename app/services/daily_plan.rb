@@ -126,8 +126,9 @@ class DailyPlan
     # a check nobody's gotten to in a while earns the trade.
     #
     # This capacity is approximate, deliberately. On a schema-review day
-    # code_review hosts only data-modeling concepts, so an ordinary concept has
-    # one host fewer than this counts. Left approximate because the arithmetic
+    # code_review hosts only data-modeling concepts, and design_comparison
+    # hosts only its own allowlist every day, so an ordinary concept can have
+    # a host or two fewer than this counts. Left approximate because the arithmetic
     # is advisory end to end — nothing verifies placement, and over-requesting
     # by one costs a concept the model could not have placed anyway. Making it
     # mode-aware would reopen this state machine, whose correctness rests on

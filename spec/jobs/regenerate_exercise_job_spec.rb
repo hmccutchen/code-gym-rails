@@ -12,13 +12,17 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                           regenerating_since: Time.current)
   end
 
+  def unjudged(problem_set, dropped: [])
+    AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: dropped, outcomes: {})
+  end
+
   def stub_provider(result)
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
     if result.is_a?(StandardError)
-      allow(fake_service).to receive(:generate_exercise).and_raise(result)
+      allow(fake_service).to receive(:generate_unjudged_exercise).and_raise(result)
     else
-      allow(fake_service).to receive(:generate_exercise).and_return(result)
+      allow(fake_service).to receive(:generate_unjudged_exercise).and_return(unjudged(result))
     end
     fake_service
   end
@@ -59,9 +63,9 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                                   answers: { "code_review" => "a draft worth keeping here" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_exercise) do
+    allow(fake_service).to receive(:generate_unjudged_exercise) do
       exercise.update_columns(regenerating_since: nil)
-      { "code_review" => { "question" => "new" } }
+      unjudged({ "code_review" => { "question" => "new" } })
     end
 
     described_class.new.perform(user_id: user.id)
@@ -83,9 +87,9 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                                   answers: { "code_review" => "a draft worth keeping here" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_exercise) do
+    allow(fake_service).to receive(:generate_unjudged_exercise) do
       exercise.update_columns(regenerating_since: newer_claim)
-      { "code_review" => { "question" => "new" } }
+      unjudged({ "code_review" => { "question" => "new" } })
     end
 
     described_class.new.perform(user_id: user.id)
@@ -100,7 +104,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     newer_claim = exercise.regenerating_since + 90.seconds
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_exercise) do
+    allow(fake_service).to receive(:generate_unjudged_exercise) do
       exercise.update_columns(regenerating_since: newer_claim)
       raise AiService::TimeoutError, "slow"
     end
@@ -208,9 +212,9 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                            answers: { "code_review" => "a" * 20 })
     fake_service = stub_provider({ "code_review" => { "question" => "new" } })
-    allow(fake_service).to receive(:generate_exercise) do
+    allow(fake_service).to receive(:generate_unjudged_exercise) do
       daily_response.destroy
-      { "code_review" => { "question" => "new" } }
+      unjudged({ "code_review" => { "question" => "new" } })
     end
 
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
@@ -228,7 +232,18 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
     described_class.new.perform(user_id: user.id)
 
-    expect(fake_service).to have_received(:generate_exercise).with(user, language: "javascript")
+    expect(fake_service).to have_received(:generate_unjudged_exercise).with(user, language: "javascript")
+  end
+
+  it "records a section the provider returned unusable as dropped" do
+    exercise = claimed_exercise
+    stub_provider({ "code_review" => { "question" => "new" } })
+    allow(AiService.for(user)).to receive(:generate_unjudged_exercise)
+      .and_return(unjudged({ "code_review" => { "question" => "new" } }, dropped: [ "design_comparison" ]))
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(exercise.reload.dropped_sections).to eq([ "design_comparison" ])
   end
 
   # The whole point of regenerating in place: a provider failure must not cost

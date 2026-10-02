@@ -18,7 +18,7 @@ class RegenerateExerciseJob < ApplicationJob
     # this claim from a later one: the paused dashboard can clear it and a
     # second click re-make it while the provider call below is still running.
     claim = exercise.regenerating_since
-    problem_set = AiService.for(user).generate_exercise(user, language: exercise.language)
+    generated = AiService.for(user).generate_unjudged_exercise(user, language: exercise.language)
 
     kept_for = nil
     ActiveRecord::Base.transaction do
@@ -59,8 +59,8 @@ class RegenerateExerciseJob < ApplicationJob
 
       existing&.destroy
       exercise.update!(
-        problem_set:        problem_set,
-        dropped_sections:   [],
+        problem_set:        generated.problem_set,
+        dropped_sections:   generated.dropped_sections,
         generated_at:       Time.current,
         regenerated_at:     Time.current,
         regenerating_since: nil

@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "principal_engineer",
+  "locked": false,
+  "expected": "keep_or_edit",
+  "principle": null,
+  "expected_better": "a",
+  "section": {
+    "title": "Counting a project's open tasks",
+    "scenario": "A project dashboard shows each project's open task count. The dashboard is read thousands of times an hour, and tasks are written only by a nightly import that runs in batches.",
+    "question": "Both pieces show the same count. Which cost should this system pay, and which stated facts decide it?",
+    "piece_a": "class Project < ApplicationRecord\n  # open_tasks_count is kept by TaskImport after each batch.\n  def open_task_count\n    open_tasks_count\n  end\nend\n\nclass TaskImport\n  def finish_batch(project)\n    project.update!(open_tasks_count: project.tasks.open.count)\n  end\nend",
+    "piece_b": "class Project < ApplicationRecord\n  def open_task_count\n    tasks.open.count\n  end\nend\n\nclass TaskImport\n  def finish_batch(project)\n    project.touch\n  end\nend",
+    "concept": "denormalization_tradeoffs"
+  }
+}

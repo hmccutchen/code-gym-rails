@@ -69,11 +69,13 @@ RSpec.describe ModelComparison do
       .to eq(ModelComparison::CANDIDATES.fetch("generate").map { |route| route[:effort] && { "effort" => route[:effort] } })
   end
 
-  it "never prints the ambiguity hunt's answer key" do
+  it "never prints any kind's answer key" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :ambiguity_hunt)
     comparison.generate(user.id)
 
-    expect(out.string).to include("ambiguity_hunt")
+    expect(out.string).to include("ambiguity_hunt", "design_comparison")
     ExerciseSection.all_answer_key_fields.each { |field| expect(out.string).not_to include(field) }
+    expect(out.string).not_to include(*FakeService::EXERCISE_PROBLEM_SET.dig("design_comparison", "answer_key").values)
   end
 
   it "prints a malformed provider response as that model's result rather than losing both" do
@@ -193,7 +195,60 @@ RSpec.describe ModelComparison do
     ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
     expect(out.string.scan(/^thread_prerequisite: .*got=error .*AiService::RateLimitError: slow down/).size)
       .to eq(ModelComparison::CANDIDATES.fetch("judge").size)
-    expect(out.string).to include("valid: 10/11")
+    fixture_count = Dir[Rails.root.join("spec/fixtures/judge/*.json")].size
+    expect(out.string).to include("valid: #{fixture_count - 1}/#{fixture_count}")
+  end
+
+  # A solve is a verdict field only for the kind the judge solves blind.
+  def keep_verdict(kind, solve: "b")
+    JudgeVerdict.new(status: :keep, solve: (solve if kind.judge_solve_options))
+  end
+
+  it "judge_fixtures counts an edit of a keep fixture as not kept, and accepts it for keep_or_edit" do
+    allow_any_instance_of(ClaudeService).to receive(:judge_section) do |_service, _user, kind, _section, **|
+      JudgeVerdict.new(status: :edit, issues: [ { type: "padding", evidence: "x" } ], fields: { "question" => "q" },
+                       solve: (kind.judge_solve_options && "a"))
+    end
+
+    comparison.judge_fixtures
+
+    keeps = Dir[Rails.root.join("spec/fixtures/judge/*.json")].count { |path| JSON.parse(File.read(path))["expected"] == "keep" }
+    expect(keeps).to be >= 2
+    expect(out.string).to match(/^design_comparison_junior_valid: expected=keep got=edit classification=edited/)
+    expect(out.string).to match(/^design_comparison_principal_tradeoff: expected=keep_or_edit got=edit classification=ok/)
+    expect(out.string).to include("kept unedited where keep was expected: 0/#{keeps}")
+  end
+
+  it "judge_fixtures reports blind-solve agreement per rung and concept without printing a solve or a key" do
+    expected = Dir[Rails.root.join("spec/fixtures/judge/*.json")].map { |path| JSON.parse(File.read(path)) }
+                                                                 .select { |fixture| fixture.key?("expected_better") }
+    allow_any_instance_of(ClaudeService).to receive(:judge_section) do |_service, _user, kind, section, **|
+      fixture = expected.find { |each| each["section"] == section }
+      keep_verdict(kind, solve: fixture ? fixture["expected_better"] : "a")
+    end
+
+    comparison.judge_fixtures
+
+    with_key = expected.size
+    attempted = Dir[Rails.root.join("spec/fixtures/judge/*.json")].count { |path| JSON.parse(File.read(path))["kind"] == "design_comparison" }
+    expect(out.string).to include("blind solve, claude-sonnet-5-5: valid-solve agreement #{with_key}/#{with_key} · " \
+                                  "matches of attempted #{with_key}/#{with_key}")
+    expect(out.string).to include("  rung junior: ", "  concept n_plus_one: ")
+    expect(out.string).to include("solve=match")
+    expect(out.string).not_to include("better", "expected_better")
+    expect(attempted).to be > with_key
+  end
+
+  it "judge mode reports each candidate's blind-solve agreement against the drafted key" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+
+    comparison.judge(user.id)
+
+    ModelComparison::CANDIDATES.fetch("judge").each do |route|
+      expect(out.string).to include("blind solve, #{route[:model]}: valid-solve agreement 1/1 · matches of attempted 1/1")
+    end
+    expect(out.string).to include("\"solve\": \"match\"")
+    expect(out.string).not_to include("\"better\"", "answer_key")
   end
 
   it "judge_fixtures prints each edit's issues with the text they quote" do
@@ -210,13 +265,16 @@ RSpec.describe ModelComparison do
   describe "review calibration" do
     let(:fixtures) { Dir[ModelComparison::REVIEW_CALIBRATION_FIXTURE_DIR.join("*.json")] }
 
-    it "grades every fixture's three answers once per candidate and prints a summary" do
+    let(:answer_count) do
+      fixtures.sum { |path| ModelComparison::CALIBRATION_EXPECTED.size + Array(JSON.parse(File.read(path))["extra_answers"]).size }
+    end
+
+    it "grades every fixture's answers, extra ones included, once per candidate and prints a summary" do
       comparison.review_calibration
 
-      expect(posted.size).to eq(fixtures.size * ModelComparison::CALIBRATION_EXPECTED.size *
-                                ModelComparison::CANDIDATES.fetch("review_calibration").size)
+      expect(posted.size).to eq(answer_count * ModelComparison::CANDIDATES.fetch("review_calibration").size)
       expect(out.string).to include("=== review_calibration: #{ClaudeService::DEFAULT_ROUTE[:model]} ===")
-        .and match(%r{in order: \d+/#{fixtures.size} · matched expected: \d+/#{fixtures.size * 3}})
+        .and match(%r{in order: \d+/#{fixtures.size} · matched expected: \d+/#{answer_count}})
         .and include("complete answers rated solid or better:").and include("cache write")
     end
 
@@ -231,6 +289,32 @@ RSpec.describe ModelComparison do
     it "grades with the route production uses for reviews" do
       expect(ModelComparison::CANDIDATES.fetch("review_calibration"))
         .to eq([ ClaudeService::MODEL_FOR_PURPOSE.fetch("review_response", ClaudeService::DEFAULT_ROUTE) ])
+    end
+
+    # FakeService grades every answer "solid", which no extra case here expects.
+    it "prints each extra answer beside its own expected ratings" do
+      comparison.review_calibration
+
+      expect(out.string).to match(%r{^  vague_correct_pick solid +expected beginner/developing +MISMATCH})
+      expect(out.string).to match(%r{^  other_pick_sound_reason solid +expected developing +MISMATCH})
+    end
+
+    it "grades a design comparison's extra cases from the decoded answer and the key" do
+      comparison.review_calibration
+
+      prompts = posted.map { |body| body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"] }
+      expect(prompts.join).to include("Picked: A. Reason: The scenario says carriers are added monthly")
+      expect(prompts.join).not_to include("pick:a")
+    end
+
+    it "every extra answer carries a label, an answer and its own expected ratings" do
+      extras = fixtures.flat_map { |path| Array(JSON.parse(File.read(path))["extra_answers"]) }
+
+      expect(extras.size).to be >= 2
+      extras.each do |extra|
+        expect(extra.keys).to contain_exactly("label", "answer", "expected")
+        expect(extra["expected"] - ConceptMastery::AI_RATING_RANK.keys).to be_empty
+      end
     end
 
     it "every fixture names a registered kind, a stamped rung and an answer for each quality" do

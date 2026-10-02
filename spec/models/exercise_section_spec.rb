@@ -4,7 +4,7 @@ RSpec.describe ExerciseSection do
   describe ".keys" do
     it "lists every section kind in the order the app has always enumerated them" do
       expect(described_class.keys).to eq(%w[
-        code_review pattern challenge architecture security_review parsons_problem
+        code_review design_comparison pattern challenge architecture security_review parsons_problem
         plan_review ambiguity_hunt pseudocode_to_code
       ])
     end
@@ -20,13 +20,6 @@ RSpec.describe ExerciseSection do
     # to decide on rather than an exception.
     it "returns nil for a key outside the closed set" do
       expect(described_class.find("bogus")).to be_nil
-    end
-  end
-
-  describe ".droppable?" do
-    it "is false for the day's anchor and true for every other kind" do
-      expect(ExerciseSection::CodeReview.droppable?).to be(false)
-      expect((described_class.all - [ ExerciseSection::CodeReview ]).map(&:droppable?)).to all(be(true))
     end
   end
 
@@ -470,7 +463,7 @@ RSpec.describe ExerciseSection do
   describe ".for_plan" do
     it "returns the day's kinds in slot order" do
       expect(ExerciseSection.for_plan(third: :architecture, fourth: :ambiguity_hunt))
-        .to eq([ ExerciseSection::CodeReview, ExerciseSection::Pattern,
+        .to eq([ ExerciseSection::CodeReview, ExerciseSection::DesignComparison, ExerciseSection::Pattern,
                  ExerciseSection::Architecture, ExerciseSection::AmbiguityHunt ])
     end
 
@@ -478,7 +471,7 @@ RSpec.describe ExerciseSection do
       ExerciseSection.thirds.map { |kind| kind.key.to_sym }.each do |third|
         ExerciseSection.fourths.map { |kind| kind.key.to_sym }.each do |fourth|
           expect(ExerciseSection.for_plan(third: third, fourth: fourth).map(&:key))
-            .to eq([ "code_review", "pattern", third.to_s, fourth.to_s ])
+            .to eq([ "code_review", "design_comparison", "pattern", third.to_s, fourth.to_s ])
         end
       end
     end
@@ -493,16 +486,16 @@ RSpec.describe ExerciseSection do
     end
 
     it "omits a slot given nil" do
-      expect(described_class.for_plan(third: nil, fourth: :plan_review).map(&:key))
-        .to eq(%w[code_review pattern plan_review])
+      expect(described_class.for_plan(third: nil, fourth: :plan_review, pattern: nil).map(&:key))
+        .to eq(%w[code_review design_comparison plan_review])
 
       expect(described_class.for_plan(third: :challenge, fourth: nil, pattern: nil).map(&:key))
-        .to eq(%w[code_review challenge])
+        .to eq(%w[code_review design_comparison challenge])
     end
 
-    it "always includes code_review" do
+    it "always includes both fixed kinds" do
       expect(described_class.for_plan(third: nil, fourth: nil, pattern: nil).map(&:key))
-        .to eq(%w[code_review])
+        .to eq(%w[code_review design_comparison])
     end
 
     it "still raises for a kind ineligible for its slot" do
@@ -515,7 +508,7 @@ RSpec.describe ExerciseSection do
     it "keeps every slot, so an omitted one cannot shift a later kind into its place" do
       kinds = described_class.slot_kinds(third: nil, fourth: :plan_review)
 
-      expect(kinds.keys).to eq(%i[code_review pattern third fourth])
+      expect(kinds.keys).to eq(%i[code_review design_comparison pattern third fourth])
       expect(kinds[:third]).to be_nil
       expect(kinds[:fourth]).to eq(ExerciseSection::PlanReview)
     end
@@ -543,15 +536,15 @@ RSpec.describe ExerciseSection do
   end
 
   describe "MAX_SECTIONS" do
-    it "is four, as many as a fully populated plan holds today" do
+    it "is four, one fewer than the slots, so every day leaves at least one slot empty" do
       expect(described_class::MAX_SECTIONS).to eq(4)
-      expect(described_class::MAX_SECTIONS).to eq(described_class.for_plan(third: :challenge, fourth: :plan_review).size)
+      expect(described_class.slots.size).to eq(described_class::MAX_SECTIONS + 1)
     end
   end
 
   describe ".fixed" do
-    it "holds code_review alone" do
-      expect(described_class.fixed).to eq([ ExerciseSection::CodeReview ])
+    it "holds code_review and design_comparison" do
+      expect(described_class.fixed).to eq([ ExerciseSection::CodeReview, ExerciseSection::DesignComparison ])
       expect((described_class.all - described_class.fixed).map(&:fixed?)).to all(be(false))
     end
   end
@@ -559,16 +552,22 @@ RSpec.describe ExerciseSection do
   describe ".slots" do
     it "gives each fixed kind its own slot ahead of pattern, third and fourth" do
       expect(described_class.slots).to eq(
-        code_review: [ ExerciseSection::CodeReview ], pattern: [ ExerciseSection::Pattern ],
-        third: described_class.thirds, fourth: described_class.fourths
+        code_review: [ ExerciseSection::CodeReview ], design_comparison: [ ExerciseSection::DesignComparison ],
+        pattern: [ ExerciseSection::Pattern ], third: described_class.thirds, fourth: described_class.fourths
       )
     end
   end
 
   describe ".resolved_keys" do
-    it "resolves FakeService's every-kind set to one key per slot, by precedence" do
+    it "caps FakeService's every-kind set at MAX_SECTIONS, keeping both fixed kinds and then slot order" do
       expect(described_class.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
-        .to eq(%w[code_review pattern architecture plan_review])
+        .to eq(%w[code_review design_comparison pattern architecture])
+    end
+
+    it "keeps both fixed kinds first when it has to cut" do
+      every_shape = described_class.keys.index_with { {} }
+
+      expect(described_class.resolved_keys(every_shape).first(2)).to eq(described_class.fixed.map(&:key))
     end
 
     it "skips a key whose value is not a section" do
@@ -591,17 +590,18 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".all_answer_key_fields" do
-    it "is the union of every kind's answer key, which today is the ambiguity hunt's planted list" do
-      expect(described_class.all_answer_key_fields).to eq(%w[planted_ambiguities])
-      expect((described_class.all - [ ExerciseSection::AmbiguityHunt ]).map(&:answer_key_fields)).to all(eq([]))
+    it "is the union of every kind's answer key" do
+      expect(described_class.all_answer_key_fields).to match_array(%w[answer_key planted_ambiguities])
+      expect((described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::DesignComparison ])
+        .map(&:answer_key_fields)).to all(eq([]))
     end
   end
 
   describe ".narrow_vocabulary" do
-    it "returns the vocabulary unchanged for every kind, at any rung or none" do
+    it "returns the vocabulary unchanged for every kind but design_comparison, at any rung or none" do
       vocabulary = %w[n_plus_one memoization]
 
-      described_class.all.each do |kind|
+      (described_class.all - [ ExerciseSection::DesignComparison ]).each do |kind|
         expect(kind.narrow_vocabulary(vocabulary)).to equal(vocabulary)
         KindDifficulty::LEVELS.each { |rung| expect(kind.narrow_vocabulary(vocabulary, rung: rung)).to equal(vocabulary) }
       end
@@ -612,21 +612,36 @@ RSpec.describe ExerciseSection do
     it "leaves a section of a kind with nothing to refuse untouched" do
       section = { "question" => "" }
 
-      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode ]).each do |kind|
+      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode,
+                               ExerciseSection::DesignComparison ]).each do |kind|
         expect { kind.reject_unusable!(section) }.not_to change { section }
       end
     end
   end
 
   describe ".judge_retries" do
-    it "is one for every kind" do
-      expect(described_class.all.map(&:judge_retries)).to all(eq(1))
+    it "is two for a fixed kind and one for every other kind" do
+      expect(described_class.fixed.map(&:judge_retries)).to all(eq(2))
+      expect((described_class.all - described_class.fixed).map(&:judge_retries)).to all(eq(1))
     end
   end
 
   describe ".judge_guidance" do
-    it "is absent for every kind" do
-      expect(described_class.all.map(&:judge_guidance)).to all(be_nil)
+    it "is absent for every kind but design_comparison" do
+      expect((described_class.all - [ ExerciseSection::DesignComparison ]).map(&:judge_guidance)).to all(be_nil)
+      expect(ExerciseSection::DesignComparison.judge_guidance).to include("Solve it before judging")
+    end
+  end
+
+  describe ".reference_opens_before_answer?" do
+    it "is false only for design_comparison, whose reference would give its reason away" do
+      expect(described_class.all.reject(&:reference_opens_before_answer?)).to eq([ ExerciseSection::DesignComparison ])
+    end
+  end
+
+  describe ".judge_solve_options" do
+    it "is absent for every kind but design_comparison" do
+      expect((described_class.all - [ ExerciseSection::DesignComparison ]).map(&:judge_solve_options)).to all(be_nil)
     end
   end
 
@@ -648,8 +663,14 @@ RSpec.describe ExerciseSection do
         expect(JSON.parse("{#{kind.schema_fragment(label: RUBY_LABEL)}}").keys).to eq([ kind.key ])
       end
 
-      it "defines a teaching_note, a concept, and a scenario" do
-        expect(parse(kind)).to include("teaching_note", "concept", "scenario")
+      it "defines a concept and a scenario" do
+        expect(parse(kind)).to include("concept", "scenario")
+      end
+
+      # A kind with no teaching note says so by leaving it out of the fields
+      # the judge may rewrite.
+      it "asks for a teaching_note exactly when the judge may rewrite one" do
+        expect(parse(kind).key?("teaching_note")).to eq(kind.prose_fields.include?("teaching_note"))
       end
 
       # Catches a kind that hardcodes a language instead of interpolating the
@@ -1148,7 +1169,7 @@ RSpec.describe ExerciseSection do
 
     it "omits the kinds whose slot offers no choice" do
       expect(described_class.rotatable)
-        .not_to include(ExerciseSection::CodeReview, ExerciseSection::Pattern)
+        .not_to include(ExerciseSection::CodeReview, ExerciseSection::DesignComparison, ExerciseSection::Pattern)
     end
   end
 end
@@ -1157,12 +1178,14 @@ RSpec.describe ExerciseSection, "judge facets" do
   it "gives every kind a task and prose fields drawn from its own schema" do
     ExerciseSection.all.each do |kind|
       expect(kind.judge_task).to be_a(String).and(satisfy { |s| s.length > 20 })
-      expect(kind.prose_fields).to include("question", "teaching_note")
-      expect(kind.prose_fields).not_to include("concept", "snippet", "starter_code", "blocks", "plan_excerpt", "planted_ambiguities", "problem_statement", "answer_scaffold", "diagram", "options")
+      expect(kind.prose_fields).to include("question")
+      expect(kind.prose_fields).not_to include("concept", "snippet", "starter_code", "blocks", "plan_excerpt", "planted_ambiguities", "problem_statement", "answer_scaffold", "diagram", "options",
+                                               "piece_a", "piece_b", "answer_key")
     end
   end
 
   it "marks the discovery kinds" do
-    expect(ExerciseSection.all.select(&:discovery?).map(&:key)).to match_array(%w[code_review security_review plan_review parsons_problem])
+    expect(ExerciseSection.all.select(&:discovery?).map(&:key))
+      .to match_array(%w[code_review design_comparison security_review plan_review parsons_problem])
   end
 end

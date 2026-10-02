@@ -1,3 +1,5 @@
+require_relative "solve_agreement"
+
 # Runs one stored input through two Claude models and prints both results
 # side by side, for a person to read and judge. Nothing in app/ loads this.
 #
@@ -18,6 +20,10 @@ class ModelComparison
   }.freeze
 
   REVIEW_FIELDS = %w[rating missed next_step].freeze
+
+  # A judge fixture's expected status: "reject", "keep_or_edit", or "keep",
+  # which an edit does not satisfy.
+  SOUND_EXPECTATIONS = %w[keep keep_or_edit].freeze
   VERDICT_FIELDS = %w[status issues principle evidence reason].freeze
 
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
@@ -25,7 +31,10 @@ class ModelComparison
   REVIEW_CALIBRATION_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_calibration")
 
   # What AiService::RATING_RUBRIC should give each answer a calibration
-  # fixture carries, in descending order of quality.
+  # fixture carries, in descending order of quality. A fixture may also carry
+  # "extra_answers", each with a label, an answer and its own expected
+  # ratings, for cases outside that ladder; they are graded and matched but
+  # take no part in the rank-order check.
   CALIBRATION_EXPECTED = {
     "complete" => %w[solid strong],
     "partial"  => %w[developing],
@@ -116,9 +125,10 @@ class ModelComparison
       pinned_service(CANDIDATES.fetch("generate").first, []).send(:draft_exercise, user, language: language, blocking: true)
     end
 
-    compare("judge", heading: "user #{user.id}, #{language}") do |service|
+    runs = compare("judge", heading: "user #{user.id}, #{language}") do |service|
       judge_draft(service, user, draft, difficulty)
     end
+    runs.each { |run| SolveAgreement.new(draft_solve_rows(run, draft, difficulty, user), out: @out).print(run.route[:model]) }
   end
 
   # Runs every fixture under spec/fixtures/judge through each judge candidate
@@ -183,14 +193,36 @@ class ModelComparison
     end.to_h
   end
 
+  # The solve is reported as match or mismatch against the drafted key, never
+  # as the piece the judge picked, so the output never names the answer.
   def judge_drafted_section(service, user, kind, section, difficulty)
     verdict = service.judge_section(
       user, kind, section,
       rung: difficulty.rung_for(kind, skill_level: user.skill_level), locked: difficulty.locked?(kind)
     )
-    VERDICT_FIELDS.index_with { |field| verdict.public_send(field) }
+    fields = VERDICT_FIELDS.index_with { |field| verdict.public_send(field) }
+    verdict.solve ? fields.merge("solve" => kind.solve_matches_key?(section, verdict.solve) ? "match" : "mismatch") : fields
   rescue JudgeVerdict::Invalid, AiService::Error => e
     "#{e.class}: #{e.message}"
+  end
+
+  def draft_solve_rows(run, draft, difficulty, user)
+    return [] unless run.output.is_a?(Hash)
+
+    run.output.filter_map do |key, result|
+      kind = ExerciseSection.for(key)
+      next unless kind.judge_solve_options
+
+      { rung: difficulty.rung_for(kind, skill_level: user.skill_level), concept: draft.problem_set.dig(key, "concept"),
+        **drafted_solve_outcome(result), false_reject: false }
+    end
+  end
+
+  def drafted_solve_outcome(result)
+    return { status: result["status"], matched: result.key?("solve") ? result["solve"] == "match" : nil } if result.is_a?(Hash)
+
+    invalid = result.start_with?(JudgeVerdict::Invalid.name, AiService::InvalidResponseError.name)
+    { status: invalid ? :invalid : :error, matched: nil }
   end
 
   def print_fixture_table(route, fixtures, user)
@@ -201,13 +233,29 @@ class ModelComparison
     @out.puts "=== judge_fixtures: #{route[:model]} ==="
     rows.each { |row| print_fixture_row(row) }
     print_fixture_totals(route, rows, usage)
+    SolveAgreement.new(fixture_solve_rows(rows), out: @out).print(route[:model])
     @out.puts
+  end
+
+  def fixture_solve_rows(rows)
+    rows.select { |row| row[:expects_solve] }.map do |row|
+      status = %i[invalid error].include?(row[:classification]) ? row[:classification] : row[:status]
+      { rung: row[:rung], concept: row[:concept], status: status, matched: row[:solve_matched],
+        false_reject: row[:classification] == :false_reject }
+    end
   end
 
   def print_fixture_row(row)
     @out.puts "#{row[:name]}: expected=#{row[:expected]} got=#{row[:status] || row[:classification]} " \
-              "classification=#{row[:classification]} principle=#{row[:principle]} #{row[:ms]}ms" \
+              "classification=#{row[:classification]} principle=#{row[:principle]}#{fixture_solve_label(row)} #{row[:ms]}ms" \
               "#{fixture_row_detail(row)}"
+  end
+
+  # Match or mismatch only: printing the judge's pick would print the answer.
+  def fixture_solve_label(row)
+    return "" if row[:solve_matched].nil?
+
+    " solve=#{row[:solve_matched] ? 'match' : 'MISMATCH'}"
   end
 
   def fixture_row_detail(row)
@@ -219,7 +267,8 @@ class ModelComparison
 
   def print_fixture_totals(route, rows, usage)
     broken        = rows.select { |row| row[:expected] == "reject" }
-    sound         = rows.select { |row| row[:expected] == "keep_or_edit" }
+    sound         = rows.select { |row| SOUND_EXPECTATIONS.include?(row[:expected]) }
+    keeps         = rows.select { |row| row[:expected] == "keep" }
     valid         = rows.reject { |row| %i[invalid error].include?(row[:classification]) }
     detected      = broken.count { |row| row[:classification] == :detected }
     false_rejects = sound.count { |row| row[:classification] == :false_reject }
@@ -228,6 +277,7 @@ class ModelComparison
 
     @out.puts "valid: #{valid.size}/#{rows.size} · detected: #{detected}/#{broken.size} · " \
               "false rejections: #{false_rejects}/#{sound.size} · " \
+              "kept unedited where keep was expected: #{keeps.count { |row| row[:classification] == :ok }}/#{keeps.size} · " \
               "#{rows.sum { |row| row[:ms] }}ms · #{tokens_in} in / #{tokens_out} out · " \
               "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out))}"
     print_detection_per_principle(broken)
@@ -266,8 +316,9 @@ class ModelComparison
   end
 
   def fixture_result(fixture, verdict)
+    solve_matched = verdict.solve == fixture["expected_better"] if fixture["expected_better"] && verdict.solve
     fixture_identity(fixture).merge(status: verdict.status, principle: verdict.principle, issues: verdict.issues,
-                                    classification: classify_fixture(fixture, verdict))
+                                    classification: classify_fixture(fixture, verdict), solve_matched: solve_matched)
   end
 
   def fixture_failure(fixture, classification, error)
@@ -275,16 +326,24 @@ class ModelComparison
   end
 
   def fixture_identity(fixture)
-    { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"] }
+    { name: fixture["name"], expected: fixture["expected"], expected_principle: fixture["principle"],
+      rung: fixture["rung"], concept: fixture.dig("section", "concept"), expects_solve: fixture.key?("expected_better") }
   end
 
   # detected/wrong_principle/missed for a fixture whose section is meant to be
-  # caught; ok/false_reject for one that's meant to survive.
+  # caught; ok/false_reject for one that's meant to survive, plus edited for a
+  # "keep" fixture the judge rewrote, since rewriting a deliberately sound
+  # section is not keeping it.
   def classify_fixture(fixture, verdict)
-    if fixture["expected"] == "reject"
+    case fixture["expected"]
+    when "reject"
       return :missed unless verdict.reject?
 
       verdict.principle == fixture["principle"] ? :detected : :wrong_principle
+    when "keep"
+      return :false_reject if verdict.reject?
+
+      verdict.edit? ? :edited : :ok
     else
       verdict.reject? ? :false_reject : :ok
     end
@@ -448,49 +507,53 @@ class ModelComparison
     end.join(", ")
   end
 
+  # Each graded answer is [label, expected ratings, run]; the first three are
+  # the quality ladder, in order.
   def calibration_row(route, user, fixture)
-    graded = CALIBRATION_EXPECTED.keys.to_h { |quality| [ quality, grade_calibration_answer(route, user, fixture, quality) ] }
-    ranks  = graded.values.map { |run| ConceptMastery::AI_RATING_RANK[run.output["rating"]] if run.output.is_a?(Hash) }
+    answers = CALIBRATION_EXPECTED.map { |quality, expected| [ quality, expected, fixture.dig("answers", quality) ] } +
+              Array(fixture["extra_answers"]).map { |extra| extra.values_at("label", "expected", "answer") }
+    graded  = answers.map { |label, expected, answer| [ label, expected, grade_calibration_answer(route, user, fixture, answer) ] }
+    ranks   = graded.first(CALIBRATION_EXPECTED.size).map { |_, _, run| ConceptMastery::AI_RATING_RANK[run.output["rating"]] if run.output.is_a?(Hash) }
     ordered = ranks.all? && ranks.each_cons(2).all? { |better, worse| better > worse }
 
     @out.puts "--- #{fixture['name']} (#{fixture['kind']}, #{fixture.dig('section', 'pitched_at')}) · #{ordered ? 'in order' : 'OUT OF ORDER'} ---"
-    graded.each { |quality, run| @out.puts calibration_line(quality, run) }
+    graded.each { |label, expected, run| @out.puts calibration_line(label, expected, run) }
     { ordered: ordered, graded: graded }
   end
 
-  def grade_calibration_answer(route, user, fixture, quality)
+  def grade_calibration_answer(route, user, fixture, answer)
     kind     = fixture["kind"]
     exercise = DailyExercise.new(user: user, language: fixture["language"], problem_set: { kind => fixture["section"] })
-    response = DailyResponse.new(user: user, daily_exercise: exercise, answers: { kind => fixture.dig("answers", quality) },
+    response = DailyResponse.new(user: user, daily_exercise: exercise, answers: { kind => answer },
                                  section_ratings: { kind => "right_level" })
 
     timed_run(route) { |service| graded_review(service, response, exercise, kind) }
   end
 
-  def calibration_line(quality, run)
-    return "  #{quality.ljust(8)} error: #{run.output}" unless run.output.is_a?(Hash)
+  def calibration_line(label, expected, run)
+    return "  #{label.ljust(8)} error: #{run.output}" unless run.output.is_a?(Hash)
 
     review   = run.output
-    expected = CALIBRATION_EXPECTED.fetch(quality)
     check    = RubricCheck.new(review)
-    "  #{quality.ljust(8)} #{review['rating'].to_s.ljust(10)} expected #{expected.join('/').ljust(13)}" \
+    "  #{label.ljust(8)} #{review['rating'].to_s.ljust(10)} expected #{expected.join('/').ljust(20)}" \
       "#{expected.include?(review['rating']) ? 'match' : 'MISMATCH'} · essential #{check.essential_gaps&.size || '?'}" \
       " of #{check.missed_count} missed · rubric #{check.agrees?.nil? ? 'unchecked' : (check.agrees? ? 'agrees' : 'DISAGREES')}" \
       " · #{format('%.1f', run.seconds)}s"
   end
 
   def print_calibration_summary(route, rows)
-    runs       = rows.flat_map { |row| row[:graded].to_a }
-    graded     = runs.select { |_quality, run| run.output.is_a?(Hash) }
-    matched    = graded.count { |quality, run| CALIBRATION_EXPECTED.fetch(quality).include?(run.output["rating"]) }
-    agreeing   = graded.count { |_quality, run| RubricCheck.new(run.output).agrees? }
-    tokens_in  = runs.sum { |_quality, run| run.tokens_in }
-    tokens_out = runs.sum { |_quality, run| run.tokens_out }
-    cache      = { cache_read: runs.sum { |_quality, run| run.cache_read }, cache_write: runs.sum { |_quality, run| run.cache_write } }
+    runs       = rows.flat_map { |row| row[:graded] }
+    graded     = runs.select { |_label, _expected, run| run.output.is_a?(Hash) }
+    matched    = graded.count { |_label, expected, run| expected.include?(run.output["rating"]) }
+    agreeing   = graded.count { |_label, _expected, run| RubricCheck.new(run.output).agrees? }
+    tokens_in  = runs.sum { |_label, _expected, run| run.tokens_in }
+    tokens_out = runs.sum { |_label, _expected, run| run.tokens_out }
+    cache      = { cache_read: runs.sum { |_label, _expected, run| run.cache_read },
+                   cache_write: runs.sum { |_label, _expected, run| run.cache_write } }
 
     @out.puts "in order: #{rows.count { |row| row[:ordered] }}/#{rows.size} · matched expected: #{matched}/#{runs.size} · " \
               "rating agrees with essential gaps: #{agreeing}/#{graded.size} · " \
-              "complete answers rated solid or better: #{graded.count { |quality, run| quality == 'complete' && CALIBRATION_EXPECTED.fetch('complete').include?(run.output['rating']) }}/#{rows.size} · " \
+              "complete answers rated solid or better: #{graded.count { |label, expected, run| label == 'complete' && expected.include?(run.output['rating']) }}/#{rows.size} · " \
               "#{tokens_in} in / #{cache[:cache_write]} cache write / #{cache[:cache_read]} cache read / #{tokens_out} out · " \
               "$#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out, **cache))}"
     @out.puts

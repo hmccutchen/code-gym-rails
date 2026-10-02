@@ -162,15 +162,17 @@ RSpec.describe "DailyExercises", type: :request do
       get dashboard_status_path
       expect(JSON.parse(response.body)["status"]).to eq("pending")
 
-      fake_service = instance_double(ClaudeService, generate_exercise: {
-                                       "code_review" => { "question" => "freshly generated", "snippet" => "def a; end" },
-                                       "pattern" => {
-                                         "title" => "Service Objects", "why" => "Because", "question" => "When?",
-                                         "reference" => { "tagline" => "T", "explanation" => "E",
-                                                          "code_example" => "code", "senior_lens" => "S" }
-                                       },
-                                       "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
-                                     })
+      fresh = {
+        "code_review" => { "question" => "freshly generated", "snippet" => "def a; end" },
+        "pattern" => {
+          "title" => "Service Objects", "why" => "Because", "question" => "When?",
+          "reference" => { "tagline" => "T", "explanation" => "E",
+                           "code_example" => "code", "senior_lens" => "S" }
+        },
+        "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
+      }
+      fake_service = instance_double(ClaudeService, generate_unjudged_exercise:
+        AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}))
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
       perform_enqueued_jobs
 

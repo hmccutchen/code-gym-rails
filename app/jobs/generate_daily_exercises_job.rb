@@ -85,8 +85,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     language = user.language_for_today
     service  = AiService.for(user)
     judged   = judge ? service.generate_judged_exercise(user, language: language)
-                     : AiService::JudgedSet.new(problem_set: service.generate_exercise(user, language: language),
-                                                dropped_sections: [], outcomes: {})
+                     : service.generate_unjudged_exercise(user, language: language)
 
     DailyExercise.create!(
       user:             user,

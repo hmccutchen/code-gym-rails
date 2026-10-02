@@ -331,7 +331,8 @@ RSpec.describe DailyPlan do
   end
 
   describe "#for with the fourth slot" do
-    it "always includes a fourth kind, reinforcement, due_checks, and established" do
+    it "carries the fourth kind and its own reinforcement, due_checks, and established when one is chosen" do
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
       result = DailyPlan.for(user, language: "ruby_rails")
 
       expect(%i[plan_review ambiguity_hunt]).to include(result.fourth)
@@ -479,6 +480,7 @@ RSpec.describe DailyPlan do
     before { allow(SectionCount).to receive(:for).and_return(2) }
 
     it "carries the chosen slots, leaving the unchosen ones nil" do
+      allow(SectionCount).to receive(:for).and_return(3)
       plan = described_class.for(user, language: "ruby_rails")
 
       chosen = [ plan.pattern, plan.third, plan.fourth ].compact
@@ -511,11 +513,11 @@ RSpec.describe DailyPlan do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
       code_review_and_third = described_class.for(user, language: "ruby_rails")
 
-      # code_review + fourth has one non-fourth host (capacity 1); code_review +
-      # third has two (capacity 2) — pinning capacity's derivation from the
-      # chosen kinds rather than a hardcoded slot count.
-      expect(code_review_and_fourth_only.due_checks.size).to eq(1)
-      expect(code_review_and_third.due_checks.size).to eq(2)
+      # The two fixed kinds + fourth have two non-fourth hosts (capacity 2); the
+      # fixed kinds + third have three (capacity 3) — pinning capacity's
+      # derivation from the chosen kinds rather than a hardcoded slot count.
+      expect(code_review_and_fourth_only.due_checks.size).to eq(2)
+      expect(code_review_and_third.due_checks.size).to eq(3)
     end
 
     # The prompt's mastery instruction demands every listed concept be
@@ -527,7 +529,7 @@ RSpec.describe DailyPlan do
           { concept: "idempotency", bucket: "ruby_rails", tier: "standard" } ]
       )
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: anything).and_return([])
-      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
 
       plan = described_class.for(user, language: "ruby_rails")
 
@@ -542,7 +544,7 @@ RSpec.describe DailyPlan do
       user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
                                      mastered_at: 6.months.ago, retention_interval_days: 7,
                                      next_retention_check_on: 6.months.ago.to_date)
-      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
 
       plan = described_class.for(user, language: "ruby_rails")
 
@@ -561,7 +563,8 @@ RSpec.describe DailyPlan do
 
       plan = described_class.for(user, language: "ruby_rails")
 
-      expect([ plan.pattern, plan.third, plan.fourth ]).to all(be_present)
+      optional_slots = ExerciseSection::MAX_SECTIONS - ExerciseSection.fixed.size
+      expect([ plan.pattern, plan.third, plan.fourth ].compact.size).to eq(optional_slots)
     end
 
     it "leaves adaptive sizing on for a user who never turned it off" do
@@ -686,7 +689,7 @@ RSpec.describe DailyPlan, "drilled concepts" do
     submit("n_plus_one", date: Date.current - 1)
     submit("transaction_safety", date: Date.current - 2)
     ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
-    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
 
     plan = described_class.for(user, language: "ruby_rails")
 
@@ -706,15 +709,19 @@ RSpec.describe DailyPlan, "drilled concepts" do
     expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[sync_vs_async])
   end
 
+  # denormalization_tradeoffs, because the design comparison hosts the rest of
+  # the group and DailyPlan, which never reads a rung, offers it the strictest
+  # list, without the tradeoff concepts.
   it "offers a drilled data-modeling concept only when a section today can tag it" do
-    ConceptDrills.start!(user, concept: "wrong_cardinality", bucket: "ruby_rails")
+    ConceptDrills.start!(user, concept: "denormalization_tradeoffs", bucket: "ruby_rails")
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
 
     pin_code_review_mode(:application_code)
     expect(described_class.for(user, language: "ruby_rails").reinforcement).to eq([])
 
     pin_code_review_mode(:schema_review)
-    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[wrong_cardinality])
+    expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] })
+      .to eq(%w[denormalization_tradeoffs])
   end
 
   it "leaves one host for evidence-driven reinforcement when a group drill could fill the day" do
@@ -724,12 +731,12 @@ RSpec.describe DailyPlan, "drilled concepts" do
 
     plan = described_class.for(user, language: "ruby_rails")
 
-    expect(plan.reinforcement.size).to eq(3)
-    expect(plan.reinforcement.count { |h| h[:drilled] }).to eq(2)
+    expect(plan.reinforcement.size).to eq(4)
+    expect(plan.reinforcement.count { |h| h[:drilled] }).to eq(3)
     expect(plan.reinforcement.last).to eq(concept: "n_plus_one", bucket: "ruby_rails", tier: "standard")
   end
 
-  it "still offers a drill on a one-host day with evidence waiting" do
+  it "shares the two fixed hosts between a drill and the evidence waiting" do
     submit("n_plus_one", date: Date.current - 1)
     ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
@@ -737,7 +744,14 @@ RSpec.describe DailyPlan, "drilled concepts" do
 
     plan = described_class.for(user, language: "ruby_rails")
 
-    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization])
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization n_plus_one])
+  end
+
+  it "still gives a one-host share to the drill with evidence waiting" do
+    drilled  = { concept: "memoization", bucket: "ruby_rails", tier: "standard", drilled: true }
+    evidence = { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }
+
+    expect(described_class.send(:share_hosts, [ drilled, evidence ], 1)).to eq([ drilled ])
   end
 
   it "does not let a drilled concept's own overdue check take the slot back from it" do

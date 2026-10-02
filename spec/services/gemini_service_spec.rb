@@ -36,6 +36,23 @@ RSpec.describe GeminiService do
       .to raise_error(AiService::InvalidResponseError, /Gemini returned an unreadable response/)
   end
 
+  # A body that starts like JSON is most likely a cut-off reply, which can
+  # carry an answer (a judge's blind solve), so only its size reaches the log.
+  it "withholds a cut-off JSON body from the log and still logs a non-JSON one" do
+    logged = []
+    allow(Rails.logger).to receive(:error) { |message| logged << message }
+
+    expect { service.send(:unreadable_envelope!, '{"text":"{\\"better\\":\\"b\\"', "Gemini") }
+      .to raise_error(AiService::InvalidResponseError)
+    expect { service.send(:unreadable_envelope!, '"{\\"better\\":\\"b\\"', "Gemini") }
+      .to raise_error(AiService::InvalidResponseError)
+    expect { service.send(:unreadable_envelope!, "<html>Bad gateway</html>", "Gemini") }
+      .to raise_error(AiService::InvalidResponseError)
+
+    expect(logged.first(2)).to all(include("withheld").and(satisfy { |line| !line.include?("better") }))
+    expect(logged.last).to include("Bad gateway")
+  end
+
   # Valid JSON of the wrong shape would otherwise reach a hash lookup and
   # escape every AiService::Error rescue as a TypeError.
   it "raises InvalidResponseError when a successful response body is not a JSON object" do

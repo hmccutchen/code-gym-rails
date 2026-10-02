@@ -123,16 +123,65 @@ RSpec.describe ProblemSetIngest do
       expect(result.suggested_concepts).to be_empty
     end
 
-    # The guarantee that replaces the old ordering comment: a set rejected for
-    # an unusable answer key cannot leave a vocabulary suggestion behind,
-    # because nothing is written and the caller never receives a Result.
+    # The guarantee that replaces the old ordering comment: a set refused
+    # because nothing usable is left cannot leave a vocabulary suggestion
+    # behind, because nothing is written and the caller never receives a Result.
     it "reports nothing at all when the set is rejected" do
-      set = {
-        "code_review"    => { "concept" => "invented_concept" },
-        "ambiguity_hunt" => { "planted_ambiguities" => [] }
-      }
+      set = { "ambiguity_hunt" => { "concept" => "invented_concept", "planted_ambiguities" => [] } }
 
-      expect { ingest(set) }.to raise_error(AiService::InvalidResponseError)
+      expect { ingest(set) }.to raise_error(AiService::InvalidResponseError, /No usable section left/)
+    end
+
+    describe "a section its kind refuses" do
+      it "leaves only that section out and reports it with its concept and the check's reason" do
+        hunt = { "code_review" => { "concept" => "n_plus_one" },
+                 "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] } }
+        result = ingest(hunt)
+
+        expect(result.problem_set.keys).to eq([ "code_review" ])
+        expect(result.unusable_sections).to eq([
+          described_class::Unusable.new(key: "ambiguity_hunt", concept: "missing_success_criteria",
+                                        reason: "Ambiguity hunt returned no usable planted_ambiguities to grade coverage against")
+        ])
+      end
+
+      it "checks the lower-precedence shape that takes a refused section's slot" do
+        pseudo = { "code_review" => { "concept" => "n_plus_one" },
+                   "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
+                   "pseudocode_to_code" => { "concept" => "x", "problem_statement" => " " } }
+        result = ingest(pseudo)
+
+        expect(result.problem_set.keys).to eq([ "code_review" ])
+        expect(result.unusable_sections.map(&:key)).to eq(%w[ambiguity_hunt pseudocode_to_code])
+      end
+
+      # An unrequested hunt the provider threw in must not take a requested,
+      # usable section down with it.
+      it "keeps a usable lower-precedence shape when the one above it is refused" do
+        pseudo = { "code_review" => { "concept" => "n_plus_one" },
+                   "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
+                   "pseudocode_to_code" => { "concept" => "x", "problem_statement" => "Write the function" } }
+        result = described_class.call(pseudo, language: "ruby_rails", expected_keys: %w[code_review pseudocode_to_code])
+
+        expect(result.problem_set.keys).to contain_exactly("code_review", "pseudocode_to_code")
+        expect(result.unusable_sections.map(&:key)).to eq([ "ambiguity_hunt" ])
+      end
+
+      it "reports no concept when the refused section's tag is off its vocabulary" do
+        result = ingest({ "code_review" => { "concept" => "n_plus_one" },
+                          "pseudocode_to_code" => { "concept" => "invented", "problem_statement" => "" } })
+
+        expect(result.unusable_sections.sole.concept).to be_nil
+      end
+
+      it "still refuses a set missing a requested key entirely" do
+        expect { described_class.call({ "code_review" => {} }, language: "ruby_rails", expected_keys: %w[code_review pattern]) }
+          .to raise_error(AiService::InvalidResponseError, /omitted/)
+      end
+
+      it "reports nothing for a set with nothing to refuse" do
+        expect(ingest({ "code_review" => { "concept" => "n_plus_one" } }).unusable_sections).to eq([])
+      end
     end
 
     it "writes no SuggestedConcept rows of its own" do
@@ -497,22 +546,23 @@ RSpec.describe ProblemSetIngest do
         expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
       end
 
-      it "raises when the field is missing entirely" do
-        set = { "ambiguity_hunt" => { "request" => "vague" } }
-        expect { step(set) }
-          .to raise_error(AiService::InvalidResponseError, /no usable planted_ambiguities/)
+      # A refused hunt costs only itself, so each case leaves a code review
+      # standing beside it and reads the refusal off the Result.
+      def refusal_of(hunt)
+        ingest({ "code_review" => { "concept" => "n_plus_one" } }.merge(hunt)).unusable_sections.map(&:reason)
       end
 
-      it "raises when the field is not an array" do
-        set = { "ambiguity_hunt" => { "planted_ambiguities" => "one; two; three; four" } }
-        expect { step(set) }
-          .to raise_error(AiService::InvalidResponseError)
+      it "leaves the hunt out when the field is missing entirely" do
+        expect(refusal_of({ "ambiguity_hunt" => { "request" => "vague" } })).to contain_exactly(/no usable planted_ambiguities/)
       end
 
-      it "raises when every entry is unusable" do
-        set = planted([ "   ", nil, 42, "" ])
-        expect { step(set) }
-          .to raise_error(AiService::InvalidResponseError)
+      it "leaves the hunt out when the field is not an array" do
+        expect(refusal_of({ "ambiguity_hunt" => { "planted_ambiguities" => "one; two; three; four" } }))
+          .to contain_exactly(/no usable planted_ambiguities/)
+      end
+
+      it "leaves the hunt out when every entry is unusable" do
+        expect(refusal_of(planted([ "   ", nil, 42, "" ]))).to contain_exactly(/no usable planted_ambiguities/)
       end
 
       # The prompt asks for an exact count, but nothing downstream reads it: the
@@ -570,10 +620,12 @@ RSpec.describe ProblemSetIngest do
         expect(statement.length).to eq(ExerciseSection::PseudocodeToCode::MAX_PROBLEM_STATEMENT_LENGTH)
       end
 
-      it "raises when the statement is blank or not a string" do
+      it "leaves the section out when the statement is blank or not a string" do
         [ nil, "   ", 42, [ "merge ranges" ] ].each do |statement|
-          expect { step(pseudocode(statement)) }
-            .to raise_error(AiService::InvalidResponseError, /no usable problem_statement/)
+          result = ingest({ "code_review" => { "concept" => "n_plus_one" } }.merge(pseudocode(statement)))
+
+          expect(result.problem_set).not_to have_key("pseudocode_to_code")
+          expect(result.unusable_sections.map(&:reason)).to contain_exactly(/no usable problem_statement/)
         end
       end
 
@@ -983,5 +1035,90 @@ RSpec.describe ProblemSetIngest, "fixed concepts on a retry" do
     extra = set.merge("pattern" => { "question" => "q", "concept" => "memoization" })
     result = described_class.call(extra, language: "ruby_rails", expected_keys: [ "challenge" ], fixed_concepts: { "challenge" => "n_plus_one" }).problem_set
     expect(result.keys).to eq([ "challenge" ])
+  end
+end
+
+RSpec.describe ProblemSetIngest, "with the second fixed kind" do
+  describe "a design comparison" do
+    def comparison(overrides = {})
+      FakeService::EXERCISE_PROBLEM_SET.fetch("design_comparison").deep_dup.merge(overrides)
+    end
+
+    def ingested(problem_set)
+      described_class.call(problem_set, language: "ruby_rails", expected_keys: problem_set.keys).problem_set
+    end
+
+    def roll_better(position)
+      allow(WeightedRoll).to receive(:pick).with(ExerciseSection::DesignComparison::POSITION_WEIGHTS).and_return(position)
+    end
+
+    it "shows the provider's pieces in the rolled order and records the position only in the answer key" do
+      roll_better("a")
+      section = ingested({ "design_comparison" => comparison })["design_comparison"]
+
+      expect(section["piece_a"]).to eq(comparison["better_piece"])
+      expect(section["piece_b"]).to eq(comparison["other_piece"])
+      expect(section["answer_key"]["better"]).to eq("a")
+      expect(section).not_to have_key("better_piece")
+      expect(section).not_to have_key("other_piece")
+    end
+
+    it "overwrites pieces the provider placed itself" do
+      roll_better("b")
+      forged = comparison("piece_a" => "forged", "piece_b" => "forged")
+      section = ingested({ "design_comparison" => forged })["design_comparison"]
+
+      expect(section["piece_b"]).to eq(comparison["better_piece"])
+      expect(section["piece_a"]).to eq(comparison["other_piece"])
+    end
+
+    # The fixed kind is no exception: a refused comparison costs only itself.
+    it "leaves the comparison out when a piece or the answer key is unusable" do
+      { comparison("other_piece" => "") => /other_piece/, comparison("answer_key" => {}) => /answer key/ }.each do |section, reason|
+        result = described_class.call({ "code_review" => { "concept" => "n_plus_one" }, "design_comparison" => section },
+                                      language: "ruby_rails", expected_keys: %w[code_review design_comparison])
+
+        expect(result.problem_set.keys).to eq([ "code_review" ])
+        expect(result.unusable_sections.sole).to have_attributes(key: "design_comparison", concept: "open_closed", reason: reason)
+      end
+    end
+
+    it "holds the concept to the language vocabulary like any other section" do
+      expect(ingested({ "design_comparison" => comparison("concept" => "invented") })["design_comparison"]["concept"]).to eq("other")
+    end
+  end
+
+  describe "a payload with a shape in every slot" do
+    # Every kind at once resolves to one section per slot, which is one more
+    # than a day holds.
+    let(:every_kind) { FakeService::EXERCISE_PROBLEM_SET.deep_dup }
+
+    it "drops the slots the plan left empty, so no requested section is cut" do
+      expected = %w[code_review design_comparison challenge plan_review]
+      result = described_class.call(every_kind, language: "ruby_rails", expected_keys: expected).problem_set
+
+      expect(result.keys).not_to include("pattern")
+      expect(ExerciseSection.resolved_keys(result)).to eq(%w[code_review design_comparison architecture plan_review])
+      expect(ExerciseSection.resolved_keys(result).size).to eq(ExerciseSection::MAX_SECTIONS)
+    end
+
+    it "never delivers more than MAX_SECTIONS, whatever the plan asked for" do
+      plans = [ %w[code_review design_comparison], %w[code_review design_comparison pattern],
+                %w[code_review design_comparison pattern challenge], %w[code_review design_comparison ambiguity_hunt] ]
+
+      plans.each do |expected|
+        result = described_class.call(FakeService::EXERCISE_PROBLEM_SET.deep_dup, language: "ruby_rails",
+                                      expected_keys: expected).problem_set
+        expect(ExerciseSection.resolved_keys(result).size).to be <= ExerciseSection::MAX_SECTIONS
+        expect(ExerciseSection.resolved_keys(result).first(2)).to eq(%w[code_review design_comparison])
+      end
+    end
+
+    it "keeps an unrequested extra when the day still has room" do
+      set = { "code_review" => { "concept" => "n_plus_one" }, "pattern" => { "concept" => "memoization" } }
+      result = described_class.call(set, language: "ruby_rails", expected_keys: [ "code_review" ]).problem_set
+
+      expect(result.keys).to eq(%w[code_review pattern])
+    end
   end
 end

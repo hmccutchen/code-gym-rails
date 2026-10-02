@@ -7,12 +7,6 @@ class ExerciseSection::CodeReview < ExerciseSection
     false
   end
 
-  # Every day is built around code_review, and a set with no sections at all
-  # fails DailyExercise's presence validation.
-  def self.droppable?
-    false
-  end
-
   def self.leads_learning_track?
     true
   end
@@ -39,7 +33,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   # mode. `source` is the RealSource excerpt today's snippet is grounded in,
   # when there is one: its own instruction replaces the mode's toy line,
   # since a grounded snippet is still that mode, just with its material given.
-  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil)
+  def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, **)
     <<~GUIDANCE.chomp
       #{source ? source.instruction : content_instruction(label, mode, artifact, test_framework)}
       - Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}

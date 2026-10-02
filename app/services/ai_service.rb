@@ -41,6 +41,15 @@ class AiService
   # show the engineer a try-again message rather than an error page.
   class UnsupportedRouteError < Error; end
 
+  # The judge rejected every section of a drafted day, retries included. No
+  # empty day is written; the job records this like any other failed
+  # generation, so its message is what the dashboard shows.
+  class AllSectionsRejectedError < Error
+    def initialize(message = "Every section of today's draft failed its quality check, so no set was saved. Try generating again.")
+      super
+    end
+  end
+
   # Faraday sets no timeout by default, so without one a call made from a
   # request thread would tie up a Puma thread indefinitely and outlive
   # ResponsesController#review's claim on the row, letting a second review
@@ -165,11 +174,15 @@ class AiService
   end
 
   # How long a judged generation can run before it lands or fails: the draft,
-  # then the judge fan-out, the retry fan-out and the re-judge fan-out, each
-  # waiting on its slowest thread.
+  # then the judge fan-out, then one retry fan-out and one re-judge fan-out
+  # for each retry the most-retried kind gets, each waiting on its slowest
+  # thread, and one more judge call when a kind re-judges its edits. Only the
+  # version that ships is edited and re-judged, so that happens once a chain.
   JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
-                             worst_case_call_seconds(RETRY_READ_TIMEOUT) +
-                             (2 * worst_case_call_seconds(READ_TIMEOUT))
+                             worst_case_call_seconds(READ_TIMEOUT) +
+                             (ExerciseSection.all.map(&:judge_retries).max *
+                               (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT))) +
+                             (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_call_seconds(READ_TIMEOUT) : 0)
 
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the
@@ -1070,7 +1083,7 @@ class AiService
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
-                      :prompt_options, :suggested_concepts)
+                      :prompt_options, :suggested_concepts, :unusable_sections)
   private_constant :Draft
 
   # ── Generate a personalized daily exercise set ────────────────────────────
@@ -1082,12 +1095,22 @@ class AiService
   # tighter read budget (see SYNC_GENERATION_READ_TIMEOUT). Callers state their
   # constraint; the timeout policy stays here.
   def generate_exercise(user, language: user.language_for_today, blocking: false)
-    draft = draft_exercise(user, language: language, blocking: blocking)
-    finish_generation(user, language, draft, draft.problem_set)
-    draft.problem_set
+    generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
   end
 
-  # ── Draft, judge, retry once, drop — the weekday batch's path ────────────
+  # The single-stage path with what it left out: a planned section ingest
+  # refused is dropped, as the judged path drops one it cannot repair, and
+  # its key is recorded the same way.
+  def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false)
+    draft   = draft_exercise(user, language: language, blocking: blocking)
+    planned = draft.kinds.map(&:key)
+    dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
+    finish_generation(user, language, draft, draft.problem_set,
+                      dropped_concepts: dropped.to_h { |section| [ section.key, section.concept ] })
+    JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {})
+  end
+
+  # ── Draft, judge, retry, drop — the weekday batch's path ─────────────────
   # Drafts here, then hands the draft to JudgedGeneration, which owns the
   # judge, retry and drop rules. Every provider instance it uses is a fresh one
   # built from this key, as every other fan-out here builds its own.
@@ -1385,6 +1408,9 @@ class AiService
   # they say what the day intended, which is the one thing a judge that judges
   # the section as written must not be told. The rung and lock state reach it
   # as stated arguments instead, since a level is what it measures against.
+  #
+  # A kind the judge solves blind gets its reply parsed without logging it on
+  # failure: the solve is an answer candidate.
   def judge_section(user, kind, section, rung:, locked:)
     visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
     result  = call_and_log(
@@ -1393,7 +1419,8 @@ class AiService
       system: JUDGE_SYSTEM_PROMPT,
       prompt: judge_prompt(kind, visible, rung: rung, locked: locked)
     )
-    JudgeVerdict.parse(parse_json_object(result[:text], subject: "#{kind.key} verdict"), kind: kind)
+    raw = parse_json_object(result[:text], subject: "#{kind.key} verdict", log_raw: kind.judge_solve_options.nil?)
+    JudgeVerdict.parse(raw, kind: kind)
   end
 
   # Handed the review alone, as the page renders it, plus the section's kind
@@ -1507,14 +1534,22 @@ class AiService
     )
 
     ingested = ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "problem set"),
+      parse_json_object(result[:text], subject: "problem set", log_raw: false),
       language: language, expected_keys: kinds.map(&:key), code_review_source: plan.code_review_source,
       pitched_at: pitched_rungs(difficulty, user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
 
+    log_unusable_sections(user, ingested.unusable_sections)
     Draft.new(problem_set: ingested.problem_set, plan: plan, kinds: kinds, difficulty: difficulty,
               ladders: ladders, history: history, prompt_options: options,
-              suggested_concepts: ingested.suggested_concepts)
+              suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
+  end
+
+  # The check's own message only: the section's text could carry its answer key.
+  def log_unusable_sections(user, unusable)
+    unusable.each do |section|
+      Rails.logger.warn("[unusable_section] user=#{user.id} section=#{section.key} reason=#{section.reason}")
+    end
   end
 
   def exercise_prompt_options(plan, history, difficulty, ladders)
@@ -1569,7 +1604,7 @@ class AiService
     )
 
     ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "#{kind.key} retry"), language: language,
+      parse_json_object(result[:text], subject: "#{kind.key} retry", log_raw: false), language: language,
       expected_keys: [ kind.key ], fixed_concepts: { kind.key => concept },
       code_review_source: draft.plan.code_review_source,
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
@@ -1639,6 +1674,8 @@ class AiService
       ("Plan excerpt:\n#{data["plan_excerpt"]}" if data["plan_excerpt"].present?),
       ("The problem to plan:\n#{data["problem_statement"]}" if data["problem_statement"].present?),
       ("Feature request:\n#{data["request"]}" if data["request"].present?),
+      ("Piece A:\n#{data["piece_a"]}" if data["piece_a"].present?),
+      ("Piece B:\n#{data["piece_b"]}" if data["piece_b"].present?),
       duck_parsons_blocks(data)
     ].compact.join("\n")
   end
@@ -1757,10 +1794,10 @@ class AiService
   # hosts only the rest. pattern and the language-vocabulary thirds are
   # unscoped, which is what keeps a due data-modeling concept reachable on a
   # non-schema day.
-  def annotate_retention_concept(cm, kinds, language, code_review_mode)
+  def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
-      kind.key if can_host?(cm, kind.key, language, mode: mode)
+      kind.key if can_host?(cm, kind.key, language, mode: mode, rung: rungs[kind])
     end
 
     # nil, not "concept ()": with every line derived, a day can present no
@@ -1786,7 +1823,8 @@ class AiService
   # exclusion, which is exactly what adding a second concept group did.
   #
   # `mode` is passed only for code_review, the one kind whose selectable
-  # vocabulary depends on it; the third slot is never code_review.
+  # vocabulary depends on it; the third slot is never code_review. `rung` is
+  # the level the section is pitched at, which a kind may narrow by.
   #
   # `language` is the day's actual generation language, deliberately not
   # `cm.language`: for an architecture-bucket concept the two diverge
@@ -1796,8 +1834,8 @@ class AiService
   # kinds against that entry's vocabulary instead of the day's real one,
   # falsely reporting code_review/pattern as hosts for an architecture
   # concept.
-  def can_host?(cm, section_key, language, mode: nil)
-    ProblemSetIngest.selectable_vocabulary_for(section_key, language, mode: mode).include?(cm.concept)
+  def can_host?(cm, section_key, language, mode: nil, rung: nil)
+    ProblemSetIngest.selectable_vocabulary_for(section_key, language, mode: mode, rung: rung).include?(cm.concept)
   end
 
   # Delivery is advisory, so the only way to know whether retention checks actually
@@ -1906,7 +1944,7 @@ class AiService
     return {} if targeted.empty?
 
     per_kind = targeted.to_h do |kind|
-      vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode)
+      vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: difficulty.level_for(kind))
       grounded   = vocabulary & ladders.fetch(difficulty.level_for(kind), {}).keys
       chosen     = problem_set.dig(kind.key, "concept")
       [ kind.key, { level: difficulty.level_for(kind), locked: difficulty.locked?(kind),
@@ -2037,7 +2075,8 @@ class AiService
     # filter_map, not map: a due concept no section can host today annotates as
     # nil and is dropped, so the block disappears entirely rather than listing
     # a concept the prompt cannot ask for.
-    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode) }
+    rungs = kinds.index_with { |kind| difficulty.rung_for(kind, skill_level: user.skill_level) }
+    annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode, rungs) }
 
     retention_block =
       if annotated_due_checks.any?
@@ -2127,7 +2166,7 @@ class AiService
     # it and the rest absorb it, which is what the uniform context is for.
     sections_guidance = kinds.map { |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
-      generation_guidance_for(kind, language, mode: mode, source: code_review_source)
+      generation_guidance_for(kind, language, mode: mode, source: code_review_source, rung: rungs[kind])
     }.join("\n")
 
     <<~PROMPT
@@ -2218,7 +2257,8 @@ class AiService
       "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
       "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
       "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
-      "migration to review."
+      "migration to review; a design_comparison shows two ways to store or query the same data that behave the " \
+      "same, such as with and without an index, and asks which one the stated access pattern should use."
   end
 
   # The meta-skill concepts name a way of reasoning, which makes them the one
@@ -2248,7 +2288,9 @@ class AiService
       "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
       "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
       "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
-      "section's own idiom: on a test-file code_review, a god_object is a bloated test class. The challenge " \
+      "section's own idiom: on a test-file code_review, a god_object is a bloated test class; a " \
+      "design_comparison shows one piece with the smell and one without it, behaving the same, and the " \
+      "scenario states how the code changes, which decides what the smell costs. The challenge " \
       "section is the exception to the answer shape, since its answer is code: there the exercise is a " \
       "refactor — starter_code exhibits the smell at that scale and the question asks the engineer to " \
       "restructure it, so writing the better shape IS the answer rather than describing it."
@@ -2269,7 +2311,9 @@ class AiService
       "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
       "tagged open_closed shows a conditional that must be edited every time a variant is added; a pattern, which " \
       "shows no code, describes a hierarchy built for reuse and asks what the composed shape would be and what it " \
-      "costs; on a test-file code_review the planted test smell must BE the violation rather than sit beside it, " \
+      "costs; a design_comparison shows one piece that follows the principle and one that breaks it, behaving " \
+      "the same, and the scenario states the change that makes the difference matter; " \
+      "on a test-file code_review the planted test smell must BE the violation rather than sit beside it, " \
       "which every principle in the group can express — a dependency_inversion violation is a test that can only " \
       "reach its subject by stubbing one hard-coded collaborator, an open_closed violation is a conditional " \
       "inside the test that gains a branch for every case added, and a composition_over_inheritance violation is " \
@@ -2296,7 +2340,8 @@ class AiService
       "forwards its arguments to one collaborator; on a test-file code_review, a shallow_module is a test helper " \
       "whose setup arguments spell out the very state it claims to hide; a pattern, which shows no code, " \
       "describes a module's interface and asks what it actually hides and what it forces every caller to know " \
-      "anyway. The challenge section is " \
+      "anyway; a design_comparison shows a deep and a shallow version of the same interface, behaving the " \
+      "same, and the scenario states how callers use it. The challenge section is " \
       "the exception to the answer shape, since its answer is code: there the starter_code exhibits the shape — " \
       "for temporal_decomposition, a flow split into objects that exist only because they run in that order — and " \
       "the question asks for the version organized around information instead, so writing the deeper module IS " \
@@ -2355,7 +2400,9 @@ class AiService
       "owns the set, or a caller reaching past the owner to update a member directly; it is never about whether a " \
       "transaction was opened, which is transaction_safety, nor about which service owns the data, which is " \
       "data_ownership. Express it in the host section's own idiom: a pattern, which shows no code, describes the " \
-      "model in the domain's words and asks which name is overloaded or which writes must not be separable; on a " \
+      "model in the domain's words and asks which name is overloaded or which writes must not be separable; a " \
+      "design_comparison shows two models with the same behavior, only one named or bounded the way the stated " \
+      "domain is; on a " \
       "test-file code_review the planted test smell must BE the instance rather than sit beside it — a test whose " \
       "own setup names the same thing two ways, or one that builds a member row the aggregate's rules forbid on " \
       "its own. The challenge section is the exception to the answer shape, since its answer is code: there " \
@@ -2375,7 +2422,8 @@ class AiService
 
     requests = targeted.map do |kind|
       { level: difficulty.level_for(kind), bucket: ConceptBucket.for(kind.key, language),
-        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode) }
+        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode,
+                                                             rung: difficulty.level_for(kind)) }
     end
     pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
 
@@ -2462,16 +2510,17 @@ class AiService
   # one lived here for code_review's mode arguments, which put per-kind
   # knowledge back into the shared assembler that .generation_guidance exists
   # to keep it out of.
-  def generation_guidance_for(kind, language, mode: nil, source: nil)
+  def generation_guidance_for(kind, language, mode: nil, source: nil, rung: nil)
     config = config_for(language)
 
     kind.generation_guidance(
-      vocabulary:     ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode),
+      vocabulary:     ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: rung),
       label:          config[:label],
       mode:           mode,
       artifact:       config[:schema_artifact],
       test_framework: config[:test_framework],
-      source:         source
+      source:         source,
+      rung:           rung
     )
   end
 
@@ -2969,9 +3018,10 @@ class AiService
     raise InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
   end
 
-  # log_raw: false is for replies that are an engineer's review text, which
-  # stays out of application logs: nothing is logged, and the message never
-  # quotes the reply (a parser message can).
+  # log_raw: false is for replies that must stay out of application logs: an
+  # engineer's review text, a blind solve, and a drafted problem set, whose
+  # answer keys the stripping steps have not yet seen. Nothing is logged, and
+  # the message never quotes the reply (a parser message can).
   def parse_json_response(text, subject: "response", log_raw: true)
     # Strip any accidental markdown fences
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
@@ -2996,8 +3046,18 @@ class AiService
     unreadable_envelope!(body, provider)
   end
 
+  # A body that starts like JSON (an object, an array or a quoted string) is
+  # most likely a reply cut off in transit, and a reply can carry an answer
+  # the logs must not (a judge's blind solve, an engineer's review), so only
+  # its size is logged. Anything else, such as a proxy's HTML page, is logged
+  # as a snippet for diagnosis.
   def unreadable_envelope!(body, provider)
-    log_raw_snippet("Unreadable #{provider} response body", body)
+    text = body.to_s
+    if text.lstrip.start_with?("{", "[", '"')
+      Rails.logger.error("Unreadable #{provider} response body: #{text.bytesize} bytes of cut-off JSON, withheld")
+    else
+      log_raw_snippet("Unreadable #{provider} response body", text)
+    end
     raise InvalidResponseError, "#{provider} returned an unreadable response"
   end
 

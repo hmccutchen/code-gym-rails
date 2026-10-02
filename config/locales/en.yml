@@ -225,7 +225,8 @@ en:
   exercise_mix:
     summary: "Exercise mix"
     intro: "Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that's the setting above. Changes save automatically."
-    fixed_group: "Sections that don't rotate"
+    fixed_group: "In every set"
+    pattern_group: "Pattern section, in some sets"
     third_group: "Rotating third section"
     fourth_group: "Rotating fourth section"
     exclude_heading: "Excluding is a stronger, different action than turning a slider down."
@@ -299,6 +300,15 @@ en:
       name: "Code Review"
       placeholder: "What's the issue and how would you fix it?"
       current_schema: "Current schema (db/schema.rb)"
+    design_comparison:
+      name: "Design Comparison"
+      placeholder: "Name the fact from the scenario or question, and the principle it settles…"
+      piece: "Piece %{piece}"
+      pick_legend: "Which piece fits this system better?"
+      reason_label: "What decides it?"
+      picked: "Picked piece %{piece}"
+      key_heading: "What decides it"
+      key_better: "Piece %{piece} is the better fit."
     pattern:
       name: "Pattern of the Month"
       placeholder: "Your answer…"

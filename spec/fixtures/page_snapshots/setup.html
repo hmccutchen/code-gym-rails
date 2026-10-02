@@ -326,6 +326,16 @@
     .parsons-correct pre.snippet { border-color: #2f7d5a; }
     .parsons-misplaced pre.snippet { border-color: #a4453f; }
 
+    details.comparison-piece { margin-bottom: .75rem; }
+    details.comparison-piece > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: .9rem; font-weight: 600; }
+    .comparison-pick { border: none; padding: 0; margin: 0 0 .75rem; }
+    .comparison-pick legend { font-size: .95rem; margin-bottom: .4rem; }
+    .comparison-pick label { display: flex; align-items: center; gap: .5rem; min-height: 44px; }
+    .comparison-reason-label { display: block; font-size: .95rem; margin-bottom: .4rem; }
+    .comparison-key { margin-top: 1rem; font-size: .92rem; line-height: 1.6; }
+    .comparison-key h3 { font-size: .95rem; margin-bottom: .4rem; }
+    .comparison-key p { margin-bottom: .4rem; }
+
     details.ref { margin-bottom: 1rem; }
     details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
     details.ref summary::before { content: "▶ "; }
@@ -688,7 +698,7 @@
     </div>
 
     <fieldset class="mix-group">
-      <legend>Sections that don&#39;t rotate</legend>
+      <legend>In every set</legend>
         <div class="mix-row mix-row-fixed">
           <span>Code Review</span>
           <fieldset class="mix-difficulty" data-kind="code_review">
@@ -721,6 +731,40 @@
 
         </div>
         <div class="mix-row mix-row-fixed">
+          <span>Design Comparison</span>
+          <fieldset class="mix-difficulty" data-kind="design_comparison">
+  <legend>Difficulty target</legend>
+  <label>
+    <input type="radio" name="level-design_comparison" value="" checked >
+    <span data-skill-level-label>Your skill level (developing)</span>
+  </label>
+    <label>
+      <input type="radio" name="level-design_comparison" value="junior"  >
+      Junior
+    </label>
+    <label>
+      <input type="radio" name="level-design_comparison" value="senior"  >
+      Senior
+    </label>
+    <label>
+      <input type="radio" name="level-design_comparison" value="principal_engineer"  >
+      Principal engineer
+    </label>
+  <label class="mix-lock" for="lock-design_comparison">
+    <input type="checkbox" class="mix-lock-box" id="lock-design_comparison"
+            disabled>
+    Lock at this level
+  </label>
+  <p class="hint mix-coverage" hidden>
+    0 of 21 concepts have AI difficulty guidance.
+  </p>
+</fieldset>
+
+        </div>
+    </fieldset>
+      <fieldset class="mix-group">
+        <legend>Pattern section, in some sets</legend>
+        <div class="mix-row mix-row-fixed">
           <span>Pattern of the Month</span>
           <fieldset class="mix-difficulty" data-kind="pattern">
   <legend>Difficulty target</legend>
@@ -751,7 +795,7 @@
 </fieldset>
 
         </div>
-    </fieldset>
+      </fieldset>
 
       <fieldset class="mix-group mix-group-rotating">
         <legend>Rotating third section</legend>

@@ -4,7 +4,7 @@ require "rails_helper"
 # reaches a provider only through JudgedGeneration::Provider, so these examples
 # pin that interface as well as the keep, retry, drop and fallback rules.
 RSpec.describe JudgedGeneration do
-  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, keyword_init: true) }
+  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true) }
   let(:plan_type) { Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true) }
   let(:due_check) { Struct.new(:concept) }
 
@@ -77,17 +77,17 @@ RSpec.describe JudgedGeneration do
     expect(retry_calls).to eq([ [ user, "ruby_rails", draft, "pattern", "service_objects" ] ])
     expect(judged.problem_set["pattern"]["question"]).to eq("Retried")
     expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 1, principle: "scope_mismatch",
-                                                  retry_principle: nil)
+                                                  retry_principle: [ nil ], retry_issues: [ [] ])
   end
 
-  it "drops a droppable section rejected twice and hands the finish step what it carried" do
+  it "drops a section rejected on its last retry and hands the finish step what it carried" do
     verdicts["pattern"] = [ reject, reject("underdetermined") ]
 
     judged = run
 
     expect(judged.dropped_sections).to eq([ "pattern" ])
     expect(judged.problem_set).not_to have_key("pattern")
-    expect(judged.outcomes["pattern"]).to include(status: :reject, dropped: true, retry_principle: "underdetermined")
+    expect(judged.outcomes["pattern"]).to include(status: :reject, dropped: true, retry_principle: [ "underdetermined" ])
     set, logs = finished.sole
     expect(set).to equal(judged.problem_set)
     expect(logs).to eq(
@@ -96,13 +96,70 @@ RSpec.describe JudgedGeneration do
     )
   end
 
-  it "anchors a twice-rejected code_review instead of dropping it" do
+  it "gives a fixed kind two retries and then drops it like any other" do
     verdicts["code_review"] = [ reject ]
 
     judged = run
 
-    expect(judged.problem_set["code_review"]).to include("anchored" => true, "question" => "Retried")
-    expect(judged.outcomes["code_review"]).to include(dropped: false, fallback: "anchor", retries: 1)
+    expect(retry_calls.map { |call| call[3] }).to eq(%w[code_review code_review])
+    expect(judged.dropped_sections).to eq([ "code_review" ])
+    expect(judged.problem_set).not_to have_key("code_review")
+    expect(judged.outcomes["code_review"]).to include(dropped: true, fallback: nil, retries: 2,
+                                                      retry_principle: %w[scope_mismatch scope_mismatch])
+  end
+
+  it "raises rather than write an empty day when every section is dropped" do
+    kinds.each { |kind| verdicts[kind.key] = [ reject ] }
+    allow(Rails.logger).to receive(:warn)
+
+    expect { run }.to raise_error(AiService::AllSectionsRejectedError)
+    expect(finished).to be_empty
+    expect(Rails.logger).to have_received(:warn).with(/\[judge_all_rejected\] user=42/)
+  end
+
+  describe "a planned section ingest refused as unusable" do
+    let(:unusable) { [ ProblemSetIngest::Unusable.new(key: "challenge", concept: "memoization", reason: "bad") ] }
+
+    before do
+      drafted.delete("challenge")
+      draft.unusable_sections = unusable
+    end
+
+    it "is retried with its drafted concept, like a rejection, and ships when the retry is kept" do
+      retried_sections["challenge"] = { "concept" => "memoization", "question" => "Retried" }
+
+      judged = run
+
+      expect(retry_calls).to eq([ [ user, "ruby_rails", draft, "challenge", "memoization" ] ])
+      expect(judged.problem_set["challenge"]).to include("question" => "Retried")
+      expect(judged.outcomes["challenge"]).to include(unusable: true, status: :keep, retries: 1, dropped: false)
+    end
+
+    it "is dropped once its retries are rejected, and named with its concept" do
+      retried_sections["challenge"] = { "concept" => "memoization", "question" => "Retried" }
+      verdicts["challenge"] = [ reject ]
+
+      judged = run
+
+      expect(judged.dropped_sections).to eq([ "challenge" ])
+      expect(finished.sole.last[:dropped_concepts]).to include("challenge" => "memoization")
+    end
+
+    it "is dropped without a retry when it carried no usable concept" do
+      draft.unusable_sections = [ ProblemSetIngest::Unusable.new(key: "challenge", concept: nil, reason: "bad") ]
+
+      judged = run
+
+      expect(retry_calls).to be_empty
+      expect(judged.dropped_sections).to eq([ "challenge" ])
+    end
+
+    it "ignores an unusable section the day never planned" do
+      draft.unusable_sections = [ ProblemSetIngest::Unusable.new(key: "plan_review", concept: "scope_creep", reason: "bad") ]
+      drafted["challenge"] = { "concept" => "memoization", "question" => "Implement it" }
+
+      expect(run.outcomes).not_to have_key("plan_review")
+    end
   end
 
   it "drops without a retry call when the drafted concept is other" do
@@ -175,10 +232,10 @@ RSpec.describe JudgedGeneration do
 
     expect(retry_calls.map { |call| call[3] }).to eq(%w[pattern pattern])
     expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 2, dropped: false)
-    # The first retry was rejected; nothing of that attempt may describe the
-    # section that shipped.
-    expect(judged.outcomes["pattern"]).to include(retry_principle: nil)
-    expect(judged.outcomes["pattern"]).not_to include(:retry_evidence, :retry_reason)
+    # One entry per judged retry, so the rejected first attempt never reads as
+    # describing the section that shipped.
+    expect(judged.outcomes["pattern"]).to include(retry_principle: [ "underdetermined", nil ],
+                                                  retry_evidence: [ "quoted", nil ], retry_reason: [ "because", nil ])
   end
 
   it "drops a section once every retry its kind allows is rejected" do
@@ -188,7 +245,7 @@ RSpec.describe JudgedGeneration do
     judged = run
 
     expect(retry_calls.size).to eq(2)
-    expect(judged.outcomes["pattern"]).to include(retries: 2, dropped: true, retry_principle: "underdetermined")
+    expect(judged.outcomes["pattern"]).to include(retries: 2, dropped: true, retry_principle: %w[scope_mismatch underdetermined])
   end
 
   # The diagnostics log serializes these hashes, so their keys and order are
@@ -206,8 +263,8 @@ RSpec.describe JudgedGeneration do
                                     retry_principle retry_issues retry_evidence retry_reason])
       expect(outcome.except(:latency_ms)).to eq(
         status: :reject, issues: [], principle: "scope_mismatch", retries: 1, dropped: true, fallback: nil,
-        evidence: "quoted", reason: "because", retry_principle: "underdetermined", retry_issues: [],
-        retry_evidence: "quoted", retry_reason: "because"
+        evidence: "quoted", reason: "because", retry_principle: [ "underdetermined" ], retry_issues: [ [] ],
+        retry_evidence: [ "quoted" ], retry_reason: [ "because" ]
       )
     end
 
@@ -215,10 +272,11 @@ RSpec.describe JudgedGeneration do
       outcome = outcome_for(reject, { "status" => "keep" })
 
       expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
-                                    retry_principle retry_issues])
+                                    retry_principle retry_issues retry_evidence retry_reason])
       expect(outcome.except(:latency_ms)).to eq(
         status: :keep, issues: [], principle: "scope_mismatch", retries: 1, dropped: false, fallback: nil,
-        evidence: "quoted", reason: "because", retry_principle: nil, retry_issues: []
+        evidence: "quoted", reason: "because", retry_principle: [ nil ], retry_issues: [ [] ],
+        retry_evidence: [ nil ], retry_reason: [ nil ]
       )
     end
 
@@ -227,10 +285,11 @@ RSpec.describe JudgedGeneration do
       outcome = outcome_for(reject, AiService::TimeoutError.new("slow"))
 
       expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
-                                    retry_principle])
+                                    retry_principle retry_issues retry_evidence retry_reason])
       expect(outcome.except(:latency_ms)).to eq(
         status: :keep, issues: [], principle: "scope_mismatch", retries: 1, dropped: false, fallback: "timeout",
-        evidence: "quoted", reason: "because", retry_principle: nil
+        evidence: "quoted", reason: "because", retry_principle: [ nil ], retry_issues: [ [] ],
+        retry_evidence: [ nil ], retry_reason: [ nil ]
       )
     end
 
@@ -240,10 +299,11 @@ RSpec.describe JudgedGeneration do
       outcome = outcome_for(reject)
 
       expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
-                                    retry_principle])
+                                    retry_principle retry_issues retry_evidence retry_reason])
       expect(outcome.except(:latency_ms)).to eq(
         status: :reject, issues: [], principle: "scope_mismatch", retries: 0, dropped: true, fallback: nil,
-        evidence: "quoted", reason: "because", retry_principle: nil
+        evidence: "quoted", reason: "because", retry_principle: [], retry_issues: [],
+        retry_evidence: [], retry_reason: []
       )
     end
   end
@@ -252,5 +312,136 @@ RSpec.describe JudgedGeneration do
     verdicts["pattern"] = [ reject, reject ]
 
     expect { run }.not_to change { drafted.deep_dup }
+  end
+
+  describe "a section the judge solves blind" do
+    let(:kinds) { [ ExerciseSection::CodeReview, ExerciseSection::DesignComparison ] }
+    let(:drafted) do
+      {
+        "code_review" => { "concept" => "n_plus_one", "question" => "What is wrong?", "snippet" => "code" },
+        "design_comparison" => { "concept" => "open_closed", "question" => "Which fits?", "piece_a" => "a", "piece_b" => "b",
+                                 "answer_key" => { "better" => "b", "deciding_fact" => "SECRET fact",
+                                                   "principle" => "SECRET principle", "why_other_fails" => "SECRET cost" } }
+      }
+    end
+    let(:logged) { [] }
+
+    before { allow(Rails.logger).to receive(:warn) { |message| logged << message } }
+
+    def solve(status, better)
+      { "status" => status, "better" => better }
+    end
+
+    it "records an agreeing solve without logging a mismatch" do
+      verdicts["design_comparison"] = [ solve("keep", "b") ]
+
+      expect(run.outcomes["design_comparison"]).to include(solve_matched: [ true ], status: :keep)
+      expect(logged.grep(/judge_solve_mismatch/)).to be_empty
+    end
+
+    # A refused verdict's message quotes the value it refused, which for this
+    # kind can be the solve, so the log carries the reason code alone.
+    it "logs a refused verdict by reason code only" do
+      verdicts["design_comparison"] = [ JudgeVerdict::Invalid.new('unknown principle "SECRET: b is better"') ]
+
+      judged = run
+
+      expect(judged.outcomes["design_comparison"]).to include(fallback: "invalid_output")
+      expect(logged.grep(/judge_fallback/).sole).to eq("[judge_fallback] user=42 section=design_comparison reason=invalid_output")
+    end
+
+    it "logs a mismatch with the rung only, and lets the verdict stand while rejection is off" do
+      verdicts["design_comparison"] = [ solve("keep", "a") ]
+
+      judged = run
+
+      expect(judged.outcomes["design_comparison"]).to include(solve_matched: [ false ], status: :keep)
+      expect(judged.problem_set).to have_key("design_comparison")
+      line = logged.grep(/judge_solve_mismatch/).sole
+      expect(line).to eq("[judge_solve_mismatch] user=42 section=design_comparison rung=senior")
+      expect(described_class::REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL).to be(false)
+    end
+
+    it "rejects a mismatch as underdetermined below principal once the switch is on" do
+      stub_const("#{described_class}::REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL", true)
+      verdicts["design_comparison"] = [ solve("keep", "a"), solve("keep", "b") ]
+
+      judged = run
+
+      expect(judged.outcomes["design_comparison"]).to include(principle: "underdetermined", retries: 1, status: :keep,
+                                                              solve_matched: [ false, true ])
+    end
+
+    it "never rejects a mismatch at principal_engineer, switch or not" do
+      stub_const("#{described_class}::REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL", true)
+      draft.difficulty = KindDifficulty.new(levels: { "design_comparison" => "principal_engineer" }, locked: [])
+      verdicts["design_comparison"] = [ solve("keep", "a") ]
+
+      expect(run.outcomes["design_comparison"]).to include(status: :keep, retries: 0)
+    end
+
+    it "keeps the judge's evidence and reason, and the key, out of the outcome" do
+      verdicts["design_comparison"] = [ solve("reject", "a").merge("principle" => "reasoning_failure",
+                                                                    "evidence" => "SECRET quote", "reason" => "SECRET why"),
+                                        solve("keep", "b") ]
+
+      outcome = run.outcomes["design_comparison"]
+
+      expect(outcome).not_to include(:evidence, :reason, :retry_evidence, :retry_reason)
+      expect(outcome.to_s).not_to include("SECRET", "better")
+      expect(logged.join).not_to include("SECRET")
+    end
+
+    describe "an edit, judged once more" do
+      def edit_verdict(better: "b")
+        solve("edit", better).merge("issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                                    "fields" => { "question" => "Edited question?" })
+      end
+
+      it "ships the edit when the second judgment keeps it and solves it to the key" do
+        verdicts["design_comparison"] = [ edit_verdict, solve("keep", "b") ]
+
+        judged = run
+
+        expect(judged.problem_set["design_comparison"]["question"]).to eq("Edited question?")
+        expect(judged.outcomes["design_comparison"]).to include(status: :edit, edit_reverted: false, solve_matched: [ true, true ])
+        expect(judged_calls.count { |call| call[1] == "design_comparison" }).to eq(2)
+      end
+
+      it "ships the unedited draft when the second judgment rejects the edit" do
+        verdicts["design_comparison"] = [ edit_verdict, solve("reject", "b").merge("principle" => "underdetermined",
+                                                                                   "evidence" => "x", "reason" => "r") ]
+
+        judged = run
+
+        expect(judged.problem_set["design_comparison"]["question"]).to eq("Which fits?")
+        expect(judged.outcomes["design_comparison"]).to include(edit_reverted: true, dropped: false)
+      end
+
+      it "ships the unedited draft when the edited section's solve mismatches the key" do
+        verdicts["design_comparison"] = [ edit_verdict, solve("keep", "a") ]
+
+        expect(run.outcomes["design_comparison"]).to include(edit_reverted: true, solve_matched: [ true, false ])
+      end
+
+      it "ships the unedited draft when the second judgment cannot answer" do
+        verdicts["design_comparison"] = [ edit_verdict, AiService::TimeoutError.new("slow") ]
+
+        judged = run
+
+        expect(judged.problem_set["design_comparison"]["question"]).to eq("Which fits?")
+        expect(judged.outcomes["design_comparison"]).to include(edit_reverted: true, solve_matched: [ true ])
+      end
+
+      it "makes no second call for a kind whose edits are not re-judged" do
+        verdicts["code_review"] = [ { "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                                      "fields" => { "question" => "Edited" } } ]
+
+        judged = run
+
+        expect(judged_calls.count { |call| call[1] == "code_review" }).to eq(1)
+        expect(judged.outcomes["code_review"]).not_to have_key(:edit_reverted)
+      end
+    end
   end
 end

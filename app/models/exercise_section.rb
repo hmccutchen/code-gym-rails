@@ -22,7 +22,7 @@ class ExerciseSection
   # (strong params, concept tagging, scenario collection) so anything deriving a
   # Hash or Array from it keeps the ordering it already had.
   def self.all
-    [ CodeReview, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem,
+    [ CodeReview, DesignComparison, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem,
       PlanReview, AmbiguityHunt, PseudocodeToCode ]
   end
 
@@ -70,11 +70,16 @@ class ExerciseSection
   end
 
   # The keys a problem set presents, in slot order: each slot's resolved kind,
-  # kept only when the payload holds it. DailyExercise#active_section_keys
-  # reads this for a stored row; ingest reads it for a payload that is not a
-  # row yet.
+  # kept only when the payload holds it, and never more than MAX_SECTIONS.
+  # There are more slots than a day holds, so a payload with an extra shape in
+  # every slot would otherwise present one section too many; the fixed slots
+  # come first, so the cut always falls on an optional one. Ingest prunes
+  # unplanned slots before it gets here (see ProblemSetIngest), so on a
+  # delivered set the cut never removes a requested section.
+  # DailyExercise#active_section_keys reads this for a stored row; ingest
+  # reads it for a payload that is not a row yet.
   def self.resolved_keys(problem_set)
-    slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }
+    slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }.first(MAX_SECTIONS)
   end
 
   # The day's shape, in slot order. Every slot but a fixed kind's may be nil,
@@ -190,9 +195,17 @@ class ExerciseSection
       []
     end
 
+    # What the server decides about one resolved section's presentation that
+    # the provider must not, applied after .reject_unusable! accepts it. Most
+    # kinds have nothing to arrange.
+    def arrange!(section)
+    end
+
     # The provider boundary's check on one resolved section of this kind:
     # raises AiService::InvalidResponseError when the section cannot be used,
-    # and may bound its fields in place. Most kinds have nothing to refuse.
+    # and may bound its fields in place. Ingest then leaves that section out
+    # of the set rather than refusing the day. Most kinds have nothing to
+    # refuse.
     def reject_unusable!(section)
     end
 
@@ -241,13 +254,14 @@ class ExerciseSection
     # `vocabulary` (this kind's own, resolved by the caller from
     # .vocabulary_key), `label`, `mode` (the rolled content mode — only
     # code_review has one today), `artifact`/`test_framework` (the day's
-    # language config, which only a code_review mode reads), and `source`
-    # (the RealSource excerpt a code_review is grounded in today, or nil).
+    # language config, which only a code_review mode reads), `source` (the
+    # RealSource excerpt a code_review is grounded in today, or nil), and
+    # `rung` (the level this section is pitched at).
     # Uniform, so the assembler never has to know which kind it is holding; a
     # kind that reads none of the optional values absorbs them with `**`
     # rather than naming them. Widening this context stays a one-line change
     # here and at the single call site, and touches no other kind.
-    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil)
+    def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil)
       raise NotImplementedError, "#{self} must implement .generation_guidance"
     end
 
@@ -259,12 +273,6 @@ class ExerciseSection
     # when the grader chooses one under AiService::RATING_RUBRIC.
     def fixed_rating(section:, answer:)
       nil
-    end
-
-    # Whether the judge may drop this kind from the day rather than ship a
-    # section whose last retry it rejected. A day reads fine without any one of these.
-    def droppable?
-      true
     end
 
     def leads_learning_track?
@@ -297,15 +305,36 @@ class ExerciseSection
     end
 
     # How many regenerations a rejected section of this kind gets before it is
-    # dropped or anchored.
+    # dropped. A fixed kind gets one more, since every day is built around it.
     def judge_retries
-      1
+      fixed? ? 2 : 1
     end
 
     # Extra instructions for judging this kind, added to the judge prompt when
     # present.
     def judge_guidance
       nil
+    end
+
+    # Whether an edit the judge makes to this kind is judged once more before
+    # it ships. True where the editable prose holds what decides the answer,
+    # so a rewrite could change which answer is right.
+    def rejudge_edits?
+      false
+    end
+
+    # The answers a judge must choose between when it solves this kind blind,
+    # or nil for a kind the judge does not solve. A solve is an answer
+    # candidate, so a kind with one keeps it, and the judge's free text, out
+    # of every log.
+    def judge_solve_options
+      nil
+    end
+
+    # Whether the judge's blind solve agrees with the section's answer key.
+    # Only called for a kind with .judge_solve_options.
+    def solve_matches_key?(section, solve)
+      raise NotImplementedError, "#{self} has judge_solve_options and must compare a solve with its key"
     end
 
     # Whether grading this kind needs the engineer's answer translated into
@@ -359,6 +388,13 @@ class ExerciseSection
     # the monospace treatment.
     def answer_class
       "answer"
+    end
+
+    # Whether a concept's reference may open on its own on first exposure,
+    # before the section is answered. False for a kind whose reference would
+    # name and illustrate what the grade asks the engineer to supply.
+    def reference_opens_before_answer?
+      true
     end
 
     # Whether this kind's problem_set may carry a Mermaid `diagram` of the

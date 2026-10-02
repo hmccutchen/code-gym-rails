@@ -1,7 +1,8 @@
 # Turns a parsed provider problem set into one that is safe to persist:
 # concepts held to their closed vocabulary, scaffolds and diagrams bounded,
 # parsons blocks scrambled for display, and each resolved section held to its
-# kind's own check (ExerciseSection.reject_unusable!). This is the generation
+# kind's own check and arranged by it (ExerciseSection.reject_unusable!,
+# .arrange!). This is the generation
 # boundary — the one place provider output is checked before anything
 # downstream is allowed to assume it is clean.
 #
@@ -19,10 +20,11 @@
 class ProblemSetIngest
   # Facts about a section that the server knows and the provider does not: the
   # rung asked for, whether the prompt was told to ease it, which real excerpt
-  # it was grounded in, and whether the judge rejected its last retry and it
-  # shipped anyway. A provider copy of any of them is stripped from every section on
-  # every call, so none can be forged. `anchored` is stamped after ingest, by
-  # the judged path, and is listed here because the strip is the guarantee.
+  # it was grounded in, and, on older rows, whether the judge rejected its
+  # last retry and it shipped anyway. A provider copy of any of them is
+  # stripped from every section on every call, so none can be forged.
+  # `anchored` is no longer written, since every kind is now dropped after its
+  # last rejected retry; it stays listed so a provider still cannot forge it.
   #
   # They describe how the section was made, not what it asks, so nothing that
   # serializes a section to a model may include them — AiService#judge_section
@@ -42,7 +44,13 @@ class ProblemSetIngest
   # under.
   Suggestion = Data.define(:bucket, :name)
 
-  Result = Data.define(:problem_set, :suggested_concepts)
+  # A resolved section its kind's boundary check refused. `concept` is the
+  # tag it carried when that tag is in the section's vocabulary, else nil,
+  # so a retry is only ever asked for a concept the plan could have placed.
+  # `reason` is the check's own message, which never quotes section text.
+  Unusable = Data.define(:key, :concept, :reason)
+
+  Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections)
 
   # Raises AiService::InvalidResponseError when the set cannot be used at all.
   # `code_review_source` is the RealSource excerpt today's code_review was
@@ -169,6 +177,7 @@ class ProblemSetIngest
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
     @suggested_concepts = []
+    @unusable_sections  = []
   end
 
   # Rejection runs before the normalizers: there is no reason to bound
@@ -179,18 +188,20 @@ class ProblemSetIngest
     reject_missing_sections!
     warn_unrequested_sections!
     prune_retry_extras!
+    prune_unplanned_slots!
     reject_unusable_sections!
     enforce_fixed_concepts!
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
     shuffle_parsons_blocks!
+    arrange_sections!
     strip_current_schemas!
     strip_server_stamps!
     ground_code_review!
     stamp_pitched_rungs!
 
-    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts)
+    Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections)
   end
 
   private
@@ -198,7 +209,7 @@ class ProblemSetIngest
   # A silently short set would make sections_total under-report, which feeds
   # recent_performance, which sizes tomorrow's set — the day's own provider
   # glitch nudging future days shorter. Extra sections are fine: FakeService
-  # returns every registered kind, and only the resolved ones are ever rendered.
+  # returns every kind, and only the resolved ones are ever rendered.
   def reject_missing_sections!
     missing = @expected_keys.reject { |key| ExerciseSection.present?(@problem_set, key) }
     return if missing.empty?
@@ -234,14 +245,64 @@ class ProblemSetIngest
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
 
+  # There are more slots than a day holds, so a payload with a shape in every
+  # slot resolves past ExerciseSection::MAX_SECTIONS, and the cap in
+  # ExerciseSection.resolved_keys would then cut whichever slot comes last,
+  # requested or not. Dropping the slots the plan left empty first means the
+  # cap only ever trims what nobody asked for. Below the cap an extra section
+  # is kept, as warn_unrequested_sections! describes.
+  def prune_unplanned_slots!
+    return if resolved_slot_count <= ExerciseSection::MAX_SECTIONS
+
+    ExerciseSection.slots.each_value do |kinds|
+      keys = kinds.map(&:key)
+      @problem_set = @problem_set.except(*keys) if (keys & @expected_keys).empty?
+    end
+  end
+
+  def resolved_slot_count
+    ExerciseSection.slots.values.count { |kinds| ExerciseSection.resolved_key(@problem_set, kinds) }
+  end
+
   # Only the sections the set resolves to: a provider that returns two fourth
   # shapes leaves one that nothing downstream will render or grade, and
   # discarding a good day over a section no one reads would be a strictly
   # worse outcome than ignoring it.
+  #
+  # A refused section costs only itself: its whole slot leaves the set, so a
+  # lower-precedence shape in the same slot cannot take its place unchecked,
+  # and the refusal is reported on the Result for the caller to retry or
+  # record as dropped. The set is refused only when nothing usable remains.
+  # A refused section is removed alone. The next shape in its slot, if the
+  # payload holds one, then resolves and is checked in turn rather than taking
+  # the slot unchecked.
   def reject_unusable_sections!
-    ExerciseSection.resolved_keys(@problem_set).each do |key|
-      ExerciseSection.for(key).reject_unusable!(@problem_set[key])
+    pending = ExerciseSection.resolved_keys(@problem_set)
+    while (key = pending.shift)
+      successor = reject_if_unusable(key)
+      pending << successor if successor
     end
+    return if ExerciseSection.resolved_keys(@problem_set).any?
+
+    raise AiService::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
+  end
+
+  def reject_if_unusable(key)
+    ExerciseSection.for(key).reject_unusable!(@problem_set[key])
+    nil
+  rescue AiService::InvalidResponseError => e
+    @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: e.message)
+    @problem_set = @problem_set.except(key)
+    ExerciseSection.resolved_key(@problem_set, slot_kinds_for(key))
+  end
+
+  def usable_concept(key)
+    concept = @problem_set.dig(key, "concept")
+    concept if self.class.vocabulary_for(key, @language).include?(concept)
+  end
+
+  def slot_kinds_for(key)
+    ExerciseSection.slots.values.find { |kinds| kinds.map(&:key).include?(key) }
   end
 
   # A single-section retry names the concept the day's plan already placed at
@@ -338,9 +399,9 @@ class ProblemSetIngest
   # excerpt this set never showed. `current_schema` is server-owned the same
   # way, so it is stamped only from a source that has one; every provider copy
   # is already gone by now (see strip_current_schemas!).
-  # In production code_review is always present — it is a fixed kind, so
-  # every plan includes it — but ingest is also called on partial sets, and a
-  # set with no code_review has no trace to stamp.
+  # In production code_review is always present — ExerciseSection.for_plan
+  # never omits it — but ingest is also called on partial sets, and a set
+  # with no code_review has no trace to stamp.
   def ground_code_review!
     return if @code_review_source.nil?
     return unless ExerciseSection.present?(@problem_set, "code_review")
@@ -382,6 +443,14 @@ class ProblemSetIngest
 
       section["pitched_at"] = @pitched_at.fetch(key)
       section["eased"] = true if @eased_for.fetch(key, []).include?(section["concept"])
+    end
+  end
+
+  # Runs on resolved sections only, after reject_unusable_sections! has
+  # accepted them, for the same reason that step does.
+  def arrange_sections!
+    ExerciseSection.resolved_keys(@problem_set).each do |key|
+      ExerciseSection.for(key).arrange!(@problem_set[key])
     end
   end
 

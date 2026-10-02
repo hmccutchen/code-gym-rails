@@ -1,0 +1,15 @@
+{
+  "kind": "design_comparison",
+  "rung": "senior",
+  "locked": false,
+  "expected": "reject",
+  "principle": "reasoning_failure",
+  "section": {
+    "title": "Tagging uploaded photos",
+    "scenario": "A photo service tags each upload with labels from a vision API. Uploads arrive at about ten a minute.",
+    "question": "Which piece fits this service better, and why?",
+    "piece_a": "class T\n  def go(p)\n    r = Api.call(p.u)\n    p.update!(t: r.map { |x| x[\"n\"] })\n  end\nend",
+    "piece_b": "# Tags a photo with the labels the vision API returns for its image.\nclass PhotoTagger\n  def tag(photo)\n    labels = VisionApi.labels_for(photo.url)\n    photo.update!(tags: labels.map { |label| label[\"name\"] })\n  end\nend",
+    "concept": "pass_through_method"
+  }
+}
