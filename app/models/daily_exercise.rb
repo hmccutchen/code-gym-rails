@@ -63,12 +63,14 @@ class DailyExercise < ApplicationRecord
   # reads the payload, not the plan — the plan is gone by the time anything
   # asks — so a section the provider added unasked for still counts here if it
   # resolves (ProblemSetIngest logs that case; see warn_unrequested_sections!).
-  # A planned day holds 2 to ExerciseSection::MAX_SECTIONS of them, and a
-  # judged one can hold fewer: every kind but code_review is droppable, so a
-  # day the judge rejected its way through can arrive with code_review alone.
+  # A planned day holds 2 to ExerciseSection::MAX_SECTIONS of them, and one
+  # that lost sections can hold fewer: any kind can be dropped, fixed ones
+  # included, so a day can arrive with a single section. A day with none is
+  # never written (AiService::AllSectionsRejectedError, or ingest refusing a
+  # set with nothing usable left).
   #
   # NOT `problem_set.keys`. A payload can hold more than one third- or
-  # fourth-shaped key — FakeService persists all nine deliberately, and a real
+  # fourth-shaped key — FakeService answers with every kind deliberately, and a real
   # provider can return an extra alternate — but only the resolved one is ever
   # rendered, answerable, or rateable. Every "N of M sections" denominator
   # derives from this, so a count can never exceed what is on screen.
