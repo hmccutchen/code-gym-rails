@@ -59,7 +59,8 @@
           const pick = area.querySelector("input[type=radio]:checked")?.value;
           const text = reason.value.trim();
           field.value = pick || text ? `${pick ? prefix + pick : ""}\n${reason.value}` : "";
-          field.dataset.answerComplete = String(Boolean(pick) && text.length >= Number(field.dataset.minReason));
+          // Code points, as the server counts: an emoji is one, not two.
+          field.dataset.answerComplete = String(Boolean(pick) && [...text].length >= Number(field.dataset.minReason));
           field.dispatchEvent(new Event("input", { bubbles: true }));
         }
 

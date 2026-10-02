@@ -83,4 +83,25 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
         .to eq([ nil, reason ])
     end
   end
+
+  # The server counts the reason in code points, so the browser must too: an
+  # emoji is one code point but two UTF-16 units.
+  it "marks a reason complete at the same length the server does, counting code points" do
+    travel_to(a_weekday) do
+      user = create_fake_provider_user
+      visit_with_todays_set(user)
+      floor = ExerciseSection::DesignComparison::MIN_REASON_LENGTH
+
+      within(comparison) do
+        choose("Piece A")
+        fill_in("What decides it?", with: "\u{1F600}" * (floor - 1))
+      end
+      expect(hidden_answer["data-answer-complete"]).to eq("false")
+      expect(ExerciseSection::DesignComparison.answered?(hidden_answer.value)).to be(false)
+
+      within(comparison) { fill_in("What decides it?", with: "\u{1F600}" * floor) }
+      expect(hidden_answer["data-answer-complete"]).to eq("true")
+      expect(ExerciseSection::DesignComparison.answered?(hidden_answer.value)).to be(true)
+    end
+  end
 end
