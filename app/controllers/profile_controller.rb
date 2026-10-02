@@ -32,22 +32,27 @@ class ProfileController < ApplicationController
 
   # Active Record's integer cast is too forgiving for a request boundary: "",
   # null and "abc" become nil, which means Automatic, and "2.5" becomes 2, so a
-  # malformed request would save a choice it never made. Only the literal
-  # "automatic" or a listed count, as a number or its string, is accepted.
-  AUTOMATIC_SECTION_COUNT = "automatic".freeze
-  DAILY_SECTION_COUNT_VALUES = [ AUTOMATIC_SECTION_COUNT,
-                                 *User::DAILY_SECTION_COUNTS, *User::DAILY_SECTION_COUNTS.map(&:to_s) ].freeze
+  # malformed request would save a choice it never made. Only the Automatic
+  # sentinel or a listed count, as an Integer or its exact string, is accepted;
+  # a JSON 2.0 equals 2 but is not one.
+  DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
 
   def invalid_daily_section_count?
     user_params = params.require(:user)
+    return false unless user_params.key?(:daily_section_count)
 
-    user_params.key?(:daily_section_count) &&
-      DAILY_SECTION_COUNT_VALUES.exclude?(user_params[:daily_section_count])
+    !valid_daily_section_count?(user_params[:daily_section_count])
+  end
+
+  def valid_daily_section_count?(value)
+    return User::DAILY_SECTION_COUNTS.include?(value) if value.is_a?(Integer)
+
+    value == User::AUTOMATIC_SECTION_COUNT || DAILY_SECTION_COUNT_STRINGS.include?(value)
   end
 
   def render_invalid_daily_section_count
-    render json: { errors: [ "Daily sections must be #{AUTOMATIC_SECTION_COUNT} or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}" ] },
+    render json: { errors: [ "Daily sections must be #{User::AUTOMATIC_SECTION_COUNT} or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}" ] },
            status: :unprocessable_content
   end
 
@@ -254,7 +259,7 @@ class ProfileController < ApplicationController
                                              display_preferences: {})
     permitted[:name] = permitted[:name].to_s.strip if permitted.key?(:name)
     permitted[:time_zone] = permitted[:time_zone].to_s.strip.presence if permitted.key?(:time_zone)
-    permitted[:daily_section_count] = nil if permitted[:daily_section_count] == AUTOMATIC_SECTION_COUNT
+    permitted[:daily_section_count] = nil if permitted[:daily_section_count] == User::AUTOMATIC_SECTION_COUNT
     # permit(x: {}) yields Parameters, which a jsonb column cannot serialize.
     %i[section_kind_weights section_kind_levels display_preferences].each do |key|
       permitted[key] = permitted[key].to_h if permitted.key?(key)

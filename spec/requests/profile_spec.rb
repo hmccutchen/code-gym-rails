@@ -414,11 +414,12 @@ RSpec.describe "Profile", type: :request do
       user.update!(daily_section_count: 3)
       login_as(user)
 
-      [ "abc", "", nil, "1", "5", "2.5", 2.5, 1, 5, "Automatic", [ 2 ], { "count" => 2 } ].each do |value|
+      [ "abc", "", nil, "1", "5", "2.5", 2.5, 2.0, "2.0", 1, 5, "Automatic", [ 2 ], { "count" => 2 } ].each do |value|
         save_daily_sections(value)
 
         expect(response).to have_http_status(:unprocessable_content), "#{value.inspect} was accepted"
-        expect(response.parsed_body["errors"]).to be_present
+        expect(response.parsed_body["errors"]).to eq([ "Daily sections must be automatic or one of #{User::DAILY_SECTION_COUNTS.to_a.join(', ')}" ]),
+          "#{value.inspect} passed the boundary"
         expect(user.reload.daily_section_count).to eq(3)
       end
     end

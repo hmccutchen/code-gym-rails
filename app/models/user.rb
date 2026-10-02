@@ -20,6 +20,8 @@ class User < ApplicationRecord
 
   # nil is Automatic: SectionCount sizes the day from recent completion.
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
+  # What Setup posts for Automatic, since a radio has no nil value.
+  AUTOMATIC_SECTION_COUNT = "automatic".freeze
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }

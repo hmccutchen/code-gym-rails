@@ -79,7 +79,7 @@
     <fieldset class="daily-sections" id="daily-sections">
       <legend><%= t("daily_sections.legend") %></legend>
       <label>
-        <input type="radio" name="daily_section_count" value="automatic" <%= "checked" if current_user.daily_section_count.nil? %>>
+        <input type="radio" name="daily_section_count" value="<%= User::AUTOMATIC_SECTION_COUNT %>" <%= "checked" if current_user.daily_section_count.nil? %>>
         <%= t("daily_sections.automatic") %>
       </label>
       <% User::DAILY_SECTION_COUNTS.each do |count| %>
