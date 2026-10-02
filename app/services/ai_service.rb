@@ -359,7 +359,9 @@ class AiService
   # different question; an evidence reader that compares ratings to a bar
   # reads only stamped reviews. A stamp rather than a date because grading
   # knows which prompt it ran, and a date misfiles a review retried after a
-  # deploy. Raise it when RATING_RUBRIC changes what a rating means.
+  # deploy. Raise it when RATING_RUBRIC changes what a rating means. Raising
+  # it also restarts every Automatic account's earned size at two, since the
+  # competency gate reads only reviews stamped with the current version.
   RUBRIC_VERSION = 1
 
   PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT = <<~PROMPT.chomp
