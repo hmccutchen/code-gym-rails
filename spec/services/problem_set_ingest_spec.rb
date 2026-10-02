@@ -524,15 +524,12 @@ RSpec.describe ProblemSetIngest do
       expect(set["parsons_problem"]).not_to have_key("display_order")
     end
 
-    # A judge drop deletes the third that won, and the parsons alternate then
-    # resolves and renders, so it has to be scrambled already.
-    it "scrambles a parsons alternate that loses the third slot" do
+    it "leaves a parsons alternate that loses the third slot unarranged" do
       set = step({ "architecture" => { "question" => "q" },
                   "parsons_problem" => { "blocks" => %w[a b c d e] } })
 
       expect(ExerciseSection.resolved_keys(set)).not_to include("parsons_problem")
-      expect(set["parsons_problem"]["display_order"]).to match_array([ 0, 1, 2, 3, 4 ])
-      expect(set["parsons_problem"]["display_order"]).not_to eq([ 0, 1, 2, 3, 4 ])
+      expect(set["parsons_problem"]).not_to have_key("display_order")
     end
   end
 

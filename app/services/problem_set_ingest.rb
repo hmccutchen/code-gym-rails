@@ -1,8 +1,7 @@
 # Turns a parsed provider problem set into one that is safe to persist:
 # concepts held to their closed vocabulary, scaffolds and diagrams bounded,
-# each resolved section held to its kind's own check
-# (ExerciseSection.reject_unusable!), and every section arranged by its kind
-# (.arrange!). This is the generation
+# and each resolved section held to its kind's own check and arranged by it
+# (ExerciseSection.reject_unusable!, .arrange!). This is the generation
 # boundary — the one place provider output is checked before anything
 # downstream is allowed to assume it is clean.
 #
@@ -445,15 +444,11 @@ class ProblemSetIngest
     end
   end
 
-  # Every section present, not only the resolved ones: a judge drop deletes
-  # the winning key, and a lower-precedence alternate in that slot then
-  # resolves and renders, so it must already be arranged. That is safe
-  # because a fixed kind is alone in its slot, so a present one is resolved
-  # and has passed reject_unusable_sections!; an alternate's hook guards its
-  # own shape.
+  # Runs on resolved sections only, after reject_unusable_sections! has
+  # accepted them, for the same reason that step does.
   def arrange_sections!
-    ExerciseSection.all.each do |kind|
-      kind.arrange!(@problem_set[kind.key]) if ExerciseSection.present?(@problem_set, kind.key)
+    ExerciseSection.resolved_keys(@problem_set).each do |key|
+      ExerciseSection.for(key).arrange!(@problem_set[key])
     end
   end
 end
