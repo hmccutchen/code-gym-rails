@@ -1121,57 +1121,20 @@ RSpec.describe AiService do
     end
   end
 
-  describe "GAME_AND_ANIMATION_SCENARIO_DOMAINS" do
-    let(:vocabularies) do
-      [ AiService::RAILS_CONCEPTS, AiService::JS_CONCEPTS, AiService::ARCHITECTURE_CONCEPTS,
-        AiService::PLAN_REVIEW_CONCEPTS, AiService::AMBIGUITY_HUNT_CONCEPTS, AiService::PSEUDOCODE_TO_CODE_CONCEPTS ]
-    end
-
-    it "is a frozen, non-empty pool disjoint from the general pool and every concept vocabulary" do
-      expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS).to be_frozen
-      expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS).not_to be_empty
-      expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS & AiService::SCENARIO_DOMAINS).to be_empty
-      vocabularies.each do |vocabulary|
-        expect(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS & vocabulary).to be_empty
-      end
-    end
-
-    # A setting is names and story. One that names the mechanics of games or
-    # animation hands the section a domain fact the engineer has to already
-    # know — the frame-rate velocity that failed the first trial. The
-    # criterion is held here so the pool cannot drift past it quietly.
-    it "names systems to build, never game or animation internals" do
-      internals = %w[frame physics render shader collision netcode tick velocity]
-
-      AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS.each do |domain|
-        expect(domain.split("_") & internals).to be_empty, "#{domain} names an internal"
-      end
-    end
-
-    it "is rolled under exactly the flavors DailyPlan weights" do
-      rolled = ([ DailyPlan::SCENARIO_FLAVOR_WEIGHTS ] + DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.values).flat_map(&:keys).uniq
-
-      expect(AiService::SCENARIO_POOLS.keys).to match_array(rolled)
-      expect(AiService::SCENARIO_POOLS.dig(:general, :domains)).to equal(AiService::SCENARIO_DOMAINS)
-      expect(AiService::SCENARIO_POOLS.dig(:game_and_animation, :domains)).to equal(AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS)
-      expect(AiService::SCENARIO_POOLS.dig(:everyday, :domains)).to equal(AiService::EVERYDAY_SCENARIO_DOMAINS)
-    end
-  end
-
   describe "EVERYDAY_SCENARIO_DOMAINS" do
     it "is a frozen, non-empty pool disjoint from the other pools and every concept vocabulary" do
       pool = AiService::EVERYDAY_SCENARIO_DOMAINS
 
       expect(pool).to be_frozen
       expect(pool).not_to be_empty
-      expect(pool & (AiService::SCENARIO_DOMAINS + AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS)).to be_empty
+      expect(pool & AiService::SCENARIO_DOMAINS).to be_empty
       [ AiService::RAILS_CONCEPTS, AiService::JS_CONCEPTS, AiService::ARCHITECTURE_CONCEPTS,
         AiService::PLAN_REVIEW_CONCEPTS, AiService::AMBIGUITY_HUNT_CONCEPTS ].each do |vocabulary|
         expect(pool & vocabulary).to be_empty
       end
     end
 
-    # The pool exists so a career changer is not handed industry context
+    # The pool exists so a concept can be met without industry context
     # first. A setting naming a back office would bring that context back.
     it "names nothing from a company's back office" do
       back_office = %w[invoice invoicing ledger tenant csv webhook payroll billing export graphql api]
@@ -1179,6 +1142,12 @@ RSpec.describe AiService do
       AiService::EVERYDAY_SCENARIO_DOMAINS.each do |domain|
         expect(domain.split("_") & back_office).to be_empty, "#{domain} names back-office context"
       end
+    end
+
+    it "is rolled under exactly the flavors DailyPlan weights" do
+      expect(AiService::SCENARIO_POOLS.keys).to match_array(DailyPlan::SCENARIO_FLAVOR_WEIGHTS.keys)
+      expect(AiService::SCENARIO_POOLS.dig(:general, :domains)).to equal(AiService::SCENARIO_DOMAINS)
+      expect(AiService::SCENARIO_POOLS.dig(:everyday, :domains)).to equal(AiService::EVERYDAY_SCENARIO_DOMAINS)
     end
   end
 
@@ -1500,17 +1469,17 @@ RSpec.describe AiService do
       # Regression for #171: the day's scenario-flavor line and the grounded
       # excerpt's own instruction both land in the same prompt, and the
       # excerpt's instruction is the one place that tells the model the
-      # flavor doesn't apply to it. Without that line a game_and_animation day described a real
+      # flavor doesn't apply to it. Without that line a game-flavored day described a real
       # Code Gym table as serving game players.
       it "tells a grounded schema-review section to ignore the day's scenario flavor" do
         excerpt = RealSource::SCHEMA_REVIEW.first
         prompt  = service.send(:build_exercise_prompt, user, "ruby_rails",
                                code_review_mode: :schema_review, code_review_source: excerpt,
-                               scenario_flavor: :game_and_animation)
+                               scenario_flavor: :everyday)
 
-        expect(prompt).to include("platformer save state system")
+        expect(prompt).to include("shared grocery list")
         expect(prompt).to include("business-domain settings suggested for each section do not apply to this one")
-        expect(prompt).to include("never a game or other fictional domain")
+        expect(prompt).to include("never one of the suggested settings or another fictional domain")
       end
 
       { application_code: "memoization", schema_review: "missing_index" }.each do |mode, concept|
@@ -1787,32 +1756,19 @@ RSpec.describe AiService do
           "\"component state management\" becomes a service/controller state concern instead). " \
           "Use a legacy GraphQL maintenance scenario"
         )
-        expect(prompt).not_to include("platformer save state system")
-        expect(prompt).not_to include("names and story only")
-      end
-
-      it "offers the game and animation pool, with the no-internals rule, on a game_and_animation day" do
-        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: :game_and_animation)
-
-        AiService::GAME_AND_ANIMATION_SCENARIO_DOMAINS.each do |domain|
-          expect(prompt).to include(domain.tr("_", " "))
-        end
-        expect(prompt).to include("game-development and animation-tooling settings like:")
-        expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
-        expect(prompt).to include("The setting supplies names and story only")
-        expect(prompt).to include("never require knowing how games or animation work inside")
-        expect(prompt).not_to include("background job processing")
+        expect(prompt).not_to include("shared grocery list")
+        expect(prompt).not_to include("back-office terms")
       end
 
       # The one kind that opts out. The characterization suite renders only the
       # default flavor, so the flavor that could reach this schema is checked
-      # here: the day's line offers the game pool and the fragment still turns
-      # it down.
-      it "leaves ambiguity_hunt's own Code Gym framing in place on a game_and_animation day" do
+      # here: the day's line offers the everyday pool and the fragment still
+      # turns it down.
+      it "leaves ambiguity_hunt's own Code Gym framing in place on an everyday day" do
         prompt = service.send(:build_exercise_prompt, user, "ruby_rails",
-                              fourth: :ambiguity_hunt, scenario_flavor: :game_and_animation)
+                              fourth: :ambiguity_hunt, scenario_flavor: :everyday)
 
-        expect(prompt).to include("game-development and animation-tooling settings like:")
+        expect(prompt).to include("everyday settings people already know from daily life like:")
         expect(prompt).to include("drawn from Code Gym-style feature requests (a daily-practice app's own features) " \
                                   "and NOT from the scenario flavors listed above")
       end
@@ -1823,20 +1779,19 @@ RSpec.describe AiService do
         AiService::EVERYDAY_SCENARIO_DOMAINS.each do |domain|
           expect(prompt).to include(domain.tr("_", " "))
         end
-        expect(prompt).to include("everyday settings someone new to the software industry already knows from daily life like:")
+        expect(prompt).to include("everyday settings people already know from daily life like:")
+        expect(prompt.downcase).to include("adapt any flavor to fit the day's stack")
         expect(prompt).to include("no business back-office terms such as invoices")
         expect(prompt).not_to include("background job processing")
         expect(prompt).not_to match(/1 in every 8-10/)
       end
 
-      it "keeps the legacy GraphQL clause rare and concept-free under the job-adjacent and game flavors" do
-        %i[general game_and_animation].each do |flavor|
-          prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: flavor)
+      it "keeps the legacy GraphQL clause rare and concept-free under the job-adjacent flavor" do
+        prompt = service.send(:build_exercise_prompt, user, "ruby_rails", scenario_flavor: :general)
 
-          expect(prompt).to match(/1 in every 8-10/)
-          expect(prompt.downcase).to include("never as the tagged concept")
-          expect(prompt).not_to include("legacy graphql maintenance,")
-        end
+        expect(prompt).to match(/1 in every 8-10/)
+        expect(prompt.downcase).to include("never as the tagged concept")
+        expect(prompt).not_to include("legacy graphql maintenance,")
       end
 
       it "refuses a flavor with no pool rather than rendering an empty list" do
@@ -2976,14 +2931,14 @@ RSpec.describe AiService do
     # drives build_exercise_prompt directly.
     it "threads the day's scenario flavor into the prompt and the diagnostics payload" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:game_and_animation)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:everyday)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       svc = double_class.new(canned_text: full_problem_set.to_json)
 
       payload = diagnostics_payload(svc)
 
-      expect(svc.last_prompt).to include("game-development and animation-tooling settings like:")
-      expect(payload["requested"]["scenario_flavor"]).to eq("game_and_animation")
+      expect(svc.last_prompt).to include("everyday settings people already know from daily life like:")
+      expect(payload["requested"]["scenario_flavor"]).to eq("everyday")
     end
 
     it "omits difficulty fields when nothing targeted is on the plan" do
@@ -4469,7 +4424,7 @@ RSpec.describe AiService do
   end
 
   describe "#duck_response sending real conversational turns" do
-    let(:user) { User.create!(email: "duck@example.com", name: "Duck", skill_level: "developing", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
+    let(:user) { User.create!(email: "duck@example.com", name: "Duck", skill_level: "junior", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
     let(:exercise) do
       user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
                                    problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
@@ -4539,7 +4494,7 @@ RSpec.describe AiService do
   end
 
   describe "#answer_follow_up sending real conversational turns" do
-    let(:user) { User.create!(email: "follow-up@example.com", name: "FollowUp", skill_level: "developing", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
+    let(:user) { User.create!(email: "follow-up@example.com", name: "FollowUp", skill_level: "junior", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
     let(:exercise) do
       user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
                                    problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
@@ -5102,13 +5057,13 @@ RSpec.describe AiService do
     # nothing tier-shaped is passed to the method that builds it.
     it "carries nothing about the engineer, their tier, or their history" do
       exercise, = loaded_day
-      user.update!(name: "Ada Lovelace", skill_level: "beginner")
+      user.update!(name: "Ada Lovelace", skill_level: "principal_engineer")
       user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :reduced)
 
       prompt = difficulty_prompt(exercise)
 
       expect(prompt).not_to include("Ada Lovelace")
-      expect(prompt).not_to include("beginner")
+      expect(prompt).not_to include("principal_engineer")
       expect(prompt).not_to include("(reduced)")
       expect(prompt).not_to include("(standard)")
       expect(prompt).not_to include("n_plus_one")
@@ -5542,7 +5497,7 @@ RSpec.describe AiService, "generation prompt without feedback" do
 end
 
 RSpec.describe AiService, "rung stamps on a generated set" do
-  let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "solid", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
+  let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "senior", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   it "stamps each section with its target when set, else the skill level's rung" do
     user.update!(section_kind_levels: { "code_review" => "principal_engineer" },
@@ -6714,7 +6669,7 @@ RSpec.describe AiService, ".judge_fallback_reason" do
 end
 
 RSpec.describe AiService, "the grading rubric" do
-  let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_keys: { "fake" => "fake-test-key" }, skill_level: "solid") }
+  let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_keys: { "fake" => "fake-test-key" }, skill_level: "senior") }
   let(:service) { FakeService.new("key") }
   let(:problem_set) do
     { "code_review" => { "question" => "cr?", "snippet" => "code", "pitched_at" => "principal_engineer" },

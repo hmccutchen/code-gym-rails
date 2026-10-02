@@ -21,9 +21,13 @@ class ProgressController < ApplicationController
 
   private
 
-  # A rung, :not_yet, or :not_offered when every kind that could show the
+  # A held rung; developing toward the next rung once a higher one has been
+  # attempted; :not_yet; or :not_offered when every kind that could show the
   # concept is excluded — the user's own choice, never a gap.
   def standing_for(concept, bucket, ledger, hosts, preferences)
+    toward = ledger.developing_toward(concept, bucket)
+    return :"#{ProgressHelper::DEVELOPING}#{toward}" if toward
+
     held = ledger.held(concept, bucket)
     return held if held
 

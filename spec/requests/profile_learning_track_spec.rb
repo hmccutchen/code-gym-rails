@@ -21,7 +21,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
 
     before { login_as(user) }
 
-    it "applies the preset: junior everywhere, beginner skill, unlocked, version bumped, nothing else touched" do
+    it "applies the preset: junior everywhere, junior skill, unlocked, version bumped, nothing else touched" do
       patch_profile(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels, skill_level: LearningTrack::START_SKILL_LEVEL,
                     section_kind_preferences_version: user.section_kind_preferences_version)
 
@@ -32,7 +32,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       expect(user.locked_section_kinds).to eq([])
       expect(user.section_kind_preferences_version).to eq(1)
       expect(response.parsed_body["section_kind_preferences_version"]).to eq(1)
-      expect(user.skill_level).to eq("beginner")
+      expect(user.skill_level).to eq("junior")
       expect(user.section_kind_weights).to eq({})
       expect(user.excluded_section_kinds).to eq([])
       expect(user.track_evidence_cutoffs).to eq({})
@@ -71,8 +71,8 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       end
     end
 
-    [ {}, { skill_level: "developing" }, { skill_level: "strong" } ].each do |skill|
-      it "refuses Junior without the beginner skill level #{skill.inspect}, saving nothing" do
+    [ {}, { skill_level: "senior" }, { skill_level: "principal_engineer" } ].each do |skill|
+      it "refuses Junior without the junior skill level #{skill.inspect}, saving nothing" do
         original = user.reload.attributes
 
         patch_profile({ learning_track: "junior", name: "Not saved", section_kind_levels: LearningTrack.preset_levels,

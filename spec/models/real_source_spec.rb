@@ -99,7 +99,7 @@ RSpec.describe RealSource do
       instruction = excerpt.instruction
 
       expect(instruction).to include("business-domain settings suggested for each section do not apply to this one")
-      expect(instruction).to include("never a game or other fictional domain")
+      expect(instruction).to include("never one of the suggested settings or another fictional domain")
     end
   end
 
@@ -192,7 +192,7 @@ RSpec.describe RealSource do
       instruction = excerpt.instruction
 
       expect(instruction).to include("business-domain settings suggested for each section do not apply to this one")
-      expect(instruction).to include("never a game or other fictional domain")
+      expect(instruction).to include("never one of the suggested settings or another fictional domain")
     end
   end
 

@@ -856,28 +856,9 @@ class AiService
     multi_tenant_data_isolation legacy_graphql_maintenance
   ].freeze
 
-  # Game-development and animation-tooling SETTINGS for the scenario field,
-  # used the same way SCENARIO_DOMAINS is: prompt-level framing only, never a
-  # concept, never read by ProblemSetIngest or any mastery bucket. Each names
-  # a system an ordinary web engineer would build — a save-state store, an
-  # undo stack, a leaderboard — never one whose defect needs game or
-  # animation internals to see. A frame-rate-coupled velocity was tried and
-  # failed for exactly that reason: the fix needed a domain fact rather than
-  # reasoning from the code, and ConceptReference explains only the tagged
-  # concept, so nothing could have supplied it.
-  GAME_AND_ANIMATION_SCENARIO_DOMAINS = %w[
-    platformer_save_state_system game_inventory_and_crafting
-    level_editor_undo_redo_stack animation_timeline_keyframe_editor
-    leaderboard_and_season_rankings matchmaking_lobby_queue
-    sprite_and_audio_asset_pipeline achievement_unlock_tracking
-    replay_recording_and_playback in_game_marketplace_and_trading
-    animation_export_job_queue
-  ].freeze
-
-  # Everyday SETTINGS for a beginner's day, used the same way as the other
-  # pools. Each names something a person outside the software industry
-  # already uses, so a career changer meets the concept without first having
-  # to learn what an invoice run or a tenant is.
+  # Everyday SETTINGS, used the same way SCENARIO_DOMAINS is. Each names
+  # something people use outside work, so a concept can be met without first
+  # having to learn what an invoice run or a tenant is.
   EVERYDAY_SCENARIO_DOMAINS = %w[
     shared_grocery_list recipe_box_and_meal_planner gym_workout_log
     library_book_checkout pet_adoption_listings household_chore_rota
@@ -885,10 +866,9 @@ class AiService
     personal_savings_goals
   ].freeze
 
-  # Legacy GraphQL is scenario dressing at a stated rarity, the same under
-  # the job-adjacent and game flavors — a studio has a legacy layer as
-  # readily as a SaaS does. A beginner's everyday day leaves it out, since a
-  # legacy layer is exactly the industry context that pool avoids.
+  # Legacy GraphQL is scenario dressing at a stated rarity on a job-adjacent
+  # day. An everyday day leaves it out, since a legacy layer is exactly the
+  # industry context that pool avoids.
   LEGACY_GRAPHQL_SCENARIO_GUIDANCE =
     "Use a legacy GraphQL maintenance scenario (e.g. \"a legacy GraphQL layer needs a fix\") only rarely — " \
     "at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.".freeze
@@ -896,10 +876,9 @@ class AiService
   # What the scenario bullet says under each flavor: which pool, how the pool
   # is introduced, one example of adapting a setting to the day's stack, and
   # any rule the flavor needs stated. Keyed by every flavor DailyPlan can
-  # roll, from SCENARIO_FLAVOR_WEIGHTS or a per-skill-level table; a spec holds
-  # these keys equal to that union, so a flavor cannot be rolled that has no
-  # pool or listed that is never rolled. Data rather than a branch, so a new
-  # flavor is an entry.
+  # roll from SCENARIO_FLAVOR_WEIGHTS; a spec holds these keys equal to its
+  # keys, so a flavor cannot be rolled that has no pool or listed that is
+  # never rolled. Data rather than a branch, so a new flavor is an entry.
   SCENARIO_POOLS = {
     general: {
       domains:    SCENARIO_DOMAINS,
@@ -908,18 +887,9 @@ class AiService
       rule:       nil,
       legacy:     LEGACY_GRAPHQL_SCENARIO_GUIDANCE
     },
-    game_and_animation: {
-      domains:    GAME_AND_ANIMATION_SCENARIO_DOMAINS,
-      intro:      "game-development and animation-tooling settings",
-      adaptation: "a Rails day's \"platformer save-state system\" is the service that stores, versions and restores saves",
-      rule:       "The setting supplies names and story only: the tagged concept and the one planted issue come from " \
-                  "each section's own vocabulary as always, and solving a section must never require knowing how " \
-                  "games or animation work inside — no frame timing, physics, rendering, engine or netcode detail.",
-      legacy:     LEGACY_GRAPHQL_SCENARIO_GUIDANCE
-    },
     everyday: {
       domains:    EVERYDAY_SCENARIO_DOMAINS,
-      intro:      "everyday settings someone new to the software industry already knows from daily life",
+      intro:      "everyday settings people already know from daily life",
       adaptation: "a Rails day's \"shared grocery list\" is the model and controller that store and update the list",
       rule:       "Keep the setting's own words plain and familiar: no business back-office terms such as invoices, " \
                   "ledgers, tenants, CSV exports or webhooks, and solving a section must never require knowing how " \
@@ -2230,7 +2200,7 @@ class AiService
 
       Engineer profile:
       - Name: #{user.name}
-      - Skill level: #{user.skill_level} (beginner → developing → solid → strong)
+      - Skill level: #{user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
       Recent performance (last 10 sessions):

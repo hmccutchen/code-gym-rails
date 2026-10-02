@@ -16,7 +16,15 @@ class User < ApplicationRecord
   self.ignored_columns += [ "api_key" ]
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
-  SKILL_LEVELS = %w[beginner developing solid strong].freeze
+  SKILL_LEVELS = KindDifficulty::LEVELS
+
+  # Stored values from before skill levels took the difficulty levels' names.
+  # Read through #skill_level until a migration rewrites them; writing them
+  # in the same deploy would fail the old code's validation while it still
+  # serves.
+  LEGACY_SKILL_LEVELS = {
+    "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer"
+  }.freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
@@ -293,6 +301,11 @@ class User < ApplicationRecord
   end
 
   def on_learning_track? = learning_track == LearningTrack::ON
+
+  def skill_level
+    stored = super
+    LEGACY_SKILL_LEVELS.fetch(stored, stored)
+  end
 
   # Accounts that existed when the track shipped were backfilled to "none", so
   # nil means an account created since. The exercise check covers the preview

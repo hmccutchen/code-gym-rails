@@ -13,7 +13,7 @@ RSpec.describe "Welcome choices", type: :system do
     expect(user.reload.learning_track).to eq("junior")
     expect(user.section_kind_levels).to eq(LearningTrack.preset_levels)
     expect(user.section_kind_preferences_version).to eq(1)
-    expect(user.skill_level).to eq("beginner")
+    expect(user.skill_level).to eq("junior")
     expect(user.daily_exercises).to be_empty
   end
 
@@ -27,7 +27,7 @@ RSpec.describe "Welcome choices", type: :system do
     expect(user.reload.learning_track).to eq("none")
     expect(user.section_kind_levels).to eq({})
     expect(user.section_kind_preferences_version).to eq(0)
-    expect(user.skill_level).to eq("developing")
+    expect(user.skill_level).to eq("junior")
   end
 
   it "reports a failed save and lets the user retry without leaving the question" do

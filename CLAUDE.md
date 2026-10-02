@@ -351,12 +351,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   that version and the exact registry-derived preset; an incomplete or
   mismatched choice saves nothing. The new-account targets are unlocked so
   ordinary easing still applies. Junior also sets `skill_level` to
-  `LearningTrack::START_SKILL_LEVEL` (`beginner`), and the endpoint refuses a
+  `LearningTrack::START_SKILL_LEVEL` (`junior`), and the endpoint refuses a
   junior choice without it, like any other mismatch with the preset. Targets
-  already decide every kind's rung, so the skill level changes the generation
-  prompt's profile line and which scenario pools the day rolls from (see
-  "Scenario flavor" below), never a rung. Nothing resets it: after a kind steps up to
-  senior, or after leaving the track, the profile still says beginner until
+  already decide every kind's rung, so the skill level changes only the
+  generation prompt's profile line, never a rung. Nothing resets it: after a kind steps up to
+  senior, or after leaving the track, the profile still says junior until
   the user changes it on Setup. Experienced records
   `"none"` without changing targets. Existing accounts are not enrolled or
   prompted, and joining after the first-run choice is refused.
@@ -984,41 +983,38 @@ concept-specific difficulty descriptions for future generation, not a new set.
   boundary would refuse.
 - **Scenario flavor**: the business setting every section's `scenario` is dressed
   in comes from one prompt line, and that line offers one pool from
-  `AiService::SCENARIO_POOLS`. Most days choose between two: the general,
-  job-adjacent `SCENARIO_DOMAINS` and `GAME_AND_ANIMATION_SCENARIO_DOMAINS` — a platformer's save-state store,
-  a level editor's undo stack, an animation timeline's keyframe editor.
-  `DailyPlan` rolls which pool once per day (`SCENARIO_FLAVOR_WEIGHTS`, 70%
-  game and animation) and carries it on `Result#scenario_flavor`; the prompt
-  renders the chosen pool and the diagnostics log records the flavor. Nothing
-  persists it, like `code_review_mode`. A prompt-stated "roughly 7 in 10" was
-  rejected for the reason `CODE_REVIEW_MODE_WEIGHTS` records: nothing would
-  decide or record it. The 30% is a floor, not a placeholder — an exclusive
-  pool relocates the staleness this fixes into a smaller fixed pool, and a
+  `AiService::SCENARIO_POOLS`: the job-adjacent `SCENARIO_DOMAINS` (webhook
+  delivery, rate limiting, data export) or `EVERYDAY_SCENARIO_DOMAINS` (a
+  shared grocery list, a gym workout log, a library checkout). `DailyPlan`
+  rolls which pool once per day (`SCENARIO_FLAVOR_WEIGHTS`, an even split)
+  and carries it on `Result#scenario_flavor`; the prompt renders the chosen
+  pool and the diagnostics log records the flavor. Every skill level rolls
+  the same weights. Nothing persists the flavor, like `code_review_mode`. A
+  split stated in the prompt was rejected for the reason
+  `CODE_REVIEW_MODE_WEIGHTS` records: nothing would decide or record it. Two
+  pools rather than one, because a single fixed pool goes stale and a
   familiar setting starts to predict the bug.
 
-  **A beginner gets everyday settings instead of job-adjacent ones.**
-  `DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL` gives `beginner` 70%
-  `EVERYDAY_SCENARIO_DOMAINS` (a shared grocery list, a gym workout log, a
-  library checkout) and 30% game and animation, and never the general pool:
-  webhooks, tenants and invoice runs assume someone already works in
-  software, which a career changer does not. Every other skill level keeps the
-  default weights. The everyday pool's own rule asks for plain words with no
-  back-office terms, and it carries no legacy GraphQL clause, the one piece of
-  industry framing the other two pools share. It is keyed on skill level, a
-  difficulty setting, because generation never reads learning-track state;
-  joining the junior track is what sets beginner. A spec holds the pool's
-  entries clear of back-office words, as it holds the game pool clear of
-  game internals.
+  **Everyday settings need no industry context.** Webhooks, tenants and
+  invoice runs assume someone already works in software, which a career
+  changer does not, and an everyday setting gives every level a break from
+  them. The everyday pool's own rule asks for plain words with no back-office
+  terms, and it carries no legacy GraphQL clause, the one piece of industry
+  framing the job-adjacent pool carries. A spec holds the pool's entries
+  clear of back-office words.
+
+  **A game and animation pool was removed.** It filled 70% of every
+  account's days, though it was meant for one person's taste.
 
   **Flavor is setting only, never a source of concepts.** The tagged concept
   and the planted issue still come from each section's own vocabulary, and
-  the game-day line says solving a section must never require knowing how
-  games or animation work inside. That rule is the lesson of a real trial: a
-  `code_review` planted on frame-rate-coupled velocity failed because the fix
-  needed a domain fact (render loops are hardware-dependent) rather than
-  reasoning from the code, and `ConceptReference` explains only the tagged
-  concept, so nothing could have supplied it. A spec holds the pool's entries
-  to naming systems, not internals. Every kind reads the same line —
+  the everyday line says solving a section must never require knowing how a
+  company's internal systems work. That rule is the lesson of a real trial: a
+  `code_review` planted on frame-rate-coupled velocity, on a game-flavored
+  day, failed because the fix needed a domain fact (render loops are
+  hardware-dependent) rather than reasoning from the code, and
+  `ConceptReference` explains only the tagged concept, so nothing could have
+  supplied it. Every kind reads the same line —
   `architecture`, `plan_review` and `pseudocode_to_code` have no separate
   mechanism — except `ambiguity_hunt`, whose own schema fragment keeps its
   scenario a Code Gym-style feature request: an unfamiliar setting would add
@@ -1027,8 +1023,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `scenario` over `code_review`, so that field always names the real file.
   The snippet's comments, names and prose are not guaranteed: each excerpt's
   `#instruction` (`RealSource::Excerpt#setting_rule`) tells the model the
-  flavor line does not apply and to describe Code Gym, never a game or other
-  fictional domain. That is prompt guidance, and nothing downstream checks a
+  flavor line does not apply and to describe Code Gym, never one of the
+  suggested settings or another fictional domain. That is prompt guidance, and nothing downstream checks a
   snippet's wording (#171).
 
   **Grounded sections remain eligible for retention checks.** The same
@@ -1126,7 +1122,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   spot forever. Decoupling slot frequency from pool size needs slots ranked by
   when the slot itself last filled, which is a change to how every day is
   shaped and not something this preference should drag in behind it.
-- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, deliberately disjoint from `skill_level`). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched.
+- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, which `User::SKILL_LEVELS` reuses, and deliberately disjoint from the review grades). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched.
 - **Drills**: a user can mark one concept, or a whole Learn display group, as
   drilled from the Learn tab (`ConceptDrills`, `ConceptDrillsController`). A
   drilled concept leads `User#concepts_needing_reinforcement`, and since
@@ -1214,9 +1210,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `current_schema`: every provider copy is stripped on every call, whatever
   the caller passed, before the stamps go on. The rung is
   `KindDifficulty#rung_for`: the kind's target when one is set, else the
-  profile's skill level read through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`
-  (beginner and developing are junior, solid is senior, strong is principal),
-  the one place that second scale is read as a rung. A section whose concept
+  profile's skill level, which uses the same scale, the one place a skill
+  level is read as a rung. A section whose concept
   was offered as reduced-tier reinforcement in an unlocked kind also carries
   `eased: true`, since the prompt's `(reduced)` rule asked for an easier
   problem than the rung says; a locked kind exempts itself from that rule and
@@ -1251,7 +1246,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   least-favourable-section rules `record_review!` applies, with a review that
   stored no rating counted as no signal as there; the standing
   is the highest held rung, which covers the rungs below, and a later poor
-  attempt releases a rung, so the page describes now. It is pure over the
+  attempt releases a rung, so the page describes now. Between rungs a
+  concept is "developing toward" the next one up
+  (`RungLedger#developing_toward`): once any rung above the held one has an
+  attempt that did not hold, or any attempt at all when none is held, the
+  page shows it one step past the held rung, so the ladder reads not yet,
+  developing toward junior, junior, developing toward senior, and so on. An
+  attempt two rungs up still reads as developing toward the next one, since
+  the rung between is not held either. Its bar segment is striped in the
+  target rung's colour, its dot half filled, and the legend states it once.
+  This replaced "not yet" for a concept attempted but never held, which the
+  legend had described as having no reviewed answer. It is pure over the
   response objects it is given and compares nothing to today, so time alone
   changes nothing, which a spec pins. A concept with no attempt is "not yet",
   or "not offered" when every kind that could show it is excluded, worded
@@ -1264,20 +1269,33 @@ concept-specific difficulty descriptions for future generation, not a new set.
   ledger records what was asked, `eased` covers the one easing the server
   decides, and the page's own note says a rating adjustment can still nudge
   an unlocked section and only a lock makes a rung exact.
-- **Skill level control**: Setup's "Skill level" select is the only page
+- **Skill level control**: the choices are the difficulty levels themselves
+  (`User::SKILL_LEVELS` is `KindDifficulty::LEVELS`), labelled Junior,
+  Senior and Principal engineer. Junior covers early-career developers and
+  career changers. They replaced
+  beginner, developing, solid and strong, which shared their words with the
+  review grades: a "developing" grade on a review is the grader's word for
+  where an answer sits, and is no longer also a setting. Stored values from
+  before that are read through `User#skill_level` (`LEGACY_SKILL_LEVELS`:
+  beginner and developing as junior, solid as senior, strong as principal
+  engineer),
+  and nothing in the database was rewritten, because old code validates the old
+  list on every save and would refuse a rewritten row while it serves through
+  the pre-deploy migration. A later migration converts the stored values and
+  the column default, and drops the mapping. A legacy value posted to
+  `PATCH /profile` is refused like any other value outside the list.
+  Setup's "Skill level" select is the only page
   that edits `User#skill_level`, and it autosaves through `PATCH /profile`,
   which refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
-  profile's prompt line, the rung of every kind without its own target
-  (through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`), and, for `beginner`, the
-  scenario pools the day rolls from
-  (`DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL`). Joining the junior track
-  sets it to `beginner`; nothing else changes it automatically, and daily
-  ratings still nudge each set around it. It is not
+  profile's prompt line and the rung of every kind without its own target
+  (`KindDifficulty#rung_for`); scenario settings do not depend on it.
+  Joining the junior track sets it to `junior`; nothing else changes it
+  automatically, and daily ratings still nudge each set around it. It is not
   part of the Exercise mix, so it does not bump
-  `section_kind_preferences_version`. No migration set a value: existing
-  accounts keep the `developing` default until they choose otherwise, since a
-  change here changes that account's prompts. The Exercise mix's default
-  options name the stored value and are renamed in place once a save lands.
+  `section_kind_preferences_version`. Every account at the old `developing`
+  default reads as Junior, which pitches at the same rung. The Exercise
+  mix's default options name the stored level by its label and are renamed
+  in place once a save lands.
 - **What a usage row records**: every provider call writes one `ApiUsage`
   row through `AiService#log_usage`, and that row now carries enough to price
   it. `model` is the model `#call` routed to (`MODEL_FOR_PURPOSE` /
@@ -2518,7 +2536,7 @@ always pull in the full suite — is stated once, in
 - `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence or reason is invalid output rather than a judgment. Pure; its specs need no database
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
 - `app/models/kind_preferences.rb` — `KindPreferences`: a user's stated weight and exclusion bias over rotating kinds, as plain values `SectionRotation` takes instead of a `User`, so its specs need no database. `.none` is the untouched default; a stored value outside `MULTIPLIERS` reads back as that default rather than reaching `WeightedRoll`
-- `app/models/kind_difficulty.rb` — `KindDifficulty`: a user's stated difficulty target and lock per section kind, as plain values the same way `KindPreferences` is. A level outside `LEVELS` reads as unset and a lock on an untargeted kind reads as unlocked, so an orphaned lock can never suppress easing the user did not validly choose. `#rung_for` is the rung a kind is pitched at today, target or skill level, and `RUNG_FOR_SKILL_LEVEL` the one reading of the skill scale as rungs
+- `app/models/kind_difficulty.rb` — `KindDifficulty`: a user's stated difficulty target and lock per section kind, as plain values the same way `KindPreferences` is. A level outside `LEVELS` reads as unset and a lock on an untargeted kind reads as unlocked, so an orphaned lock can never suppress easing the user did not validly choose. `#rung_for` is the rung a kind is pitched at today, target or skill level, the one place a skill level is read as a rung
 - `app/models/concept_hosts.rb` — `ConceptHosts`: which section kinds can host each (concept, bucket), derived from `ProblemSetIngest.selectable_vocabulary_for` across every `code_review` mode and the user's languages; read by `LadderCoverage` and the Progress page
 - `app/models/ladder_coverage.rb` — `LadderCoverage`: which of the pairs `ConceptHosts` offers each kind already carry a ladder rung, for every kind whether or not it is targeted — callers filter for targets themselves
 - `app/models/rung_ledger.rb` — `RungLedger`: the rung a user holds per concept, from stored responses and the `pitched_at` stamps; pure over the rows it is given

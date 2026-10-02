@@ -4,7 +4,7 @@ module LearningTrack
   VALUES = [ ON, OFF ].freeze
 
   START_LEVEL = "junior".freeze
-  START_SKILL_LEVEL = "beginner".freeze
+  START_SKILL_LEVEL = "junior".freeze
   GRADUATED_LEVEL = "senior".freeze
   LEVELS = [ START_LEVEL, GRADUATED_LEVEL ].freeze
 

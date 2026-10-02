@@ -139,7 +139,7 @@ class ModelComparison
   # and the fixture user is never persisted.
   def judge_fixtures
     fixtures = Dir[FIXTURE_DIR.join("*.json")].sort.map { |path| load_fixture(path) }
-    user     = User.new(skill_level: "solid")
+    user     = User.new(skill_level: "senior")
 
     CANDIDATES.fetch("judge").each { |route| print_fixture_table(route, fixtures, user) }
   end
@@ -158,7 +158,7 @@ class ModelComparison
   end
 
   def review_prose_fixtures
-    user   = User.new(skill_level: "solid")
+    user   = User.new(skill_level: "senior")
     inputs = Dir[REVIEW_PROSE_FIXTURE_DIR.join("*.json")].sort.map { |path| fixture_input(load_fixture(path)) }
     CANDIDATES.fetch("review_prose").each do |route|
       run_prose_judge("review_prose_fixtures: #{route[:model]}", route, inputs, user)
@@ -170,7 +170,7 @@ class ModelComparison
   # fall in rank order; the expected ratings are printed beside the actual
   # ones for a person to read.
   def review_calibration
-    user     = User.new(skill_level: "developing")
+    user     = User.new(skill_level: "junior")
     fixtures = Dir[REVIEW_CALIBRATION_FIXTURE_DIR.join("*.json")].sort.map { |path| load_fixture(path) }
 
     CANDIDATES.fetch("review_calibration").each do |route|

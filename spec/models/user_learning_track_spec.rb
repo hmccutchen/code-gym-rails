@@ -122,12 +122,12 @@ RSpec.describe User, "learning track", type: :model do
 
   describe "clearing the track" do
     it "clears when no kind keeps a junior target, preserving targets and skill level" do
-      user = on_track(skill_level: "developing")
+      user = on_track(skill_level: "junior")
       user.update!(section_kind_levels: ExerciseSection.keys.index_with { "senior" })
 
       expect(user.reload.learning_track).to eq("none")
       expect(user.section_kind_levels.values.uniq).to eq([ "senior" ])
-      expect(user.skill_level).to eq("developing")
+      expect(user.skill_level).to eq("junior")
     end
 
     it "clears when every target is removed" do
@@ -160,11 +160,11 @@ RSpec.describe User, "learning track", type: :model do
     end
 
     it "records nothing for the joining save" do
-      user = new_account(skill_level: "strong")
+      user = new_account(skill_level: "principal_engineer")
       user.update!(learning_track: "junior", section_kind_levels: LearningTrack.preset_levels)
 
       expect(user.reload.track_evidence_cutoffs).to eq({})
-      expect(user.skill_level).to eq("strong")
+      expect(user.skill_level).to eq("principal_engineer")
     end
 
     it "records nothing when joining replaces a hand-set senior target" do

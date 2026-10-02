@@ -20,13 +20,13 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
   end
 
   it "returns the same body other profile saves do" do
-    patch_profile(skill_level: "solid")
+    patch_profile(skill_level: "senior")
 
     expect(response.parsed_body).to eq("name" => "Dev", "time_zone" => "UTC", "daily_section_count" => nil)
   end
 
   it "leaves the preference version alone, since skill level is not part of the Exercise mix" do
-    expect { patch_profile(skill_level: "strong") }.not_to(change { user.reload.section_kind_preferences_version })
+    expect { patch_profile(skill_level: "principal_engineer") }.not_to(change { user.reload.section_kind_preferences_version })
   end
 
   # A track choice writes only its own fields, so skill level cannot ride along.
@@ -34,13 +34,13 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
     user.update!(learning_track: nil)
     original = user.reload.attributes
 
-    patch_profile(learning_track: "none", skill_level: "strong")
+    patch_profile(learning_track: "none", skill_level: "principal_engineer")
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(user.reload.attributes).to eq(original)
   end
 
-  [ "expert", "", nil, [ "solid" ], { "level" => "solid" } ].each do |value|
+  [ "expert", "beginner", "developing", "", nil, [ "solid" ], { "level" => "solid" } ].each do |value|
     it "refuses #{value.inspect} without saving anything else in the request" do
       original = user.reload.attributes
 

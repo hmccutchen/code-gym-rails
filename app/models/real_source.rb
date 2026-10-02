@@ -113,7 +113,7 @@ class RealSource
     def setting_rule
       "The business-domain settings suggested for each section do not apply to this one: its setting is " \
       "Code Gym itself, a learning app for engineers, so its comments, names, and any other prose describe " \
-      "Code Gym, never a game or other fictional domain. " \
+      "Code Gym, never one of the suggested settings or another fictional domain. " \
       "These source-specific instructions take precedence over the general variety, mastery-loop, " \
       "and retention requests for new domains, names, or framing. " \
       "Keep the required source names and setting even if this excerpt appears in prior framings. " \

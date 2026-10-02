@@ -71,7 +71,7 @@ class PreviewSeed
   def find_or_create_user
     User.create_with(
       name:        "Preview Reviewer",
-      skill_level: "solid",
+      skill_level: "senior",
       language:    "ruby_rails",
       provider:    "anthropic",
       api_keys:    { "anthropic" => DUMMY_API_KEY }

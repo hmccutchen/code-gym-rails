@@ -335,13 +335,16 @@ en:
     intro: "Which rung you currently hold on each concept, from your reviewed answers. Nothing here is a target: it describes now, and it changes only when a new answer is reviewed."
     note: "A rung is held when your latest reviewed answer to a section asked at that rung was rated just right or too easy by you and solid or strong by the review. Holding a higher rung covers the ones below it. Answers from before rungs were recorded, and sections the prompt was told to ease, are not counted. A section's rung is what was asked for: your difficulty ratings can still nudge an unlocked section, and only a lock makes the rung exact."
     legend:
+      developing: "you have answered at a rung you don't hold yet, and that answer didn't hold it. It points to the next rung above the one you hold, or to junior when you hold none."
       not_yet: "no reviewed answer at any rung yet."
       not_offered: "every section that could show it is excluded in your exercise mix."
     rungs:
       junior: "junior"
       senior: "senior"
       principal_engineer: "principal"
+    developing_toward: "developing toward %{rung}"
     standings:
+      developing: "developing"
       not_yet: "not yet"
       not_offered: "not offered"
     not_offered_note: "Not offered: every section that could show this concept is excluded in your exercise mix, so it is your choice rather than a gap."
@@ -642,12 +645,7 @@ en:
         hawaii: "Hawaii"
       time_zone_hint: 'Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser''s zone.'
       skill_level_label: "Skill level"
-      skill_levels:
-        beginner: "Beginner"
-        developing: "Developing"
-        solid: "Solid"
-        strong: "Strong"
-      skill_level_hint: "How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Your ratings still nudge each day's set up or down."
+      skill_level_hint: "How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings still nudge each day's set up or down."
   history:
     index:
       title: "History"

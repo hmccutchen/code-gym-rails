@@ -38,24 +38,15 @@ class DailyPlan
   }.freeze
 
   # Which scenario pool today's prompt offers (AiService::SCENARIO_POOLS).
-  # Leaned hard toward the setting the engineer asked for, with a floor for
-  # the general pool rather than none: an exclusive pool relocates the
-  # staleness this exists to fix into a smaller fixed pool, and a familiar
-  # setting starts to predict the bug. Rolled once per day, not per section,
-  # the same shape as CODE_REVIEW_MODE_WEIGHTS and for the same reason a
-  # prompt-stated "roughly 7 in 10" was rejected: nothing would decide or
-  # record it. Not gated on language or kinds — every day has a scenario.
-  SCENARIO_FLAVOR_WEIGHTS = { game_and_animation: 0.7, general: 0.3 }.freeze
-
-  # A beginner trades the job-adjacent pool for an everyday one: webhooks,
-  # tenants and invoice runs assume someone already works in software, which
-  # a career changer does not. The game pool stays as the second setting, so
-  # a beginner still has two pools to vary between. Keyed on skill level, a
-  # difficulty setting, because generation never reads learning-track state;
-  # joining the junior track sets beginner.
-  SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL = {
-    "beginner" => { everyday: 0.7, game_and_animation: 0.3 }.freeze
-  }.freeze
+  # Half everyday settings, half job-adjacent ones, at every skill level: an
+  # everyday setting needs no industry context, and the job-adjacent pool
+  # keeps work settings in view. Two pools rather than one, because a single
+  # fixed pool goes stale and a familiar setting starts to predict the bug.
+  # Rolled once per day, not per section, the same shape as
+  # CODE_REVIEW_MODE_WEIGHTS and for the same reason a split stated in the
+  # prompt was rejected: nothing would decide or record it. Not gated on
+  # language, kinds or skill level — every day has a scenario.
+  SCENARIO_FLAVOR_WEIGHTS = { everyday: 0.5, general: 0.5 }.freeze
 
   # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket
   # per kind (not a single shared bucket), matching how ARCHITECTURE already
@@ -106,7 +97,7 @@ class DailyPlan
     Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third), **tracks, coverage: coverage, size: size,
                code_review_mode: code_review_mode,
                code_review_source: code_review_source_for(user, language, code_review_mode),
-               scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)))
+               scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
 
   # Public so the dashboard's forecast of tomorrow composes the size the same
@@ -247,9 +238,6 @@ class DailyPlan
   end
   private_class_method :main_track
 
-  def self.scenario_flavor_weights_for(skill_level)
-    SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.fetch(skill_level, SCENARIO_FLAVOR_WEIGHTS)
-  end
 
   # Whether today's code_review is grounded in Code Gym's own source, and in
   # which excerpt. Gated before it is rolled: only a day generating in the

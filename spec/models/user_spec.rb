@@ -881,6 +881,30 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#skill_level" do
+    it "reads each stored value from before skill levels took the difficulty levels' names as its new name" do
+      user = create_user
+
+      { "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }.each do |stored, read|
+        user.update_column(:skill_level, stored)
+        expect(user.reload.skill_level).to eq(read)
+      end
+    end
+
+    it "reads a new account, which the database still defaults to developing, as junior" do
+      expect(create_user.reload.skill_level).to eq("junior")
+    end
+
+    it "leaves the stored value alone when another column is saved" do
+      user = create_user
+      user.update_column(:skill_level, "solid")
+
+      user.reload.update!(name: "Renamed")
+
+      expect(User.where(id: user.id).pick(:skill_level)).to eq("solid")
+    end
+  end
+
   describe "#provider_label" do
     it "returns Claude for the anthropic provider" do
       user = create_user
@@ -961,7 +985,7 @@ RSpec.describe User, type: :model do
     it "keeps non-identifying fields for aggregate stats" do
       user = create_user
       user.update!(provider: "gemini", time_zone: "America/Chicago",
-                   language: "javascript", skill_level: "strong",
+                   language: "javascript", skill_level: "principal_engineer",
                    focus_areas: [ "testing" ])
 
       user.anonymize!
@@ -970,7 +994,7 @@ RSpec.describe User, type: :model do
       expect(user.provider).to eq("gemini")
       expect(user.time_zone).to eq("America/Chicago")
       expect(user.language).to eq("javascript")
-      expect(user.skill_level).to eq("strong")
+      expect(user.skill_level).to eq("principal_engineer")
       expect(user.focus_areas).to eq([ "testing" ])
     end
 

@@ -13,11 +13,11 @@ RSpec.describe "Skill level on Setup", type: :system do
   end
 
   it "saves a new skill level and renames the Exercise mix default options to match" do
-    select "Solid", from: "Skill level"
+    select "Senior", from: "Skill level"
 
-    expect(page).to have_css("[data-skill-level-label]", text: "Your skill level (solid)", visible: :all)
-    expect(default_labels).to eq([ "Your skill level (solid)" ])
-    expect(user.reload.skill_level).to eq("solid")
+    expect(page).to have_css("[data-skill-level-label]", text: "Your skill level (Senior)", visible: :all)
+    expect(default_labels).to eq([ "Your skill level (Senior)" ])
+    expect(user.reload.skill_level).to eq("senior")
     expect(page).to have_current_path(setup_path)
   end
 
@@ -28,31 +28,31 @@ RSpec.describe "Skill level on Setup", type: :system do
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       window.fetch = (url, options) => {
-        if (url.endsWith("/profile") && JSON.parse(options.body).user.skill_level === "solid") {
-          return new Promise((resolve) => { window.releaseSolid = () => resolve(originalFetch(url, options)); });
+        if (url.endsWith("/profile") && JSON.parse(options.body).user.skill_level === "senior") {
+          return new Promise((resolve) => { window.releaseSenior = () => resolve(originalFetch(url, options)); });
         }
         return originalFetch(url, options);
       };
     JS
 
-    select "Solid", from: "Skill level"
-    page.driver.with_playwright_page { |pw| pw.wait_for_function("typeof window.releaseSolid === 'function'") }
-    select "Strong", from: "Skill level"
+    select "Senior", from: "Skill level"
+    page.driver.with_playwright_page { |pw| pw.wait_for_function("typeof window.releaseSenior === 'function'") }
+    select "Principal engineer", from: "Skill level"
     page.driver.with_playwright_page { |pw| pw.wait_for_timeout(300) }
-    page.execute_script("window.releaseSolid()")
+    page.execute_script("window.releaseSenior()")
     page.driver.with_playwright_page { |pw| pw.wait_for_function("!window.CodeGymSaveStatus.pending()") }
 
-    expect(user.reload.skill_level).to eq("strong")
-    expect(default_labels).to eq([ "Your skill level (strong)" ])
+    expect(user.reload.skill_level).to eq("principal_engineer")
+    expect(default_labels).to eq([ "Your skill level (Principal engineer)" ])
   end
 
   it "reports a failed save and keeps the labels naming the stored level" do
     page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
 
-    select "Strong", from: "Skill level"
+    select "Principal engineer", from: "Skill level"
 
     expect(page).to have_css("#save-status", text: /couldn't save/i)
-    expect(default_labels).to eq([ "Your skill level (developing)" ])
-    expect(user.reload.skill_level).to eq("developing")
+    expect(default_labels).to eq([ "Your skill level (Junior)" ])
+    expect(user.reload.skill_level).to eq("junior")
   end
 end

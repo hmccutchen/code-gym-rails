@@ -5,7 +5,9 @@
 # on several sections of one day is judged by its least favourable section,
 # and a review that stored no rating is no signal rather than a bad one. The
 # concept's standing is the highest held rung, which covers the rungs below
-# it; a later poor attempt at a rung releases it, so this describes now.
+# it; a later poor attempt at a rung releases it, so this describes now. An
+# attempt at any rung above that one which did not hold means the concept is
+# developing toward the next rung up.
 #
 # Pure over the response objects it is given, newest first: nothing here
 # queries, and nothing compares a date to today, so time alone changes no
@@ -29,6 +31,15 @@ class RungLedger
   # The highest rung held for the concept in this bucket, or nil.
   def held(concept, bucket)
     KindDifficulty::LEVELS.reverse.find { |rung| @verdicts[[ concept, bucket, rung ]] }
+  end
+
+  # The rung just above the held one, or the lowest when none is held, once
+  # any rung above has been attempted; otherwise nil. Every verdict recorded
+  # above the held rung did not hold, or that rung would be the held one.
+  def developing_toward(concept, bucket)
+    held_rung = held(concept, bucket)
+    above = held_rung ? KindDifficulty::LEVELS.drop(KindDifficulty::LEVELS.index(held_rung) + 1) : KindDifficulty::LEVELS
+    above.first if above.any? { |rung| @verdicts.key?([ concept, bucket, rung ]) }
   end
 
   private

@@ -33,6 +33,41 @@ RSpec.describe "Progress", type: :request do
     expect(response.body).to match(%r{data-concept="memoization"[^>]*data-standing="not_yet"})
   end
 
+  it "shows a concept attempted above its held rung as developing toward the next one" do
+    reviewed_session(date: Date.current - 2, concept: "n_plus_one", rung: "junior")
+    reviewed_session(date: Date.current - 1, concept: "n_plus_one", rung: "senior", ai_rating: "developing")
+    reviewed_session(date: Date.current - 3, concept: "memoization", rung: "junior", section: "pattern", self_rating: "too_hard")
+
+    get progress_path
+
+    page = Nokogiri::HTML(response.body)
+    n_plus_one = page.at_css('[data-concept="n_plus_one"]')
+    expect(n_plus_one["data-standing"]).to eq("developing_senior")
+    expect(n_plus_one.at_css(".progress-word").text).to eq("developing toward senior")
+    expect(n_plus_one.css(".progress-rung.held").size).to eq(1)
+    expect(n_plus_one.css(".progress-rung.toward").size).to eq(1)
+    expect(page.at_css('[data-concept="memoization"]')["data-standing"]).to eq("developing_junior")
+    expect(response.body).to include("developing toward junior")
+  end
+
+  it "explains developing once in the legend" do
+    get progress_path
+
+    legend = Nokogiri::HTML(response.body).css(".progress-legend dt").map(&:text)
+    expect(legend).to eq([ "principal", "senior", "junior", "developing", "not yet", "not offered" ])
+  end
+
+  # Developing toward junior means nothing is held, so the legend must not
+  # describe developing only as a step above a held rung.
+  it "describes developing for both a held rung and none held" do
+    get progress_path
+
+    developing = Nokogiri::HTML(response.body).css(".progress-legend div")
+                         .find { |row| row.at_css("dt").text == "developing" }.at_css("dd").text
+    expect(developing).to include("the next rung above the one you hold")
+    expect(developing).to include("to junior when you hold none")
+  end
+
   it "summarizes each group by rung counts rather than a percentage" do
     reviewed_session(date: Date.current - 1, concept: "n_plus_one", rung: "senior")
 
