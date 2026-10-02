@@ -41,10 +41,12 @@ RSpec.describe ClaudeService do
 
     expect { service.send(:unreadable_envelope!, '{"text":"{\\"better\\":\\"b\\"', "Claude") }
       .to raise_error(AiService::InvalidResponseError)
+    expect { service.send(:unreadable_envelope!, '"{\\"better\\":\\"b\\"', "Claude") }
+      .to raise_error(AiService::InvalidResponseError)
     expect { service.send(:unreadable_envelope!, "<html>Bad gateway</html>", "Claude") }
       .to raise_error(AiService::InvalidResponseError)
 
-    expect(logged.first).to include("withheld").and(satisfy { |line| !line.include?("better") })
+    expect(logged.first(2)).to all(include("withheld").and(satisfy { |line| !line.include?("better") }))
     expect(logged.last).to include("Bad gateway")
   end
 

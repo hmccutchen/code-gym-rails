@@ -15,14 +15,15 @@ RSpec.describe AnswerPositionBalance do
     exercise_on(Date.current, "a")
     exercise_on(Date.current - 1, "b")
     exercise_on(Date.current - 2, "b")
-    DailyExercise.create!(user: user, date: Date.current - 3, generated_at: Time.current,
+    exercise_on(Date.current - 3, "c")
+    DailyExercise.create!(user: user, date: Date.current - 4, generated_at: Time.current,
                           problem_set: { "code_review" => { "question" => "q" } })
 
     expect { described_class.new(out: out).report }.not_to change { [ DailyExercise.count, ApiUsage.count ] }
 
-    expect(out.string).to include("design comparisons with an answer key: 3",
+    expect(out.string).to include("design comparisons with a usable position: 3",
                                   "better piece shown as A: 1 (33.3%)", "better piece shown as B: 2 (66.7%)",
-                                  "no usable position: 0")
+                                  "no usable position: 1")
     expect(out.string).not_to include("SECRET", user.email)
   end
 end

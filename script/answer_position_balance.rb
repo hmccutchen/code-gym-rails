@@ -8,10 +8,11 @@ class AnswerPositionBalance
     @out = out
   end
 
+  # Shares are of the usable positions alone, so they always sum to 100.
   def report
     counts = positions.tally
-    total  = counts.values.sum
-    @out.puts "design comparisons with an answer key: #{total}"
+    total  = counts.slice(*KIND::PIECES).values.sum
+    @out.puts "design comparisons with a usable position: #{total}"
     KIND::PIECES.each do |piece|
       share = total.zero? ? 0 : (100.0 * counts.fetch(piece, 0) / total).round(1)
       @out.puts "better piece shown as #{piece.upcase}: #{counts.fetch(piece, 0)} (#{share}%)"

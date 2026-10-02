@@ -32,7 +32,7 @@
     },
     {
       "label": "other_pick_sound_reason",
-      "answer": "pick:a\nThe scenario says carriers are added monthly, so what matters is how cheap a new one is. A keeps every rule in one case statement, so a new carrier is one when line in one file, which I think is cheaper than adding a class and a registry entry.",
+      "answer": "pick:a\nThe scenario says carriers are added monthly, so what matters is how cheap a new one is. A keeps every rule in one case statement, so a new carrier is one `when` line in one file, which I think is cheaper than adding a class and a registry entry.",
       "expected": [
         "developing"
       ]

@@ -393,7 +393,7 @@ RSpec.describe JudgedGeneration do
         judged = run
 
         expect(judged.problem_set["design_comparison"]["question"]).to eq("Edited question?")
-        expect(judged.outcomes["design_comparison"]).to include(status: :edit, edit_reverted: false)
+        expect(judged.outcomes["design_comparison"]).to include(status: :edit, edit_reverted: false, solve_matched: [ true, true ])
         expect(judged_calls.count { |call| call[1] == "design_comparison" }).to eq(2)
       end
 
@@ -410,13 +410,16 @@ RSpec.describe JudgedGeneration do
       it "ships the unedited draft when the edited section's solve mismatches the key" do
         verdicts["design_comparison"] = [ edit_verdict, solve("keep", "a") ]
 
-        expect(run.outcomes["design_comparison"]).to include(edit_reverted: true)
+        expect(run.outcomes["design_comparison"]).to include(edit_reverted: true, solve_matched: [ true, false ])
       end
 
       it "ships the unedited draft when the second judgment cannot answer" do
         verdicts["design_comparison"] = [ edit_verdict, AiService::TimeoutError.new("slow") ]
 
-        expect(run.problem_set["design_comparison"]["question"]).to eq("Which fits?")
+        judged = run
+
+        expect(judged.problem_set["design_comparison"]["question"]).to eq("Which fits?")
+        expect(judged.outcomes["design_comparison"]).to include(edit_reverted: true, solve_matched: [ true ])
       end
 
       it "makes no second call for a kind whose edits are not re-judged" do

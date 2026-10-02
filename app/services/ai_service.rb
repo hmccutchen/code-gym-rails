@@ -3046,13 +3046,14 @@ class AiService
     unreadable_envelope!(body, provider)
   end
 
-  # A body that starts like JSON is most likely a reply cut off in transit,
-  # and a reply can carry an answer the logs must not (a judge's blind solve,
-  # an engineer's review), so only its size is logged. Anything else, such as
-  # a proxy's HTML page, is logged as a snippet for diagnosis.
+  # A body that starts like JSON (an object, an array or a quoted string) is
+  # most likely a reply cut off in transit, and a reply can carry an answer
+  # the logs must not (a judge's blind solve, an engineer's review), so only
+  # its size is logged. Anything else, such as a proxy's HTML page, is logged
+  # as a snippet for diagnosis.
   def unreadable_envelope!(body, provider)
     text = body.to_s
-    if text.lstrip.start_with?("{", "[")
+    if text.lstrip.start_with?("{", "[", '"')
       Rails.logger.error("Unreadable #{provider} response body: #{text.bytesize} bytes of cut-off JSON, withheld")
     else
       log_raw_snippet("Unreadable #{provider} response body", text)

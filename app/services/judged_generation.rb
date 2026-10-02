@@ -136,13 +136,16 @@ class JudgedGeneration
   # [section to ship, outcome]. For a kind whose edits are re-judged, the
   # edited section is judged once more, and the unedited one ships instead
   # when that judge rejects it, cannot answer, or solves it against the key.
+  # The second solve is recorded like the first, so solve_matched counts
+  # every judged version.
   def confirmed_edit(kind, section, verdict, outcome)
     edited = apply_verdict(verdict, section)
     return [ edited, outcome ] unless verdict.edit? && kind.rejudge_edits?
 
     check, latency = judge_with_fallback(kind, edited)
-    outcome = outcome.merge(latency_ms: outcome[:latency_ms] + latency)
-    reverted = check.is_a?(String) || check.reject? || solve_matched(kind, edited, check) == false
+    matched  = check.is_a?(String) ? nil : solve_matched(kind, edited, check)
+    outcome  = with_solve(outcome, matched).merge(latency_ms: outcome[:latency_ms] + latency)
+    reverted = check.is_a?(String) || check.reject? || matched == false
     [ reverted ? section : edited, outcome.merge(edit_reverted: reverted) ]
   end
 
