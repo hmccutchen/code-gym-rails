@@ -33,7 +33,7 @@ RSpec.describe "Setup for a learning track user", type: :request do
   end
 
   it "still shows the guide after saving a key if no set exists" do
-    user.update!(api_key: "fake-test-key", provider: "fake")
+    user.update!(provider: "fake", api_keys: { "fake" => "fake-test-key" })
     login_as(user)
     get setup_path
 

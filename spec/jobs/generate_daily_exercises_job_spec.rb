@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe GenerateDailyExercisesJob do
   include ActiveSupport::Testing::TimeHelpers
 
-  let(:user) { User.create!(email: "cronuser@example.com", name: "Cron", provider: "anthropic", api_key: "sk-ant-test", time_zone: "UTC") }
+  let(:user) { User.create!(email: "cronuser@example.com", name: "Cron", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC") }
 
   # On-demand generation is judged on a weekday and single-stage on a weekend,
   # and examples without a travel_to run on whatever day the suite does, so
@@ -104,8 +104,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "persists the failure date in the user's own time zone" do
-    pac = User.create!(email: "pac2@example.com", name: "Pac", provider: "anthropic",
-                       api_key: "sk-ant-test", time_zone: "America/Los_Angeles")
+    pac = User.create!(email: "pac2@example.com", name: "Pac", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles")
     stub_provider_failure(AiService::Error, "boom", pac)
     allow(Rails.logger).to receive(:error)
 
@@ -260,7 +259,7 @@ RSpec.describe GenerateDailyExercisesJob do
       allow(AiService).to receive(:for).with(u).and_return(svc)
     end
 
-    let(:pac) { User.create!(email: "pac@example.com", name: "Pac", provider: "anthropic", api_key: "sk-ant-test", time_zone: "America/Los_Angeles") }
+    let(:pac) { User.create!(email: "pac@example.com", name: "Pac", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles") }
 
     it "does not generate before 8am local" do
       stub_generation_for(pac)
@@ -298,8 +297,7 @@ RSpec.describe GenerateDailyExercisesJob do
     end
 
     it "gates each user independently by their own zone within the same batch run" do
-      alaska = User.create!(email: "alaska@example.com", name: "Alaska", provider: "anthropic",
-                             api_key: "sk-ant-test", time_zone: "America/Anchorage")
+      alaska = User.create!(email: "alaska@example.com", name: "Alaska", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Anchorage")
       stub_generation_for(pac)
       stub_generation_for(alaska)
 
@@ -343,7 +341,7 @@ RSpec.describe GenerateDailyExercisesJob do
       allow(AiService).to receive(:for).with(u).and_return(svc)
     end
 
-    let(:pac) { User.create!(email: "reminded@example.com", name: "Pac", provider: "anthropic", api_key: "sk-ant-test", time_zone: "America/Los_Angeles") }
+    let(:pac) { User.create!(email: "reminded@example.com", name: "Pac", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles") }
 
     it "enqueues one for the batch that generated the set" do
       stub_generation_for(pac)

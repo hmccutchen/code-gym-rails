@@ -180,9 +180,9 @@ authentication?** BLOCKING. `current_user` being present is not authorization â€
 confirm the user is allowed to access that specific record.
 
 **Can an API key reach a log, a view, or an error message?** BLOCKING. Provider
-keys pass only through the encrypted `api_key` column and the request headers
+keys pass only through the encrypted `api_keys` column and the request headers
 built in `app/services/*_service.rb`. Never approve a change that reads or
-transmits another user's `api_key`, email, or personal data without an
+transmits another user's `api_keys`, email, or personal data without an
 explicit, visible authorization check.
 
 **Does a hidden answer key stay hidden?** BLOCKING. `planted_ambiguities` is

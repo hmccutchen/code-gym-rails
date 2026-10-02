@@ -45,7 +45,21 @@
       <%= f.label :api_key, t("api_keys.edit.api_key_label") %>
       <%= f.password_field :api_key, placeholder: t("api_keys.edit.api_key_placeholder"), autocomplete: "off" %>
       <p class="hint"><%= t("api_keys.edit.api_key_hint_html") %></p>
+      <% if current_user.stored_providers.any? %>
+        <p class="hint"><%= t("api_keys.edit.saved_keys_hint") %></p>
+      <% end %>
     </div>
+    <% if current_user.stored_providers.any? %>
+      <div class="form-field">
+        <fieldset class="display-group" id="provider-choice">
+          <legend><%= t("api_keys.edit.provider_legend") %></legend>
+          <% current_user.stored_providers.each do |provider| %>
+            <label><%= f.radio_button :provider, provider, checked: current_user.provider == provider %><%= AiProvider.label(provider) %></label>
+          <% end %>
+          <p class="hint display-hint"><%= t("api_keys.edit.provider_hint") %></p>
+        </fieldset>
+      </div>
+    <% end %>
     <div class="form-field">
       <%= f.label :language, t("api_keys.edit.language_label") %>
       <%= f.select :language,

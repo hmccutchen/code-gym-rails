@@ -43,7 +43,7 @@ Rails.application.configure do
   # (rspec-rails' have_enqueued_* matchers require the :test adapter).
   config.active_job.queue_adapter = :test
 
-  # Deterministic throwaway keys so `encrypts :api_key` works in tests
+  # Deterministic throwaway keys so `encrypts :api_keys` works in tests
   # without needing the real credentials.
   config.active_record.encryption.primary_key = "test" * 8
   config.active_record.encryption.deterministic_key = "test" * 8

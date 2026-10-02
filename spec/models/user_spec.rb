@@ -61,7 +61,7 @@ RSpec.describe User, type: :model do
   describe "api key encryption" do
     it "persists the api key across reloads" do
       user = create_user
-      user.update!(api_key: "sk-ant-secret123")
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-secret123" })
 
       expect(user.reload.api_key).to eq("sk-ant-secret123")
       expect(user.api_key_present?).to be true
@@ -69,10 +69,10 @@ RSpec.describe User, type: :model do
 
     it "stores the key encrypted, not in plaintext" do
       user = create_user
-      user.update!(api_key: "sk-ant-secret123")
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-secret123" })
 
       raw = ActiveRecord::Base.connection.select_value(
-        "SELECT api_key FROM users WHERE id = #{user.id}"
+        "SELECT api_keys FROM users WHERE id = #{user.id}"
       )
       expect(raw).to be_present
       expect(raw).not_to include("sk-ant-secret123")
@@ -815,6 +815,72 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "provider keys" do
+    it "keeps a key per provider and reads the one in use" do
+      user = create_user
+      user.store_api_key("sk-ant-one", provider: "anthropic")
+      user.store_api_key("sk-proj-two", provider: "openai")
+      user.save!
+
+      user.reload
+      expect(user.api_key).to eq("sk-proj-two")
+      expect(user.stored_providers).to eq(%w[anthropic openai])
+      user.update!(provider: "anthropic")
+      expect(user.api_key).to eq("sk-ant-one")
+    end
+
+    it "lists stored providers in registry order whatever order they were saved in" do
+      user = create_user
+      user.store_api_key("sk-proj-two", provider: "openai")
+      user.store_api_key("AIzaThree", provider: "gemini")
+      user.store_api_key("sk-ant-one", provider: "anthropic")
+
+      expect(user.stored_providers).to eq(AiProvider.keys & %w[anthropic gemini openai])
+    end
+
+    it "refuses selecting a provider with no stored key" do
+      user = create_user
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-one" })
+
+      expect(user.update(provider: "openai")).to be false
+      expect(user.errors[:provider]).to include("has no stored key")
+    end
+
+    it "refuses a key under an unknown provider or a blank key" do
+      user = create_user
+
+      expect(user.update(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-one", "mistral" => "m" })).to be false
+      expect(user.errors[:api_keys]).to include("names an unknown provider: mistral")
+      expect(user.update(provider: "anthropic", api_keys: { "anthropic" => " " })).to be false
+      expect(user.errors[:api_keys]).to include("has a blank key for anthropic")
+    end
+
+    it "records the old provider on unlabelled reviews before switching" do
+      user = create_user
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-one", "openai" => "sk-proj-two" })
+      exercise = user.daily_exercises.create!(date: Date.new(2026, 9, 28), problem_set: { "code_review" => {} }, generated_at: Time.current)
+      reviewed = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+                                              ai_review: { "code_review" => { "rating" => "solid" } })
+      other_exercise = user.daily_exercises.create!(date: Date.new(2026, 9, 29), problem_set: { "code_review" => {} }, generated_at: Time.current)
+      unreviewed = user.daily_responses.create!(daily_exercise: other_exercise, date: other_exercise.date, submitted_at: Time.current)
+
+      user.update!(provider: "openai")
+
+      expect(reviewed.reload.review_provider).to eq("anthropic")
+      expect(reviewed.review_provider_label).to eq("Claude")
+      expect(unreviewed.reload.review_provider).to be_nil
+    end
+
+    it "stores no keys as nil, so the batch's has-a-key query skips the account" do
+      user = create_user
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-one" })
+      user.update!(api_keys: {})
+
+      expect(user.reload.api_keys).to be_nil
+      expect(User.where.not(api_keys: nil)).not_to include(user)
+    end
+  end
+
   describe "#provider_label" do
     it "returns Claude for the anthropic provider" do
       user = create_user
@@ -851,9 +917,19 @@ RSpec.describe User, type: :model do
   end
 
   describe "#anonymize!" do
+    it "clears the legacy api_key column the migration left populated" do
+      user = create_user(email: "legacy-key@example.com")
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-secret" })
+      ActiveRecord::Base.connection.execute("UPDATE users SET api_key = 'legacy-ciphertext' WHERE id = #{user.id}")
+
+      user.anonymize!
+
+      expect(ActiveRecord::Base.connection.select_value("SELECT api_key FROM users WHERE id = #{user.id}")).to be_nil
+    end
+
     it "replaces or clears every identifying field" do
       user = create_user(email: "real@example.com", name: "Real Person")
-      user.update!(api_key: "sk-ant-secret", provider: "anthropic")
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-secret" })
       user.generate_login_code!
 
       expect(user.anonymize!).to be true
@@ -1441,8 +1517,7 @@ RSpec.describe User, type: :model do
 
   describe "reminder level" do
     let(:user) do
-      User.create!(email: "level@example.com", name: "Level", provider: "anthropic",
-                   api_key: "sk-ant-test")
+      User.create!(email: "level@example.com", name: "Level", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" })
     end
 
     it "defaults to none, so a new account is not enrolled" do

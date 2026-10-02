@@ -121,6 +121,12 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
+  # A review with no recorded provider was written while the user's provider
+  # was the current one: switching providers records it first. The backfill
+  # stores "unknown" where usage shows the user ran another provider, which
+  # labels as the generic name.
+  def review_provider_label = AiProvider.label(review_provider.presence || user.provider)
+
   # A review is claimed and still plausibly running — mirrors
   # DailyExercise#regenerating?. Anything that would destroy this row has to
   # ask: #review's provider call runs outside a transaction, so a destroy

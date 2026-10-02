@@ -90,7 +90,7 @@
 
     <% if daily_response.reviewed? %>
       <details class="review" <%= "open" if i.zero? && @pagy.page == 1 %>>
-        <summary><%= t("review.history_summary", provider: daily_response.user.provider_label) %></summary>
+        <summary><%= t("review.history_summary", provider: daily_response.review_provider_label) %></summary>
         <%= render "shared/ai_review", response: daily_response %>
       </details>
     <% else %>

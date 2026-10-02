@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_01_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_02_170100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -102,6 +102,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_160000) do
     t.datetime "submitted_at"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.string "review_provider"
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id"
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
@@ -327,6 +328,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_160000) do
     t.string "learning_track"
     t.jsonb "track_evidence_cutoffs", default: {}, null: false
     t.integer "daily_section_count"
+    t.text "api_keys"
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 

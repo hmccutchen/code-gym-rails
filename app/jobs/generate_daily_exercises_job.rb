@@ -20,7 +20,7 @@ class GenerateDailyExercisesJob < ApplicationJob
       # A paused user is skipped; the on-demand path above still serves them,
       # but while paused nothing reaches it without an explicit /generate click
       # (DashboardController#show stops auto-triggering it).
-      User.active.where.not(api_key: nil).where(paused_generation_at: nil).find_each do |user|
+      User.active.where.not(api_keys: nil).where(paused_generation_at: nil).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
       end
     end

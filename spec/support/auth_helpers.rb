@@ -3,7 +3,7 @@ module AuthHelpers
   # track backfill marked "none". A first-run spec passes learning_track: nil.
   def create_user_with_key(email: "dev@example.com", name: "Dev", time_zone: "UTC", learning_track: LearningTrack::OFF)
     user = User.create!(email: email, name: name, time_zone: time_zone, learning_track: learning_track)
-    user.update!(api_key: "sk-ant-test-key", provider: "anthropic")
+    user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test-key" })
     user
   end
 
@@ -20,8 +20,7 @@ module AuthHelpers
       time_zone: time_zone,
       learning_track: learning_track,
       daily_section_count: daily_section_count,
-      api_key: "fake-test-key",
-      provider: "fake"
+      provider: "fake", api_keys: { "fake" => "fake-test-key" }
     )
   end
 

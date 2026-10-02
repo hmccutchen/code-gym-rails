@@ -100,7 +100,7 @@ RSpec.describe "ApiKeys", type: :request do
     end
 
     it "updates only the language when the api_key field is blank and a key already exists" do
-      user.update!(api_key: "sk-ant-existing", provider: "anthropic")
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing" })
       login_as(user)
 
       patch setup_path, params: { api_key: "", language: "javascript" }
@@ -108,6 +108,63 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response).to redirect_to(root_path)
       expect(user.reload.language).to eq("javascript")
       expect(user.api_key).to eq("sk-ant-existing")
+    end
+
+    it "keeps the key saved for another provider when a new provider's key is pasted" do
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing" })
+      login_as(user)
+
+      patch setup_path, params: { api_key: "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq" }
+
+      user.reload
+      expect(user.provider).to eq("openai")
+      expect(user.api_key).to eq("sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq")
+      expect(user.api_keys["anthropic"]).to eq("sk-ant-existing")
+    end
+
+    it "replaces only the key saved for the pasted key's provider" do
+      user.update!(provider: "openai", api_keys: { "anthropic" => "sk-ant-old", "openai" => "sk-proj-kept" })
+      login_as(user)
+
+      patch setup_path, params: { api_key: "sk-ant-api03-new" }
+
+      user.reload
+      expect(user.provider).to eq("anthropic")
+      expect(user.api_keys).to eq("anthropic" => "sk-ant-api03-new", "openai" => "sk-proj-kept")
+    end
+
+    it "lets a pasted key choose the provider over the posted provider choice" do
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing", "openai" => "sk-proj-kept" })
+      login_as(user)
+
+      patch setup_path, params: { api_key: "AIzaSyExampleKey12345", provider: "openai" }
+
+      expect(user.reload.provider).to eq("gemini")
+    end
+
+    it "switches to another provider with a saved key without re-entering it" do
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing", "openai" => "sk-proj-kept" })
+      login_as(user)
+
+      patch setup_path, params: { api_key: "", provider: "openai" }
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq(I18n.t("flash.api_keys.preferences_saved"))
+      user.reload
+      expect(user.provider).to eq("openai")
+      expect(user.api_key).to eq("sk-proj-kept")
+      expect(user.api_keys["anthropic"]).to eq("sk-ant-existing")
+    end
+
+    it "ignores a provider choice with no saved key" do
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing" })
+      login_as(user)
+
+      patch setup_path, params: { api_key: "", provider: "openai" }
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq(I18n.t("flash.api_keys.no_changes"))
+      expect(user.reload.provider).to eq("anthropic")
     end
 
     it "rejects a language-only update when no key has been set yet" do
@@ -122,6 +179,28 @@ RSpec.describe "ApiKeys", type: :request do
   end
 
   describe "GET /setup" do
+    it "offers a provider choice for each saved key only, with the one in use checked" do
+      user.update!(provider: "openai", api_keys: { "anthropic" => "sk-ant-existing", "openai" => "sk-proj-kept" })
+      login_as(user)
+
+      get setup_path
+
+      page = Nokogiri::HTML(response.body)
+      choices = page.css("#provider-choice input[type=radio]")
+      expect(choices.map { |input| input["value"] }).to eq(%w[anthropic openai])
+      expect(page.at_css("#provider-choice input[checked]")["value"]).to eq("openai")
+      expect(page.at_css("#provider-choice").text).to include("Claude", "GPT")
+      expect(page.at_css("#provider-choice").text).not_to include("Gemini")
+    end
+
+    it "offers no provider choice before any key is saved" do
+      login_as(user)
+
+      get setup_path
+
+      expect(response.body).not_to include(%(id="provider-choice"))
+    end
+
     it "renders a weight control and an exclude toggle for every rotatable kind" do
       login_as(user)
 

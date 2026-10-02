@@ -17,7 +17,7 @@ RSpec.describe "Welcome", type: :request do
   end
 
   it "sends a first-run account with a key from the dashboard without generating" do
-    user = new_account(api_key: "fake-test-key", provider: "fake")
+    user = new_account(provider: "fake", api_keys: { "fake" => "fake-test-key" })
     login_as(user)
 
     expect { get root_path }.not_to have_enqueued_job(GenerateDailyExercisesJob)

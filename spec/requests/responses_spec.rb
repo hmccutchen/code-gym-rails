@@ -566,6 +566,26 @@ RSpec.describe "Responses", type: :request do
 
       expect(response).to redirect_to(root_path(anchor: "ai-review"))
       expect(daily_response.reload.ai_review.keys).to match_array(%w[code_review pattern challenge])
+      expect(daily_response.review_provider).to eq("anthropic")
+    end
+
+    it "keeps naming the provider that wrote a review after the user switches" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: true, review: { "rating" => "solid" } },
+        "challenge"   => { ok: true, review: { "rating" => "solid" } }
+      )
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      post review_response_path(daily_response)
+
+      user.store_api_key("sk-proj-switched", provider: "openai")
+      user.save!
+      get history_path
+
+      summaries = Nokogiri::HTML(response.body).css("details.review summary").map { |summary| summary.text.strip }
+      expect(summaries).to eq([ I18n.t("review.history_summary", provider: "Claude") ])
     end
 
     it "logs the AI rating paired with the user's self-rating for each reviewed section" do

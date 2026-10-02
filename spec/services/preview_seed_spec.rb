@@ -75,7 +75,7 @@ RSpec.describe PreviewSeed do
     # happens to share the configured preview address.
     it "never overwrites an existing API key" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
-      real.update!(api_key: "sk-ant-a-real-key", provider: "anthropic")
+      real.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
       set_target
 
       PreviewSeed.run!
@@ -98,7 +98,7 @@ RSpec.describe PreviewSeed do
 
     it "never overwrites an existing provider" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
-      real.update!(api_key: "AIzaSyReal", provider: "gemini")
+      real.update!(provider: "gemini", api_keys: { "gemini" => "AIzaSyReal" })
       set_target
 
       PreviewSeed.run!
@@ -139,7 +139,7 @@ RSpec.describe PreviewSeed do
 
     it "is false for a real account at the same address, which seeding leaves alone" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
-      real.update!(api_key: "sk-ant-a-real-key", provider: "anthropic")
+      real.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
       set_target
 
       PreviewSeed.run!

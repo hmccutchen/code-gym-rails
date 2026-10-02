@@ -3,8 +3,15 @@
 # way ApiKeysController does going forward, in case any non-Anthropic-shaped
 # key ever slipped through.
 class BackfillUserProvider < ActiveRecord::Migration[8.0]
+  # Its own model, because User no longer reads the api_key column this
+  # migration ran against.
+  class LegacyUser < ActiveRecord::Base
+    self.table_name = "users"
+    encrypts :api_key
+  end
+
   def up
-    User.where.not(api_key: nil).find_each do |user|
+    LegacyUser.where.not(api_key: nil).find_each do |user|
       # Skip users who already have a provider set (idempotent)
       next if user.provider.present?
 

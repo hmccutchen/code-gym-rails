@@ -560,7 +560,8 @@ RSpec.describe "History", type: :request do
 
   describe "review summary label" do
     it "names the user's provider on the history review summary" do
-      user.update!(provider: "gemini")
+      user.store_api_key("AIzaGem", provider: "gemini")
+      user.save!
       login_as(user)
       create_session_for(user, date: Date.current, reviewed: true)
 
