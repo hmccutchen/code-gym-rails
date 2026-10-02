@@ -6969,3 +6969,20 @@ RSpec.describe AiService, "the shared concept" do
     expect(JSON.parse(lines.last.delete_prefix("[difficulty_diagnostics] "))["requested"]["shared_concept"]).to eq("n_plus_one")
   end
 end
+
+RSpec.describe AiService, "waiting retention checks" do
+  let(:user) { User.create!(email: "waiting@example.com", name: "W", provider: "fake", api_key: "fake-test-key") }
+
+  it "logs each check the day did not offer on one [retention] line" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    user.concept_masteries.create!(concept: "service_boundaries", language: "architecture", tier: :standard,
+                                   mastered_at: 2.months.ago, retention_interval_days: 7,
+                                   next_retention_check_on: Date.current - 2)
+    lines = []
+    allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?("[retention]") }
+
+    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+
+    expect(lines).to eq([ "[retention] user=#{user.id} date=#{Date.current} waiting=architecture:service_boundaries(no_host)" ])
+  end
+end

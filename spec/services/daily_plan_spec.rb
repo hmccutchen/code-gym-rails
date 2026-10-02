@@ -938,3 +938,66 @@ RSpec.describe DailyPlan, "the shared concept" do
     expect(described_class.for(user, language: "ruby_rails").shared_concept).to be_nil
   end
 end
+
+RSpec.describe DailyPlan, "retention checks left waiting" do
+  let(:user) { User.create!(email: "plan-waiting@example.com", name: "Plan") }
+
+  before do
+    pin_code_review_mode(:application_code)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+  end
+
+  def due(concept, bucket, days_late: 2)
+    user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard, mastered_at: 2.months.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - days_late)
+  end
+
+  def waiting
+    described_class.for(user, language: "ruby_rails").waiting_checks.map { |w| w.slice(:bucket, :concept, :reason) }
+  end
+
+  it "names an architecture check and a fourth-bucket check no section today can tag" do
+    due("service_boundaries", "architecture")
+    due("scope_creep", "plan_review")
+
+    expect(waiting).to contain_exactly(
+      { bucket: "architecture", concept: "service_boundaries", reason: :no_host },
+      { bucket: "plan_review", concept: "scope_creep", reason: :no_host }
+    )
+  end
+
+  it "says no_slot when a section could tag the check but reinforcement took every host" do
+    allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
+      %w[n_plus_one service_objects query_objects policy_objects].map { |c| { concept: c, bucket: "ruby_rails", tier: "standard" } }
+    )
+    due("memoization", "ruby_rails")
+
+    expect(waiting).to eq([ { bucket: "ruby_rails", concept: "memoization", reason: :no_slot } ])
+  end
+
+  it "leaves out a check the day offers and one reinforcement already carries" do
+    allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything)
+      .and_return([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
+    due("memoization", "ruby_rails")
+    due("n_plus_one", "ruby_rails")
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.due_checks.map(&:concept)).to eq(%w[memoization])
+    expect(plan.waiting_checks).to eq([])
+  end
+
+  it "names the other language's check for a mixed user as having no host today" do
+    user.update!(language: "mixed")
+    due("closures", "javascript")
+
+    expect(waiting).to eq([ { bucket: "javascript", concept: "closures", reason: :no_host } ])
+  end
+
+  it "lists the most overdue first" do
+    due("service_boundaries", "architecture", days_late: 2)
+    due("scope_creep", "plan_review", days_late: 20)
+
+    expect(waiting.map { |w| w[:concept] }).to eq(%w[scope_creep service_boundaries])
+  end
+end

@@ -435,6 +435,16 @@ class User < ApplicationRecord
       .limit(limit)
   end
 
+  # Every due check across the buckets given, in one query, for the plan to
+  # say which of them today left waiting.
+  def concepts_due_for_retention_check_in(buckets)
+    concept_masteries
+      .in_buckets(buckets)
+      .where.not(next_retention_check_on: nil)
+      .where(next_retention_check_on: ..Date.current)
+      .to_a
+  end
+
   # Due concepts that have crossed the "meaningfully overdue" threshold: overdue
   # by RETENTION_OVERDUE_THRESHOLD_MULTIPLIER × the concept's OWN current
   # retention_interval_days, on top of its due date. Used only to decide whether

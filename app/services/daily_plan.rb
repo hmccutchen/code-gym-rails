@@ -14,7 +14,7 @@ class DailyPlan
   Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
                         :code_review_mode, :code_review_source, :scenario_flavor,
-                        :shared_concept, :coverage) do
+                        :shared_concept, :coverage, :waiting_checks) do
     # What daily_exercises.plan_notes stores for the day this plan produced.
     def notes
       { "coverage" => coverage&.kind&.key, "shared_concept" => shared_concept }.compact
@@ -114,15 +114,33 @@ class DailyPlan
                                         preferences: KindPreferences.for(user))
     kinds         = ExerciseSection.for_plan(**rotation)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
+    due           = user.concepts_due_for_retention_check_in(ConceptBucket.slice_for(user.language))
 
-    Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third),
-               **main_track(user, language, kinds: kinds, mode: code_review_mode),
-               code_review_mode: code_review_mode,
-               code_review_source: code_review_source_for(user, language, code_review_mode),
-               scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)),
-               coverage: nil,
-               **fourth_track(user, rotation.fetch(:fourth)))
+    plan = Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third),
+                      **main_track(user, language, kinds: kinds, mode: code_review_mode),
+                      code_review_mode: code_review_mode,
+                      code_review_source: code_review_source_for(user, language, code_review_mode),
+                      scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)),
+                      coverage: nil, waiting_checks: [],
+                      **fourth_track(user, rotation.fetch(:fourth)))
+    plan.with(waiting_checks: waiting_checks(plan, due, kinds: kinds, hosts: DayHosts.new(language, mode: code_review_mode)))
   end
+
+  # Due checks across the user's whole slice that today does not offer, most
+  # overdue first: no_slot when a section today could tag the concept but
+  # the day's hosts went elsewhere, no_host when none could. A concept
+  # reinforcement already carries is being worked, not waiting.
+  def self.waiting_checks(plan, due, kinds:, hosts:)
+    taken = claimed_concepts(plan.reinforcement + plan.fourth_reinforcement, plan.due_checks + plan.fourth_due_checks)
+
+    due.reject { |cm| taken.include?([ cm.concept, cm.language ]) }
+       .sort_by { |cm| -overdue_ratio(cm) }
+       .map do |cm|
+         reason = hosts.hosts(kinds, cm.concept, cm.language).any? ? :no_slot : :no_host
+         { bucket: cm.language, concept: cm.concept, overdue_ratio: overdue_ratio(cm), reason: reason }
+       end
+  end
+  private_class_method :waiting_checks
 
   # The non-fourth sections' concepts: reinforcement, the concept both fixed
   # sections share, retention checks and established concepts.

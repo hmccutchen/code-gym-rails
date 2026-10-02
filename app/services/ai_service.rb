@@ -1593,6 +1593,7 @@ class AiService
       log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
                     set, plan.code_review_mode, dropped: fourth_dropped)
     end
+    log_waiting_retention(user, plan.waiting_checks)
     log_shared_concept(user, plan.shared_concept, set)
     log_difficulty_diagnostics(user, language, plan, set, draft.history,
                                kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
@@ -1883,6 +1884,16 @@ class AiService
       "[shared_concept] user=#{user.id} concept=#{concept} reason=reduced_tier " \
       "honored=#{ExerciseSection.fixed_sections_share?(problem_set, concept)}"
     )
+  end
+
+  # Checks the plan did not offer would otherwise stay due with no trace, the
+  # way an architecture or fourth-bucket check did on every day without its
+  # kind.
+  def log_waiting_retention(user, waiting)
+    return if waiting.empty?
+
+    entries = waiting.map { |check| "#{check[:bucket]}:#{check[:concept]}(#{check[:reason]})" }
+    Rails.logger.info("[retention] user=#{user.id} date=#{Date.current} waiting=#{entries.join(',')}")
   end
 
   # Nearly all difficulty adaptation in this app is advisory — the prompt asks
