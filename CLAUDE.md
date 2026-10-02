@@ -1368,8 +1368,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   (`DailyPlan::Result#notes`). It is server-owned and written with the row
   from the plan that produced it, never recomputed while rendering: both
   generation paths hand it back on `AiService::JudgedSet#plan_notes`
-  (`#generate_exercise_set` is the single-stage path that carries it;
-  `#generate_exercise` still returns only the set).
+  (`#generate_unjudged_exercise` on the single-stage path,
+  `#generate_judged_exercise` on the judged one; `#generate_exercise` still
+  returns only the set).
   `RegenerateExerciseJob` rewrites it from the new plan, clearing it when the
   new plan recorded nothing, and carry-forward moves it with the row because
   it is on the row. No backfill: no earlier plan added a section or shared a
