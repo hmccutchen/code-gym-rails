@@ -1784,6 +1784,20 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
+  # Ingest keeps an unrequested extra section under the cap, so a day planned
+  # at two can show three; tomorrow's three is then not a larger set.
+  it "does not promise a larger set of the size today showed through an extra section" do
+    stub_gate(3, :grew)
+    today = day(Date.current, planned: 2)
+    today.daily_exercise.update!(problem_set: problem_set.merge(
+      "pattern" => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" }
+    ))
+
+    get root_path
+
+    expect(response.body).not_to include(larger_line)
+  end
+
   it "says nothing about size under a fixed setting" do
     user.update!(daily_section_count: 2)
     stub_gate(3, :grew)

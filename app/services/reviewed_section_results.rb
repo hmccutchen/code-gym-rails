@@ -1,6 +1,6 @@
 # The sections of one submitted, reviewed response that count as evidence of
 # how the engineer did at a rung: answered, graded with a rating from the
-# closed list, and stamped with the rung they were pitched at. Eased sections
+# closed list, and stamped with a rung from KindDifficulty::LEVELS. Eased sections
 # are left out unless a caller asks for them. Pure over the response it is
 # given; callers choose which responses to load.
 class ReviewedSectionResults
@@ -57,7 +57,8 @@ class ReviewedSectionResults
   end
 
   def self.counts?(data, review, require_rubric, include_eased)
-    data.is_a?(Hash) && review.is_a?(Hash) && data["pitched_at"].present? && (include_eased || data["eased"].blank?) &&
+    data.is_a?(Hash) && review.is_a?(Hash) && KindDifficulty::LEVELS.include?(data["pitched_at"]) &&
+      (include_eased || data["eased"].blank?) &&
       ConceptMastery::AI_RATING_RANK.key?(review["rating"]) &&
       (!require_rubric || review["rubric"] == AiService::RUBRIC_VERSION)
   end

@@ -11,8 +11,17 @@ class SizeForecast
     return nil unless user.daily_section_count.nil? && exercise.planned_size && !exercise.planned_by_setting?
 
     history = user.recent_exercise_history(limit: SectionRotation::LOOKBACK, before: exercise.date.next_day)
-    change(exercise.planned_size_with_coverage, DailyPlan.size_for(user, history))
+    change(delivered_or_planned(exercise), DailyPlan.size_for(user, history))
   end
+
+  # Today's baseline is the larger of what the plan asked for and what the
+  # page shows: ingest keeps an unrequested extra section under the cap, so a
+  # day planned at two can show three, and a judge drop can show fewer than
+  # planned without tomorrow's planned size reading as a change.
+  def self.delivered_or_planned(exercise)
+    [ exercise.planned_size_with_coverage, exercise.active_section_keys.size ].max
+  end
+  private_class_method :delivered_or_planned
 
   # Larger whenever the composed size grows, so a gate increase completion
   # still blocks never promises one. Smaller only when the brake is what
