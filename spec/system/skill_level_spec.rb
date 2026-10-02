@@ -37,19 +37,19 @@ RSpec.describe "Skill level on Setup", type: :system do
 
     select "Senior", from: "Skill level"
     page.driver.with_playwright_page { |pw| pw.wait_for_function("typeof window.releaseSenior === 'function'") }
-    select "Principal", from: "Skill level"
+    select "Principal engineer", from: "Skill level"
     page.driver.with_playwright_page { |pw| pw.wait_for_timeout(300) }
     page.execute_script("window.releaseSenior()")
     page.driver.with_playwright_page { |pw| pw.wait_for_function("!window.CodeGymSaveStatus.pending()") }
 
     expect(user.reload.skill_level).to eq("principal_engineer")
-    expect(default_labels).to eq([ "Your skill level (Principal)" ])
+    expect(default_labels).to eq([ "Your skill level (Principal engineer)" ])
   end
 
   it "reports a failed save and keeps the labels naming the stored level" do
     page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
 
-    select "Principal", from: "Skill level"
+    select "Principal engineer", from: "Skill level"
 
     expect(page).to have_css("#save-status", text: /couldn't save/i)
     expect(default_labels).to eq([ "Your skill level (Junior)" ])

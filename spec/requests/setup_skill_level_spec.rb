@@ -22,8 +22,8 @@ RSpec.describe "Setup skill level control", type: :request do
 
     get setup_path
 
-    expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Junior", "Senior", "Principal" ])
-    expect(page_html.text).to include("Junior suits early-career developers and career changers, and sets most exercises in everyday situations instead of work ones.")
+    expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Junior", "Senior", "Principal engineer" ])
+    expect(page_html.text).to include("Junior suits early-career developers and career changers. Your ratings")
   end
 
   it "selects Junior for an account still storing the old developing default" do

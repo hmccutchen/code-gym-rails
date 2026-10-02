@@ -375,7 +375,7 @@ en:
     levels:
       junior: "Junior"
       senior: "Senior"
-      principal_engineer: "Principal"
+      principal_engineer: "Principal engineer"
     lock_label: "Lock at this level"
     lock_heading: "Locking a difficulty target"
     lock_body: "Lock means this section is always pitched at the level you chose. Easing for concepts you're finding hard, and adjustments from your difficulty ratings, stop applying to it — including the first time you meet a concept. Your progress is still tracked, and unlocking uses it again straight away."
@@ -648,8 +648,8 @@ en:
       skill_levels:
         junior: "Junior"
         senior: "Senior"
-        principal_engineer: "Principal"
-      skill_level_hint: "How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Junior suits early-career developers and career changers, and sets most exercises in everyday situations instead of work ones. Your ratings still nudge each day's set up or down."
+        principal_engineer: "Principal engineer"
+      skill_level_hint: "How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Junior suits early-career developers and career changers. Your ratings still nudge each day's set up or down."
   history:
     index:
       title: "History"
