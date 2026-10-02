@@ -675,7 +675,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `answer_key.better`, and deletes the canonical fields. There is no
   "must differ from the stored order" rule, which with two pieces would
   always swap. `.reject_unusable!` refuses a missing, blank or non-string
-  piece, a piece past `MAX_PIECE_LINES` (20), and an answer key missing any
+  piece, a piece past `MAX_PIECE_LINES` (24 non-blank lines), and an answer key missing any
   of `deciding_fact`, `principle`, `why_other_fails`. Specs pin the roll to
   B (`spec/support/weighted_roll_position_default.rb`), which sorts after
   `real_source_default.rb` on purpose. `script/report_answer_positions.rb`

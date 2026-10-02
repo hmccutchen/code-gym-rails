@@ -43,8 +43,8 @@ RSpec.describe ExerciseSection::DesignComparison do
       end
     end
 
-    it "refuses a piece past the line bound and accepts one at it" do
-      at_bound = Array.new(described_class::MAX_PIECE_LINES, "x").join("\n")
+    it "refuses a piece past the line bound and accepts one at it, not counting blank lines" do
+      at_bound = Array.new(described_class::MAX_PIECE_LINES, "x").join("\n\n")
       past     = Array.new(described_class::MAX_PIECE_LINES + 1, "x").join("\n")
 
       expect { described_class.reject_unusable!(provider_section("better_piece" => at_bound)) }.not_to raise_error

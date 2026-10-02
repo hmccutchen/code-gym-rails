@@ -8,9 +8,11 @@
 # position then exists only in the stored answer key, which nothing before
 # submission may show, log or send to a model.
 class ExerciseSection::DesignComparison < ExerciseSection
-  # A hard bound above the prompt's 12-15 line target, the way
-  # AmbiguityHunt::MAX_PLANTED sits above PLANTED_COUNT.
-  MAX_PIECE_LINES = 20
+  # Lines of code, blanks not counted: twice the prompt's lower target, the
+  # way AmbiguityHunt::MAX_PLANTED doubles PLANTED_COUNT. Exceeding it fails
+  # the whole day's generation, so it stops a runaway reply, not a long piece;
+  # unequal lengths are the judge's surface-parity check.
+  MAX_PIECE_LINES = 24
 
   # About one sentence naming a fact, against prose's ten characters. A pick
   # and a word is not an answer to "what decides it".
@@ -218,7 +220,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def reject_unusable_piece!(field, piece)
       raise AiService::InvalidResponseError, "Design comparison returned no usable #{field}" unless usable_text?(piece)
-      return if piece.strip.lines.size <= MAX_PIECE_LINES
+      return if piece.lines.count { |line| line.strip.present? } <= MAX_PIECE_LINES
 
       raise AiService::InvalidResponseError, "Design comparison #{field} runs past #{MAX_PIECE_LINES} lines"
     end
