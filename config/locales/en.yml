@@ -133,7 +133,7 @@ en:
     coverage_added:
       gap: "Today's set adds one section of a kind you haven't seen in a while."
       due_check: "Today's set adds one section so an idea you learned earlier can come back up."
-    shared_concept: "%{sections} today look at the same idea from two sides."
+    shared_concept: "%{sections} today look at the same idea from different sides."
     rating_group: "How hard was %{section} for you?"
   learn:
     title: "Learn"

@@ -6928,7 +6928,8 @@ RSpec.describe AiService, "the shared concept" do
                                               third: nil, pattern: nil, fourth: nil, shared_concept: "n_plus_one")
 
     line = prompt.lines.find { |l| l.include?("as their concept today") }
-    expect(line).to include("- Both the code_review and design_comparison sections take `n_plus_one` as their concept today.")
+    expect(line).to include("- The code_review and design_comparison sections share `n_plus_one` as their concept today.")
+    expect(line).not_to match(/\b(both|two)\b/i)
     expect(line).not_to match(/tier|reduced|struggl/i)
   end
 

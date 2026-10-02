@@ -2266,7 +2266,7 @@ class AiService
     return "" if concept.nil?
 
     sections = ExerciseSection.fixed.map(&:key).to_sentence
-    "\n- Both the #{sections} sections take `#{concept}` as their concept today. It is one concept needing reinforcement, looked at from two sides: each section tests it in its own way and its own scenario, following its own rules above."
+    "\n- The #{sections} sections share `#{concept}` as their concept today. It is one concept needing reinforcement, looked at from different sides: each section tests it in its own way and its own scenario, following its own rules above."
   end
 
   # One bullet, whichever pool today rolled. The general flavor renders the

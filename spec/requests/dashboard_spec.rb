@@ -1690,5 +1690,6 @@ RSpec.describe "Dashboard lines about what the plan did", type: :request do
 
   it "keeps both lines free of any reading of the engineer's standing" do
     expect([ coverage_line, due_check_line, shared_line ]).to all(satisfy { |line| line !~ /tier|reduced|struggl|trouble|score|\d/i })
+    expect(I18n.t("dashboard.shared_concept", sections: "X")).not_to match(/\b(both|two)\b/i)
   end
 end
