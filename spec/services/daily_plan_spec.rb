@@ -23,17 +23,9 @@ RSpec.describe DailyPlan do
   end
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
-  describe "RETENTION_BUCKET_FETCH_CAP" do
-    # Deliberately restates the constant's own expression, so it cannot fail
-    # when a vocabulary grows — that is the point. What it catches is someone
-    # replacing the derivation with a literal again, which is how this became a
-    # truncating cap in the first place (issue #93). The ordering test below is
-    # what actually proves the fetch reaches the right row.
-    it "stays derived from the vocabularies rather than hardcoded" do
-      largest_vocabulary = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
-
-      expect(DailyPlan::RETENTION_BUCKET_FETCH_CAP).to be >= largest_vocabulary
-    end
+  # What DailyPlan.for reads once and hands both tracks.
+  def due_slice
+    user.concepts_due_for_retention_check_in(ConceptBucket.slice_for("mixed"))
   end
 
   describe "retention check selection" do
@@ -76,7 +68,7 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement)
         .and_return([ { concept: "a", bucket: "ruby_rails", tier: "standard" }, { concept: "b", bucket: "ruby_rails", tier: "standard" } ])
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
@@ -93,16 +85,15 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 10)
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
-    # The SQL orders by next_retention_check_on — absolute days overdue — and
-    # the LIMIT is applied against THAT ordering, while the Ruby re-rank below
-    # sorts by overdue ratio against each concept's own interval. Two different
-    # orderings, so a truncating cap can discard the row the re-rank would have
-    # put first. The concept here is the most overdue by ratio and the LEAST
-    # overdue by date, which is exactly the row a date-ordered LIMIT drops first.
+    # The ranking is by overdue ratio against each concept's own interval, not
+    # by date. A date-ordered, capped fetch once dropped the row the ranking
+    # would have put first (issue #93): the concept here is the most overdue
+    # by ratio and the LEAST overdue by date, so any such cap returning would
+    # fail this.
     it "sees a high-ratio concept whose due date sorts it past a fixed 20-row fetch" do
       (AiService::RAILS_CONCEPTS - %w[memoization]).first(20).each do |concept|
         user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard,
@@ -115,20 +106,20 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 5)
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
     it "offers nothing when reinforcement already claims three slots" do
       mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
-      expect(DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 0)).to eq([])
+      expect(DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 0)).to eq([])
     end
 
     it "offers architecture-bucket concepts only on architecture days" do
       mastery(concept: "service_boundaries", bucket: "architecture", due_on: Date.current - 2)
 
-      on_challenge = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
-      on_arch      = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Architecture ], slots: 3)
+      on_challenge = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
+      on_arch      = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Architecture ], slots: 3)
 
       expect(on_challenge.map(&:concept)).to eq([])
       expect(on_arch.map(&:concept)).to eq(%w[service_boundaries])
@@ -136,7 +127,7 @@ RSpec.describe DailyPlan do
 
     it "never offers a concept from the other language's bucket" do
       mastery(concept: "closures", bucket: "javascript", due_on: Date.current - 2)
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
       expect(checks.map(&:concept)).to eq([])
     end
   end
@@ -277,8 +268,8 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 2)
 
-      matching    = DailyPlan.send(:retention_checks_for_bucket, user, "plan_review", slots: 1)
-      non_matching = DailyPlan.send(:retention_checks_for_bucket, user, "ambiguity_hunt", slots: 1)
+      matching    = DailyPlan.send(:retention_checks_for_bucket, due_slice, "plan_review", slots: 1)
+      non_matching = DailyPlan.send(:retention_checks_for_bucket, due_slice, "ambiguity_hunt", slots: 1)
 
       expect(matching.map(&:concept)).to eq(%w[scope_creep])
       expect(non_matching.map(&:concept)).to eq([])
@@ -288,7 +279,7 @@ RSpec.describe DailyPlan do
       user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 2)
-      expect(DailyPlan.send(:retention_checks_for_bucket, user, "plan_review", slots: 0)).to eq([])
+      expect(DailyPlan.send(:retention_checks_for_bucket, due_slice, "plan_review", slots: 0)).to eq([])
     end
   end
 

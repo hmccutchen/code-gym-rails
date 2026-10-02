@@ -1409,7 +1409,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   in the user's slice in one query
   (`User#concepts_due_for_retention_check_in`), including architecture and
   the fourth buckets, which were fetched only when their kind was chosen and
-  so waited with no trace on every other day. Each check the plan did not
+  so waited with no trace on every other day. That one read also feeds
+  both tracks' retention checks, which filter it by bucket instead of
+  querying each bucket again, and `ConceptMastery.due_for_retention_check`
+  is the one statement of what "due" means. Each check the plan did not
   offer and reinforcement does not carry lands on
   `Result#waiting_checks` with a reason: `no_slot` when a section today
   could tag it but the hosts went elsewhere, `no_host` when none could.

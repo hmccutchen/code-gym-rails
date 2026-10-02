@@ -652,7 +652,7 @@ RSpec.describe User, type: :model do
     end
   end
 
-  describe "#concepts_due_for_retention_check" do
+  describe "#concepts_due_for_retention_check_in" do
     let(:user) { User.create!(email: "due@example.com", name: "Due") }
 
     def mastery(concept:, bucket:, due_on:)
@@ -662,35 +662,26 @@ RSpec.describe User, type: :model do
                                      next_retention_check_on: due_on)
     end
 
-    it "returns only due concepts in the requested bucket, most overdue first" do
-      mastery(concept: "n_plus_one",   bucket: "ruby_rails", due_on: Date.current - 3)
-      mastery(concept: "memoization",  bucket: "ruby_rails", due_on: Date.current - 10)
-      mastery(concept: "closures",     bucket: "javascript", due_on: Date.current - 5)
-      mastery(concept: "indexing",     bucket: "ruby_rails", due_on: Date.current + 4)
+    it "returns every due concept in the buckets given, and nothing else" do
+      mastery(concept: "n_plus_one",         bucket: "ruby_rails",   due_on: Date.current - 3)
+      mastery(concept: "service_boundaries", bucket: "architecture", due_on: Date.current)
+      mastery(concept: "closures",           bucket: "javascript",   due_on: Date.current - 5)
+      mastery(concept: "memoization",        bucket: "ruby_rails",   due_on: Date.current + 4)
 
-      result = user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 5)
-      expect(result.map(&:concept)).to eq(%w[memoization n_plus_one])
+      result = user.concepts_due_for_retention_check_in(%w[ruby_rails architecture])
+      expect(result.map(&:concept)).to match_array(%w[n_plus_one service_boundaries])
     end
 
     it "excludes concepts with no schedule" do
       user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :standard)
-      expect(user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 5)).to be_empty
+      expect(user.concepts_due_for_retention_check_in(%w[ruby_rails])).to be_empty
     end
 
-    it "honors the limit" do
-      mastery(concept: "n_plus_one",  bucket: "ruby_rails", due_on: Date.current - 3)
-      mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 10)
-      expect(user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 1).map(&:concept)).to eq(%w[memoization])
-    end
-
-    # The orphan here is the MOST overdue of the two, so it would sort first
-    # without the filter — this fails on membership, not on ordering luck.
     it "excludes a concept no longer in the bucket's vocabulary" do
-      mastery(concept: "memoization",      bucket: "ruby_rails", due_on: Date.current - 3)
-      mastery(concept: "retired_concept",  bucket: "ruby_rails", due_on: Date.current - 30)
+      mastery(concept: "memoization",     bucket: "ruby_rails", due_on: Date.current - 3)
+      mastery(concept: "retired_concept", bucket: "ruby_rails", due_on: Date.current - 30)
 
-      expect(user.concepts_due_for_retention_check(bucket: "ruby_rails", limit: 5).map(&:concept))
-        .to eq(%w[memoization])
+      expect(user.concepts_due_for_retention_check_in(%w[ruby_rails]).map(&:concept)).to eq(%w[memoization])
     end
   end
 

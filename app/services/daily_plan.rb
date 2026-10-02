@@ -81,23 +81,6 @@ class DailyPlan
   # one-concept section to carry two.
   FOURTH_SLOT_CAPACITY = 1
 
-  # Bounds the per-bucket due-concept fetch without truncating it. Not
-  # truncating is the point, not a nicety: the query orders by
-  # next_retention_check_on — absolute days overdue — while
-  # retention_checks_for re-ranks by overdue RATIO against each concept's own
-  # interval. Those orderings disagree, so a cap that actually cut rows would
-  # discard by date the row the re-rank was about to pick by ratio (issue #93,
-  # where a hardcoded 20 outlived two vocabulary additions).
-  #
-  # A bucket holds at most one row per concept — unique index on
-  # (user_id, concept, language), and ConceptMastery.record_review! never
-  # records "other". concepts_due_for_retention_check additionally filters on
-  # vocabulary membership, so a concept later renamed or removed drops out of
-  # the fetch rather than lingering: the ceiling is the bucket's CURRENT
-  # vocabulary, not every name ever valid in it. Sizing against the largest
-  # vocabulary therefore cannot truncate.
-  RETENTION_BUCKET_FETCH_CAP = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
-
   # fourth_track's early return when no fourth section was chosen today.
   NO_FOURTH_TRACK = { fourth: nil, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
@@ -131,7 +114,7 @@ class DailyPlan
   # the check it was added for.
   def self.concept_tracks(user, language, rotation, due:, hosts:)
     kinds  = ExerciseSection.for_plan(**rotation)
-    tracks = main_track(user, language, kinds: kinds, hosts: hosts).merge(fourth_track(user, rotation.fetch(:fourth)))
+    tracks = main_track(user, language, kinds: kinds, hosts: hosts, due: due).merge(fourth_track(user, rotation.fetch(:fourth), due: due))
 
     tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts))
   end
@@ -206,7 +189,7 @@ class DailyPlan
   #
   # The shared concept is decided last, from whatever host reinforcement and
   # retention left free, so pairing never displaces either.
-  def self.main_track(user, language, kinds:, hosts:)
+  def self.main_track(user, language, kinds:, hosts:, due:)
     hostable      = hostable_buckets(language, kinds: kinds)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
                                                         hostable: drill_host_test(kinds: kinds, hosts: hosts))
@@ -216,7 +199,7 @@ class DailyPlan
     slots         = capacity - reinforcement.size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
     reinforcement = reinforcement.first(capacity - slots)
-    due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
+    due_checks    = retention_checks_for(due, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
     shared        = SharedConcept.pick(reinforcement, hosts, spare: capacity - reinforcement.size - due_checks.size)
 
     { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
@@ -278,7 +261,7 @@ class DailyPlan
   # cross-vocab item can never be placed somewhere it structurally cannot go.
   # Skipped entirely when no fourth section was chosen — there is no bucket to
   # run the track against.
-  def self.fourth_track(user, fourth)
+  def self.fourth_track(user, fourth, due:)
     return NO_FOURTH_TRACK if fourth.nil?
 
     bucket = FOURTH_BUCKET_FOR.fetch(fourth)
@@ -291,7 +274,7 @@ class DailyPlan
     # reinforcement in place alongside would put two mutually exclusive
     # concepts in the same prompt.
     reinforcement = [] if reinforcement.any? && overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement)
-    due_checks    = retention_checks_for_bucket(user, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size,
+    due_checks    = retention_checks_for_bucket(due, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size,
                                                 reinforcement: reinforcement)
 
     { fourth: fourth, fourth_reinforcement: reinforcement, fourth_due_checks: due_checks,
@@ -304,10 +287,10 @@ class DailyPlan
   # version: the fourth slot's bucket is always exactly one fixed value
   # (today's rolled kind), never a multi-bucket set the way hostable_buckets
   # can return for the third slot.
-  def self.retention_checks_for_bucket(user, bucket, slots:, reinforcement: [])
+  def self.retention_checks_for_bucket(due, bucket, slots:, reinforcement: [])
     return [] if slots.zero?
 
-    unclaimed_by(reinforcement, user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a)
+    unclaimed_by(reinforcement, due.select { |cm| cm.language == bucket })
       .sort_by { |cm| -(overdue_ratio(cm)) }
       .first(slots)
   end
@@ -355,16 +338,16 @@ class DailyPlan
   # that's merely due outrank a short-interval one that's actually crossed the
   # overdue threshold, handing the reserved slot to a concept that didn't earn it.
   #
-  # The per-bucket query is fetched WITHOUT truncating to `slots` — passing
-  # `limit: slots` there would let SQL's raw-date ORDER BY throw away the very
-  # concept this ranking exists to surface before overdue_ratio ever saw it.
-  def self.retention_checks_for(user, language, kinds:, slots:, reinforcement: [])
+  # `due` is the user's whole slice, read once by .for; this keeps only the
+  # buckets today can host, and truncates only after ranking, so no date
+  # order or fetch cap can drop the concept this ranking exists to surface.
+  def self.retention_checks_for(due, language, kinds:, slots:, reinforcement: [])
     return [] if slots.zero?
 
-    due = hostable_buckets(language, kinds: kinds)
-      .flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a }
+    buckets  = hostable_buckets(language, kinds: kinds)
+    hostable = due.select { |cm| buckets.include?(cm.language) }
 
-    unclaimed_by(reinforcement, due).sort_by { |cm| -(overdue_ratio(cm)) }.first(slots)
+    unclaimed_by(reinforcement, hostable).sort_by { |cm| -(overdue_ratio(cm)) }.first(slots)
   end
   private_class_method :retention_checks_for
 
