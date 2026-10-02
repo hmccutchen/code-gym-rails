@@ -222,6 +222,10 @@ en:
   save_status:
     generic: "Couldn't save your last change. It hasn't reached the server — check your connection and try again."
     signed_out: "Couldn't save your last change — you've been signed out. Reload the page and sign in again."
+  daily_sections:
+    legend: "Daily sections"
+    automatic: "Automatic"
+    hint: "Automatic gives you shorter sets after days you don't finish, and longer ones as you do. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. %{lowest} gives you only %{fixed_sections}."
   exercise_mix:
     summary: "Exercise mix"
     intro: "Bias how often each rotating section appears, and set how hard any section is pitched. Neither changes how many sections a day holds — that's the setting above. Changes save automatically."

@@ -72,7 +72,7 @@ RSpec.describe "Exercise mix", type: :system do
     find("#exercise-mix summary").click
 
     heights = page.evaluate_script(<<~JS)
-      Array.from(document.querySelectorAll(".mix-exclude, .mix-lock, .mix-difficulty label, label[for=adaptive-set-size]"))
+      Array.from(document.querySelectorAll(".mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label"))
         .map(label => label.getBoundingClientRect().height)
     JS
 

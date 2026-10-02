@@ -9,10 +9,19 @@ class User < ApplicationRecord
   # credentials to be set (standard Rails setup).
   encrypts :api_key
 
+  # Old code keeps serving while the pre-deploy migration runs, so the column
+  # stays until a later migration drops it.
+  self.ignored_columns += [ "adaptive_set_size" ]
+
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = %w[beginner developing solid strong].freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
+
+  # nil is Automatic: SectionCount sizes the day from recent completion.
+  DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
+  # What Setup posts for Automatic, since a radio has no nil value.
+  AUTOMATIC_SECTION_COUNT = "automatic".freeze
 
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
@@ -35,6 +44,10 @@ class User < ApplicationRecord
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
   validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
   validate :display_preferences_name_known_options, if: :display_preferences_changed?
+  # Checked only on change so a later range change cannot make a stored row
+  # unsavable; SectionCount clamps the stored count on read.
+  validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS }, allow_nil: true,
+                                  if: :daily_section_count_changed?
 
   normalizes :display_preferences, with: ->(values) { DisplayPreferences.sparse(values) }
 

@@ -620,7 +620,7 @@
   .mix-exclude { font-size: .8rem; color: var(--muted); }
   /* A tap on the label toggles its box, so the label is the target, and 24px
      is the WCAG 2.5.8 minimum for it. */
-  .mix-exclude, .mix-lock, .mix-difficulty label, label[for="adaptive-set-size"] { min-height: 24px; }
+  .mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
   .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
   .mix-difficulty legend { font-size: .8rem; color: var(--muted); padding: 0; }
@@ -665,11 +665,26 @@
   </div>
 
   <div class="form-field">
-    <label for="adaptive-set-size">
-      <input type="checkbox" name="adaptive_set_size" id="adaptive-set-size" value="1" checked="checked" />
-      Adjust set size to my recent completion
-    </label>
-    <p class="hint">Shorter sets after days you don't finish, back to a full set as you do. Off means always a full set.</p>
+    <fieldset class="display-group daily-sections" id="daily-sections">
+      <legend>Daily sections</legend>
+      <label>
+        <input type="radio" name="daily_section_count" value="automatic" checked>
+        Automatic
+      </label>
+        <label>
+          <input type="radio" name="daily_section_count" value="2" >
+          2
+        </label>
+        <label>
+          <input type="radio" name="daily_section_count" value="3" >
+          3
+        </label>
+        <label>
+          <input type="radio" name="daily_section_count" value="4" >
+          4
+        </label>
+      <p class="hint display-hint">Automatic gives you shorter sets after days you don&#39;t finish, and longer ones as you do. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. 2 gives you only Code Review and Design Comparison.</p>
+    </fieldset>
   </div>
 
   <div class="form-field">
@@ -1252,8 +1267,23 @@
       const tz = document.getElementById("tz-select");
       if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
 
-      const adaptive = document.getElementById("adaptive-set-size");
-      if (adaptive) adaptive.addEventListener("change", () => save({ adaptive_set_size: adaptive.checked }, "adaptive_set_size"));
+      // Chained like the skill level below, so a slow older save cannot land
+      // last and store a count the page no longer shows.
+      const dailySections = document.getElementById("daily-sections");
+      if (dailySections) {
+        let sectionSaves = Promise.resolve();
+        let queuedSectionSaves = 0;
+        document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => queuedSectionSaves > 0));
+
+        dailySections.addEventListener("change", (event) => {
+          const count = event.target.value;
+          queuedSectionSaves++;
+          sectionSaves = sectionSaves.then(async () => {
+            await save({ daily_section_count: count }, "daily_section_count");
+            queuedSectionSaves--;
+          });
+        });
+      }
 
       // Chained like the Exercise mix's saves: sent in parallel, a slow older
       // request could land last and store a level the page no longer shows.
