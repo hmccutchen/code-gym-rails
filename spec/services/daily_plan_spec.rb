@@ -1001,3 +1001,75 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
     expect(waiting.map { |w| w[:concept] }).to eq(%w[scope_creep service_boundaries])
   end
 end
+
+RSpec.describe DailyPlan, "the coverage exception" do
+  include ActiveSupport::Testing::TimeHelpers
+
+  let(:user) { User.create!(email: "plan-coverage@example.com", name: "Plan") }
+
+  around { |example| travel_to(Time.zone.local(2026, 10, 7, 9)) { example.run } }
+
+  before do
+    pin_code_review_mode(:application_code)
+    allow(SectionCount).to receive(:for).and_call_original
+    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(SectionCount::FLOOR)
+  end
+
+  def two_section_day(date, plan_notes: {})
+    user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails", plan_notes: plan_notes,
+                                 problem_set: { "code_review" => { "concept" => "n_plus_one" },
+                                                "design_comparison" => { "concept" => "open_closed" } })
+  end
+
+  def overdue_architecture_check
+    user.concept_masteries.create!(concept: "service_boundaries", language: "architecture", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7,
+                                   next_retention_check_on: Date.current - 30)
+  end
+
+  it "adds the kind that can host an overdue waiting check, and the check lands there" do
+    overdue_architecture_check
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage).to eq(CoverageException::Addition.new(kind: ExerciseSection::Architecture, reason: :due_check))
+    expect(plan.third).to eq(:architecture)
+    expect(plan.due_checks.map(&:concept)).to eq(%w[service_boundaries])
+    expect(plan.waiting_checks).to eq([])
+    expect(plan.notes).to eq("coverage" => "architecture")
+  end
+
+  it "adds the longest-unseen kind once the gap has run past four weeks" do
+    two_section_day(Date.current - 60)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage).to eq(CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap))
+    expect(plan.pattern).to eq(:pattern)
+  end
+
+  it "adds nothing under a fixed two, and the check waits with no host" do
+    user.update!(daily_section_count: 2)
+    overdue_architecture_check
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage).to be_nil
+    expect([ plan.pattern, plan.third, plan.fourth ].compact).to eq([])
+    expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "service_boundaries", reason: :no_host } ])
+  end
+
+  it "adds nothing within four weekdays of the last addition" do
+    overdue_architecture_check
+    two_section_day(Date.current - 1, plan_notes: { "coverage" => "pattern" })
+
+    expect(described_class.for(user, language: "ruby_rails").coverage).to be_nil
+  end
+
+  it "does not read the coverage history on a day it cannot apply to" do
+    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(SectionCount::FLOOR + 1)
+    expect(CoverageException::History).not_to receive(:for)
+
+    described_class.for(user, language: "ruby_rails")
+  end
+end

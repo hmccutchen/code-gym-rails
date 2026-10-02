@@ -97,9 +97,6 @@ class DailyPlan
   # vocabulary therefore cannot truncate.
   RETENTION_BUCKET_FETCH_CAP = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
 
-  # A shared concept is placed in every fixed section.
-  SHARED_HOSTS = ExerciseSection.fixed.size
-
   # fourth_track's early return when no fourth section was chosen today.
   NO_FOURTH_TRACK = { fourth: nil, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
@@ -108,30 +105,55 @@ class DailyPlan
   # the prompt builder is private and returns only a string, so it cannot report
   # that (see AiService#log_retention).
   def self.for(user, language:)
-    history       = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
-    rotation      = SectionRotation.for(history,
-                                        count: SectionCount.for(history, fixed: user.daily_section_count),
-                                        preferences: KindPreferences.for(user))
-    kinds         = ExerciseSection.for_plan(**rotation)
+    history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
+    count            = SectionCount.for(history, fixed: user.daily_section_count)
+    preferences      = KindPreferences.for(user)
+    rotation         = SectionRotation.for(history, count: count, preferences: preferences)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
-    due           = user.concepts_due_for_retention_check_in(ConceptBucket.slice_for(user.language))
+    hosts            = DayHosts.new(language, mode: code_review_mode)
+    due              = user.concepts_due_for_retention_check_in(ConceptBucket.slice_for(user.language))
+    tracks           = concept_tracks(user, language, rotation, due: due, hosts: hosts)
+    coverage         = coverage_for(user, count, preferences, tracks.fetch(:waiting_checks), hosts)
+    if coverage
+      rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind) => coverage.kind.key.to_sym)
+      tracks   = concept_tracks(user, language, rotation, due: due, hosts: hosts)
+    end
 
-    plan = Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third),
-                      **main_track(user, language, kinds: kinds, mode: code_review_mode),
-                      code_review_mode: code_review_mode,
-                      code_review_source: code_review_source_for(user, language, code_review_mode),
-                      scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)),
-                      coverage: nil, waiting_checks: [],
-                      **fourth_track(user, rotation.fetch(:fourth)))
-    plan.with(waiting_checks: waiting_checks(plan, due, kinds: kinds, hosts: DayHosts.new(language, mode: code_review_mode)))
+    Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third), **tracks, coverage: coverage,
+               code_review_mode: code_review_mode,
+               code_review_source: code_review_source_for(user, language, code_review_mode),
+               scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)))
   end
+
+  # Everything the day's chosen kinds decide about concepts. Computed again
+  # when the coverage exception adds a kind, so the added section can take
+  # the check it was added for.
+  def self.concept_tracks(user, language, rotation, due:, hosts:)
+    kinds  = ExerciseSection.for_plan(**rotation)
+    tracks = main_track(user, language, kinds: kinds, hosts: hosts).merge(fourth_track(user, rotation.fetch(:fourth)))
+
+    tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts))
+  end
+  private_class_method :concept_tracks
+
+  # The exception reads its history only on a day it could apply to, so
+  # every other day costs no extra query.
+  def self.coverage_for(user, count, preferences, waiting, hosts)
+    return nil unless CoverageException.applies_to_day?(count: count, fixed: user.daily_section_count)
+
+    CoverageException.for(today: Date.current, count: count, fixed: user.daily_section_count,
+                          history: CoverageException::History.for(user), checks: waiting,
+                          preferences: preferences, hosts: hosts)
+  end
+  private_class_method :coverage_for
 
   # Due checks across the user's whole slice that today does not offer, most
   # overdue first: no_slot when a section today could tag the concept but
   # the day's hosts went elsewhere, no_host when none could. A concept
   # reinforcement already carries is being worked, not waiting.
-  def self.waiting_checks(plan, due, kinds:, hosts:)
-    taken = claimed_concepts(plan.reinforcement + plan.fourth_reinforcement, plan.due_checks + plan.fourth_due_checks)
+  def self.waiting_checks(tracks, due, kinds:, hosts:)
+    taken = claimed_concepts(tracks[:reinforcement] + tracks[:fourth_reinforcement],
+                             tracks[:due_checks] + tracks[:fourth_due_checks])
 
     due.reject { |cm| taken.include?([ cm.concept, cm.language ]) }
        .sort_by { |cm| -overdue_ratio(cm) }
@@ -177,17 +199,17 @@ class DailyPlan
   # check takes a slot back: the prompt's mastery instruction demands every
   # concept listed here be reintroduced, so an entry past capacity is an
   # instruction no section is left to satisfy.
-  def self.main_track(user, language, kinds:, mode:)
+  def self.main_track(user, language, kinds:, hosts:)
     hostable      = hostable_buckets(language, kinds: kinds)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
-                                                        hostable: drill_host_test(language, kinds: kinds, mode: mode))
+                                                        hostable: drill_host_test(kinds: kinds, hosts: hosts))
                         .select { |h| hostable.include?(h[:bucket]) }
     capacity      = kinds.count { |kind| !kind.fourth? }
     reinforcement = share_hosts(reinforcement, capacity)
-    reinforcement, shared = fit_shared(reinforcement, shared_concept_in(reinforcement, DayHosts.new(language, mode: mode)), capacity)
-    slots         = capacity - hosts_taken(reinforcement, shared)
+    reinforcement, shared = SharedConcept.fit(reinforcement, SharedConcept.pick(reinforcement, hosts), capacity)
+    slots         = capacity - SharedConcept.hosts_taken(reinforcement, shared)
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
-    reinforcement, shared = fit_shared(reinforcement, shared, capacity - slots)
+    reinforcement, shared = SharedConcept.fit(reinforcement, shared, capacity - slots)
     due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
 
     { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
@@ -195,31 +217,6 @@ class DailyPlan
                                             reinforcement: reinforcement, due_checks: due_checks) }
   end
   private_class_method :main_track
-
-  # A reduced-tier concept has stalled across several reviews, so both fixed
-  # sections take it, each from its own side. Paused concepts never reach the
-  # reinforcement list.
-  def self.shared_concept_in(reinforcement, hosts)
-    reinforcement.find do |h|
-      h[:tier] == "reduced" && ExerciseSection.fixed.all? { |kind| hosts.can_tag?(kind, h[:concept], h[:bucket]) }
-    end
-  end
-  private_class_method :shared_concept_in
-
-  # One entry filling every fixed section costs that many hosts. When the
-  # hosts left cannot hold it, the concept stays ordinary reinforcement.
-  def self.fit_shared(reinforcement, shared, hosts)
-    return [ reinforcement.first(hosts), nil ] if shared.nil? || hosts < SHARED_HOSTS
-
-    others = (reinforcement - [ shared ]).first(hosts - SHARED_HOSTS)
-    [ reinforcement & [ shared, *others ], shared ]
-  end
-  private_class_method :fit_shared
-
-  def self.hosts_taken(reinforcement, shared)
-    reinforcement.size + (shared ? SHARED_HOSTS - 1 : 0)
-  end
-  private_class_method :hosts_taken
 
   def self.scenario_flavor_weights_for(skill_level)
     SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.fetch(skill_level, SCENARIO_FLAVOR_WEIGHTS)
@@ -261,13 +258,10 @@ class DailyPlan
   # drill would otherwise claim that day's slot every time the mode rolled
   # that way. The bucket check keeps a mixed user's same-named concept in the
   # other language out.
-  def self.drill_host_test(language, kinds:, mode:)
-    buckets  = hostable_buckets(language, kinds: kinds)
-    taggable = kinds.reject(&:fourth?)
-                    .flat_map { |kind| ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) }
-                    .to_set
+  def self.drill_host_test(kinds:, hosts:)
+    candidates = kinds.reject(&:fourth?)
 
-    ->(concept, bucket) { buckets.include?(bucket) && taggable.include?(concept) }
+    ->(concept, bucket) { hosts.hosts(candidates, concept, bucket).any? }
   end
   private_class_method :drill_host_test
 

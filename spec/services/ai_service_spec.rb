@@ -2661,6 +2661,10 @@ RSpec.describe AiService do
           end
         end
         svc = spy_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" }).to_json)
+        # The history sizes an Automatic day at two, which no stubbed rotation
+        # filling every optional slot could produce; the fixed count keeps the
+        # coverage exception out of a day it could never see.
+        user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
         allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: third, fourth: :plan_review)
         allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
@@ -6984,5 +6988,34 @@ RSpec.describe AiService, "waiting retention checks" do
     FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
 
     expect(lines).to eq([ "[retention] user=#{user.id} date=#{Date.current} waiting=architecture:service_boundaries(no_host)" ])
+  end
+end
+
+RSpec.describe AiService, "the coverage exception" do
+  let(:user) { User.create!(email: "coverage@example.com", name: "C", provider: "fake", api_key: "fake-test-key") }
+
+  def lines_from(prefix)
+    lines = []
+    allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?(prefix) }
+    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    lines
+  end
+
+  before do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
+    addition = CoverageException::Addition.new(kind: ExerciseSection::PlanReview, reason: :gap)
+    allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).with(coverage: addition)
+    end
+  end
+
+  it "logs the added kind and why" do
+    expect(lines_from("[coverage]")).to eq([ "[coverage] user=#{user.id} kind=plan_review reason=gap" ])
+  end
+
+  it "carries the addition in the diagnostics payload" do
+    payload = JSON.parse(lines_from("[difficulty_diagnostics]").last.delete_prefix("[difficulty_diagnostics] "))
+
+    expect(payload["requested"]["coverage"]).to eq("kind" => "plan_review", "reason" => "gap")
   end
 end

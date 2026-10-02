@@ -96,6 +96,11 @@ class ExerciseSection
       .merge(pattern: [ Pattern ], third: thirds, fourth: fourths)
   end
 
+  # The slot a kind fills.
+  def self.slot_for(kind)
+    slots.find { |_slot, kinds| kinds.include?(kind) }&.first
+  end
+
   # Every field any kind keeps as answer key: data the grader reads and
   # nothing before submission may show, log or send to a model.
   def self.all_answer_key_fields

@@ -1595,6 +1595,7 @@ class AiService
     end
     log_waiting_retention(user, plan.waiting_checks)
     log_shared_concept(user, plan.shared_concept, set)
+    log_coverage(user, plan.coverage)
     log_difficulty_diagnostics(user, language, plan, set, draft.history,
                                kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
                                judge: judge, unhosted: unhosted)
@@ -1875,6 +1876,12 @@ class AiService
     )
   end
 
+  def log_coverage(user, coverage)
+    return if coverage.nil?
+
+    Rails.logger.info("[coverage] user=#{user.id} kind=#{coverage.kind.key} reason=#{coverage.reason}")
+  end
+
   # The pairing is advisory, so whether the model placed it is read from the
   # delivered set.
   def log_shared_concept(user, concept, problem_set)
@@ -1920,6 +1927,7 @@ class AiService
       due_checks: plan.due_checks.map(&:concept),
       established: plan.established.map(&:concept),
       shared_concept: plan.shared_concept,
+      coverage: plan.coverage && { kind: plan.coverage.kind.key, reason: plan.coverage.reason },
       recent_performance: history
     }
     requested.merge!(kind_difficulty_diagnostics(kinds, difficulty, ladders, language, plan.code_review_mode, problem_set))
