@@ -1602,7 +1602,7 @@ end
 RSpec.describe "Dashboard lines about what the plan did", type: :request do
   let(:user) { create_user_with_key }
   let(:coverage_line) { I18n.t("dashboard.coverage_added") }
-  let(:shared_line) { I18n.t("dashboard.shared_concept") }
+  let(:shared_line) { I18n.t("dashboard.shared_concept", sections: "Code Review and Design Comparison") }
 
   let(:comparison) do
     { "title" => "Where rates come from", "scenario" => "A carrier arrives monthly.", "question" => "Which fits?",

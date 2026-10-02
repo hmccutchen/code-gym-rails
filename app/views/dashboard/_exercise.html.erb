@@ -66,7 +66,7 @@
       <p class="hint"><%= t("dashboard.coverage_added") %></p>
     <% end %>
     <% if exercise.shared_concept_shown? %>
-      <p class="hint"><%= t("dashboard.shared_concept") %></p>
+      <p class="hint"><%= t("dashboard.shared_concept", sections: ExerciseSection.fixed.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
     <% end %>
 
     <% submit_blocker = response.submit_blocker %>
