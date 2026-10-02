@@ -97,6 +97,9 @@ class DailyPlan
   # vocabulary therefore cannot truncate.
   RETENTION_BUCKET_FETCH_CAP = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
 
+  # A shared concept is placed in every fixed section.
+  SHARED_HOSTS = ExerciseSection.fixed.size
+
   # fourth_track's early return when no fourth section was chosen today.
   NO_FOURTH_TRACK = { fourth: nil, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
@@ -111,57 +114,94 @@ class DailyPlan
                                         preferences: KindPreferences.for(user))
     kinds         = ExerciseSection.for_plan(**rotation)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
-    # Held to the buckets today can host, like retention and established
-    # concepts: a mixed user's javascript entry on a ruby_rails day could
-    # otherwise sit beside the ruby_rails retention check for the same name,
-    # and the prompt, which names concepts without their bucket, would ask for
-    # one name under two instructions.
-    hostable      = hostable_buckets(language, kinds: kinds)
-    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
-                                                        hostable: drill_host_test(language, kinds: kinds, mode: code_review_mode))
-                        .select { |h| hostable.include?(h[:bucket]) }
-    # Only the non-fourth kinds present today can ever host a language or
-    # architecture concept, so capacity follows the chosen set rather than a
-    # literal 3 — a short day (pattern chosen but no third) has fewer hosts,
-    # and this now says so structurally instead of by counting. Reinforcement
-    # keeps every such slot by default; a slot is taken back for retention only
-    # when reinforcement would otherwise claim all of them AND at least one
-    # retention check, in a bucket today can actually host, has gone
-    # meaningfully overdue (see ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
-    # A merely-due check is not enough to spend a reinforcement slot on — only
-    # a check nobody's gotten to in a while earns the trade.
-    #
-    # This capacity is approximate, deliberately. On a schema-review day
-    # code_review hosts only data-modeling concepts, and design_comparison
-    # hosts only its own allowlist every day, so an ordinary concept can have
-    # a host or two fewer than this counts. Left approximate because the arithmetic
-    # is advisory end to end — nothing verifies placement, and over-requesting
-    # by one costs a concept the model could not have placed anyway. Making it
-    # mode-aware would reopen this state machine, whose correctness rests on
-    # structural separation rather than on arguments about interacting
-    # conditions. AiService#log_retention already records offered-versus-
-    # honored per bucket, so if this matters it will show up there first.
-    capacity      = kinds.count { |kind| !kind.fourth? }
-    reinforcement = share_hosts(reinforcement, capacity)
-    slots         = capacity - reinforcement.size
-    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
-    # Truncated to what today can actually host, and again when a retention
-    # check takes a slot back: the prompt's mastery instruction demands every
-    # concept listed here be reintroduced, so an entry past capacity is an
-    # instruction no section is left to satisfy.
-    reinforcement = reinforcement.first(capacity - slots)
-    due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
-    established   = established_concepts_for(user, language, kinds: kinds,
-                                             reinforcement: reinforcement, due_checks: due_checks)
 
     Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third),
-               reinforcement: reinforcement, due_checks: due_checks, established: established,
+               **main_track(user, language, kinds: kinds, mode: code_review_mode),
                code_review_mode: code_review_mode,
                code_review_source: code_review_source_for(user, language, code_review_mode),
                scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)),
-               shared_concept: nil, coverage: nil,
+               coverage: nil,
                **fourth_track(user, rotation.fetch(:fourth)))
   end
+
+  # The non-fourth sections' concepts: reinforcement, the concept both fixed
+  # sections share, retention checks and established concepts.
+  #
+  # Held to the buckets today can host, like retention and established
+  # concepts: a mixed user's javascript entry on a ruby_rails day could
+  # otherwise sit beside the ruby_rails retention check for the same name,
+  # and the prompt, which names concepts without their bucket, would ask for
+  # one name under two instructions.
+  #
+  # Only the non-fourth kinds present today can ever host a language or
+  # architecture concept, so capacity follows the chosen set rather than a
+  # literal 3 — a short day (pattern chosen but no third) has fewer hosts,
+  # and this now says so structurally instead of by counting. Reinforcement
+  # keeps every such slot by default; a slot is taken back for retention only
+  # when reinforcement would otherwise claim all of them AND at least one
+  # retention check, in a bucket today can actually host, has gone
+  # meaningfully overdue (see ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
+  # A merely-due check is not enough to spend a reinforcement slot on — only
+  # a check nobody's gotten to in a while earns the trade.
+  #
+  # This capacity is approximate, deliberately. On a schema-review day
+  # code_review hosts only data-modeling concepts, and design_comparison
+  # hosts only its own allowlist every day, so an ordinary concept can have
+  # a host or two fewer than this counts. Left approximate because the arithmetic
+  # is advisory end to end — nothing verifies placement, and over-requesting
+  # by one costs a concept the model could not have placed anyway. Making it
+  # mode-aware would reopen this state machine, whose correctness rests on
+  # structural separation rather than on arguments about interacting
+  # conditions. AiService#log_retention already records offered-versus-
+  # honored per bucket, so if this matters it will show up there first.
+  #
+  # Truncated to what today can actually host, and again when a retention
+  # check takes a slot back: the prompt's mastery instruction demands every
+  # concept listed here be reintroduced, so an entry past capacity is an
+  # instruction no section is left to satisfy.
+  def self.main_track(user, language, kinds:, mode:)
+    hostable      = hostable_buckets(language, kinds: kinds)
+    reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
+                                                        hostable: drill_host_test(language, kinds: kinds, mode: mode))
+                        .select { |h| hostable.include?(h[:bucket]) }
+    capacity      = kinds.count { |kind| !kind.fourth? }
+    reinforcement = share_hosts(reinforcement, capacity)
+    reinforcement, shared = fit_shared(reinforcement, shared_concept_in(reinforcement, DayHosts.new(language, mode: mode)), capacity)
+    slots         = capacity - hosts_taken(reinforcement, shared)
+    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
+    reinforcement, shared = fit_shared(reinforcement, shared, capacity - slots)
+    due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
+
+    { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
+      established: established_concepts_for(user, language, kinds: kinds,
+                                            reinforcement: reinforcement, due_checks: due_checks) }
+  end
+  private_class_method :main_track
+
+  # A reduced-tier concept has stalled across several reviews, so both fixed
+  # sections take it, each from its own side. Paused concepts never reach the
+  # reinforcement list.
+  def self.shared_concept_in(reinforcement, hosts)
+    reinforcement.find do |h|
+      h[:tier] == "reduced" && ExerciseSection.fixed.all? { |kind| hosts.can_tag?(kind, h[:concept], h[:bucket]) }
+    end
+  end
+  private_class_method :shared_concept_in
+
+  # One entry filling every fixed section costs that many hosts. When the
+  # hosts left cannot hold it, the concept stays ordinary reinforcement.
+  def self.fit_shared(reinforcement, shared, hosts)
+    return [ reinforcement.first(hosts), nil ] if shared.nil? || hosts < SHARED_HOSTS
+
+    others = (reinforcement - [ shared ]).first(hosts - SHARED_HOSTS)
+    [ reinforcement & [ shared, *others ], shared ]
+  end
+  private_class_method :fit_shared
+
+  def self.hosts_taken(reinforcement, shared)
+    reinforcement.size + (shared ? SHARED_HOSTS - 1 : 0)
+  end
+  private_class_method :hosts_taken
 
   def self.scenario_flavor_weights_for(skill_level)
     SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.fetch(skill_level, SCENARIO_FLAVOR_WEIGHTS)

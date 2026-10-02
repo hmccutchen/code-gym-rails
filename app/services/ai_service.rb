@@ -1566,7 +1566,7 @@ class AiService
       fourth_due_checks: plan.fourth_due_checks, fourth_established: plan.fourth_established,
       code_review_mode: plan.code_review_mode,
       code_review_source: plan.code_review_source,
-      scenario_flavor: plan.scenario_flavor,
+      scenario_flavor: plan.scenario_flavor, shared_concept: plan.shared_concept,
       difficulty: difficulty, ladders: ladders }
   end
 
@@ -1593,6 +1593,7 @@ class AiService
       log_retention(user, DailyPlan::FOURTH_BUCKET_FOR.fetch(plan.fourth), plan.fourth_due_checks,
                     set, plan.code_review_mode, dropped: fourth_dropped)
     end
+    log_shared_concept(user, plan.shared_concept, set)
     log_difficulty_diagnostics(user, language, plan, set, draft.history,
                                kinds: draft.kinds, difficulty: draft.difficulty, ladders: draft.ladders,
                                judge: judge, unhosted: unhosted)
@@ -1873,6 +1874,17 @@ class AiService
     )
   end
 
+  # The pairing is advisory, so whether the model placed it is read from the
+  # delivered set.
+  def log_shared_concept(user, concept, problem_set)
+    return if concept.nil?
+
+    Rails.logger.info(
+      "[shared_concept] user=#{user.id} concept=#{concept} reason=reduced_tier " \
+      "honored=#{ExerciseSection.fixed_sections_share?(problem_set, concept)}"
+    )
+  end
+
   # Nearly all difficulty adaptation in this app is advisory — the prompt asks
   # the model to ease off reduced-tier concepts or raise the bar after a run
   # of "too easy" ratings, but nothing verifies the returned problem set
@@ -1896,6 +1908,7 @@ class AiService
       reinforcement: plan.reinforcement,
       due_checks: plan.due_checks.map(&:concept),
       established: plan.established.map(&:concept),
+      shared_concept: plan.shared_concept,
       recent_performance: history
     }
     requested.merge!(kind_difficulty_diagnostics(kinds, difficulty, ladders, language, plan.code_review_mode, problem_set))
@@ -2036,7 +2049,7 @@ class AiService
                             established: [], history: user.recent_performance,
                             fourth: :plan_review, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [],
                             code_review_mode: :application_code, code_review_source: nil,
-                            scenario_flavor: :general,
+                            scenario_flavor: :general, shared_concept: nil,
                             difficulty: KindDifficulty.none, ladders: {},
                             only: nil, fixed_concept: nil)
     history_text = if history.empty?
@@ -2159,6 +2172,7 @@ class AiService
     fixed_concept_line = fixed_concept ?
       "\n- This section's concept must be exactly `#{fixed_concept}`: it replaces a section that was rejected on wording alone, and the day's plan already placed this concept here." :
       ""
+    shared_concept_line = only ? "" : shared_concept_guidance(shared_concept)
 
     config = config_for(language)
     label  = config[:label]
@@ -2213,7 +2227,7 @@ class AiService
       #{domain_modeling_guidance}
       - Reduced-tier concepts: for any concept whose annotation includes `reduced` (alone or as `(reduced, drilled)`), keep the SAME concept and vocabulary — never silently swap in a different, easier concept. Ease the difficulty only: simpler framing, a smaller scenario, more scaffolding/starter code, and a teaching_note that guides more directly toward the key insight (it may name the technique, but not the full answer).
       - Mastery loop: reintroduce every concept listed as "needing reinforcement right now" above (both standard and reduced tiers) with a fresh code example and framing — never a repeat snippet. A concept exits reinforcement only on full mastery: the user's self-rating for that section was "right level"/"too easy" AND the AI rated it "solid"/"strong". Short of that, steady improvement (a better AI rating than last time) still counts as progress — keep reinforcing, and let the tier annotation tell you how hard to pitch it.
-      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line}
+      - Drilled concepts: a concept marked `drilled` is one the engineer asked to practise on purpose, not one the ratings flagged. Include it exactly as you would any other concept needing reinforcement, with fresh framing. Its difficulty comes only from its tier annotation and the section's level — `drilled` on its own never eases or raises anything.#{fixed_concept_line}#{shared_concept_line}
       #{retention_block}
       #{established_block}
       #{fourth_retention_block}
@@ -2224,6 +2238,16 @@ class AiService
       Return JSON matching this schema exactly:
       #{exercise_schema_for(language, third: third, fourth: fourth, pattern: pattern, only: only)}
     PROMPT
+  end
+
+  # Folded onto the end of the drilled-concepts bullet, like a retry's fixed
+  # concept, so a day without one renders the prompt byte for byte as before.
+  # A retry asks for one section, so it never carries the pairing.
+  def shared_concept_guidance(concept)
+    return "" if concept.nil?
+
+    sections = ExerciseSection.fixed.map(&:key).to_sentence
+    "\n- Both the #{sections} sections take `#{concept}` as their concept today. It is one concept needing reinforcement, looked at from two sides: each section tests it in its own way and its own scenario, following its own rules above."
   end
 
   # One bullet, whichever pool today rolled. The general flavor renders the

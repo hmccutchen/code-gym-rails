@@ -82,6 +82,13 @@ class ExerciseSection
     slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }.first(MAX_SECTIONS)
   end
 
+  # Whether every fixed section the payload holds carries `concept`. A fixed
+  # section that is missing, dropped or tagged with something else makes it
+  # false, so a placement the model ignored is never reported as delivered.
+  def self.fixed_sections_share?(problem_set, concept)
+    concept.present? && fixed.all? { |kind| present?(problem_set, kind.key) && problem_set[kind.key]["concept"] == concept }
+  end
+
   # The day's shape, in slot order. Every slot but a fixed kind's may be nil,
   # meaning the day does not include it.
   def self.slots

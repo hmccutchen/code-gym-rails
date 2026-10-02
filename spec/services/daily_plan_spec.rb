@@ -850,3 +850,91 @@ RSpec.describe DailyPlan::Result, "#notes" do
     expect(result(shared_concept: "feature_envy").notes).to eq("shared_concept" => "feature_envy")
   end
 end
+
+RSpec.describe DailyPlan, "the shared concept" do
+  let(:user) { User.create!(email: "plan-shared@example.com", name: "Plan") }
+
+  before do
+    pin_code_review_mode(:application_code)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: nil, fourth: nil)
+  end
+
+  def struggled_with(concept, tier:, date: Date.current - 1)
+    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { "code_review" => { "concept" => concept } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+                          answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
+                          concept_tags: { "code_review" => concept }, ai_review: { "code_review" => { "rating" => "developing" } })
+    user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: tier)
+  end
+
+  it "places a reduced-tier concept both fixed sections can tag in both of them" do
+    struggled_with("n_plus_one", tier: :reduced)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to eq("n_plus_one")
+    expect(plan.notes).to eq("shared_concept" => "n_plus_one")
+  end
+
+  it "never shares a paused concept" do
+    struggled_with("n_plus_one", tier: :paused)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to be_nil
+  end
+
+  it "does not share a standard-tier concept" do
+    struggled_with("n_plus_one", tier: :standard)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to be_nil
+  end
+
+  it "falls back to no share when one fixed section cannot tag the concept" do
+    struggled_with("transaction_safety", tier: :reduced)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to be_nil
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[transaction_safety])
+  end
+
+  it "skips past an ineligible reduced concept to the first one both can tag" do
+    struggled_with("transaction_safety", tier: :reduced, date: Date.current - 1)
+    struggled_with("memoization", tier: :reduced, date: Date.current - 2)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to eq("memoization")
+  end
+
+  it "cuts the rest of reinforcement by one more, since the shared concept takes two hosts" do
+    struggled_with("n_plus_one", tier: :reduced, date: Date.current - 1)
+    struggled_with("memoization", tier: :standard, date: Date.current - 2)
+    struggled_with("service_objects", tier: :standard, date: Date.current - 3)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to eq("n_plus_one")
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization])
+  end
+
+  it "gives the pairing up when an overdue retention check takes a host back on a two-section day" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    struggled_with("n_plus_one", tier: :reduced)
+    user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7,
+                                   next_retention_check_on: 6.months.ago.to_date)
+    user.update!(daily_section_count: 2)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to be_nil
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one])
+    expect(plan.due_checks.map(&:concept)).to eq(%w[memoization])
+  end
+
+  it "reads the schema-review vocabulary on a schema-review day" do
+    pin_code_review_mode(:schema_review)
+    struggled_with("n_plus_one", tier: :reduced)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to be_nil
+  end
+end
