@@ -905,10 +905,9 @@ RSpec.describe DailyPlan, "the shared concept" do
     expect(described_class.for(user, language: "ruby_rails").shared_concept).to eq("memoization")
   end
 
-  it "cuts the rest of reinforcement by one more, since the shared concept takes two hosts" do
+  it "pairs into a host nothing else wanted and leaves reinforcement as it was" do
     struggled_with("n_plus_one", tier: :reduced, date: Date.current - 1)
     struggled_with("memoization", tier: :standard, date: Date.current - 2)
-    struggled_with("service_objects", tier: :standard, date: Date.current - 3)
 
     plan = described_class.for(user, language: "ruby_rails")
 
@@ -916,19 +915,42 @@ RSpec.describe DailyPlan, "the shared concept" do
     expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization])
   end
 
-  it "gives the pairing up when an overdue retention check takes a host back on a two-section day" do
-    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
-    struggled_with("n_plus_one", tier: :reduced)
-    user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
-                                   mastered_at: 6.months.ago, retention_interval_days: 7,
-                                   next_retention_check_on: 6.months.ago.to_date)
-    user.update!(daily_section_count: 2)
+  it "does not pair when reinforcement already fills every host" do
+    struggled_with("n_plus_one", tier: :reduced, date: Date.current - 1)
+    struggled_with("memoization", tier: :standard, date: Date.current - 2)
+    struggled_with("service_objects", tier: :standard, date: Date.current - 3)
 
     plan = described_class.for(user, language: "ruby_rails")
 
     expect(plan.shared_concept).to be_nil
-    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one])
-    expect(plan.due_checks.map(&:concept)).to eq(%w[memoization])
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization service_objects])
+  end
+
+  it "keeps a drill rather than evicting it for the pairing on a two-section day" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    struggled_with("n_plus_one", tier: :reduced)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to be_nil
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization n_plus_one])
+  end
+
+  it "plans exactly the unpaired day when an overdue retention check takes the free host" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
+    struggled_with("n_plus_one", tier: :reduced)
+    user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7,
+                                   next_retention_check_on: 6.months.ago.to_date)
+
+    paired = described_class.for(user, language: "ruby_rails")
+    allow(SharedConcept).to receive(:pick).and_return(nil)
+    unpaired = described_class.for(user, language: "ruby_rails")
+
+    expect(paired).to eq(unpaired)
+    expect(paired.due_checks.map(&:concept)).to eq(%w[memoization])
   end
 
   it "reads the schema-review vocabulary on a schema-review day" do

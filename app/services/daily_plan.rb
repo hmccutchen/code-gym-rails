@@ -199,6 +199,9 @@ class DailyPlan
   # check takes a slot back: the prompt's mastery instruction demands every
   # concept listed here be reintroduced, so an entry past capacity is an
   # instruction no section is left to satisfy.
+  #
+  # The shared concept is decided last, from whatever host reinforcement and
+  # retention left free, so pairing never displaces either.
   def self.main_track(user, language, kinds:, hosts:)
     hostable      = hostable_buckets(language, kinds: kinds)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
@@ -206,11 +209,11 @@ class DailyPlan
                         .select { |h| hostable.include?(h[:bucket]) }
     capacity      = kinds.count { |kind| !kind.fourth? }
     reinforcement = share_hosts(reinforcement, capacity)
-    reinforcement, shared = SharedConcept.fit(reinforcement, SharedConcept.pick(reinforcement, hosts), capacity)
-    slots         = capacity - SharedConcept.hosts_taken(reinforcement, shared)
+    slots         = capacity - reinforcement.size
     slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
-    reinforcement, shared = SharedConcept.fit(reinforcement, shared, capacity - slots)
+    reinforcement = reinforcement.first(capacity - slots)
     due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
+    shared        = SharedConcept.pick(reinforcement, hosts, spare: capacity - reinforcement.size - due_checks.size)
 
     { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
       established: established_concepts_for(user, language, kinds: kinds,

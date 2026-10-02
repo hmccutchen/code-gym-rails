@@ -1382,11 +1382,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   concepts never reach the list. Hosting goes through `DayHosts`, which reads
   the mode-aware `code_review` vocabulary and `design_comparison`'s strictest
   no-rung list, since `DailyPlan` never reads `KindDifficulty`; the cost is
-  that a tradeoff concept is never shared. The entry takes one host per fixed
-  kind, so `SharedConcept.fit` cuts the rest of reinforcement by one more.
-  When an overdue retention check takes a host back and fewer than two are
-  left, the concept stays ordinary reinforcement rather than the check
-  waiting.
+  that a tradeoff concept is never shared. The pairing only fills a host
+  nothing else wanted: reinforcement and retention are fitted first, against
+  the final slot count, and the concept is shared only when a host is left
+  free for each further fixed kind. So it never evicts a drill or another
+  reinforcement entry, and when an overdue retention check takes the free
+  host the day is planned exactly as it would be without pairing. This
+  replaces the design note's "cut the remaining reinforcement by one more",
+  which let a reduced concept push a drill out.
 
   **Advisory, like all reinforcement.** One line folded onto the end of the
   drilled-concepts bullet (`AiService#shared_concept_guidance`) names it for
@@ -2333,7 +2336,7 @@ always pull in the full suite — is stated once, in
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, runs each resolved section's own `.reject_unusable!` check, leaving a refused section out and reporting it on `Result#unusable_sections`, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, the shared concept, retention checks and the ones left waiting, the coverage addition, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/services/coverage_exception.rb` (+ `coverage_exception/history.rb`) — `CoverageException`: whether a two-section Automatic day gains one optional section, and which; pure. `History.for` is its one-query loader
-- `app/services/shared_concept.rb` — `SharedConcept`: which reduced-tier concept both fixed sections take, and what that costs the rest of reinforcement; pure
+- `app/services/shared_concept.rb` — `SharedConcept`: which reduced-tier concept both fixed sections take, from a host the day left free; pure
 - `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
 - `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence or reason is invalid output rather than a judgment. Pure; its specs need no database
