@@ -28,6 +28,10 @@ RSpec.describe DailyPlan do
     user.concepts_due_for_retention_check_in(ConceptBucket.slice_for("mixed"))
   end
 
+  def day_hosts
+    DayHosts.new("ruby_rails", mode: :application_code)
+  end
+
   describe "retention check selection" do
     it "releases the fourth slot after a skipped due check and leaves a not-yet-due repeat unchanged" do
       user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
@@ -68,7 +72,7 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement)
         .and_return([ { concept: "a", bucket: "ruby_rails", tier: "standard" }, { concept: "b", bucket: "ruby_rails", tier: "standard" } ])
 
-      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
@@ -85,7 +89,7 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 10)
 
-      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
@@ -106,20 +110,20 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 5)
 
-      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
     it "offers nothing when reinforcement already claims three slots" do
       mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
-      expect(DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 0)).to eq([])
+      expect(DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 0)).to eq([])
     end
 
     it "offers architecture-bucket concepts only on architecture days" do
       mastery(concept: "service_boundaries", bucket: "architecture", due_on: Date.current - 2)
 
-      on_challenge = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
-      on_arch      = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Architecture ], slots: 3)
+      on_challenge = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 3)
+      on_arch      = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Architecture ], hosts: day_hosts, slots: 3)
 
       expect(on_challenge.map(&:concept)).to eq([])
       expect(on_arch.map(&:concept)).to eq(%w[service_boundaries])
@@ -127,7 +131,7 @@ RSpec.describe DailyPlan do
 
     it "never offers a concept from the other language's bucket" do
       mastery(concept: "closures", bucket: "javascript", due_on: Date.current - 2)
-      checks = DailyPlan.send(:retention_checks_for, due_slice, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 3)
       expect(checks.map(&:concept)).to eq([])
     end
   end
@@ -527,7 +531,10 @@ RSpec.describe DailyPlan do
       expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization])
     end
 
+    # Pinned to a mode whose code_review can tag a core Ruby concept: on a
+    # schema-review day no fixed section could, and the check would wait.
     it "gives a reinforcement entry up when an overdue check takes the slot back" do
+      pin_code_review_mode(:application_code)
       allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
         [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }, { concept: "memoization", bucket: "ruby_rails", tier: "standard" } ]
       )
@@ -1095,6 +1102,33 @@ RSpec.describe DailyPlan, "the coverage exception" do
 
     expect(plan.coverage).to eq(CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap))
     expect(plan.pattern).to eq(:pattern)
+  end
+
+  # A due check is selected only when a section today can tag it. On a
+  # schema-review day neither fixed section can tag a core Ruby concept, so
+  # the check waits as no_host and the coverage addition brings a kind that can.
+  it "leaves a check no fixed section can tag waiting, and adds a kind that can host it" do
+    pin_code_review_mode(:schema_review)
+    user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 30)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage.reason).to eq(:due_check)
+    expect(plan.due_checks.map(&:concept)).to eq(%w[transaction_safety])
+    expect(plan.waiting_checks).to eq([])
+  end
+
+  it "under a fixed two, leaves that check waiting rather than selecting it for a section that cannot tag it" do
+    pin_code_review_mode(:schema_review)
+    user.update!(daily_section_count: 2)
+    user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 30)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.due_checks).to eq([])
+    expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "transaction_safety", reason: :no_host } ])
   end
 
   it "adds nothing under a fixed two, and the check waits with no host" do

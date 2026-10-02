@@ -1383,10 +1383,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   concepts never reach the list. Hosting goes through `DayHosts`, which reads
   the mode-aware `code_review` vocabulary and `design_comparison`'s strictest
   no-rung list, since `DailyPlan` never reads `KindDifficulty`; the cost is
-  that a tradeoff concept is never shared. The pairing only fills a host
-  nothing else wanted: reinforcement and retention are fitted first, against
-  the final slot count, and the concept is shared only when a host is left
-  free for each further fixed kind. So it never evicts a drill or another
+  that a tradeoff concept is never shared. The pairing only fills hosts
+  nothing else needed: reinforcement and retention are fitted first, against
+  the final slot count, and the concept is shared only when every other
+  reinforcement entry and due check can still take a distinct remaining kind
+  able to tag it (`SharedConcept.placeable?`). A free section count alone
+  is not enough: with architecture as the only optional kind, two Ruby
+  concepts have the fixed sections as their only hosts, and pairing one
+  would leave the other nowhere. So it never evicts a drill or another
   reinforcement entry, and when an overdue retention check takes the free
   host the day is planned exactly as it would be without pairing. This
   replaces the design note's "cut the remaining reinforcement by one more",
@@ -1416,8 +1420,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   exercise's language, which can differ from the setting. That one read also feeds
   both tracks' retention checks, which filter it by bucket instead of
   querying each bucket again, and `ConceptMastery.due_for_retention_check`
-  is the one statement of what "due" means. Each check the plan did not
-  offer and reinforcement does not carry lands on
+  is the one statement of what "due" means. A check is selected, and a slot
+  reserved for an overdue one, only when some section today can tag it, by
+  the same `DayHosts` test the waiting classification uses: on a
+  schema-review two-section day a core Ruby check that neither fixed section
+  can tag waits as `no_host`, where the coverage exception can bring it a
+  host, rather than being selected and then left out of the prompt. Each
+  check the plan did not offer and reinforcement does not carry lands on
   `Result#waiting_checks` with a reason: `no_slot` when a section today
   could tag it but the hosts went elsewhere, `no_host` when none could.
   Generation logs them on one line beside the other two:

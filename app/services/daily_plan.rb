@@ -226,10 +226,10 @@ class DailyPlan
     capacity      = kinds.count { |kind| !kind.fourth? }
     reinforcement = share_hosts(reinforcement, capacity)
     slots         = capacity - reinforcement.size
-    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
+    slots         = 1 if slots.zero? && overdue_retention_check_pending?(due, kinds: kinds, hosts: hosts, reinforcement: reinforcement)
     reinforcement = reinforcement.first(capacity - slots)
-    due_checks    = retention_checks_for(due, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
-    shared        = SharedConcept.pick(reinforcement, hosts, spare: capacity - reinforcement.size - due_checks.size)
+    due_checks    = retention_checks_for(due, kinds: kinds, hosts: hosts, slots: slots, reinforcement: reinforcement)
+    shared        = SharedConcept.pick(reinforcement, due_checks, hosts, kinds: kinds)
 
     { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
       established: established_concepts_for(user, language, kinds: kinds,
@@ -368,17 +368,24 @@ class DailyPlan
   # overdue threshold, handing the reserved slot to a concept that didn't earn it.
   #
   # `due` is the user's whole slice, read once by .for; this keeps only the
-  # buckets today can host, and truncates only after ranking, so no date
-  # order or fetch cap can drop the concept this ranking exists to surface.
-  def self.retention_checks_for(due, language, kinds:, slots:, reinforcement: [])
+  # checks some section today can tag, and truncates only after ranking, so
+  # no date order or fetch cap can drop the concept this ranking exists to
+  # surface. Tagging is DayHosts' test, the one waiting_checks reads, so a
+  # check only a kind the day lacks could carry waits as no_host instead of
+  # being selected here and then left out of the prompt.
+  def self.retention_checks_for(due, kinds:, hosts:, slots:, reinforcement: [])
     return [] if slots.zero?
 
-    buckets  = hostable_buckets(language, kinds: kinds)
-    hostable = due.select { |cm| buckets.include?(cm.language) }
-
-    unclaimed_by(reinforcement, hostable).sort_by { |cm| -(overdue_ratio(cm)) }.first(slots)
+    unclaimed_by(reinforcement, hostable_checks(due, kinds: kinds, hosts: hosts))
+      .sort_by { |cm| -(overdue_ratio(cm)) }.first(slots)
   end
   private_class_method :retention_checks_for
+
+  def self.hostable_checks(due, kinds:, hosts:)
+    candidates = kinds.reject(&:fourth?)
+    due.select { |cm| hosts.hosts(candidates, cm.concept, cm.language).any? }
+  end
+  private_class_method :hostable_checks
 
   # A drill can put a mastered concept back in reinforcement, and its due
   # check would otherwise list the same concept twice in one prompt with two
@@ -442,14 +449,13 @@ class DailyPlan
   private_class_method :established_in_bucket
 
   # Whether reinforcement should give up a slot: only when some retention
-  # check, in a bucket today's kinds can actually host, has crossed the
-  # "meaningfully overdue" threshold (ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
-  # Sharing hostable_buckets with retention_checks_for is what stops an
-  # architecture-only overdue concept from forcing a slot on a challenge day it
-  # could never occupy.
-  def self.overdue_retention_check_pending?(user, language, kinds:, reinforcement: [])
-    hostable_buckets(language, kinds: kinds)
-      .any? { |bucket| overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement) }
+  # check a section today can tag has crossed the "meaningfully overdue"
+  # threshold (ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER). Read
+  # from the same hostable list retention_checks_for fills the slot from, so
+  # a slot is never reserved for a check nothing today could carry.
+  def self.overdue_retention_check_pending?(due, kinds:, hosts:, reinforcement: [])
+    unclaimed_by(reinforcement, hostable_checks(due, kinds: kinds, hosts: hosts))
+      .any? { |cm| overdue_ratio(cm) >= ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER }
   end
   private_class_method :overdue_retention_check_pending?
 end
