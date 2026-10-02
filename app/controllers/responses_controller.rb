@@ -67,13 +67,13 @@ class ResponsesController < ApplicationController
   # The exits that have a review to show anchor it (see review_anchor); the
   # ones that don't land at the top of that same page.
   def review
-    return redirect_to root_path, alert: "Submit your answers first." unless @response.submitted?
+    return redirect_to root_path, alert: t("flash.responses.not_submitted") unless @response.submitted?
 
     missing = @response.section_keys - Array(@response.ai_review&.keys)
-    return redirect_to review_anchor, notice: "Already reviewed." if missing.empty?
+    return redirect_to review_anchor, notice: t("flash.responses.already_reviewed") if missing.empty?
 
     unless claim_review!
-      return redirect_to root_path, alert: "A review is already being generated for this — check back in a moment."
+      return redirect_to root_path, alert: t("flash.responses.review_already_running")
     end
 
     # Recompute after reload to close the race: another request may have
@@ -81,7 +81,7 @@ class ResponsesController < ApplicationController
     missing = @response.section_keys - Array(@response.ai_review&.keys)
     if missing.empty?
       release_review_claim!
-      return redirect_to review_anchor, notice: "Already reviewed."
+      return redirect_to review_anchor, notice: t("flash.responses.already_reviewed")
     end
 
     first_batch = @response.ai_review.blank?
@@ -112,23 +112,23 @@ class ResponsesController < ApplicationController
     log_review_diagnostics(@response, successes.keys) if successes.any?
 
     if failures.empty?
-      redirect_to review_anchor, notice: "Review ready!"
+      redirect_to review_anchor, notice: t("flash.responses.review_ready")
     elsif successes.any?
-      redirect_to review_anchor, notice: "#{successes.size} of #{missing.size} sections reviewed — #{failures.size} couldn't be reviewed, try again."
+      redirect_to review_anchor, notice: t("flash.responses.review_partial", reviewed: successes.size, total: missing.size, failed: failures.size)
     else
       redirect_to root_path, alert: zero_success_alert(failures)
     end
   rescue ActiveRecord::RecordNotFound
-    redirect_to root_path, alert: "This set was cleared while the review was running — nothing was saved."
+    redirect_to root_path, alert: t("flash.responses.set_cleared_during_review")
   rescue AiService::AuthenticationError
     release_review_claim!
-    redirect_to root_path, alert: "Your API key was rejected — check it in Settings."
+    redirect_to root_path, alert: t("flash.responses.api_key_rejected")
   rescue AiService::RateLimitError
     release_review_claim!
-    redirect_to root_path, alert: "The AI provider is rate-limiting requests — try again shortly."
+    redirect_to root_path, alert: t("flash.responses.rate_limited")
   rescue AiService::Error => e
     release_review_claim!
-    redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
+    redirect_to root_path, alert: t("flash.responses.review_failed", message: e.message)
   end
 
   # DELETE /responses/:id/start_over — abandon today's saved answers and
@@ -143,12 +143,12 @@ class ResponsesController < ApplicationController
   # outside a transaction, so destroying the row mid-flight lets its
   # ConceptMastery writes commit against a response that no longer exists.
   def start_over
-    return redirect_to root_path, alert: "This set has already been reviewed — nothing to start over." if @response.reviewed?
-    return redirect_to root_path, alert: "You can only start over on today's set." unless @response.date == Date.current
-    return redirect_to root_path, alert: "A review is being generated for this — try again in a moment." if @response.reviewing?
+    return redirect_to root_path, alert: t("flash.responses.start_over_after_review") if @response.reviewed?
+    return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
+    return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if @response.reviewing?
 
     @response.destroy
-    redirect_to root_path, notice: "Today's answers have been cleared — start fresh whenever you're ready."
+    redirect_to root_path, notice: t("flash.responses.answers_cleared")
   end
 
   # POST /responses/:id/email_review — email the completed review to the user.
@@ -156,10 +156,10 @@ class ResponsesController < ApplicationController
   # dashboard's submitted state (_submission.html.erb), not on history, so
   # that's the only page where the user can repeat or confirm the action.
   def email_review
-    return redirect_to root_path, alert: "No review to email yet." unless @response.fully_reviewed?
+    return redirect_to root_path, alert: t("flash.responses.no_review_to_email") unless @response.fully_reviewed?
 
     ReviewMailer.send_review(@response).deliver_later
-    redirect_to root_path, notice: "Review sent to #{current_user.email}."
+    redirect_to root_path, notice: t("flash.responses.review_emailed", email: current_user.email)
   end
 
   # POST /responses/:id/explain_differently — one section's feedback, reframed.
@@ -363,7 +363,7 @@ class ResponsesController < ApplicationController
         if saved
           redirect_to root_path
         else
-          redirect_to root_path, alert: "Couldn't save your answers."
+          redirect_to root_path, alert: t("flash.responses.save_failed")
         end
       end
     end
@@ -635,11 +635,11 @@ class ResponsesController < ApplicationController
     codes = failures.values.map { |f| f[:error_code] }.uniq
     case codes
     in [ "authentication" ]
-      "Your API key was rejected — check it in Settings."
+      t("flash.responses.api_key_rejected")
     in [ "rate_limit" ]
-      "The AI provider is rate-limiting requests — try again shortly."
+      t("flash.responses.rate_limited")
     else
-      "Couldn't generate the review: #{failures.values.first[:message]}"
+      t("flash.responses.review_failed", message: failures.values.first[:message])
     end
   end
 

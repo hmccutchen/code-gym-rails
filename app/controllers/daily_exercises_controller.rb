@@ -32,20 +32,20 @@ class DailyExercisesController < ApplicationController
   # view, since the view's button is not what makes the destroy unsafe.
   def regenerate
     exercise = current_user.daily_exercises.for_date.first
-    return redirect_to root_path, alert: "No exercise set to regenerate yet." unless exercise
+    return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
 
     # Named daily_response, not response: a local named `response` shadows the
     # controller's own response object for the rest of the action.
     daily_response = exercise.daily_response
     if daily_response&.reviewed?
-      return redirect_to root_path, alert: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
+      return redirect_to root_path, alert: t("flash.daily_exercises.already_reviewed")
     end
     if daily_response&.reviewing?
-      return redirect_to root_path, alert: "A review is being generated for today's set — try again in a moment."
+      return redirect_to root_path, alert: t("flash.daily_exercises.review_in_progress")
     end
 
     unless claim_regeneration!(exercise)
-      return redirect_to root_path, alert: "You've already generated a new set today."
+      return redirect_to root_path, alert: t("flash.daily_exercises.already_regenerated")
     end
 
     current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
@@ -57,7 +57,7 @@ class DailyExercisesController < ApplicationController
     rescue StandardError => e
       Rails.logger.error("Failed to enqueue RegenerateExerciseJob for user #{current_user.id}: #{e.class}: #{e.message}")
       release_regeneration!(exercise)
-      return redirect_to root_path, alert: "Couldn't start regeneration. Please try again."
+      return redirect_to root_path, alert: t("flash.daily_exercises.regeneration_not_started")
     end
 
     redirect_to root_path, flash: { generating: true }

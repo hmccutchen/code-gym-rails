@@ -116,6 +116,53 @@ en:
         anywhere else. It expires in %{expiry}. If you
         didn't request this, you can ignore it.
       sign_off: "— Code Gym"
+  flash:
+    application:
+      session_expired: "Your session expired — please try again."
+      login_required: "Please log in first."
+      api_key_needed: "Add your API key to get started."
+    admin:
+      not_authorized: "Not authorized."
+      suggested_concepts:
+        reference_missing: "Add a ConceptReference for this concept first."
+        promoted: "Marked %{name} as promoted."
+        dismissed: "Dismissed %{name}."
+    accounts:
+      deleted: "Your account has been deleted."
+      generation_resumed_with_held_set: "Automatic daily generation resumed. The set you had waiting is on your dashboard."
+      generation_resumed: "Automatic daily generation resumed."
+      generation_paused: "Automatic daily generation paused."
+    api_keys:
+      unrecognized_key: "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
+      key_saved: "API key saved. You're all set!"
+      no_changes: "No changes made."
+      preferences_saved: "Preferences saved!"
+    daily_exercises:
+      nothing_to_regenerate: "No exercise set to regenerate yet."
+      already_reviewed: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
+      review_in_progress: "A review is being generated for today's set — try again in a moment."
+      already_regenerated: "You've already generated a new set today."
+      regeneration_not_started: "Couldn't start regeneration. Please try again."
+    push_subscriptions:
+      settings_saved: "Reminder settings saved."
+      turned_off: "Daily reminders turned off."
+    responses:
+      not_submitted: "Submit your answers first."
+      already_reviewed: "Already reviewed."
+      review_already_running: "A review is already being generated for this — check back in a moment."
+      review_ready: "Review ready!"
+      review_partial: "%{reviewed} of %{total} sections reviewed — %{failed} couldn't be reviewed, try again."
+      set_cleared_during_review: "This set was cleared while the review was running — nothing was saved."
+      api_key_rejected: "Your API key was rejected — check it in Settings."
+      rate_limited: "The AI provider is rate-limiting requests — try again shortly."
+      review_failed: "Couldn't generate the review: %{message}"
+      start_over_after_review: "This set has already been reviewed — nothing to start over."
+      start_over_not_today: "You can only start over on today's set."
+      start_over_while_reviewing: "A review is being generated for this — try again in a moment."
+      answers_cleared: "Today's answers have been cleared — start fresh whenever you're ready."
+      no_review_to_email: "No review to email yet."
+      review_emailed: "Review sent to %{email}."
+      save_failed: "Couldn't save your answers."
   hello: "Hello world"
   providers:
     anthropic: "Claude"

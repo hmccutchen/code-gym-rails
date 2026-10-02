@@ -19,7 +19,7 @@ class ApplicationController < ActionController::Base
   def handle_invalid_token
     return redirect_to(root_path) if duplicate_login_submit?
 
-    redirect_to login_path, alert: "Your session expired — please try again."
+    redirect_to login_path, alert: t("flash.application.session_expired")
   end
 
   # Logging in rotates the session (and its CSRF token), which leaves the login
@@ -58,7 +58,7 @@ class ApplicationController < ActionController::Base
   def require_login
     unless logged_in?
       session[:return_to] = request.fullpath
-      redirect_to login_path, alert: "Please log in first."
+      redirect_to login_path, alert: t("flash.application.login_required")
     end
   end
 
@@ -67,6 +67,6 @@ class ApplicationController < ActionController::Base
     return if current_user.api_key_present?
     return if controller_name == "api_keys" || controller_name == "sessions"
 
-    redirect_to setup_path, notice: "Add your API key to get started."
+    redirect_to setup_path, notice: t("flash.application.api_key_needed")
   end
 end
