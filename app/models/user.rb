@@ -9,10 +9,6 @@ class User < ApplicationRecord
   # credentials to be set (standard Rails setup).
   encrypts :api_key
 
-  # Old code keeps serving while the pre-deploy migration runs, so the column
-  # stays until a later migration drops it.
-  self.ignored_columns += [ "adaptive_set_size" ]
-
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = %w[beginner developing solid strong].freeze
 

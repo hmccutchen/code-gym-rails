@@ -1356,9 +1356,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Automatic.** `AddDailySectionCountToUsers` adds the column with no default
   and no backfill, so an account that had turned adaptive sizing off, which
   meant a fixed full day, now gets Automatic sizing until it picks a count.
-  That change was deliberate. `User` lists `adaptive_set_size` in
-  `ignored_columns` because the old code keeps serving while the pre-deploy
-  migration runs; a later migration drops the column.
+  That change was deliberate. The column was ignored for one release, while
+  the old code kept serving through the pre-deploy migration, and
+  `RemoveAdaptiveSetSizeFromUsers` dropped it afterwards.
 
   **A fixed count never gains a coverage section.** The coverage exception
   below applies only to Automatic, so under a fixed 2 a check that only an
