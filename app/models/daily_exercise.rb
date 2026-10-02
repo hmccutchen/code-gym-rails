@@ -6,7 +6,7 @@ class DailyExercise < ApplicationRecord
   # per-user meta-preference (see User::LANGUAGES) that User#language_for_today
   # always resolves down to one of these before a DailyExercise is created or
   # regenerated. Persisting "mixed" here would let an invalid value flow back
-  # into AiService#generate_exercise via DailyExercisesController#regenerate.
+  # into AiService#generate_unjudged_exercise via RegenerateExerciseJob.
   LANGUAGES = %w[ruby_rails javascript].freeze
 
   # A regeneration claim expires so a worker that dies mid-job can't strand the

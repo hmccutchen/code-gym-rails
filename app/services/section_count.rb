@@ -25,9 +25,10 @@ class SectionCount
   end
 
   # A drop fills in for an unanswered delivered section, up to the delivered
-  # count, so the judge removing a section does not shorten tomorrow. A day
-  # with nothing answered earns nothing: a drop cannot turn an untouched day
-  # into finished work.
+  # count, so on a day left partly unanswered the judge removing a section
+  # does not shorten tomorrow; a fully answered short day still credits only
+  # what it delivered. A day with nothing answered earns nothing: a drop
+  # cannot turn an untouched day into finished work.
   def self.credited_sections(entry)
     answered = entry.answered.to_i
     return 0 if answered.zero?

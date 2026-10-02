@@ -2389,6 +2389,17 @@ RSpec.describe AiService do
       expect { svc.generate_exercise(user) }.to raise_error(AiService::InvalidResponseError)
     end
 
+    # A drafted set carries every answer key before ingest has stripped
+    # anything, so a reply that fails to parse is never quoted in the log or
+    # in the error the dashboard shows.
+    it "keeps an unparseable draft out of the log and the error message" do
+      svc = double_class.new(canned_text: "not json: SENTINEL-DRAFT")
+      expect(Rails.logger).not_to receive(:error).with(/Invalid JSON from provider/)
+
+      expect { svc.generate_exercise(user) }
+        .to raise_error(AiService::InvalidResponseError, "Provider returned invalid JSON for the problem set")
+    end
+
     # The guarantee ingest's purity buys: a rejected set cannot have written a
     # vocabulary suggestion, because the write only happens after ingest returns.
     it "writes no suggestion when ingest rejects the set" do

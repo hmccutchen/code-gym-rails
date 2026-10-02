@@ -1110,7 +1110,7 @@ class AiService
     JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {})
   end
 
-  # ── Draft, judge, retry once, drop — the weekday batch's path ────────────
+  # ── Draft, judge, retry, drop — the weekday batch's path ─────────────────
   # Drafts here, then hands the draft to JudgedGeneration, which owns the
   # judge, retry and drop rules. Every provider instance it uses is a fresh one
   # built from this key, as every other fan-out here builds its own.
@@ -1534,7 +1534,7 @@ class AiService
     )
 
     ingested = ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "problem set"),
+      parse_json_object(result[:text], subject: "problem set", log_raw: false),
       language: language, expected_keys: kinds.map(&:key), code_review_source: plan.code_review_source,
       pitched_at: pitched_rungs(difficulty, user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
     )
@@ -1604,7 +1604,7 @@ class AiService
     )
 
     ProblemSetIngest.call(
-      parse_json_object(result[:text], subject: "#{kind.key} retry"), language: language,
+      parse_json_object(result[:text], subject: "#{kind.key} retry", log_raw: false), language: language,
       expected_keys: [ kind.key ], fixed_concepts: { kind.key => concept },
       code_review_source: draft.plan.code_review_source,
       pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
@@ -3018,9 +3018,10 @@ class AiService
     raise InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
   end
 
-  # log_raw: false is for replies that are an engineer's review text, which
-  # stays out of application logs: nothing is logged, and the message never
-  # quotes the reply (a parser message can).
+  # log_raw: false is for replies that must stay out of application logs: an
+  # engineer's review text, a blind solve, and a drafted problem set, whose
+  # answer keys the stripping steps have not yet seen. Nothing is logged, and
+  # the message never quotes the reply (a parser message can).
   def parse_json_response(text, subject: "response", log_raw: true)
     # Strip any accidental markdown fences
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip

@@ -80,7 +80,7 @@ RSpec.describe JudgedGeneration do
                                                   retry_principle: [ nil ], retry_issues: [ [] ])
   end
 
-  it "drops a droppable section rejected twice and hands the finish step what it carried" do
+  it "drops a section rejected on its last retry and hands the finish step what it carried" do
     verdicts["pattern"] = [ reject, reject("underdetermined") ]
 
     judged = run

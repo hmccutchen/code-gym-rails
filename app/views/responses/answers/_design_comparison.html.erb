@@ -12,7 +12,7 @@
   <div class="answer-display"><% if pick %><strong><%= t("sections.design_comparison.picked", piece: pick.upcase) %></strong>
 <%= reason %><% else %>(skipped)<% end %></div>
   <% answer_key = data["answer_key"] %>
-  <% if response.ai_review.is_a?(Hash) && response.ai_review[key].is_a?(Hash) && answer_key.is_a?(Hash) %>
+  <% if response.section_reviewed?(key) && answer_key.is_a?(Hash) %>
     <div class="comparison-key">
       <h3><%= t("sections.design_comparison.key_heading") %></h3>
       <p><strong><%= t("sections.design_comparison.key_better", piece: answer_key["better"].to_s.upcase) %></strong> <%= answer_key["deciding_fact"] %></p>

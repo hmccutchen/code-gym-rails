@@ -12,7 +12,7 @@ require "rails_helper"
 # by a marker string distinctive enough that the assertion can only pass if that
 # exact field reached that exact render.
 #
-# All nine kinds are covered across all three renders, enumerated from
+# Every kind is covered across all three renders, enumerated from
 # ExerciseSection.thirds/.fourths rather than sampled — a kind quietly dropping
 # out of one of the three renders is the specific failure this exists to catch.
 # (This read DailyPlan's third/fourth weight tables when it was written; those
