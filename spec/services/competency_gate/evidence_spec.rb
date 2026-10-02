@@ -54,8 +54,16 @@ RSpec.describe CompetencyGate::Evidence do
     expect(days).to eq([])
   end
 
+  # The brake reads an eased section's self-rating; growth leaves it out.
+  it "carries eased sections, marked as eased" do
+    day(0, { "code_review" => {}, "pattern" => { eased: true, self: "too_hard" } })
+
+    expect(days.sole.results.map { |result| [ result.kind, result.eased, result.self_rating ] })
+      .to eq([ [ "code_review", false, "right_level" ], [ "pattern", true, "too_hard" ] ])
+  end
+
   it "keeps a stamped day's optional state even when none of its sections are evidence" do
-    day(0, { "code_review" => { answered: false }, "pattern" => { eased: true } })
+    day(0, { "code_review" => { answered: false }, "pattern" => { rung: nil } })
 
     expect(days).to eq([ CompetencyGate::Day.new(results: [], optional: :complete) ])
   end

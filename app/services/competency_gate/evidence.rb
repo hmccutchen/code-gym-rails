@@ -35,7 +35,7 @@ class CompetencyGate
     end
 
     def day_for(response)
-      Day.new(results: ReviewedSectionResults.for(response, require_rubric: true), optional: optional_state(response))
+      Day.new(results: ReviewedSectionResults.for(response, require_rubric: true, include_eased: true), optional: optional_state(response))
     end
 
     def optional_state(response)

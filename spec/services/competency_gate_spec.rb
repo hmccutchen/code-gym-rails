@@ -3,13 +3,15 @@ require "rails_helper"
 RSpec.describe CompetencyGate do
   let(:fixed) { %w[code_review design_comparison] }
 
-  def result(kind = "code_review", level: "senior", ai: "solid", self_rating: "right_level")
-    ReviewedSectionResults::Result.new(date: nil, kind: kind, level: level, ai_rating: ai, self_rating: self_rating)
+  def result(kind = "code_review", level: "senior", ai: "solid", self_rating: "right_level", eased: false)
+    ReviewedSectionResults::Result.new(date: nil, kind: kind, level: level, ai_rating: ai, self_rating: self_rating, eased: eased)
   end
 
   def good(kind = "code_review", level: "senior") = result(kind, level: level)
   def poor(kind = "code_review", level: "senior") = result(kind, level: level, ai: "developing")
-  def too_hard(kind = "code_review", level: "senior") = result(kind, level: level, self_rating: "too_hard")
+  def too_hard(kind = "code_review", level: "senior", eased: false)
+    result(kind, level: level, self_rating: "too_hard", eased: eased)
+  end
 
   def day(*results, optional: :none)
     CompetencyGate::Day.new(results: results, optional: optional)
@@ -47,8 +49,8 @@ RSpec.describe CompetencyGate do
     expect(described_class::FLOOR + described_class::GROWTH.size).to eq(ExerciseSection::MAX_SECTIONS)
   end
 
-  it "reads the AI bar on the rating scale from lowest to highest" do
-    expect(described_class::RATING_SCALE).to eq(%w[beginner developing solid strong])
+  it "reads its AI bar on the mastery rating rank" do
+    expect(ConceptMastery::AI_RATING_RANK).to have_key(described_class::BAR)
   end
 
   describe "growing to three" do
@@ -72,6 +74,15 @@ RSpec.describe CompetencyGate do
 
     it "takes no growth evidence from optional kinds" do
       expect(counts(Array.new(5) { day(good("pattern"), good("challenge")) })).to all(eq(2))
+    end
+
+    # An eased section answered an easier question than its rung, so its AI
+    # rating says nothing about the rung.
+    it "takes no growth evidence from eased sections" do
+      eased = Array.new(5) { day(result(eased: true)) }
+
+      expect(counts(eased)).to all(eq(2))
+      expect(described_class.plan(eased, fixed_kinds: fixed).evidence[:to_three]).to include(available: 0)
     end
 
     it "moves at most one step a day" do
@@ -144,11 +155,34 @@ RSpec.describe CompetencyGate do
     end
 
     it "takes precedence over growth on the same day" do
+      grows = Array.new(5) { day(good) }
       days = Array.new(3) { day(good) } + Array.new(2) { day(good, too_hard("pattern")) }
-      plan = described_class.plan(days, fixed_kinds: fixed)
 
-      expect(plan.evidence[:to_three]).to include(available: 5, favourable: 5)
-      expect(plan).to have_attributes(count: 2, reason: :brake)
+      expect(described_class.plan(grows, fixed_kinds: fixed).count).to eq(3)
+      expect(described_class.plan(days, fixed_kinds: fixed)).to have_attributes(count: 2, reason: :brake)
+    end
+
+    # Struggling only on optional sections must not swing the day 3, 2, 3:
+    # the fixed window that earned three was earned before the brake.
+    it "needs a fresh fixed-kind window before growing again" do
+      both = -> { day(good, good("design_comparison")) }
+      days = earned_three + [ day(too_hard("pattern"), too_hard("challenge")) ] + Array.new(4) { both.call }
+
+      expect(counts(days)).to eq([ 2, 2, 2, 2, 3, 2, 2, 2, 2, 3 ])
+      expect(described_class.plans(days, fixed_kinds: fixed).map(&:reason).last(5)).to eq(%i[brake brake held held grew])
+    end
+
+    it "restarts the growth window on every day the brake holds" do
+      plan = described_class.plan(earned_three + [ day(too_hard), day(too_hard) ], fixed_kinds: fixed)
+
+      expect(plan.evidence[:to_three]).to include(available: 0, favourable: 0)
+      expect(plan.evidence[:brake]).to include(available: 4, too_hard: 2)
+    end
+
+    it "reads an eased section's too-hard self-rating" do
+      days = earned_three + [ day(too_hard(eased: true)), day(too_hard("pattern", eased: true)) ]
+
+      expect(described_class.plan(days, fixed_kinds: fixed)).to have_attributes(count: 2, reason: :brake)
     end
 
     it "holds a later day at two while the too-hard results stay in the window" do
@@ -179,7 +213,7 @@ RSpec.describe CompetencyGate do
         day(good)
       ]
 
-      plans = described_class.plans(days, fixed_kinds: fixed)
+      plans = described_class.plans(days, fixed_kinds: fixed, evidence: true)
       expect(plans.map(&:count)).to eq([ 2, 2, 2, 3 ])
       expect(plans.last.evidence[:to_three][:by_kind]).to eq("code_review" => 4, "design_comparison" => 1)
       expect(plans.last.evidence[:levels]).to eq("code_review" => "senior", "design_comparison" => "junior")
@@ -229,11 +263,21 @@ RSpec.describe CompetencyGate do
     expect { day(good, optional: true) }.to raise_error(ArgumentError, /optional/)
   end
 
+  # Only the plan a caller reads needs its evidence; the fold does not build
+  # it for every day it passes.
+  it "builds evidence only for the plans asked for" do
+    days = Array.new(6) { day(good) }
+
+    expect(described_class.plans(days, fixed_kinds: fixed).map(&:evidence)).to all(be_nil)
+    expect(described_class.plans(days, fixed_kinds: fixed, evidence: true).map(&:evidence)).to all(include(:to_three))
+    expect(described_class.plan(days, fixed_kinds: fixed).evidence).to include(:to_three)
+  end
+
   it "folds the same way one day at a time" do
     days = Array.new(5) { day(good) } + [ day(too_hard), day(too_hard) ]
     gate = described_class.new(fixed_kinds: fixed)
 
-    expect(days.map { |each_day| gate.add(each_day) }).to eq(described_class.plans(days, fixed_kinds: fixed))
+    expect(days.map { |each_day| gate.add(each_day).plan(evidence: false) }).to eq(described_class.plans(days, fixed_kinds: fixed))
     expect(gate.plan).to eq(described_class.plan(days, fixed_kinds: fixed))
   end
 end
