@@ -40,6 +40,11 @@
 <% if submitted %>
   <%= render "responses/answered_sections", exercise: exercise, response: response %>
   <%= render "responses/submission", response: response %>
+  <% if @size_change == :larger %>
+    <p class="hint"><%= t("dashboard.size_change.larger") %></p>
+  <% elsif @size_change == :smaller %>
+    <p class="hint"><%= t("dashboard.size_change.smaller", count: SectionCount::FLOOR) %></p>
+  <% end %>
   <% if @track_proposal %>
     <%= render "dashboard/track_proposal", proposal: @track_proposal %>
   <% end %>

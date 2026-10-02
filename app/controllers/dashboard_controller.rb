@@ -28,6 +28,7 @@ class DashboardController < ApplicationController
     @response = @exercise&.daily_response ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
     @track_proposal = TrackGraduation.for(current_user) if current_user.on_learning_track? && @response&.submitted?
+    @size_change = SizeForecast.for(current_user, @exercise) if @response&.submitted?
 
     if @exercise&.regenerating?
       @generating = true

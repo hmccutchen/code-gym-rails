@@ -1693,3 +1693,110 @@ RSpec.describe "Dashboard lines about what the plan did", type: :request do
     expect(I18n.t("dashboard.shared_concept", sections: "X")).not_to match(/\b(both|two)\b/i)
   end
 end
+
+RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
+  let(:user) { create_user_with_key }
+  let(:larger_line) { I18n.t("dashboard.size_change.larger") }
+  let(:smaller_line) { I18n.t("dashboard.size_change.smaller", count: SectionCount::FLOOR) }
+
+  let(:problem_set) do
+    { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end", "concept" => "n_plus_one" },
+      "design_comparison" => { "title" => "Rates", "scenario" => "S", "question" => "Which fits?",
+                               "piece_a" => "class A\nend", "piece_b" => "class B\nend", "concept" => "n_plus_one",
+                               "answer_key" => { "better" => "b", "deciding_fact" => "f", "principle" => "p",
+                                                 "why_other_fails" => "w" } } }
+  end
+
+  def day(date, planned:, answered: { "code_review" => "a" * 20 }, submitted: true)
+    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: problem_set, plan_notes: planned ? { "size" => planned, "size_reason" => "gate" } : {})
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: date, answers: answered,
+                          section_ratings: answered.transform_values { "right_level" },
+                          submitted_at: (Time.current if submitted))
+  end
+
+  def stub_gate(count, reason)
+    allow(CompetencyGate).to receive(:for).and_return(CompetencyGate::Plan.new(count: count, reason: reason, evidence: {}))
+  end
+
+  before { login_as(user) }
+
+  it "says tomorrow's set is larger when the gate and completion both allow it" do
+    stub_gate(3, :grew)
+    day(Date.current, planned: 2)
+
+    get root_path
+
+    expect(response.body).to include(larger_line)
+    expect(response.body).not_to include(CGI.escapeHTML(smaller_line))
+  end
+
+  it "says nothing when completion still holds tomorrow at today's size" do
+    stub_gate(3, :grew)
+    day(Date.current - 2, planned: 2, answered: {})
+    day(Date.current - 1, planned: 2, answered: {})
+    day(Date.current, planned: 2)
+
+    get root_path
+
+    expect(response.body).not_to include(larger_line)
+  end
+
+  it "says tomorrow's set is smaller when the brake lowers it" do
+    stub_gate(SectionCount::FLOOR, :brake)
+    day(Date.current, planned: 3)
+
+    get root_path
+
+    expect(response.body).to include(CGI.escapeHTML(smaller_line))
+    expect(response.body).not_to include(larger_line)
+  end
+
+  it "says nothing about size under a fixed setting" do
+    user.update!(daily_section_count: 2)
+    stub_gate(3, :grew)
+    day(Date.current, planned: 2)
+    expect(CompetencyGate).not_to receive(:for)
+
+    get root_path
+
+    expect(response.body).not_to include(larger_line)
+  end
+
+  it "says nothing before the day is submitted" do
+    stub_gate(3, :grew)
+    day(Date.current, planned: 2, submitted: false)
+
+    get root_path
+
+    expect(response.body).not_to include(larger_line)
+  end
+
+  it "says nothing for a day planned before sizes were recorded" do
+    stub_gate(3, :grew)
+    day(Date.current, planned: nil)
+
+    get root_path
+
+    expect(response.body).not_to include(larger_line)
+  end
+
+  # Without today, two days are too few for the completion rule, which would
+  # then give the largest day and promise a larger set. With today, three days
+  # of two answered sections give three, today's planned size.
+  it "counts today's submission toward tomorrow's completion" do
+    stub_gate(ExerciseSection::MAX_SECTIONS, :held)
+    both = { "code_review" => "a" * 20, "design_comparison" => "b" * 20 }
+    day(Date.current - 2, planned: 3, answered: both)
+    day(Date.current - 1, planned: 3, answered: both)
+    day(Date.current, planned: 3, answered: both)
+
+    get root_path
+
+    expect(response.body).not_to include(larger_line)
+  end
+
+  it "keeps both lines free of any score, tier or badge" do
+    expect([ larger_line, smaller_line ]).to all(satisfy { |line| line !~ /tier|score|badge|level|reduced|%/i })
+  end
+end
