@@ -130,6 +130,8 @@ en:
     section_left_out:
       one: "One section was left out today because it didn't pass a quality check."
       other: "%{count} sections were left out today because they didn't pass a quality check."
+    coverage_added: "Today's set adds one section of a kind you haven't seen in a while."
+    shared_concept: "Both sections today look at the same idea from two sides."
     rating_group: "How hard was %{section} for you?"
   learn:
     title: "Learn"

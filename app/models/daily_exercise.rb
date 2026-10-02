@@ -29,6 +29,17 @@ class DailyExercise < ApplicationRecord
   def plan_review        = problem_set["plan_review"]&.with_indifferent_access
   def ambiguity_hunt     = problem_set["ambiguity_hunt"]&.with_indifferent_access
 
+  # plan_notes records what the plan meant to do; these say whether the
+  # delivered set still shows it, so a dropped section or an ignored
+  # placement never produces a false claim on the dashboard.
+  def coverage_shown?
+    active_section_keys.include?(plan_notes["coverage"])
+  end
+
+  def shared_concept_shown?
+    ExerciseSection.fixed_sections_share?(problem_set, plan_notes["shared_concept"])
+  end
+
   def regenerating?
     regenerating_since.present? && regenerating_since > REGENERATION_STALE_AFTER.ago
   end

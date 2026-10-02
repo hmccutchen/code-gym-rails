@@ -1598,3 +1598,83 @@ RSpec.describe "Dashboard while paused with an unfinished set", type: :request d
     end
   end
 end
+
+RSpec.describe "Dashboard lines about what the plan did", type: :request do
+  let(:user) { create_user_with_key }
+  let(:coverage_line) { I18n.t("dashboard.coverage_added") }
+  let(:shared_line) { I18n.t("dashboard.shared_concept") }
+
+  let(:comparison) do
+    { "title" => "Where rates come from", "scenario" => "A carrier arrives monthly.", "question" => "Which fits?",
+      "piece_a" => "class A\nend", "piece_b" => "class B\nend", "concept" => "n_plus_one",
+      "answer_key" => { "better" => "b", "deciding_fact" => "f", "principle" => "p", "why_other_fails" => "w" } }
+  end
+  let(:code_review) { { "question" => "Find the bug", "snippet" => "def a; end", "concept" => "n_plus_one" } }
+  let(:plan_review) { { "title" => "Plan", "plan_excerpt" => "Do it.", "question" => "Approve?", "concept" => "scope_creep" } }
+
+  def exercise_with(sections, plan_notes:, dropped: [])
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                          problem_set: sections, plan_notes: plan_notes, dropped_sections: dropped)
+  end
+
+  before { login_as(user) }
+
+  it "shows the coverage line when the added kind is on the page" do
+    exercise_with({ "code_review" => code_review, "design_comparison" => comparison, "plan_review" => plan_review },
+                  plan_notes: { "coverage" => "plan_review" })
+
+    get root_path
+
+    expect(response.body).to include(CGI.escapeHTML(coverage_line))
+  end
+
+  it "says nothing about coverage once the added section was dropped" do
+    exercise_with({ "code_review" => code_review, "design_comparison" => comparison },
+                  plan_notes: { "coverage" => "plan_review" }, dropped: [ "plan_review" ])
+
+    get root_path
+
+    expect(response.body).not_to include(CGI.escapeHTML(coverage_line))
+    expect(response.body).to include("left out today")
+  end
+
+  it "shows the shared-concept line when both fixed sections carry the planned concept" do
+    exercise_with({ "code_review" => code_review, "design_comparison" => comparison },
+                  plan_notes: { "shared_concept" => "n_plus_one" })
+
+    get root_path
+
+    expect(response.body).to include(shared_line)
+  end
+
+  it "says nothing about a shared concept the model placed in one section only" do
+    exercise_with({ "code_review" => code_review, "design_comparison" => comparison.merge("concept" => "open_closed") },
+                  plan_notes: { "shared_concept" => "n_plus_one" })
+
+    get root_path
+
+    expect(response.body).not_to include(shared_line)
+  end
+
+  it "says nothing about a shared concept when one of its sections was dropped" do
+    exercise_with({ "code_review" => code_review }, plan_notes: { "shared_concept" => "n_plus_one" },
+                  dropped: [ "design_comparison" ])
+
+    get root_path
+
+    expect(response.body).not_to include(shared_line)
+  end
+
+  it "shows neither line on a day the plan recorded nothing" do
+    exercise_with({ "code_review" => code_review, "design_comparison" => comparison }, plan_notes: {})
+
+    get root_path
+
+    expect(response.body).not_to include(CGI.escapeHTML(coverage_line))
+    expect(response.body).not_to include(shared_line)
+  end
+
+  it "keeps both lines free of any reading of the engineer's standing" do
+    expect([ coverage_line, shared_line ]).to all(satisfy { |line| line !~ /tier|reduced|struggl|trouble|score|\d/i })
+  end
+end
