@@ -627,10 +627,10 @@
   .mix-difficulty label { margin-bottom: 0; }
   .mix-lock { flex-basis: 100%; color: var(--text); font-weight: 600; }
   .mix-coverage { flex-basis: 100%; margin-top: 0; }
-  .display-group, .daily-sections { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
-  .display-group legend, .daily-sections legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
-  .display-group label, .daily-sections label { margin-bottom: 0; color: var(--text); }
-  .display-hint, .daily-sections .hint { flex-basis: 100%; margin-top: 0; }
+  .display-group { border: 0; padding: .6rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .9rem; font-size: .85rem; }
+  .display-group legend { font-size: .8rem; color: var(--muted); padding: 0; margin-bottom: .35rem; }
+  .display-group label { margin-bottom: 0; color: var(--text); }
+  .display-hint { flex-basis: 100%; margin-top: 0; }
 </style>
 
 <div class="setup-wrap">
@@ -665,7 +665,7 @@
   </div>
 
   <div class="form-field">
-    <fieldset class="daily-sections" id="daily-sections">
+    <fieldset class="display-group daily-sections" id="daily-sections">
       <legend>Daily sections</legend>
       <label>
         <input type="radio" name="daily_section_count" value="automatic" checked>
@@ -683,7 +683,7 @@
           <input type="radio" name="daily_section_count" value="4" >
           4
         </label>
-      <p class="hint">Automatic gives you shorter sets after days you don&#39;t finish, and longer ones as you do. A number gives you that many sections every day.</p>
+      <p class="hint display-hint">Automatic gives you shorter sets after days you don&#39;t finish, and longer ones as you do. A number sets how many sections each day is planned with, though a section that fails a quality check can still be left out. 2 gives you only Code Review and Design Comparison.</p>
     </fieldset>
   </div>
 
