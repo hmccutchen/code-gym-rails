@@ -187,6 +187,46 @@ en:
         one: "Your next automatic set will have one section because several recent sections felt too hard."
         other: "Your next automatic set will have %{count} sections because several recent sections felt too hard."
     rating_group: "How hard was %{section} for you?"
+    generating_label: "Generating…"
+    generate_anyway: "Generate today's set anyway"
+    show:
+      title: "Today's Workout"
+      streak: "🔥 %{days}-day streak"
+    generating:
+      title: "Generating your personalized exercise set…"
+      hint: "This usually takes under a minute — this page will update automatically."
+      slow_hint: "This is taking longer than expected — try refreshing the page."
+    generation_failed:
+      title: "Couldn't generate today's exercises."
+      try_again: "Try again"
+    paused_empty:
+      message: "Automatic generation is paused, so today's set wasn't created. You can still generate one whenever you want it."
+      resume: "Resume automatic generation"
+    weekend_empty:
+      message: "No exercises are generated automatically on weekends — the morning job runs Monday–Friday."
+    teaching_hint:
+      summary: "Need a nudge? 💡"
+      locked: "Available after you attempt this section"
+    exercise:
+      regeneration_failed: "Couldn't generate a new set: %{error}"
+      reviewed: "Today's set has been reviewed, so it can't be replaced — tomorrow's set builds on it."
+      already_regenerated: "You've already generated a new set today."
+      regenerate: "Generate new set"
+      regenerate_confirm: "Generate a new set for today?"
+      regenerate_confirm_with_progress: "This will replace today's problems and erase your answers so far. This can't be undone. Continue?"
+      start_over: "Start over"
+      starting_over: "Starting over…"
+      start_over_confirm: "This will clear today's answers and ratings so you can start fresh. This can't be undone. Continue?"
+      answered_count: "%{answered} of %{total} answered"
+      all_answered: "✓ All answered"
+      submit: "Submit answers"
+      submitting: "Submitting…"
+      auto_saved: "Auto-saved as you type"
+      submit_nudges:
+        unanswered: "Answer at least one section to finish up."
+        unrated: "Rate each section you answered to finish up."
+      submit_failed: "Couldn't submit your answers — please try again."
+      review_start_failed: "Your answers were saved, but the review couldn't start. Reloading so you can try the review again."
   learn:
     title: "Learn"
     intro: "Every concept your sets can draw from — read up on one whenever you like."

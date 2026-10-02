@@ -1,5 +1,5 @@
 <div class="section" style="text-align:center;padding:3rem;">
-  <p style="color:var(--muted);margin-bottom:1rem;">No exercises are generated automatically on weekends — the morning job runs Monday–Friday.</p>
-  <%= button_to "Generate today's set anyway", generate_path, method: :post, class: "btn btn-ghost btn-sm",
-        form: { data: { loading_form: true, loading_label: "Generating…" } } %>
+  <p style="color:var(--muted);margin-bottom:1rem;"><%= t("dashboard.weekend_empty.message") %></p>
+  <%= button_to t("dashboard.generate_anyway"), generate_path, method: :post, class: "btn btn-ghost btn-sm",
+        form: { data: { loading_form: true, loading_label: t("dashboard.generating_label") } } %>
 </div>

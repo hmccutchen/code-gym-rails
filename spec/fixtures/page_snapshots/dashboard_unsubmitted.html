@@ -630,7 +630,7 @@
 </style>
 
 <div class="page-header">
-  <h1>Today's Workout</h1>
+  <h1>Today&#39;s Workout</h1>
   <div class="date">
     Tuesday, September 29
   </div>
@@ -853,10 +853,12 @@ What would be easy to get wrong or worth testing:
       return [...substantive(textarea)].length > ANSWER_MIN_LENGTH;
     }
 
+    const ANSWERED_COUNT = "%{answered} of %{total} answered";
+
     function updateProgress() {
       const filled = [...textareas].filter(answered).length;
       progressFill.style.width = (filled / sectionFields.length * 100) + "%";
-      progressLabel.textContent = filled === sectionFields.length ? "✓ All answered" : `${filled} of ${sectionFields.length} answered`;
+      progressLabel.textContent = filled === sectionFields.length ? "✓ All answered" : ANSWERED_COUNT.replace("%{answered}", filled).replace("%{total}", sectionFields.length);
       form.querySelectorAll(".hint-slot[data-hint-for]").forEach(slot => {
         const t = form.querySelector(`textarea[data-field="${slot.dataset.hintFor}"]`);
         if (t) setHintLocked(slot, !answered(t));

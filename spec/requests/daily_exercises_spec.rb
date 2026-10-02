@@ -83,7 +83,7 @@ RSpec.describe "DailyExercises", type: :request do
       get root_path
 
       expect(response.body).not_to include("Generate new set")
-      expect(response.body).to include("Today's set has been reviewed")
+      expect(response.body).to include("Today&#39;s set has been reviewed")
     end
 
     it "enqueues the job without calling the provider inline" do

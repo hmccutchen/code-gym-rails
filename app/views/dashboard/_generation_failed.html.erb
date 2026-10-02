@@ -1,6 +1,6 @@
 <div class="section" style="text-align:center;padding:3rem;">
-  <p style="color:var(--muted);margin-bottom:.5rem;">Couldn't generate today's exercises.</p>
+  <p style="color:var(--muted);margin-bottom:.5rem;"><%= t("dashboard.generation_failed.title") %></p>
   <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem;"><%= message %></p>
-  <%= button_to "Try again", generate_path, method: :post, class: "btn btn-ghost btn-sm",
-        form: { data: { loading_form: true, loading_label: "Generating…" } } %>
+  <%= button_to t("dashboard.generation_failed.try_again"), generate_path, method: :post, class: "btn btn-ghost btn-sm",
+        form: { data: { loading_form: true, loading_label: t("dashboard.generating_label") } } %>
 </div>

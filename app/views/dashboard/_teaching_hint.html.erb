@@ -11,12 +11,12 @@
   <% locked = !submitted && !response.answered?(field) %>
   <% disclosure = capture do %>
     <details class="hint">
-      <summary>Need a nudge? 💡</summary>
+      <summary><%= t("dashboard.teaching_hint.summary") %></summary>
       <div class="hint-body"><%= note %></div>
     </details>
   <% end %>
   <div class="hint-slot" data-hint-for="<%= field %>">
-    <p class="hint-locked"<%= " hidden" unless locked %>>Available after you attempt this section</p>
+    <p class="hint-locked"<%= " hidden" unless locked %>><%= t("dashboard.teaching_hint.locked") %></p>
     <%= disclosure unless locked %>
     <% unless submitted %><template><%= disclosure %></template><% end %>
   </div>
