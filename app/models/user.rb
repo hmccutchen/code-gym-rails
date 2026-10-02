@@ -69,6 +69,7 @@ class User < ApplicationRecord
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
   before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
   before_save :finish_learning_track, if: :on_learning_track?
+  before_update :record_provider_on_unlabelled_reviews, if: -> { will_save_change_to_provider? && provider_in_database.present? }
 
   scope :active, -> { where(anonymized_at: nil) }
 
@@ -257,6 +258,7 @@ class User < ApplicationRecord
       # SendPushReminderJob away from this row; destroying them means a
       # deleted account cannot be reached even if that guard is ever missed.
       push_subscriptions.destroy_all
+      clear_legacy_api_key
 
       update!(
         email:                  "deleted-user-#{id}@anonymized.local",
@@ -739,6 +741,21 @@ class User < ApplicationRecord
     (locked_section_kinds - section_kind_levels.keys).each do |key|
       errors.add(:locked_section_kinds, "locks #{key} without a difficulty target")
     end
+  end
+
+  # The ignored api_key column still holds the key copied into api_keys until
+  # a later migration drops it, so deleting an account has to clear it too.
+  # Remove this with the column.
+  def clear_legacy_api_key
+    self.class.where(id: id).update_all(api_key: nil)
+  end
+
+  # A review written before review_provider existed, or by old code while the
+  # migration ran, is labelled with the user's provider. Recording it before
+  # the provider changes keeps those reviews naming the one that wrote them.
+  def record_provider_on_unlabelled_reviews
+    daily_responses.where(review_provider: nil).where.not(ai_review: [ nil, {} ])
+                   .update_all(review_provider: provider_in_database)
   end
 
   def api_keys_name_providers
