@@ -1526,6 +1526,7 @@ class AiService
   # provider call.
   def draft_exercise(user, language:, blocking:)
     plan       = DailyPlan.for(user, language: language)
+    log_set_size(user, plan.size)
     history    = user.recent_performance
     difficulty = KindDifficulty.for(user)
     kinds      = ExerciseSection.for_plan(third: plan.third, fourth: plan.fourth, pattern: plan.pattern)
@@ -1876,6 +1877,19 @@ class AiService
     )
   end
 
+  # Logged when the plan is decided, before the provider is contacted, so an
+  # attempt that later fails still leaves its size and evidence behind. The
+  # transition compares planned counts, since a coverage addition makes the
+  # delivered count larger than the size that was planned.
+  def log_set_size(user, size)
+    Rails.logger.info("[set_size] user=#{user.id} date=#{Date.current} #{size.diagnostics.to_json}")
+
+    previous = user.daily_exercises.planned_size_before(Date.current)
+    return if previous.nil? || previous == size.count
+
+    Rails.logger.info("[set_size] user=#{user.id} from=#{previous} to=#{size.count} reason=#{size.reason}")
+  end
+
   def log_coverage(user, coverage)
     return if coverage.nil?
 
@@ -1928,6 +1942,7 @@ class AiService
       established: plan.established.map(&:concept),
       shared_concept: plan.shared_concept,
       coverage: plan.coverage && { kind: plan.coverage.kind.key, reason: plan.coverage.reason },
+      size: plan.size.diagnostics,
       recent_performance: history
     }
     requested.merge!(kind_difficulty_diagnostics(kinds, difficulty, ladders, language, plan.code_review_mode, problem_set))
