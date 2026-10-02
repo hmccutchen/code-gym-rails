@@ -702,12 +702,18 @@ concept-specific difficulty descriptions for future generation, not a new set.
   never restates the rubric's levels.
 
   **Vocabulary.** `.narrow_vocabulary` is an allowlist built from the
-  existing constants (the code-smell, OO-design, module-design,
-  domain-modeling and data-modeling groups, the TypeScript concepts, and the
-  concepts in `HOSTED_CONCEPTS`), intersected with the day's language
-  vocabulary, minus `TRADEOFF_CONCEPTS` unless the rung is
-  principal_engineer. Concepts whose worse piece would be incorrect stay
-  out. Callers that know the rung pass it (`generation_guidance_for`,
+  existing constants (the code-smell, OO-design, module-design and
+  domain-modeling groups, the data-modeling group minus `DEFERRED_CONCEPTS`,
+  the TypeScript concepts, and the concepts in `HOSTED_CONCEPTS`),
+  intersected with the day's language vocabulary, minus `TRADEOFF_CONCEPTS`
+  unless the rung is principal_engineer. Concepts whose worse piece would be
+  incorrect stay out. `missing_constraint`, `unsafe_migration` and
+  `wrong_cardinality` were deferred after the 2026-10-01 real-draft check,
+  where a missing_constraint draft's pieces behaved differently under the
+  scenario's own concurrent writers and bulk insert and the judge kept it;
+  each returns only after a comparison run shows behavior-equivalent
+  drafts. The judge guidance names behavior that differs under any
+  condition the scenario states as a reasoning failure. Callers that know the rung pass it (`generation_guidance_for`,
   `can_host?` through the prompt's per-kind rungs, the kind-difficulty
   diagnostics, `ladders_for`); `DailyPlan` passes none and gets the strictest
   list; `ConceptHosts` unions every rung unless handed a `difficulty`, which

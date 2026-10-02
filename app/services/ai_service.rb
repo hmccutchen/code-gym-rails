@@ -2255,8 +2255,8 @@ class AiService
       "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
       "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
       "relationship should be modeled and what the wrong shape costs the code that uses it, not for a " \
-      "migration to review; a design_comparison shows two working ways to model the relationship and asks " \
-      "which one the stated access pattern should use."
+      "migration to review; a design_comparison shows two ways to store or query the same data that behave the " \
+      "same, such as with and without an index, and asks which one the stated access pattern should use."
   end
 
   # The meta-skill concepts name a way of reasoning, which makes them the one

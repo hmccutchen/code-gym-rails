@@ -194,7 +194,7 @@ RSpec.describe ExerciseSection::DesignComparison do
     it "offers only its own hosts, intersected with the language vocabulary" do
       offered = described_class.narrow_vocabulary(rails, rung: "senior")
 
-      expect(offered).to include("open_closed", "n_plus_one", "over_mocking", "god_object")
+      expect(offered).to include("open_closed", "n_plus_one", "over_mocking", "god_object", "missing_index")
       expect(offered).not_to include("idempotency", "error_handling", "concurrency", "transaction_safety",
                                      "reading_for_intent", "sql_injection_prevention")
       expect(offered - rails).to be_empty
@@ -214,6 +214,14 @@ RSpec.describe ExerciseSection::DesignComparison do
       expect(described_class.narrow_vocabulary(rails, rung: "principal_engineer")).to include(*tradeoffs)
       expect(described_class.narrow_vocabulary(rails, rung: "senior") & tradeoffs).to be_empty
       expect(described_class.narrow_vocabulary(rails) & tradeoffs).to be_empty
+    end
+
+    it "defers the data-modeling concepts whose pieces could not behave the same, at every rung" do
+      expect(described_class::DEFERRED_CONCEPTS).to contain_exactly("missing_constraint", "unsafe_migration", "wrong_cardinality")
+      KindDifficulty::LEVELS.each do |rung|
+        expect(described_class.narrow_vocabulary(rails, rung: rung) & described_class::DEFERRED_CONCEPTS).to be_empty
+      end
+      expect(described_class::DEFERRED_CONCEPTS - AiService::DATA_MODELING_CONCEPTS).to be_empty
     end
 
     it "names only concepts some language vocabulary holds, so a rename fails here" do
@@ -242,6 +250,11 @@ RSpec.describe ExerciseSection::DesignComparison do
   end
 
   describe "the judge's blind solve" do
+    it "tells the judge that behavior differing under a stated condition is a reasoning failure" do
+      expect(described_class.judge_guidance)
+        .to include("behavior that differs under any condition the scenario states, such as concurrent writers, retries, bulk writes or a failure")
+    end
+
     it "asks the judge to choose between the two pieces" do
       expect(described_class.judge_solve_options).to eq(%w[a b])
     end

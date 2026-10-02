@@ -38,6 +38,13 @@ class ExerciseSection::DesignComparison < ExerciseSection
   # transactions, security) turn the task back into a code review and stay out.
   # A borderline concept joins only after the judge comparison keeps real
   # drafts for it.
+  # Data-modeling concepts deferred after the 2026-10-01 real-draft check: a
+  # missing_constraint draft's two pieces behaved differently under the
+  # scenario's own concurrent writers and bulk insert, and the judge kept it.
+  # Each is eligible again only after a comparison run shows drafts whose
+  # pieces behave the same under every stated condition.
+  DEFERRED_CONCEPTS = %w[missing_constraint unsafe_migration wrong_cardinality].freeze
+
   HOSTED_CONCEPTS = %w[
     n_plus_one memoization service_objects query_objects policy_objects
     over_mocking testing_implementation_not_behavior
@@ -87,7 +94,8 @@ class ExerciseSection::DesignComparison < ExerciseSection
         "Solve it before judging: decide which piece is better for the stated system, and quote the sentence that decides it. " \
         "Reject as underdetermined if no stated fact decides it, or if, at the junior rung, both pieces are defensible. " \
         "Reject as reasoning_failure if a piece can be picked without reasoning about the system: cleaner names, more or " \
-        "better comments, clearly shorter code, or behavior that differs. Reject as scope_mismatch if the principle the " \
+        "better comments, clearly shorter code, or behavior that differs under any condition the scenario states, such as " \
+        "concurrent writers, retries, bulk writes or a failure. Reject as scope_mismatch if the principle the " \
         "pieces differ on is not the tagged concept. At principal_engineer both pieces may be defensible and each may carry " \
         "a real cost; keep it only if the stated facts still settle which cost this system should pay. When this section " \
         "shares its concept with the day's code review, it must test the concept through a choice between two working " \
@@ -116,7 +124,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
     # vocabulary later is not offered here until someone decides it fits.
     def hosted_concepts
       AiService::CODE_SMELL_CONCEPTS + AiService::OO_DESIGN_CONCEPTS + AiService::MODULE_DESIGN_CONCEPTS +
-        AiService::DOMAIN_MODELING_CONCEPTS + AiService::DATA_MODELING_CONCEPTS +
+        AiService::DOMAIN_MODELING_CONCEPTS + (AiService::DATA_MODELING_CONCEPTS - DEFERRED_CONCEPTS) +
         AiService::TYPESCRIPT_FLAVORED_CONCEPTS + HOSTED_CONCEPTS
     end
 
