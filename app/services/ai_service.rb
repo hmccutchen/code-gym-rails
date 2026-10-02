@@ -176,11 +176,13 @@ class AiService
   # How long a judged generation can run before it lands or fails: the draft,
   # then the judge fan-out, then one retry fan-out and one re-judge fan-out
   # for each retry the most-retried kind gets, each waiting on its slowest
-  # thread.
+  # thread, and one more judge call when a kind re-judges its edits. Only the
+  # version that ships is edited and re-judged, so that happens once a chain.
   JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
                              worst_case_call_seconds(READ_TIMEOUT) +
                              (ExerciseSection.all.map(&:judge_retries).max *
-                               (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT)))
+                               (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT))) +
+                             (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_call_seconds(READ_TIMEOUT) : 0)
 
   # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
   # taken as final: the provider has almost certainly finished, and billed, the

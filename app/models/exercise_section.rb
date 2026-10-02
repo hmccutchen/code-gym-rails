@@ -316,6 +316,13 @@ class ExerciseSection
       nil
     end
 
+    # Whether an edit the judge makes to this kind is judged once more before
+    # it ships. True where the editable prose holds what decides the answer,
+    # so a rewrite could change which answer is right.
+    def rejudge_edits?
+      false
+    end
+
     # The answers a judge must choose between when it solves this kind blind,
     # or nil for a kind the judge does not solve. A solve is an answer
     # candidate, so a kind with one keeps it, and the judge's free text, out

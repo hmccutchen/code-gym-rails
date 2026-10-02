@@ -380,5 +380,54 @@ RSpec.describe JudgedGeneration do
       expect(outcome.to_s).not_to include("SECRET", "better")
       expect(logged.join).not_to include("SECRET")
     end
+
+    describe "an edit, judged once more" do
+      def edit_verdict(better: "b")
+        solve("edit", better).merge("issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                                    "fields" => { "question" => "Edited question?" })
+      end
+
+      it "ships the edit when the second judgment keeps it and solves it to the key" do
+        verdicts["design_comparison"] = [ edit_verdict, solve("keep", "b") ]
+
+        judged = run
+
+        expect(judged.problem_set["design_comparison"]["question"]).to eq("Edited question?")
+        expect(judged.outcomes["design_comparison"]).to include(status: :edit, edit_reverted: false)
+        expect(judged_calls.count { |call| call[1] == "design_comparison" }).to eq(2)
+      end
+
+      it "ships the unedited draft when the second judgment rejects the edit" do
+        verdicts["design_comparison"] = [ edit_verdict, solve("reject", "b").merge("principle" => "underdetermined",
+                                                                                   "evidence" => "x", "reason" => "r") ]
+
+        judged = run
+
+        expect(judged.problem_set["design_comparison"]["question"]).to eq("Which fits?")
+        expect(judged.outcomes["design_comparison"]).to include(edit_reverted: true, dropped: false)
+      end
+
+      it "ships the unedited draft when the edited section's solve mismatches the key" do
+        verdicts["design_comparison"] = [ edit_verdict, solve("keep", "a") ]
+
+        expect(run.outcomes["design_comparison"]).to include(edit_reverted: true)
+      end
+
+      it "ships the unedited draft when the second judgment cannot answer" do
+        verdicts["design_comparison"] = [ edit_verdict, AiService::TimeoutError.new("slow") ]
+
+        expect(run.problem_set["design_comparison"]["question"]).to eq("Which fits?")
+      end
+
+      it "makes no second call for a kind whose edits are not re-judged" do
+        verdicts["code_review"] = [ { "status" => "edit", "issues" => [ { "type" => "padding", "evidence" => "x" } ],
+                                      "fields" => { "question" => "Edited" } } ]
+
+        judged = run
+
+        expect(judged_calls.count { |call| call[1] == "code_review" }).to eq(1)
+        expect(judged.outcomes["code_review"]).not_to have_key(:edit_reverted)
+      end
+    end
   end
 end

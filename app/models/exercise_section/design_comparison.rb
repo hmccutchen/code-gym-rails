@@ -108,6 +108,12 @@ class ExerciseSection::DesignComparison < ExerciseSection
       PIECES
     end
 
+    # The scenario and question the judge may reword are where the deciding
+    # fact lives.
+    def rejudge_edits?
+      true
+    end
+
     def solve_matches_key?(section, solve)
       section.dig(ANSWER_KEY_FIELD, "better") == solve
     end

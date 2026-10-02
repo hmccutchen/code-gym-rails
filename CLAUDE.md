@@ -733,7 +733,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `JudgedGeneration::REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL`, which stays
   false until `script/compare_models.rb judge` has run on real drafts and a
   person has read the disagreements; principal_engineer never rejects on a
-  mismatch. Because the solve makes the judge's own words an answer
+  mismatch. The judge may reword the title, scenario and question, which is
+  where the deciding fact lives, so an edit to this kind is judged once more
+  (`.rejudge_edits?`, true only here): if that judgment rejects, cannot
+  answer, or solves the edited section against the key, the unedited draft
+  ships and the outcome records `edit_reverted: true`. It costs one judge call
+  only when this kind is edited, and `JUDGED_GENERATION_BUDGET` adds one
+  judge call's worst case for it. Because the solve makes the judge's own words an answer
   candidate, this kind's outcomes omit evidence and reason, its reply is
   parsed with `log_raw: false`, and an unreadable response body that starts
   like JSON is logged by size only, for every call. Known limit: the judge
@@ -932,7 +938,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `JUDGED_GENERATION_BUDGET`, which the dashboard's generating poll reads,
   derives its retry cycles from the largest registered `judge_retries`, each
   cycle `worst_case_call_seconds(RETRY_READ_TIMEOUT)` plus
-  `worst_case_call_seconds(READ_TIMEOUT)`. Each retry asks for one
+  `worst_case_call_seconds(READ_TIMEOUT)`, plus one judge call when a kind
+  re-judges its edits. Each retry asks for one
   section, so it runs on `RETRY_READ_TIMEOUT` rather than the draft's
   300-second budget. Both figures assume that token
   shape and that list price; re-measure against `ApiUsage` rows under
@@ -2177,7 +2184,7 @@ always pull in the full suite — is stated once, in
 - `script/prepare_junior_ladders.rb` (+ `script/junior_ladder_preparation.rb`) — operator coverage report; explicit `--run` queues shared-reference refreshes using the operator's key.
 - `spec/requests/existing_account_pages_spec.rb` — exact pre-track Dashboard, Setup, Account and History snapshots. `UPDATE_PAGE_SNAPSHOTS=1` intentionally rewrites fixtures; never use it to conceal a learning-track regression.
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt, the single-section retry call, and the two-stage entry point: `#generate_judged_exercise` drafts, then hands the draft to `JudgedGeneration`
-- `app/services/judged_generation.rb` — `JudgedGeneration`: the two-stage path after the draft. Fans the judge out a section at a time, retries a rejection up to its kind's `judge_retries` times (once, for every kind today) with its concept fixed, drops a rejected last retry, and hands the final set to `AiService`'s shared logging tail. It reaches the provider only through `JudgedGeneration::Provider` (`judge_section` and `retry_section`, as callables built fresh per call), so its specs need no provider subclass
+- `app/services/judged_generation.rb` — `JudgedGeneration`: the two-stage path after the draft. Fans the judge out a section at a time, retries a rejection, or a planned section ingest refused, up to its kind's `judge_retries` times (twice for a fixed kind, once otherwise) with its concept fixed, drops a rejected last retry, re-judges a design comparison's edits, and hands the final set to `AiService`'s shared logging tail. It reaches the provider only through `JudgedGeneration::Provider` (`judge_section` and `retry_section`, as callables built fresh per call), so its specs need no provider subclass. `JudgedGeneration::UnhostedConcepts` names the planned concepts a drop left without a host
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, runs each resolved section's own `.reject_unusable!` check, leaving a refused section out and reporting it on `Result#unusable_sections`, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
 - `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class

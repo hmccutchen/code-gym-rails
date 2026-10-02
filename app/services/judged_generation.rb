@@ -5,16 +5,14 @@
 # to the kind's judge_retries regenerations of that section, unless the
 # drafted concept normalized to "other", which is rejected directly rather
 # than spending a retry on an unusable tag. A planned section ingest refused
-# as unusable counts as rejected before judging. Rejecting the last retry drops the
-# section, whichever kind it is; a day with every section dropped is a failed
-# generation (AiService::AllSectionsRejectedError), never an empty set. A judge
-# that fails or answers invalidly leaves the draft unedited: the judge alone
-# never costs a day its set. The finish step runs last so its logs describe the final set.
+# counts as rejected before judging. Rejecting the last retry drops the
+# section, whichever kind; a day with every section dropped raises
+# AiService::AllSectionsRejectedError. A judge that fails or answers
+# invalidly leaves the draft unedited. The finish step runs last so its logs
+# describe the final set.
 #
 # The retries fan out the way the judging does, so a day with three of them
-# waits for the slowest rather than their sum — serially they ran a full
-# generation and a re-judge each, which put the worst case far past the single
-# call this path replaced, on a schedule that ticks hourly.
+# waits for the slowest rather than their sum, on a schedule that ticks hourly.
 #
 # The provider is reached only through Provider, built fresh by `providers`
 # for every call, so each thread has its own instance and therefore its own
@@ -96,7 +94,7 @@ class JudgedGeneration
 
   def finish(set, dropped, outcomes)
     dropped_concepts = dropped.to_h { |key| [ key, drafted_concept(key) ] }
-    @finish.call(set, dropped_concepts: dropped_concepts, judge: outcomes, unhosted: unhosted_concepts(dropped_concepts))
+    @finish.call(set, dropped_concepts: dropped_concepts, judge: outcomes, unhosted: UnhostedConcepts.for(@draft.plan, dropped_concepts))
   end
 
   # No thread writes the set: each returns its own section back and this
@@ -131,7 +129,21 @@ class JudgedGeneration
 
     matched = solve_matched(kind, section, verdict)
     verdict = settled(kind, verdict, matched)
-    [ kind.key, with_solve(outcome, matched).merge(judgment(kind, verdict)), apply_verdict(verdict, section) ]
+    shipped, outcome = confirmed_edit(kind, section, verdict, with_solve(outcome, matched).merge(judgment(kind, verdict)))
+    [ kind.key, outcome, shipped ]
+  end
+
+  # [section to ship, outcome]. For a kind whose edits are re-judged, the
+  # edited section is judged once more, and the unedited one ships instead
+  # when that judge rejects it, cannot answer, or solves it against the key.
+  def confirmed_edit(kind, section, verdict, outcome)
+    edited = apply_verdict(verdict, section)
+    return [ edited, outcome ] unless verdict.edit? && kind.rejudge_edits?
+
+    check, latency = judge_with_fallback(kind, edited)
+    outcome = outcome.merge(latency_ms: outcome[:latency_ms] + latency)
+    reverted = check.is_a?(String) || check.reject? || solve_matched(kind, edited, check) == false
+    [ reverted ? section : edited, outcome.merge(edit_reverted: reverted) ]
   end
 
   # `source` marks a section ProblemSetIngest#ground_code_review! stamped its
@@ -156,9 +168,7 @@ class JudgedGeneration
     summary.merge(evidence: verdict.evidence, reason: verdict.reason)
   end
 
-  def issue_types(verdict)
-    verdict.issues.map { |issue| issue[:type] }
-  end
+  def issue_types(verdict) = verdict.issues.map { |issue| issue[:type] }
 
   def rejected_keys(outcomes)
     outcomes.select { |_, outcome| outcome[:status] == :reject }.keys
@@ -201,7 +211,8 @@ class JudgedGeneration
     # The draft's principle and issues survive a retry the judge accepted:
     # they are the only record this section was rejected at all, and
     # rejection rate per principle is read off these entries.
-    [ apply_verdict(verdict, retried), outcome.merge(status: verdict.status), true ]
+    shipped, outcome = confirmed_edit(kind, retried, verdict, outcome.merge(status: verdict.status))
+    [ shipped, outcome, true ]
   end
 
   # Appends one judged retry to each retry list the outcome carries; a judge
@@ -269,22 +280,6 @@ class JudgedGeneration
   rescue AiService::Error, *AiService::INFRASTRUCTURE_ERRORS => e
     Rails.logger.warn("[judge_retry_failed] user=#{@user.id} section=#{kind.key}: #{e.message}")
     nil
-  end
-
-  # What the plan asked for that no delivered section carries. The plan
-  # attributes a concept to a section only in the fourth slot, so this is
-  # decided after the fact the way AiService#log_retention decides honored:
-  # the dropped section's own concept, matched against what the plan offered.
-  def unhosted_concepts(dropped_concepts)
-    plan          = @draft.plan
-    retention     = (plan.due_checks + plan.fourth_due_checks).map(&:concept)
-    reinforcement = (plan.reinforcement.to_a + plan.fourth_reinforcement.to_a).map { |entry| entry[:concept] }
-
-    dropped_concepts.filter_map do |key, concept|
-      planned_as = "retention" if retention.include?(concept)
-      planned_as ||= "reinforcement" if reinforcement.include?(concept)
-      { section: key, concept: concept, planned_as: planned_as } if planned_as
-    end
   end
 
   def elapsed_ms(started)

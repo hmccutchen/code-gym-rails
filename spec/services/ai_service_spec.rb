@@ -55,9 +55,11 @@ RSpec.describe AiService do
     it "gives a judged generation every attempt of each stage, for every retry the most-retried kind gets" do
       retry_cycles = ExerciseSection.all.map(&:judge_retries).max
       stages = [ AiService::GENERATION_READ_TIMEOUT, AiService::READ_TIMEOUT ] +
-               ([ AiService::RETRY_READ_TIMEOUT, AiService::READ_TIMEOUT ] * retry_cycles)
+               ([ AiService::RETRY_READ_TIMEOUT, AiService::READ_TIMEOUT ] * retry_cycles) +
+               [ AiService::READ_TIMEOUT ]
 
       expect(retry_cycles).to eq(2)
+      expect(ExerciseSection.all.select(&:rejudge_edits?)).to eq([ ExerciseSection::DesignComparison ])
       expect(AiService::JUDGED_GENERATION_BUDGET)
         .to be >= stages.sum { |timeout| AiService.worst_case_call_seconds(timeout) }
     end
