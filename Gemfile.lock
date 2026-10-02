@@ -99,7 +99,7 @@ GEM
       rack-test (>= 0.6.3)
       regexp_parser (>= 1.5, < 3.0)
       xpath (~> 3.2)
-    capybara-playwright-driver (0.5.10)
+    capybara-playwright-driver (0.5.12)
       addressable
       capybara
       playwright-ruby-client (>= 1.16.0)
@@ -190,7 +190,7 @@ GEM
     mime-types (3.7.0)
       logger
       mime-types-data (~> 3.2025, >= 3.2025.0507)
-    mime-types-data (3.2026.0701)
+    mime-types-data (3.2026.0929)
     mini_mime (1.1.5)
     minitest (6.0.6)
       drb (~> 2.0)
@@ -250,7 +250,7 @@ GEM
     pg (1.6.3-x86_64-darwin)
     pg (1.6.3-x86_64-linux)
     pg (1.6.3-x86_64-linux-musl)
-    playwright-ruby-client (1.62.0)
+    playwright-ruby-client (1.63.0)
       base64
       concurrent-ruby (>= 1.1.6)
       mime-types (>= 3.0)
@@ -316,7 +316,7 @@ GEM
       prism (>= 1.6.0)
       rbs (>= 4.0.0)
       tsort
-    regexp_parser (2.12.0)
+    regexp_parser (2.13.1)
     reline (0.7.0)
       io-console (~> 0.5)
     resend (1.17.0)
@@ -445,7 +445,7 @@ DEPENDENCIES
   bootsnap
   brakeman
   capybara
-  capybara-playwright-driver (~> 0.5.10)
+  capybara-playwright-driver (~> 0.5.12)
   debug
   faraday (~> 2.14)
   faraday-retry
