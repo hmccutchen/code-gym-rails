@@ -73,7 +73,7 @@ RSpec.describe ModelComparison do
     comparison.generate(user.id)
 
     expect(out.string).to include("ambiguity_hunt")
-    expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
+    ExerciseSection.all_answer_key_fields.each { |field| expect(out.string).not_to include(field) }
   end
 
   it "prints a malformed provider response as that model's result rather than losing both" do
@@ -159,7 +159,7 @@ RSpec.describe ModelComparison do
     comparison.judge(user.id)
 
     expect(out.string).to include("ambiguity_hunt")
-    expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
+    ExerciseSection.all_answer_key_fields.each { |field| expect(out.string).not_to include(field) }
   end
 
   it "judge_fixtures prints a per-model detection table and never the answer key" do
@@ -177,7 +177,7 @@ RSpec.describe ModelComparison do
     ModelComparison::CANDIDATES.fetch("judge").each { |route| expect(out.string).to include("=== judge_fixtures: #{route[:model]} ===") }
     expect(out.string).to include("detected:")
     expect(out.string).to include("unstated_prerequisite: 2/2")
-    expect(out.string).not_to include(ProblemSetIngest::ANSWER_KEY_FIELD)
+    ExerciseSection.all_answer_key_fields.each { |field| expect(out.string).not_to include(field) }
   end
 
   it "judge_fixtures prints a provider failure as that fixture's row and finishes every table" do

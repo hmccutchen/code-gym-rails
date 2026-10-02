@@ -159,6 +159,95 @@ RSpec.describe JudgedGeneration do
     expect(built).to eq(kinds.size + 2)
   end
 
+  it "retries a rejected retry no further when the kind allows one" do
+    verdicts["pattern"] = [ reject, reject ]
+
+    run
+
+    expect(retry_calls.size).to eq(1)
+  end
+
+  it "gives a kind as many retries as its judge_retries allows" do
+    allow(ExerciseSection::Pattern).to receive(:judge_retries).and_return(2)
+    verdicts["pattern"] = [ reject, reject("underdetermined"), { "status" => "keep" } ]
+
+    judged = run
+
+    expect(retry_calls.map { |call| call[3] }).to eq(%w[pattern pattern])
+    expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 2, dropped: false)
+    # The first retry was rejected; nothing of that attempt may describe the
+    # section that shipped.
+    expect(judged.outcomes["pattern"]).to include(retry_principle: nil)
+    expect(judged.outcomes["pattern"]).not_to include(:retry_evidence, :retry_reason)
+  end
+
+  it "drops a section once every retry its kind allows is rejected" do
+    allow(ExerciseSection::Pattern).to receive(:judge_retries).and_return(2)
+    verdicts["pattern"] = [ reject, reject, reject("underdetermined") ]
+
+    judged = run
+
+    expect(retry_calls.size).to eq(2)
+    expect(judged.outcomes["pattern"]).to include(retries: 2, dropped: true, retry_principle: "underdetermined")
+  end
+
+  # The diagnostics log serializes these hashes, so their keys and order are
+  # part of what the log line says.
+  describe "the outcome a rejection leaves" do
+    def outcome_for(*pattern_verdicts)
+      verdicts["pattern"] = pattern_verdicts
+      run.outcomes["pattern"]
+    end
+
+    it "lists a dropped section's fields in the order the log has always written them" do
+      outcome = outcome_for(reject, reject("underdetermined"))
+
+      expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
+                                    retry_principle retry_issues retry_evidence retry_reason])
+      expect(outcome.except(:latency_ms)).to eq(
+        status: :reject, issues: [], principle: "scope_mismatch", retries: 1, dropped: true, fallback: nil,
+        evidence: "quoted", reason: "because", retry_principle: "underdetermined", retry_issues: [],
+        retry_evidence: "quoted", retry_reason: "because"
+      )
+    end
+
+    it "lists a kept retry's fields in the same order" do
+      outcome = outcome_for(reject, { "status" => "keep" })
+
+      expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
+                                    retry_principle retry_issues])
+      expect(outcome.except(:latency_ms)).to eq(
+        status: :keep, issues: [], principle: "scope_mismatch", retries: 1, dropped: false, fallback: nil,
+        evidence: "quoted", reason: "because", retry_principle: nil, retry_issues: []
+      )
+    end
+
+    it "lists a re-judge fallback's fields in the same order" do
+      allow(Rails.logger).to receive(:warn)
+      outcome = outcome_for(reject, AiService::TimeoutError.new("slow"))
+
+      expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
+                                    retry_principle])
+      expect(outcome.except(:latency_ms)).to eq(
+        status: :keep, issues: [], principle: "scope_mismatch", retries: 1, dropped: false, fallback: "timeout",
+        evidence: "quoted", reason: "because", retry_principle: nil
+      )
+    end
+
+    it "lists a failed retry's fields in the same order" do
+      allow(Rails.logger).to receive(:warn)
+      retried_sections["pattern"] = AiService::RateLimitError.new("slow down")
+      outcome = outcome_for(reject)
+
+      expect(outcome.keys).to eq(%i[status issues principle retries dropped fallback latency_ms evidence reason
+                                    retry_principle])
+      expect(outcome.except(:latency_ms)).to eq(
+        status: :reject, issues: [], principle: "scope_mismatch", retries: 0, dropped: true, fallback: nil,
+        evidence: "quoted", reason: "because", retry_principle: nil
+      )
+    end
+  end
+
   it "leaves the draft's own problem set untouched" do
     verdicts["pattern"] = [ reject, reject ]
 

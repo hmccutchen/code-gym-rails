@@ -12,8 +12,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   MAX_CRITIQUE_POINT_LENGTH = 300
 
   # problem_statement is the whole task: rendered, persisted, and interpolated
-  # into both round prompts. Bounded here, enforced by ProblemSetIngest, the
-  # same split AmbiguityHunt::MAX_PLANTED uses.
+  # into both round prompts. Bounded on ingest by .reject_unusable!.
   MAX_PROBLEM_STATEMENT_LENGTH = 2_000
 
   # A pseudocode plan for a 15-25 line problem. Generous enough not to clip a
@@ -27,6 +26,23 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
 
   def self.vocabulary_key
     :pseudocode_to_code
+  end
+
+  # problem_statement is the entire task for a pseudocode_to_code day: it is the
+  # only thing telling the engineer what to plan, it is interpolated into both
+  # round prompts, and it reaches glossary_wrap in the view — where a non-string
+  # raises. A section with nothing to plan is not a section, so this rejects
+  # rather than repairs, the same call AmbiguityHunt.reject_unusable! makes and
+  # for the same reason. Bounded too, since it is provider text going into a
+  # prompt.
+  def self.reject_unusable!(section)
+    statement = section["problem_statement"].is_a?(String) ? section["problem_statement"].strip : ""
+    if statement.empty?
+      raise AiService::InvalidResponseError,
+            "Pseudocode section returned no usable problem_statement to plan against"
+    end
+
+    section["problem_statement"] = statement.truncate(MAX_PROBLEM_STATEMENT_LENGTH)
   end
 
   def self.judge_task

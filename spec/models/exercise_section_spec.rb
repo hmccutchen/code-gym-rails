@@ -526,11 +526,107 @@ RSpec.describe ExerciseSection do
     end
   end
 
-  describe ".slot_count" do
-    it "matches a fully populated plan, so the ceiling and the roster cannot drift" do
-      full = described_class.for_plan(third: :challenge, fourth: :plan_review)
+  describe ".slots" do
+    # A kind in two slots would resolve twice and count twice in every
+    # denominator.
+    it "places each kind in exactly one slot" do
+      expect(described_class.slots.values.flatten).to match_array(described_class.all)
+    end
+  end
 
-      expect(described_class.slot_count).to eq(full.size)
+  describe ".resolved_keys" do
+    it "never presents more sections than a day holds, even when the provider returns every shape" do
+      every_shape = described_class.keys.index_with { {} }
+
+      expect(described_class.resolved_keys(every_shape).size).to be <= described_class::MAX_SECTIONS
+    end
+  end
+
+  describe "MAX_SECTIONS" do
+    it "is four, as many as a fully populated plan holds today" do
+      expect(described_class::MAX_SECTIONS).to eq(4)
+      expect(described_class::MAX_SECTIONS).to eq(described_class.for_plan(third: :challenge, fourth: :plan_review).size)
+    end
+  end
+
+  describe ".fixed" do
+    it "holds code_review alone" do
+      expect(described_class.fixed).to eq([ ExerciseSection::CodeReview ])
+      expect((described_class.all - described_class.fixed).map(&:fixed?)).to all(be(false))
+    end
+  end
+
+  describe ".slots" do
+    it "gives each fixed kind its own slot ahead of pattern, third and fourth" do
+      expect(described_class.slots).to eq(
+        code_review: [ ExerciseSection::CodeReview ], pattern: [ ExerciseSection::Pattern ],
+        third: described_class.thirds, fourth: described_class.fourths
+      )
+    end
+  end
+
+  describe ".resolved_keys" do
+    it "resolves FakeService's every-kind set to one key per slot, by precedence" do
+      expect(described_class.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
+        .to eq(%w[code_review pattern architecture plan_review])
+    end
+
+    it "skips a key whose value is not a section" do
+      set = { "code_review" => { "q" => "?" }, "pattern" => "a bare string", "architecture" => nil,
+              "challenge" => { "q" => "?" }, "plan_review" => [ "not a hash" ], "ambiguity_hunt" => { "q" => "?" } }
+
+      expect(described_class.resolved_keys(set)).to eq(%w[code_review challenge ambiguity_hunt])
+    end
+
+    it "keeps the third's precedence over a provider's extra alternates" do
+      set = { "code_review" => { "q" => "?" }, "parsons_problem" => { "q" => "?" }, "challenge" => { "q" => "?" },
+              "security_review" => { "q" => "?" } }
+
+      expect(described_class.resolved_keys(set)).to eq(%w[code_review security_review])
+    end
+
+    it "is empty for a set holding no section at all" do
+      expect(described_class.resolved_keys({ "code_review" => nil, "bogus" => { "q" => "?" } })).to eq([])
+    end
+  end
+
+  describe ".all_answer_key_fields" do
+    it "is the union of every kind's answer key, which today is the ambiguity hunt's planted list" do
+      expect(described_class.all_answer_key_fields).to eq(%w[planted_ambiguities])
+      expect((described_class.all - [ ExerciseSection::AmbiguityHunt ]).map(&:answer_key_fields)).to all(eq([]))
+    end
+  end
+
+  describe ".narrow_vocabulary" do
+    it "returns the vocabulary unchanged for every kind, at any rung or none" do
+      vocabulary = %w[n_plus_one memoization]
+
+      described_class.all.each do |kind|
+        expect(kind.narrow_vocabulary(vocabulary)).to equal(vocabulary)
+        KindDifficulty::LEVELS.each { |rung| expect(kind.narrow_vocabulary(vocabulary, rung: rung)).to equal(vocabulary) }
+      end
+    end
+  end
+
+  describe ".reject_unusable!" do
+    it "leaves a section of a kind with nothing to refuse untouched" do
+      section = { "question" => "" }
+
+      (described_class.all - [ ExerciseSection::AmbiguityHunt, ExerciseSection::PseudocodeToCode ]).each do |kind|
+        expect { kind.reject_unusable!(section) }.not_to change { section }
+      end
+    end
+  end
+
+  describe ".judge_retries" do
+    it "is one for every kind" do
+      expect(described_class.all.map(&:judge_retries)).to all(eq(1))
+    end
+  end
+
+  describe ".judge_guidance" do
+    it "is absent for every kind" do
+      expect(described_class.all.map(&:judge_guidance)).to all(be_nil)
     end
   end
 

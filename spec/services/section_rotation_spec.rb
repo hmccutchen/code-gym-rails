@@ -36,7 +36,15 @@ RSpec.describe SectionRotation do
   end
 
   it "derives its slot roster from ExerciseSection.slots rather than restating it" do
-    expect(described_class::OPTIONAL_SLOTS).to eq(ExerciseSection.slots.keys - [ :code_review ])
+    fixed_slots = ExerciseSection.fixed.map { |kind| kind.key.to_sym }
+
+    expect(described_class::OPTIONAL_SLOTS).to eq(ExerciseSection.slots.keys - fixed_slots)
+    expect(described_class::OPTIONAL_SLOTS).to eq(%i[pattern third fourth])
+  end
+
+  it "counts one mandatory slot per fixed kind" do
+    expect(described_class::MANDATORY_SLOT_COUNT).to eq(ExerciseSection.fixed.size)
+    expect(described_class::MANDATORY_SLOT_COUNT).to eq(1)
   end
 
   # The regime this is designed for: every optional kind competing for one
@@ -44,7 +52,7 @@ RSpec.describe SectionRotation do
   # is derived from the roster rather than counted, so adding an eighth kind
   # lengthens this run instead of leaving the new kind silently uncovered.
   it "drains the whole pool in pool-size days rather than repeating" do
-    pool_size = (ExerciseSection.slots.values.flatten - [ ExerciseSection::CodeReview ]).size
+    pool_size = (ExerciseSection.slots.values.flatten - ExerciseSection.fixed).size
     seen = []
     log  = []
 
@@ -52,7 +60,7 @@ RSpec.describe SectionRotation do
       chosen = described_class.for(history(*log.reverse), count: 2)
       kind   = chosen.values.compact.first
       seen << kind
-      log << ([ "code_review" ] + chosen.values.compact.map(&:to_s))
+      log << (ExerciseSection.fixed.map(&:key) + chosen.values.compact.map(&:to_s))
     end
 
     expect(seen.uniq.size).to eq(pool_size)

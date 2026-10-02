@@ -14,6 +14,10 @@ class ExerciseSection
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80
 
+  # The most sections one day holds. Its own fact rather than the slot count:
+  # a second fixed kind adds a slot without making a day longer.
+  MAX_SECTIONS = 4
+
   # Enumeration order, matching the order these keys have always been listed in
   # (strong params, concept tagging, scenario collection) so anything deriving a
   # Hash or Array from it keeps the ordering it already had.
@@ -30,6 +34,11 @@ class ExerciseSection
     all.find(&:leads_learning_track?)
   end
 
+  # The kinds every day is built around, each in a slot of its own.
+  def self.fixed
+    all.select(&:fixed?)
+  end
+
   # Precedence order, NOT enumeration order: a problem_set holding more than one
   # third key (a provider returning both) resolves the way it always has —
   # architecture first, then security_review, then challenge, then
@@ -40,16 +49,11 @@ class ExerciseSection
 
   # Precedence order for the fourth slot, mirroring .thirds: if a provider
   # somehow returned more than one fourth-shaped key, plan_review wins, then
-  # ambiguity_hunt.
+  # ambiguity_hunt, then pseudocode_to_code.
   def self.fourths
     [ PlanReview, AmbiguityHunt, PseudocodeToCode ]
   end
 
-  # Which fourth-slot key a raw problem_set resolves to, by .fourths
-  # precedence — nil when it holds none. Lives here rather than on
-  # DailyExercise because the generation-time normalizers have to resolve the
-  # same slot on a payload that isn't a row yet, and two copies of a
-  # precedence rule is one copy too many.
   # A provider can emit a key holding null or a bare string alongside the real
   # section; only a Hash is a section anything downstream can render.
   def self.present?(problem_set, key)
@@ -57,17 +61,33 @@ class ExerciseSection
   end
 
   def self.resolved_fourth_key(problem_set)
-    fourths.map(&:key).find { |key| present?(problem_set, key) }
+    resolved_key(problem_set, fourths)
   end
 
-  # The day's shape, in slot order. Every slot but code_review may be nil,
+  # The first of `kinds` the payload holds, by their precedence order, or nil.
+  def self.resolved_key(problem_set, kinds)
+    kinds.map(&:key).find { |key| present?(problem_set, key) }
+  end
+
+  # The keys a problem set presents, in slot order: each slot's resolved kind,
+  # kept only when the payload holds it. DailyExercise#active_section_keys
+  # reads this for a stored row; ingest reads it for a payload that is not a
+  # row yet.
+  def self.resolved_keys(problem_set)
+    slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }
+  end
+
+  # The day's shape, in slot order. Every slot but a fixed kind's may be nil,
   # meaning the day does not include it.
   def self.slots
-    { code_review: [ CodeReview ], pattern: [ Pattern ], third: thirds, fourth: fourths }
+    fixed.to_h { |kind| [ kind.key.to_sym, [ kind ] ] }
+      .merge(pattern: [ Pattern ], third: thirds, fourth: fourths)
   end
 
-  def self.slot_count
-    slots.size
+  # Every field any kind keeps as answer key: data the grader reads and
+  # nothing before submission may show, log or send to a model.
+  def self.all_answer_key_fields
+    all.flat_map(&:answer_key_fields).uniq
   end
 
   # Which kinds a user can bias or exclude. A slot holding one candidate has no
@@ -77,8 +97,8 @@ class ExerciseSection
     slots.values.select { |kinds| kinds.size > 1 }.flatten
   end
 
-  # DailyExercise#active_section_keys answers the same question after the fact;
-  # this one works from DailyPlan's rolled symbols, before a row exists.
+  # .resolved_keys answers the same question from a payload; this one works
+  # from DailyPlan's rolled symbols, before the provider is contacted.
   def self.for_plan(third:, fourth:, pattern: :pattern)
     slot_kinds(third: third, fourth: fourth, pattern: pattern).values.compact
   end
@@ -88,7 +108,8 @@ class ExerciseSection
   # kind left — so reading a slot out of it by position names the wrong kind on
   # any day that omits one.
   def self.slot_kinds(third:, fourth:, pattern: :pattern)
-    chosen = { code_review: :code_review, pattern: pattern, third: third, fourth: fourth }
+    chosen = fixed.to_h { |kind| [ kind.key.to_sym, kind.key.to_sym ] }
+      .merge(pattern: pattern, third: third, fourth: fourth)
 
     slots.to_h { |slot, eligible| [ slot, slot_kind(chosen.fetch(slot), eligible) ] }
   end
@@ -131,6 +152,10 @@ class ExerciseSection
       ExerciseSection.fourths.include?(self)
     end
 
+    def fixed?
+      false
+    end
+
     # Names which vocabulary this kind's concept is validated against. AiService
     # owns the constants themselves — this only says which one applies, so the
     # vocabularies stay closed Ruby constants in one place.
@@ -149,6 +174,26 @@ class ExerciseSection
     # what to ask for.
     def excluded_vocabulary_keys
       []
+    end
+
+    # The last say over what generation may offer this kind, handed the
+    # vocabulary left after excluded_vocabulary_keys. `rung` is the level the
+    # section is pitched at, or nil when the caller does not know it, in which
+    # case a kind that narrows by level returns its strictest list.
+    def narrow_vocabulary(vocabulary, rung: nil)
+      vocabulary
+    end
+
+    # Fields of this kind's section that are answer key rather than exercise
+    # content. See ExerciseSection.all_answer_key_fields.
+    def answer_key_fields
+      []
+    end
+
+    # The provider boundary's check on one resolved section of this kind:
+    # raises AiService::InvalidResponseError when the section cannot be used,
+    # and may bound its fields in place. Most kinds have nothing to refuse.
+    def reject_unusable!(section)
     end
 
     # This kind's entry in the generation schema — the JSON object the provider
@@ -217,7 +262,7 @@ class ExerciseSection
     end
 
     # Whether the judge may drop this kind from the day rather than ship a
-    # section it rejected twice. A day reads fine without any one of these.
+    # section whose last retry it rejected. A day reads fine without any one of these.
     def droppable?
       true
     end
@@ -249,6 +294,18 @@ class ExerciseSection
     # The fields the judge may rewrite. Everything else is the artifact.
     def prose_fields
       %w[title scenario question teaching_note]
+    end
+
+    # How many regenerations a rejected section of this kind gets before it is
+    # dropped or anchored.
+    def judge_retries
+      1
+    end
+
+    # Extra instructions for judging this kind, added to the judge prompt when
+    # present.
+    def judge_guidance
+      nil
     end
 
     # Whether grading this kind needs the engineer's answer translated into

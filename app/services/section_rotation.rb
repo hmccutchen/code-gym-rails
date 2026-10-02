@@ -8,11 +8,11 @@ class SectionRotation
   LOOKBACK         = 20
   STARVATION_LIMIT = 10
 
-  # code_review is the only mandatory slot; everything else ExerciseSection
-  # names is fair game for rotation, so a slot added there needs no matching
-  # edit here.
-  OPTIONAL_SLOTS       = (ExerciseSection.slots.keys - [ :code_review ]).freeze
-  MANDATORY_SLOT_COUNT = ExerciseSection.slot_count - OPTIONAL_SLOTS.size
+  # Each fixed kind's slot is mandatory; everything else ExerciseSection names
+  # is fair game for rotation, so a slot added there needs no matching edit
+  # here.
+  MANDATORY_SLOT_COUNT = ExerciseSection.fixed.size
+  OPTIONAL_SLOTS       = (ExerciseSection.slots.keys - ExerciseSection.fixed.map { |kind| kind.key.to_sym }).freeze
 
   def self.for(history, count:, preferences: KindPreferences.none)
     recent    = history.first(LOOKBACK)

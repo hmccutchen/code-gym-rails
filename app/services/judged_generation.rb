@@ -1,12 +1,12 @@
-# Runs a drafted set through the judge, retries each rejection once with its
-# kind and drafted concept fixed, and decides what ships.
+# Runs a drafted set through the judge, retries each rejection with its kind
+# and drafted concept fixed, and decides what ships.
 #
-# Each section is judged in its own thread, like grading. A rejection buys one
-# regeneration of that section, unless the drafted concept normalized to
-# "other", which is rejected directly rather than spending a retry on an
-# unusable tag. A second rejection drops the section. A judge that fails or
-# answers invalidly leaves the draft unedited: the judge is never why a day
-# has no set. The finish step runs last so its logs describe the final set.
+# Each section is judged in its own thread, like grading. A rejection buys up
+# to the kind's judge_retries regenerations of that section, unless the
+# drafted concept normalized to "other", which is rejected directly rather
+# than spending a retry on an unusable tag. Rejecting the last retry drops the
+# section. A judge that fails or answers invalidly leaves the draft unedited:
+# the judge is never why a day has no set. The finish step runs last so its logs describe the final set.
 #
 # The retries fan out the way the judging does, so a day with three of them
 # waits for the slowest rather than their sum — serially they ran a full
@@ -116,39 +116,52 @@ class JudgedGeneration
     outcomes.select { |_, outcome| outcome[:status] == :reject }.keys
   end
 
-  # The one regeneration a rejection buys, judged again. Returns
-  # [section_or_nil, outcome]; nil is a drop. `retries` counts a retry that was
-  # actually judged, not merely attempted, so a retry whose generation failed
-  # reads as 0. A judge that fails on the re-judge keeps the retry for the
-  # same reason it keeps a draft.
+  # The regenerations a rejection buys, each judged again. Returns
+  # [section_or_nil, outcome]; nil is a drop. `retries` counts retries that
+  # were actually judged, not merely attempted, so a retry whose generation
+  # failed is not counted. A judge that fails on a re-judge keeps that retry
+  # for the same reason it keeps a draft. A rejected retry is the section the
+  # next attempt replaces, and the one anchored if none is left.
   def resolve_rejection(kind, section, outcome)
-    outcome = outcome.merge(retry_principle: nil)
-    return drop_or_anchor(kind, section, outcome.merge(retries: 0)) if section["concept"] == "other"
+    outcome = outcome.merge(retry_principle: nil, retries: 0)
+    return drop_or_anchor(kind, section, outcome) if section["concept"] == "other"
 
-    retried = retry_section(kind, section["concept"])
-    return drop_or_anchor(kind, section, outcome.merge(retries: 0)) if retried.nil?
+    concept = section["concept"]
+    kind.judge_retries.times do
+      retried = retry_section(kind, concept)
+      return drop_or_anchor(kind, section, outcome) if retried.nil?
 
+      section, outcome, settled = rejudge(kind, retried, outcome)
+      return [ section, outcome ] if settled
+    end
+    drop_or_anchor(kind, section, outcome)
+  end
+
+  # Returns [section, outcome, settled]; settled is false only when the judge
+  # rejected the retry.
+  # Each attempt starts from a clean retry record, so an outcome never mixes
+  # one attempt's principle with another's issues.
+  def rejudge(kind, retried, outcome)
     verdict, latency = judge_with_fallback(kind, retried)
-    outcome = outcome.merge(retries: 1, latency_ms: outcome[:latency_ms] + latency)
-    return [ retried, outcome.merge(status: :keep, fallback: verdict) ] if verdict.is_a?(String)
+    outcome = outcome.except(:retry_issues, :retry_evidence, :retry_reason)
+                     .merge(retry_principle: nil, retries: outcome[:retries] + 1, latency_ms: outcome[:latency_ms] + latency)
+    return [ retried, outcome.merge(status: :keep, fallback: verdict), true ] if verdict.is_a?(String)
 
-    verdict_summary = judgment(verdict)
+    summary = judgment(verdict)
     if verdict.reject?
-      return drop_or_anchor(kind, retried, outcome.merge(retry_principle: verdict_summary[:principle],
-                                                         retry_issues: verdict_summary[:issues],
-                                                         retry_evidence: verdict_summary[:evidence],
-                                                         retry_reason: verdict_summary[:reason]))
+      return [ retried, outcome.merge(retry_principle: summary[:principle], retry_issues: summary[:issues],
+                                      retry_evidence: summary[:evidence], retry_reason: summary[:reason]), false ]
     end
 
     # The draft's principle and issues survive a retry the judge accepted:
     # they are the only record this section was rejected at all, and
     # rejection rate per principle is read off these entries.
-    [ apply_verdict(verdict, retried), outcome.merge(status: verdict_summary[:status], retry_issues: verdict_summary[:issues]) ]
+    [ apply_verdict(verdict, retried), outcome.merge(status: summary[:status], retry_issues: summary[:issues]), true ]
   end
 
-  # A second rejection drops the section — unless the kind is the one the day
-  # cannot be delivered without, which ships the best section it has and says
-  # so. The principle is recorded either way, so the rejection is still read
+  # A rejected last retry drops the section — unless the kind is the one the
+  # day cannot be delivered without, which ships the best section it has and
+  # says so. The principle is recorded either way, so the rejection is still read
   # off the log.
   #
   # The delivered section is stamped too, because the outcomes are gone once

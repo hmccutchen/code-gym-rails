@@ -163,6 +163,25 @@ RSpec.describe ProblemSetIngest do
   end
 
   describe ".selectable_vocabulary_for" do
+    it "hands the kind's own hook what the excluded groups left, with the rung" do
+      after_exclusions = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
+      allow(ExerciseSection::ParsonsProblem).to receive(:narrow_vocabulary).and_return(%w[n_plus_one])
+
+      vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails", rung: "senior")
+
+      expect(vocabulary).to eq(%w[n_plus_one])
+      expect(ExerciseSection::ParsonsProblem).to have_received(:narrow_vocabulary)
+        .with(after_exclusions, rung: "senior")
+    end
+
+    it "passes no rung when the caller names none" do
+      allow(ExerciseSection::Pattern).to receive(:narrow_vocabulary).and_call_original
+
+      described_class.selectable_vocabulary_for("pattern", "ruby_rails")
+
+      expect(ExerciseSection::Pattern).to have_received(:narrow_vocabulary).with(AiService::RAILS_CONCEPTS, rung: nil)
+    end
+
     # Parsons grades by positional diff against one correct sequence, and
     # neither the data-modeling nor the meta-skill concepts are sequential —
     # see ExerciseSection::ParsonsProblem.excluded_vocabulary_keys.
@@ -533,6 +552,58 @@ RSpec.describe ProblemSetIngest do
         }
 
         expect { step(set) }.not_to raise_error
+      end
+    end
+
+    describe "the pseudocode problem statement" do
+      def pseudocode(statement)
+        { "pseudocode_to_code" => { "title" => "P2C", "problem_statement" => statement } }
+      end
+
+      it "strips the statement" do
+        expect(step(pseudocode("  merge ranges \n"))["pseudocode_to_code"]["problem_statement"]).to eq("merge ranges")
+      end
+
+      it "truncates a runaway statement at PseudocodeToCode::MAX_PROBLEM_STATEMENT_LENGTH" do
+        statement = step(pseudocode("x" * 5_000))["pseudocode_to_code"]["problem_statement"]
+
+        expect(statement.length).to eq(ExerciseSection::PseudocodeToCode::MAX_PROBLEM_STATEMENT_LENGTH)
+      end
+
+      it "raises when the statement is blank or not a string" do
+        [ nil, "   ", 42, [ "merge ranges" ] ].each do |statement|
+          expect { step(pseudocode(statement)) }
+            .to raise_error(AiService::InvalidResponseError, /no usable problem_statement/)
+        end
+      end
+
+      it "ignores an unusable statement on a section that lost the fourth slot" do
+        set = pseudocode(nil).merge("ambiguity_hunt" => { "planted_ambiguities" => [ "who can see it?" ] })
+
+        expect { step(set) }.not_to raise_error
+      end
+    end
+
+    describe "each kind's own boundary check" do
+      it "runs only for the sections the set resolves to" do
+        allow(ExerciseSection::PlanReview).to receive(:reject_unusable!)
+        allow(ExerciseSection::AmbiguityHunt).to receive(:reject_unusable!)
+        allow(ExerciseSection::Architecture).to receive(:reject_unusable!)
+        allow(ExerciseSection::Challenge).to receive(:reject_unusable!)
+        set = {
+          "code_review"    => { "concept" => "n_plus_one" },
+          "architecture"   => { "question" => "which?" },
+          "challenge"      => { "question" => "unrendered alternate" },
+          "plan_review"    => { "plan_excerpt" => "a plan" },
+          "ambiguity_hunt" => { "request" => "vague" }
+        }
+
+        step(set)
+
+        expect(ExerciseSection::Architecture).to have_received(:reject_unusable!).with(set["architecture"])
+        expect(ExerciseSection::PlanReview).to have_received(:reject_unusable!).with(set["plan_review"])
+        expect(ExerciseSection::Challenge).not_to have_received(:reject_unusable!)
+        expect(ExerciseSection::AmbiguityHunt).not_to have_received(:reject_unusable!)
       end
     end
 

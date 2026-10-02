@@ -120,7 +120,7 @@ RSpec.describe DailyExercise, type: :model do
     end
 
     # The count the user sees is the count of sections on screen, not of raw
-    # payload keys — FakeService persists all eight deliberately, and a real
+    # payload keys — FakeService persists all nine deliberately, and a real
     # provider can return an extra alternate third or fourth.
     it "counts only the precedence-resolved third and fourth when a payload holds several" do
       exercise = DailyExercise.new(problem_set: {
@@ -134,6 +134,13 @@ RSpec.describe DailyExercise, type: :model do
     it "drops a fixed key holding a non-Hash value" do
       exercise = DailyExercise.new(problem_set: { "code_review" => "junk", "pattern" => {}, "challenge" => {} })
       expect(exercise.active_section_keys).to eq(%w[pattern challenge])
+    end
+
+    it "reads the same keys ExerciseSection.resolved_keys does for FakeService's every-kind set" do
+      exercise = DailyExercise.new(problem_set: FakeService::EXERCISE_PROBLEM_SET)
+
+      expect(exercise.active_section_keys).to eq(ExerciseSection.resolved_keys(FakeService::EXERCISE_PROBLEM_SET))
+      expect(exercise.active_section_keys).to eq(%w[code_review pattern architecture plan_review])
     end
   end
 

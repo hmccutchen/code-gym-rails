@@ -5120,13 +5120,13 @@ RSpec.describe AiService do
     # 160 is the rounded per-section output observed there (319 tokens across
     # two sections).
     it "budgets at least 160 tokens per section a day can hold" do
-      floor = ExerciseSection.slot_count * 160
+      floor = ExerciseSection::MAX_SECTIONS * 160
 
       expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= floor
     end
 
     it "grows with the reason length a day's sections may use" do
-      longest_valid_reasons = ExerciseSection.slot_count * DailyResponse::MAX_DIFFICULTY_REASON_LENGTH /
+      longest_valid_reasons = ExerciseSection::MAX_SECTIONS * DailyResponse::MAX_DIFFICULTY_REASON_LENGTH /
                               AiService::DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN
 
       expect(AiService::DIFFICULTY_ASSESSMENT_MAX_TOKENS).to be >= longest_valid_reasons
@@ -5504,6 +5504,40 @@ RSpec.describe AiService, "#judge_section" do
     ProblemSetIngest::SERVER_STAMPS.each { |stamp| expect(captured[:prompt]).not_to include(stamp) }
     expect(captured[:prompt]).not_to include("excerpt-trace-id")
     expect(captured[:prompt]).to include("create_table :orders")
+  end
+
+  describe "a kind's own judge guidance" do
+    def judge_prompt_for(kind)
+      svc = FakeService.new("fake-key")
+      captured = nil
+      allow(svc).to receive(:call_and_log).and_wrap_original { |m, *args, **kw| captured = kw; m.call(*args, **kw) }
+      svc.judge_section(user, kind, section.except("pitched_at"), rung: "senior", locked: false)
+      captured[:prompt]
+    end
+
+    it "leaves the prompt as it has always read when the kind has none" do
+      expect(judge_prompt_for(ExerciseSection::Pattern)).to eq(<<~PROMPT)
+        Section kind: pattern
+        The learner's task for this kind: #{ExerciseSection::Pattern.judge_task}
+        Naming the concept is expected for this kind.
+        Tagged concept: n_plus_one
+        Pitched at: senior
+        Level meaning: #{KindDifficulty::LEVEL_DEFINITIONS.fetch("senior")}
+        Prose fields you may rewrite: #{ExerciseSection::Pattern.prose_fields.join(', ')}
+        Every other field is the artifact and must not change.
+
+        The section as delivered:
+        #{JSON.pretty_generate(section.except("pitched_at"))}
+      PROMPT
+    end
+
+    it "adds the guidance as its own block above the section when the kind has some" do
+      allow(ExerciseSection::Pattern).to receive(:judge_guidance).and_return("Solve it before judging.")
+
+      expect(judge_prompt_for(ExerciseSection::Pattern)).to include(
+        "Every other field is the artifact and must not change.\n\nSolve it before judging.\n\nThe section as delivered:\n"
+      )
+    end
   end
 end
 

@@ -37,7 +37,7 @@ class SectionCount
   private_class_method :credited_sections
 
   def self.ceiling
-    ExerciseSection.slot_count
+    ExerciseSection::MAX_SECTIONS
   end
   private_class_method :ceiling
 

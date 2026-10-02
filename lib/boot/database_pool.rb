@@ -16,8 +16,9 @@ require "active_support/configuration_file"
 # connections open only when a thread asks for one, so a larger ceiling costs
 # nothing until it is used.
 #
-# SECTIONS_PER_DAY restates ExerciseSection.slot_count because database.yml is
-# read during boot, before app/ can be autoloaded; a spec holds the two equal.
+# SECTIONS_PER_DAY restates ExerciseSection::MAX_SECTIONS because database.yml
+# is read during boot, before app/ can be autoloaded; a spec holds the two
+# equal.
 # Worker threads are read from config/queue.yml, which is plain configuration.
 # Lives in lib/boot for the same reason AppHost does.
 module DatabasePool
