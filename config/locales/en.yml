@@ -163,6 +163,36 @@ en:
       no_review_to_email: "No review to email yet."
       review_emailed: "Review sent to %{email}."
       save_failed: "Couldn't save your answers."
+  errors:
+    no_exercise_today: "No exercise set for today."
+    section_not_in_exercise: "That section isn't part of this exercise."
+    responses:
+      alternates_used:
+        one: "You've already asked for an alternate explanation here."
+        other: "You've already asked for %{count} alternate explanations here."
+      question_blank: "Ask a question first."
+      follow_ups_used:
+        one: "You've used your one follow-up for this section."
+        other: "You've used all %{count} follow-ups for this section."
+      duck_after_submit: "The thinking partner is only available before you submit."
+      message_blank: "Say something first."
+      message_too_long: "That message is too long — keep it under %{max} characters."
+      conversation_too_long: "This conversation is too long to continue — clear it to keep going."
+      conversation_out_of_step: "This conversation is out of step — clear it to keep going."
+      no_review_yet: "No review to attach that to yet."
+      pseudocode:
+        no_section: "Today's set has no pseudocode section."
+        blank: "Write your pseudocode first."
+        too_long: "That's too long — keep it under %{max} characters."
+        after_submit: "The rounds are only available before you submit."
+        already_checked: "You've already had this plan checked."
+        check_running: "A check of this plan is already running."
+    concept_references:
+      framings_used:
+        one: "You've already asked for another framing of this concept."
+        other: "You've already asked for %{count} other framings of this concept."
+      too_much_explanation: "That's more explanation than this can carry — reload the page to start fresh."
+      reference_missing: "That reference no longer exists."
   hello: "Hello world"
   providers:
     anthropic: "Claude"
