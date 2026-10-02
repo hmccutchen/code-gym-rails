@@ -1694,7 +1694,7 @@ class AiService
 
   # A Parsons question is only "arrange these blocks", so without the blocks
   # the model cannot say anything section-specific. But blocks are persisted
-  # already-solved (see ProblemSetIngest#shuffle_parsons_blocks!), so their stored order IS
+  # already-solved (see ExerciseSection::ParsonsProblem.arrange!), so their stored order IS
   # the answer the duck prompt forbids revealing. Positions are therefore only
   # ever quoted from a genuine persisted scramble; with no trustworthy
   # scramble to quote, the blocks go over unordered rather than in the stored

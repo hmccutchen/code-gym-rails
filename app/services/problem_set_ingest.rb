@@ -1,8 +1,7 @@
 # Turns a parsed provider problem set into one that is safe to persist:
 # concepts held to their closed vocabulary, scaffolds and diagrams bounded,
-# parsons blocks scrambled for display, and each resolved section held to its
-# kind's own check and arranged by it (ExerciseSection.reject_unusable!,
-# .arrange!). This is the generation
+# and each resolved section held to its kind's own check and arranged by it
+# (ExerciseSection.reject_unusable!, .arrange!). This is the generation
 # boundary — the one place provider output is checked before anything
 # downstream is allowed to assume it is clean.
 #
@@ -194,7 +193,6 @@ class ProblemSetIngest
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
-    shuffle_parsons_blocks!
     arrange_sections!
     strip_current_schemas!
     strip_server_stamps!
@@ -452,19 +450,5 @@ class ProblemSetIngest
     ExerciseSection.resolved_keys(@problem_set).each do |key|
       ExerciseSection.for(key).arrange!(@problem_set[key])
     end
-  end
-
-  # The provider returns "blocks" already in correct order, so the scramble is
-  # rolled once here and persisted — refreshes and the history view then show
-  # the same arrangement. Never the identity permutation, which would ship an
-  # already-solved problem.
-  def shuffle_parsons_blocks!
-    parsons = @problem_set["parsons_problem"]
-    return unless parsons.is_a?(Hash) && parsons["blocks"].is_a?(Array)
-
-    identity = (0...parsons["blocks"].size).to_a
-    order    = identity.shuffle
-    order    = identity.shuffle while order == identity && identity.size > 1
-    parsons["display_order"] = order
   end
 end

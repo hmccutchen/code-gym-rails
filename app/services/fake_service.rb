@@ -1,7 +1,7 @@
 # Deterministic, zero-cost AiService provider for tests. Supplies provider
 # metadata and the two transport hooks (#call, #build_connection) —
 # exercise processing (DailyPlan, log_usage, normalize_concepts,
-# log_retention, shuffle_parsons_blocks!, ParsonsProblem.fixed_rating)
+# log_retention, ParsonsProblem.arrange!, ParsonsProblem.fixed_rating)
 # runs unmodified against this fake's output, so tests exercise the same
 # control flow a real provider triggers. #call dispatches on the literal
 # `system:` string each AiService caller passes; the review path further
@@ -18,8 +18,8 @@ class FakeService < AiService
   # resolves by precedence over whichever keys are present hashes
   # (ExerciseSection.thirds: architecture, security_review, challenge,
   # parsons_problem) — architecture wins here every time, regardless of
-  # which third DailyPlan actually asked for, since normalize_concepts and
-  # shuffle_parsons_blocks! only ever touch keys that exist. Same precedence
+  # which third DailyPlan actually asked for, since resolution reads only
+  # which keys are present. Same precedence
   # story for the fourth slot (ExerciseSection.fourths): plan_review wins over
   # ambiguity_hunt and pseudocode_to_code whenever more than one is present,
   # via DailyExercise#fourth_key.

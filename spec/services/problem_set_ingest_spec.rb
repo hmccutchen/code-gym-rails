@@ -523,6 +523,14 @@ RSpec.describe ProblemSetIngest do
 
       expect(set["parsons_problem"]).not_to have_key("display_order")
     end
+
+    it "leaves a parsons alternate that loses the third slot unarranged" do
+      set = step({ "architecture" => { "question" => "q" },
+                  "parsons_problem" => { "blocks" => %w[a b c d e] } })
+
+      expect(ExerciseSection.resolved_keys(set)).not_to include("parsons_problem")
+      expect(set["parsons_problem"]).not_to have_key("display_order")
+    end
   end
 
     describe "the answer key"  do

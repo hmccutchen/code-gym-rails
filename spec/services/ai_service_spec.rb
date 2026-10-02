@@ -2520,7 +2520,10 @@ RSpec.describe AiService do
     before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
     it "shuffles parsons_problem blocks into a non-identity display_order" do
-      set = full_problem_set("parsons_problem" => { "blocks" => %w[a b c d e] })
+      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :parsons_problem, fourth: :plan_review)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
+      set = { "code_review" => { "concept" => "n_plus_one" }, "design_comparison" => design_comparison_section,
+              "parsons_problem" => { "blocks" => %w[a b c d e] }, "plan_review" => {} }
       svc = double_class.new(canned_text: set.to_json)
 
       result = svc.generate_exercise(user)

@@ -1,5 +1,5 @@
-# Blocks are always persisted in correct order (ProblemSetIngest#shuffle_parsons_blocks!
-# scrambles only the display order), so a correct submission is always the
+# Blocks are always persisted in correct order (.arrange! scrambles only the
+# display order), so a correct submission is always the
 # identity permutation. That is what keeps grading local and deterministic —
 # the AI is never asked to judge correctness for this kind, only to explain it.
 class ExerciseSection::ParsonsProblem < ExerciseSection
@@ -8,6 +8,19 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
   class << self
     def improved_code?
       false
+    end
+
+    # The provider returns "blocks" already in correct order, so the scramble
+    # is rolled once at ingest and persisted, and refreshes and the history
+    # view then show the same arrangement. Never the identity permutation,
+    # which would ship an already-solved problem.
+    def arrange!(section)
+      return unless section["blocks"].is_a?(Array)
+
+      identity = (0...section["blocks"].size).to_a
+      order    = identity.shuffle
+      order    = identity.shuffle while order == identity && identity.size > 1
+      section["display_order"] = order
     end
 
     # Correctness is decided here, never by the model: whatever the grader
