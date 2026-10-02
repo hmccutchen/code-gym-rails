@@ -10,20 +10,6 @@
 class SendPushReminderJob < ApplicationJob
   queue_as :default
 
-  # How a nudge addresses each unfinished state. The copy has to be right for
-  # someone two-thirds through, not only for someone who never opened the set —
-  # telling them it is "still waiting" is how a reminder starts reading as
-  # something that hasn't noticed the work. :unrated is its own state rather
-  # than part of :unsubmitted because the dashboard keeps Submit disabled until
-  # every answered section is rated (DailyResponse#submittable?), so calling
-  # that set ready to submit would name a button the user cannot press.
-  NUDGE_TITLES = {
-    untouched:   "Today's set is still waiting",
-    partway:     "You're partway through today's set",
-    unrated:     "Today's set just needs its difficulty ratings",
-    unsubmitted: "Today's set is ready to submit"
-  }.freeze
-
   def perform(user_id:, kind: :ready)
     return unless WebPushCredentials.configured?
 
@@ -83,6 +69,14 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
+  # Which unfinished state a nudge addresses; each has its own title under
+  # push_reminder.nudge.titles. The copy has to be right for someone
+  # two-thirds through, not only for someone who never opened the set —
+  # telling them it is "still waiting" is how a reminder starts reading as
+  # something that hasn't noticed the work. :unrated is its own state rather
+  # than part of :unsubmitted because the dashboard keeps Submit disabled until
+  # every answered section is rated (DailyResponse#submittable?), so calling
+  # that set ready to submit would name a button the user cannot press.
   def stage_for(exercise, response)
     answered = answered_count(response)
 
@@ -94,35 +88,27 @@ class SendPushReminderJob < ApplicationJob
   end
 
   def title_for(kind, stage)
-    return "Today's Code Gym is ready" unless kind.to_sym == :nudge
+    return I18n.t("push_reminder.ready.title", app_name: I18n.t("app_name")) unless kind.to_sym == :nudge
 
-    NUDGE_TITLES.fetch(stage)
+    I18n.t("push_reminder.nudge.titles.#{stage}", raise: true)
   end
 
   def body_for(kind, exercise, response, stage)
-    return "#{sections_phrase(exercise)} waiting." unless kind.to_sym == :nudge
+    return I18n.t("push_reminder.ready.body", count: section_count(exercise)) unless kind.to_sym == :nudge
 
-    "#{progress_phrase(exercise, response, stage)} · about #{hours_left_today}h left today."
+    I18n.t("push_reminder.nudge.body", progress: progress_phrase(exercise, response, stage), hours: hours_left_today)
   end
 
   def progress_phrase(exercise, response, stage)
     total = section_count(exercise)
     remaining = total - answered_count(response)
-    if stage == :unsubmitted && remaining.positive?
-      return "Submit your answers; the remaining #{remaining} #{'section'.pluralize(remaining)} #{remaining == 1 ? 'is' : 'are'} optional"
-    end
+    return I18n.t("push_reminder.nudge.progress.optional_left", count: remaining) if stage == :unsubmitted && remaining.positive?
 
     case stage
-    when :untouched then sections_phrase(exercise)
-    when :partway   then "#{total - answered_count(response)} of #{total} #{'section'.pluralize(total)} still to go"
-    else                 "All #{total} #{'section'.pluralize(total)} answered"
+    when :untouched then I18n.t("push_reminder.nudge.progress.untouched", count: total)
+    when :partway   then I18n.t("push_reminder.nudge.progress.partway", count: total, remaining: remaining)
+    else                 I18n.t("push_reminder.nudge.progress.all_answered", count: total)
     end
-  end
-
-  def sections_phrase(exercise)
-    count = section_count(exercise)
-
-    "#{count} #{'section'.pluralize(count)}"
   end
 
   # active_section_keys is the authority for how many sections a day has; the

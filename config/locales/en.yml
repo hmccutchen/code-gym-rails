@@ -533,6 +533,32 @@ en:
     summary: "🗺️ Structure diagram"
   push:
     register_failed: "This device couldn't be registered for reminders — try again."
+  push_reminder:
+    ready:
+      title: "Today's %{app_name} is ready"
+      body:
+        one: "%{count} section waiting."
+        other: "%{count} sections waiting."
+    nudge:
+      titles:
+        untouched: "Today's set is still waiting"
+        partway: "You're partway through today's set"
+        unrated: "Today's set just needs its difficulty ratings"
+        unsubmitted: "Today's set is ready to submit"
+      body: "%{progress} · about %{hours}h left today."
+      progress:
+        untouched:
+          one: "%{count} section"
+          other: "%{count} sections"
+        partway:
+          one: "%{remaining} of %{count} section still to go"
+          other: "%{remaining} of %{count} sections still to go"
+        all_answered:
+          one: "All %{count} section answered"
+          other: "All %{count} sections answered"
+        optional_left:
+          one: "Submit your answers; the remaining %{count} section is optional"
+          other: "Submit your answers; the remaining %{count} sections are optional"
   nav:
     menu: "Menu"
     skip_to_content: "Skip to content"
