@@ -1434,10 +1434,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   count toward the four, a weekend addition inside the window still blocks,
   and a paused stretch counts as the weekdays it spans. Because the note is
   written at plan time, an addition whose section the judge dropped still
-  counts. `CoverageException::History.for` reads each optional kind's last
-  delivered date (`active_section_keys`), the planned additions and the
-  oldest date from one query over the last `HISTORY_LIMIT` (120) exercises
-  before today; it is loaded only on a day the exception could apply to. A
+  counts. The checks run cheapest first: the setting and count cost
+  nothing, then `History.recent_coverage_dates` reads the planned additions
+  over the cap's window alone, and only a day the cap leaves open runs
+  `History.for`, which reads each optional kind's last delivered date
+  (`active_section_keys`) and the oldest date from one query over the last
+  `HISTORY_LIMIT` (120) exercises before today. A
   kind never delivered counts as unseen from the oldest exercise read, so a
   new account gains nothing from the gap rule. Today's row is left out, so a
   regeneration plans as the first generation did. Generation logs

@@ -1090,9 +1090,17 @@ RSpec.describe DailyPlan, "the coverage exception" do
     expect(described_class.for(user, language: "ruby_rails").coverage).to be_nil
   end
 
+  it "does not load the gaps on a day the cap holds" do
+    two_section_day(Date.current - 1, plan_notes: { "coverage" => "pattern" })
+    expect(CoverageException::History).not_to receive(:for)
+
+    expect(described_class.for(user, language: "ruby_rails").coverage).to be_nil
+  end
+
   it "does not read the coverage history on a day it cannot apply to" do
     allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(SectionCount::FLOOR + 1)
     expect(CoverageException::History).not_to receive(:for)
+    expect(CoverageException::History).not_to receive(:recent_coverage_dates)
 
     described_class.for(user, language: "ruby_rails")
   end

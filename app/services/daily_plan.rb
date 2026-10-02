@@ -137,13 +137,16 @@ class DailyPlan
   end
   private_class_method :concept_tracks
 
-  # The exception reads its history only on a day it could apply to, so
-  # every other day costs no extra query.
+  # Cheapest check first: the setting and count cost nothing, the cap one
+  # small query, and only a day that passes both loads the gaps.
   def self.coverage_for(user, count, preferences, waiting, hosts)
     return nil unless CoverageException.applies_to_day?(count: count, fixed: user.daily_section_count)
 
+    recent = CoverageException::History.recent_coverage_dates(user)
+    return nil if CoverageException.capped?(recent, Date.current)
+
     CoverageException.for(today: Date.current, count: count, fixed: user.daily_section_count,
-                          history: CoverageException::History.for(user), checks: waiting,
+                          history: CoverageException::History.for(user, coverage_dates: recent), checks: waiting,
                           preferences: preferences, hosts: hosts)
   end
   private_class_method :coverage_for

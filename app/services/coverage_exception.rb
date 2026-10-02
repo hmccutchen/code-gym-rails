@@ -33,7 +33,7 @@ class CoverageException
   # :overdue_ratio. `hosts` answers which kinds can tag a check (DayHosts).
   def self.for(today:, count:, fixed:, history:, checks:, preferences:, hosts:, brake: false)
     return nil unless applies_to_day?(count: count, fixed: fixed, brake: brake)
-    return nil if added_recently?(history.coverage_dates, today)
+    return nil if capped?(history.coverage_dates, today)
 
     gaps       = OPTIONAL_KINDS.reject { |kind| preferences.excluded?(kind) }.index_with { |kind| gap(kind, history, today) }
     candidates = gaps.keys.sort_by { |kind| [ -gaps[kind], history.last_seen.key?(kind.key) ? 1 : 0, ExerciseSection.all.index(kind) ] }
@@ -57,12 +57,14 @@ class CoverageException
   end
   private_class_method :gap_addition
 
-  def self.added_recently?(coverage_dates, today)
-    window_start = weekdays_before(today, CAP_WEEKDAYS)
-
-    coverage_dates.any? { |date| date >= window_start && date < today }
+  # The first date whose coverage addition still blocks today's.
+  def self.cap_window_start(today)
+    weekdays_before(today, CAP_WEEKDAYS)
   end
-  private_class_method :added_recently?
+
+  def self.capped?(coverage_dates, today)
+    coverage_dates.any? { |date| date >= cap_window_start(today) && date < today }
+  end
 
   # Weekdays after the kind was last delivered, up to and including today. A
   # kind never delivered counts from the oldest exercise read, and a user
