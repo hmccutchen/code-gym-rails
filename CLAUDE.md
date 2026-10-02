@@ -1337,10 +1337,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `User::AUTOMATIC_SECTION_COUNT` (`"automatic"`, stored as nil, and the value
   Setup's radio posts) or a listed count, as an Integer or its exact string.
   Anything else is a 422 that saves nothing, because Active Record's integer
-  cast would turn `""`, `null` or `"abc"` into nil, which means Automatic, and
-  `"2.5"` into 2, and a JSON `2.0` equals 2. The model checks the same range
-  only when the value changes, like the other validations that read moving
-  constants, since `SectionRotation` clamps a stale stored count anyway.
+  cast would turn `""` or `null` into nil, which means Automatic, `"abc"`
+  into 0 and `"2.5"` into 2, and a JSON `2.0` equals 2. The model checks the
+  same range only when the value changes, like the other validations that
+  read moving constants, and `SectionCount.for` clamps a stored count to the
+  current range on read, so a row saved under a wider range plans a day the
+  set can actually hold.
 
   **It replaced the `adaptive_set_size` boolean, and every account reads
   Automatic.** `AddDailySectionCountToUsers` adds the column with no default

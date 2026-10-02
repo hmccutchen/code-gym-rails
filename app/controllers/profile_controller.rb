@@ -30,9 +30,9 @@ class ProfileController < ApplicationController
 
   private
 
-  # Active Record's integer cast is too forgiving for a request boundary: "",
-  # null and "abc" become nil, which means Automatic, and "2.5" becomes 2, so a
-  # malformed request would save a choice it never made. Only the Automatic
+  # Active Record's integer cast is too forgiving for a request boundary: ""
+  # and null become nil, which means Automatic, "abc" becomes 0 and "2.5"
+  # becomes 2, so a malformed request would save a choice it never made. Only the Automatic
   # sentinel or a listed count, as an Integer or its exact string, is accepted;
   # a JSON 2.0 equals 2 but is not one.
   DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze

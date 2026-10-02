@@ -68,6 +68,13 @@ RSpec.describe SectionCount do
       expect(described_class.for(history(0, 0, 0, 0, 0), fixed: 4)).to eq(4)
     end
 
+    # The model validates the count only when it changes, so a row saved under
+    # a wider range can still hold a count outside the current one.
+    it "clamps a stored choice outside the current range" do
+      expect(described_class.for(history(2, 2, 2, 2, 2), fixed: ExerciseSection::MAX_SECTIONS + 1)).to eq(ExerciseSection::MAX_SECTIONS)
+      expect(described_class.for(history(4, 4, 4, 4, 4), fixed: described_class::FLOOR - 1)).to eq(described_class::FLOOR)
+    end
+
     it "sizes from history when the choice is Automatic" do
       expect(described_class.for(history(2, 2, 2, 2, 2), fixed: nil)).to eq(3)
       expect(described_class.for(history(2, 2, 2, 2, 2))).to eq(3)

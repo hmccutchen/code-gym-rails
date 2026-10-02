@@ -44,8 +44,8 @@ class User < ApplicationRecord
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
   validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
   validate :display_preferences_name_known_options, if: :display_preferences_changed?
-  # SectionRotation clamps the count it is given, so a stored count outside a
-  # later range is harmless on read too.
+  # Checked only on change so a later range change cannot make a stored row
+  # unsavable; SectionCount clamps the stored count on read.
   validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS }, allow_nil: true,
                                   if: :daily_section_count_changed?
 

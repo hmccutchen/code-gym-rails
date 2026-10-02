@@ -407,9 +407,9 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.daily_section_count).to be_nil
     end
 
-    # Active Record's integer cast turns "", "abc" and null into nil, which
-    # here means Automatic, and "2.5" into 2, so each would otherwise save a
-    # choice the request never made.
+    # Active Record's integer cast turns "" and null into nil, which here
+    # means Automatic, "abc" into 0 and "2.5" into 2, so each would otherwise
+    # save a choice the request never made.
     it "refuses anything else and changes nothing" do
       user.update!(daily_section_count: 3)
       login_as(user)
