@@ -13,7 +13,14 @@
 class DailyPlan
   Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode, :code_review_source, :scenario_flavor)
+                        :code_review_mode, :code_review_source, :scenario_flavor,
+                        :shared_concept, :coverage, :waiting_checks) do
+    # What daily_exercises.plan_notes stores for the day this plan produced.
+    def notes
+      { "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
+        "shared_concept" => shared_concept }.compact
+    end
+  end
 
   # Which content mode code_review takes. Equal thirds, as close as float
   # weights get — application_code keeps a 1% edge rather than the split
@@ -74,23 +81,6 @@ class DailyPlan
   # one-concept section to carry two.
   FOURTH_SLOT_CAPACITY = 1
 
-  # Bounds the per-bucket due-concept fetch without truncating it. Not
-  # truncating is the point, not a nicety: the query orders by
-  # next_retention_check_on — absolute days overdue — while
-  # retention_checks_for re-ranks by overdue RATIO against each concept's own
-  # interval. Those orderings disagree, so a cap that actually cut rows would
-  # discard by date the row the re-rank was about to pick by ratio (issue #93,
-  # where a hardcoded 20 outlived two vocabulary additions).
-  #
-  # A bucket holds at most one row per concept — unique index on
-  # (user_id, concept, language), and ConceptMastery.record_review! never
-  # records "other". concepts_due_for_retention_check additionally filters on
-  # vocabulary membership, so a concept later renamed or removed drops out of
-  # the fetch rather than lingering: the ceiling is the bucket's CURRENT
-  # vocabulary, not every name ever valid in it. Sizing against the largest
-  # vocabulary therefore cannot truncate.
-  RETENTION_BUCKET_FETCH_CAP = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
-
   # fourth_track's early return when no fourth section was chosen today.
   NO_FOURTH_TRACK = { fourth: nil, fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
@@ -99,62 +89,153 @@ class DailyPlan
   # the prompt builder is private and returns only a string, so it cannot report
   # that (see AiService#log_retention).
   def self.for(user, language:)
-    history       = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
-    rotation      = SectionRotation.for(history,
-                                        count: SectionCount.for(history, fixed: user.daily_section_count),
-                                        preferences: KindPreferences.for(user))
-    kinds         = ExerciseSection.for_plan(**rotation)
+    history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
+    count            = SectionCount.for(history, fixed: user.daily_section_count)
+    preferences      = KindPreferences.for(user)
+    rotation         = SectionRotation.for(history, count: count, preferences: preferences)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
-    # Held to the buckets today can host, like retention and established
-    # concepts: a mixed user's javascript entry on a ruby_rails day could
-    # otherwise sit beside the ruby_rails retention check for the same name,
-    # and the prompt, which names concepts without their bucket, would ask for
-    # one name under two instructions.
+    hosts            = DayHosts.new(language, mode: code_review_mode)
+    due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
+    tracks           = concept_tracks(user, language, rotation, due: due, hosts: hosts)
+    coverage, rotation, tracks = with_coverage(coverage_for(user, count, preferences, tracks.fetch(:waiting_checks), hosts),
+                                               rotation, tracks, user, language, due: due, hosts: hosts)
+
+    Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third), **tracks, coverage: coverage,
+               code_review_mode: code_review_mode,
+               code_review_source: code_review_source_for(user, language, code_review_mode),
+               scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)))
+  end
+
+  # The user's slice plus the bucket of the language being generated, which
+  # differs from the setting when a regeneration keeps the stored exercise's
+  # language after the user changed theirs.
+  def self.due_buckets(user, language)
+    ConceptBucket.slice_for(user.language) | [ language ]
+  end
+  private_class_method :due_buckets
+
+  # Everything the day's chosen kinds decide about concepts. Computed again
+  # when the coverage exception adds a kind, so the added section can take
+  # the check it was added for.
+  def self.concept_tracks(user, language, rotation, due:, hosts:)
+    kinds  = ExerciseSection.for_plan(**rotation)
+    tracks = main_track(user, language, kinds: kinds, hosts: hosts, due: due).merge(fourth_track(user, rotation.fetch(:fourth), due: due))
+
+    tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts))
+  end
+  private_class_method :concept_tracks
+
+  # The added kind fills its slot and the tracks are decided again so the
+  # check it was added for can land there. Reinforcement can still outrank
+  # that check for the one retention slot, and then the addition is given up:
+  # the day stays at two rather than spending the cap on a section that
+  # carries something else.
+  def self.with_coverage(coverage, rotation, tracks, user, language, due:, hosts:)
+    return [ nil, rotation, tracks ] unless coverage
+
+    added_rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind) => coverage.kind.key.to_sym)
+    added_tracks   = concept_tracks(user, language, added_rotation, due: due, hosts: hosts)
+    return [ nil, rotation, tracks ] unless check_landed?(coverage, added_tracks)
+
+    [ coverage, added_rotation, added_tracks ]
+  end
+  private_class_method :with_coverage
+
+  def self.check_landed?(coverage, tracks)
+    return true unless coverage.check
+
+    (tracks[:due_checks] + tracks[:fourth_due_checks])
+      .any? { |cm| cm.concept == coverage.check[:concept] && cm.language == coverage.check[:bucket] }
+  end
+  private_class_method :check_landed?
+
+  # Cheapest check first: the setting and count cost nothing, the cap one
+  # small query, and only a day that passes both loads the gaps.
+  def self.coverage_for(user, count, preferences, waiting, hosts)
+    return nil unless CoverageException.applies_to_day?(count: count, fixed: user.daily_section_count)
+
+    recent = CoverageException::History.recent_coverage_dates(user)
+    return nil if CoverageException.capped?(recent, Date.current)
+
+    CoverageException.for(today: Date.current, count: count, fixed: user.daily_section_count,
+                          history: CoverageException::History.for(user, coverage_dates: recent), checks: waiting,
+                          preferences: preferences, hosts: hosts)
+  end
+  private_class_method :coverage_for
+
+  # Due checks across the user's whole slice that today does not offer, most
+  # overdue first: no_slot when a section today could tag the concept but
+  # the day's hosts went elsewhere, no_host when none could. A concept
+  # reinforcement already carries is being worked, not waiting.
+  def self.waiting_checks(tracks, due, kinds:, hosts:)
+    taken = claimed_concepts(tracks[:reinforcement] + tracks[:fourth_reinforcement],
+                             tracks[:due_checks] + tracks[:fourth_due_checks])
+
+    due.reject { |cm| taken.include?([ cm.concept, cm.language ]) }
+       .sort_by { |cm| -overdue_ratio(cm) }
+       .map do |cm|
+         reason = hosts.hosts(kinds, cm.concept, cm.language).any? ? :no_slot : :no_host
+         { bucket: cm.language, concept: cm.concept, overdue_ratio: overdue_ratio(cm), reason: reason }
+       end
+  end
+  private_class_method :waiting_checks
+
+  # The non-fourth sections' concepts: reinforcement, the concept both fixed
+  # sections share, retention checks and established concepts.
+  #
+  # Held to the buckets today can host, like retention and established
+  # concepts: a mixed user's javascript entry on a ruby_rails day could
+  # otherwise sit beside the ruby_rails retention check for the same name,
+  # and the prompt, which names concepts without their bucket, would ask for
+  # one name under two instructions.
+  #
+  # Only the non-fourth kinds present today can ever host a language or
+  # architecture concept, so capacity follows the chosen set rather than a
+  # literal 3 — a short day (pattern chosen but no third) has fewer hosts,
+  # and this now says so structurally instead of by counting. Reinforcement
+  # keeps every such slot by default; a slot is taken back for retention only
+  # when reinforcement would otherwise claim all of them AND at least one
+  # retention check, in a bucket today can actually host, has gone
+  # meaningfully overdue (see ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
+  # A merely-due check is not enough to spend a reinforcement slot on — only
+  # a check nobody's gotten to in a while earns the trade.
+  #
+  # This capacity is approximate, deliberately. On a schema-review day
+  # code_review hosts only data-modeling concepts, and design_comparison
+  # hosts only its own allowlist every day, so an ordinary concept can have
+  # a host or two fewer than this counts. Left approximate because the arithmetic
+  # is advisory end to end — nothing verifies placement, and over-requesting
+  # by one costs a concept the model could not have placed anyway. Making it
+  # mode-aware would reopen this state machine, whose correctness rests on
+  # structural separation rather than on arguments about interacting
+  # conditions. AiService#log_retention already records offered-versus-
+  # honored per bucket, so if this matters it will show up there first.
+  #
+  # Truncated to what today can actually host, and again when a retention
+  # check takes a slot back: the prompt's mastery instruction demands every
+  # concept listed here be reintroduced, so an entry past capacity is an
+  # instruction no section is left to satisfy.
+  #
+  # The shared concept is decided last, from whatever host reinforcement and
+  # retention left free, so pairing never displaces either.
+  def self.main_track(user, language, kinds:, hosts:, due:)
     hostable      = hostable_buckets(language, kinds: kinds)
     reinforcement = user.concepts_needing_reinforcement(exclude_buckets: FOURTH_BUCKETS,
-                                                        hostable: drill_host_test(language, kinds: kinds, mode: code_review_mode))
+                                                        hostable: drill_host_test(kinds: kinds, hosts: hosts))
                         .select { |h| hostable.include?(h[:bucket]) }
-    # Only the non-fourth kinds present today can ever host a language or
-    # architecture concept, so capacity follows the chosen set rather than a
-    # literal 3 — a short day (pattern chosen but no third) has fewer hosts,
-    # and this now says so structurally instead of by counting. Reinforcement
-    # keeps every such slot by default; a slot is taken back for retention only
-    # when reinforcement would otherwise claim all of them AND at least one
-    # retention check, in a bucket today can actually host, has gone
-    # meaningfully overdue (see ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
-    # A merely-due check is not enough to spend a reinforcement slot on — only
-    # a check nobody's gotten to in a while earns the trade.
-    #
-    # This capacity is approximate, deliberately. On a schema-review day
-    # code_review hosts only data-modeling concepts, and design_comparison
-    # hosts only its own allowlist every day, so an ordinary concept can have
-    # a host or two fewer than this counts. Left approximate because the arithmetic
-    # is advisory end to end — nothing verifies placement, and over-requesting
-    # by one costs a concept the model could not have placed anyway. Making it
-    # mode-aware would reopen this state machine, whose correctness rests on
-    # structural separation rather than on arguments about interacting
-    # conditions. AiService#log_retention already records offered-versus-
-    # honored per bucket, so if this matters it will show up there first.
     capacity      = kinds.count { |kind| !kind.fourth? }
     reinforcement = share_hosts(reinforcement, capacity)
     slots         = capacity - reinforcement.size
-    slots         = 1 if slots.zero? && overdue_retention_check_pending?(user, language, kinds: kinds, reinforcement: reinforcement)
-    # Truncated to what today can actually host, and again when a retention
-    # check takes a slot back: the prompt's mastery instruction demands every
-    # concept listed here be reintroduced, so an entry past capacity is an
-    # instruction no section is left to satisfy.
+    slots         = 1 if slots.zero? && overdue_retention_check_pending?(due, kinds: kinds, hosts: hosts, reinforcement: reinforcement)
     reinforcement = reinforcement.first(capacity - slots)
-    due_checks    = retention_checks_for(user, language, kinds: kinds, slots: slots, reinforcement: reinforcement)
-    established   = established_concepts_for(user, language, kinds: kinds,
-                                             reinforcement: reinforcement, due_checks: due_checks)
+    due_checks    = retention_checks_for(due, kinds: kinds, hosts: hosts, slots: slots, reinforcement: reinforcement)
+    shared        = SharedConcept.pick(reinforcement, due_checks, hosts, kinds: kinds)
 
-    Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third),
-               reinforcement: reinforcement, due_checks: due_checks, established: established,
-               code_review_mode: code_review_mode,
-               code_review_source: code_review_source_for(user, language, code_review_mode),
-               scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)),
-               **fourth_track(user, rotation.fetch(:fourth)))
+    { reinforcement: reinforcement, due_checks: due_checks, shared_concept: shared&.fetch(:concept),
+      established: established_concepts_for(user, language, kinds: kinds,
+                                            reinforcement: reinforcement, due_checks: due_checks) }
   end
+  private_class_method :main_track
 
   def self.scenario_flavor_weights_for(skill_level)
     SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.fetch(skill_level, SCENARIO_FLAVOR_WEIGHTS)
@@ -196,13 +277,10 @@ class DailyPlan
   # drill would otherwise claim that day's slot every time the mode rolled
   # that way. The bucket check keeps a mixed user's same-named concept in the
   # other language out.
-  def self.drill_host_test(language, kinds:, mode:)
-    buckets  = hostable_buckets(language, kinds: kinds)
-    taggable = kinds.reject(&:fourth?)
-                    .flat_map { |kind| ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode) }
-                    .to_set
+  def self.drill_host_test(kinds:, hosts:)
+    candidates = kinds.reject(&:fourth?)
 
-    ->(concept, bucket) { buckets.include?(bucket) && taggable.include?(concept) }
+    ->(concept, bucket) { hosts.hosts(candidates, concept, bucket).any? }
   end
   private_class_method :drill_host_test
 
@@ -212,7 +290,7 @@ class DailyPlan
   # cross-vocab item can never be placed somewhere it structurally cannot go.
   # Skipped entirely when no fourth section was chosen — there is no bucket to
   # run the track against.
-  def self.fourth_track(user, fourth)
+  def self.fourth_track(user, fourth, due:)
     return NO_FOURTH_TRACK if fourth.nil?
 
     bucket = FOURTH_BUCKET_FOR.fetch(fourth)
@@ -225,7 +303,7 @@ class DailyPlan
     # reinforcement in place alongside would put two mutually exclusive
     # concepts in the same prompt.
     reinforcement = [] if reinforcement.any? && overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement)
-    due_checks    = retention_checks_for_bucket(user, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size,
+    due_checks    = retention_checks_for_bucket(due, bucket, slots: FOURTH_SLOT_CAPACITY - reinforcement.size,
                                                 reinforcement: reinforcement)
 
     { fourth: fourth, fourth_reinforcement: reinforcement, fourth_due_checks: due_checks,
@@ -238,10 +316,10 @@ class DailyPlan
   # version: the fourth slot's bucket is always exactly one fixed value
   # (today's rolled kind), never a multi-bucket set the way hostable_buckets
   # can return for the third slot.
-  def self.retention_checks_for_bucket(user, bucket, slots:, reinforcement: [])
+  def self.retention_checks_for_bucket(due, bucket, slots:, reinforcement: [])
     return [] if slots.zero?
 
-    unclaimed_by(reinforcement, user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a)
+    unclaimed_by(reinforcement, due.select { |cm| cm.language == bucket })
       .sort_by { |cm| -(overdue_ratio(cm)) }
       .first(slots)
   end
@@ -289,18 +367,25 @@ class DailyPlan
   # that's merely due outrank a short-interval one that's actually crossed the
   # overdue threshold, handing the reserved slot to a concept that didn't earn it.
   #
-  # The per-bucket query is fetched WITHOUT truncating to `slots` — passing
-  # `limit: slots` there would let SQL's raw-date ORDER BY throw away the very
-  # concept this ranking exists to surface before overdue_ratio ever saw it.
-  def self.retention_checks_for(user, language, kinds:, slots:, reinforcement: [])
+  # `due` is the user's whole slice, read once by .for; this keeps only the
+  # checks some section today can tag, and truncates only after ranking, so
+  # no date order or fetch cap can drop the concept this ranking exists to
+  # surface. Tagging is DayHosts' test, the one waiting_checks reads, so a
+  # check only a kind the day lacks could carry waits as no_host instead of
+  # being selected here and then left out of the prompt.
+  def self.retention_checks_for(due, kinds:, hosts:, slots:, reinforcement: [])
     return [] if slots.zero?
 
-    due = hostable_buckets(language, kinds: kinds)
-      .flat_map { |bucket| user.concepts_due_for_retention_check(bucket: bucket, limit: RETENTION_BUCKET_FETCH_CAP).to_a }
-
-    unclaimed_by(reinforcement, due).sort_by { |cm| -(overdue_ratio(cm)) }.first(slots)
+    unclaimed_by(reinforcement, hostable_checks(due, kinds: kinds, hosts: hosts))
+      .sort_by { |cm| -(overdue_ratio(cm)) }.first(slots)
   end
   private_class_method :retention_checks_for
+
+  def self.hostable_checks(due, kinds:, hosts:)
+    candidates = kinds.reject(&:fourth?)
+    due.select { |cm| hosts.hosts(candidates, cm.concept, cm.language).any? }
+  end
+  private_class_method :hostable_checks
 
   # A drill can put a mastered concept back in reinforcement, and its due
   # check would otherwise list the same concept twice in one prompt with two
@@ -364,14 +449,13 @@ class DailyPlan
   private_class_method :established_in_bucket
 
   # Whether reinforcement should give up a slot: only when some retention
-  # check, in a bucket today's kinds can actually host, has crossed the
-  # "meaningfully overdue" threshold (ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER).
-  # Sharing hostable_buckets with retention_checks_for is what stops an
-  # architecture-only overdue concept from forcing a slot on a challenge day it
-  # could never occupy.
-  def self.overdue_retention_check_pending?(user, language, kinds:, reinforcement: [])
-    hostable_buckets(language, kinds: kinds)
-      .any? { |bucket| overdue_retention_check_pending_for_bucket?(user, bucket, reinforcement: reinforcement) }
+  # check a section today can tag has crossed the "meaningfully overdue"
+  # threshold (ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER). Read
+  # from the same hostable list retention_checks_for fills the slot from, so
+  # a slot is never reserved for a check nothing today could carry.
+  def self.overdue_retention_check_pending?(due, kinds:, hosts:, reinforcement: [])
+    unclaimed_by(reinforcement, hostable_checks(due, kinds: kinds, hosts: hosts))
+      .any? { |cm| overdue_ratio(cm) >= ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER }
   end
   private_class_method :overdue_retention_check_pending?
 end

@@ -2661,6 +2661,10 @@ RSpec.describe AiService do
           end
         end
         svc = spy_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" }).to_json)
+        # The history sizes an Automatic day at two, which no stubbed rotation
+        # filling every optional slot could produce; the fixed count keeps the
+        # coverage exception out of a day it could never see.
+        user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
         allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: third, fourth: :plan_review)
         allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
@@ -5785,6 +5789,19 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
   end
 
+  it "hands back the plan's notes on both generation paths" do
+    allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).with(shared_concept: "feature_envy")
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
+
+    expect(judged.plan_notes).to eq("shared_concept" => "feature_envy")
+    expect(single.plan_notes).to eq("shared_concept" => "feature_envy")
+    expect(single.dropped_sections).to eq([])
+  end
+
   it "keeps a set the judge keeps, with every section still present and stamped" do
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
@@ -6866,5 +6883,140 @@ end
       expect(logged.string).not_to include("[rubric_check]")
       expect(result[:review]).not_to have_key("essential_gaps")
     end
+  end
+end
+
+RSpec.describe AiService, "the shared concept" do
+  let(:user) { User.create!(email: "shared@example.com", name: "S", provider: "fake", api_key: "fake-test-key") }
+
+  # FakeService's design comparison carries open_closed; this one carries
+  # whatever the test asks both fixed sections to share.
+  def service_tagging_design_comparison(concept)
+    Class.new(FakeService) do
+      define_method(:call) do |**kwargs|
+        result = super(**kwargs)
+        next result unless kwargs[:purpose] == "generate_exercise"
+
+        set = JSON.parse(result[:text])
+        set["design_comparison"]["concept"] = concept
+        result.merge(text: set.to_json)
+      end
+      private :call
+    end.new("fake-key")
+  end
+
+  def plan_sharing(concept)
+    allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).with(shared_concept: concept)
+    end
+  end
+
+  def logged(prefix)
+    lines = []
+    allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?(prefix) }
+    yield
+    lines
+  end
+
+  before do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    pin_code_review_mode(:application_code)
+  end
+
+  it "names the concept for both fixed sections in one prompt line" do
+    prompt = FakeService.new("fake-key").send(:build_exercise_prompt, user, "ruby_rails",
+                                              third: nil, pattern: nil, fourth: nil, shared_concept: "n_plus_one")
+
+    line = prompt.lines.find { |l| l.include?("as their concept today") }
+    expect(line).to include("- The code_review and design_comparison sections share `n_plus_one` as their concept today.")
+    expect(line).not_to match(/\b(both|two)\b/i)
+    expect(line).not_to match(/tier|reduced|struggl/i)
+  end
+
+  it "renders no line without a shared concept, and none on a single-section retry" do
+    builder = FakeService.new("fake-key")
+    without = builder.send(:build_exercise_prompt, user, "ruby_rails", third: nil, pattern: nil, fourth: nil)
+    retry_prompt = builder.send(:build_exercise_prompt, user, "ruby_rails", third: nil, pattern: nil, fourth: nil,
+                                shared_concept: "n_plus_one", only: ExerciseSection::DesignComparison,
+                                fixed_concept: "n_plus_one")
+
+    expect(without).not_to include("as their concept today")
+    expect(retry_prompt).not_to include("as their concept today")
+  end
+
+  it "logs the pairing as honored when both delivered fixed sections carry it" do
+    plan_sharing("n_plus_one")
+
+    lines = logged("[shared_concept]") { service_tagging_design_comparison("n_plus_one").generate_exercise(user, language: "ruby_rails") }
+
+    expect(lines).to eq([ "[shared_concept] user=#{user.id} concept=n_plus_one reason=reduced_tier honored=true" ])
+  end
+
+  it "logs the pairing as not honored when the model placed it in one section only" do
+    plan_sharing("n_plus_one")
+
+    lines = logged("[shared_concept]") { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+
+    expect(lines).to eq([ "[shared_concept] user=#{user.id} concept=n_plus_one reason=reduced_tier honored=false" ])
+  end
+
+  it "logs nothing on a day without a pairing" do
+    lines = logged("[shared_concept]") { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+
+    expect(lines).to eq([])
+  end
+
+  it "carries the concept in the diagnostics payload" do
+    plan_sharing("n_plus_one")
+
+    lines = logged("[difficulty_diagnostics]") { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+
+    expect(JSON.parse(lines.last.delete_prefix("[difficulty_diagnostics] "))["requested"]["shared_concept"]).to eq("n_plus_one")
+  end
+end
+
+RSpec.describe AiService, "waiting retention checks" do
+  let(:user) { User.create!(email: "waiting@example.com", name: "W", provider: "fake", api_key: "fake-test-key") }
+
+  it "logs each check the day did not offer on one [retention] line" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    user.concept_masteries.create!(concept: "service_boundaries", language: "architecture", tier: :standard,
+                                   mastered_at: 2.months.ago, retention_interval_days: 7,
+                                   next_retention_check_on: Date.current - 2)
+    lines = []
+    allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?("[retention]") }
+
+    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+
+    expect(lines).to eq([ "[retention] user=#{user.id} date=#{Date.current} waiting=architecture:service_boundaries(no_host)" ])
+  end
+end
+
+RSpec.describe AiService, "the coverage exception" do
+  let(:user) { User.create!(email: "coverage@example.com", name: "C", provider: "fake", api_key: "fake-test-key") }
+
+  def lines_from(prefix)
+    lines = []
+    allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?(prefix) }
+    FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
+    lines
+  end
+
+  before do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
+    addition = CoverageException::Addition.new(kind: ExerciseSection::PlanReview, reason: :gap)
+    allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).with(coverage: addition)
+    end
+  end
+
+  it "logs the added kind and why" do
+    expect(lines_from("[coverage]")).to eq([ "[coverage] user=#{user.id} kind=plan_review reason=gap" ])
+  end
+
+  it "carries the addition in the diagnostics payload" do
+    payload = JSON.parse(lines_from("[difficulty_diagnostics]").last.delete_prefix("[difficulty_diagnostics] "))
+
+    expect(payload["requested"]["coverage"]).to eq("kind" => "plan_review", "reason" => "gap")
   end
 end

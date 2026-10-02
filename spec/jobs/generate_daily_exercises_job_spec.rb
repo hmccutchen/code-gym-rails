@@ -179,6 +179,23 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.last_generation_error).to be_nil
   end
 
+  it "writes the plan notes with the row on both paths" do
+    notes = { "coverage" => "plan_review", "shared_concept" => "feature_envy" }
+    judged = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {},
+                                      plan_notes: notes)
+    svc = instance_double(ClaudeService, generate_unjudged_exercise: judged, generate_judged_exercise: judged)
+    allow(AiService).to receive(:for).with(user).and_return(svc)
+
+    travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+      described_class.new.perform(user_id: user.id)
+      expect(DailyExercise.find_by(user: user, date: Date.current).plan_notes).to eq(notes)
+    end
+    travel_to(Time.utc(2026, 7, 18, 15, 0)) do
+      described_class.new.perform(user_id: user.id)
+      expect(DailyExercise.find_by(user: user, date: Date.current).plan_notes).to eq(notes)
+    end
+  end
+
   it "judges on the cron path and records dropped sections" do
     judged_set = AiService::JudgedSet.new(
       problem_set:      { "code_review" => { "question" => "q", "concept" => "n_plus_one" } },

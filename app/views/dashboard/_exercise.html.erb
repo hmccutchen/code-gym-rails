@@ -62,6 +62,12 @@
     <% if exercise.dropped_sections.any? %>
       <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
     <% end %>
+    <% if (coverage_reason = exercise.coverage_shown) %>
+      <p class="hint"><%= t("dashboard.coverage_added.#{coverage_reason}") %></p>
+    <% end %>
+    <% if exercise.shared_concept_shown? %>
+      <p class="hint"><%= t("dashboard.shared_concept", sections: ExerciseSection.fixed.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
+    <% end %>
 
     <% submit_blocker = response.submit_blocker %>
     <% submit_nudges = { unanswered: "Answer at least one section to finish up.",

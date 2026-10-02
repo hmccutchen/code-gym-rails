@@ -92,6 +92,7 @@ class GenerateDailyExercisesJob < ApplicationJob
       date:             Date.current,
       problem_set:      judged.problem_set,
       dropped_sections: judged.dropped_sections,
+      plan_notes:       judged.plan_notes,
       generated_at:     Time.current,
       language:         language
     )

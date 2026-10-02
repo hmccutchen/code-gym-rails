@@ -140,8 +140,11 @@ decisions, not defaults that drifted into place:
   its specs need no database; `DailyPlan` composes two pure collaborators of
   its own — `SectionCount` (how many sections) and `SectionRotation` (which
   kind fills each) — whose specs need none, even though `DailyPlan` itself
-  reads concept-mastery history to decide reinforcement and retention. Keep
-  the collaborators that way.
+  reads concept-mastery history to decide reinforcement and retention. The
+  same holds for `CoverageException` (whether a two-section day gains a
+  section), `SharedConcept` (which concept both fixed sections take) and
+  `DayHosts` (which kinds can tag a concept today). Keep the collaborators
+  that way.
 - **Single authority per fact** — `DailyExercise#active_section_keys` for how
   many sections a day has, `ConceptBucket` for which vocabulary a concept
   records under. Derive from the authority; never recount.
@@ -231,7 +234,8 @@ User opens dashboard:
        (Coding Challenge / Architecture Decision / Security Review / Parsons
        Problem), and a rotating fourth (Plan Review / Ambiguity Hunt /
        Pseudocode to Code) compete for the remaining slots, which today's
-       count and rotation fill
+       count and rotation fill. A two-section Automatic day can gain one
+       optional section under the coverage exception
 
 User interacts:
   └→ ResponsesController#create      → auto-saves answers + difficulty rating
@@ -290,7 +294,7 @@ Every page load, any day of the week:
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | `User`          | email, name, skill_level, focus_areas (jsonb), api_key (encrypted), provider, language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}) |
-| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at |
+| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
@@ -875,7 +879,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   dropped, that rule let one rejected section shorten tomorrow. The cost of the rotation trade is the reverse
   of the loop it prevents: a kind the judge keeps rejecting can go unseen for
   a long time without the starvation guarantee noticing. Nothing in the
-  scheduler compensates, on purpose. Drop rate per kind is read off the
+  rotation compensates, on purpose. The one exception is a two-section
+  Automatic day, where the coverage exception reads delivered dates and so
+  may add such a kind back, at most once in five weekdays. Drop rate per kind is read off the
   `[difficulty_diagnostics]` line's `judge:` entries, which are keyed by
   section key and carry `dropped: true`; rejection rate per principle comes
   off `principle` and the `retry_principle` list in the same entries, each
@@ -1168,7 +1174,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Drills are scoped to what today can tag, and stand a retention check
   down.** `DailyPlan` hands `concepts_needing_reinforcement` a `hostable:`
   test built from the day's non-fourth kinds and `code_review` mode through
-  `ProblemSetIngest.selectable_vocabulary_for`, the same authority
+  `DayHosts`, which reads `ProblemSetIngest.selectable_vocabulary_for`, the same authority
   `AiService#can_host?` reads for retention checks — so a drilled
   architecture concept is offered only on an architecture day and a drilled
   data-modeling concept only when some section can tag it. A history entry
@@ -1351,6 +1357,133 @@ concept-specific difficulty descriptions for future generation, not a new set.
   That change was deliberate. `User` lists `adaptive_set_size` in
   `ignored_columns` because the old code keeps serving while the pre-deploy
   migration runs; a later migration drops the column.
+
+  **A fixed count never gains a coverage section.** The coverage exception
+  below applies only to Automatic, so under a fixed 2 a check that only an
+  optional kind can host waits, and the `[retention] waiting=` line says so.
+  A fixed choice wins by design.
+- **What the plan did, on the row**: `daily_exercises.plan_notes` (jsonb,
+  default `{}`, null false) records `{"coverage" => kind_key, "coverage_reason" => "gap" |
+  "due_check"}` and `{"shared_concept" => concept}`, each only when it applied
+  (`DailyPlan::Result#notes`). It is server-owned and written with the row
+  from the plan that produced it, never recomputed while rendering: both
+  generation paths hand it back on `AiService::JudgedSet#plan_notes`
+  (`#generate_unjudged_exercise` on the single-stage path,
+  `#generate_judged_exercise` on the judged one; `#generate_exercise` still
+  returns only the set).
+  `RegenerateExerciseJob` rewrites it from the new plan, clearing it when the
+  new plan recorded nothing, and carry-forward moves it with the row because
+  it is on the row. No backfill: no earlier plan added a section or shared a
+  concept.
+- **Shared concept on a real struggle**: when reinforcement holds a
+  reduced-tier concept, drilled or not, that every fixed kind can tag,
+  `SharedConcept.pick` places the first such entry in both `code_review` and
+  `design_comparison` (`DailyPlan::Result#shared_concept`). Reduced takes
+  three stagnant reviews in a row, so it marks persistent difficulty; paused
+  concepts never reach the list. Hosting goes through `DayHosts`, which reads
+  the mode-aware `code_review` vocabulary and `design_comparison`'s strictest
+  no-rung list, since `DailyPlan` never reads `KindDifficulty`; the cost is
+  that a tradeoff concept is never shared. The pairing only fills hosts
+  nothing else needed: reinforcement and retention are fitted first, against
+  the final slot count, and the concept is shared only when every other
+  reinforcement entry and due check can still take a distinct remaining kind
+  able to tag it (`SharedConcept.placeable?`). A free section count alone
+  is not enough: with architecture as the only optional kind, two Ruby
+  concepts have the fixed sections as their only hosts, and pairing one
+  would leave the other nowhere. So it never evicts a drill or another
+  reinforcement entry, and when an overdue retention check takes the free
+  host the day is planned exactly as it would be without pairing. This
+  replaces the design note's "cut the remaining reinforcement by one more",
+  which let a reduced concept push a drill out.
+
+  **Advisory, like all reinforcement.** One line folded onto the end of the
+  drilled-concepts bullet (`AiService#shared_concept_guidance`) names it for
+  every fixed section, listing their keys from `ExerciseSection.fixed` and
+  stating no count, so a day without
+  one renders byte for byte as before; `DesignComparison.generation_guidance`
+  already carries the kind's own rule (two working designs, a scenario
+  different from the code review). A retry asks for one section and never
+  carries the line. It is not enforced through `fixed_concepts:`, which
+  would fail the whole draft when the model misplaced it. Each generation
+  logs `[shared_concept] user=… concept=… reason=reduced_tier
+  honored=true|false`, where honored means both delivered fixed sections
+  took it (`ExerciseSection.fixed_sections_share?`). Within one review
+  `record_review!` evaluates the concept once, on the least favourable
+  rating, so the second angle makes leaving Reduced stricter and never adds
+  weight.
+- **Waiting retention checks**: `DailyPlan` reads due checks for every bucket
+  in the user's slice, plus the bucket of the language being generated, in
+  one query (`User#concepts_due_for_retention_check_in`), including
+  architecture and the fourth buckets, which were fetched only when their
+  kind was chosen and so waited with no trace on every other day. The
+  generated language is added because a regeneration keeps the stored
+  exercise's language, which can differ from the setting. That one read also feeds
+  both tracks' retention checks, which filter it by bucket instead of
+  querying each bucket again, and `ConceptMastery.due_for_retention_check`
+  is the one statement of what "due" means. A check is selected, and a slot
+  reserved for an overdue one, only when some section today can tag it, by
+  the same `DayHosts` test the waiting classification uses: on a
+  schema-review two-section day a core Ruby check that neither fixed section
+  can tag waits as `no_host`, where the coverage exception can bring it a
+  host, rather than being selected and then left out of the prompt. Each
+  check the plan did not offer and reinforcement does not carry lands on
+  `Result#waiting_checks` with a reason: `no_slot` when a section today
+  could tag it but the hosts went elsewhere, `no_host` when none could.
+  Generation logs them on one line beside the other two:
+  `[retention] user=… date=… waiting=bucket:concept(no_slot|no_host),…`.
+- **Coverage exception**: at two sections a day has no optional slot, so
+  `SectionRotation`'s starvation guarantee has nothing to act on.
+  `CoverageException` (pure) adds one optional section when the setting is
+  Automatic, the day's count leaves no optional slot (`count <=
+  ExerciseSection.fixed.size`), the struggle brake is
+  off (a `brake:` input that defaults to false until the competency gate
+  wires it), and no exercise dated on the previous `CAP_WEEKDAYS` (4)
+  weekdays carries `plan_notes["coverage"]`. It picks (a) the kind able to
+  host the most overdue waiting check at or past
+  `ConceptMastery::RETENTION_OVERDUE_THRESHOLD_MULTIPLIER`, or else (b) the
+  optional kind unseen for more than `GAP_WEEKDAYS` (20) weekdays, longest
+  gap first, never seen before seen, ties in registry order. Both respect
+  the user's exclusions, and (a) reads hosting through `DayHosts`. The added
+  kind fills its own slot (`ExerciseSection.slot_for`) without weights, and
+  `DailyPlan` decides the concept tracks again so the check can land in it.
+  Reinforcement can still outrank that check for the one retention slot
+  (`Addition#check` names the check, and `DailyPlan.check_landed?` reads the
+  recomputed tracks for it); then the addition is given up and the day stays
+  at two, rather than spending the cap on a section carrying something else.
+
+  **The cap counts calendar weekdays, not delivered rows.** Weekends never
+  count toward the four, a weekend addition inside the window still blocks,
+  and a paused stretch counts as the weekdays it spans. Because the note is
+  written at plan time, an addition whose section the judge dropped still
+  counts. The checks run cheapest first: the setting and count cost
+  nothing, then `History.recent_coverage_dates` reads the planned additions
+  over the cap's window alone, and only a day the cap leaves open runs
+  `History.for`, which reads each optional kind's last delivered date
+  (`active_section_keys`) and the oldest date from one query over the last
+  `HISTORY_LIMIT` (120) exercises before today. A
+  kind never delivered counts as unseen from the oldest exercise read, so a
+  new account gains nothing from the gap rule. Today's row is left out, so a
+  regeneration plans as the first generation did. Generation logs
+  `[coverage] user=… kind=… reason=gap|due_check`, and the diagnostics
+  payload carries `coverage` and `shared_concept` beside the rest of
+  `requested`.
+
+  **What the dashboard says.** Two muted lines in the style of
+  `dashboard.section_left_out`, on the unsubmitted dashboard. While the
+  added kind is still in `active_section_keys`, `DailyExercise#coverage_shown`
+  returns the stored `plan_notes["coverage_reason"]` and the line follows it:
+  `dashboard.coverage_added.gap` ("a kind you haven't seen in a while") for a
+  gap, and `dashboard.coverage_added.due_check` ("so an idea you learned
+  earlier can come back up") for a due check, whose host may have been seen
+  last week, so the gap wording would be false for it.
+  `dashboard.shared_concept` shows only when both delivered fixed sections carry
+  the planned concept (`#shared_concept_shown?`), so a dropped section or an
+  ignored placement never produces a false claim. The shared line gives no
+  reason: "because it has been giving you trouble" would expose the mastery
+  tier, which stays invisible. It names the fixed sections from their
+  locale names (`sections.<key>.name`, listed from `ExerciseSection.fixed`)
+  and says "from different sides", so neither line nor prompt assumes how
+  many fixed kinds there are.
 - **Pausing generation**: `User#paused_generation_at` (nullable timestamp; nil is active) suppresses only generation the user didn't ask for — the cron batch (`GenerateDailyExercisesJob`'s no-arg branch) and `DashboardController#show`'s auto-trigger. It never gates submitting or reviewing: `ResponsesController` has no pause check, so once a row exists for today the submit → review chain runs regardless of pause state or weekday. The toggle is `PATCH /account/toggle_generation` on the Account page — the one control for this column; a second one anywhere else would be a second pause mechanism. Each button posts the state it wants (`paused=0`/`1`) rather than asking for a flip, so a double-tapped Resume stays a resume instead of the second request re-reading an already-unpaused user and pausing it again; with no param posted the endpoint still flips, keeping its original contract. Days fully inside a pause create no `DailyExercise` row at all, so they are non-events to `User#recent_exercise_history` and `#current_streak` rather than skips. The one day that *does* leave a row is the day the pause began (or an explicit `/generate` while paused). **A set left unfinished when the pause began follows the user forward**: `DashboardController#show` calls `User#carry_held_set_forward!` on a day with no set, which re-dates the held, still-unsubmitted exercise — and the draft `DailyResponse` autosave left on it, which must move too or `#create` would build a second response for the same exercise — to `Date.current`, so the pause gives time to finish rather than hiding the set at midnight. Once it is submitted, `#held_exercise` finds nothing, the paused day stays empty and nothing generates, which is what the pause is for. `User#resume_generation!` performs the same recovery (`#recover_held_set`, shared) and then lifts the pause. The row lock also settles the race against a concurrent generation, and does it through the foreign key rather than directly: inserting today's exercise needs a FOR KEY SHARE lock on the same `users` row that `with_lock` holds FOR UPDATE, so a generator either committed before the lock (and the `exists?` check sees it) or blocks until after it and loses its own set to the unique index, which `GenerateDailyExercisesJob` already treats as "generated concurrently". Resume wins, which is the right way round — the held set carries the user's draft answers and a fresh one would not. The move locks the exercise, then its response, and writes in that order — the order `RegenerateExerciseJob` takes, so the two serialize but cannot deadlock — and re-reads the response under its lock, since `#held_exercise` read it outside any lock and a submit can commit in between; a submitted response ends the move, so a finished session keeps its day. It still sits in a SAVEPOINT catching both `RecordNotUnique` and a `date`-taken `RecordInvalid` (uniqueness is enforced twice, and the model validation raises first), so that were it ever to fail it rolls back only itself and the pause still lifts. Recovering the set also clears a same-day `last_generation_error`, since `/generate` is not pause-gated and a failed attempt while the held set sat at an earlier date would otherwise leave "Couldn't generate a new set" rendered above it — the banner `persist_failure` exists to avoid. The whole method runs in the user's own zone rather than the caller's, unlike the read-only history and streak readers, since it writes a date that has to be the user's today. That move both makes the set reachable (every "today's exercise" lookup is `for_date`, so at its original date it renders nowhere and `#create` 404s) and drops it out of both signals at once, since `recent_exercise_history` filters `date: ...Date.current` and `#current_streak` exempts today — no separate "exclude paused days" rule exists or is needed. Scoped to exercises dated on or after the pause, so a day abandoned *before* pausing stays abandoned; skipped entirely if an exercise already exists for today, so an explicit `/generate` while paused is never overwritten. Both regeneration columns clear on the move, because they describe the row's *day* rather than the set: `regenerated_at` would hide the Generate-new-set button behind a claim the dashboard states outright and that is no longer true ("You've already generated a new set today"), and a leftover `regenerating_since` is worse than cosmetic — `RegenerateExerciseJob` gates on `exercise&.regenerating_since` after resolving `for_date`, and re-checks that claim under the exercise row lock before it writes, by value rather than presence (the claim's timestamp is the worker's token, so a later click's claim is not mistaken for its own) — a claim `carry_forward` cleared mid-call means the generated set is discarded, and every release is guarded the same way, so a retry stranded from the pause day cannot replace the carried-forward `problem_set` or destroy the draft response the move preserved. **At most one set can ever be carried forward**, because `[user_id, date]` is unique — so a user who stranded several (paused Monday, clicked `/generate` on Tuesday, resumed Wednesday) gets the newest one back and the older ones stay where they are — **still breaking `#current_streak`**, not merely counting as skips: a past weekday holding an unsubmitted exercise hits that method's `exercised.include?(day)` break. Recovering one set does not repair a streak an older stray still zeroes. That is a limit of re-dating rather than a gap to close: two sets cannot both be today. Re-pausing does not move the floor `#held_exercise` searches from — `AccountsController` stamps a pause only when one isn't already running — so a second Pause cannot walk that floor past the set the first pause stranded. The same limit is why the move is skipped outright when today already holds an exercise. **Accepted consequence:** finishing a carried-forward set counts toward the completion-window signal and the streak for the resume day, not the day it was generated.
 - **Personalization loop**: `user.recent_performance(limit: 10)` returns the last 10 sessions with dates, sections answered, ratings, and concept tags. This is embedded verbatim in the generation prompt so each day's exercises adjust to the user's trajectory. A skipped section's AI grade is not evidence of skill: `recent_performance`'s `ai_ratings`, `ConceptMastery.record_review!` and `User#concepts_needing_reinforcement` read `DailyResponse#answered_concept_tags`, and the prompt labels a skipped section `ai: skipped`. `recent_performance`'s `concepts:` and `User#concept_exposure_index` keep the full set because a skipped section was still shown. `self_ratings` returns the stored map unchanged for historical compatibility; new submissions use the finalization rule under "One finish action."
 
@@ -2231,7 +2364,10 @@ always pull in the full suite — is stated once, in
 - `app/services/ai_service.rb` — provider-agnostic base: prompts, concept vocabularies, JSON parsing, usage logging. Owns the difficulty scale's prompt text and `#assess_difficulty`'s deliberately narrow signature; `DailyResponse.usable_difficulty` owns what a storable/renderable assessment is, and is applied on write and again on read. Also owns the judge prompt, the single-section retry call, and the two-stage entry point: `#generate_judged_exercise` drafts, then hands the draft to `JudgedGeneration`
 - `app/services/judged_generation.rb` — `JudgedGeneration`: the two-stage path after the draft. Fans the judge out a section at a time, retries a rejection, or a planned section ingest refused, up to its kind's `judge_retries` times (twice for a fixed kind, once otherwise) with its concept fixed, drops a rejected last retry, re-judges a design comparison's edits, and hands the final set to `AiService`'s shared logging tail. It reaches the provider only through `JudgedGeneration::Provider` (`judge_section` and `retry_section`, as callables built fresh per call), so its specs need no provider subclass. `JudgedGeneration::UnhostedConcepts` names the planned concepts a drop left without a host
 - `app/services/problem_set_ingest.rb` — the generation boundary: holds concepts to their closed vocabulary, bounds scaffolds and diagrams, rolls the parsons scramble, runs each resolved section's own `.reject_unusable!` check, leaving a refused section out and reporting it on `Result#unusable_sections`, and logs a section the day never asked for. Writes nothing to the database — off-vocabulary concepts come back on the `Result` for `AiService` to record, so a rejected set structurally cannot leave a `SuggestedConcept` row behind, and its specs need no database. Not side-effect free, though: `warn_unrequested_sections!` logs.
-- `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, retention checks, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
+- `app/services/daily_plan.rb` — the day's plan (third section, reinforcement, the shared concept, retention checks and the ones left waiting, the coverage addition, `code_review` mode and the real-source excerpt grounding it, if any), decided before any provider is contacted; pure decision, no prompt or HTTP
+- `app/services/coverage_exception.rb` (+ `coverage_exception/history.rb`) — `CoverageException`: whether a two-section Automatic day gains one optional section, and which; pure. `History.for` is its one-query loader
+- `app/services/shared_concept.rb` — `SharedConcept`: which reduced-tier concept both fixed sections take, from a host the day left free; pure
+- `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
 - `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence or reason is invalid output rather than a judgment. Pure; its specs need no database
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)

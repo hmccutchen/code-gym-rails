@@ -61,6 +61,7 @@ class RegenerateExerciseJob < ApplicationJob
       exercise.update!(
         problem_set:        generated.problem_set,
         dropped_sections:   generated.dropped_sections,
+        plan_notes:         generated.plan_notes,
         generated_at:       Time.current,
         regenerated_at:     Time.current,
         regenerating_since: nil

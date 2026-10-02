@@ -51,6 +51,31 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.reload.dropped_sections).to eq([])
   end
 
+  it "rewrites the plan notes from the new plan rather than keeping the old day's" do
+    exercise = claimed_exercise
+    exercise.update!(plan_notes: { "coverage" => "plan_review", "shared_concept" => "feature_envy" })
+    fake_service = instance_double(ClaudeService)
+    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    allow(fake_service).to receive(:generate_unjudged_exercise).and_return(
+      AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "new" } }, dropped_sections: [],
+                               outcomes: {}, plan_notes: { "shared_concept" => "long_method" })
+    )
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(exercise.reload.plan_notes).to eq("shared_concept" => "long_method")
+  end
+
+  it "clears the plan notes when the new plan recorded none" do
+    exercise = claimed_exercise
+    exercise.update!(plan_notes: { "coverage" => "plan_review" })
+    stub_provider({ "code_review" => { "question" => "new" } })
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(exercise.reload.plan_notes).to eq({})
+  end
+
   # A claim can be released under the worker while its provider call runs:
   # User#carry_forward clears regenerating_since when it moves a held set to
   # today, whether from a resume or from a paused dashboard load after

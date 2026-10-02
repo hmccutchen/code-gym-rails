@@ -15,6 +15,8 @@ class ConceptMastery < ApplicationRecord
   scope :in_bucket, ->(bucket) { where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket)) }
   scope :in_buckets, ->(buckets) { buckets.map { |bucket| in_bucket(bucket) }.reduce(none, :or) }
   scope :drilling, -> { where.not(drilled_at: nil) }
+  # The one statement of "a retention check is due today".
+  scope :due_for_retention_check, -> { where.not(next_retention_check_on: nil).where(next_retention_check_on: ..Date.current) }
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
 

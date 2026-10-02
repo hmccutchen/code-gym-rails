@@ -422,17 +422,14 @@ class User < ApplicationRecord
   end
   private :drill_order
 
-  # Mastered concepts whose scheduled re-check has come due, most overdue first.
-  # Bucket-scoped by the caller: an architecture concept has no valid home outside
-  # the architecture third, and a ruby_rails concept must not surface on a
-  # JavaScript day.
-  def concepts_due_for_retention_check(bucket:, limit:)
-    concept_masteries
-      .in_bucket(bucket)
-      .where.not(next_retention_check_on: nil)
-      .where(next_retention_check_on: ..Date.current)
-      .order(:next_retention_check_on)
-      .limit(limit)
+  # Mastered concepts whose scheduled re-check has come due, across the
+  # buckets given, in one query. Bucket-scoped by the caller: an architecture
+  # concept has no valid home outside the architecture third, and a
+  # ruby_rails concept must not surface on a JavaScript day. Unordered and
+  # unlimited, because DailyPlan ranks by overdue ratio, which a date order or
+  # a cap would cut across (issue #93); the user's slice bounds the size.
+  def concepts_due_for_retention_check_in(buckets)
+    concept_masteries.in_buckets(buckets).due_for_retention_check.to_a
   end
 
   # Due concepts that have crossed the "meaningfully overdue" threshold: overdue

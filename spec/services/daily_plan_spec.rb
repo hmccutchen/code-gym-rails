@@ -23,17 +23,13 @@ RSpec.describe DailyPlan do
   end
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
-  describe "RETENTION_BUCKET_FETCH_CAP" do
-    # Deliberately restates the constant's own expression, so it cannot fail
-    # when a vocabulary grows — that is the point. What it catches is someone
-    # replacing the derivation with a literal again, which is how this became a
-    # truncating cap in the first place (issue #93). The ordering test below is
-    # what actually proves the fetch reaches the right row.
-    it "stays derived from the vocabularies rather than hardcoded" do
-      largest_vocabulary = AiService::LANGUAGE_CONFIG.values.map { |config| config.fetch(:concepts).size }.max
+  # What DailyPlan.for reads once and hands both tracks.
+  def due_slice
+    user.concepts_due_for_retention_check_in(ConceptBucket.slice_for("mixed"))
+  end
 
-      expect(DailyPlan::RETENTION_BUCKET_FETCH_CAP).to be >= largest_vocabulary
-    end
+  def day_hosts
+    DayHosts.new("ruby_rails", mode: :application_code)
   end
 
   describe "retention check selection" do
@@ -76,7 +72,7 @@ RSpec.describe DailyPlan do
       allow(user).to receive(:concepts_needing_reinforcement)
         .and_return([ { concept: "a", bucket: "ruby_rails", tier: "standard" }, { concept: "b", bucket: "ruby_rails", tier: "standard" } ])
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
@@ -93,16 +89,15 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 10)
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
-    # The SQL orders by next_retention_check_on — absolute days overdue — and
-    # the LIMIT is applied against THAT ordering, while the Ruby re-rank below
-    # sorts by overdue ratio against each concept's own interval. Two different
-    # orderings, so a truncating cap can discard the row the re-rank would have
-    # put first. The concept here is the most overdue by ratio and the LEAST
-    # overdue by date, which is exactly the row a date-ordered LIMIT drops first.
+    # The ranking is by overdue ratio against each concept's own interval, not
+    # by date. A date-ordered, capped fetch once dropped the row the ranking
+    # would have put first (issue #93): the concept here is the most overdue
+    # by ratio and the LEAST overdue by date, so any such cap returning would
+    # fail this.
     it "sees a high-ratio concept whose due date sorts it past a fixed 20-row fetch" do
       (AiService::RAILS_CONCEPTS - %w[memoization]).first(20).each do |concept|
         user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard,
@@ -115,20 +110,20 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 5)
 
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 1)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 1)
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
     it "offers nothing when reinforcement already claims three slots" do
       mastery(concept: "memoization", bucket: "ruby_rails", due_on: Date.current - 2)
-      expect(DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 0)).to eq([])
+      expect(DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 0)).to eq([])
     end
 
     it "offers architecture-bucket concepts only on architecture days" do
       mastery(concept: "service_boundaries", bucket: "architecture", due_on: Date.current - 2)
 
-      on_challenge = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
-      on_arch      = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Architecture ], slots: 3)
+      on_challenge = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 3)
+      on_arch      = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Architecture ], hosts: day_hosts, slots: 3)
 
       expect(on_challenge.map(&:concept)).to eq([])
       expect(on_arch.map(&:concept)).to eq(%w[service_boundaries])
@@ -136,7 +131,7 @@ RSpec.describe DailyPlan do
 
     it "never offers a concept from the other language's bucket" do
       mastery(concept: "closures", bucket: "javascript", due_on: Date.current - 2)
-      checks = DailyPlan.send(:retention_checks_for, user, "ruby_rails", kinds: [ ExerciseSection::Challenge ], slots: 3)
+      checks = DailyPlan.send(:retention_checks_for, due_slice, kinds: [ ExerciseSection::Challenge ], hosts: day_hosts, slots: 3)
       expect(checks.map(&:concept)).to eq([])
     end
   end
@@ -277,8 +272,8 @@ RSpec.describe DailyPlan do
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 2)
 
-      matching    = DailyPlan.send(:retention_checks_for_bucket, user, "plan_review", slots: 1)
-      non_matching = DailyPlan.send(:retention_checks_for_bucket, user, "ambiguity_hunt", slots: 1)
+      matching    = DailyPlan.send(:retention_checks_for_bucket, due_slice, "plan_review", slots: 1)
+      non_matching = DailyPlan.send(:retention_checks_for_bucket, due_slice, "ambiguity_hunt", slots: 1)
 
       expect(matching.map(&:concept)).to eq(%w[scope_creep])
       expect(non_matching.map(&:concept)).to eq([])
@@ -288,7 +283,7 @@ RSpec.describe DailyPlan do
       user.concept_masteries.create!(concept: "scope_creep", language: "plan_review", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 2)
-      expect(DailyPlan.send(:retention_checks_for_bucket, user, "plan_review", slots: 0)).to eq([])
+      expect(DailyPlan.send(:retention_checks_for_bucket, due_slice, "plan_review", slots: 0)).to eq([])
     end
   end
 
@@ -536,7 +531,10 @@ RSpec.describe DailyPlan do
       expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization])
     end
 
+    # Pinned to a mode whose code_review can tag a core Ruby concept: on a
+    # schema-review day no fixed section could, and the check would wait.
     it "gives a reinforcement entry up when an overdue check takes the slot back" do
+      pin_code_review_mode(:application_code)
       allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
         [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }, { concept: "memoization", bucket: "ruby_rails", tier: "standard" } ]
       )
@@ -836,5 +834,333 @@ RSpec.describe DailyPlan, "same-named concepts across language buckets" do
 
     expect(on_javascript_day.reinforcement).to eq([ { concept: "over_mocking", bucket: "javascript", tier: "standard" } ])
     expect(on_javascript_day.due_checks).to eq([])
+  end
+end
+
+RSpec.describe DailyPlan::Result, "#notes" do
+  def result(**overrides)
+    defaults = DailyPlan::Result.members.index_with { nil }
+    DailyPlan::Result.new(**defaults, **overrides)
+  end
+
+  it "records only what applied" do
+    expect(result.notes).to eq({})
+    expect(result(shared_concept: "feature_envy").notes).to eq("shared_concept" => "feature_envy")
+    gap = CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap)
+    expect(result(coverage: gap).notes).to eq("coverage" => "pattern", "coverage_reason" => "gap")
+  end
+end
+
+RSpec.describe DailyPlan, "the shared concept" do
+  let(:user) { User.create!(email: "plan-shared@example.com", name: "Plan") }
+
+  before do
+    pin_code_review_mode(:application_code)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: nil, fourth: nil)
+  end
+
+  def struggled_with(concept, tier:, date: Date.current - 1)
+    exercise = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { "code_review" => { "concept" => concept } })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
+                          answers: { "code_review" => "x" * 20 }, section_ratings: { "code_review" => "too_hard" },
+                          concept_tags: { "code_review" => concept }, ai_review: { "code_review" => { "rating" => "developing" } })
+    user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: tier)
+  end
+
+  it "places a reduced-tier concept both fixed sections can tag in both of them" do
+    struggled_with("n_plus_one", tier: :reduced)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to eq("n_plus_one")
+    expect(plan.notes).to eq("shared_concept" => "n_plus_one")
+  end
+
+  it "never shares a paused concept" do
+    struggled_with("n_plus_one", tier: :paused)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to be_nil
+  end
+
+  it "does not share a standard-tier concept" do
+    struggled_with("n_plus_one", tier: :standard)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to be_nil
+  end
+
+  it "falls back to no share when one fixed section cannot tag the concept" do
+    struggled_with("transaction_safety", tier: :reduced)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to be_nil
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[transaction_safety])
+  end
+
+  it "skips past an ineligible reduced concept to the first one both can tag" do
+    struggled_with("transaction_safety", tier: :reduced, date: Date.current - 1)
+    struggled_with("memoization", tier: :reduced, date: Date.current - 2)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to eq("memoization")
+  end
+
+  it "pairs into a host nothing else wanted and leaves reinforcement as it was" do
+    struggled_with("n_plus_one", tier: :reduced, date: Date.current - 1)
+    struggled_with("memoization", tier: :standard, date: Date.current - 2)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to eq("n_plus_one")
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization])
+  end
+
+  it "does not pair when reinforcement already fills every host" do
+    struggled_with("n_plus_one", tier: :reduced, date: Date.current - 1)
+    struggled_with("memoization", tier: :standard, date: Date.current - 2)
+    struggled_with("service_objects", tier: :standard, date: Date.current - 3)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to be_nil
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization service_objects])
+  end
+
+  it "keeps a drill rather than evicting it for the pairing on a two-section day" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    struggled_with("n_plus_one", tier: :reduced)
+    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.shared_concept).to be_nil
+    expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[memoization n_plus_one])
+  end
+
+  it "plans exactly the unpaired day when an overdue retention check takes the free host" do
+    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
+    struggled_with("n_plus_one", tier: :reduced)
+    user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7,
+                                   next_retention_check_on: 6.months.ago.to_date)
+
+    paired = described_class.for(user, language: "ruby_rails")
+    allow(SharedConcept).to receive(:pick).and_return(nil)
+    unpaired = described_class.for(user, language: "ruby_rails")
+
+    expect(paired).to eq(unpaired)
+    expect(paired.due_checks.map(&:concept)).to eq(%w[memoization])
+  end
+
+  it "reads the schema-review vocabulary on a schema-review day" do
+    pin_code_review_mode(:schema_review)
+    struggled_with("n_plus_one", tier: :reduced)
+
+    expect(described_class.for(user, language: "ruby_rails").shared_concept).to be_nil
+  end
+end
+
+RSpec.describe DailyPlan, "retention checks left waiting" do
+  let(:user) { User.create!(email: "plan-waiting@example.com", name: "Plan") }
+
+  before do
+    pin_code_review_mode(:application_code)
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+  end
+
+  def due(concept, bucket, days_late: 2)
+    user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard, mastered_at: 2.months.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - days_late)
+  end
+
+  def waiting
+    described_class.for(user, language: "ruby_rails").waiting_checks.map { |w| w.slice(:bucket, :concept, :reason) }
+  end
+
+  it "names an architecture check and a fourth-bucket check no section today can tag" do
+    due("service_boundaries", "architecture")
+    due("scope_creep", "plan_review")
+
+    expect(waiting).to contain_exactly(
+      { bucket: "architecture", concept: "service_boundaries", reason: :no_host },
+      { bucket: "plan_review", concept: "scope_creep", reason: :no_host }
+    )
+  end
+
+  it "says no_slot when a section could tag the check but reinforcement took every host" do
+    allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
+      %w[n_plus_one service_objects query_objects policy_objects].map { |c| { concept: c, bucket: "ruby_rails", tier: "standard" } }
+    )
+    due("memoization", "ruby_rails")
+
+    expect(waiting).to eq([ { bucket: "ruby_rails", concept: "memoization", reason: :no_slot } ])
+  end
+
+  it "leaves out a check the day offers and one reinforcement already carries" do
+    allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything)
+      .and_return([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
+    due("memoization", "ruby_rails")
+    due("n_plus_one", "ruby_rails")
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.due_checks.map(&:concept)).to eq(%w[memoization])
+    expect(plan.waiting_checks).to eq([])
+  end
+
+  it "names the other language's check for a mixed user as having no host today" do
+    user.update!(language: "mixed")
+    due("closures", "javascript")
+
+    expect(waiting).to eq([ { bucket: "javascript", concept: "closures", reason: :no_host } ])
+  end
+
+  # Regeneration keeps the stored exercise's language, so a user who has
+  # since changed theirs still gets that language's due checks offered.
+  it "offers the generated language's check when the user's setting has moved to the other language" do
+    user.update!(language: "javascript")
+    due("memoization", "ruby_rails")
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.due_checks.map(&:concept)).to eq(%w[memoization])
+    expect(plan.waiting_checks).to eq([])
+  end
+
+  it "lists the most overdue first" do
+    due("service_boundaries", "architecture", days_late: 2)
+    due("scope_creep", "plan_review", days_late: 20)
+
+    expect(waiting.map { |w| w[:concept] }).to eq(%w[scope_creep service_boundaries])
+  end
+end
+
+RSpec.describe DailyPlan, "the coverage exception" do
+  include ActiveSupport::Testing::TimeHelpers
+
+  let(:user) { User.create!(email: "plan-coverage@example.com", name: "Plan") }
+
+  around { |example| travel_to(Time.zone.local(2026, 10, 7, 9)) { example.run } }
+
+  before do
+    pin_code_review_mode(:application_code)
+    allow(SectionCount).to receive(:for).and_call_original
+    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(ExerciseSection.fixed.size)
+  end
+
+  def two_section_day(date, plan_notes: {})
+    user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails", plan_notes: plan_notes,
+                                 problem_set: { "code_review" => { "concept" => "n_plus_one" },
+                                                "design_comparison" => { "concept" => "open_closed" } })
+  end
+
+  def overdue_architecture_check
+    user.concept_masteries.create!(concept: "service_boundaries", language: "architecture", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7,
+                                   next_retention_check_on: Date.current - 30)
+  end
+
+  it "adds the kind that can host an overdue waiting check, and the check lands there" do
+    overdue_architecture_check
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage.kind).to eq(ExerciseSection::Architecture)
+    expect(plan.coverage.reason).to eq(:due_check)
+    expect(plan.coverage.check).to include(concept: "service_boundaries", bucket: "architecture")
+    expect(plan.third).to eq(:architecture)
+    expect(plan.due_checks.map(&:concept)).to eq(%w[service_boundaries])
+    expect(plan.waiting_checks).to eq([])
+    expect(plan.notes).to eq("coverage" => "architecture", "coverage_reason" => "due_check")
+  end
+
+  # Reinforcement outranks a due check for the one retention slot, so an
+  # added section would carry reinforcement and the check would still wait.
+  it "gives the addition up when the check it was added for does not land" do
+    allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
+      %w[service_objects query_objects policy_objects].map { |c| { concept: c, bucket: "ruby_rails", tier: "standard" } }
+    )
+    user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard, mastered_at: 6.months.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - 40)
+    user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard, mastered_at: 6.months.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - 30)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage).to be_nil
+    expect([ plan.pattern, plan.third, plan.fourth ].compact).to eq([])
+    expect(plan.due_checks.map(&:concept)).to eq(%w[n_plus_one])
+    expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "memoization", reason: :no_slot } ])
+    expect(plan.notes).to eq({})
+  end
+
+  it "adds the longest-unseen kind once the gap has run past four weeks" do
+    two_section_day(Date.current - 60)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage).to eq(CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap))
+    expect(plan.pattern).to eq(:pattern)
+  end
+
+  # A due check is selected only when a section today can tag it. On a
+  # schema-review day neither fixed section can tag a core Ruby concept, so
+  # the check waits as no_host and the coverage addition brings a kind that can.
+  it "leaves a check no fixed section can tag waiting, and adds a kind that can host it" do
+    pin_code_review_mode(:schema_review)
+    user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 30)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage.reason).to eq(:due_check)
+    expect(plan.due_checks.map(&:concept)).to eq(%w[transaction_safety])
+    expect(plan.waiting_checks).to eq([])
+  end
+
+  it "under a fixed two, leaves that check waiting rather than selecting it for a section that cannot tag it" do
+    pin_code_review_mode(:schema_review)
+    user.update!(daily_section_count: 2)
+    user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
+                                   mastered_at: 6.months.ago, retention_interval_days: 7, next_retention_check_on: Date.current - 30)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.due_checks).to eq([])
+    expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "transaction_safety", reason: :no_host } ])
+  end
+
+  it "adds nothing under a fixed two, and the check waits with no host" do
+    user.update!(daily_section_count: 2)
+    overdue_architecture_check
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage).to be_nil
+    expect([ plan.pattern, plan.third, plan.fourth ].compact).to eq([])
+    expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "service_boundaries", reason: :no_host } ])
+  end
+
+  it "adds nothing within four weekdays of the last addition" do
+    overdue_architecture_check
+    two_section_day(Date.current - 1, plan_notes: { "coverage" => "pattern" })
+
+    expect(described_class.for(user, language: "ruby_rails").coverage).to be_nil
+  end
+
+  it "does not load the gaps on a day the cap holds" do
+    two_section_day(Date.current - 1, plan_notes: { "coverage" => "pattern" })
+    expect(CoverageException::History).not_to receive(:for)
+
+    expect(described_class.for(user, language: "ruby_rails").coverage).to be_nil
+  end
+
+  it "does not read the coverage history on a day it cannot apply to" do
+    allow(SectionCount).to receive(:for).with(anything, fixed: nil).and_return(ExerciseSection.fixed.size + 1)
+    expect(CoverageException::History).not_to receive(:for)
+    expect(CoverageException::History).not_to receive(:recent_coverage_dates)
+
+    described_class.for(user, language: "ruby_rails")
   end
 end
