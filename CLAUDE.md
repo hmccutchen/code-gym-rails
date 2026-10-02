@@ -744,7 +744,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   parsed with `log_raw: false`, and an unreadable response body that starts
   like JSON is logged by size only, for every call. Known limit: the judge
   sees one section, so it cannot check that a shared concept's comparison
-  avoids the code review's scenario.
+  avoids the code review's scenario. Its guidance asks only what it can
+  check inside the section: a section that restates a defect to find,
+  rather than offering a choice between two working designs, is a
+  scope_mismatch.
 
   **Setup.** The Exercise mix groups the fixed kinds under "In every set"
   (difficulty only), and gives pattern a group of its own.

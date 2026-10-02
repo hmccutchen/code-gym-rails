@@ -97,9 +97,9 @@ class ExerciseSection::DesignComparison < ExerciseSection
         "better comments, clearly shorter code, or behavior that differs under any condition the scenario states, such as " \
         "concurrent writers, retries, bulk writes or a failure. Reject as scope_mismatch if the principle the " \
         "pieces differ on is not the tagged concept. At principal_engineer both pieces may be defensible and each may carry " \
-        "a real cost; keep it only if the stated facts still settle which cost this system should pay. When this section " \
-        "shares its concept with the day's code review, it must test the concept through a choice between two working " \
-        "designs, not restate a defect to find. When you edit, you may reword the title, scenario and question; never " \
+        "a real cost; keep it only if the stated facts still settle which cost this system should pay. Reject as " \
+        "scope_mismatch if the section restates a defect to find rather than offering a choice between two working " \
+        "designs. When you edit, you may reword the title, scenario and question; never " \
         "change either piece of code, which piece is better, or what the deciding fact says.\n" \
         "Put your solve in \"better\" (\"a\" or \"b\") and nowhere else: evidence, reason and issues must not say which piece is better."
     end

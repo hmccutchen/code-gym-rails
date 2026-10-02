@@ -250,6 +250,14 @@ RSpec.describe ExerciseSection::DesignComparison do
   end
 
   describe "the judge's blind solve" do
+    # The judge sees one section, so it is only asked what it can check there.
+    it "asks the judge to reject a restated defect, and never about the code review it cannot see" do
+      expect(described_class.judge_guidance).to include(
+        "Reject as scope_mismatch if the section restates a defect to find rather than offering a choice between two working designs."
+      )
+      expect(described_class.judge_guidance).not_to include("code review")
+    end
+
     it "tells the judge that behavior differing under a stated condition is a reasoning failure" do
       expect(described_class.judge_guidance)
         .to include("behavior that differs under any condition the scenario states, such as concurrent writers, retries, bulk writes or a failure")
