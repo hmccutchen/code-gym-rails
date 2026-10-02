@@ -4,7 +4,7 @@ require "rails_helper"
 # saves, and is still there after a reload. The request specs cover what the
 # layout renders from a stored choice; these cover the browser's side.
 RSpec.describe "Display preferences", type: :system, with_csrf: true do
-  let(:user) { create_fake_provider_user }
+  let(:user) { create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
   def open_display
     visit_as(user)

@@ -18,7 +18,8 @@ class User < ApplicationRecord
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
-  # nil is Automatic: SectionCount sizes the day from recent completion.
+  # nil is Automatic: DaySize sizes the day from recent completion and the
+  # competency gate.
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
   # What Setup posts for Automatic, since a radio has no nil value.
   AUTOMATIC_SECTION_COUNT = "automatic".freeze
@@ -312,14 +313,15 @@ class User < ApplicationRecord
     end
   end
 
-  # Recent exercises and whether each was answered, newest first, excluding
-  # today (which has had no chance to be). SectionCount/SectionRotation are
-  # pure and take this as an argument rather than touching the database
-  # themselves.
-  def recent_exercise_history(limit:)
+  # Recent exercises and whether each was answered, newest first, before
+  # `before`: today is left out by default, since it has had no chance to be
+  # answered; the dashboard's forecast of tomorrow passes tomorrow to count a
+  # submitted today. SectionCount/SectionRotation are pure and take this as an
+  # argument rather than touching the database themselves.
+  def recent_exercise_history(limit:, before: Date.current)
     daily_exercises
       .includes(:daily_response)
-      .where(date: ...Date.current)
+      .where(date: ...before)
       .order(date: :desc)
       .limit(limit)
       .map do |exercise|

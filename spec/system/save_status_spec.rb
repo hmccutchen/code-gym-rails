@@ -6,7 +6,7 @@ require "rails_helper"
 # page's handling of the answer — so these drive a real browser and assert what
 # the engineer is actually told.
 RSpec.describe "Save status", type: :system do
-  let(:user) { create_fake_provider_user }
+  let(:user) { create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
   def break_the_network
     page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")

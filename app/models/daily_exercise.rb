@@ -20,6 +20,12 @@ class DailyExercise < ApplicationRecord
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
 
+  # The latest planned size recorded before `date`. A row generated before
+  # plans recorded a size is skipped rather than read as one.
+  def self.planned_size_before(date)
+    where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
+  end
+
   def code_review       = problem_set["code_review"]&.with_indifferent_access
   def pattern            = problem_set["pattern"]&.with_indifferent_access
   def challenge          = problem_set["challenge"]&.with_indifferent_access
@@ -37,6 +43,18 @@ class DailyExercise < ApplicationRecord
   def coverage_shown
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end
+
+  # The count the plan sized the day with, before any coverage addition; nil
+  # on a row from before plans recorded it.
+  def planned_size = plan_notes["size"]
+
+  # The planned size plus the one section a coverage addition brings
+  # (CoverageException adds at most one), nil when no size was recorded.
+  def planned_size_with_coverage
+    planned_size && planned_size + (plan_notes["coverage"] ? 1 : 0)
+  end
+
+  def planned_by_setting? = plan_notes["size_reason"] == "setting"
 
   def shared_concept_shown?
     ExerciseSection.fixed_sections_share?(problem_set, plan_notes["shared_concept"])

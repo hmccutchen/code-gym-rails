@@ -52,34 +52,6 @@ RSpec.describe SectionCount do
     expect(described_class.for(history(nil, 4, nil, 4, nil, 4))).to eq(3)
   end
 
-  describe "a fixed daily section count" do
-    it "returns each fixed choice without consulting history" do
-      (described_class::FLOOR..ExerciseSection::MAX_SECTIONS).each do |fixed|
-        history = spy("history")
-
-        expect(described_class.for(history, fixed: fixed)).to eq(fixed)
-        expect(history).not_to have_received(:filter_map)
-        expect(history).not_to have_received(:first)
-      end
-    end
-
-    it "overrides a history that would size the day differently" do
-      expect(described_class.for(history(4, 4, 4, 4, 4), fixed: 2)).to eq(2)
-      expect(described_class.for(history(0, 0, 0, 0, 0), fixed: 4)).to eq(4)
-    end
-
-    # The model validates the count only when it changes, so a row saved under
-    # a wider range can still hold a count outside the current one.
-    it "clamps a stored choice outside the current range" do
-      expect(described_class.for(history(2, 2, 2, 2, 2), fixed: ExerciseSection::MAX_SECTIONS + 1)).to eq(ExerciseSection::MAX_SECTIONS)
-      expect(described_class.for(history(4, 4, 4, 4, 4), fixed: described_class::FLOOR - 1)).to eq(described_class::FLOOR)
-    end
-
-    it "sizes from history when the choice is Automatic" do
-      expect(described_class.for(history(2, 2, 2, 2, 2), fixed: nil)).to eq(3)
-      expect(described_class.for(history(2, 2, 2, 2, 2))).to eq(3)
-    end
-  end
 
   describe "with dropped sections" do
     it "lets a drop stand in for a delivered section left unanswered" do

@@ -6,6 +6,7 @@ class DailyResponse < ApplicationRecord
   SELF_RATINGS = %w[too_easy right_level too_hard].freeze
   SELF_RATING_LABELS = { "too_easy" => "too easy", "right_level" => "just right", "too_hard" => "too hard" }.freeze
   SELF_RATING_FAVORABLE = SELF_RATINGS[0, 2].freeze
+  SELF_RATING_UNFAVORABLE = (SELF_RATINGS - SELF_RATING_FAVORABLE).freeze
 
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
@@ -181,7 +182,7 @@ class DailyResponse < ApplicationRecord
 
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATING_FAVORABLE.include?(self_rating_for(section))
-  def self_rating_unfavorable?(section) = self_rating_for(section) == "too_hard"
+  def self_rating_unfavorable?(section) = SELF_RATING_UNFAVORABLE.include?(self_rating_for(section))
   def self_rating_label(section)       = SELF_RATING_LABELS[self_rating_for(section)]
 
   # The one definition of a usable difficulty assessment. The review path has no

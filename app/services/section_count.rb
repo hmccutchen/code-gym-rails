@@ -1,5 +1,6 @@
-# How many sections today's set holds, from how many the engineer has recently
-# finished. Pure: takes history, returns a number, touches no database.
+# The completion rule: how many sections recent finishing allows today's set,
+# one of DaySize's inputs. Pure: takes history, returns a number, touches no
+# database.
 class SectionCount
   WINDOW       = 5
   STRETCH      = 1
@@ -10,14 +11,7 @@ class SectionCount
   # becomes absence. A week away must not return someone to a floored day.
   SKIP_RUN_CAP = 2
 
-  # An early return, not a default fed through the rule below: with no path
-  # from the sizing logic to the result, the override stays correct if that
-  # logic is later rewritten. Clamped because the model validates a count
-  # only when it changes, so a stored row can hold a count outside the
-  # current range.
-  def self.for(history, fixed: nil)
-    return fixed.clamp(FLOOR, ceiling) if fixed
-
+  def self.for(history)
     window = capped_window(history)
     return ceiling if window.size < MIN_SESSIONS
 
@@ -27,10 +21,9 @@ class SectionCount
   end
 
   # A drop fills in for an unanswered delivered section, up to the delivered
-  # count, so on a day left partly unanswered the judge removing a section
-  # does not shorten tomorrow; a fully answered short day still credits only
-  # what it delivered. A day with nothing answered earns nothing: a drop
-  # cannot turn an untouched day into finished work.
+  # count, so the judge removing a section does not shorten tomorrow. A day
+  # with nothing answered earns nothing: a drop cannot turn an untouched day
+  # into finished work.
   def self.credited_sections(entry)
     answered = entry.answered.to_i
     return 0 if answered.zero?

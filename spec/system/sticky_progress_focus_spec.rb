@@ -7,7 +7,7 @@ RSpec.describe "Sticky progress bar and focus", type: :system do
   it "keeps a focused answer and its focus ring below the bar at phone width" do
     travel_to(a_weekday) do
       page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 390, height: 844) }
-      visit_with_todays_set(create_fake_provider_user)
+      visit_with_todays_set(create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS))
 
       textarea = find('textarea[data-field="pattern"]')
       textarea.click

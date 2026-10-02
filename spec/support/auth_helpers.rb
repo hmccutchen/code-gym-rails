@@ -10,12 +10,16 @@ module AuthHelpers
   # Test-only infrastructure, not demo content — deliberately not seeded via
   # PreviewSeed/db/seeds.rb. Every system spec logs in as one of these, never
   # a real-key user, so no system spec ever needs (or can reach) a real API key.
-  def create_fake_provider_user(email: nil, name: "Fake User", time_zone: "UTC", learning_track: LearningTrack::OFF)
+  # A new account starts at the competency gate's floor, which holds only the
+  # fixed kinds; a spec that answers an optional section asks for a full day.
+  def create_fake_provider_user(email: nil, name: "Fake User", time_zone: "UTC", learning_track: LearningTrack::OFF,
+                                daily_section_count: nil)
     User.create!(
       email: email || "fake-user-#{SecureRandom.hex(4)}@example.com",
       name: name,
       time_zone: time_zone,
       learning_track: learning_track,
+      daily_section_count: daily_section_count,
       api_key: "fake-test-key",
       provider: "fake"
     )

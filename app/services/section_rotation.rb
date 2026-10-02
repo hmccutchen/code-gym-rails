@@ -1,7 +1,7 @@
 # Which optional slots today's set fills, and with which kind. Pure: takes
 # history, a count, and the user's preferences, and returns rolled symbols.
 #
-# The count is a hard cap decided by SectionCount. Starvation chooses which
+# The count is a hard cap decided by DaySize. Starvation chooses which
 # slots fill it, never how many — a starved kind whose slot did not make the
 # cut waits for a day with room.
 class SectionRotation

@@ -45,7 +45,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
   end
 
   it "keeps draft ratings while clearing answers, but submits only ratings for answers kept" do
-    user = create_fake_provider_user
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
@@ -70,7 +70,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
   end
 
   it "enables Submit once the answered sections are rated, and re-locks it when another section is answered" do
-    user = create_fake_provider_user
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
     weekday = a_weekday
 
     travel_to(weekday) do
@@ -153,7 +153,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
   end
 
   it "reconciles a lost submission acknowledgement without restoring a pruned rating" do
-    user = create_fake_provider_user
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
@@ -235,7 +235,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
   end
 
   it "ignores a late autosave acknowledgement during partial submit and still requests the review" do
-    user = create_fake_provider_user
+    user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)

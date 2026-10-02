@@ -2307,6 +2307,9 @@ RSpec.describe AiService do
   # wiring only AiService can get wrong — that generation runs ingest at all,
   # and that the suggestions it returns get written.
   describe "generation runs the ingest boundary" do
+    # A new account starts at the gate's floor, which holds only the fixed kinds.
+    before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
+
     it "runs on generation, so a bad diagram never reaches a persisted problem set" do
       svc = double_class.new(canned_text: full_problem_set(
         "code_review" => { "question" => "q", "concept" => "n_plus_one", "diagram" => "x" * 5_000 },
@@ -2513,6 +2516,9 @@ RSpec.describe AiService do
   end
 
   describe "#generate_exercise" do
+    # A new account starts at the gate's floor, which holds only the fixed kinds.
+    before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
+
     it "shuffles parsons_problem blocks into a non-identity display_order" do
       set = full_problem_set("parsons_problem" => { "blocks" => %w[a b c d e] })
       svc = double_class.new(canned_text: set.to_json)
@@ -2725,6 +2731,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
+      expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=memoization/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
       svc.generate_exercise(user, language: "ruby_rails")
@@ -2736,6 +2743,7 @@ RSpec.describe AiService do
       svc = double_class.new(canned_text: set.to_json)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
 
+      expect(Rails.logger).to receive(:info).with(/\[set_size\]/)
       expect(Rails.logger).to receive(:info).with(/\[retention\].*offered=memoization.*honored=-.*tagged=n_plus_one/)
       expect(Rails.logger).to receive(:info).with(/\[difficulty_diagnostics\]/)
       svc.generate_exercise(user, language: "ruby_rails")
@@ -5534,7 +5542,8 @@ RSpec.describe AiService, "rung stamps on a generated set" do
   let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "solid", provider: "fake", api_key: "fake-test-key") }
 
   it "stamps each section with its target when set, else the skill level's rung" do
-    user.update!(section_kind_levels: { "code_review" => "principal_engineer" })
+    user.update!(section_kind_levels: { "code_review" => "principal_engineer" },
+                 daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     problem_set = FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails")
 
@@ -5797,8 +5806,9 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
     single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
 
-    expect(judged.plan_notes).to eq("shared_concept" => "feature_envy")
-    expect(single.plan_notes).to eq("shared_concept" => "feature_envy")
+    notes = { "size" => SectionCount::FLOOR, "size_reason" => "gate", "shared_concept" => "feature_envy" }
+    expect(judged.plan_notes).to eq(notes)
+    expect(single.plan_notes).to eq(notes)
     expect(single.dropped_sections).to eq([])
   end
 
@@ -7018,5 +7028,93 @@ RSpec.describe AiService, "the coverage exception" do
     payload = JSON.parse(lines_from("[difficulty_diagnostics]").last.delete_prefix("[difficulty_diagnostics] "))
 
     expect(payload["requested"]["coverage"]).to eq("kind" => "plan_review", "reason" => "gap")
+  end
+end
+
+RSpec.describe AiService, "the day's size" do
+  let(:user) { User.create!(email: "set-size@example.com", name: "S", provider: "fake", api_key: "fake-test-key") }
+
+  def lines_from(prefix)
+    lines = []
+    allow(Rails.logger).to receive(:info) { |msg| lines << msg if msg.is_a?(String) && msg.start_with?(prefix) }
+    yield
+    lines
+  end
+
+  def generated_lines(prefix)
+    lines_from(prefix) { FakeService.new("fake-key").generate_exercise(user, language: "ruby_rails") }
+  end
+
+  def decision_from(lines)
+    JSON.parse(lines.grep(/\A\[set_size\] user=#{user.id} date=/).sole[/\{.*\}\z/])
+  end
+
+  def planned_day(date, size:, reason: "completion", plan_notes: {})
+    user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
+                                 plan_notes: { "size" => size, "size_reason" => reason }.merge(plan_notes),
+                                 problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+  end
+
+  it "logs the decision and the gate's evidence before the provider is contacted" do
+    failing = Class.new(FakeService) { def call(*, **) = raise(AiService::Error, "provider down") }.new("fake-key")
+    lines = lines_from("[set_size]") do
+      expect { failing.generate_exercise(user, language: "ruby_rails") }.to raise_error(AiService::Error, "provider down")
+    end
+
+    decision = decision_from(lines)
+
+    expect(decision).to include("count" => SectionCount::FLOOR, "reason" => "gate", "setting" => "automatic")
+    expect(decision["gate"]["evidence"]["to_three"])
+      .to eq("required" => CompetencyGate::GROW_TO_THREE.of, "available" => 0, "bar_met" => 0, "favourable" => 0, "by_kind" => {})
+    expect(decision["gate"]["evidence"]).to include("to_four", "brake", "optional", "levels")
+  end
+
+  # The weekday batch is judged; regeneration and weekend sets are not.
+  it "logs on the judged and the single-stage paths alike" do
+    lines = lines_from("[set_size]") do
+      FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+      FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
+    end
+
+    expect(lines.grep(/\A\[set_size\] user=#{user.id} date=/).size).to eq(2)
+  end
+
+  it "logs a fixed setting's override with the gate's evidence beside it" do
+    user.update!(daily_section_count: 3)
+
+    decision = decision_from(generated_lines("[set_size]"))
+
+    expect(decision).to include("count" => 3, "reason" => "setting", "setting" => 3)
+    expect(decision["gate"]).to include("count" => SectionCount::FLOOR, "reason" => "held")
+  end
+
+  it "logs a transition from the previous day's planned size" do
+    user.update!(daily_section_count: 3)
+    planned_day(Date.current - 3, size: 4)
+    planned_day(Date.current - 1, size: 2)
+
+    expect(generated_lines("[set_size]")).to include("[set_size] user=#{user.id} from=2 to=3 reason=setting")
+  end
+
+  # Yesterday delivered three sections, but only two were planned: the third
+  # was a coverage addition, so today's two is no change.
+  it "compares against the planned size, not a coverage-added delivered one" do
+    planned_day(Date.current - 1, size: SectionCount::FLOOR, plan_notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
+
+    expect(generated_lines("[set_size]").grep(/from=/)).to eq([])
+  end
+
+  it "logs no transition when no earlier day recorded a planned size" do
+    user.daily_exercises.create!(date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                 problem_set: { "code_review" => { "concept" => "n_plus_one" } })
+
+    expect(generated_lines("[set_size]").grep(/from=/)).to eq([])
+  end
+
+  it "carries the same decision in the diagnostics payload" do
+    payload = JSON.parse(generated_lines("[difficulty_diagnostics]").last.delete_prefix("[difficulty_diagnostics] "))
+
+    expect(payload["requested"]["size"]).to include("count" => SectionCount::FLOOR, "reason" => "gate")
+    expect(payload["requested"]["size"]["gate"]["evidence"]).to include("to_three", "to_four", "brake")
   end
 end

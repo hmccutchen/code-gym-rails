@@ -45,6 +45,7 @@ RSpec.describe FakeService do
     end
 
     it "resolves to the architecture third when persisted, since architecture has top precedence" do
+      user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
       problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: problem_set,
                                         language: "ruby_rails", generated_at: Time.current)
