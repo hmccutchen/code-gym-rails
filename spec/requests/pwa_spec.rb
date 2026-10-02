@@ -28,6 +28,7 @@ RSpec.describe "PWA", type: :request do
       expect(manifest).to include(
         "name" => "Code Gym",
         "short_name" => "Code Gym",
+        "description" => "Daily personalized coding exercises.",
         "display" => "standalone",
         "start_url" => "/",
         "scope" => "/"
