@@ -1433,6 +1433,16 @@ RSpec.describe User, type: :model do
       end
     end
 
+    it "does not block an unrelated save when a stored count falls outside today's range" do
+      user.update_column(:daily_section_count, ExerciseSection::MAX_SECTIONS + 1)
+
+      expect(user.reload.update(name: "Renamed")).to be(true)
+    end
+
+    it "never offers fewer sections than the fixed kinds every day holds" do
+      expect(SectionCount::FLOOR).to be >= ExerciseSection.fixed.size
+    end
+
     it "no longer reads the retired adaptive_set_size column" do
       expect(User.column_names).not_to include("adaptive_set_size")
     end
