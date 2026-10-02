@@ -1,21 +1,20 @@
 <div class="reminder-toggle">
   <% if current_user.push_reminders_enabled? %>
-    <p>Daily reminders are on. You'll get a notification when each weekday's set is ready.</p>
+    <p><%= t("accounts.push_reminders.enabled") %></p>
 
     <%= form_with url: push_subscription_path, method: :patch, class: "reminder-nudges" do |form| %>
       <label>
         <%= form.check_box :nudges, checked: current_user.reminders_ready_and_nudges?,
                                     checked_value: "1", unchecked_value: "0" %>
-        Also remind me during the day if today's set isn't finished
-        (hourly, <%= PushNudgePlan.window_description %>)
+        <%= t("accounts.push_reminders.nudges_label", window: PushNudgePlan.window_description) %>
       </label>
-      <%= form.submit "Save", class: "btn btn-ghost" %>
+      <%= form.submit t("accounts.push_reminders.save"), class: "btn btn-ghost" %>
     <% end %>
 
-    <%= button_to "Turn off daily reminders", push_subscription_path, method: :delete, class: "btn btn-ghost" %>
+    <%= button_to t("accounts.push_reminders.turn_off"), push_subscription_path, method: :delete, class: "btn btn-ghost" %>
   <% else %>
-    <p>Get a notification on this device when each weekday's set is ready.</p>
-    <button type="button" id="push-enable" class="btn btn-ghost">Turn on daily reminders</button>
+    <p><%= t("accounts.push_reminders.offer") %></p>
+    <button type="button" id="push-enable" class="btn btn-ghost"><%= t("accounts.push_reminders.turn_on") %></button>
     <p class="reminder-status" id="push-status" hidden></p>
 
     <% content_for :page_scripts do %>
@@ -42,8 +41,8 @@
           if (!push || !push.supported()) {
             button.disabled = true;
             say(isApplePortable()
-              ? "On iPhone and iPad, notifications only work from the Home Screen app. Tap Share → Add to Home Screen, open Code Gym from there, and turn reminders on again."
-              : "This browser doesn't support notifications.");
+              ? <%= t("accounts.push_reminders.home_screen_only", app_name: t("app_name")).to_json.html_safe %>
+              : <%= t("accounts.push_reminders.unsupported").to_json.html_safe %>);
             return;
           }
 
@@ -57,14 +56,14 @@
             const permission = Notification.requestPermission();
 
             button.disabled = true;
-            say("Waiting for permission…");
+            say(<%= t("accounts.push_reminders.waiting").to_json.html_safe %>);
 
             permission
               .then(function (state) {
                 if (state !== "granted") {
                   throw new Error(state === "denied"
-                    ? "Notifications are blocked for Code Gym in your device settings. Allow them there, then try again."
-                    : "Permission wasn't granted.");
+                    ? <%= t("accounts.push_reminders.blocked", app_name: t("app_name")).to_json.html_safe %>
+                    : <%= t("accounts.push_reminders.not_granted").to_json.html_safe %>);
                 }
 
                 return push.subscribeAndRegister();
@@ -74,7 +73,7 @@
               })
               .catch(function (error) {
                 button.disabled = false;
-                say(error.message || "Couldn't turn on reminders — try again.");
+                say(error.message || <%= t("accounts.push_reminders.failed").to_json.html_safe %>);
               });
           });
         })();

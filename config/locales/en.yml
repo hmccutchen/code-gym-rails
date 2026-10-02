@@ -482,3 +482,95 @@ en:
       saved: "Saved ✓"
       error: "Couldn't save"
       aria_label: "Your display name"
+  accounts:
+    show:
+      title: "Account"
+      log_out: "Log out"
+      settings: "Settings"
+      paused: "Automatic generation is paused (since %{date})."
+      resume: "Resume automatic generation"
+      active: "Automatic generation is active."
+      pause: "Pause automatic generation"
+      danger_heading: "Danger zone"
+      danger_body: "Deleting your account permanently removes your name, email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone."
+      delete: "Delete my account"
+      delete_confirm: "Delete your account? This permanently removes your name and email and logs you out. It cannot be undone."
+    push_reminders:
+      enabled: "Daily reminders are on. You'll get a notification when each weekday's set is ready."
+      nudges_label: "Also remind me during the day if today's set isn't finished (hourly, %{window})"
+      save: "Save"
+      turn_off: "Turn off daily reminders"
+      offer: "Get a notification on this device when each weekday's set is ready."
+      turn_on: "Turn on daily reminders"
+      home_screen_only: "On iPhone and iPad, notifications only work from the Home Screen app. Tap Share → Add to Home Screen, open %{app_name} from there, and turn reminders on again."
+      unsupported: "This browser doesn't support notifications."
+      waiting: "Waiting for permission…"
+      blocked: "Notifications are blocked for %{app_name} in your device settings. Allow them there, then try again."
+      not_granted: "Permission wasn't granted."
+      failed: "Couldn't turn on reminders — try again."
+  api_keys:
+    edit:
+      title: "Settings"
+      heading: "Add your API key"
+      intro: "Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency."
+      api_key_label: "API key"
+      api_key_placeholder: "sk-ant-..., AQ...., AIza... or sk-proj-..."
+      api_key_hint_html: 'Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).'
+      language_label: "Exercise language"
+      language_options:
+        ruby_rails: "Ruby / Rails (default)"
+        javascript: "JavaScript (vanilla + React)"
+        mixed: "Mixed (alternates daily)"
+      language_hint: 'Choose the language your daily exercise sets are generated in. "Mixed" alternates between Ruby/Rails and JavaScript one full day at a time.'
+      save_key: "Save key"
+      time_zone_label: "Time zone"
+      time_zone_detect: "— detect automatically —"
+      time_zones:
+        eastern: "Eastern"
+        central: "Central"
+        mountain: "Mountain"
+        arizona: "Mountain (Arizona, no DST)"
+        pacific: "Pacific"
+        alaska: "Alaska"
+        hawaii: "Hawaii"
+      time_zone_hint: 'Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser''s zone.'
+      skill_level_label: "Skill level"
+      skill_levels:
+        beginner: "Beginner"
+        developing: "Developing"
+        solid: "Solid"
+        strong: "Strong"
+      skill_level_hint: "How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Your ratings still nudge each day's set up or down."
+  history:
+    index:
+      title: "History"
+      count:
+        one: "%{count} submitted session"
+        other: "%{count} submitted sessions"
+      empty_html: "No submitted sessions yet. %{link}"
+      back_link: "Back to today's gym"
+      sections: "%{answered}/%{total} sections"
+      sections_with_names: "%{answered}/%{total} sections — %{names}"
+      rating: "%{section}: %{rating}"
+      problems_summary: "Problems & answers"
+      no_review: "No AI review requested."
+      pages_label: "History pages"
+      page: "Page %{page} of %{last}"
+  admin:
+    suggested_concepts:
+      index:
+        title: "Suggested concepts"
+        heading: "Suggested Concepts"
+        empty: "No pending suggestions."
+        columns:
+          concept: "Concept"
+          language: "Language"
+          occurrences: "Occurrences"
+          first_seen: "First seen"
+          last_seen: "Last seen"
+          reference: "Reference?"
+          actions: "Actions"
+        has_reference: "Yes"
+        no_reference: "No"
+        promote: "Promote"
+        dismiss: "Dismiss"
