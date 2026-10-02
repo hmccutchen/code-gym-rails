@@ -339,6 +339,17 @@ RSpec.describe JudgedGeneration do
       expect(logged.grep(/judge_solve_mismatch/)).to be_empty
     end
 
+    # A refused verdict's message quotes the value it refused, which for this
+    # kind can be the solve, so the log carries the reason code alone.
+    it "logs a refused verdict by reason code only" do
+      verdicts["design_comparison"] = [ JudgeVerdict::Invalid.new('unknown principle "SECRET: b is better"') ]
+
+      judged = run
+
+      expect(judged.outcomes["design_comparison"]).to include(fallback: "invalid_output")
+      expect(logged.grep(/judge_fallback/).sole).to eq("[judge_fallback] user=42 section=design_comparison reason=invalid_output")
+    end
+
     it "logs a mismatch with the rung only, and lets the verdict stand while rejection is off" do
       verdicts["design_comparison"] = [ solve("keep", "a") ]
 

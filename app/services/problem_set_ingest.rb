@@ -273,16 +273,27 @@ class ProblemSetIngest
   # lower-precedence shape in the same slot cannot take its place unchecked,
   # and the refusal is reported on the Result for the caller to retry or
   # record as dropped. The set is refused only when nothing usable remains.
+  # A refused section is removed alone. The next shape in its slot, if the
+  # payload holds one, then resolves and is checked in turn rather than taking
+  # the slot unchecked.
   def reject_unusable_sections!
-    ExerciseSection.resolved_keys(@problem_set).each do |key|
-      ExerciseSection.for(key).reject_unusable!(@problem_set[key])
-    rescue AiService::InvalidResponseError => e
-      @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: e.message)
-      @problem_set = @problem_set.except(*slot_keys_for(key))
+    pending = ExerciseSection.resolved_keys(@problem_set)
+    while (key = pending.shift)
+      successor = reject_if_unusable(key)
+      pending << successor if successor
     end
     return if ExerciseSection.resolved_keys(@problem_set).any?
 
     raise AiService::InvalidResponseError, "No usable section left: #{@unusable_sections.map(&:reason).join('; ')}"
+  end
+
+  def reject_if_unusable(key)
+    ExerciseSection.for(key).reject_unusable!(@problem_set[key])
+    nil
+  rescue AiService::InvalidResponseError => e
+    @unusable_sections << Unusable.new(key: key, concept: usable_concept(key), reason: e.message)
+    @problem_set = @problem_set.except(key)
+    ExerciseSection.resolved_key(@problem_set, slot_kinds_for(key))
   end
 
   def usable_concept(key)
@@ -290,8 +301,8 @@ class ProblemSetIngest
     concept if self.class.vocabulary_for(key, @language).include?(concept)
   end
 
-  def slot_keys_for(key)
-    ExerciseSection.slots.values.find { |kinds| kinds.map(&:key).include?(key) }.map(&:key)
+  def slot_kinds_for(key)
+    ExerciseSection.slots.values.find { |kinds| kinds.map(&:key).include?(key) }
   end
 
   # A single-section retry names the concept the day's plan already placed at

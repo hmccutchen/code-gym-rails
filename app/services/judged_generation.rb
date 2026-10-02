@@ -273,8 +273,15 @@ class JudgedGeneration
     [ verdict, elapsed_ms(started) ]
   rescue JudgeVerdict::Invalid, AiService::Error, *AiService::INFRASTRUCTURE_ERRORS => e
     reason = AiService.judge_fallback_reason(e)
-    Rails.logger.warn("[judge_fallback] user=#{@user.id} section=#{kind.key} reason=#{reason}: #{e.message}")
+    Rails.logger.warn("[judge_fallback] user=#{@user.id} section=#{kind.key} reason=#{reason}#{fallback_detail(kind, e)}")
     [ reason, elapsed_ms(started) ]
+  end
+
+  # A verdict error quotes the value it refused, and for a kind the judge
+  # solves blind that value can be the solve, so only the reason code is
+  # logged there.
+  def fallback_detail(kind, error)
+    kind.judge_solve_options ? "" : ": #{error.message}"
   end
 
   # Failure is a drop, never a raised set.

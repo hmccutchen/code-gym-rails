@@ -145,13 +145,25 @@ RSpec.describe ProblemSetIngest do
         ])
       end
 
-      it "drops the whole slot, so a lower-precedence shape cannot take its place unchecked" do
+      it "checks the lower-precedence shape that takes a refused section's slot" do
         pseudo = { "code_review" => { "concept" => "n_plus_one" },
                    "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
                    "pseudocode_to_code" => { "concept" => "x", "problem_statement" => " " } }
         result = ingest(pseudo)
 
         expect(result.problem_set.keys).to eq([ "code_review" ])
+        expect(result.unusable_sections.map(&:key)).to eq(%w[ambiguity_hunt pseudocode_to_code])
+      end
+
+      # An unrequested hunt the provider threw in must not take a requested,
+      # usable section down with it.
+      it "keeps a usable lower-precedence shape when the one above it is refused" do
+        pseudo = { "code_review" => { "concept" => "n_plus_one" },
+                   "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
+                   "pseudocode_to_code" => { "concept" => "x", "problem_statement" => "Write the function" } }
+        result = described_class.call(pseudo, language: "ruby_rails", expected_keys: %w[code_review pseudocode_to_code])
+
+        expect(result.problem_set.keys).to contain_exactly("code_review", "pseudocode_to_code")
         expect(result.unusable_sections.map(&:key)).to eq([ "ambiguity_hunt" ])
       end
 
