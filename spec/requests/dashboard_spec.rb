@@ -800,7 +800,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("This didn't quite land — try a different explanation")
+      expect(response.body).to include("This didn&#39;t quite land — try a different explanation")
       expect(response.body).to include(%(data-url="#{explain_differently_concept_reference_path(reference)}"))
     end
 
@@ -825,7 +825,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("This didn't quite land — try a different explanation")
+      expect(response.body).to include("This didn&#39;t quite land — try a different explanation")
     end
 
     it "renders the section scenario label" do

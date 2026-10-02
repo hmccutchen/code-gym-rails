@@ -11,7 +11,7 @@
 <% if source.present? %>
   <% if local_assigns.fetch(:collapsible, true) %>
     <details class="ref">
-      <summary>🗺️ Structure diagram</summary>
+      <summary><%= t("diagram.summary") %></summary>
       <div class="mermaid-diagram" data-diagram="<%= source %>" data-owns-details="1"></div>
     </details>
   <% else %>

@@ -10,7 +10,7 @@
     ConceptReferencesController#explain_differently. %>
 <% open = local_assigns.fetch(:open, false) %>
 <details class="ref"<%= " open".html_safe if open %>>
-  <summary>Reference — <%= reference.concept.humanize %>: how it works</summary>
+  <summary><%= t("concept_reference.summary", concept: reference.concept.humanize) %></summary>
   <div class="ref-body">
     <p style="margin-bottom:.75rem"><strong><%= reference.tagline %></strong></p>
     <p style="margin-bottom:.75rem"><%= reference.explanation %></p>
@@ -21,7 +21,7 @@
       <%# type="button" is load-bearing, not stylistic: on the dashboard this
           partial renders inside #gym-form, so a default-type button here would
           submit the day's answers and chain into the review. %>
-      <button type="button" class="btn btn-ghost btn-sm explain-concept-differently">This didn't quite land — try a different explanation</button>
+      <button type="button" class="btn btn-ghost btn-sm explain-concept-differently"><%= t("concept_reference.explain_differently") %></button>
       <span class="alternate-status" aria-live="polite"></span>
     </div>
   </div>

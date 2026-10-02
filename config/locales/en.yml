@@ -425,6 +425,44 @@ en:
     history_summary: "%{provider}'s review"
     calibration_note: "You rated this \"%{rating}\" — the review suggests there's more to work on here."
     difficulty_note: "This problem was rated %{level} difficulty, judged from the problem itself rather than from your answer."
+    explain_differently: "Explain this differently"
+    thinking: "Thinking…"
+    alternate_added: "A different explanation was added above."
+    alternate_added_last: "A different explanation was added above — that was the last one."
+    alternate_failed: "Couldn't generate that — try again"
+    follow_up_label: "Ask a follow-up about this feedback"
+    follow_up_placeholder: "Ask a follow-up about this feedback…"
+    follow_up_send: "Ask"
+    follow_up_failed: "Couldn't send that — try again"
+    follow_ups_used:
+      one: "You've used your one follow-up for this section."
+      other: "You've used all %{count} follow-ups for this section."
+  duck:
+    toggle: "🦆 Stuck? Talk it through"
+    prompt: "What are you stuck on?"
+    send: "Ask"
+    explain: "Explain this simply"
+    clear: "Clear"
+    speakers:
+      user: "You"
+      assistant: "Duck"
+    thinking: "Thinking…"
+    send_failed: "Couldn't send that — try again"
+    turns_used:
+      one: "You've used your one message for this section — clear the conversation to keep going."
+      other: "You've used all %{count} messages for this section — clear the conversation to keep going."
+  concept_reference:
+    summary: "Reference — %{concept}: how it works"
+    explain_differently: "This didn't quite land — try a different explanation"
+    thinking: "Thinking…"
+    alternate_added: "A different explanation was added above."
+    alternate_added_last: "A different explanation was added above — that was the last one."
+    alternate_failed: "Couldn't generate that — try again"
+    session_expired: "Your session expired — reload the page and try again."
+  diagram:
+    summary: "🗺️ Structure diagram"
+  push:
+    register_failed: "This device couldn't be registered for reminders — try again."
   nav:
     menu: "Menu"
     skip_to_content: "Skip to content"

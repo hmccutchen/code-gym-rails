@@ -32,7 +32,7 @@
       const status = container.querySelector(".alternate-status");
 
       buttons.forEach(b => b.disabled = true);
-      status.textContent = "Thinking…";
+      status.textContent = <%= t("concept_reference.thinking").to_json.html_safe %>;
       try {
         const res = await fetch(container.dataset.url, {
           method: "POST",
@@ -51,8 +51,8 @@
         let data = null;
         try { data = await res.json(); } catch { data = null; }
         if (!res.ok) throw new Error((data && data.error) || res.status);
-        if (res.redirected) throw new Error("Your session expired — reload the page and try again.");
-        if (!data || data.status !== "ok" || !data.alternate) throw new Error("Couldn't generate that — try again");
+        if (res.redirected) throw new Error(<%= t("concept_reference.session_expired").to_json.html_safe %>);
+        if (!data || data.status !== "ok" || !data.alternate) throw new Error(<%= t("concept_reference.alternate_failed").to_json.html_safe %>);
 
         framings.set(refId, [...(framings.get(refId) || []), data.alternate]);
         let focused = null;
@@ -72,8 +72,8 @@
         // wording also has to say the control is going away, since its removal
         // is otherwise unannounced.
         status.textContent = data.remaining > 0
-          ? "A different explanation was added above."
-          : "A different explanation was added above — that was the last one.";
+          ? <%= t("concept_reference.alternate_added").to_json.html_safe %>
+          : <%= t("concept_reference.alternate_added_last").to_json.html_safe %>;
         if (data.remaining > 0) {
           buttons.forEach(b => b.disabled = false);
         } else {
@@ -83,7 +83,7 @@
           buttons.forEach(b => b.remove());
         }
       } catch (e) {
-        status.textContent = e.message || "Couldn't generate that — try again";
+        status.textContent = e.message || <%= t("concept_reference.alternate_failed").to_json.html_safe %>;
         // Only re-enable what the cap still allows: a failure spends nothing
         // server-side, but a retry after the cap was reached in another copy
         // of this reference would just 422.
