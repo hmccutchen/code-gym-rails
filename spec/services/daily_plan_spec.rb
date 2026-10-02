@@ -838,3 +838,15 @@ RSpec.describe DailyPlan, "same-named concepts across language buckets" do
     expect(on_javascript_day.due_checks).to eq([])
   end
 end
+
+RSpec.describe DailyPlan::Result, "#notes" do
+  def result(**overrides)
+    defaults = DailyPlan::Result.members.index_with { nil }
+    DailyPlan::Result.new(**defaults, **overrides)
+  end
+
+  it "records only what applied" do
+    expect(result.notes).to eq({})
+    expect(result(shared_concept: "feature_envy").notes).to eq("shared_concept" => "feature_envy")
+  end
+end

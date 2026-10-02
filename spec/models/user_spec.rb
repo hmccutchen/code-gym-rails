@@ -1783,6 +1783,19 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
     end
   end
 
+  it "moves the plan notes with the set, so the coverage cap and the dashboard lines follow it" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      held.update!(plan_notes: { "coverage" => "plan_review", "shared_concept" => "feature_envy" })
+      pause_on(Date.current - 1)
+
+      user.carry_held_set_forward!
+
+      expect(user.daily_exercises.for_date.first.plan_notes)
+        .to eq("coverage" => "plan_review", "shared_concept" => "feature_envy")
+    end
+  end
+
   it "does nothing for a user who is not paused" do
     travel_to(wednesday) do
       held = exercise_on(Date.current - 1)

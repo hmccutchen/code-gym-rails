@@ -1080,7 +1080,12 @@ class AiService
   # the separate ReviewProseJudge switch, which waits on measurement.
   def self.judges_review_prose? = false
 
-  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes)
+  # plan_notes is what DailyPlan::Result#notes recorded, written onto the row.
+  JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes) do
+    def initialize(problem_set:, dropped_sections:, outcomes:, plan_notes: {})
+      super
+    end
+  end
 
   Draft = Data.define(:problem_set, :plan, :kinds, :difficulty, :ladders, :history,
                       :prompt_options, :suggested_concepts, :unusable_sections)
@@ -1107,7 +1112,8 @@ class AiService
     dropped = draft.unusable_sections.select { |section| planned.include?(section.key) }
     finish_generation(user, language, draft, draft.problem_set,
                       dropped_concepts: dropped.to_h { |section| [ section.key, section.concept ] })
-    JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {})
+    JudgedSet.new(problem_set: draft.problem_set, dropped_sections: dropped.map(&:key), outcomes: {},
+                  plan_notes: draft.plan.notes)
   end
 
   # ── Draft, judge, retry, drop — the weekday batch's path ─────────────────
@@ -1120,7 +1126,7 @@ class AiService
       user: user, language: language, draft: draft,
       providers: -> { self.class.new(@api_key).judged_generation_provider },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
-    )
+    ).with(plan_notes: draft.plan.notes)
   end
 
   # ── Review a submitted response, one thread per still-missing section ────

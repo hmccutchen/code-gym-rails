@@ -13,7 +13,13 @@
 class DailyPlan
   Result = Data.define(:pattern, :third, :reinforcement, :due_checks, :established,
                         :fourth, :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode, :code_review_source, :scenario_flavor)
+                        :code_review_mode, :code_review_source, :scenario_flavor,
+                        :shared_concept, :coverage) do
+    # What daily_exercises.plan_notes stores for the day this plan produced.
+    def notes
+      { "coverage" => coverage&.kind&.key, "shared_concept" => shared_concept }.compact
+    end
+  end
 
   # Which content mode code_review takes. Equal thirds, as close as float
   # weights get — application_code keeps a 1% edge rather than the split
@@ -153,6 +159,7 @@ class DailyPlan
                code_review_mode: code_review_mode,
                code_review_source: code_review_source_for(user, language, code_review_mode),
                scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)),
+               shared_concept: nil, coverage: nil,
                **fourth_track(user, rotation.fetch(:fourth)))
   end
 

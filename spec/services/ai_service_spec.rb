@@ -5785,6 +5785,19 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     allow(WeightedRoll).to receive(:pick).with(RealSource::WEIGHTS).and_return(:toy)
   end
 
+  it "hands back the plan's notes on both generation paths" do
+    allow(DailyPlan).to receive(:for).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).with(shared_concept: "feature_envy")
+    end
+
+    judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
+    single = FakeService.new("fake-key").generate_unjudged_exercise(user, language: "ruby_rails")
+
+    expect(judged.plan_notes).to eq("shared_concept" => "feature_envy")
+    expect(single.plan_notes).to eq("shared_concept" => "feature_envy")
+    expect(single.dropped_sections).to eq([])
+  end
+
   it "keeps a set the judge keeps, with every section still present and stamped" do
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
