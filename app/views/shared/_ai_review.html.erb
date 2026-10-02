@@ -22,7 +22,7 @@
         <% points = DailyResponse.review_points(fb[key]) %>
         <% if points.any? %>
           <div class="review-item">
-            <strong><%= field[:label] %>:</strong>
+            <strong><%= DailyResponse.ai_review_label(key) %>:</strong>
             <ul class="review-points">
               <% points.each do |point| %><li><%= point %></li><% end %>
             </ul>
@@ -31,7 +31,7 @@
       <% else %>
         <% text = DailyResponse.review_points(fb[key]).join(" ") %>
         <% if text.present? %>
-          <p class="review-item"><strong><%= field[:label] %>:</strong> <%= text %></p>
+          <p class="review-item"><strong><%= DailyResponse.ai_review_label(key) %>:</strong> <%= text %></p>
         <% end %>
       <% end %>
     <% end %>

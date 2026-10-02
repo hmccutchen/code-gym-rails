@@ -4,7 +4,6 @@ class DailyResponse < ApplicationRecord
   has_many :review_follow_ups, dependent: :destroy
 
   SELF_RATINGS = %w[too_easy right_level too_hard].freeze
-  SELF_RATING_LABELS = { "too_easy" => "too easy", "right_level" => "just right", "too_hard" => "too hard" }.freeze
   SELF_RATING_FAVORABLE = SELF_RATINGS[0, 2].freeze
   SELF_RATING_UNFAVORABLE = (SELF_RATINGS - SELF_RATING_FAVORABLE).freeze
 
@@ -46,17 +45,29 @@ class DailyResponse < ApplicationRecord
 
   scope :submitted, -> { where.not(submitted_at: nil) }
 
-  # Ordered field → {label, list} map for rendering ai_review sections — shared by
-  # the shared/_ai_review partial and ReviewMailer so the copy lives in one place.
+  # Ordered field → {list} map for rendering ai_review sections — shared by the
+  # shared/_ai_review partial and ReviewMailer. Each field's heading is
+  # review.fields.<field> in en.yml, read through .ai_review_label.
   # `list: true` fields hold multiple discrete points and render as a real list;
   # next_step is deliberately one thing to study, so it stays a single string.
   # "rating" (badge) and "improved_code" (code block) render separately.
   AI_REVIEW_FIELDS = {
-    "correct"          => { label: "What you got right",        list: true  },
-    "missed"           => { label: "What you missed",           list: true  },
-    "better_questions" => { label: "Questions to ask yourself", list: true  },
-    "next_step"        => { label: "Next step",                 list: false }
+    "correct"          => { list: true  },
+    "missed"           => { list: true  },
+    "better_questions" => { list: true  },
+    "next_step"        => { list: false }
   }.freeze
+
+  # A prompt passes locale: :en so the text sent to the provider never
+  # follows a request's locale.
+  def self.ai_review_label(field, locale: I18n.locale)
+    I18n.t("review.fields.#{field}", locale: locale)
+  end
+
+  # Read at render time, so a request's locale chooses the wording.
+  def self.self_rating_labels
+    SELF_RATINGS.index_with { |rating| I18n.t("self_ratings.#{rating}") }
+  end
 
   # Reads a review field as a list of discrete points regardless of how it was
   # stored. Reviews generated before the schema moved to arrays hold a single
@@ -183,7 +194,7 @@ class DailyResponse < ApplicationRecord
   def self_rating_for(section) = section_ratings[section.to_s]
   def self_rating_favorable?(section)  = SELF_RATING_FAVORABLE.include?(self_rating_for(section))
   def self_rating_unfavorable?(section) = SELF_RATING_UNFAVORABLE.include?(self_rating_for(section))
-  def self_rating_label(section)       = SELF_RATING_LABELS[self_rating_for(section)]
+  def self_rating_label(section)       = self.class.self_rating_labels[self_rating_for(section)]
 
   # The one definition of a usable difficulty assessment. The review path has no
   # ProblemSetIngest to hold provider output to a closed vocabulary, so this

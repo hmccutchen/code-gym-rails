@@ -8,7 +8,7 @@
 <div class="submit-row">
   <span class="submitted-badge"><%= t("responses.submission.submitted") %></span>
   <% response.section_ratings.each do |section, value| %>
-    <span class="history-pill"><%= section.humanize %>: <%= DailyResponse::SELF_RATING_LABELS[value] %></span>
+    <span class="history-pill"><%= section.humanize %>: <%= DailyResponse.self_rating_labels[value] %></span>
   <% end %>
   <% unless response.fully_reviewed? %>
     <%= button_to response.reviewed? ? t("review.finish_button") : t("review.get_button", provider: response.user.provider_label),

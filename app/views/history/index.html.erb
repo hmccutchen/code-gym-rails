@@ -71,7 +71,7 @@
         <% end %>
       </span>
       <% daily_response.section_ratings.each do |section, value| %>
-        <span class="history-pill"><%= t("history.index.rating", section: section.humanize, rating: DailyResponse::SELF_RATING_LABELS[value]) %></span>
+        <span class="history-pill"><%= t("history.index.rating", section: section.humanize, rating: DailyResponse.self_rating_labels[value]) %></span>
       <% end %>
       <% daily_response.concept_tags.values.compact.uniq.each do |tag| %>
         <span class="history-tag"><%= tag.humanize %></span>

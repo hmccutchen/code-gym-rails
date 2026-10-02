@@ -18,7 +18,7 @@
 <% if field[:list] -%>
 <% points = DailyResponse.review_points(fb[key]) -%>
 <% next if points.empty? -%>
-<%= field[:label] %>:
+<%= DailyResponse.ai_review_label(key) %>:
 <% points.each do |point| -%>
 - <%= point %>
 <% end -%>
@@ -26,7 +26,7 @@
 <% else -%>
 <% text = DailyResponse.review_points(fb[key]).join(" ") -%>
 <% next if text.blank? -%>
-<%= field[:label] %>: <%= text %>
+<%= DailyResponse.ai_review_label(key) %>: <%= text %>
 
 <% end -%>
 <% end -%>

@@ -1292,9 +1292,9 @@ class AiService
     coach  = config_for(exercise.language)[:coach]
     review = daily_response.ai_review&.dig(section) || {}
 
-    review_summary = DailyResponse::AI_REVIEW_FIELDS.filter_map { |key, field|
+    review_summary = DailyResponse::AI_REVIEW_FIELDS.keys.filter_map { |key|
       points = DailyResponse.review_points(review[key])
-      "#{field[:label]}: #{points.join('; ')}" if points.any?
+      "#{DailyResponse.ai_review_label(key, locale: :en)}: #{points.join('; ')}" if points.any?
     }.join("\n")
 
     result = call_and_log(

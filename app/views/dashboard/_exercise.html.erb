@@ -180,7 +180,7 @@
 
     // The client half of SectionStatusHelper#section_status, read against the
     // live form so a folded section's summary never shows a stale state.
-    const RATING_LABELS = <%= DailyResponse::SELF_RATING_LABELS.to_json.html_safe %>;
+    const RATING_LABELS = <%= DailyResponse.self_rating_labels.to_json.html_safe %>;
     const IN_PROGRESS   = <%= SectionStatusHelper::IN_PROGRESS.to_json.html_safe %>;
 
     function refreshStatus(section) {

@@ -194,6 +194,10 @@ en:
       too_much_explanation: "That's more explanation than this can carry — reload the page to start fresh."
       reference_missing: "That reference no longer exists."
   hello: "Hello world"
+  self_ratings:
+    too_easy: "too easy"
+    right_level: "just right"
+    too_hard: "too hard"
   providers:
     anthropic: "Claude"
     gemini: "Gemini"
@@ -489,6 +493,11 @@ en:
       move_down: "Move block down"
   review:
     get_button: "Get %{provider} review"
+    fields:
+      correct: "What you got right"
+      missed: "What you missed"
+      better_questions: "Questions to ask yourself"
+      next_step: "Next step"
     finish_button: "Finish review"
     generating_label: "Generating review…"
     heading: "%{provider}'s Review"

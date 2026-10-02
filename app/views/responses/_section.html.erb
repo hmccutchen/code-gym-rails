@@ -55,7 +55,7 @@
   <% unless submitted %>
     <div class="rating-row" data-rating-for="<%= key %>" role="group"
          aria-label="<%= t("dashboard.rating_group", section: t("sections.#{key}.name")) %>">
-      <% DailyResponse::SELF_RATING_LABELS.each do |value, label| %>
+      <% DailyResponse.self_rating_labels.each do |value, label| %>
         <% selected = response.self_rating_for(key) == value %>
         <button type="button" class="rating-btn<%= " active" if selected %>" aria-pressed="<%= selected %>"
                 data-rating-for="<%= key %>" data-rating="<%= value %>"><%= label.upcase_first %></button>
