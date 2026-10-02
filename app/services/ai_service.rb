@@ -2230,7 +2230,7 @@ class AiService
 
       Engineer profile:
       - Name: #{user.name}
-      - Skill level: #{user.skill_level} (beginner → developing → solid → strong)
+      - Skill level: #{user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
       Recent performance (last 10 sessions):

@@ -34,8 +34,8 @@ html :is(textarea, select, .form-field input:not([type="checkbox"], [type="radio
 html :is(.hljs-symbol, .hljs-attr, .hljs-params) { color: #6d28d9; }
 html :is(.hljs-built_in, .hljs-title) { color: #0b6394; }
 
-html .rung-principal_engineer { --rung: var(--accent); }
-html .rung-senior { --rung: #15803d; }
-html .rung-junior { --rung: #16a34a; }
+html :is(.rung-principal_engineer, .rung-developing_principal_engineer) { --rung: var(--accent); }
+html :is(.rung-senior, .rung-developing_senior) { --rung: #15803d; }
+html :is(.rung-junior, .rung-developing_junior) { --rung: #16a34a; }
 
 html .save-status { box-shadow: 0 4px 16px rgba(0, 0, 0, .15); }

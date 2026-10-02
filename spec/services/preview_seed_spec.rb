@@ -85,14 +85,14 @@ RSpec.describe PreviewSeed do
 
     it "never overwrites an existing name, skill level, or language" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person",
-                          skill_level: "strong", language: "javascript")
+                          skill_level: "principal_engineer", language: "javascript")
       set_target
 
       PreviewSeed.run!
 
       real.reload
       expect(real.name).to eq("Real Person")
-      expect(real.skill_level).to eq("strong")
+      expect(real.skill_level).to eq("principal_engineer")
       expect(real.language).to eq("javascript")
     end
 

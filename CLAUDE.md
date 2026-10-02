@@ -1126,7 +1126,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   spot forever. Decoupling slot frequency from pool size needs slots ranked by
   when the slot itself last filled, which is a change to how every day is
   shaped and not something this preference should drag in behind it.
-- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, deliberately disjoint from `skill_level`). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched.
+- **Difficulty targets and locks**: a user may set any section kind — code_review and pattern included, since a level needs no alternative candidate — to `junior` / `senior` / `principal_engineer` (`KindDifficulty::LEVELS`, which `User::SKILL_LEVELS` reuses with `beginner` added, and deliberately disjoint from the review grades). Unset follows `skill_level`; a target replaces it as that section's baseline, with tier annotations and rating adjustments still applying on top; a lock suppresses the `(reduced)` easing rule and both rating adjustments for that section, with no exceptions, including a concept's first exposure. That last part is a deliberate tradeoff: a kind locked at `principal_engineer` can present an unfamiliar concept at full difficulty on day one. Lock changes prompt text only — `DailyPlan`, `ConceptMastery` and `User#concepts_*` never read `KindDifficulty`, and specs pin it — so unlocking reads current evidence. The block is appended by `AiService#kind_difficulty_guidance`, grouped by level, and grounded by per-concept ladder rungs written in the same `#generate_concept_reference` call as the reference and guide. A retention check in a targeted section is pitched at that section's level; raising a target after mastery makes the next check harder than the evidence behind it, an accepted consequence. `LadderCoverage` answers how grounded each kind is; `POST /learn/prepare_ladders` rewrites the ungrounded concepts behind a user's targets, the one scoped exception to the Learn tab's no-bulk-rewrite rule, and since `ConceptReference` is shared, that rewrite reaches every teammate. Weights and difficulty share `section_kind_preferences_version`, so a stale tab is refused whichever half it touched.
 - **Drills**: a user can mark one concept, or a whole Learn display group, as
   drilled from the Learn tab (`ConceptDrills`, `ConceptDrillsController`). A
   drilled concept leads `User#concepts_needing_reinforcement`, and since
@@ -1215,8 +1215,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the caller passed, before the stamps go on. The rung is
   `KindDifficulty#rung_for`: the kind's target when one is set, else the
   profile's skill level read through `KindDifficulty::RUNG_FOR_SKILL_LEVEL`
-  (beginner and developing are junior, solid is senior, strong is principal),
-  the one place that second scale is read as a rung. A section whose concept
+  (each rung's own skill level is that rung, and beginner is junior), the one
+  place a skill level is read as a rung. A section whose concept
   was offered as reduced-tier reinforcement in an unlocked kind also carries
   `eased: true`, since the prompt's `(reduced)` rule asked for an easier
   problem than the rung says; a locked kind exempts itself from that rule and
@@ -1251,7 +1251,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   least-favourable-section rules `record_review!` applies, with a review that
   stored no rating counted as no signal as there; the standing
   is the highest held rung, which covers the rungs below, and a later poor
-  attempt releases a rung, so the page describes now. It is pure over the
+  attempt releases a rung, so the page describes now. Between rungs a
+  concept is "developing toward" the next one up
+  (`RungLedger#developing_toward`): once any rung above the held one has an
+  attempt that did not hold, or any attempt at all when none is held, the
+  page shows it one step past the held rung, so the ladder reads not yet,
+  developing toward junior, junior, developing toward senior, and so on. An
+  attempt two rungs up still reads as developing toward the next one, since
+  the rung between is not held either. Its bar segment is striped in the
+  target rung's colour, its dot half filled, and the legend states it once.
+  This replaced "not yet" for a concept attempted but never held, which the
+  legend had described as having no reviewed answer. It is pure over the
   response objects it is given and compares nothing to today, so time alone
   changes nothing, which a spec pins. A concept with no attempt is "not yet",
   or "not offered" when every kind that could show it is excluded, worded
@@ -1264,7 +1274,22 @@ concept-specific difficulty descriptions for future generation, not a new set.
   ledger records what was asked, `eased` covers the one easing the server
   decides, and the page's own note says a rating adjustment can still nudge
   an unlocked section and only a lock makes a rung exact.
-- **Skill level control**: Setup's "Skill level" select is the only page
+- **Skill level control**: the choices are `beginner` plus the difficulty
+  levels themselves (`User::SKILL_LEVELS`, built from
+  `KindDifficulty::LEVELS`), labelled Beginner, Junior, Senior and Principal
+  engineer. Beginner pitches at junior like Junior and differs only in the
+  everyday scenario pools and the prompt's profile line. They replaced
+  beginner, developing, solid and strong, which shared their words with the
+  review grades: a "developing" grade on a review is the grader's word for
+  where an answer sits, and is no longer also a setting. Stored values from
+  before that are read through `User#skill_level` (`LEGACY_SKILL_LEVELS`:
+  developing as junior, solid as senior, strong as principal engineer), and
+  nothing in the database was rewritten, because old code validates the old
+  list on every save and would refuse a rewritten row while it serves through
+  the pre-deploy migration. A later migration converts the stored values and
+  the column default, and drops the mapping. A legacy value posted to
+  `PATCH /profile` is refused like any other value outside the list.
+  Setup's "Skill level" select is the only page
   that edits `User#skill_level`, and it autosaves through `PATCH /profile`,
   which refuses a value outside `User::SKILL_LEVELS` with a 422. It sets the
   profile's prompt line, the rung of every kind without its own target
@@ -1274,10 +1299,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   sets it to `beginner`; nothing else changes it automatically, and daily
   ratings still nudge each set around it. It is not
   part of the Exercise mix, so it does not bump
-  `section_kind_preferences_version`. No migration set a value: existing
-  accounts keep the `developing` default until they choose otherwise, since a
-  change here changes that account's prompts. The Exercise mix's default
-  options name the stored value and are renamed in place once a save lands.
+  `section_kind_preferences_version`. Every account at the old `developing`
+  default reads as Junior, which pitches the same and keeps the same
+  scenarios, so no account's generation changes until its owner picks
+  another level. The Exercise mix's default options name the stored level by
+  its label and are renamed in place once a save lands.
 - **What a usage row records**: every provider call writes one `ApiUsage`
   row through `AiService#log_usage`, and that row now carries enough to price
   it. `model` is the model `#call` routed to (`MODEL_FOR_PURPOSE` /

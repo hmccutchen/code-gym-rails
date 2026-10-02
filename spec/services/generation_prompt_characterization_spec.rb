@@ -42,7 +42,7 @@ RSpec.describe "generation prompt characterization" do
     User.new(
       email:       "snapshot@example.com",
       name:        "Snapshot",
-      skill_level: "developing",
+      skill_level: "junior",
       focus_areas: []
     )
   end

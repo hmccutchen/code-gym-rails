@@ -4469,7 +4469,7 @@ RSpec.describe AiService do
   end
 
   describe "#duck_response sending real conversational turns" do
-    let(:user) { User.create!(email: "duck@example.com", name: "Duck", skill_level: "developing", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
+    let(:user) { User.create!(email: "duck@example.com", name: "Duck", skill_level: "junior", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
     let(:exercise) do
       user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
                                    problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
@@ -4539,7 +4539,7 @@ RSpec.describe AiService do
   end
 
   describe "#answer_follow_up sending real conversational turns" do
-    let(:user) { User.create!(email: "follow-up@example.com", name: "FollowUp", skill_level: "developing", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
+    let(:user) { User.create!(email: "follow-up@example.com", name: "FollowUp", skill_level: "junior", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
     let(:exercise) do
       user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
                                    problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
@@ -5542,7 +5542,7 @@ RSpec.describe AiService, "generation prompt without feedback" do
 end
 
 RSpec.describe AiService, "rung stamps on a generated set" do
-  let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "solid", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
+  let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "senior", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   it "stamps each section with its target when set, else the skill level's rung" do
     user.update!(section_kind_levels: { "code_review" => "principal_engineer" },
@@ -6714,7 +6714,7 @@ RSpec.describe AiService, ".judge_fallback_reason" do
 end
 
 RSpec.describe AiService, "the grading rubric" do
-  let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_keys: { "fake" => "fake-test-key" }, skill_level: "solid") }
+  let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_keys: { "fake" => "fake-test-key" }, skill_level: "senior") }
   let(:service) { FakeService.new("key") }
   let(:problem_set) do
     { "code_review" => { "question" => "cr?", "snippet" => "code", "pitched_at" => "principal_engineer" },

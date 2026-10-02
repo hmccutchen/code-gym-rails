@@ -14,18 +14,12 @@ class KindDifficulty
     "principal_engineer" => "the concept framed as a decision with costs on both sides at system scale."
   }.freeze
 
-  # The rung an untargeted section is pitched at. The prompt states a
-  # section's difficulty either as its target or as the profile's skill
-  # level, and those are two scales by design; this is the one place the
-  # second is read as a rung, so a section's evidence can be filed under one
+  # The rung an untargeted section is pitched at. Skill levels are the rungs
+  # plus beginner, which is pitched at the lowest; this is the one place a
+  # skill level is read as a rung, so a section's evidence is filed under one
   # ladder whichever way it was pitched. Total over User::SKILL_LEVELS, and a
   # spec holds it there.
-  RUNG_FOR_SKILL_LEVEL = {
-    "beginner"   => "junior",
-    "developing" => "junior",
-    "solid"      => "senior",
-    "strong"     => "principal_engineer"
-  }.freeze
+  RUNG_FOR_SKILL_LEVEL = LEVELS.index_with(&:itself).merge("beginner" => LEVELS.first).freeze
 
   def self.none
     new(levels: {}, locked: [])

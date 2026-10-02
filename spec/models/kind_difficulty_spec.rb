@@ -70,12 +70,16 @@ RSpec.describe KindDifficulty do
   end
 
   describe "LEVELS" do
-    # skill_level and AI_RATING_RANK share values on purpose, so only the new
-    # scale is held apart from each existing one.
-    it "shares no value with any existing rating scale" do
-      [ User::SKILL_LEVELS, DailyResponse::DIFFICULTY_LEVELS, ConceptMastery::AI_RATING_RANK.keys ].each do |scale|
+    # Skill levels are these levels plus beginner, so they are held to that
+    # rather than kept apart; the rating scales stay apart from both.
+    it "shares no value with either rating scale" do
+      [ DailyResponse::DIFFICULTY_LEVELS, ConceptMastery::AI_RATING_RANK.keys ].each do |scale|
         expect(described_class::LEVELS & scale).to be_empty
       end
+    end
+
+    it "is every skill level but beginner, in the same order" do
+      expect(User::SKILL_LEVELS).to eq([ "beginner", *described_class::LEVELS ])
     end
 
     it "has exactly one fallback definition per level" do
@@ -102,12 +106,17 @@ RSpec.describe KindDifficulty, "#rung_for" do
     expect(described_class.none.rung_for(challenge, skill_level: "intermediate")).to eq("junior")
   end
 
+  it "pitches beginner and every other skill level at the rung it names" do
+    expect(described_class::RUNG_FOR_SKILL_LEVEL)
+      .to eq("junior" => "junior", "senior" => "senior", "principal_engineer" => "principal_engineer", "beginner" => "junior")
+  end
+
   it "answers the target when one is set, else the skill level's rung" do
     targeted = described_class.new(levels: { "challenge" => "principal_engineer" }, locked: [])
 
     expect(targeted.rung_for(challenge, skill_level: "beginner")).to eq("principal_engineer")
     expect(described_class.none.rung_for(challenge, skill_level: "beginner")).to eq("junior")
-    expect(described_class.none.rung_for(challenge, skill_level: "solid")).to eq("senior")
-    expect(described_class.none.rung_for(challenge, skill_level: "strong")).to eq("principal_engineer")
+    expect(described_class.none.rung_for(challenge, skill_level: "senior")).to eq("senior")
+    expect(described_class.none.rung_for(challenge, skill_level: "principal_engineer")).to eq("principal_engineer")
   end
 end

@@ -3,8 +3,12 @@
 <p class="learn-intro"><%= t("progress.intro") %></p>
 
 <dl class="progress-legend">
-  <% ProgressHelper::STANDINGS.each do |standing| %>
-    <div><dt><%= standing_label(standing) %></dt><dd><%= standing.is_a?(String) ? KindDifficulty::LEVEL_DEFINITIONS.fetch(standing) : t("progress.legend.#{standing}") %></dd></div>
+  <% ProgressHelper::LEGEND.each do |standing| %>
+    <% if standing.is_a?(String) %>
+      <div><dt><%= standing_label(standing) %></dt><dd><%= KindDifficulty::LEVEL_DEFINITIONS.fetch(standing) %></dd></div>
+    <% else %>
+      <div><dt><%= t("progress.standings.#{standing}") %></dt><dd><%= t("progress.legend.#{standing}") %></dd></div>
+    <% end %>
   <% end %>
 </dl>
 <p class="progress-note"><%= t("progress.note") %></p>
@@ -34,11 +38,11 @@
 
         <ul class="progress-list">
           <% group[:standings].each do |concept, standing| %>
-            <% held_index = standing.is_a?(String) ? KindDifficulty::LEVELS.index(standing) : -1 %>
+            <% held_count = held_rung_count(standing) %>
             <li class="progress-entry" data-concept="<%= concept %>" data-standing="<%= standing %>">
               <span class="progress-rungs rung-<%= standing %>" aria-hidden="true">
-                <% KindDifficulty::LEVELS.each_index do |i| %>
-                  <span class="progress-rung<%= " held" if i <= held_index %>"></span>
+                <% KindDifficulty::LEVELS.each_with_index do |rung, i| %>
+                  <span class="progress-rung<%= " held" if i < held_count %><%= " toward" if rung == developing_rung(standing) %>"></span>
                 <% end %>
               </span>
               <%= link_to concept.humanize, learn_concept_path(bucket: bucket[:key], concept: concept) %>

@@ -71,7 +71,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       end
     end
 
-    [ {}, { skill_level: "developing" }, { skill_level: "strong" } ].each do |skill|
+    [ {}, { skill_level: "junior" }, { skill_level: "principal_engineer" } ].each do |skill|
       it "refuses Junior without the beginner skill level #{skill.inspect}, saving nothing" do
         original = user.reload.attributes
 

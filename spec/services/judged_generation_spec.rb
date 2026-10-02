@@ -8,7 +8,7 @@ RSpec.describe JudgedGeneration do
   let(:plan_type) { Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true) }
   let(:due_check) { Struct.new(:concept) }
 
-  let(:user) { User.new(id: 42, skill_level: "solid") }
+  let(:user) { User.new(id: 42, skill_level: "senior") }
   let(:kinds) { [ ExerciseSection::CodeReview, ExerciseSection::Pattern, ExerciseSection::Challenge ] }
   let(:drafted) do
     {

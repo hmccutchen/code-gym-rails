@@ -249,8 +249,9 @@
             const result = await save({ skill_level: level }, "skill_level");
             queuedSkillSaves--;
             if (!result || !result.ok) return;
+            const levelLabel = Array.from(skill.options).find((option) => option.value === level).textContent;
             document.querySelectorAll("[data-skill-level-label]").forEach((label) => {
-              label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", level);
+              label.textContent = skill.dataset.labelTemplate.replace("__LEVEL__", levelLabel);
             });
           });
         });

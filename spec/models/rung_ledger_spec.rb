@@ -37,6 +37,42 @@ RSpec.describe RungLedger do
     expect(ai_bad.held("n_plus_one", "ruby_rails")).to be_nil
   end
 
+  describe "#developing_toward" do
+    it "names the lowest rung when an attempt held nothing" do
+      led = ledger(response_on(Date.current, sections: { "code_review" => { concept: "n_plus_one", rung: "senior", ai: "developing" } }))
+
+      expect(led.developing_toward("n_plus_one", "ruby_rails")).to eq("junior")
+    end
+
+    it "names the rung just above the held one when a higher rung has been attempted" do
+      led = ledger(
+        response_on(Date.current,     sections: { "code_review" => { concept: "n_plus_one", rung: "principal_engineer", ai: "beginner" } }),
+        response_on(Date.current - 1, sections: { "code_review" => { concept: "n_plus_one", rung: "junior" } })
+      )
+
+      expect(led.held("n_plus_one", "ruby_rails")).to eq("junior")
+      expect(led.developing_toward("n_plus_one", "ruby_rails")).to eq("senior")
+    end
+
+    it "is nil with nothing attempted above the held rung, or nothing attempted at all" do
+      held_only = ledger(response_on(Date.current, sections: { "code_review" => { concept: "n_plus_one", rung: "senior" } }))
+      led_low = ledger(
+        response_on(Date.current,     sections: { "code_review" => { concept: "n_plus_one", rung: "junior", ai: "developing" } }),
+        response_on(Date.current - 1, sections: { "code_review" => { concept: "n_plus_one", rung: "senior" } })
+      )
+
+      expect(held_only.developing_toward("n_plus_one", "ruby_rails")).to be_nil
+      expect(led_low.developing_toward("n_plus_one", "ruby_rails")).to be_nil
+      expect(ledger.developing_toward("n_plus_one", "ruby_rails")).to be_nil
+    end
+
+    it "is nil at the top rung" do
+      led = ledger(response_on(Date.current, sections: { "code_review" => { concept: "n_plus_one", rung: "principal_engineer" } }))
+
+      expect(led.developing_toward("n_plus_one", "ruby_rails")).to be_nil
+    end
+  end
+
   it "reads the most recent attempt at a rung, so a later poor one releases it" do
     good_then_bad = ledger(
       response_on(Date.current,     sections: { "code_review" => { concept: "n_plus_one", rung: "senior", ai: "developing" } }),

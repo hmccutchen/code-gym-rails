@@ -453,18 +453,22 @@
     details.progress-group[open] summary::before { content: "▼"; }
     .progress-group-name { font-weight: 600; min-width: 9rem; }
     /* Each standing sets --rung once; the bar segments and the held dots read it. */
-    .rung-principal_engineer { --rung: #7c6af7; }
-    .rung-senior { --rung: #4ade80; }
-    .rung-junior { --rung: #86efac; }
+    .rung-principal_engineer, .rung-developing_principal_engineer { --rung: #7c6af7; }
+    .rung-senior, .rung-developing_senior { --rung: #4ade80; }
+    .rung-junior, .rung-developing_junior { --rung: #86efac; }
     .rung-not_yet, .rung-not_offered { --rung: transparent; }
     .rung-bar { display: flex; flex: 1 1 8rem; height: .55rem; border-radius: 999px; overflow: hidden; background: var(--border); }
     .rung-bar span { display: block; height: 100%; background: var(--rung); }
+    /* Developing toward a rung is striped in that rung's colour, so the bar
+       reads as the same ladder with the in-between steps marked. */
+    .rung-bar span[class^="rung-developing"] { background: repeating-linear-gradient(135deg, var(--rung) 0 3px, transparent 3px 6px); }
     .progress-counts { font-size: .8rem; color: var(--muted); }
     .progress-list { list-style: none; margin: .8rem 0 .2rem; padding: 0; }
     .progress-entry { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; padding: .25rem 0; }
     .progress-rungs { display: inline-flex; gap: .2rem; }
     .progress-rung { width: .5rem; height: .5rem; border-radius: 999px; border: 1px solid var(--muted); }
     .progress-rung.held { background: var(--rung); border-color: var(--rung); }
+    .progress-rung.toward { border-color: var(--rung); background: linear-gradient(90deg, var(--rung) 50%, transparent 50%); }
     .progress-word { font-size: .8rem; color: var(--muted); margin-left: auto; }
     .learn-drill, .learn-drills { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1.5rem 0; }
     .learn-drills form, .learn-group-head form { display: inline-block; margin-right: .5rem; }
