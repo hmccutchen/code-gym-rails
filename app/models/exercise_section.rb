@@ -82,9 +82,10 @@ class ExerciseSection
     slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }.first(MAX_SECTIONS)
   end
 
-  # Whether every fixed section the payload holds carries `concept`. A fixed
-  # section that is missing, dropped or tagged with something else makes it
-  # false, so a placement the model ignored is never reported as delivered.
+  # Whether the payload holds every fixed section and each carries `concept`.
+  # A fixed section that is missing, dropped or tagged with something else
+  # makes it false, so a placement the model ignored is never reported as
+  # delivered.
   def self.fixed_sections_share?(problem_set, concept)
     concept.present? && fixed.all? { |kind| present?(problem_set, kind.key) && problem_set[kind.key]["concept"] == concept }
   end
@@ -96,7 +97,6 @@ class ExerciseSection
       .merge(pattern: [ Pattern ], third: thirds, fourth: fourths)
   end
 
-  # The slot a kind fills.
   def self.slot_for(kind)
     slots.find { |_slot, kinds| kinds.include?(kind) }&.first
   end

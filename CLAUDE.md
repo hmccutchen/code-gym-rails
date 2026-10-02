@@ -1408,10 +1408,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   rating, so the second angle makes leaving Reduced stricter and never adds
   weight.
 - **Waiting retention checks**: `DailyPlan` reads due checks for every bucket
-  in the user's slice in one query
-  (`User#concepts_due_for_retention_check_in`), including architecture and
-  the fourth buckets, which were fetched only when their kind was chosen and
-  so waited with no trace on every other day. That one read also feeds
+  in the user's slice, plus the bucket of the language being generated, in
+  one query (`User#concepts_due_for_retention_check_in`), including
+  architecture and the fourth buckets, which were fetched only when their
+  kind was chosen and so waited with no trace on every other day. The
+  generated language is added because a regeneration keeps the stored
+  exercise's language, which can differ from the setting. That one read also feeds
   both tracks' retention checks, which filter it by bucket instead of
   querying each bucket again, and `ConceptMastery.due_for_retention_check`
   is the one statement of what "due" means. Each check the plan did not
@@ -1434,7 +1436,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   gap first, never seen before seen, ties in registry order. Both respect
   the user's exclusions, and (a) reads hosting through `DayHosts`. The added
   kind fills its own slot (`ExerciseSection.slot_for`) without weights, and
-  `DailyPlan` recomputes the concept tracks so the check lands in it.
+  `DailyPlan` decides the concept tracks again so the check can land in it.
+  Reinforcement can still outrank that check for the one retention slot
+  (`Addition#check` names the check, and `DailyPlan.check_landed?` reads the
+  recomputed tracks for it); then the addition is given up and the day stays
+  at two, rather than spending the cap on a section carrying something else.
 
   **The cap counts calendar weekdays, not delivered rows.** Weekends never
   count toward the four, a weekend addition inside the window still blocks,

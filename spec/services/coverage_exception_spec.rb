@@ -61,9 +61,10 @@ RSpec.describe CoverageException do
     it "is preferred over a gap, and names the kind that can host it" do
       stale = history(last_seen: { "pattern" => weekdays_ago(30) })
 
-      addition = decide(history: stale, checks: [ overdue("service_boundaries", "architecture") ])
+      check    = overdue("service_boundaries", "architecture")
+      addition = decide(history: stale, checks: [ check ])
 
-      expect(addition).to eq(described_class::Addition.new(kind: ExerciseSection::Architecture, reason: :due_check))
+      expect(addition).to eq(described_class::Addition.new(kind: ExerciseSection::Architecture, reason: :due_check, check: check))
     end
 
     it "counts only checks past the meaningful-overdue threshold" do

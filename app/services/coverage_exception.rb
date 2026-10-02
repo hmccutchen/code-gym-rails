@@ -22,7 +22,11 @@ class CoverageException
 
   OPTIONAL_KINDS = ExerciseSection.all.reject(&:fixed?).freeze
 
-  Addition = Data.define(:kind, :reason)
+  # `check` is the waiting retention check a due_check addition was made
+  # for, so the plan can tell whether it landed; a gap addition has none.
+  Addition = Data.define(:kind, :reason, :check) do
+    def initialize(kind:, reason:, check: nil) = super
+  end
 
   def self.applies_to_day?(count:, fixed:, brake: false)
     fixed.nil? && count <= ExerciseSection.fixed.size && !brake
@@ -46,7 +50,7 @@ class CoverageException
 
     overdue.sort_by { |check| -check[:overdue_ratio] }.each do |check|
       host = hosts.hosts(candidates, check[:concept], check[:bucket]).first
-      return Addition.new(kind: host, reason: :due_check) if host
+      return Addition.new(kind: host, reason: :due_check, check: check) if host
     end
     nil
   end

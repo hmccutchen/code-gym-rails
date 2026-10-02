@@ -1009,6 +1009,18 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
     expect(waiting).to eq([ { bucket: "javascript", concept: "closures", reason: :no_host } ])
   end
 
+  # Regeneration keeps the stored exercise's language, so a user who has
+  # since changed theirs still gets that language's due checks offered.
+  it "offers the generated language's check when the user's setting has moved to the other language" do
+    user.update!(language: "javascript")
+    due("memoization", "ruby_rails")
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.due_checks.map(&:concept)).to eq(%w[memoization])
+    expect(plan.waiting_checks).to eq([])
+  end
+
   it "lists the most overdue first" do
     due("service_boundaries", "architecture", days_late: 2)
     due("scope_creep", "plan_review", days_late: 20)
@@ -1047,11 +1059,33 @@ RSpec.describe DailyPlan, "the coverage exception" do
 
     plan = described_class.for(user, language: "ruby_rails")
 
-    expect(plan.coverage).to eq(CoverageException::Addition.new(kind: ExerciseSection::Architecture, reason: :due_check))
+    expect(plan.coverage.kind).to eq(ExerciseSection::Architecture)
+    expect(plan.coverage.reason).to eq(:due_check)
+    expect(plan.coverage.check).to include(concept: "service_boundaries", bucket: "architecture")
     expect(plan.third).to eq(:architecture)
     expect(plan.due_checks.map(&:concept)).to eq(%w[service_boundaries])
     expect(plan.waiting_checks).to eq([])
     expect(plan.notes).to eq("coverage" => "architecture", "coverage_reason" => "due_check")
+  end
+
+  # Reinforcement outranks a due check for the one retention slot, so an
+  # added section would carry reinforcement and the check would still wait.
+  it "gives the addition up when the check it was added for does not land" do
+    allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
+      %w[service_objects query_objects policy_objects].map { |c| { concept: c, bucket: "ruby_rails", tier: "standard" } }
+    )
+    user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard, mastered_at: 6.months.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - 40)
+    user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard, mastered_at: 6.months.ago,
+                                   retention_interval_days: 7, next_retention_check_on: Date.current - 30)
+
+    plan = described_class.for(user, language: "ruby_rails")
+
+    expect(plan.coverage).to be_nil
+    expect([ plan.pattern, plan.third, plan.fourth ].compact).to eq([])
+    expect(plan.due_checks.map(&:concept)).to eq(%w[n_plus_one])
+    expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "memoization", reason: :no_slot } ])
+    expect(plan.notes).to eq({})
   end
 
   it "adds the longest-unseen kind once the gap has run past four weeks" do

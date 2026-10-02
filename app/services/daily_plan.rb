@@ -95,19 +95,24 @@ class DailyPlan
     rotation         = SectionRotation.for(history, count: count, preferences: preferences)
     code_review_mode = WeightedRoll.pick(CODE_REVIEW_MODE_WEIGHTS)
     hosts            = DayHosts.new(language, mode: code_review_mode)
-    due              = user.concepts_due_for_retention_check_in(ConceptBucket.slice_for(user.language))
+    due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     tracks           = concept_tracks(user, language, rotation, due: due, hosts: hosts)
-    coverage         = coverage_for(user, count, preferences, tracks.fetch(:waiting_checks), hosts)
-    if coverage
-      rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind) => coverage.kind.key.to_sym)
-      tracks   = concept_tracks(user, language, rotation, due: due, hosts: hosts)
-    end
+    coverage, rotation, tracks = with_coverage(coverage_for(user, count, preferences, tracks.fetch(:waiting_checks), hosts),
+                                               rotation, tracks, user, language, due: due, hosts: hosts)
 
     Result.new(pattern: rotation.fetch(:pattern), third: rotation.fetch(:third), **tracks, coverage: coverage,
                code_review_mode: code_review_mode,
                code_review_source: code_review_source_for(user, language, code_review_mode),
                scenario_flavor: WeightedRoll.pick(scenario_flavor_weights_for(user.skill_level)))
   end
+
+  # The user's slice plus the bucket of the language being generated, which
+  # differs from the setting when a regeneration keeps the stored exercise's
+  # language after the user changed theirs.
+  def self.due_buckets(user, language)
+    ConceptBucket.slice_for(user.language) | [ language ]
+  end
+  private_class_method :due_buckets
 
   # Everything the day's chosen kinds decide about concepts. Computed again
   # when the coverage exception adds a kind, so the added section can take
@@ -119,6 +124,30 @@ class DailyPlan
     tracks.merge(waiting_checks: waiting_checks(tracks, due, kinds: kinds, hosts: hosts))
   end
   private_class_method :concept_tracks
+
+  # The added kind fills its slot and the tracks are decided again so the
+  # check it was added for can land there. Reinforcement can still outrank
+  # that check for the one retention slot, and then the addition is given up:
+  # the day stays at two rather than spending the cap on a section that
+  # carries something else.
+  def self.with_coverage(coverage, rotation, tracks, user, language, due:, hosts:)
+    return [ nil, rotation, tracks ] unless coverage
+
+    added_rotation = rotation.merge(ExerciseSection.slot_for(coverage.kind) => coverage.kind.key.to_sym)
+    added_tracks   = concept_tracks(user, language, added_rotation, due: due, hosts: hosts)
+    return [ nil, rotation, tracks ] unless check_landed?(coverage, added_tracks)
+
+    [ coverage, added_rotation, added_tracks ]
+  end
+  private_class_method :with_coverage
+
+  def self.check_landed?(coverage, tracks)
+    return true unless coverage.check
+
+    (tracks[:due_checks] + tracks[:fourth_due_checks])
+      .any? { |cm| cm.concept == coverage.check[:concept] && cm.language == coverage.check[:bucket] }
+  end
+  private_class_method :check_landed?
 
   # Cheapest check first: the setting and count cost nothing, the cap one
   # small query, and only a day that passes both loads the gaps.
