@@ -198,7 +198,7 @@ class ProblemSetIngest
   # A silently short set would make sections_total under-report, which feeds
   # recent_performance, which sizes tomorrow's set — the day's own provider
   # glitch nudging future days shorter. Extra sections are fine: FakeService
-  # returns all eight, and only the resolved ones are ever rendered.
+  # returns every registered kind, and only the resolved ones are ever rendered.
   def reject_missing_sections!
     missing = @expected_keys.reject { |key| ExerciseSection.present?(@problem_set, key) }
     return if missing.empty?

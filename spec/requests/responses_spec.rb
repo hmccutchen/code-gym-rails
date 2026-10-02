@@ -262,7 +262,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     # A payload can hold more third- or fourth-shaped keys than the page ever
-    # renders — FakeService returns all eight, and a provider can throw in an
+    # renders — FakeService returns every registered kind, and a provider can throw in an
     # alternate. Tagging what was never shown puts a concept the engineer
     # never saw into the history that shapes tomorrow's set.
     it "omits a section the exercise holds but never presented" do

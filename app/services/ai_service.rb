@@ -74,7 +74,7 @@ class AiService
   #     synchronous caller inherits a bound rather than GENERATION_READ_TIMEOUT.
   #   - RETRY_READ_TIMEOUT: the judged path's single-section regeneration.
   #     Same call shape, a fraction of the output — GENERATION_READ_TIMEOUT is
-  #     sized for a whole day, up to eight sections with their reference
+  #     sized for a whole day, up to ExerciseSection::MAX_SECTIONS sections with their reference
   #     blocks, and a retry asks for one. Bounding it is what keeps the judged
   #     path's worst case near one draft rather than several: the retries fan
   #     out, so the day now waits for the slowest one, not their sum. Set to
