@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GenerateConceptReferenceJob do
-  let(:user) { User.create!(email: "reference-queue@example.com", name: "Queue", api_key: "fake-test-key", provider: "fake") }
+  let(:user) { User.create!(email: "reference-queue@example.com", name: "Queue", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
   let(:reference) { AiService::CONCEPT_REFERENCE_FIELDS.index_with { "Reference text." } }
   let(:service) { instance_double(FakeService, generate_concept_reference: reference) }
   let(:worker) do

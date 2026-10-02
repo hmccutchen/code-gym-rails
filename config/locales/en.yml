@@ -620,6 +620,9 @@ en:
       api_key_label: "API key"
       api_key_placeholder: "sk-ant-..., AQ...., AIza... or sk-proj-..."
       api_key_hint_html: 'Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).'
+      saved_keys_hint: "A key replaces the one saved for its provider and switches to it. Keys for other providers stay saved."
+      provider_legend: "Provider in use"
+      provider_hint: "Switch between the keys you've saved. To add another provider, paste its key above."
       language_label: "Exercise language"
       language_options:
         ruby_rails: "Ruby / Rails (default)"

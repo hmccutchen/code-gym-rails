@@ -1,4 +1,4 @@
-# ActiveRecord Encryption keys for `encrypts :api_key` on User.
+# ActiveRecord Encryption keys for `encrypts :api_keys` on User.
 #
 # Rails only reads these from encrypted credentials by default; this app
 # supplies them via env vars instead (set on the Railway services). Without

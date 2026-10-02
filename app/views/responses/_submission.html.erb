@@ -21,7 +21,7 @@
 <% if response.reviewed? %>
   <div class="review-section" id="ai-review">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      <h2 style="font-size:1rem"><%= t("review.heading", provider: response.user.provider_label) %></h2>
+      <h2 style="font-size:1rem"><%= t("review.heading", provider: response.review_provider_label) %></h2>
       <%= button_to t("responses.submission.email_button"), email_review_response_path(response), method: :post, class: "btn btn-ghost btn-sm" %>
     </div>
     <%= render "shared/ai_review", response: response %>

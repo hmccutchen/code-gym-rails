@@ -1,6 +1,18 @@
 require "rails_helper"
 
 RSpec.describe DailyResponse, type: :model do
+  describe "#review_provider_label" do
+    let(:user) { User.create!(email: "label@example.com", name: "L", provider: "openai", api_keys: { "openai" => "sk-proj-x" }) }
+
+    it "names the provider that wrote the review" do
+      expect(DailyResponse.new(user: user, review_provider: "anthropic").review_provider_label).to eq("Claude")
+    end
+
+    it "falls back to the user's provider for a review written before it was recorded" do
+      expect(DailyResponse.new(user: user, review_provider: nil).review_provider_label).to eq("GPT")
+    end
+  end
+
   describe "pseudocode rounds" do
     def response_for(rounds)
       user     = User.create!(email: "pseudo-#{SecureRandom.hex(4)}@example.com", name: "P")

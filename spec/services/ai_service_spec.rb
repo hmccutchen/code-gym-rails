@@ -4469,7 +4469,7 @@ RSpec.describe AiService do
   end
 
   describe "#duck_response sending real conversational turns" do
-    let(:user) { User.create!(email: "duck@example.com", name: "Duck", skill_level: "developing", focus_areas: [], api_key: "fake", provider: "fake") }
+    let(:user) { User.create!(email: "duck@example.com", name: "Duck", skill_level: "developing", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
     let(:exercise) do
       user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
                                    problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
@@ -4539,7 +4539,7 @@ RSpec.describe AiService do
   end
 
   describe "#answer_follow_up sending real conversational turns" do
-    let(:user) { User.create!(email: "follow-up@example.com", name: "FollowUp", skill_level: "developing", focus_areas: [], api_key: "fake", provider: "fake") }
+    let(:user) { User.create!(email: "follow-up@example.com", name: "FollowUp", skill_level: "developing", focus_areas: [], provider: "fake", api_keys: { "fake" => "fake" }) }
     let(:exercise) do
       user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
                                    problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys,
@@ -4621,17 +4621,17 @@ RSpec.describe AiService do
 
   describe ".for" do
     it "returns a ClaudeService for an anthropic user" do
-      user.update!(api_key: "sk-ant-test", provider: "anthropic")
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" })
       expect(AiService.for(user)).to be_a(ClaudeService)
     end
 
     it "returns a GeminiService for a gemini user" do
-      user.update!(api_key: "AIzaTest", provider: "gemini")
+      user.update!(provider: "gemini", api_keys: { "gemini" => "AIzaTest" })
       expect(AiService.for(user)).to be_a(GeminiService)
     end
 
     it "returns an OpenaiService for an openai user" do
-      user.update!(api_key: "sk-proj-test", provider: "openai")
+      user.update!(provider: "openai", api_keys: { "openai" => "sk-proj-test" })
       expect(AiService.for(user)).to be_a(OpenaiService)
     end
 
@@ -5542,7 +5542,7 @@ RSpec.describe AiService, "generation prompt without feedback" do
 end
 
 RSpec.describe AiService, "rung stamps on a generated set" do
-  let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "solid", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "rung-stamp@example.com", name: "Rung", skill_level: "solid", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   it "stamps each section with its target when set, else the skill level's rung" do
     user.update!(section_kind_levels: { "code_review" => "principal_engineer" },
@@ -5588,7 +5588,7 @@ RSpec.describe AiService, "rung stamps on a generated set" do
 end
 
 RSpec.describe AiService, "#judge_section" do
-  let(:user) { User.create!(email: "judge@example.com", name: "J", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "judge@example.com", name: "J", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
   let(:section) { { "question" => "What is wrong?", "snippet" => "code", "concept" => "n_plus_one", "teaching_note" => "hint", "pitched_at" => "senior" } }
 
   it "sends the section, its concept, rung, lock state and the kind's task, and never another section or history" do
@@ -5717,7 +5717,7 @@ end
 # prevents it; this pins that the boundary still refuses it and the day keeps
 # its draft if one ever gets through.
 RSpec.describe AiService, "#judge_section given a prose reply" do
-  let(:user) { User.create!(email: "judge-prose@example.com", name: "J", provider: "anthropic", api_key: "sk-ant-test") }
+  let(:user) { User.create!(email: "judge-prose@example.com", name: "J", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
   let(:prose) { Rails.root.join("spec/fixtures/judge_replies/prose_without_json.txt").read }
   let(:service) do
     ClaudeService.new("sk-ant-test").tap do |svc|
@@ -5781,7 +5781,7 @@ RSpec.describe AiService, "single-section retry prompt" do
 end
 
 RSpec.describe AiService, "#generate_judged_exercise" do
-  let(:user) { User.create!(email: "two-stage@example.com", name: "T", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "two-stage@example.com", name: "T", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   # A kind the judge solves blind needs a solve on every verdict; these
   # examples are not about the solve, so it is supplied to match FakeService's.
@@ -6503,7 +6503,7 @@ RSpec.describe AiService, "quiet JSON parsing" do
 end
 
 RSpec.describe AiService, "#judge_review_prose" do
-  let(:user) { User.create!(email: "prose@example.com", name: "P", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "prose@example.com", name: "P", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
   let(:review) do
     { "rating" => "solid", "correct" => [ "Uses includes." ], "missed" => [ "One query per row." ],
       "better_questions" => [], "next_step" => "Read about eager loading.", "improved_code" => "User.includes(:posts)" }
@@ -6555,7 +6555,7 @@ RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
 end
 
 RSpec.describe AiService, "judging graded reviews" do
-  let(:user) { User.create!(email: "graded@example.com", name: "G", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "graded@example.com", name: "G", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
   let(:exercise) do
     DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
                           problem_set: FakeService::EXERCISE_PROBLEM_SET.deep_stringify_keys)
@@ -6714,7 +6714,7 @@ RSpec.describe AiService, ".judge_fallback_reason" do
 end
 
 RSpec.describe AiService, "the grading rubric" do
-  let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_key: "fake-test-key", skill_level: "solid") }
+  let(:user) { User.create!(email: "rubric@example.com", name: "R", provider: "fake", api_keys: { "fake" => "fake-test-key" }, skill_level: "solid") }
   let(:service) { FakeService.new("key") }
   let(:problem_set) do
     { "code_review" => { "question" => "cr?", "snippet" => "code", "pitched_at" => "principal_engineer" },
@@ -6900,7 +6900,7 @@ end
 end
 
 RSpec.describe AiService, "the shared concept" do
-  let(:user) { User.create!(email: "shared@example.com", name: "S", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "shared@example.com", name: "S", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   # FakeService's design comparison carries open_closed; this one carries
   # whatever the test asks both fixed sections to share.
@@ -6989,7 +6989,7 @@ RSpec.describe AiService, "the shared concept" do
 end
 
 RSpec.describe AiService, "waiting retention checks" do
-  let(:user) { User.create!(email: "waiting@example.com", name: "W", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "waiting@example.com", name: "W", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   it "logs each check the day did not offer on one [retention] line" do
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
@@ -7006,7 +7006,7 @@ RSpec.describe AiService, "waiting retention checks" do
 end
 
 RSpec.describe AiService, "the coverage exception" do
-  let(:user) { User.create!(email: "coverage@example.com", name: "C", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "coverage@example.com", name: "C", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   def lines_from(prefix)
     lines = []
@@ -7035,7 +7035,7 @@ RSpec.describe AiService, "the coverage exception" do
 end
 
 RSpec.describe AiService, "the day's size" do
-  let(:user) { User.create!(email: "set-size@example.com", name: "S", provider: "fake", api_key: "fake-test-key") }
+  let(:user) { User.create!(email: "set-size@example.com", name: "S", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   def lines_from(prefix)
     lines = []

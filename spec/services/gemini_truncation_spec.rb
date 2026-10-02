@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe "Gemini truncation through AiService" do
   include AuthHelpers
 
-  let(:user) { create_user_with_key.tap { |u| u.update!(api_key: "AQ.test-key", provider: "gemini") } }
+  let(:user) { create_user_with_key.tap { |u| u.update!(provider: "gemini", api_keys: { "gemini" => "AQ.test-key" }) } }
   let(:service) { AiService.for(user) }
 
   def reply_with(status:, text:, output_tokens: 56)

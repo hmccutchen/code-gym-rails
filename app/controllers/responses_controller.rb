@@ -100,6 +100,7 @@ class ResponsesController < ApplicationController
 
       if successes.any?
         @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |r| r[:review] })
+        @response.review_provider = current_user.provider
         ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_batch)
       end
       @response.review_errors = @response.review_errors

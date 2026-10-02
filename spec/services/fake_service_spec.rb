@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe FakeService do
   let(:user) do
-    User.create!(email: "fake-svc@example.com", name: "Fake", provider: "fake", api_key: "fake-test-key")
+    User.create!(email: "fake-svc@example.com", name: "Fake", provider: "fake", api_keys: { "fake" => "fake-test-key" })
   end
 
   it "is a valid provider value on User" do

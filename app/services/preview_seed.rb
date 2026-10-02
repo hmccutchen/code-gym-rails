@@ -67,14 +67,14 @@ class PreviewSeed
   # create_with applies the demo defaults on the create path only. An existing
   # account — a real user, or a previously-seeded one — is returned untouched,
   # so seeding never modifies a row it did not create, including a real user who
-  # signed up but has not added an API key yet (api_key / provider still nil).
+  # signed up but has not added an API key yet (api_keys / provider still nil).
   def find_or_create_user
     User.create_with(
       name:        "Preview Reviewer",
       skill_level: "solid",
       language:    "ruby_rails",
       provider:    "anthropic",
-      api_key:     DUMMY_API_KEY
+      api_keys:    { "anthropic" => DUMMY_API_KEY }
     ).find_or_create_by!(email: target_email)
   end
 

@@ -5,9 +5,15 @@ class User < ApplicationRecord
   has_many :concept_masteries, dependent: :destroy
   has_many :push_subscriptions, dependent: :destroy
 
-  # Encrypt the user's provider API key at rest. Requires RAILS_MASTER_KEY /
-  # credentials to be set (standard Rails setup).
-  encrypts :api_key
+  # One key per provider, encrypted at rest as a whole. provider names the
+  # one in use. Requires RAILS_MASTER_KEY / credentials to be set (standard
+  # Rails setup).
+  serialize :api_keys, coder: JSON
+  encrypts :api_keys
+
+  # Old code keeps serving while the pre-deploy migration runs, so the column
+  # stays until a later migration drops it.
+  self.ignored_columns += [ "api_key" ]
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = %w[beginner developing solid strong].freeze
@@ -25,6 +31,8 @@ class User < ApplicationRecord
   validates :name,  presence: true
   validates :skill_level, inclusion: { in: SKILL_LEVELS }
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
+  validate :api_keys_name_providers, if: :api_keys_changed?
+  validate :provider_has_a_stored_key, if: -> { provider_changed? || api_keys_changed? }
   validates :language, inclusion: { in: LANGUAGES }
   validates :learning_track, inclusion: { in: LearningTrack::VALUES }, allow_nil: true
   validate :time_zone_must_be_loadable
@@ -47,6 +55,9 @@ class User < ApplicationRecord
                                   if: :daily_section_count_changed?
 
   normalizes :display_preferences, with: ->(values) { DisplayPreferences.sparse(values) }
+  # nil rather than {} when no key is stored, so where.not(api_keys: nil)
+  # finds exactly the accounts that can call a provider.
+  normalizes :api_keys, with: ->(keys) { keys.presence }
 
   before_save { email.downcase! }
 
@@ -250,7 +261,7 @@ class User < ApplicationRecord
       update!(
         email:                  "deleted-user-#{id}@anonymized.local",
         name:                   "Deleted user",
-        api_key:                nil,
+        api_keys:               nil,
         login_code_sent_at:     nil,
         login_code_digest:      nil,
         login_code_attempts:    0,
@@ -262,8 +273,21 @@ class User < ApplicationRecord
   end
 
   # ── API key ───────────────────────────────────────────────────────────────
+  def api_key = api_keys&.dig(provider)
+
   def api_key_present?
     api_key.present?
+  end
+
+  # In registry order, so Setup lists them the same way every time.
+  def stored_providers
+    AiProvider.keys & api_keys.to_h.keys
+  end
+
+  # Saving a key for a provider also selects it: the user just added it.
+  def store_api_key(key, provider:)
+    self.api_keys = api_keys.to_h.merge(provider => key)
+    self.provider = provider
   end
 
   def on_learning_track? = learning_track == LearningTrack::ON
@@ -527,12 +551,7 @@ class User < ApplicationRecord
   end
 
   # ── Display ────────────────────────────────────────────────────────────────
-  def provider_label
-    # default: falls back to the "unknown" key ("AI") for any provider value
-    # without its own translation — including legacy/invalid data that bypassed
-    # validation — so the UI never shows a "translation missing" string.
-    I18n.t("providers.#{provider.presence || 'unknown'}", default: :"providers.unknown")
-  end
+  def provider_label = AiProvider.label(provider)
 
   private
 
@@ -720,6 +739,24 @@ class User < ApplicationRecord
     (locked_section_kinds - section_kind_levels.keys).each do |key|
       errors.add(:locked_section_kinds, "locks #{key} without a difficulty target")
     end
+  end
+
+  def api_keys_name_providers
+    return if api_keys.nil?
+    return errors.add(:api_keys, "must be a map of provider to key") unless api_keys.is_a?(Hash)
+
+    api_keys.each do |provider, key|
+      errors.add(:api_keys, "names an unknown provider: #{provider}") unless AiProvider.keys.include?(provider)
+      errors.add(:api_keys, "has a blank key for #{provider}") unless key.is_a?(String) && key.present?
+    end
+  end
+
+  # An account with no key at all may still name a provider: an anonymized
+  # account keeps its provider after its keys are cleared.
+  def provider_has_a_stored_key
+    return unless api_keys.is_a?(Hash) && provider.present?
+
+    errors.add(:provider, "has no stored key") unless api_keys.key?(provider)
   end
 
   def display_preferences_name_known_options

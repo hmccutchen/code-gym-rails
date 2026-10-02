@@ -475,7 +475,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   describe "review button label" do
     it "names the user's provider on the get-review button" do
       user = create_user_with_key(email: "gem@example.com", name: "Gem")
-      user.update!(provider: "gemini")
+      user.store_api_key("AIzaGem", provider: "gemini")
+      user.save!
       login_as(user)
 
       exercise = DailyExercise.create!(

@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GenerateRecognitionGuideJob do
-  let(:user) { User.create!(email: "guide-job@example.com", name: "Job", api_key: "sk-ant-test", provider: "anthropic") }
+  let(:user) { User.create!(email: "guide-job@example.com", name: "Job", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
 
   def stub_service
     service = instance_double(ClaudeService)
@@ -24,7 +24,7 @@ RSpec.describe GenerateRecognitionGuideJob do
   end
 
   it "dates its usage row on the user's own day, not the worker's" do
-    local = User.create!(email: "guide-zone@example.com", name: "Zone", provider: "fake", api_key: "fake-key",
+    local = User.create!(email: "guide-zone@example.com", name: "Zone", provider: "fake", api_keys: { "fake" => "fake-key" },
                          time_zone: "Pacific/Auckland")
 
     travel_to Time.utc(2026, 9, 29, 20, 0, 0) do

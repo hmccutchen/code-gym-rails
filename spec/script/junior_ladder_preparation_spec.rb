@@ -72,7 +72,7 @@ RSpec.describe JuniorLadderPreparation do
   end
 
   it "refuses an operator without an API key before enqueueing" do
-    operator.update!(api_key: nil)
+    operator.update!(api_keys: nil)
 
     expect { preparation.run! }.to raise_error(ArgumentError, /no API key/)
     expect(enqueued_jobs).to be_empty

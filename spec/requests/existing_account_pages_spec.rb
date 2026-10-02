@@ -9,7 +9,7 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
     User.create!(id: 900_001, email: "existing@example.com", name: "Existing",
                  time_zone: "UTC", created_at: Time.utc(2026, 1, 5, 12),
                  learning_track: "none").tap do |user|
-      user.update!(api_key: "sk-ant-test-key", provider: "anthropic")
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test-key" })
     end
   end
 

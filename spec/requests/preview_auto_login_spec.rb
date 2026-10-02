@@ -10,7 +10,7 @@ RSpec.describe "Preview auto-login", type: :request do
   # needs a row the seeder would have created.
   def seeded_user(email = PreviewSeed::DEFAULT_EMAIL)
     User.create!(email: email, name: "Preview Reviewer",
-                 provider: "anthropic", api_key: PreviewSeed::DUMMY_API_KEY)
+                 provider: "anthropic", api_keys: { "anthropic" => PreviewSeed::DUMMY_API_KEY })
   end
 
   describe "in a non-preview environment (the default)" do
@@ -126,7 +126,7 @@ RSpec.describe "Preview auto-login", type: :request do
     # (spec/services/preview_seed_spec.rb), so auto-login must decline on it.
     it "declines for a real account that happens to sit at the configured address" do
       User.create!(email: PreviewSeed::DEFAULT_EMAIL, name: "Real Person",
-                   provider: "anthropic", api_key: "sk-ant-a-real-key")
+                   provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
 
       controller.send(:preview_auto_login)
 

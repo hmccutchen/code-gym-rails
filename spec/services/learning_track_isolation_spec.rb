@@ -5,7 +5,7 @@ RSpec.describe "Learning track isolation" do
 
   def twin(email, learning_track, cutoffs: {})
     User.create!(
-      email: email, name: "Twin", time_zone: "UTC", api_key: "fake-test-key", provider: "fake",
+      email: email, name: "Twin", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-test-key" },
       language: "ruby_rails", learning_track: learning_track, track_evidence_cutoffs: cutoffs,
       section_kind_levels: LearningTrack.preset_levels
     )

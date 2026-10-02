@@ -121,6 +121,10 @@ class DailyResponse < ApplicationRecord
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
+  # A review written before the provider was recorded is labelled with the
+  # user's current provider, which was the only one it could have been.
+  def review_provider_label = AiProvider.label(review_provider.presence || user.provider)
+
   # A review is claimed and still plausibly running — mirrors
   # DailyExercise#regenerating?. Anything that would destroy this row has to
   # ask: #review's provider call runs outside a transaction, so a destroy
