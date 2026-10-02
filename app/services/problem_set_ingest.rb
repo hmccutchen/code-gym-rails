@@ -1,8 +1,8 @@
 # Turns a parsed provider problem set into one that is safe to persist:
 # concepts held to their closed vocabulary, scaffolds and diagrams bounded,
-# parsons blocks scrambled for display, and each resolved section held to its
-# kind's own check and arranged by it (ExerciseSection.reject_unusable!,
-# .arrange!). This is the generation
+# each resolved section held to its kind's own check
+# (ExerciseSection.reject_unusable!), and every section arranged by its kind
+# (.arrange!). This is the generation
 # boundary — the one place provider output is checked before anything
 # downstream is allowed to assume it is clean.
 #
@@ -194,7 +194,6 @@ class ProblemSetIngest
     normalize_concepts!
     normalize_answer_scaffolds!
     normalize_diagrams!
-    shuffle_parsons_blocks!
     arrange_sections!
     strip_current_schemas!
     strip_server_stamps!
@@ -446,25 +445,15 @@ class ProblemSetIngest
     end
   end
 
-  # Runs on resolved sections only, after reject_unusable_sections! has
-  # accepted them, for the same reason that step does.
+  # Every section present, not only the resolved ones: a judge drop deletes
+  # the winning key, and a lower-precedence alternate in that slot then
+  # resolves and renders, so it must already be arranged. That is safe
+  # because a fixed kind is alone in its slot, so a present one is resolved
+  # and has passed reject_unusable_sections!; an alternate's hook guards its
+  # own shape.
   def arrange_sections!
-    ExerciseSection.resolved_keys(@problem_set).each do |key|
-      ExerciseSection.for(key).arrange!(@problem_set[key])
+    ExerciseSection.all.each do |kind|
+      kind.arrange!(@problem_set[kind.key]) if ExerciseSection.present?(@problem_set, kind.key)
     end
-  end
-
-  # The provider returns "blocks" already in correct order, so the scramble is
-  # rolled once here and persisted — refreshes and the history view then show
-  # the same arrangement. Never the identity permutation, which would ship an
-  # already-solved problem.
-  def shuffle_parsons_blocks!
-    parsons = @problem_set["parsons_problem"]
-    return unless parsons.is_a?(Hash) && parsons["blocks"].is_a?(Array)
-
-    identity = (0...parsons["blocks"].size).to_a
-    order    = identity.shuffle
-    order    = identity.shuffle while order == identity && identity.size > 1
-    parsons["display_order"] = order
   end
 end

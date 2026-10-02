@@ -207,9 +207,11 @@ class ExerciseSection
       []
     end
 
-    # What the server decides about one resolved section's presentation that
-    # the provider must not, applied after .reject_unusable! accepts it. Most
-    # kinds have nothing to arrange.
+    # What the server decides about one section's presentation that the
+    # provider must not. Ingest calls it on every section present, so a kind
+    # that is not fixed must guard its own shape, since an unresolved
+    # alternate never reaches .reject_unusable!. Most kinds have nothing to
+    # arrange.
     def arrange!(section)
     end
 
