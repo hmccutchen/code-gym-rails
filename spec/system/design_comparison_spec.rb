@@ -58,4 +58,29 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
       end
     end
   end
+
+  # HTML drops a newline straight after a <textarea> tag, so a reason saved
+  # with no pick would lose its separator on reload, and the next autosave of
+  # any other section would store the reason as the pick line.
+  it "keeps a reason saved without a pick through a reload and another section's autosave" do
+    travel_to(a_weekday) do
+      user = create_fake_provider_user
+      perform_enqueued_jobs { GenerateDailyExercisesJob.perform_now(user_id: user.id) }
+      exercise = DailyExercise.find_by!(user: user, date: Date.current)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                            answers: { "design_comparison" => "\n#{reason}" })
+      visit_as(user)
+
+      expect(hidden_answer.value).to eq("\n#{reason}")
+      within(comparison) { expect(find_field("What decides it?").value).to eq(reason) }
+
+      find("textarea[data-field='code_review']").fill_in(with: "An answer to the code review that is long enough.")
+      Timeout.timeout(10) do
+        sleep 0.05 until user.daily_responses.reload.sole.answers["code_review"].present?
+      end
+
+      expect(ExerciseSection::DesignComparison.parse_answer(user.daily_responses.sole.answers["design_comparison"]))
+        .to eq([ nil, reason ])
+    end
+  end
 end

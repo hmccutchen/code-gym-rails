@@ -35,8 +35,11 @@
     <label class="comparison-reason-label" for="comparison-reason-<%= key %>"><%= t("sections.design_comparison.reason_label") %></label>
     <textarea id="comparison-reason-<%= key %>" class="<%= kind.answer_class %>" data-comparison-reason
               placeholder="<%= t("sections.#{key}.placeholder") %>"><%= reason %></textarea>
+    <%# The leading newline is the one HTML drops after the tag, as Rails'
+        text_area emits it: without it a stored "\n" + reason, a reason with no
+        pick, would lose its separator. %>
     <textarea name="response[answers][<%= key %>]" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>"
-              data-min-reason="<%= ExerciseSection::DesignComparison::MIN_REASON_LENGTH %>" hidden><%= response.answers[key] %></textarea>
+              data-min-reason="<%= ExerciseSection::DesignComparison::MIN_REASON_LENGTH %>" hidden><%= "\n" %><%= response.answers[key] %></textarea>
   </div>
 <% end %>
 <% unless submitted || @design_comparison_script_emitted %>
