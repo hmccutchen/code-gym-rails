@@ -171,9 +171,6 @@ en:
         one: "You've already asked for an alternate explanation here."
         other: "You've already asked for %{count} alternate explanations here."
       question_blank: "Ask a question first."
-      follow_ups_used:
-        one: "You've used your one follow-up for this section."
-        other: "You've used all %{count} follow-ups for this section."
       duck_after_submit: "The thinking partner is only available before you submit."
       message_blank: "Say something first."
       message_too_long: "That message is too long — keep it under %{max} characters."
@@ -481,6 +478,8 @@ en:
       titled_label: "%{slot} — %{name}: %{title}"
     answered:
       skipped: "(skipped)"
+    section_status:
+      in_progress: "in progress"
     submission:
       submitted: "✓ Submitted"
       email_button: "Email me this review"

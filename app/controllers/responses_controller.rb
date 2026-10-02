@@ -214,7 +214,7 @@ class ResponsesController < ApplicationController
 
     asked = @response.review_follow_ups.where(section: @section, role: :user).count
     if asked >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
-      return render_section_error(t("errors.responses.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
+      return render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
     end
 
     thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
@@ -244,7 +244,7 @@ class ResponsesController < ApplicationController
     end
 
     if capped
-      render_section_error(t("errors.responses.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
+      render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
     else
       render json: { status: "ok", answer: answer, remaining: remaining }
     end
