@@ -14,7 +14,7 @@ class AccountsController < ApplicationController
   def destroy
     current_user.anonymize!
     reset_session
-    redirect_to login_path, notice: "Your account has been deleted."
+    redirect_to login_path, notice: t("flash.accounts.deleted")
   end
 
   # PATCH /account/toggle_generation
@@ -27,9 +27,9 @@ class AccountsController < ApplicationController
     if resume_requested?
       resumed = current_user.resume_generation!
       notice = if resumed
-        "Automatic daily generation resumed. The set you had waiting is on your dashboard."
+        t("flash.accounts.generation_resumed_with_held_set")
       else
-        "Automatic daily generation resumed."
+        t("flash.accounts.generation_resumed")
       end
       redirect_to account_path, notice: notice
     else
@@ -40,7 +40,7 @@ class AccountsController < ApplicationController
       # good, still breaking the streak, with no way back. Pausing twice means
       # the pause that is already running, not a new one.
       current_user.update!(paused_generation_at: Time.current) unless current_user.paused_generation_at?
-      redirect_to account_path, notice: "Automatic daily generation paused."
+      redirect_to account_path, notice: t("flash.accounts.generation_paused")
     end
   end
 

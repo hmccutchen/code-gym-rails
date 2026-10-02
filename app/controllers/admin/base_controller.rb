@@ -9,7 +9,7 @@ module Admin
     def require_admin!
       return if admin?
 
-      redirect_to root_path, alert: "Not authorized."
+      redirect_to root_path, alert: t("flash.admin.not_authorized")
     end
 
     def admin?

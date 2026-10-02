@@ -1,4 +1,4 @@
-<% page_title "Account" %>
+<% page_title t("accounts.show.title") %>
 <style>
   .account-wrap { max-width: 480px; margin: 5rem auto; }
   .account-wrap h1 { margin-bottom: .5rem; }
@@ -21,24 +21,24 @@
 </style>
 
 <div class="account-wrap">
-  <h1>Account</h1>
+  <h1><%= t("accounts.show.title") %></h1>
   <p class="account-id">
     <span class="email"><%= current_user.email %></span>
     <%= current_user.provider_label %> · <%= t("languages.#{current_user.language}") %>
   </p>
 
   <div class="account-actions">
-    <%= button_to "Log out", logout_path, method: :delete, class: "btn btn-ghost" %>
-    <%= link_to "Settings", setup_path %>
+    <%= button_to t("accounts.show.log_out"), logout_path, method: :delete, class: "btn btn-ghost" %>
+    <%= link_to t("accounts.show.settings"), setup_path %>
   </div>
 
   <div class="generation-toggle">
     <% if current_user.paused_generation_at? %>
-      <p>Automatic generation is paused (since <%= current_user.paused_generation_at.to_date.strftime("%B %-d") %>).</p>
-      <%= button_to "Resume automatic generation", toggle_generation_account_path, method: :patch, params: { paused: "0" }, class: "btn btn-ghost" %>
+      <p><%= t("accounts.show.paused", date: current_user.paused_generation_at.to_date.strftime("%B %-d")) %></p>
+      <%= button_to t("accounts.show.resume"), toggle_generation_account_path, method: :patch, params: { paused: "0" }, class: "btn btn-ghost" %>
     <% else %>
-      <p>Automatic generation is active.</p>
-      <%= button_to "Pause automatic generation", toggle_generation_account_path, method: :patch, params: { paused: "1" }, class: "btn btn-ghost" %>
+      <p><%= t("accounts.show.active") %></p>
+      <%= button_to t("accounts.show.pause"), toggle_generation_account_path, method: :patch, params: { paused: "1" }, class: "btn btn-ghost" %>
     <% end %>
   </div>
 
@@ -47,9 +47,9 @@
   <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
 
   <div class="danger-zone">
-    <h2>Danger zone</h2>
-    <p>Deleting your account permanently removes your name, email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone.</p>
-    <%= button_to "Delete my account", account_path, method: :delete,
+    <h2><%= t("accounts.show.danger_heading") %></h2>
+    <p><%= t("accounts.show.danger_body") %></p>
+    <%= button_to t("accounts.show.delete"), account_path, method: :delete,
           class: "btn btn-danger", form: { id: "delete-account-form" } %>
   </div>
 </div>
@@ -63,7 +63,7 @@
     const form = document.getElementById("delete-account-form");
     if (!form) return;
     form.addEventListener("submit", (event) => {
-      if (!confirm("Delete your account? This permanently removes your name and email and logs you out. It cannot be undone.")) {
+      if (!confirm(<%= t("accounts.show.delete_confirm").to_json.html_safe %>)) {
         event.preventDefault();
       }
     });

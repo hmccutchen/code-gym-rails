@@ -22,7 +22,7 @@
         <% points = DailyResponse.review_points(fb[key]) %>
         <% if points.any? %>
           <div class="review-item">
-            <strong><%= field[:label] %>:</strong>
+            <strong><%= DailyResponse.ai_review_label(key) %>:</strong>
             <ul class="review-points">
               <% points.each do |point| %><li><%= point %></li><% end %>
             </ul>
@@ -31,7 +31,7 @@
       <% else %>
         <% text = DailyResponse.review_points(fb[key]).join(" ") %>
         <% if text.present? %>
-          <p class="review-item"><strong><%= field[:label] %>:</strong> <%= text %></p>
+          <p class="review-item"><strong><%= DailyResponse.ai_review_label(key) %>:</strong> <%= text %></p>
         <% end %>
       <% end %>
     <% end %>
@@ -52,7 +52,7 @@
       <% if Array(response.review_alternates[section]).size < DailyResponse::MAX_ALTERNATES_PER_SECTION %>
         <button type="button" class="btn btn-ghost btn-sm explain-differently"
                 data-url="<%= explain_differently_response_path(response) %>"
-                data-section="<%= section %>">Explain this differently</button>
+                data-section="<%= section %>"><%= t("review.explain_differently") %></button>
       <% end %>
       <span class="alternate-status" aria-live="polite"></span>
     </div>
@@ -66,13 +66,13 @@
       </div>
       <% if asked < DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %>
         <div class="follow-up-form">
-          <label class="visually-hidden" for="follow-up-input-<%= response.id %>-<%= section %>">Ask a follow-up about this feedback</label>
-          <input type="text" class="follow-up-input" id="follow-up-input-<%= response.id %>-<%= section %>" placeholder="Ask a follow-up about this feedback…"
+          <label class="visually-hidden" for="follow-up-input-<%= response.id %>-<%= section %>"><%= t("review.follow_up_label") %></label>
+          <input type="text" class="follow-up-input" id="follow-up-input-<%= response.id %>-<%= section %>" placeholder="<%= t("review.follow_up_placeholder") %>"
                  data-url="<%= follow_ups_response_path(response) %>" data-section="<%= section %>">
-          <button type="button" class="btn btn-ghost btn-sm follow-up-send">Ask</button>
+          <button type="button" class="btn btn-ghost btn-sm follow-up-send"><%= t("review.follow_up_send") %></button>
         </div>
       <% else %>
-        <p class="follow-up-capped">You've used all <%= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.</p>
+        <p class="follow-up-capped"><%= t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION) %></p>
       <% end %>
       <span class="follow-up-status" aria-live="polite"></span>
     </div>
@@ -106,7 +106,7 @@
 
     button.addEventListener("click", async () => {
       button.disabled = true;
-      status.textContent = "Thinking…";
+      status.textContent = <%= t("review.thinking").to_json.html_safe %>;
       try {
         const res = await fetch(button.dataset.url, {
           method: "POST",
@@ -126,11 +126,11 @@
         // Set, never cleared: the explanation lands outside this live region,
         // the same pattern the concept reference's alternates use.
         status.textContent = data.remaining > 0
-          ? "A different explanation was added above."
-          : "A different explanation was added above — that was the last one.";
+          ? <%= t("review.alternate_added").to_json.html_safe %>
+          : <%= t("review.alternate_added_last").to_json.html_safe %>;
         if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
       } catch (e) {
-        status.textContent = e.message || "Couldn't generate that — try again";
+        status.textContent = e.message || <%= t("review.alternate_failed").to_json.html_safe %>;
         button.disabled = false;
       }
     });
@@ -155,7 +155,7 @@
       if (!question) return;
       button.disabled = true;
       input.disabled = true;
-      status.textContent = "Thinking…";
+      status.textContent = <%= t("review.thinking").to_json.html_safe %>;
       try {
         const res = await fetch(input.dataset.url, {
           method: "POST",
@@ -179,11 +179,11 @@
           container.querySelector(".follow-up-form").remove();
           const capped = document.createElement("p");
           capped.className = "follow-up-capped";
-          capped.textContent = "You've used all <%= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION %> follow-ups for this section.";
+          capped.textContent = <%= t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION).to_json.html_safe %>;
           container.insertBefore(capped, status);
         }
       } catch (e) {
-        status.textContent = e.message || "Couldn't send that — try again";
+        status.textContent = e.message || <%= t("review.follow_up_failed").to_json.html_safe %>;
         button.disabled = false;
         input.disabled = false;
       }

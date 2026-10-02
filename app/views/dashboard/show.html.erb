@@ -1,4 +1,4 @@
-<% page_title "Today's Workout" %>
+<% page_title t("dashboard.show.title") %>
 <style>
   .page-header { margin-bottom: 2rem; }
   .page-header h1 { font-size: 1.5rem; }
@@ -33,11 +33,11 @@
 </style>
 
 <div class="page-header">
-  <h1>Today's Workout</h1>
+  <h1><%= t("dashboard.show.title") %></h1>
   <div class="date">
     <%= Date.current.strftime("%A, %B %-d") %>
     <% if (streak = current_user.current_streak).positive? %>
-      <span class="streak">🔥 <%= streak %>-day streak</span>
+      <span class="streak"><%= t("dashboard.show.streak", days: streak) %></span>
     <% end %>
   </div>
 </div>

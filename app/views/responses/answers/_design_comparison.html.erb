@@ -10,7 +10,7 @@
 <% if submitted %>
   <% pick, reason = kind.parse_answer(response.answer_for(key)) %>
   <div class="answer-display"><% if pick %><strong><%= t("sections.design_comparison.picked", piece: pick.upcase) %></strong>
-<%= reason %><% else %>(skipped)<% end %></div>
+<%= reason %><% else %><%= t("responses.answered.skipped") %><% end %></div>
   <% answer_key = data["answer_key"] %>
   <% if response.section_reviewed?(key) && answer_key.is_a?(Hash) %>
     <div class="comparison-key">

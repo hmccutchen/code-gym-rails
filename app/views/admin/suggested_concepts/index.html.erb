@@ -1,4 +1,4 @@
-<% page_title "Suggested concepts" %>
+<% page_title t("admin.suggested_concepts.index.title") %>
 <style>
   .suggested-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
   .suggested-table th, .suggested-table td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border); font-size: .9rem; }
@@ -9,23 +9,23 @@
 </style>
 
 <div class="page-header">
-  <h1>Suggested Concepts</h1>
+  <h1><%= t("admin.suggested_concepts.index.heading") %></h1>
 </div>
 
 <div class="section">
   <% if @suggested_concepts.empty? %>
-    <p style="color: var(--muted);">No pending suggestions.</p>
+    <p style="color: var(--muted);"><%= t("admin.suggested_concepts.index.empty") %></p>
   <% else %>
     <table class="suggested-table">
       <thead>
         <tr>
-          <th>Concept</th>
-          <th>Language</th>
-          <th>Occurrences</th>
-          <th>First seen</th>
-          <th>Last seen</th>
-          <th>Reference?</th>
-          <th>Actions</th>
+          <th><%= t("admin.suggested_concepts.index.columns.concept") %></th>
+          <th><%= t("admin.suggested_concepts.index.columns.language") %></th>
+          <th><%= t("admin.suggested_concepts.index.columns.occurrences") %></th>
+          <th><%= t("admin.suggested_concepts.index.columns.first_seen") %></th>
+          <th><%= t("admin.suggested_concepts.index.columns.last_seen") %></th>
+          <th><%= t("admin.suggested_concepts.index.columns.reference") %></th>
+          <th><%= t("admin.suggested_concepts.index.columns.actions") %></th>
         </tr>
       </thead>
       <tbody>
@@ -38,14 +38,14 @@
             <td><%= concept.last_seen_at.strftime("%b %-d") %></td>
             <td>
               <% if @referenced_keys.include?([ concept.language, concept.normalized_name ]) %>
-                <span class="has-reference">Yes</span>
+                <span class="has-reference"><%= t("admin.suggested_concepts.index.has_reference") %></span>
               <% else %>
-                <span class="no-reference">No</span>
+                <span class="no-reference"><%= t("admin.suggested_concepts.index.no_reference") %></span>
               <% end %>
             </td>
             <td class="actions">
-              <%= button_to "Promote", promote_admin_suggested_concept_path(concept), method: :patch, class: "btn btn-ghost btn-sm" %>
-              <%= button_to "Dismiss", dismiss_admin_suggested_concept_path(concept), method: :patch, class: "btn btn-ghost btn-sm" %>
+              <%= button_to t("admin.suggested_concepts.index.promote"), promote_admin_suggested_concept_path(concept), method: :patch, class: "btn btn-ghost btn-sm" %>
+              <%= button_to t("admin.suggested_concepts.index.dismiss"), dismiss_admin_suggested_concept_path(concept), method: :patch, class: "btn btn-ghost btn-sm" %>
             </td>
           </tr>
         <% end %>

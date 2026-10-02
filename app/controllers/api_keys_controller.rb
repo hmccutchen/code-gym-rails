@@ -16,7 +16,7 @@ class ApiKeysController < ApplicationController
     provider = AiProvider.detect(key)
 
     unless provider
-      flash.now[:alert] = "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
+      flash.now[:alert] = t("flash.api_keys.unrecognized_key")
       render :edit, status: :unprocessable_content
       return
     end
@@ -25,7 +25,7 @@ class ApiKeysController < ApplicationController
     attrs[:language] = params[:language] if User::LANGUAGES.include?(params[:language])
 
     current_user.update!(attrs)
-    redirect_to root_path, notice: "API key saved. You're all set!"
+    redirect_to root_path, notice: t("flash.api_keys.key_saved")
   end
 
   private
@@ -35,17 +35,17 @@ class ApiKeysController < ApplicationController
   # the language dropdown -- not that they're clearing their key.
   def language_only_update
     unless current_user.api_key_present?
-      flash.now[:alert] = "Add your API key to get started."
+      flash.now[:alert] = t("flash.application.api_key_needed")
       render :edit, status: :unprocessable_content
       return
     end
 
     unless User::LANGUAGES.include?(params[:language])
-      redirect_to root_path, notice: "No changes made."
+      redirect_to root_path, notice: t("flash.api_keys.no_changes")
       return
     end
 
     current_user.update!(language: params[:language])
-    redirect_to root_path, notice: "Preferences saved!"
+    redirect_to root_path, notice: t("flash.api_keys.preferences_saved")
   end
 end

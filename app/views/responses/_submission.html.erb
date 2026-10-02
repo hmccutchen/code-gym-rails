@@ -6,9 +6,9 @@
     attempt didn't complete: a failure, or a day left part-reviewed.
     Local: response. %>
 <div class="submit-row">
-  <span class="submitted-badge">✓ Submitted</span>
+  <span class="submitted-badge"><%= t("responses.submission.submitted") %></span>
   <% response.section_ratings.each do |section, value| %>
-    <span class="history-pill"><%= section.humanize %>: <%= DailyResponse::SELF_RATING_LABELS[value] %></span>
+    <span class="history-pill"><%= section.humanize %>: <%= DailyResponse.self_rating_labels[value] %></span>
   <% end %>
   <% unless response.fully_reviewed? %>
     <%= button_to response.reviewed? ? t("review.finish_button") : t("review.get_button", provider: response.user.provider_label),
@@ -22,7 +22,7 @@
   <div class="review-section" id="ai-review">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <h2 style="font-size:1rem"><%= t("review.heading", provider: response.user.provider_label) %></h2>
-      <%= button_to "Email me this review", email_review_response_path(response), method: :post, class: "btn btn-ghost btn-sm" %>
+      <%= button_to t("responses.submission.email_button"), email_review_response_path(response), method: :post, class: "btn btn-ghost btn-sm" %>
     </div>
     <%= render "shared/ai_review", response: response %>
   </div>

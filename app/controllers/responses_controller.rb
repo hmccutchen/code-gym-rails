@@ -67,13 +67,13 @@ class ResponsesController < ApplicationController
   # The exits that have a review to show anchor it (see review_anchor); the
   # ones that don't land at the top of that same page.
   def review
-    return redirect_to root_path, alert: "Submit your answers first." unless @response.submitted?
+    return redirect_to root_path, alert: t("flash.responses.not_submitted") unless @response.submitted?
 
     missing = @response.section_keys - Array(@response.ai_review&.keys)
-    return redirect_to review_anchor, notice: "Already reviewed." if missing.empty?
+    return redirect_to review_anchor, notice: t("flash.responses.already_reviewed") if missing.empty?
 
     unless claim_review!
-      return redirect_to root_path, alert: "A review is already being generated for this — check back in a moment."
+      return redirect_to root_path, alert: t("flash.responses.review_already_running")
     end
 
     # Recompute after reload to close the race: another request may have
@@ -81,7 +81,7 @@ class ResponsesController < ApplicationController
     missing = @response.section_keys - Array(@response.ai_review&.keys)
     if missing.empty?
       release_review_claim!
-      return redirect_to review_anchor, notice: "Already reviewed."
+      return redirect_to review_anchor, notice: t("flash.responses.already_reviewed")
     end
 
     first_batch = @response.ai_review.blank?
@@ -112,23 +112,23 @@ class ResponsesController < ApplicationController
     log_review_diagnostics(@response, successes.keys) if successes.any?
 
     if failures.empty?
-      redirect_to review_anchor, notice: "Review ready!"
+      redirect_to review_anchor, notice: t("flash.responses.review_ready")
     elsif successes.any?
-      redirect_to review_anchor, notice: "#{successes.size} of #{missing.size} sections reviewed — #{failures.size} couldn't be reviewed, try again."
+      redirect_to review_anchor, notice: t("flash.responses.review_partial", reviewed: successes.size, total: missing.size, failed: failures.size)
     else
       redirect_to root_path, alert: zero_success_alert(failures)
     end
   rescue ActiveRecord::RecordNotFound
-    redirect_to root_path, alert: "This set was cleared while the review was running — nothing was saved."
+    redirect_to root_path, alert: t("flash.responses.set_cleared_during_review")
   rescue AiService::AuthenticationError
     release_review_claim!
-    redirect_to root_path, alert: "Your API key was rejected — check it in Settings."
+    redirect_to root_path, alert: t("flash.responses.api_key_rejected")
   rescue AiService::RateLimitError
     release_review_claim!
-    redirect_to root_path, alert: "The AI provider is rate-limiting requests — try again shortly."
+    redirect_to root_path, alert: t("flash.responses.rate_limited")
   rescue AiService::Error => e
     release_review_claim!
-    redirect_to root_path, alert: "Couldn't generate the review: #{e.message}"
+    redirect_to root_path, alert: t("flash.responses.review_failed", message: e.message)
   end
 
   # DELETE /responses/:id/start_over — abandon today's saved answers and
@@ -143,12 +143,12 @@ class ResponsesController < ApplicationController
   # outside a transaction, so destroying the row mid-flight lets its
   # ConceptMastery writes commit against a response that no longer exists.
   def start_over
-    return redirect_to root_path, alert: "This set has already been reviewed — nothing to start over." if @response.reviewed?
-    return redirect_to root_path, alert: "You can only start over on today's set." unless @response.date == Date.current
-    return redirect_to root_path, alert: "A review is being generated for this — try again in a moment." if @response.reviewing?
+    return redirect_to root_path, alert: t("flash.responses.start_over_after_review") if @response.reviewed?
+    return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
+    return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if @response.reviewing?
 
     @response.destroy
-    redirect_to root_path, notice: "Today's answers have been cleared — start fresh whenever you're ready."
+    redirect_to root_path, notice: t("flash.responses.answers_cleared")
   end
 
   # POST /responses/:id/email_review — email the completed review to the user.
@@ -156,10 +156,10 @@ class ResponsesController < ApplicationController
   # dashboard's submitted state (_submission.html.erb), not on history, so
   # that's the only page where the user can repeat or confirm the action.
   def email_review
-    return redirect_to root_path, alert: "No review to email yet." unless @response.fully_reviewed?
+    return redirect_to root_path, alert: t("flash.responses.no_review_to_email") unless @response.fully_reviewed?
 
     ReviewMailer.send_review(@response).deliver_later
-    redirect_to root_path, notice: "Review sent to #{current_user.email}."
+    redirect_to root_path, notice: t("flash.responses.review_emailed", email: current_user.email)
   end
 
   # POST /responses/:id/explain_differently — one section's feedback, reframed.
@@ -167,7 +167,7 @@ class ResponsesController < ApplicationController
   def explain_differently
     existing = Array(@response.review_alternates[@section])
     if existing.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
-      return render_section_error("You've already asked for #{DailyResponse::MAX_ALTERNATES_PER_SECTION} alternate explanations here.")
+      return render_section_error(t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION))
     end
 
     alternate = AiService.for(current_user).explain_differently(
@@ -196,7 +196,7 @@ class ResponsesController < ApplicationController
     end
 
     if capped
-      render_section_error("You've already asked for #{DailyResponse::MAX_ALTERNATES_PER_SECTION} alternate explanations here.")
+      render_section_error(t("errors.responses.alternates_used", count: DailyResponse::MAX_ALTERNATES_PER_SECTION))
     else
       render json: { status: "ok", alternate: alternate, remaining: remaining }
     end
@@ -210,11 +210,11 @@ class ResponsesController < ApplicationController
   # leave an orphaned question with no answer in the thread.
   def follow_ups
     question = params[:question].to_s.strip
-    return render_section_error("Ask a question first.") if question.blank?
+    return render_section_error(t("errors.responses.question_blank")) if question.blank?
 
     asked = @response.review_follow_ups.where(section: @section, role: :user).count
     if asked >= DailyResponse::MAX_FOLLOW_UPS_PER_SECTION
-      return render_section_error("You've used all #{DailyResponse::MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+      return render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
     end
 
     thread = @response.review_follow_ups.for_section(@section).map { |t| { role: t.role, content: t.content } }
@@ -244,7 +244,7 @@ class ResponsesController < ApplicationController
     end
 
     if capped
-      render_section_error("You've used all #{DailyResponse::MAX_FOLLOW_UPS_PER_SECTION} follow-ups for this section.")
+      render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
     else
       render json: { status: "ok", answer: answer, remaining: remaining }
     end
@@ -263,37 +263,37 @@ class ResponsesController < ApplicationController
     # A JSON body, not head :not_found — the client's fetch handler always
     # calls res.json() before checking res.ok, so an empty body would raise
     # a confusing "Unexpected end of JSON input" instead of a clean message.
-    return render json: { status: "error", error: "No exercise set for today." }, status: :not_found unless exercise
+    return render json: { status: "error", error: t("errors.no_exercise_today") }, status: :not_found unless exercise
 
     section = params[:section].to_s
     # #active_section_keys, not the raw payload keys: a payload can hold a
     # third- or fourth-shaped key the page never rendered, and a section the
     # engineer cannot see is not one they can think out loud about.
-    return render_section_error("That section isn't part of this exercise.") unless exercise.active_section_keys.include?(section)
+    return render_section_error(t("errors.section_not_in_exercise")) unless exercise.active_section_keys.include?(section)
 
     existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
-    return render_section_error("The thinking partner is only available before you submit.") if existing&.submitted?
+    return render_section_error(t("errors.responses.duck_after_submit")) if existing&.submitted?
 
     message = params[:message].to_s.strip
-    return render_section_error("Say something first.") if message.blank?
+    return render_section_error(t("errors.responses.message_blank")) if message.blank?
     if message.length > MAX_DUCK_MESSAGE_LENGTH
-      return render_section_error("That message is too long — keep it under #{MAX_DUCK_MESSAGE_LENGTH} characters.")
+      return render_section_error(t("errors.responses.message_too_long", max: MAX_DUCK_MESSAGE_LENGTH))
     end
 
     thread = duck_thread_param
     if thread.size > MAX_DUCK_THREAD_ENTRIES ||
        thread.sum { |turn| turn[:content].bytesize } > MAX_DUCK_THREAD_BYTES
-      return render_section_error("This conversation is too long to continue — clear it to keep going.")
+      return render_section_error(t("errors.responses.conversation_too_long"))
     end
     unless well_formed_thread?(thread)
-      return render_section_error("This conversation is out of step — clear it to keep going.")
+      return render_section_error(t("errors.responses.conversation_out_of_step"))
     end
     # Soft, request-level cap: the thread lives only in the browser, so this
     # is not a hardened boundary (a hand-crafted request could understate its
     # own history) — acceptable given each user pays for their own provider
     # calls with their own key. See the design doc's "Cap on exchanges".
     if thread.count { |turn| turn[:role] == "user" } >= MAX_DUCK_TURNS_PER_SECTION
-      return render_section_error("You've used all #{MAX_DUCK_TURNS_PER_SECTION} messages for this section — clear the conversation to keep going.")
+      return render_section_error(t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION))
     end
 
     answer = AiService.for(current_user).duck_response(
@@ -363,7 +363,7 @@ class ResponsesController < ApplicationController
         if saved
           redirect_to root_path
         else
-          redirect_to root_path, alert: "Couldn't save your answers."
+          redirect_to root_path, alert: t("flash.responses.save_failed")
         end
       end
     end
@@ -424,12 +424,12 @@ class ResponsesController < ApplicationController
   def load_pseudocode_context
     exercise = current_user.daily_exercises.for_date.first
     unless exercise
-      render json: { status: "error", error: "No exercise set for today." }, status: :not_found
+      render json: { status: "error", error: t("errors.no_exercise_today") }, status: :not_found
       return
     end
 
     section = ExerciseSection::PseudocodeToCode.key
-    return pseudocode_error("Today's set has no pseudocode section.") unless exercise.active_section_keys.include?(section)
+    return pseudocode_error(t("errors.responses.pseudocode.no_section")) unless exercise.active_section_keys.include?(section)
 
     pseudocode = validated_pseudocode or return
     row        = open_response_for(exercise) or return
@@ -439,9 +439,9 @@ class ResponsesController < ApplicationController
 
   def validated_pseudocode
     value = params[:pseudocode].to_s.strip
-    return pseudocode_error("Write your pseudocode first.") if value.blank?
+    return pseudocode_error(t("errors.responses.pseudocode.blank")) if value.blank?
     if value.length > ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
-      return pseudocode_error("That's too long — keep it under #{ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH} characters.")
+      return pseudocode_error(t("errors.responses.pseudocode.too_long", max: ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH))
     end
 
     value
@@ -452,7 +452,7 @@ class ResponsesController < ApplicationController
   # request never creates one.
   def open_response_for(exercise)
     row = persisted_response_for(exercise)
-    return pseudocode_error("The rounds are only available before you submit.") if row.submitted?
+    return pseudocode_error(t("errors.responses.pseudocode.after_submit")) if row.submitted?
 
     row
   end
@@ -505,7 +505,7 @@ class ResponsesController < ApplicationController
   end
 
   def critique_busy_message(row, section)
-    row.critiqued?(section) ? "You've already had this plan checked." : "A check of this plan is already running."
+    t(row.critiqued?(section) ? "errors.responses.pseudocode.already_checked" : "errors.responses.pseudocode.check_running")
   end
 
   # render_section_error returns the rendered response, which is truthy; the
@@ -536,8 +536,8 @@ class ResponsesController < ApplicationController
   # it a crafted param writes arbitrary keys into the jsonb columns.
   def require_reviewed_section!
     @section = params[:section].to_s
-    return render_section_error("That section isn't part of this exercise.") unless @response.daily_exercise.problem_set.key?(@section)
-    render_section_error("No review to attach that to yet.") unless @response.section_reviewed?(@section)
+    return render_section_error(t("errors.section_not_in_exercise")) unless @response.daily_exercise.problem_set.key?(@section)
+    render_section_error(t("errors.responses.no_review_yet")) unless @response.section_reviewed?(@section)
   end
 
   def render_section_error(message)
@@ -635,11 +635,11 @@ class ResponsesController < ApplicationController
     codes = failures.values.map { |f| f[:error_code] }.uniq
     case codes
     in [ "authentication" ]
-      "Your API key was rejected — check it in Settings."
+      t("flash.responses.api_key_rejected")
     in [ "rate_limit" ]
-      "The AI provider is rate-limiting requests — try again shortly."
+      t("flash.responses.rate_limited")
     else
-      "Couldn't generate the review: #{failures.values.first[:message]}"
+      t("flash.responses.review_failed", message: failures.values.first[:message])
     end
   end
 

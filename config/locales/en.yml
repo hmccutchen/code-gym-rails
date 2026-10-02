@@ -116,7 +116,85 @@ en:
         anywhere else. It expires in %{expiry}. If you
         didn't request this, you can ignore it.
       sign_off: "— Code Gym"
+  flash:
+    application:
+      session_expired: "Your session expired — please try again."
+      login_required: "Please log in first."
+      api_key_needed: "Add your API key to get started."
+    admin:
+      not_authorized: "Not authorized."
+      suggested_concepts:
+        reference_missing: "Add a ConceptReference for this concept first."
+        promoted: "Marked %{name} as promoted."
+        dismissed: "Dismissed %{name}."
+    accounts:
+      deleted: "Your account has been deleted."
+      generation_resumed_with_held_set: "Automatic daily generation resumed. The set you had waiting is on your dashboard."
+      generation_resumed: "Automatic daily generation resumed."
+      generation_paused: "Automatic daily generation paused."
+    api_keys:
+      unrecognized_key: "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
+      key_saved: "API key saved. You're all set!"
+      no_changes: "No changes made."
+      preferences_saved: "Preferences saved!"
+    daily_exercises:
+      nothing_to_regenerate: "No exercise set to regenerate yet."
+      already_reviewed: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
+      review_in_progress: "A review is being generated for today's set — try again in a moment."
+      already_regenerated: "You've already generated a new set today."
+      regeneration_not_started: "Couldn't start regeneration. Please try again."
+    push_subscriptions:
+      settings_saved: "Reminder settings saved."
+      turned_off: "Daily reminders turned off."
+    responses:
+      not_submitted: "Submit your answers first."
+      already_reviewed: "Already reviewed."
+      review_already_running: "A review is already being generated for this — check back in a moment."
+      review_ready: "Review ready!"
+      review_partial: "%{reviewed} of %{total} sections reviewed — %{failed} couldn't be reviewed, try again."
+      set_cleared_during_review: "This set was cleared while the review was running — nothing was saved."
+      api_key_rejected: "Your API key was rejected — check it in Settings."
+      rate_limited: "The AI provider is rate-limiting requests — try again shortly."
+      review_failed: "Couldn't generate the review: %{message}"
+      start_over_after_review: "This set has already been reviewed — nothing to start over."
+      start_over_not_today: "You can only start over on today's set."
+      start_over_while_reviewing: "A review is being generated for this — try again in a moment."
+      answers_cleared: "Today's answers have been cleared — start fresh whenever you're ready."
+      no_review_to_email: "No review to email yet."
+      review_emailed: "Review sent to %{email}."
+      save_failed: "Couldn't save your answers."
+  errors:
+    no_exercise_today: "No exercise set for today."
+    section_not_in_exercise: "That section isn't part of this exercise."
+    responses:
+      alternates_used:
+        one: "You've already asked for an alternate explanation here."
+        other: "You've already asked for %{count} alternate explanations here."
+      question_blank: "Ask a question first."
+      duck_after_submit: "The thinking partner is only available before you submit."
+      message_blank: "Say something first."
+      message_too_long: "That message is too long — keep it under %{max} characters."
+      conversation_too_long: "This conversation is too long to continue — clear it to keep going."
+      conversation_out_of_step: "This conversation is out of step — clear it to keep going."
+      no_review_yet: "No review to attach that to yet."
+      pseudocode:
+        no_section: "Today's set has no pseudocode section."
+        blank: "Write your pseudocode first."
+        too_long: "That's too long — keep it under %{max} characters."
+        after_submit: "The rounds are only available before you submit."
+        already_checked: "You've already had this plan checked."
+        check_running: "A check of this plan is already running."
+    concept_references:
+      framings_used:
+        one: "You've already asked for another framing of this concept."
+        other: "You've already asked for %{count} other framings of this concept."
+      too_much_explanation: "That's more explanation than this can carry — reload the page to start fresh."
+      reference_missing: "That reference no longer exists."
   hello: "Hello world"
+  self_ratings:
+    too_easy: "too easy"
+    right_level: "just right"
+    too_hard: "too hard"
   providers:
     anthropic: "Claude"
     gemini: "Gemini"
@@ -140,6 +218,46 @@ en:
         one: "Your next automatic set will have one section because several recent sections felt too hard."
         other: "Your next automatic set will have %{count} sections because several recent sections felt too hard."
     rating_group: "How hard was %{section} for you?"
+    generating_label: "Generating…"
+    generate_anyway: "Generate today's set anyway"
+    show:
+      title: "Today's Workout"
+      streak: "🔥 %{days}-day streak"
+    generating:
+      title: "Generating your personalized exercise set…"
+      hint: "This usually takes under a minute — this page will update automatically."
+      slow_hint: "This is taking longer than expected — try refreshing the page."
+    generation_failed:
+      title: "Couldn't generate today's exercises."
+      try_again: "Try again"
+    paused_empty:
+      message: "Automatic generation is paused, so today's set wasn't created. You can still generate one whenever you want it."
+      resume: "Resume automatic generation"
+    weekend_empty:
+      message: "No exercises are generated automatically on weekends — the morning job runs Monday–Friday."
+    teaching_hint:
+      summary: "Need a nudge? 💡"
+      locked: "Available after you attempt this section"
+    exercise:
+      regeneration_failed: "Couldn't generate a new set: %{error}"
+      reviewed: "Today's set has been reviewed, so it can't be replaced — tomorrow's set builds on it."
+      already_regenerated: "You've already generated a new set today."
+      regenerate: "Generate new set"
+      regenerate_confirm: "Generate a new set for today?"
+      regenerate_confirm_with_progress: "This will replace today's problems and erase your answers so far. This can't be undone. Continue?"
+      start_over: "Start over"
+      starting_over: "Starting over…"
+      start_over_confirm: "This will clear today's answers and ratings so you can start fresh. This can't be undone. Continue?"
+      answered_count: "%{answered} of %{total} answered"
+      all_answered: "✓ All answered"
+      submit: "Submit answers"
+      submitting: "Submitting…"
+      auto_saved: "Auto-saved as you type"
+      submit_nudges:
+        unanswered: "Answer at least one section to finish up."
+        unrated: "Rate each section you answered to finish up."
+      submit_failed: "Couldn't submit your answers — please try again."
+      review_start_failed: "Your answers were saved, but the review couldn't start. Reloading so you can try the review again."
   learn:
     title: "Learn"
     intro: "Every concept your sets can draw from — read up on one whenever you like."
@@ -325,12 +443,14 @@ en:
     pattern:
       name: "Pattern of the Month"
       placeholder: "Your answer…"
+      why_label: "Why it exists:"
     challenge:
       name: "Coding Challenge"
       placeholder: "# Your implementation…"
     architecture:
       name: "Architecture Decision"
       placeholder: "Your decision and why — weigh the tradeoffs…"
+      reference_summary: "Reference — %{title}: tradeoffs"
     security_review:
       name: "Security Review"
       placeholder: "What's exploitable here, and how would you mitigate it?"
@@ -352,19 +472,209 @@ en:
     no_gaps: "Your plan holds up — nothing worth flagging before you submit it."
     caption: "This is your plan implemented literally — gaps and all. It was not corrected."
     working: "Working…"
+  responses:
+    section:
+      label: "%{slot} — %{name}"
+      titled_label: "%{slot} — %{name}: %{title}"
+    answered:
+      skipped: "(skipped)"
+    section_status:
+      in_progress: "in progress"
+    submission:
+      submitted: "✓ Submitted"
+      email_button: "Email me this review"
+    parsons:
+      confirm_button: "Use this order"
+      key_hint: "Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks."
+      moved: "Block moved to position %{position} of %{total}."
+      recorded: "Order recorded."
+      move_up: "Move block up"
+      move_down: "Move block down"
   review:
     get_button: "Get %{provider} review"
+    fields:
+      correct: "What you got right"
+      missed: "What you missed"
+      better_questions: "Questions to ask yourself"
+      next_step: "Next step"
     finish_button: "Finish review"
     generating_label: "Generating review…"
     heading: "%{provider}'s Review"
     history_summary: "%{provider}'s review"
     calibration_note: "You rated this \"%{rating}\" — the review suggests there's more to work on here."
     difficulty_note: "This problem was rated %{level} difficulty, judged from the problem itself rather than from your answer."
+    explain_differently: "Explain this differently"
+    thinking: "Thinking…"
+    alternate_added: "A different explanation was added above."
+    alternate_added_last: "A different explanation was added above — that was the last one."
+    alternate_failed: "Couldn't generate that — try again"
+    follow_up_label: "Ask a follow-up about this feedback"
+    follow_up_placeholder: "Ask a follow-up about this feedback…"
+    follow_up_send: "Ask"
+    follow_up_failed: "Couldn't send that — try again"
+    follow_ups_used:
+      one: "You've used your one follow-up for this section."
+      other: "You've used all %{count} follow-ups for this section."
+  duck:
+    toggle: "🦆 Stuck? Talk it through"
+    prompt: "What are you stuck on?"
+    send: "Ask"
+    explain: "Explain this simply"
+    clear: "Clear"
+    speakers:
+      user: "You"
+      assistant: "Duck"
+    thinking: "Thinking…"
+    send_failed: "Couldn't send that — try again"
+    turns_used:
+      one: "You've used your one message for this section — clear the conversation to keep going."
+      other: "You've used all %{count} messages for this section — clear the conversation to keep going."
+  concept_reference:
+    summary: "Reference — %{concept}: how it works"
+    explain_differently: "This didn't quite land — try a different explanation"
+    thinking: "Thinking…"
+    alternate_added: "A different explanation was added above."
+    alternate_added_last: "A different explanation was added above — that was the last one."
+    alternate_failed: "Couldn't generate that — try again"
+    session_expired: "Your session expired — reload the page and try again."
+  diagram:
+    summary: "🗺️ Structure diagram"
+  push:
+    register_failed: "This device couldn't be registered for reminders — try again."
+  push_reminder:
+    ready:
+      title: "Today's %{app_name} is ready"
+      body:
+        one: "%{count} section waiting."
+        other: "%{count} sections waiting."
+    nudge:
+      titles:
+        untouched: "Today's set is still waiting"
+        partway: "You're partway through today's set"
+        unrated: "Today's set just needs its difficulty ratings"
+        unsubmitted: "Today's set is ready to submit"
+      body: "%{progress} · about %{hours}h left today."
+      progress:
+        untouched:
+          one: "%{count} section"
+          other: "%{count} sections"
+        partway:
+          one: "%{remaining} of %{count} section still to go"
+          other: "%{remaining} of %{count} sections still to go"
+        all_answered:
+          one: "All %{count} section answered"
+          other: "All %{count} sections answered"
+        optional_left:
+          one: "Submit your answers; the remaining %{count} section is optional"
+          other: "Submit your answers; the remaining %{count} sections are optional"
   nav:
     menu: "Menu"
     skip_to_content: "Skip to content"
+    history: "History"
+    account: "Account"
+  review_mailer:
+    send_review:
+      subject: "Your %{app_name} review — %{date}"
+      greeting: "Hi %{name},"
+      intro: "Here's your %{app_name} review from %{date}."
+      rating: "Rating: %{rating}"
+      sign_off: "— %{app_name}"
+  pwa:
+    description: "Daily personalized coding exercises."
   profile:
     name:
       saved: "Saved ✓"
       error: "Couldn't save"
       aria_label: "Your display name"
+  accounts:
+    show:
+      title: "Account"
+      log_out: "Log out"
+      settings: "Settings"
+      paused: "Automatic generation is paused (since %{date})."
+      resume: "Resume automatic generation"
+      active: "Automatic generation is active."
+      pause: "Pause automatic generation"
+      danger_heading: "Danger zone"
+      danger_body: "Deleting your account permanently removes your name, email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone."
+      delete: "Delete my account"
+      delete_confirm: "Delete your account? This permanently removes your name and email and logs you out. It cannot be undone."
+    push_reminders:
+      enabled: "Daily reminders are on. You'll get a notification when each weekday's set is ready."
+      nudges_label: "Also remind me during the day if today's set isn't finished (hourly, %{window})"
+      save: "Save"
+      turn_off: "Turn off daily reminders"
+      offer: "Get a notification on this device when each weekday's set is ready."
+      turn_on: "Turn on daily reminders"
+      home_screen_only: "On iPhone and iPad, notifications only work from the Home Screen app. Tap Share → Add to Home Screen, open %{app_name} from there, and turn reminders on again."
+      unsupported: "This browser doesn't support notifications."
+      waiting: "Waiting for permission…"
+      blocked: "Notifications are blocked for %{app_name} in your device settings. Allow them there, then try again."
+      not_granted: "Permission wasn't granted."
+      failed: "Couldn't turn on reminders — try again."
+  api_keys:
+    edit:
+      title: "Settings"
+      heading: "Add your API key"
+      intro: "Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency."
+      api_key_label: "API key"
+      api_key_placeholder: "sk-ant-..., AQ...., AIza... or sk-proj-..."
+      api_key_hint_html: 'Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).'
+      language_label: "Exercise language"
+      language_options:
+        ruby_rails: "Ruby / Rails (default)"
+        javascript: "JavaScript (vanilla + React)"
+        mixed: "Mixed (alternates daily)"
+      language_hint: 'Choose the language your daily exercise sets are generated in. "Mixed" alternates between Ruby/Rails and JavaScript one full day at a time.'
+      save_key: "Save key"
+      time_zone_label: "Time zone"
+      time_zone_detect: "— detect automatically —"
+      time_zones:
+        eastern: "Eastern"
+        central: "Central"
+        mountain: "Mountain"
+        arizona: "Mountain (Arizona, no DST)"
+        pacific: "Pacific"
+        alaska: "Alaska"
+        hawaii: "Hawaii"
+      time_zone_hint: 'Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser''s zone.'
+      skill_level_label: "Skill level"
+      skill_levels:
+        beginner: "Beginner"
+        developing: "Developing"
+        solid: "Solid"
+        strong: "Strong"
+      skill_level_hint: "How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Your ratings still nudge each day's set up or down."
+  history:
+    index:
+      title: "History"
+      count:
+        one: "%{count} submitted session"
+        other: "%{count} submitted sessions"
+      empty_html: "No submitted sessions yet. %{link}"
+      back_link: "Back to today's gym"
+      sections: "%{answered}/%{total} sections"
+      sections_with_names: "%{answered}/%{total} sections — %{names}"
+      rating: "%{section}: %{rating}"
+      problems_summary: "Problems & answers"
+      no_review: "No AI review requested."
+      pages_label: "History pages"
+      page: "Page %{page} of %{last}"
+  admin:
+    suggested_concepts:
+      index:
+        title: "Suggested concepts"
+        heading: "Suggested Concepts"
+        empty: "No pending suggestions."
+        columns:
+          concept: "Concept"
+          language: "Language"
+          occurrences: "Occurrences"
+          first_seen: "First seen"
+          last_seen: "Last seen"
+          reference: "Reference?"
+          actions: "Actions"
+        has_reference: "Yes"
+        no_reference: "No"
+        promote: "Promote"
+        dismiss: "Dismiss"

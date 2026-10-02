@@ -4,7 +4,7 @@ class ReviewMailer < ApplicationMailer
     @response = daily_response
     mail(
       to:      daily_response.user.email,
-      subject: "Your Code Gym review — #{daily_response.date.strftime('%A, %B %-d')}"
+      subject: default_i18n_subject(app_name: t("app_name"), date: daily_response.date.strftime("%A, %B %-d"))
     )
   end
 end

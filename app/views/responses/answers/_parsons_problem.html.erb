@@ -18,7 +18,7 @@
   <ol class="parsons-list parsons-list-readonly">
     <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>
       <li class="parsons-block <%= block_id == position ? "parsons-correct" : "parsons-misplaced" %>">
-        <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= ExerciseSection::ParsonsProblem.valid_id?(block_id, blocks.size) ? blocks[block_id] : "(skipped)" %></code></pre>
+        <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= ExerciseSection::ParsonsProblem.valid_id?(block_id, blocks.size) ? blocks[block_id] : t("responses.answered.skipped") %></code></pre>
       </li>
     <% end %>
   </ol>
@@ -43,12 +43,12 @@
       correct order, so the button only matters when there is nothing to move:
       without it a one-block exercise could never be answered. %>
   <% if blocks.size == 1 %>
-    <button type="button" class="btn btn-ghost btn-sm" data-parsons-confirm>Use this order</button>
+    <button type="button" class="btn btn-ghost btn-sm" data-parsons-confirm><%= t("responses.parsons.confirm_button") %></button>
   <% end %>
   <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
       not using a mouse. The hint is clipped until a block takes focus, which
       keeps it out of the way of the people who will never need it. %>
-  <p class="parsons-keyhint">Reorder with the arrow keys: Ctrl+↑ / Ctrl+↓ moves the focused block, ↑ / ↓ moves between blocks.</p>
+  <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
   <p class="parsons-status" aria-live="polite"></p>
   <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= response.answers[key] %></textarea>
 <% end %>
@@ -62,6 +62,11 @@
     // — only on a move or explicit confirmation — so the section reads as
     // unanswered until the learner does something, matching every other section.
     (() => {
+      const MOVED     = <%= t("responses.parsons.moved").to_json.html_safe %>;
+      const RECORDED  = <%= t("responses.parsons.recorded").to_json.html_safe %>;
+      const MOVE_UP   = <%= t("responses.parsons.move_up").to_json.html_safe %>;
+      const MOVE_DOWN = <%= t("responses.parsons.move_down").to_json.html_safe %>;
+
       function syncHiddenField(list) {
         const ids = [...list.querySelectorAll(".parsons-block")].map(li => li.dataset.blockId);
         const textarea = list.parentElement.querySelector('textarea[data-field="parsons_problem"]');
@@ -90,7 +95,7 @@
         const status = list.parentElement.querySelector(".parsons-status");
         if (!status) return;
         const blocks = [ ...list.querySelectorAll(".parsons-block") ];
-        status.textContent = `Block moved to position ${blocks.indexOf(li) + 1} of ${blocks.length}.`;
+        status.textContent = MOVED.replace("%{position}", blocks.indexOf(li) + 1).replace("%{total}", blocks.length);
       }
 
       function handleKey(list, event) {
@@ -117,7 +122,7 @@
         btn.type = "button";
         btn.className = `btn btn-ghost btn-sm parsons-move-${direction}`;
         btn.textContent = direction === "up" ? "↑" : "↓";
-        btn.setAttribute("aria-label", `Move block ${direction}`);
+        btn.setAttribute("aria-label", direction === "up" ? MOVE_UP : MOVE_DOWN);
         btn.addEventListener("click", () => moveBlock(list, li, direction));
         return btn;
       }
@@ -140,7 +145,7 @@
         list.addEventListener("keydown", event => handleKey(list, event));
         list.parentElement.querySelector("[data-parsons-confirm]")?.addEventListener("click", () => {
           syncHiddenField(list);
-          list.parentElement.querySelector(".parsons-status").textContent = "Order recorded.";
+          list.parentElement.querySelector(".parsons-status").textContent = RECORDED;
         });
         // A CDN that hangs rather than errors never rejects the import below,
         // so its catch never runs. Without this the section would stay

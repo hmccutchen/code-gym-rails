@@ -63,7 +63,7 @@ class PushSubscriptionsController < ApplicationController
 
     current_user.update!(reminder_level: params[:nudges] == "1" ? :ready_and_nudges : :ready)
 
-    redirect_to account_path, notice: "Reminder settings saved."
+    redirect_to account_path, notice: t("flash.push_subscriptions.settings_saved")
   end
 
   # DELETE /push_subscription
@@ -75,7 +75,7 @@ class PushSubscriptionsController < ApplicationController
       current_user.update!(reminder_level: :none)
     end
 
-    redirect_to account_path, notice: "Daily reminders turned off."
+    redirect_to account_path, notice: t("flash.push_subscriptions.turned_off")
   end
 
   private

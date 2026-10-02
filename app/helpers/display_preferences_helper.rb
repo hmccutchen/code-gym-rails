@@ -18,7 +18,7 @@ module DisplayPreferencesHelper
   # wherever the light palette applies, through the same media value as the
   # palette's own <link>, so the two can never disagree.
   def brand_mark
-    outlined = image_tag("logo-outlined.png", alt: "Code Gym", class: "brand-mark", width: 930, height: 654)
+    outlined = image_tag("logo-outlined.png", alt: t("app_name"), class: "brand-mark", width: 930, height: 654)
     return outlined unless display_stylesheets?
 
     tag.picture do

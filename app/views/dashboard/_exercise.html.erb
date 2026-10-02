@@ -1,6 +1,6 @@
 <% if @regeneration_failed %>
   <div class="flash alert" style="margin-bottom:1.5rem;">
-    Couldn't generate a new set: <%= current_user.last_generation_error %>
+    <%= t("dashboard.exercise.regeneration_failed", error: current_user.last_generation_error) %>
   </div>
 <% end %>
 <% submitted = response.persisted? && response.submitted? %>
@@ -10,30 +10,30 @@
     <% if response.persisted? && response.reviewed? %>
       <%# Mirrors the controller guard, which is the one that holds — the review
           is already part of concept tracking and a new set would discard it. %>
-      <p class="hint">Today's set has been reviewed, so it can't be replaced — tomorrow's set builds on it.</p>
+      <p class="hint"><%= t("dashboard.exercise.reviewed") %></p>
     <% elsif exercise.regenerated_at.present? %>
-      <p class="hint">You've already generated a new set today.</p>
+      <p class="hint"><%= t("dashboard.exercise.already_regenerated") %></p>
     <% else %>
       <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
       <% confirm_msg = has_progress ?
-           "This will replace today's problems and erase your answers so far. This can't be undone. Continue?" :
-           "Generate a new set for today?" %>
+           t("dashboard.exercise.regenerate_confirm_with_progress") :
+           t("dashboard.exercise.regenerate_confirm") %>
       <%# turbo_confirm would be inert here — Turbo JS is not loaded. The
           layout's loading-form script provides the confirm and the in-flight
           spinner; the request then blocks synchronously on the provider
           (10–30s) until the redirect lands. %>
-      <%= button_to "Generate new set", regenerate_path, method: :post,
+      <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
             class: "btn btn-ghost btn-sm",
-            form: { data: { loading_form: true, loading_label: "Generating…",
+            form: { data: { loading_form: true, loading_label: t("dashboard.generating_label"),
                             confirm_message: confirm_msg } } %>
     <% end %>
   </div>
 
   <% if response.persisted? && !response.reviewed? %>
-    <%= button_to "Start over", start_over_response_path(response), method: :delete,
+    <%= button_to t("dashboard.exercise.start_over"), start_over_response_path(response), method: :delete,
           class: "btn btn-ghost btn-sm",
-          form: { data: { loading_form: true, loading_label: "Starting over…",
-                          confirm_message: "This will clear today's answers and ratings so you can start fresh. This can't be undone. Continue?" } } %>
+          form: { data: { loading_form: true, loading_label: t("dashboard.exercise.starting_over"),
+                          confirm_message: t("dashboard.exercise.start_over_confirm") } } %>
   <% end %>
 </div>
 
@@ -56,7 +56,7 @@
     <div class="progress-bar">
       <div class="progress-fill" id="progress-fill" style="width:0%"></div>
     </div>
-    <div class="progress-label" id="progress-label">0 of <%= exercise.active_section_keys.size %> answered</div>
+    <div class="progress-label" id="progress-label"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
   </div>
 
   <%# Always POST, never PATCH — ResponsesController#create serializes saves
@@ -75,12 +75,12 @@
     <% end %>
 
     <% submit_blocker = response.submit_blocker %>
-    <% submit_nudges = { unanswered: "Answer at least one section to finish up.",
-                         unrated:    "Rate each section you answered to finish up." } %>
+    <% submit_nudges = { unanswered: t("dashboard.exercise.submit_nudges.unanswered"),
+                         unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
     <div class="submit-row" id="submit-row">
       <%= f.hidden_field :submit, value: "1" %>
-      <%= f.button "Submit answers", type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: submit_blocker.present? %>
-      <span style="font-size:.8rem;color:var(--muted)">Auto-saved as you type</span>
+      <%= f.button t("dashboard.exercise.submit"), type: "submit", id: "submit-answers", class: "btn btn-primary", disabled: submit_blocker.present? %>
+      <span style="font-size:.8rem;color:var(--muted)"><%= t("dashboard.exercise.auto_saved") %></span>
     </div>
     <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge",
               hidden: submit_blocker.nil?, data: submit_nudges %>
@@ -134,10 +134,12 @@
       return [...substantive(textarea)].length > ANSWER_MIN_LENGTH;
     }
 
+    const ANSWERED_COUNT = <%= t("dashboard.exercise.answered_count").to_json.html_safe %>;
+
     function updateProgress() {
       const filled = [...textareas].filter(answered).length;
       progressFill.style.width = (filled / sectionFields.length * 100) + "%";
-      progressLabel.textContent = filled === sectionFields.length ? "✓ All answered" : `${filled} of ${sectionFields.length} answered`;
+      progressLabel.textContent = filled === sectionFields.length ? <%= t("dashboard.exercise.all_answered").to_json.html_safe %> : ANSWERED_COUNT.replace("%{answered}", filled).replace("%{total}", sectionFields.length);
       form.querySelectorAll(".hint-slot[data-hint-for]").forEach(slot => {
         const t = form.querySelector(`textarea[data-field="${slot.dataset.hintFor}"]`);
         if (t) setHintLocked(slot, !answered(t));
@@ -178,8 +180,8 @@
 
     // The client half of SectionStatusHelper#section_status, read against the
     // live form so a folded section's summary never shows a stale state.
-    const RATING_LABELS = <%= DailyResponse::SELF_RATING_LABELS.to_json.html_safe %>;
-    const IN_PROGRESS   = <%= SectionStatusHelper::IN_PROGRESS.to_json.html_safe %>;
+    const RATING_LABELS = <%= DailyResponse.self_rating_labels.to_json.html_safe %>;
+    const IN_PROGRESS   = <%= t("responses.section_status.in_progress").to_json.html_safe %>;
 
     function refreshStatus(section) {
       const status = form.querySelector(`.section-status[data-status-for="${section}"]`);
@@ -250,7 +252,7 @@
       form.inert = true;
       submitButton.disabled = true;
       submitButton.classList.add("btn-loading");
-      submitButton.textContent = "Submitting…";
+      submitButton.textContent = <%= t("dashboard.exercise.submitting").to_json.html_safe %>;
 
       let submissionSaved = false;
       try {
@@ -271,20 +273,20 @@
           requestReview(data.review_url);
           reviewRequested = true;
         } else {
-          alert("Couldn't submit your answers — please try again.");
+          alert(<%= t("dashboard.exercise.submit_failed").to_json.html_safe %>);
         }
       } catch (error) {
         if (submissionSaved) {
-          alert("Your answers were saved, but the review couldn't start. Reloading so you can try the review again.");
+          alert(<%= t("dashboard.exercise.review_start_failed").to_json.html_safe %>);
           window.location.reload();
         } else {
-          alert("Couldn't submit your answers — please try again.");
+          alert(<%= t("dashboard.exercise.submit_failed").to_json.html_safe %>);
         }
       } finally {
         if (!reviewRequested && !submissionSaved) {
           form.inert = false;
           submitButton.classList.remove("btn-loading");
-          submitButton.textContent = "Submit answers";
+          submitButton.textContent = <%= t("dashboard.exercise.submit").to_json.html_safe %>;
           refreshSubmit();
           autoSave();
         }

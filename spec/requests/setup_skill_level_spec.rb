@@ -22,7 +22,7 @@ RSpec.describe "Setup skill level control", type: :request do
 
     get setup_path
 
-    expect(response.body).to include("unless you've set a difficulty for that section in the Exercise mix below",
+    expect(page_html.text).to include("unless you've set a difficulty for that section in the Exercise mix below",
                                      "Your ratings still nudge each day's set up or down")
   end
 

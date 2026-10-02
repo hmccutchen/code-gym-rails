@@ -459,7 +459,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       exercise = create_exercise
       exercise.update!(regenerated_at: Time.current)
       get root_path
-      expect(response.body).to include("You've already generated a new set today.")
+      expect(response.body).to include("You&#39;ve already generated a new set today.")
       expect(response.body).not_to include("Generate new set")
     end
 
@@ -693,7 +693,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("Couldn't generate today's exercises.")
+      expect(response.body).to include("Couldn&#39;t generate today&#39;s exercises.")
       expect(response.body).to include("The AI provider is rate-limiting requests — try again shortly.")
     end
 
@@ -724,7 +724,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).not_to include("Couldn't generate today's exercises.")
+      expect(response.body).not_to include("Couldn&#39;t generate today&#39;s exercises.")
       expect(response.body).to include('data-rating-for="code_review"')
     end
 
@@ -800,7 +800,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("This didn't quite land — try a different explanation")
+      expect(response.body).to include("This didn&#39;t quite land — try a different explanation")
       expect(response.body).to include(%(data-url="#{explain_differently_concept_reference_path(reference)}"))
     end
 
@@ -825,7 +825,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("This didn't quite land — try a different explanation")
+      expect(response.body).to include("This didn&#39;t quite land — try a different explanation")
     end
 
     it "renders the section scenario label" do

@@ -2285,7 +2285,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   what a reminder exists to reach, so going silent the moment anything was
   typed left the commonest abandonment unreachable. `SendPushReminderJob` picks
   the copy from how far through the day is
-  (`SendPushReminderJob::NUDGE_TITLES`), since "still waiting" reads as not
+  (`push_reminder.nudge.titles` in `config/locales/en.yml`), since "still waiting" reads as not
   having noticed the half that was done. A partly answered day whose answered
   sections are rated gets the ready-to-submit nudge, explicitly naming the
   remaining sections as optional. A partly answered, unrated day still gets

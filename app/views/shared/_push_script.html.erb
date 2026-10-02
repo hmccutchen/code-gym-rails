@@ -52,7 +52,7 @@
           auth: json.keys.auth
         })
       }).then(function (response) {
-        if (!response.ok) throw new Error("This device couldn't be registered for reminders — try again.")
+        if (!response.ok) throw new Error(<%= t("push.register_failed").to_json.html_safe %>)
 
         return response
       })

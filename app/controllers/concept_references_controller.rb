@@ -34,10 +34,10 @@ class ConceptReferencesController < ApplicationController
     prior = prior_alternates_param
 
     if prior.size >= MAX_ALTERNATES_PER_CONCEPT
-      return render_error("You've already asked for #{MAX_ALTERNATES_PER_CONCEPT} other framings of this concept.")
+      return render_error(t("errors.concept_references.framings_used", count: MAX_ALTERNATES_PER_CONCEPT))
     end
     if prior.sum(&:bytesize) > MAX_PRIOR_ALTERNATE_BYTES
-      return render_error("That's more explanation than this can carry — reload the page to start fresh.")
+      return render_error(t("errors.concept_references.too_much_explanation"))
     end
 
     alternate = AiService.for(current_user).explain_concept_differently(
@@ -51,7 +51,7 @@ class ConceptReferencesController < ApplicationController
     # res.json() before checking res.ok, so an HTML page would surface as a
     # parse error instead of a clean message (same reasoning as
     # ResponsesController#duck_thread's missing-exercise branch).
-    render json: { status: "error", error: "That reference no longer exists." }, status: :not_found
+    render json: { status: "error", error: t("errors.concept_references.reference_missing") }, status: :not_found
   rescue AiService::Error => e
     render json: { status: "error", error: e.message }, status: :service_unavailable
   end

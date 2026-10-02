@@ -1,4 +1,4 @@
-<% page_title "Settings" %>
+<% page_title t("api_keys.edit.title") %>
 <style>
   .setup-wrap { max-width: 480px; margin: 5rem auto; }
   .setup-wrap h1 { margin-bottom: .5rem; }
@@ -34,45 +34,43 @@
 </style>
 
 <div class="setup-wrap">
-  <h1>Add your API key</h1>
-  <p>Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency.</p>
+  <h1><%= t("api_keys.edit.heading") %></h1>
+  <p><%= t("api_keys.edit.intro") %></p>
   <% if current_user.on_learning_track? && !current_user.daily_exercises.exists? %>
     <%= render "api_keys/key_guide" %>
   <% end %>
 
   <%= form_with url: setup_path, method: :patch do |f| %>
     <div class="form-field">
-      <%= f.label :api_key, "API key" %>
-      <%= f.password_field :api_key, placeholder: "sk-ant-..., AQ...., AIza... or sk-proj-...", autocomplete: "off" %>
-      <p class="hint">Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).</p>
+      <%= f.label :api_key, t("api_keys.edit.api_key_label") %>
+      <%= f.password_field :api_key, placeholder: t("api_keys.edit.api_key_placeholder"), autocomplete: "off" %>
+      <p class="hint"><%= t("api_keys.edit.api_key_hint_html") %></p>
     </div>
     <div class="form-field">
-      <%= f.label :language, "Exercise language" %>
+      <%= f.label :language, t("api_keys.edit.language_label") %>
       <%= f.select :language,
-            [ [ "Ruby / Rails (default)", "ruby_rails" ],
-              [ "JavaScript (vanilla + React)", "javascript" ],
-              [ "Mixed (alternates daily)", "mixed" ] ],
+            User::LANGUAGES.map { |language| [ t("api_keys.edit.language_options.#{language}"), language ] },
             selected: current_user.language %>
-      <p class="hint">Choose the language your daily exercise sets are generated in. "Mixed" alternates between Ruby/Rails and JavaScript one full day at a time.</p>
+      <p class="hint"><%= t("api_keys.edit.language_hint") %></p>
     </div>
-    <%= f.submit "Save key", class: "btn btn-primary" %>
+    <%= f.submit t("api_keys.edit.save_key"), class: "btn btn-primary" %>
   <% end %>
 
   <div class="form-field">
-    <label for="tz-select">Time zone</label>
+    <label for="tz-select"><%= t("api_keys.edit.time_zone_label") %></label>
     <%= select_tag "tz_select",
           options_for_select(
-            [ [ "Eastern", "America/New_York" ],
-              [ "Central", "America/Chicago" ],
-              [ "Mountain", "America/Denver" ],
-              [ "Mountain (Arizona, no DST)", "America/Phoenix" ],
-              [ "Pacific", "America/Los_Angeles" ],
-              [ "Alaska", "America/Anchorage" ],
-              [ "Hawaii", "Pacific/Honolulu" ] ],
+            [ [ t("api_keys.edit.time_zones.eastern"), "America/New_York" ],
+              [ t("api_keys.edit.time_zones.central"), "America/Chicago" ],
+              [ t("api_keys.edit.time_zones.mountain"), "America/Denver" ],
+              [ t("api_keys.edit.time_zones.arizona"), "America/Phoenix" ],
+              [ t("api_keys.edit.time_zones.pacific"), "America/Los_Angeles" ],
+              [ t("api_keys.edit.time_zones.alaska"), "America/Anchorage" ],
+              [ t("api_keys.edit.time_zones.hawaii"), "Pacific/Honolulu" ] ],
             current_user.time_zone),
-          include_blank: "— detect automatically —",
+          include_blank: t("api_keys.edit.time_zone_detect"),
           id: "tz-select" %>
-    <p class="hint">Sets when your day rolls over and when your 8am exercise set is generated. Leave on "detect automatically" to use your browser's zone.</p>
+    <p class="hint"><%= t("api_keys.edit.time_zone_hint") %></p>
   </div>
 
   <div class="form-field">
@@ -95,12 +93,12 @@
   </div>
 
   <div class="form-field">
-    <label for="skill-level">Skill level</label>
+    <label for="skill-level"><%= t("api_keys.edit.skill_level_label") %></label>
     <%= select_tag "skill_level",
-          options_for_select(User::SKILL_LEVELS.map { |level| [ level.capitalize, level ] }, current_user.skill_level),
+          options_for_select(User::SKILL_LEVELS.map { |level| [ t("api_keys.edit.skill_levels.#{level}"), level ] }, current_user.skill_level),
           id: "skill-level",
           data: { label_template: t("exercise_mix.level_default", skill_level: "__LEVEL__") } %>
-    <p class="hint">How hard your sections start out, unless you've set a difficulty for that section in the Exercise mix below. Your ratings still nudge each day's set up or down.</p>
+    <p class="hint"><%= t("api_keys.edit.skill_level_hint") %></p>
   </div>
 
   <% if current_user.on_learning_track? %>

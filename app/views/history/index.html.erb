@@ -1,4 +1,4 @@
-<% page_title "History" %>
+<% page_title t("history.index.title") %>
 <style>
   .page-header { margin-bottom: 2rem; }
   .page-header h1 { font-size: 1.5rem; }
@@ -46,13 +46,13 @@
 </style>
 
 <div class="page-header">
-  <h1>History</h1>
-  <div class="count"><%= pluralize(@pagy.count, "submitted session") %></div>
+  <h1><%= t("history.index.title") %></h1>
+  <div class="count"><%= t("history.index.count", count: @pagy.count) %></div>
 </div>
 
 <% if @pagy.count.zero? %>
   <div class="history-entry" style="text-align:center;padding:3rem;">
-    <p style="color:var(--muted);">No submitted sessions yet. <%= link_to "Back to today's gym", root_path %></p>
+    <p style="color:var(--muted);"><%= t("history.index.empty_html", link: link_to(t("history.index.back_link"), root_path)) %></p>
   </div>
 <% end %>
 
@@ -62,10 +62,16 @@
 
     <div class="history-meta">
       <span class="history-pill">
-        <%= daily_response.answered_sections.size %>/<%= daily_response.section_keys.size %> sections<% if daily_response.answered_sections.any? %> — <%= daily_response.answered_sections.map(&:humanize).join(", ") %><% end %>
+        <% answered = daily_response.answered_sections %>
+        <% counts = { answered: answered.size, total: daily_response.section_keys.size } %>
+        <% if answered.any? %>
+        <%= t("history.index.sections_with_names", **counts, names: answered.map(&:humanize).join(", ")) %>
+        <% else %>
+        <%= t("history.index.sections", **counts) %>
+        <% end %>
       </span>
       <% daily_response.section_ratings.each do |section, value| %>
-        <span class="history-pill"><%= section.humanize %>: <%= DailyResponse::SELF_RATING_LABELS[value] %></span>
+        <span class="history-pill"><%= t("history.index.rating", section: section.humanize, rating: DailyResponse.self_rating_labels[value]) %></span>
       <% end %>
       <% daily_response.concept_tags.values.compact.uniq.each do |tag| %>
         <span class="history-tag"><%= tag.humanize %></span>
@@ -78,7 +84,7 @@
         someone opening this page came for, and the problems are a page-long
         scroll past it. %>
     <details class="answers">
-      <summary>Problems &amp; answers</summary>
+      <summary><%= t("history.index.problems_summary") %></summary>
       <%= render "responses/answered_sections", exercise: daily_response.daily_exercise, response: daily_response %>
     </details>
 
@@ -88,16 +94,16 @@
         <%= render "shared/ai_review", response: daily_response %>
       </details>
     <% else %>
-      <p class="no-review">No AI review requested.</p>
+      <p class="no-review"><%= t("history.index.no_review") %></p>
     <% end %>
   </div>
 <% end %>
 
 <% if @pagy.last > 1 %>
   <%# Raw output: Pagy returns pre-escaped HTML without calling html_safe. %>
-  <nav class="pagination" aria-label="History pages">
+  <nav class="pagination" aria-label="<%= t("history.index.pages_label") %>">
     <%== @pagy.previous_tag(text: "← Newer") %>
-    <span>Page <%= @pagy.page %> of <%= @pagy.last %></span>
+    <span><%= t("history.index.page", page: @pagy.page, last: @pagy.last) %></span>
     <%== @pagy.next_tag(text: "Older →") %>
   </nav>
 <% end %>
