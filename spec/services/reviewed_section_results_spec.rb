@@ -72,6 +72,85 @@ RSpec.describe ReviewedSectionResults do
     expect(described_class.for(response({ "code_review" => { rung: "junior" } }, submitted: false))).to eq([])
   end
 
+  describe "include_eased:" do
+    let(:with_eased) do
+      response({ "code_review" => { rung: "junior" }, "challenge" => { rung: "junior", eased: true, self: "too_hard" } })
+    end
+
+    it "marks every result it returns by default as not eased" do
+      expect(described_class.for(with_eased).map { |result| [ result.kind, result.eased ] }).to eq([ [ "code_review", false ] ])
+    end
+
+    it "returns eased sections marked as eased when asked" do
+      results = described_class.for(with_eased, include_eased: true)
+
+      expect(results.map { |result| [ result.kind, result.eased ] }).to eq([ [ "code_review", false ], [ "challenge", true ] ])
+      expect(results.last.self_rating).to eq("too_hard")
+    end
+  end
+
+  # An old or hand-edited row must not stop the gate, which runs on every plan.
+  describe "malformed rows" do
+    def malformed(**columns)
+      response({ "code_review" => { rung: "junior" }, "pattern" => { rung: "junior" } }).tap do |row|
+        columns.each { |column, value| row[column] = value }
+      end
+    end
+
+    it "skips a section whose review is not a hash and keeps the rest" do
+      row = malformed
+      row.ai_review = row.ai_review.merge("pattern" => "solid")
+
+      expect(described_class.for(row, require_rubric: true).map(&:kind)).to eq(%w[code_review])
+    end
+
+    it "skips a section whose problem is not a hash" do
+      row = malformed
+      row.daily_exercise.problem_set = row.daily_exercise.problem_set.merge("pattern" => "a bare string")
+
+      expect(described_class.for(row).map(&:kind)).to eq(%w[code_review])
+    end
+
+    [ [ :ai_review, [ "solid" ] ], [ :answers, [ "a" * 40 ] ] ].each do |column, value|
+      it "returns nothing when #{column} is not a hash" do
+        expect(described_class.for(malformed(column => value))).to eq([])
+      end
+    end
+
+    it "reads no self-rating when the ratings are not a hash" do
+      expect(described_class.for(malformed(section_ratings: [ "right_level" ])).map(&:self_rating)).to eq([ nil, nil ])
+    end
+  end
+
+  describe "Result predicates" do
+    def result(ai: "solid", self_rating: "right_level")
+      ReviewedSectionResults::Result.new(date: date, kind: "code_review", level: "junior", ai_rating: ai, self_rating: self_rating)
+    end
+
+    it "places the AI rating on the mastery rank" do
+      expect(%w[beginner developing solid strong].map { |rating| result(ai: rating).at_or_above?("solid") })
+        .to eq([ false, false, true, true ])
+      expect(result(ai: "excellent").at_or_above?("beginner")).to be(false)
+    end
+
+    it "is favourable only with the bar met and a favourable self-rating together" do
+      expect(result.favourable?(bar: "solid")).to be(true)
+      expect(result(ai: "developing").favourable?(bar: "solid")).to be(false)
+      expect(result(ai: "developing").favourable?(bar: "developing")).to be(true)
+      expect(result(self_rating: "too_hard").favourable?(bar: "solid")).to be(false)
+      expect(result(self_rating: nil).favourable?(bar: "solid")).to be(false)
+    end
+
+    it "is too hard only on the engineer's own too-hard rating" do
+      expect(%w[too_easy right_level too_hard meh].map { |rating| result(self_rating: rating).too_hard? })
+        .to eq([ false, false, true, false ])
+    end
+
+    it "takes the lowest favourable AI rating as the favourable bar" do
+      expect(ReviewedSectionResults::FAVOURABLE_BAR).to eq("solid")
+    end
+  end
+
   describe "require_rubric:" do
     let(:stamped) do
       response({

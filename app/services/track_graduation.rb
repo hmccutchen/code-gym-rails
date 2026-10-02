@@ -7,12 +7,8 @@ class TrackGraduation
   PREVIOUS_LEVEL = NEXT_LEVEL.invert.freeze
 
   Result = Data.define(:date, :level, :ai_rating, :self_rating) do
-    def favourable?
-      DailyResponse::AI_RATING_FAVORABLE.include?(ai_rating) &&
-        DailyResponse::SELF_RATING_FAVORABLE.include?(self_rating)
-    end
-
-    def too_hard? = self_rating == "too_hard"
+    def favourable? = ReviewedSectionResults.favourable?(ai_rating, self_rating, bar: ReviewedSectionResults::FAVOURABLE_BAR)
+    def too_hard? = ReviewedSectionResults.too_hard?(self_rating)
   end
 
   Step = Data.define(:kind, :from, :to, :results_at_level)
