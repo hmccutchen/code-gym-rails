@@ -874,7 +874,7 @@ class AiService
     animation_export_job_queue
   ].freeze
 
-  # Everyday SETTINGS for a beginner's day, used the same way as the other
+  # Everyday SETTINGS for a junior's day, used the same way as the other
   # pools. Each names something a person outside the software industry
   # already uses, so a career changer meets the concept without first having
   # to learn what an invoice run or a tenant is.
@@ -887,7 +887,7 @@ class AiService
 
   # Legacy GraphQL is scenario dressing at a stated rarity, the same under
   # the job-adjacent and game flavors — a studio has a legacy layer as
-  # readily as a SaaS does. A beginner's everyday day leaves it out, since a
+  # readily as a SaaS does. A junior's everyday day leaves it out, since a
   # legacy layer is exactly the industry context that pool avoids.
   LEGACY_GRAPHQL_SCENARIO_GUIDANCE =
     "Use a legacy GraphQL maintenance scenario (e.g. \"a legacy GraphQL layer needs a fix\") only rarely — " \

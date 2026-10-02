@@ -108,7 +108,7 @@ RSpec.describe PreviewSeed do
 
     it "does not touch users other than the named one" do
       bystander = User.create!(email: "someone-else@example.com", name: "Bystander",
-                               skill_level: "beginner")
+                               skill_level: "principal_engineer")
       set_target
 
       expect { PreviewSeed.run! }.not_to change { bystander.reload.attributes }

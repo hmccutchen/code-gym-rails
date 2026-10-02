@@ -16,16 +16,15 @@ class User < ApplicationRecord
   self.ignored_columns += [ "api_key" ]
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
-  # The difficulty levels themselves, plus beginner: pitched at the lowest
-  # level, with everyday scenarios for someone who does not work in software
-  # yet (DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL).
-  SKILL_LEVELS = [ "beginner", *KindDifficulty::LEVELS ].freeze
+  SKILL_LEVELS = KindDifficulty::LEVELS
 
   # Stored values from before skill levels took the difficulty levels' names.
   # Read through #skill_level until a migration rewrites them; writing them
   # in the same deploy would fail the old code's validation while it still
   # serves.
-  LEGACY_SKILL_LEVELS = { "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }.freeze
+  LEGACY_SKILL_LEVELS = {
+    "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer"
+  }.freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 

@@ -2976,7 +2976,7 @@ RSpec.describe AiService do
     # drives build_exercise_prompt directly.
     it "threads the day's scenario flavor into the prompt and the diagnostics payload" do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:game_and_animation)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan.scenario_flavor_weights_for(user.skill_level)).and_return(:game_and_animation)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       svc = double_class.new(canned_text: full_problem_set.to_json)
 
@@ -5102,13 +5102,13 @@ RSpec.describe AiService do
     # nothing tier-shaped is passed to the method that builds it.
     it "carries nothing about the engineer, their tier, or their history" do
       exercise, = loaded_day
-      user.update!(name: "Ada Lovelace", skill_level: "beginner")
+      user.update!(name: "Ada Lovelace", skill_level: "principal_engineer")
       user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :reduced)
 
       prompt = difficulty_prompt(exercise)
 
       expect(prompt).not_to include("Ada Lovelace")
-      expect(prompt).not_to include("beginner")
+      expect(prompt).not_to include("principal_engineer")
       expect(prompt).not_to include("(reduced)")
       expect(prompt).not_to include("(standard)")
       expect(prompt).not_to include("n_plus_one")

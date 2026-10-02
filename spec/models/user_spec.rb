@@ -885,7 +885,7 @@ RSpec.describe User, type: :model do
     it "reads each stored value from before skill levels took the difficulty levels' names as its new name" do
       user = create_user
 
-      { "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer", "beginner" => "beginner" }.each do |stored, read|
+      { "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer" }.each do |stored, read|
         user.update_column(:skill_level, stored)
         expect(user.reload.skill_level).to eq(read)
       end

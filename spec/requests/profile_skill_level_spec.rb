@@ -40,7 +40,7 @@ RSpec.describe "PATCH /profile skill_level", type: :request do
     expect(user.reload.attributes).to eq(original)
   end
 
-  [ "expert", "", nil, [ "solid" ], { "level" => "solid" } ].each do |value|
+  [ "expert", "beginner", "developing", "", nil, [ "solid" ], { "level" => "solid" } ].each do |value|
     it "refuses #{value.inspect} without saving anything else in the request" do
       original = user.reload.attributes
 

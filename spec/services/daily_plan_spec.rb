@@ -448,14 +448,14 @@ RSpec.describe DailyPlan do
   end
 
   describe "SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL" do
-    # Exact for the same reason as the default: a beginner's 70/30 everyday
+    # Exact for the same reason as the default: a junior's 70/30 everyday
     # and game split is the decision, with no job-adjacent days at all.
-    it "gives a beginner 70% everyday and 30% game and animation" do
-      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL).to eq("beginner" => { everyday: 0.7, game_and_animation: 0.3 })
+    it "gives a junior 70% everyday and 30% game and animation" do
+      expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL).to eq("junior" => { everyday: 0.7, game_and_animation: 0.3 })
     end
 
     it "keeps every other skill level on the default weights" do
-      (User::SKILL_LEVELS - %w[beginner]).each do |level|
+      (User::SKILL_LEVELS - %w[junior]).each do |level|
         expect(DailyPlan.scenario_flavor_weights_for(level)).to equal(DailyPlan::SCENARIO_FLAVOR_WEIGHTS)
       end
     end
@@ -464,15 +464,16 @@ RSpec.describe DailyPlan do
   describe "#scenario_flavor on the plan" do
     let(:user) { User.create!(email: "plan@example.com", name: "Plan") }
 
-    it "rolls a beginner's flavor from the beginner weights" do
-      user.update!(skill_level: "beginner")
+    it "rolls a junior's flavor from the junior weights" do
+      user.update!(skill_level: "junior")
       allow(WeightedRoll).to receive(:pick).and_call_original
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.fetch("beginner")).and_return(:everyday)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL.fetch("junior")).and_return(:everyday)
 
       expect(DailyPlan.for(user, language: "ruby_rails").scenario_flavor).to eq(:everyday)
     end
 
     it "is carried on the Result from its own roll, on any language" do
+      user.update!(skill_level: "senior")
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
 
       expect(DailyPlan.for(user, language: "ruby_rails").scenario_flavor).to eq(:general)
@@ -734,7 +735,7 @@ RSpec.describe DailyPlan do
     it "never reads KindDifficulty and plans the same day regardless" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
       pin_code_review_mode(:application_code)
-      allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
+      allow(WeightedRoll).to receive(:pick).with(DailyPlan.scenario_flavor_weights_for(user.skill_level)).and_return(:general)
       expect(KindDifficulty).not_to receive(:for)
       expect(KindDifficulty).not_to receive(:new)
 
@@ -1019,7 +1020,7 @@ RSpec.describe DailyPlan, "the shared concept" do
 
   it "plans exactly the unpaired day when an overdue retention check takes the free host" do
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: nil)
-    allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
+    allow(WeightedRoll).to receive(:pick).with(DailyPlan.scenario_flavor_weights_for(user.skill_level)).and_return(:general)
     struggled_with("n_plus_one", tier: :reduced)
     user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                    mastered_at: 6.months.ago, retention_interval_days: 7,

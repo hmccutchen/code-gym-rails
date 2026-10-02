@@ -14,13 +14,6 @@ class KindDifficulty
     "principal_engineer" => "the concept framed as a decision with costs on both sides at system scale."
   }.freeze
 
-  # The rung an untargeted section is pitched at. Skill levels are the rungs
-  # plus beginner, which is pitched at the lowest; this is the one place a
-  # skill level is read as a rung, so a section's evidence is filed under one
-  # ladder whichever way it was pitched. Total over User::SKILL_LEVELS, and a
-  # spec holds it there.
-  RUNG_FOR_SKILL_LEVEL = LEVELS.index_with(&:itself).merge("beginner" => LEVELS.first).freeze
-
   def self.none
     new(levels: {}, locked: [])
   end
@@ -44,13 +37,13 @@ class KindDifficulty
     !level_for(kind).nil?
   end
 
-  # The rung a kind is pitched at today: its target, else the skill level's.
-  # A skill level outside the scale reads as the lowest rung rather than
+  # The rung a kind is pitched at today: its target, else the skill level,
+  # which shares this scale (User::SKILL_LEVELS). A skill level outside it reads as the lowest rung rather than
   # raising, the same total-by-construction contract as #level_for: an
   # orphaned console write must understate evidence, never abort generation
   # after the provider call was billed.
   def rung_for(kind, skill_level:)
-    level_for(kind) || RUNG_FOR_SKILL_LEVEL.fetch(skill_level, LEVELS.first)
+    level_for(kind) || (LEVELS.include?(skill_level) ? skill_level : LEVELS.first)
   end
 
   def locked?(kind)

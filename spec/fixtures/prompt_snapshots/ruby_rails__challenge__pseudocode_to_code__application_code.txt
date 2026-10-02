@@ -2,7 +2,7 @@ Generate a daily Code Gym exercise set for this engineer.
 
 Engineer profile:
 - Name: Snapshot
-- Skill level: junior (beginner → junior → senior → principal_engineer)
+- Skill level: junior (junior → senior → principal_engineer)
 - Priority focus areas: general Ruby/Rails patterns
 
 Recent performance (last 10 sessions):

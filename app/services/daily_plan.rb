@@ -47,14 +47,14 @@ class DailyPlan
   # record it. Not gated on language or kinds — every day has a scenario.
   SCENARIO_FLAVOR_WEIGHTS = { game_and_animation: 0.7, general: 0.3 }.freeze
 
-  # A beginner trades the job-adjacent pool for an everyday one: webhooks,
-  # tenants and invoice runs assume someone already works in software, which
-  # a career changer does not. The game pool stays as the second setting, so
-  # a beginner still has two pools to vary between. Keyed on skill level, a
-  # difficulty setting, because generation never reads learning-track state;
-  # joining the junior track sets beginner.
+  # Junior covers career changers and early-career developers, so it trades
+  # the job-adjacent pool for an everyday one: webhooks, tenants and invoice
+  # runs assume someone already works in software, which a career changer
+  # does not. The game pool stays as the second setting, so a junior still
+  # has two pools to vary between. Keyed on skill level, a difficulty
+  # setting, because generation never reads learning-track state.
   SCENARIO_FLAVOR_WEIGHTS_BY_SKILL_LEVEL = {
-    "beginner" => { everyday: 0.7, game_and_animation: 0.3 }.freeze
+    "junior" => { everyday: 0.7, game_and_animation: 0.3 }.freeze
   }.freeze
 
   # Each fourth kind's own ConceptBucket name — see ConceptBucket. One bucket

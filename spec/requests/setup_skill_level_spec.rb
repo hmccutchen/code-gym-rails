@@ -17,13 +17,13 @@ RSpec.describe "Setup skill level control", type: :request do
     expect(page_html.at_css("label[for='skill-level']").text).to include("Skill level")
   end
 
-  it "names each level as the Exercise mix's difficulty options do, plus Beginner" do
+  it "names each level as the Exercise mix's difficulty options do" do
     login_as(user)
 
     get setup_path
 
-    expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Beginner", "Junior", "Senior", "Principal engineer" ])
-    expect(page_html.text).to include("Beginner starts at Junior difficulty, set in everyday situations instead of work ones.")
+    expect(page_html.css("select#skill-level option").map(&:text)).to eq([ "Junior", "Senior", "Principal" ])
+    expect(page_html.text).to include("Junior suits early-career developers and career changers, and sets most exercises in everyday situations instead of work ones.")
   end
 
   it "selects Junior for an account still storing the old developing default" do
