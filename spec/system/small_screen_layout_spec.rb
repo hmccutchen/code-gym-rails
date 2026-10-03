@@ -98,6 +98,47 @@ RSpec.describe "Small screen layout", type: :system do
     end
   end
 
+  def width_share(input, form)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const field = document.querySelector(#{input.to_json});
+        return field.getBoundingClientRect().width / field.closest(#{form.to_json}).getBoundingClientRect().width;
+      })()
+    JS
+  end
+
+  # A text field that shares a row with its buttons must wrap the buttons
+  # below it rather than shrink to a sliver beside them.
+  [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
+    it "keeps the duck's field wide enough to read at #{width}px#{' with the largest text' if prefs.any?}" do
+      travel_to(a_weekday) do
+        user = create_fake_provider_user
+        user.update!(display_preferences: prefs)
+        resize(width)
+        visit_with_todays_set(user)
+        find(".duck-toggle", match: :first).click
+
+        expect(page).to have_css(".duck-input", visible: :visible)
+        expect(width_share(".duck-input", ".duck-form")).to be > 0.6
+        expect(page_width).to eq(width)
+      end
+    end
+
+    it "keeps the follow-up field wide enough to read at #{width}px#{' with the largest text' if prefs.any?}" do
+      travel_to(a_weekday) do
+        user = create_fake_provider_user
+        user.update!(display_preferences: prefs)
+        reviewed_day_for(user)
+        resize(width)
+        visit_as(user)
+
+        expect(page).to have_css(".follow-up-input")
+        expect(width_share(".follow-up-input", ".follow-up-form")).to be > 0.6
+        expect(page_width).to eq(width)
+      end
+    end
+  end
+
   it "wraps a long email on Account at 320px with the largest text and the spacing override" do
     user = create_fake_provider_user
     user.update!(email: "averyverylongengineeringaddress@example.com", display_preferences: LARGEST)
