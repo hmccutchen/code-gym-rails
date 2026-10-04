@@ -2428,14 +2428,23 @@ concept-specific difficulty descriptions for future generation, not a new set.
 ## Local Development
 
 ```bash
-cp .env.example .env
-# fill in DATABASE_URL, SECRET_KEY_BASE, and the ACTIVE_RECORD_ENCRYPTION_* keys
 bundle install
-rails db:create db:migrate
-bin/dev  # starts web + solid_queue worker
+bin/rails db:prepare  # creates the database and loads the schema
+bin/dev               # starts the web server only
+bin/jobs              # optional: Solid Queue and the recurring schedule
 ```
 
-In development, login code emails open in the browser via `letter_opener` gem (no SMTP needed).
+Development needs no environment variables. `config/database.yml` points at
+a local PostgreSQL through its default socket, Rails generates the
+development secret itself, and `config/initializers/active_record_encryption.rb`
+derives the encryption keys from that secret. Login code emails open in the
+browser through `letter_opener`, so no mail service is needed.
+
+`bin/dev` runs no worker. Development has no `queue_adapter` setting, so jobs
+the web process enqueues, such as the dashboard's on-demand generation, run
+in that process on Rails' default async adapter. The recurring schedule in
+`config/recurring.yml` runs only under `bin/jobs`, every five minutes in
+development.
 
 ## Tests
 
