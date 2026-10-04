@@ -1,7 +1,16 @@
 require "json"
 
 class AiService
-  class Error < StandardError; end
+  # http_status is set when the provider answered with a non-success status,
+  # so a fallback can say which.
+  class Error < StandardError
+    attr_reader :http_status
+
+    def initialize(message = nil, http_status: nil)
+      super(message)
+      @http_status = http_status
+    end
+  end
 
   # Bad/revoked API key (HTTP 401/403) — user-actionable: they need to fix
   # their key in Settings. Never worth retrying.
@@ -1441,8 +1450,13 @@ class AiService
     when InvalidResponseError                                then "invalid_json"
     when RefusalError                                        then "refusal"
     when TimeoutError, Timeout::Error                        then "timeout"
-    else                                                          error_code_for(error)
+    else                                                          http_status_code_for(error) || error_code_for(error)
     end
+  end
+
+  # Only a plain Error: authentication and rate limits keep their own codes.
+  def self.http_status_code_for(error)
+    "http_#{error.http_status}" if error.instance_of?(Error) && error.http_status
   end
 
   protected

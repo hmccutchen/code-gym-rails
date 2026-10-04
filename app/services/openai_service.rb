@@ -29,6 +29,10 @@ class OpenaiService < AiService
     "gpt-6-luna" => "none"
   }.freeze
 
+  # OpenAI refuses JSON mode with a 400 unless an input message mentions JSON,
+  # and the system prompt goes in instructions, which it does not count (#253).
+  JSON_MODE_REQUEST = "Reply with a JSON object.".freeze
+
   # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
   # every retry decision through `retry_if` — faraday-retry treats a method on
   # its `methods` list as retryable outright and never consults `retry_if`, and
@@ -69,7 +73,7 @@ class OpenaiService < AiService
       model:        route[:model],
       instructions: system,
       input:        history.map { |turn| { role: turn[:role], content: turn[:content] } } +
-                    [ { role: "user", content: prompt } ],
+                    [ { role: "user", content: response_schema ? "#{prompt}\n\n#{JSON_MODE_REQUEST}" : prompt } ],
       store:        false,
       reasoning:    { effort: max_tokens ? reasoning_off_for(route[:model]) : route[:effort] }
     }
@@ -77,8 +81,7 @@ class OpenaiService < AiService
     # JSON mode rather than the schema itself: strict schemas need an object at
     # the root and every property required, and VerdictSchema builds an anyOf
     # with optional fields. JSON mode guarantees a parseable reply, and each
-    # verdict's .parse still holds the shape. It also needs "JSON" in the
-    # prompt, which both judge prompts say.
+    # verdict's .parse still holds the shape.
     body[:text] = { format: { type: "json_object" } } if response_schema
     body
   end
@@ -87,7 +90,8 @@ class OpenaiService < AiService
     # OpenAI's authentication errors can echo the key, including masked fragments.
     if [ 401, 403 ].include?(resp.status)
       Rails.logger.error("OpenAI authentication failed (HTTP #{resp.status})")
-      raise AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings."
+      raise AiService::AuthenticationError.new("OpenAI rejected your API key or its permissions. Check it in Settings.",
+                                               http_status: resp.status)
     end
 
     log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
@@ -96,7 +100,7 @@ class OpenaiService < AiService
     when 429      then AiService::RateLimitError
     else               AiService::Error
     end
-    raise error_class, message
+    raise error_class.new(message, http_status: resp.status)
   end
 
   def read_result(parsed, route)

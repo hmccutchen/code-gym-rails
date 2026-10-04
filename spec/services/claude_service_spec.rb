@@ -443,7 +443,7 @@ RSpec.describe ClaudeService do
 
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, /Claude API error 500/)
+      }.to raise_error(AiService::Error, /Claude API error 500/) { |error| expect(error.http_status).to eq(500) }
     end
 
     it "surfaces the provider's own error message when the body includes one" do

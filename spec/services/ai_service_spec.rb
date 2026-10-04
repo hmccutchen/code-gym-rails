@@ -6655,7 +6655,10 @@ RSpec.describe AiService, ".judge_fallback_reason" do
     Timeout::Error.new("x")                            => "timeout",
     AiService::RateLimitError.new("x")                 => "rate_limit",
     AiService::AuthenticationError.new("x")            => "authentication",
-    AiService::Error.new("x")                          => "other"
+    AiService::Error.new("x")                          => "other",
+    AiService::Error.new("x", http_status: 400)        => "http_400",
+    AiService::RateLimitError.new("x", http_status: 429) => "rate_limit",
+    AiService::AuthenticationError.new("x", http_status: 401) => "authentication"
   }.each do |error, reason|
     it "names #{error.class} #{reason}" do
       expect(AiService.judge_fallback_reason(error)).to eq(reason)
