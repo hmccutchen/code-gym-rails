@@ -255,6 +255,21 @@ RSpec.describe OpenaiService do
       expect(body["text"]).to eq("format" => { "type" => "json_object" })
     end
 
+    # OpenAI refuses JSON mode with a 400 unless an input message mentions
+    # JSON, and the system prompt, which says so, goes in instructions (#253).
+    it "ends the input with a request for a JSON object when JSON mode is on" do
+      body, = call_with(hello, response_schema: JudgeVerdict.schema_for(ExerciseSection::Challenge))
+
+      expect(body["input"].last).to eq("role" => "user", "content" => "prompt text\n\n#{OpenaiService::JSON_MODE_REQUEST}")
+      expect(OpenaiService::JSON_MODE_REQUEST).to match(/json/i)
+    end
+
+    it "leaves the input as written when JSON mode is off" do
+      body, = call_with(hello)
+
+      expect(body["input"].last).to eq("role" => "user", "content" => "prompt text")
+    end
+
     it "joins the message's text parts and skips reasoning items" do
       response = reply(output: [
         { "type" => "reasoning", "summary" => [] },
@@ -307,7 +322,7 @@ RSpec.describe OpenaiService do
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, "<html>secret page</html>" ] ]))
 
       expect { service.send(:call, system: "sys", prompt: "p") }
-        .to raise_error(AiService::Error, "OpenAI API error 400")
+        .to raise_error(AiService::Error, "OpenAI API error 400") { |error| expect(error.http_status).to eq(400) }
     end
   end
 end

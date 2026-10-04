@@ -422,7 +422,7 @@ RSpec.describe GeminiService do
 
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, /Gemini API error 503/)
+      }.to raise_error(AiService::Error, /Gemini API error 503/) { |error| expect(error.http_status).to eq(503) }
     end
 
     it "surfaces the provider's own error message when the body includes one" do

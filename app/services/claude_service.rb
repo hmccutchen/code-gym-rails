@@ -100,7 +100,7 @@ class ClaudeService < AiService
       when 429, 529 then AiService::RateLimitError # 529 is Anthropic's own "overloaded" status — same transient/retry semantics as 429
       else               AiService::Error
       end
-      raise error_class, message
+      raise error_class.new(message, http_status: resp.status)
     end
 
     parsed = parse_provider_envelope(resp.body, provider: "Claude")

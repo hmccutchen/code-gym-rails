@@ -908,8 +908,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   raises, times out, or returns output `JudgeVerdict` refuses, the draft
   section stands unedited, `fallback` records the reason from
   `AiService.judge_fallback_reason` (`invalid_output`, `truncated`,
-  `invalid_json`, `refusal`, `timeout`, or the shared error code), and
-  `[judge_fallback]` warns. The judge is never retried. The review prose
+  `invalid_json`, `refusal`, `timeout`, the shared error code, or
+  `http_<status>` when the provider refused the request itself), and
+  `[judge_fallback]` warns. Provider errors carry the response's HTTP status
+  (`AiService::Error#http_status`); authentication and rate-limit errors keep
+  their own codes. The judge is never retried. The review prose
   judge reads the same table, so the two judges' fallback rates compare.
 
   **The judge's reply is held to a schema on Claude.** Its call is capped, so
@@ -927,7 +930,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   json_object`) rather than the schema: OpenAI's strict schemas need an object
   at the root and every property required, and `VerdictSchema` builds an
   `anyOf` with optional fields. JSON mode guarantees a parseable reply, and
-  `.parse` holds the shape.
+  `.parse` holds the shape. OpenAI refuses JSON mode with a 400 unless an
+  input message mentions JSON, and the system prompt goes in `instructions`,
+  which it does not check, so `OpenaiService` ends the input with
+  `JSON_MODE_REQUEST`. Before that, only a section whose own text happened to
+  mention JSON was judged on OpenAI (#253).
   `response_schema:` is the fourth additive keyword on `#call`, after
   `cache_system:`, `max_tokens:` and `history:`; `judge_section` and
   `judge_review_prose` (`ReviewProseVerdict.schema`) pass it, and every other

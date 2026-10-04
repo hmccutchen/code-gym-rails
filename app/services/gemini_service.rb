@@ -92,7 +92,7 @@ class GeminiService < AiService
       when 429      then AiService::RateLimitError
       else               AiService::Error
       end
-      raise error_class, message
+      raise error_class.new(message, http_status: resp.status)
     end
 
     parsed       = parse_provider_envelope(resp.body, provider: "Gemini")
