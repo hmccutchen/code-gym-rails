@@ -195,7 +195,9 @@ RSpec.describe OpenaiService do
         allow(Rails.logger).to receive(:error)
 
         expect { service.send(:call, system: "sys", prompt: "p") }
-          .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.")
+          .to raise_error(AiService::AuthenticationError, "OpenAI rejected your API key or its permissions. Check it in Settings.") { |error|
+            expect(error.http_status).to eq(status)
+          }
         expect(Rails.logger).not_to have_received(:error).with(/sk-proj-/)
       end
     end
