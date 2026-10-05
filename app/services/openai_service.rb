@@ -13,17 +13,23 @@ class OpenaiService < AiService
   # been compared against another model yet. Effort is stated even where it is
   # the model's default, so a change to that default cannot move a route
   # silently. Generation is never capped, so it can take 6.1 Sol, which cannot
-  # turn reasoning off; every other purpose may be capped, so the default is
-  # 6 Sol, which can.
-  DEFAULT_ROUTE = { model: "gpt-6-sol", effort: "medium" }.freeze
+  # turn reasoning off. The judge is capped, and Astra cannot turn reasoning
+  # off either, so its route carries a reasoning allowance (see
+  # #request_body). Everything else runs on 6 Sol with reasoning off.
+  DEFAULT_ROUTE = { model: "gpt-6-sol", effort: "none" }.freeze
   MODEL_FOR_PURPOSE = {
-    "generate_exercise" => { model: "gpt-6.1-sol", effort: "high" }
+    "generate_exercise" => { model: "gpt-6.1-sol", effort: "high" },
+    # 25,000 is OpenAI's suggested starting reserve for reasoning and output.
+    # Low is Astra's lowest effort, chosen because the judge's read timeout is
+    # 45 seconds.
+    "judge_section"     => { model: "gpt-6-astra", effort: "low", reasoning_allowance: 25_000 }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
   # max_output_tokens caps reasoning and reply together, so a capped call turns
   # reasoning off or the model can spend the cap before it answers. 6.1 Sol and
-  # Astra have no "none" effort, so they have no entry and a capped call routed
-  # to either raises before sending.
+  # Astra have no "none" effort, so they have no entry, and a capped call routed
+  # to either raises before sending unless its route carries a
+  # reasoning_allowance.
   REASONING_OFF = {
     "gpt-6-sol"  => "none",
     "gpt-6-luna" => "none"
@@ -75,9 +81,11 @@ class OpenaiService < AiService
       input:        history.map { |turn| { role: turn[:role], content: turn[:content] } } +
                     [ { role: "user", content: response_schema ? "#{prompt}\n\n#{JSON_MODE_REQUEST}" : prompt } ],
       store:        false,
-      reasoning:    { effort: max_tokens ? reasoning_off_for(route[:model]) : route[:effort] }
+      reasoning:    { effort: effort_for(route, capped: max_tokens.present?) }
     }
-    body[:max_output_tokens] = max_tokens if max_tokens
+    # An allowance lets a capped call reason: the cap grows by it, leaving
+    # room for reasoning on top of the reply the caller sized the cap for.
+    body[:max_output_tokens] = max_tokens + route.fetch(:reasoning_allowance, 0) if max_tokens
     # JSON mode rather than the schema itself: strict schemas need an object at
     # the root and every property required, and VerdictSchema builds an anyOf
     # with optional fields. JSON mode guarantees a parseable reply, and each
@@ -134,6 +142,14 @@ class OpenaiService < AiService
 
   def route_for(purpose)
     MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)
+  end
+
+  def effort_for(route, capped:)
+    if capped && !route.key?(:reasoning_allowance)
+      reasoning_off_for(route[:model])
+    else
+      route[:effort]
+    end
   end
 
   def reasoning_off_for(model)

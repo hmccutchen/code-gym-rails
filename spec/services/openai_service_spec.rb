@@ -237,11 +237,19 @@ RSpec.describe OpenaiService do
       ])
     end
 
-    it "turns reasoning off whenever it caps the budget, so the cap is not spent reasoning" do
+    it "turns reasoning off when it caps a route with no allowance, so the cap is not spent reasoning" do
       body, = call_with(hello, max_tokens: 250)
 
       expect(body["max_output_tokens"]).to eq(250)
       expect(body["reasoning"]).to eq("effort" => "none")
+    end
+
+    it "keeps a capped call's reasoning when its route carries an allowance, and adds the allowance to the cap" do
+      body, = call_with(hello, max_tokens: 250, purpose: "judge_section")
+      route = OpenaiService::MODEL_FOR_PURPOSE.fetch("judge_section")
+
+      expect(body["reasoning"]).to eq("effort" => route[:effort])
+      expect(body["max_output_tokens"]).to eq(250 + route[:reasoning_allowance])
     end
 
     it "refuses a capped call routed to a model that cannot turn reasoning off" do
