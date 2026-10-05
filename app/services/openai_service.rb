@@ -62,9 +62,12 @@ class OpenaiService < AiService
     route = route_for(purpose)
     body  = request_body(route, system: system, prompt: prompt, history: history, max_tokens: max_tokens, response_schema: response_schema)
 
+    # A call that reasons within an allowance can spend most of the allowance
+    # before it times out, so its timeout is final rather than retried.
+    final_timeout = read_timeout > READ_TIMEOUT || route.key?(:reasoning_allowance)
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
-      req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
+      req.options.context = (req.options.context || {}).merge(long_running: final_timeout, single_attempt: single_attempt)
     end
     raise_for_status(resp) unless resp.success?
 

@@ -163,6 +163,30 @@ RSpec.describe OpenaiService do
       expect(attempts).to eq(1)
     end
 
+    it "does not retry a timed-out call on a route that reasons within an allowance" do
+      attempts = 0
+      service.instance_variable_set(:@conn, Faraday.new do |f|
+        f.request :retry, OpenaiService::RETRY_OPTIONS
+        f.adapter(:test) { |stub| stub.post(OpenaiService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+      end)
+
+      expect {
+        service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::JUDGE_MAX_TOKENS, purpose: "judge_section")
+      }.to raise_error(AiService::TimeoutError)
+      expect(attempts).to eq(1)
+    end
+
+    it "still retries a timed-out call on a route with no allowance" do
+      attempts = 0
+      service.instance_variable_set(:@conn, Faraday.new do |f|
+        f.request :retry, OpenaiService::RETRY_OPTIONS
+        f.adapter(:test) { |stub| stub.post(OpenaiService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+      end)
+
+      expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 250) }.to raise_error(AiService::TimeoutError)
+      expect(attempts).to eq(OpenaiService::RETRY_OPTIONS[:max] + 1)
+    end
+
     it "retries a 429 and eventually succeeds" do
       responses = [ [ 429, "" ], [ 200, hello.to_json ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))

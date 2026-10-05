@@ -462,8 +462,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   OpenAI's suggested starting reserve for reasoning and output, so a judge
   call can cost up to 26,200 output tokens at Astra's $50 per million. The
   judge still runs on the 45-second `READ_TIMEOUT`, and one that runs out of
-  time or budget falls back to the draft, like any other judge failure. Low
-  is Astra's lowest effort. Nobody has measured whether the judge fits that
+  time or budget falls back to the draft, like any other judge failure. A
+  route with an allowance also makes its timeout final, as a long-running
+  call's is, so a timed-out judge call is not sent again. Low is Astra's
+  lowest effort. Nobody has measured whether the judge fits that
   timeout, or what it costs per day.
 
   `generate_exercise` goes to `claude-opus-5-5` at `medium`
