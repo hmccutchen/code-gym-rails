@@ -13,6 +13,8 @@ RSpec.describe ParameterFilterReport do
       "user.api_keys" => :filtered,
       "response.answers.code_review" => :logged,
       "message" => :logged,
+      "thread.role" => :logged,
+      "thread.content" => :logged,
       "question" => :logged,
       "pseudocode" => :logged,
       "prior_alternates" => :logged,
@@ -23,16 +25,17 @@ RSpec.describe ParameterFilterReport do
   end
 
   it "follows nested hashes and arrays, and partial matches" do
-    results = described_class.new(filter_parameters: [ :code, :answers, :alternates ]).results.to_h
+    results = described_class.new(filter_parameters: [ :code, :answers, :alternates, :content ]).results.to_h
 
     expect(results).to include("code" => :filtered, "response.answers" => :filtered, "prior_alternates" => :filtered,
-                               "pseudocode" => :filtered, "email" => :logged)
+                               "pseudocode" => :filtered, "thread.content" => :filtered, "thread.role" => :logged,
+                               "email" => :logged)
   end
 
   it "prints one line per parameter" do
     described_class.new(out: out).report
 
-    expect(out.string.lines.size).to eq(13)
+    expect(out.string.lines.size).to eq(15)
     expect(out.string).to match(/^code\s+LOGGED$/).and match(/^email\s+filtered$/)
   end
 end

@@ -8,6 +8,7 @@ class ParameterFilterReport
     "user" => { "name" => "A name", "api_keys" => { "anthropic" => "sk-ant-not-a-real-key" } },
     "response" => { "answers" => { "code_review" => "an answer" } },
     "message" => "a duck message",
+    "thread" => [ { "role" => "user", "content" => "an earlier duck turn" } ],
     "question" => "a follow-up question",
     "pseudocode" => "a plan",
     "prior_alternates" => [ "an earlier framing" ],
@@ -36,7 +37,7 @@ class ParameterFilterReport
       path = [ prefix, key ].compact.join(".")
       case value
       when Hash then leaves(value, path)
-      when Array then value.map { |item| [ path, item ] }
+      when Array then value.flat_map { |item| item.is_a?(Hash) ? leaves(item, path) : [ [ path, item ] ] }
       else [ [ path, value ] ]
       end
     end

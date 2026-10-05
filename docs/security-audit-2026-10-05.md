@@ -6,8 +6,9 @@ This branch adds three things beside this report:
 - `spec/requests/security_audit/cross_user_access_spec.rb`: 12 passing
   two-user specs for the routes that had no cross-user spec.
 - `spec/requests/security_audit/hardening_targets_spec.rb`: 6 `pending`
-  specs, one per fix recommended below. Each fails today for the reason it
-  names. RSpec fails a pending spec once it starts passing, so the PR that
+  specs for the fixes a request spec can check (L1, R1, R4, A1, A2, A6).
+  The other recommended fixes have no target spec yet. Each fails today for
+  the reason it names. RSpec fails a pending spec once it starts passing, so the PR that
   fixes it has to drop `pending`.
 - `script/security_audit/`: three read-only scripts. Each is a short runner
   over a class with its own spec in `spec/script/security_audit/`, where
@@ -37,11 +38,17 @@ The medium findings are all defence in depth or abuse limits:
 - There is no Content-Security-Policy.
 - Mermaid is on a version with known XSS bugs and renders model-written
   diagrams.
-- Nothing limits how often a user can hit the endpoints that call a provider.
+- The endpoints that call a provider have only per-section or per-day caps.
+  No per-user limit covers them all, and repeat clicks on `/generate` queue
+  billed duplicates.
 - Signup is open with only per-IP limits.
-- Text sent to the AI has no length cap, normalization or data markers.
+- Answers, follow-up questions and `name` have no length cap. The duck
+  message, duck history, pseudocode and earlier framings are capped. No
+  text sent to the AI is normalized or marked as data.
 
-The prompt-injection risk is real, but only to a user's own grade.
+The prompt-injection risk is real but stays within the user's own data. It
+can sway that user's review grade, the judge's verdict on that user's draft
+sections, and that user's duck conversation.
 
 ---
 
@@ -51,7 +58,7 @@ The prompt-injection risk is real, but only to a user's own grade.
 |---|---|---|---|---|
 | R1 | Rendering | medium | No Content-Security-Policy and no nonces; 31 inline scripts and 8 inline style blocks | M |
 | R2 | Rendering | medium | Mermaid 11.4.1 has two XSS advisories (fixed in 11.10.0); diagram type isn't checked | S |
-| RL1 | Rate limits | medium | No limit on provider-calling or job-enqueuing endpoints; repeat clicks on `/generate` enqueue billed duplicates | S–M |
+| RL1 | Rate limits | medium | Provider-calling and job-enqueuing endpoints have per-section or per-day caps but no per-user limit across them; repeat clicks on `/generate` enqueue billed duplicates | S–M |
 | L2 | Accounts | medium | Open signup: one IP can create about 1,900 accounts a day, and the attacker picks the name printed in our login email | S, after a decision |
 | L3 | Login | medium | No per-address limit on code attempts, so 25 guesses per address per 15 minutes from rotating IPs | S |
 | A1 | AI inputs | medium | No server cap on answers, the design comparison reason, follow-up questions or `name` | S |
@@ -366,8 +373,9 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
 
 **A5. User content and emails in logs (low).**
 - **Found:**
-  - `parameter_filter_check.rb` shows answers, `message`, `question`,
-    `pseudocode`, `prior_alternates`, `p256dh` and `auth` are logged.
+  - `parameter_filter_check.rb` shows answers, `message`, the duck's
+    `thread` turns, `question`, `pseudocode`, `prior_alternates`, `p256dh`
+    and `auth` are logged.
   - `grade_section` (`ai_service.rb:2793`) and the pseudocode critique
     (`:1355`) parse with the default `log_raw: true`. On bad JSON they log
     500 bytes of a reply that can quote the answer, though the comment at

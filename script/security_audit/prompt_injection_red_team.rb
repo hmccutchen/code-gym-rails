@@ -1,6 +1,6 @@
 # Prompt-injection red team for the review grader, the section judge and the
 # duck. Read-only: every record is built in memory, and the pinned service
-# ModelComparison already uses writes no ApiUsage rows. Run it through
+# that ModelComparison already uses writes no ApiUsage rows. Run it through
 # script/security_audit/red_team.rb.
 require_relative "../model_comparison"
 
