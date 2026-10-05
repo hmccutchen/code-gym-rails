@@ -17,13 +17,19 @@ module MermaidSource
   # semicolon inside a quoted label also splits here, which can only refuse
   # more, never less.
   STATEMENT_BREAK = /[;\n]/
+  # Mermaid's lexer treats every JavaScript whitespace character as a space,
+  # including a no-break space, a BOM and a line separator, which Ruby's strip
+  # leaves in place. A statement behind one would slip past REFUSED_STATEMENT,
+  # so any whitespace or invisible formatting character beyond space, tab and
+  # line breaks refuses the whole source.
+  UNEXPECTED_SPACING = /[\p{Space}\p{Cf}&&[^ \t\n\r]]/
 
   def self.usable?(source)
     return false unless source.is_a?(String)
 
     text = source.strip
     return false unless text.length.between?(1, MAX_LENGTH)
-    return false if text.include?("%%{")
+    return false if text.include?("%%{") || text.match?(UNEXPECTED_SPACING)
 
     statements = text.split(STATEMENT_BREAK).map(&:strip)
     statements.first.match?(HEADER) && statements.none? { |statement| statement.match?(REFUSED_STATEMENT) }

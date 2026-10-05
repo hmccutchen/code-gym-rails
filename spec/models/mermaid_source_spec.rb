@@ -38,6 +38,20 @@ RSpec.describe MermaidSource do
     end
   end
 
+  # Mermaid reads each of these as a space, so a statement behind one is still
+  # a statement; Ruby's strip removes none of them.
+  it "refuses whitespace and invisible formatting characters beyond space, tab and line breaks" do
+    [ "\u00A0", "\uFEFF", "\u2028", "\u3000", "\v", "\f", "\u2003", "\u200B" ].each do |character|
+      source = "flowchart TD\n  A --> B\n#{character}style A fill:#f00"
+      expect(described_class.usable?(source)).to be(false), character.inspect
+    end
+    expect(described_class.usable?("flowchart TD\n  A[\"Order\u00A0service\"] --> B")).to be(false)
+  end
+
+  it "accepts tabs and Windows line endings" do
+    expect(described_class.usable?("flowchart TD\r\n\tA --> B\r\n")).to be(true)
+  end
+
   it "refuses blank, oversized and non-string sources" do
     [ nil, 42, [ "flowchart TD" ], "", "   ", "flowchart TD\n#{'x' * described_class::MAX_LENGTH}" ].each do |source|
       expect(described_class.usable?(source)).to be(false), source.inspect
