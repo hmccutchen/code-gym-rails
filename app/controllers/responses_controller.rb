@@ -1,9 +1,10 @@
 class ResponsesController < ApplicationController
   include ProviderCallLimits
 
+  # Ahead of the other checks, so a request they refuse still counts.
+  limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
   before_action :set_response, only: [ :review, :email_review, :explain_differently, :follow_ups, :start_over ]
   before_action :require_reviewed_section!, only: [ :explain_differently, :follow_ups ]
-  limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
 
   # Double MAX_FOLLOW_UPS_PER_SECTION (3): a follow-up is one clarifying
   # question about an already-finished review, while a duck thread supports

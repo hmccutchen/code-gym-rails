@@ -72,7 +72,7 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
-    # The three rate_limit declarations need distinct `name:`s or they alias:
+    # The rate_limit declarations need distinct `name:`s or they alias:
     # nameless, both key on `by`, and `by` for #create is attacker-controlled,
     # so submitting the request's own IP as the email makes both limits key
     # on "127.0.0.1". Eleven such posts land the shared key at 11 (posts

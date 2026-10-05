@@ -615,7 +615,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `ProviderCallLimits`, which counts them together: `ProviderCallLimits::HOURLY`
   (60) per user per hour and `DAILY` (300) per day, in one fixed scope so the
   count is shared across both controllers. Each endpoint's own per-section or
-  per-page cap still applies first. `/generate` allows
+  per-page cap still applies; the shared count runs before every other check,
+  so a request those checks refuse still counts. `/generate` allows
   `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
   prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
   `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per

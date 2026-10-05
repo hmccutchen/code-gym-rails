@@ -33,6 +33,26 @@ RSpec.describe "Per-user request limits", type: :request do
       expect(response).to have_http_status(:too_many_requests)
     end
 
+    # One request to each action, then a critique that is over the limit only
+    # if that request counted. Each is refused by its own checks after the
+    # limit has counted it, so no provider is called.
+    {
+      "duck_thread" => -> { post duck_thread_responses_path, params: {}, as: :json },
+      "follow_ups" => -> { post follow_ups_response_path(0), params: {}, as: :json },
+      "explain_differently on a review" => -> { post explain_differently_response_path(0), params: {}, as: :json },
+      "explain_differently on a concept reference" => -> { post explain_differently_concept_reference_path(0), as: :json }
+    }.each do |label, request|
+      it "counts #{label} toward the shared limit" do
+        (ProviderCallLimits::HOURLY - 1).times { critique }
+        instance_exec(&request)
+        expect(response).not_to have_http_status(:too_many_requests)
+
+        critique
+
+        expect(response).to have_http_status(:too_many_requests)
+      end
+    end
+
     it "keeps counting across hours toward the daily limit" do
       ProviderCallLimits::DAILY.times do |n|
         travel(61.minutes) if (n % ProviderCallLimits::HOURLY).zero? && n.positive?
@@ -76,6 +96,15 @@ RSpec.describe "Per-user request limits", type: :request do
       expect { post concept_path, as: :json }.not_to have_enqueued_job(GenerateConceptReferenceJob)
       expect(response).to have_http_status(:too_many_requests)
       expect(response.parsed_body["error"]).to match(/several write-ups/)
+    end
+
+    it "counts the ladder button with the per-concept requests and redirects it back to Setup" do
+      LearnController::PREPARE_PER_HOUR.times { post concept_path, as: :json }
+
+      expect { post prepare_learn_ladders_path, headers: { "HTTP_REFERER" => setup_url } }
+        .not_to have_enqueued_job(GenerateConceptReferenceJob)
+      expect(response).to redirect_to(setup_url)
+      expect(flash[:alert]).to match(/several write-ups/)
     end
 
     it "counts the backfill button with the per-concept requests and redirects it" do
