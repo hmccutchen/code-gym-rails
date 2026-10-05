@@ -1353,7 +1353,7 @@ class AiService
       prompt: build_pseudocode_critique_prompt(exercise, section, pseudocode)
     )
 
-    parsed     = parse_json_object(result[:text], subject: "pseudocode critique")
+    parsed     = parse_json_object(result[:text], subject: "pseudocode critique", log_raw: false)
     gaps_found = parsed["gaps_found"]
     unless [ true, false ].include?(gaps_found)
       raise InvalidResponseError, "Pseudocode critique returned no usable \"gaps_found\" flag"
@@ -2791,7 +2791,7 @@ class AiService
     )
     # graded_prose and the rubric stamp are server-owned: only the prose
     # judge's edit writes the first, and only this line the second.
-    review = service.send(:parse_json_object, result[:text], subject: "#{section} review")
+    review = service.send(:parse_json_object, result[:text], subject: "#{section} review", log_raw: false)
                     .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
     review = service.send(:rated, user, exercise, daily_response, section, review)
     review = service.send(:gaps_beside_their_prose, service.send(:judged_review, user, exercise, section, review))
@@ -3070,7 +3070,8 @@ class AiService
   end
 
   # log_raw: false is for replies that must stay out of application logs: an
-  # engineer's review text, a blind solve, and a drafted problem set, whose
+  # engineer's review text or pseudocode critique, which can quote their
+  # answer, a blind solve, and a drafted problem set, whose
   # answer keys the stripping steps have not yet seen. Nothing is logged, and
   # the message never quotes the reply (a parser message can).
   def parse_json_response(text, subject: "response", log_raw: true)
@@ -3125,6 +3126,16 @@ class AiService
     message.presence || fallback
   rescue JSON::ParserError
     fallback
+  end
+
+  # A provider's authentication error body can echo the key or fragments of
+  # it, so the body is neither logged nor shown; the status says enough.
+  def raise_if_key_rejected(company, status)
+    return unless [ 401, 403 ].include?(status)
+
+    Rails.logger.error("#{company} authentication failed (HTTP #{status})")
+    raise AuthenticationError.new("#{company} rejected your API key or its permissions. Check it in Settings.",
+                                  http_status: status)
   end
 
   # Logs a truncated snippet of raw provider output server-side instead of

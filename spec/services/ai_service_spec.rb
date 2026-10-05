@@ -4002,6 +4002,16 @@ RSpec.describe AiService do
           .to change { ApiUsage.where(purpose: "pseudocode_critique").count }.by(1)
       end
 
+      # The critique can quote the engineer's plan, so an unreadable reply is
+      # neither logged nor quoted in the error the page shows.
+      it "keeps an unparseable critique out of the log and the error" do
+        allow(Rails.logger).to receive(:error)
+
+        expect { critique_with("SENTINEL-CRITIQUE is not json") }
+          .to raise_error(AiService::InvalidResponseError) { |error| expect(error.message).not_to include("SENTINEL") }
+        expect(Rails.logger).not_to have_received(:error).with(/SENTINEL/)
+      end
+
       it "logs counts only, never the plan or the critique text" do
         logged = []
         allow(Rails.logger).to receive(:info) { |msg| logged << msg.to_s if msg.to_s.start_with?("[pseudocode]") }
@@ -6553,6 +6563,22 @@ RSpec.describe AiService, "judging graded reviews" do
     context = svc.send(:build_review_day_context, "Rails", exercise, response)
     _, result = svc.send(:grade_section, user, exercise, response, "code_review", context)
     [ result, judge_calls ]
+  end
+
+  # A grade quotes the engineer's answer, so an unreadable one is neither
+  # logged nor carried in the section's stored error.
+  it "keeps an unparseable grade out of the log and the section's error" do
+    svc = FakeService.new("key")
+    allow(FakeService).to receive(:new).and_return(svc)
+    allow(svc).to receive(:call).and_return(text: "SENTINEL-GRADE is not json", input_tokens: 1, output_tokens: 1)
+    allow(Rails.logger).to receive(:error)
+
+    context = svc.send(:build_review_day_context, "Rails", exercise, response)
+    _, result = svc.send(:grade_section, user, exercise, response, "code_review", context)
+
+    expect(result[:ok]).to be(false)
+    expect(result[:message]).not_to include("SENTINEL")
+    expect(Rails.logger).not_to have_received(:error).with(/SENTINEL/)
   end
 
   def edit_reply
