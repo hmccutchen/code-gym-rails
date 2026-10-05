@@ -11,8 +11,12 @@ module MermaidSource
   # anything actually asked for.
   MAX_LENGTH = 1_000
 
-  HEADER = /\A(?:flowchart|graph)(?:[ \t]+(?:TD|TB|BT|LR|RL))?[ \t]*\z/
-  REFUSED_STATEMENT = /\A[ \t]*(?:classDef|class|style|linkStyle|click)\b/
+  HEADER = /\A(?:flowchart|graph)(?:[ \t]+(?:TD|TB|BT|LR|RL))?\z/
+  REFUSED_STATEMENT = /\A(?:classDef|class|style|linkStyle|click)\b/
+  # Mermaid ends a statement at a semicolon as well as a line break. A
+  # semicolon inside a quoted label also splits here, which can only refuse
+  # more, never less.
+  STATEMENT_BREAK = /[;\n]/
 
   def self.usable?(source)
     return false unless source.is_a?(String)
@@ -21,7 +25,7 @@ module MermaidSource
     return false unless text.length.between?(1, MAX_LENGTH)
     return false if text.include?("%%{")
 
-    lines = text.lines(chomp: true)
-    lines.first.match?(HEADER) && lines.none? { |line| line.match?(REFUSED_STATEMENT) }
+    statements = text.split(STATEMENT_BREAK).map(&:strip)
+    statements.first.match?(HEADER) && statements.none? { |statement| statement.match?(REFUSED_STATEMENT) }
   end
 end

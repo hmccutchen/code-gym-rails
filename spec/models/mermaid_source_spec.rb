@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe MermaidSource do
   it "accepts the flowchart and graph headers the prompt asks for" do
     [ "flowchart TD\n  A[Job] --> B[(DB)]", "graph LR\n  A --> B", "flowchart\n  A --> B",
-      "  flowchart TB  \n  A[\"Order service\"] --> B" ].each do |source|
+      "  flowchart TB  \n  A[\"Order service\"] --> B", "flowchart TD;A --> B", "graph LR\n  A[\"x; y\"] --> B" ].each do |source|
       expect(described_class.usable?(source)).to be(true), source
     end
   end
@@ -26,6 +26,15 @@ RSpec.describe MermaidSource do
     [ "classDef hot fill:#f00", "class A hot", "style A fill:#f00", "linkStyle 0 stroke:#f00",
       "click A \"https://example.com\"" ].each do |statement|
       expect(described_class.usable?("flowchart TD\n  A --> B\n  #{statement}")).to be(false), statement
+    end
+  end
+
+  # Mermaid ends a statement at a semicolon too, so a refused statement after
+  # one is still a statement.
+  it "refuses class, style and click statements that follow a semicolon" do
+    [ "flowchart TD\n  A --> B;style A fill:#f00", "flowchart TD\n  A --> B; classDef hot fill:#f00",
+      "graph TD;class A hot", "flowchart TD;click A \"https://example.com\"" ].each do |source|
+      expect(described_class.usable?(source)).to be(false), source
     end
   end
 
