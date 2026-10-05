@@ -1393,7 +1393,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
       expect(response.body).to include("flowchart TD")
-      expect(response.body).to include("mermaid@11.4.1")
+      expect(response.body).to include("mermaid@11.17.2")
       expect(response.body).to match(/securityLevel:\s*["']strict["']/)
 
       # collapsible: true call sites mark the div as owning the <details> this
@@ -1414,7 +1414,23 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
+      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
+    end
+
+    # Rows stored before ingest held diagrams to MermaidSource still render
+    # through it, so an older sequence diagram or config directive never
+    # reaches the renderer.
+    it "renders no disclosure or script for a stored diagram MermaidSource refuses" do
+      ps = base_problem_set
+      ps["code_review"]["diagram"] = "sequenceDiagram\n  A->>B: hi"
+      ps["pattern"]["diagram"]     = "%%{init: {'theme': 'base'}}%%\nflowchart TD\n  A --> B"
+      create_exercise(problem_set: ps)
+      login_as(user)
+
+      get root_path
+
+      expect(response.body).not_to include('class="mermaid-diagram"')
+      expect(response.body).not_to include("mermaid@11.17.2")
     end
 
     # The old-data guarantee: a row generated before this field existed must
@@ -1427,7 +1443,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect(response.body).not_to include('class="mermaid-diagram"')
       expect(response.body).not_to include("🗺️ Structure diagram")
-      expect(response.body).not_to include("mermaid@11.4.1")
+      expect(response.body).not_to include("mermaid@11.17.2")
     end
 
     # The submitted day renders a different partial than the unsubmitted one
@@ -1448,7 +1464,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("graph LR")
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(3)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
+      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
 
     # Nothing else exercises collapsible: true and collapsible: false diagrams
@@ -1474,7 +1490,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       # its own "Reference — tradeoffs" summary is the only wrapper around it.
       expect(response.body.scan("🗺️ Structure diagram").size).to eq(2)
       expect(response.body.scan('class="mermaid-diagram"').size).to eq(3)
-      expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
+      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
   end
 end

@@ -15,7 +15,9 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
   let(:user)    { create_fake_provider_user }
   let(:weekday) { a_weekday }
 
-  bad_diagram = "not mermaid syntax @@@ <<< >>>"
+  # Passes MermaidSource, so it reaches the browser, and then fails Mermaid's
+  # own parse on the unclosed label.
+  bad_diagram = "flowchart TD\n  A[unclosed --> B"
 
   # Travelled here rather than around each example body, the way the sibling
   # specs do it: this spec already enters the page in one place, and that place

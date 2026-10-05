@@ -1,6 +1,6 @@
 <%# A Mermaid container plus, once per page, the module script that renders
     every such container on it. Local: source (Mermaid text) — a blank
-    source renders nothing at all, so call sites stay a single unconditional
+    source, or one MermaidSource refuses, renders nothing at all, so call sites stay a single unconditional
     line and a pre-diagram row is indistinguishable from a section that chose
     not to have one. Local: collapsible (default true) — wraps the container
     in its own closed <details>, matching shared/_concept_reference.html.erb's
@@ -8,7 +8,7 @@
     already renders inside its own <details class="ref"> (the "Reference —
     tradeoffs" box) — a second nested disclosure there would turn a one-click
     reveal into two. %>
-<% if source.present? %>
+<% if MermaidSource.usable?(source) %>
   <% if local_assigns.fetch(:collapsible, true) %>
     <details class="ref">
       <summary><%= t("diagram.summary") %></summary>
@@ -59,7 +59,7 @@
         const removeFailed = (el) => (el.dataset.ownsDetails === "1" ? el.closest("details") : el).remove();
         const cleanupAllPending = () => { for (const el of pending()) removeFailed(el); };
         try {
-          const mermaid = (await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs")).default;
+          const mermaid = (await import("https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs")).default;
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
 
           for (const el of pending()) {

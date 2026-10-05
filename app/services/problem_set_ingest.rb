@@ -33,11 +33,6 @@ class ProblemSetIngest
   # has to read it to tell whether the question is answerable.
   SERVER_STAMPS = %w[pitched_at eased source anchored].freeze
 
-  # Upper bound on a section's Mermaid `diagram`. The prompt asks for at most
-  # 8 nodes with short labels, which lands well under half this — so the bound
-  # rejects runaway output without rejecting anything actually asked for.
-  MAX_DIAGRAM_LENGTH = 1_000
-
   # An off-vocabulary concept the provider invented. `bucket` is the vocabulary
   # bucket it would have belonged to, which is what SuggestedConcept records
   # under.
@@ -355,23 +350,24 @@ class ProblemSetIngest
   end
 
   # Mermaid source is provider output rendered straight into an HTML data
-  # attribute, so it is bounded here rather than trusted downstream. Anything
-  # unusable is deleted, not repaired: the reader then takes the same "no
-  # diagram" path every pre-diagram row already takes.
-  #
-  # Only the top-level key — architecture's diagram lives at reference.diagram,
-  # predates this field, and is not touched.
+  # attribute, so it is held to MermaidSource here rather than trusted
+  # downstream. Anything unusable is deleted, not repaired: the reader then
+  # takes the same "no diagram" path every pre-diagram row already takes.
+  # Architecture's diagram lives at reference.diagram and is held to the same
+  # rule.
   def normalize_diagrams!
     @problem_set.each do |section_key, section_data|
       next unless section_data.is_a?(Hash)
 
-      diagram = section_data["diagram"]
-      usable  = ExerciseSection.find(section_key)&.diagrammable? &&
-                diagram.is_a?(String) &&
-                diagram.strip.length.between?(1, MAX_DIAGRAM_LENGTH)
-
-      usable ? section_data["diagram"] = diagram.strip : section_data.delete("diagram")
+      keep_usable_diagram(section_data, allowed: ExerciseSection.find(section_key)&.diagrammable?)
+      reference = section_data["reference"]
+      keep_usable_diagram(reference, allowed: true) if reference.is_a?(Hash) && reference.key?("diagram")
     end
+  end
+
+  def keep_usable_diagram(holder, allowed:)
+    diagram = holder["diagram"]
+    allowed && MermaidSource.usable?(diagram) ? holder["diagram"] = diagram.strip : holder.delete("diagram")
   end
 
   # The page, the grader, the duck and the difficulty assessment all read

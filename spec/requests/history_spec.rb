@@ -228,7 +228,7 @@ RSpec.describe "History", type: :request do
       # present on every page regardless of content. What must NOT appear is
       # an actual container element or the mermaid script.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
-      expect(response.body).not_to include("mermaid@11.4.1")
+      expect(response.body).not_to include("mermaid@11.17.2")
     end
 
     it "renders no container and no mermaid script for an exercise generated before diagrams existed" do
@@ -241,7 +241,7 @@ RSpec.describe "History", type: :request do
       # present on every page regardless of content. What must NOT appear is
       # an actual container element or the mermaid script.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
-      expect(response.body).not_to include("mermaid@11.4.1")
+      expect(response.body).not_to include("mermaid@11.17.2")
     end
 
     it "emits the ai_review script and the mermaid module exactly once across multiple entries" do
@@ -258,7 +258,7 @@ RSpec.describe "History", type: :request do
 
       expect(response.body.scan("This script is emitted once").size).to eq(1)
       # Check for mermaid script specifically, since highlight.js script also uses cdn.jsdelivr.net
-      expect(response.body.scan("mermaid@11.4.1").size).to eq(1)
+      expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
 
     it "renders improved_code for a visible pattern section" do
