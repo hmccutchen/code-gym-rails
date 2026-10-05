@@ -53,7 +53,7 @@ RSpec.describe MermaidSource do
   end
 
   it "refuses blank, oversized and non-string sources" do
-    [ nil, 42, [ "flowchart TD" ], "", "   ", "flowchart TD\n#{'x' * described_class::MAX_LENGTH}" ].each do |source|
+    [ nil, 42, [ "flowchart TD" ], "", "   ", ";", ";;\n;", "\n;", "flowchart TD\n#{'x' * described_class::MAX_LENGTH}" ].each do |source|
       expect(described_class.usable?(source)).to be(false), source.inspect
     end
   end

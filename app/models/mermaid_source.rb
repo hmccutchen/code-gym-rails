@@ -31,7 +31,7 @@ module MermaidSource
     return false unless text.length.between?(1, MAX_LENGTH)
     return false if text.include?("%%{") || text.match?(UNEXPECTED_SPACING)
 
-    statements = text.split(STATEMENT_BREAK).map(&:strip)
-    statements.first.match?(HEADER) && statements.none? { |statement| statement.match?(REFUSED_STATEMENT) }
+    header, *body = text.split(STATEMENT_BREAK).map(&:strip)
+    header.to_s.match?(HEADER) && body.none? { |statement| statement.match?(REFUSED_STATEMENT) }
   end
 end
