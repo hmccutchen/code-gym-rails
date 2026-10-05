@@ -1,0 +1,90 @@
+require "rails_helper"
+
+# The test environment uses :null_store, whose #increment returns nil, so no
+# limit trips in the rest of the suite. These examples swap in a real store.
+# Requests here are refused by each action's own checks after the limit has
+# counted them, so no provider is called.
+RSpec.describe "Per-user request limits", type: :request do
+  let(:user) { create_user_with_key }
+
+  before do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    login_as(user)
+  end
+
+  def critique = post(pseudocode_critique_responses_path, params: {}, as: :json)
+
+  describe "provider-calling endpoints" do
+    it "refuses the request past the hourly limit with a JSON error the page can show" do
+      ProviderCallLimits::HOURLY.times { critique }
+      expect(response).not_to have_http_status(:too_many_requests)
+
+      critique
+
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.parsed_body["error"]).to match(/limit on AI requests/)
+    end
+
+    it "shares the count across controllers" do
+      ProviderCallLimits::HOURLY.times { critique }
+
+      post explain_differently_concept_reference_path(0), as: :json
+
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
+    it "keeps counting across hours toward the daily limit" do
+      ProviderCallLimits::DAILY.times do |n|
+        travel(61.minutes) if (n % ProviderCallLimits::HOURLY).zero? && n.positive?
+        critique
+      end
+      travel(61.minutes)
+
+      critique
+
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
+    it "counts each user separately" do
+      ProviderCallLimits::HOURLY.times { critique }
+
+      login_as(create_user_with_key(email: "other@example.com"))
+      critique
+
+      expect(response).not_to have_http_status(:too_many_requests)
+    end
+  end
+
+  describe "POST /generate" do
+    it "refuses a press past the hourly limit without queueing a generation" do
+      DailyExercisesController::GENERATE_PER_HOUR.times { post generate_path }
+
+      expect { post generate_path }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to match(/several times in the last hour/)
+    end
+  end
+
+  describe "Learn write-ups" do
+    let(:concept_path) { prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one") }
+
+    before { user.update!(language: "ruby_rails") }
+
+    it "answers a script's request past the limit with JSON" do
+      LearnController::PREPARE_PER_HOUR.times { post concept_path, as: :json }
+
+      expect { post concept_path, as: :json }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.parsed_body["error"]).to match(/several write-ups/)
+    end
+
+    it "counts the backfill button with the per-concept requests and redirects it" do
+      LearnController::PREPARE_PER_HOUR.times { post concept_path, as: :json }
+
+      post prepare_learn_path
+
+      expect(response).to redirect_to(learn_path)
+      expect(flash[:alert]).to match(/several write-ups/)
+    end
+  end
+end
