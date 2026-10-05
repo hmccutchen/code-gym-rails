@@ -9,7 +9,9 @@ This branch adds three things beside this report:
   specs, one per fix recommended below. Each fails today for the reason it
   names. RSpec fails a pending spec once it starts passing, so the PR that
   fixes it has to drop `pending`.
-- `script/security_audit/`: three read-only scripts.
+- `script/security_audit/`: three read-only scripts. Each is a short runner
+  over a class with its own spec in `spec/script/security_audit/`, where
+  the red team runs against a stubbed provider.
   - `parameter_filter_check.rb` shows which params reach the logs.
   - `account_counts.rb` counts accounts for the signup question.
   - `red_team.rb` runs the prompt-injection cases against Claude with your
@@ -132,8 +134,11 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
 - **Why low:** a code is single-use, cleared on success
   (`user.rb:136`, `:146-152`) and redeemable only in the browser that asked
   for it, so a logged code is already spent.
-- **Fix:** add `:code` to `filter_parameters`. The pending spec "filters the
-  login code" covers it.
+- **Fix:** add `/\Acode\z/` to `filter_parameters`. A bare `:code` would
+  also match `pseudocode` and the `code_review` answer, because Rails matches
+  filter names as substrings (`spec/script/security_audit/parameter_filter_report_spec.rb`
+  shows this), so it would also decide A5's question. The pending spec
+  "filters the login code" covers it.
 - **Size:** XS.
 
 **L4. Limits fail open (low).**
@@ -520,7 +525,7 @@ bundler and actions, daily (`.github/dependabot.yml`).
 
 | Check | Evidence |
 |---|---|
-| `html_safe` and `raw` | All wrap constants, translations or `to_json` inside `<script>` (JSON escaping turns `<>&` into `<` etc.). Examples: `dashboard/_exercise.html.erb:137`, `api_keys/edit.html.erb:260-262`, `_push_script.html.erb:13` (stored endpoints, via `to_json`) |
+| `html_safe` and `raw` | All wrap constants, translations or `to_json` inside `<script>` (Rails' JSON encoder writes `<`, `>` and `&` as the escapes `\u003c`, `\u003e` and `\u0026`, so the text can't close the script tag). Examples: `dashboard/_exercise.html.erb:137`, `api_keys/edit.html.erb:260-262`, `_push_script.html.erb:13` (stored endpoints, via `to_json`) |
 | No markdown or sanitize | No redcarpet, commonmarker or kramdown; no `sanitize`, `simple_format`, `insertAdjacentHTML` or `document.write`. Model text is shown through ERB escaping or `textContent` (`_duck_thread:58`, `_ai_review:124, 149`, `_pseudocode_to_code:102`, `_concept_reference_alternates_script:62`). User text is never rendered as HTML |
 | Glossary | `glossary_wrap` (`app/helpers/glossary_helper.rb:19-51`) drops any SafeBuffer (`:25`), escapes every fragment and attribute (`:42-48`), and takes definitions only from the fixed `Glossary::TERMS` |
 | Syntax highlighting | `hljs.highlight(el.textContent)` into `innerHTML` (`_syntax_highlighting_script.html.erb:52-53`). The input is the already-escaped text, and highlight.js escapes its output |
