@@ -57,7 +57,7 @@ sections, and that user's duck conversation.
 | ID | Area | Severity | Finding | Size |
 |---|---|---|---|---|
 | R1 | Rendering | medium | No Content-Security-Policy and no nonces; 31 inline scripts and 8 inline style blocks | M |
-| R2 | Rendering | medium | Mermaid 11.4.1 has two XSS advisories (fixed in 11.10.0); diagram type isn't checked | S |
+| R2 | Rendering | medium | Mermaid 11.4.1 is inside nine advisories, including XSS (all fixed by 11.16.1); diagram type isn't checked | S |
 | RL1 | Rate limits | medium | Provider-calling and job-enqueuing endpoints have per-section or per-day caps but no per-user limit across them; repeat clicks on `/generate` enqueue billed duplicates | S–M |
 | L2 | Accounts | medium | Open signup: one IP can create about 1,900 accounts a day, and the attacker picks the name printed in our login email | S, after a decision |
 | L3 | Login | medium | No per-address limit on code attempts, so 25 guesses per address per 15 minutes from rotating IPs | S |
@@ -226,7 +226,10 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   - [CVE-2025-54880](https://osv.dev/vulnerability/CVE-2025-54880): XSS
     through architecture diagram icons.
 
-  Both are fixed in 11.10.0.
+  Both are fixed in 11.10.0, but npm's advisory API lists seven more for
+  11.4.1: CSS injection through `classDef`, `style` and config directives,
+  prototype pollution through config, and two infinite loops. The last of
+  them is fixed in 11.16.1.
 - **Where diagram source comes from:** the model, inside the user's own
   problem set.
   - `ProblemSetIngest#normalize_diagrams!` (`app/services/problem_set_ingest.rb:364-375`)
@@ -239,7 +242,7 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   would need the model to write one, which the user can steer only through
   their own name (`ai_service.rb:2216`).
 - **Fix:**
-  - Pin `mermaid@11.10.0` or later.
+  - Pin `mermaid@11.16.1` or later.
   - At ingest, accept only diagrams whose first token is `flowchart` or
     `graph`, and apply the same check and length bound to
     `architecture.reference.diagram`.
@@ -575,7 +578,8 @@ bundler and actions, daily (`.github/dependabot.yml`).
 Small and focused, highest severity first. Each PR also drops `pending` from
 its own target spec in `security_audit/hardening_targets_spec.rb`.
 
-1. **Mermaid 11.10+ and diagram checks (R2).**
+1. **Mermaid 11.16.1+ and diagram checks (R2).** Opened as #284, which
+   pins 11.17.2.
    - **Changes:** pin the new version; accept only `flowchart` or `graph`
      diagrams at ingest, including `architecture.reference.diagram`, with the
      same length limit.
