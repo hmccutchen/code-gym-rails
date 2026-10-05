@@ -461,7 +461,8 @@ class AiService
   # couple of hundred more, and the JSON structure the rest. The cap keeps
   # several times that headroom on purpose: what it bounds is a model
   # overrunning the length it was asked for, not a correctly sized reply.
-  # Passing it turns thinking off, as for every capped purpose.
+  # Passing it turns thinking off, as for every capped purpose, unless the
+  # provider's route for the judge adds room to reason on top of it.
   JUDGE_MAX_TOKENS = 1_200
 
   # One line per rejection principle, rendered into the prompt in

@@ -163,6 +163,30 @@ RSpec.describe OpenaiService do
       expect(attempts).to eq(1)
     end
 
+    it "does not retry a timed-out call on a route that reasons within an allowance" do
+      attempts = 0
+      service.instance_variable_set(:@conn, Faraday.new do |f|
+        f.request :retry, OpenaiService::RETRY_OPTIONS
+        f.adapter(:test) { |stub| stub.post(OpenaiService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+      end)
+
+      expect {
+        service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::JUDGE_MAX_TOKENS, purpose: "judge_section")
+      }.to raise_error(AiService::TimeoutError)
+      expect(attempts).to eq(1)
+    end
+
+    it "still retries a timed-out call on a route with no allowance" do
+      attempts = 0
+      service.instance_variable_set(:@conn, Faraday.new do |f|
+        f.request :retry, OpenaiService::RETRY_OPTIONS
+        f.adapter(:test) { |stub| stub.post(OpenaiService::API_URL) { attempts += 1; raise Faraday::TimeoutError } }
+      end)
+
+      expect { service.send(:call, system: "sys", prompt: "p", max_tokens: 250) }.to raise_error(AiService::TimeoutError)
+      expect(attempts).to eq(OpenaiService::RETRY_OPTIONS[:max] + 1)
+    end
+
     it "retries a 429 and eventually succeeds" do
       responses = [ [ 429, "" ], [ 200, hello.to_json ] ]
       service.instance_variable_set(:@conn, stubbed_connection(responses))
@@ -237,11 +261,19 @@ RSpec.describe OpenaiService do
       ])
     end
 
-    it "turns reasoning off whenever it caps the budget, so the cap is not spent reasoning" do
+    it "turns reasoning off when it caps a route with no allowance, so the cap is not spent reasoning" do
       body, = call_with(hello, max_tokens: 250)
 
       expect(body["max_output_tokens"]).to eq(250)
       expect(body["reasoning"]).to eq("effort" => "none")
+    end
+
+    it "keeps a capped call's reasoning when its route carries an allowance, and adds the allowance to the cap" do
+      body, = call_with(hello, max_tokens: 250, purpose: "judge_section")
+      route = OpenaiService::MODEL_FOR_PURPOSE.fetch("judge_section")
+
+      expect(body["reasoning"]).to eq("effort" => route[:effort])
+      expect(body["max_output_tokens"]).to eq(250 + route[:reasoning_allowance])
     end
 
     it "refuses a capped call routed to a model that cannot turn reasoning off" do

@@ -444,16 +444,29 @@ concept-specific difficulty descriptions for future generation, not a new set.
   and falls back to its `DEFAULT_ROUTE` for any purpose not listed. The tables
   are per provider because the providers share no model names and turn thinking down
   differently (`effort` on Claude, `thinking_level` on Gemini,
-  `reasoning.effort` on OpenAI). OpenAI routes generation and its retry to
-  `gpt-6.1-sol` at `high` effort and everything else to `gpt-6-sol` at an
-  explicit `medium`; none of those routes has been compared against another
-  model. A capped OpenAI call sends effort `none` from
-  `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`. GPT-6.1
-  Sol and GPT-6 Astra have no `none`, so like Opus 5.5 neither can take a
-  capped purpose, which is why only uncapped generation goes to 6.1 Sol. `call_and_log`
-  hands `purpose:` to `#call` for this. Because an unlisted purpose falls back
-  silently, `spec/services/model_routing_spec.rb` fails on a key that no call
-  site logs, so a typo cannot quietly route nothing.
+  `reasoning.effort` on OpenAI). `call_and_log` hands `purpose:` to `#call`
+  for this. Because an unlisted purpose falls back silently,
+  `spec/services/model_routing_spec.rb` fails on a key that no call site
+  logs, so a typo cannot quietly route nothing.
+
+  **OpenAI** sends generation and its retry to `gpt-6.1-sol` at `high`
+  effort, the section judge to `gpt-6-astra` at `low`, and everything else to
+  `gpt-6-sol` with reasoning off (`none`). None of these routes has been
+  compared against another model, because `script/compare_models.rb` runs
+  only Claude. A capped OpenAI call normally sends effort `none` from
+  `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`, because
+  `max_output_tokens` caps reasoning and reply together. GPT-6.1 Sol and
+  Astra have no `none`, so a capped purpose can go to either only when its
+  route carries a `reasoning_allowance`. That allowance keeps the route's
+  effort and adds itself to the cap. The judge's is 25,000 tokens,
+  OpenAI's suggested starting reserve for reasoning and output, so a judge
+  call can cost up to 26,200 output tokens at Astra's $50 per million. The
+  judge still runs on the 45-second `READ_TIMEOUT`, and one that runs out of
+  time or budget falls back to the draft, like any other judge failure. A
+  route with an allowance also makes its timeout final, as a long-running
+  call's is, so a timed-out judge call is not sent again. Low is Astra's
+  lowest effort. Nobody has measured whether the judge fits that
+  timeout, or what it costs per day.
 
   `generate_exercise` goes to `claude-opus-5-5` at `medium`
   effort, not `low`, because nothing measures whether `low` holds quality.

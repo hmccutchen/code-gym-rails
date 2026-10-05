@@ -151,17 +151,27 @@ RSpec.describe "per-purpose model routing" do
       expect(body["reasoning"]).to eq("effort" => "high")
     end
 
-    it "sends the default route to 6 Sol at an explicit medium effort" do
-      body = posted_body(OpenaiService, purpose: "review_response")
+    it "sends the default route to 6 Sol with reasoning off, capped or not" do
+      [ {}, { max_tokens: 250 } ].each do |cap|
+        body = posted_body(OpenaiService, purpose: "review_response", **cap)
 
-      expect(body["model"]).to eq("gpt-6-sol")
-      expect(body["reasoning"]).to eq("effort" => "medium")
+        expect(body["model"]).to eq("gpt-6-sol")
+        expect(body["reasoning"]).to eq("effort" => "none")
+      end
     end
 
-    it "gives every non-generation route a reasoning-off setting, since any of them may be capped" do
+    it "sends the section judge to Astra at low effort, with its cap raised by the reasoning allowance" do
+      body = posted_body(OpenaiService, purpose: "judge_section", max_tokens: AiService::JUDGE_MAX_TOKENS)
+
+      expect(body["model"]).to eq("gpt-6-astra")
+      expect(body["reasoning"]).to eq("effort" => "low")
+      expect(body["max_output_tokens"]).to eq(AiService::JUDGE_MAX_TOKENS + 25_000)
+    end
+
+    it "lets every capped purpose either turn reasoning off or reason within an allowance" do
       generation = OpenaiService::MODEL_FOR_PURPOSE.values_at("generate_exercise", "retry_section")
       (OpenaiService::MODEL_FOR_PURPOSE.values + [ OpenaiService::DEFAULT_ROUTE ] - generation).each do |route|
-        expect(OpenaiService::REASONING_OFF).to have_key(route[:model])
+        expect(OpenaiService::REASONING_OFF.key?(route[:model]) || route.key?(:reasoning_allowance)).to be(true), route.inspect
       end
     end
   end
