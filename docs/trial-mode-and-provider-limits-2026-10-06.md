@@ -210,53 +210,69 @@ user sees as today, so the gate reads the user's zone explicitly rather than
 
 ---
 
-## 3. The capacity probe
+## 3. The capacity probe, as built
 
 ### 3.1 Design
 
 `script/probe_gemini_capacity.rb` (runner) and `script/gemini_capacity_probe.rb`
-(the class, with a spec under `spec/script/` that drives it against a
-stubbed connection, like `gemini_structured_output_check.rb`). Never in CI;
-`GEMINI_API_KEY` from the environment; writes no `ApiUsage` rows and no
-exercise, response or reference. It builds an anonymous `GeminiService`
-subclass that overrides `log_usage` to collect in memory and
-`build_connection` to use `RETRY_OPTIONS.merge(max: 0)` plus a response
-middleware recording status, headers, latency and the usage block of every
-HTTP attempt. The prompts are the production ones: it goes through
-`AiService`'s public entry points, which is what `ModelComparison` does.
+(`GeminiCapacityProbe`, with `spec/script/gemini_capacity_probe_spec.rb`
+driving it against a stubbed connection that answers every production
+prompt the way `FakeService` does, then refuses with the stored 429 body).
+Never in CI; `GEMINI_API_KEY` from the environment; writes no `ApiUsage`
+rows and no exercise, response or reference. It builds an anonymous
+`GeminiService` subclass that overrides `log_usage` to write nothing and
+`build_connection` to use no retry middleware and a `Recorder` middleware
+that keeps every HTTP attempt's status, response headers, latency and
+usage block. The prompts are the production ones: it goes through
+`AiService`'s entry points, as `ModelComparison` does.
 
-One tester-day, in order, on a stored user id so the plan reads real history
-(`--user ID`, required), with the plan fixed to two sections through
-`ModelComparison`'s `with_fixed_plan` pattern:
+```
+GEMINI_API_KEY=AIza... bin/rails runner script/probe_gemini_capacity.rb --user ID
+GEMINI_API_KEY=AIza... bin/rails runner script/probe_gemini_capacity.rb --user ID --no-pace
+GEMINI_API_KEY=AIza... bin/rails runner script/probe_gemini_capacity.rb --user ID --pace 20 --max-days 3
+```
+
+`--user ID` is required: the prompts are built from that stored account's
+history, so the day is a realistic one. The plan is held to two sections by
+setting `daily_section_count` on the loaded user in memory only; the stored
+setting is untouched (pinned by the spec). One tester-day, in order:
 
 | Step | Entry point | Calls |
 |---|---|---|
-| Draft | `generate_exercise(user, language:)` | 1 |
-| Judge | `judge_section` for each of the two sections | 2 |
+| Draft | `draft_exercise(user, language:, blocking: false)`, the batch's budget | 1 |
+| Judge | `judge_section` for each fixed section, at the user's rung and lock | 2 |
 | Review | `review_sections` on an in-memory `DailyResponse` with short answers | 2 grading + 1 difficulty |
 | First-exposure reference | `generate_concept_reference` for the draft's `code_review` concept | 1 |
-| Duck | `duck_response` three turns on `code_review` | 3 |
+| Duck | `duck_response` three turns on `code_review`, each carrying the thread | 3 |
 
-Ten calls per tester-day. It repeats tester-days until a provider reply is a
-429 or `--max-days N` is reached, pacing calls `--pace SECONDS` apart
+`GeminiCapacityProbe.calls_per_day` derives the ten from the fixed-kind
+count and `DUCK_TURNS`. It repeats tester-days until a provider reply is a
+429 or `--max-days N` is reached, pacing steps `--pace SECONDS` apart
 (default 15, under a 5 RPM limit) so the daily limit is what trips, with
-`--no-pace` to measure the per-minute limit instead. A parse failure on a
-judge or review reply is recorded and the day continues, since the probe
-measures quota, not output quality.
+`--no-pace` to measure the per-minute limit instead. The review fan-out
+still sends its three calls together. A reply the app could not use (a
+judge verdict that fails `JudgeVerdict.parse`, an unparseable reference) is
+recorded with its error and the day goes on, since the probe measures quota,
+not output quality. A 429 inside the review fan-out raises nothing of its
+own, so it is read off the recorded attempts and still ends the run.
 
-Per call it prints: step, HTTP status, latency, `total_input_tokens`,
+Per attempt it prints: day, step, HTTP status, latency, `total_input_tokens`,
 `total_output_tokens`, `total_thought_tokens`, `total_cached_tokens`. On a
-non-2xx it writes the full body and response headers to
-`tmp/gemini_probe/<timestamp>-<status>.json` (`tmp/` is gitignored; the body
-carries no request header, so the key is never in it) and prints the
-`quotaId`, `quotaValue`, `retryDelay` and any `Retry-After` header.
+non-2xx it writes the status, response headers and full body to
+`tmp/gemini_probe/<timestamp>-<status>.json` (`tmp/` is gitignored; request
+headers are never captured, so the key is never written) and prints the
+`quotaId`, `quotaValue`, `retryDelay` and any `Retry-After` header. The
+first 429 body is also written as `tmp/gemini_probe/gemini_429_capture.json`,
+the shape `spec/fixtures/provider_errors/` holds, so replacing a fixture is a
+copy.
 
-The report at the end: requests until the first 429; which limit by
-`quotaId` (`…PerMinute…`, `…PerDay…`, or a token quota); the retry delay
-returned; tokens per tester-day; and tester-days per quota day as
-`floor(quotaValue / 10)`, with the caveat that judged generation may add
-retries. For a second quota (tokens per minute) it reports the largest single
-request so the per-minute budget can be read against it.
+The report at the end: requests made; the request number of the first 429
+and which limit by `quotaId` (`PerMinute`, `PerDay`, a token quota, or
+unrecognized); the `retryDelay` and `Retry-After` returned; tokens per
+completed tester-day (a day the 429 cut short is left out); tester-days per
+quota day as `quotaValue / calls_per_day` when the quota is per day; and the
+largest single request's input tokens, to read against the per-minute token
+quota.
 
 ### 3.2 When to run it
 
@@ -676,8 +692,8 @@ it once house keys exist.
    Gemini 400 `API_KEY_INVALID` as `AuthenticationError`, the locale table,
    every surface off `e.message`, the per-user Learn failure note, the
    characterization spec turned into the target).
-2. The probe, no behavior change; then replace the fixtures with its output
-   and set the cap numbers.
+2. Done: the probe, no behavior change. Still to do once it has run:
+   replace the fixtures with its capture and set the cap numbers.
 3. Invite codes, trial accounts, `ProviderCredential`, `HouseKeys`, the
    gates, the kill switch, the minting script, the signup code field.
 4. The trial screen, redemption consent, trial end, the dashboard banner and
