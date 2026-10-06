@@ -98,12 +98,7 @@ class OpenaiService < AiService
   end
 
   def raise_for_status(resp)
-    # OpenAI's authentication errors can echo the key, including masked fragments.
-    if [ 401, 403 ].include?(resp.status)
-      Rails.logger.error("OpenAI authentication failed (HTTP #{resp.status})")
-      raise AiService::AuthenticationError.new("OpenAI rejected your API key or its permissions. Check it in Settings.",
-                                               http_status: resp.status)
-    end
+    raise_if_key_rejected("OpenAI", resp.status)
 
     log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
     message     = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")

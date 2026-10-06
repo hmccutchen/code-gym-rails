@@ -22,6 +22,40 @@ RSpec.describe GenerateDailyExercisesJob do
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
 
+  # Job logs name the user by id: an email in a log line is personal data in a
+  # place nobody deletes it from.
+  describe "the user named in log lines" do
+    let(:logged) { StringIO.new }
+
+    before { allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(logged)) }
+
+    def expect_logged_by_id
+      expect(logged.string).to include("user #{user.id}")
+      expect(logged.string).not_to include(user.email)
+    end
+
+    it "names the user by id on success" do
+      stub_provider
+      described_class.new.perform(user_id: user.id)
+      expect_logged_by_id
+    end
+
+    [ AiService::Error, AiService::AuthenticationError, AiService::RateLimitError, AiService::TimeoutError ].each do |error|
+      it "names the user by id on #{error.name.demodulize}" do
+        stub_provider_failure(error, "boom")
+        described_class.new.perform(user_id: user.id)
+        expect_logged_by_id
+      end
+    end
+
+    it "names the user by id when a concurrent job already generated the day" do
+      stub_provider
+      allow(DailyExercise).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique.new("duplicate key"))
+      described_class.new.perform(user_id: user.id)
+      expect_logged_by_id
+    end
+  end
+
   it "creates a DailyExercise from the provider's generated problem set" do
     stub_provider
 

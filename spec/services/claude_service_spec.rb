@@ -217,10 +217,25 @@ RSpec.describe ClaudeService do
 
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::AuthenticationError, "invalid x-api-key")
+      }.to raise_error(AiService::AuthenticationError, "Anthropic rejected your API key or its permissions. Check it in Settings.")
       # The 401 isn't in retry_statuses, so only one request is made — the
       # second stubbed response is never consumed.
       expect(responses.size).to eq(1)
+    end
+
+    [ 401, 403 ].each do |status|
+      it "keeps credentials out of logs and errors on HTTP #{status}" do
+        body = { error: { message: "API key sk-ant-TestKeyFragment is not valid" } }.to_json
+        service.instance_variable_set(:@conn, stubbed_connection([ [ status, body ] ]))
+        allow(Rails.logger).to receive(:error)
+
+        expect { service.send(:call, system: "sys", prompt: "prompt") }
+          .to raise_error(AiService::AuthenticationError, /\AAnthropic rejected your API key/) { |error|
+            expect(error.http_status).to eq(status)
+            expect(error.message).not_to include("sk-ant-")
+          }
+        expect(Rails.logger).not_to have_received(:error).with(/sk-ant-/)
+      end
     end
 
     describe "a single-attempt call" do

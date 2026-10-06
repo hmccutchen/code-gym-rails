@@ -1382,8 +1382,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   status is an error, raised after usage recording even when partial prose
   is allowed. Its `incomplete` status is truncation unless the reason is
   `content_filter`, which is a refusal, as is a refusal content block.
-  OpenAI authentication errors use fixed guidance and log only the HTTP
-  status because the provider's error body can echo the key or its fragments.
+  An authentication error (401 or 403) from any provider gets fixed guidance
+  naming the company and logs only the HTTP status, through
+  `AiService#raise_if_key_rejected`, because the provider's error body can
+  echo the key or its fragments.
+- **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
+  filters what engineers write (`answers`, `message`, `question`,
+  `pseudocode`, `prior_alternates`, the duck's `thread`), the login `code`
+  and the push keys from request logs. Entries match as substrings, so `code`
+  is anchored (`/\Acode\z/`); a bare `:code` would also hide `pseudocode`
+  and every `code_review` key. The same list is Active Record's
+  `filter_attributes`, so these columns also read `[FILTERED]` in `inspect`.
+  A reply that can quote an engineer's answer (a review grade, a pseudocode
+  critique) is parsed with `log_raw: false`, and jobs log `user <id>`, never an
+  email.
 - **Daily sections setting**: `User#daily_section_count` is Automatic (nil)
   or a fixed count in `User::DAILY_SECTION_COUNTS`, which runs from
   `SectionCount::FLOOR` to `ExerciseSection::MAX_SECTIONS`. Setup shows it as a

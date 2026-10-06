@@ -6,3 +6,11 @@
 Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc
 ]
+
+# What engineers write and the login code, which would otherwise reach the
+# request log. `code` is anchored because entries match as substrings, and a
+# bare :code would also hide `pseudocode` and every `code_review` key. The
+# push keys are a browser install's encryption keys.
+Rails.application.config.filter_parameters += [
+  /\Acode\z/, :answers, :message, :question, :pseudocode, :prior_alternates, :thread, :p256dh, :auth
+]
