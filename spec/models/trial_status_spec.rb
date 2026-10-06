@@ -8,7 +8,7 @@ RSpec.describe TrialStatus, type: :model do
     travel_to(now) do
       user = create_trial_user(provider: "fake", days: 7, cap: 12, time_zone: "America/New_York")
       3.times { ApiUsage.create!(user: user, purpose: "duck_thread", provider: "fake", house_key: true, tokens_in: 1, tokens_out: 1, date: Date.new(2026, 10, 7)) }
-      ApiUsage.create!(user: user, purpose: "duck_thread", provider: "fake", house_key: true, tokens_in: 1, tokens_out: 1, date: Date.new(2026, 10, 6))
+      ApiUsage.create!(user: user, purpose: "duck_thread", provider: "fake", house_key: true, tokens_in: 1, tokens_out: 1, date: Date.new(2026, 10, 6), created_at: now - 1.day)
 
       status = described_class.for(user, now: now)
 
