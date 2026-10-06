@@ -537,7 +537,12 @@ code gets one sentence: "That code didn't work. Check it and try again, or
 ask the person who gave it to you."
 
 `User#start_trial!(code:, consented_at:)` runs under the user row lock and
-refuses an account that already has a trial or another code. Taking the seat
+refuses an account that already has a trial or another code, or a key of
+its own (which a trial would never be used over; the page sends such an
+account to Setup instead). A trial code names only a provider whose data
+notice exists (`InviteCode.trial_providers`: Gemini and Claude, plus the
+test provider where it is available), since consent is given to that
+notice; minting an OpenAI trial code is refused. Taking the seat
 is one statement, `InviteCode#redeem!`:
 
 ```sql
@@ -574,14 +579,25 @@ provider:
 - Per account: `ApiUsage.requests_on(user, day, provider:)` on the user's
   own day, attempts included, against the invite's `daily_request_cap`;
   resets at the user's next midnight. No cap when the invite sets none.
+  The count reads when each row was written, in the user's zone, rather
+  than the row's `date`, which a job running outside that zone stamps with
+  the server's day.
 - Global: `ApiUsage.house_requests_between(provider:, from:, to:)` over the
   provider's quota day (`AiService.quota_day`: Pacific for Gemini, UTC for
   a provider that states no boundary) against
   `HOUSE_<PROVIDER>_DAILY_GUARD` from `ENV`; resets at the end of that day.
   No guard when unset.
 
-A count-then-call gate overshoots by at most the fan-out width (a review on a
-two-section day makes three calls at once), which is acceptable and bounded.
+A count-then-call gate overshoots: each caller counts before its own row is
+written, so concurrent calls can all pass on the same count. For one account
+that is the width of its fan-out (a review on a two-section day makes three
+calls at once); across the house key it is that width times the trial
+accounts calling at the same moment, which the seats you mint bound. The
+guard is a soft stop; the provider's own spend limit or quota is the hard
+one, as section 6.4's numbers say. Reserving capacity before the call would
+mean writing the usage row ahead of the reply and amending it after, a
+change to `log_usage`'s one-row-after-the-call rule that the stack does not
+make.
 
 `ProviderFailure` gains `trial_allowance_used` and `trial_ended`;
 `ProviderFailureText` writes those in the `trial` variant whatever variant

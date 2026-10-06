@@ -349,10 +349,11 @@ class User < ApplicationRecord
   # signup already took one. Under the row lock, so two submissions cannot
   # start it twice, and the seat is taken only once the account is known to
   # be eligible. Returns false for a code that is wrong, expired, exhausted,
-  # a join code, or when this account already has one.
+  # a join code, when this account already has one, or when it has a key of
+  # its own, which a trial would never be used over.
   def start_trial!(code:, consented_at:)
     with_lock do
-      return false if trial? || invite_code_id.present? && !trial_pending?
+      return false if api_key_present? || trial? || invite_code_id.present? && !trial_pending?
 
       invite = trial_pending? ? invite_code : InviteCode.find_by_code(code)
       return false unless invite&.trial?
@@ -858,7 +859,8 @@ class User < ApplicationRecord
   end
 
   # An account with no key at all may still name a provider: an anonymized
-  # account keeps its provider after its keys are cleared.
+  # account keeps its provider after its keys are cleared, and a trial
+  # account's provider comes from its invite while its keys stay nil.
   def provider_has_a_stored_key
     return unless api_keys.is_a?(Hash) && provider.present?
 

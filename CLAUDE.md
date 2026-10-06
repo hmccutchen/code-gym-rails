@@ -450,8 +450,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
 
   **A trial is a `trial_ends_at`, nothing more.** `User#start_trial!` runs
   under the row lock from `POST /trial`, after the data notice and the
-  consent checkbox, and sets `provider` from the code and the end to the
-  last day's end in the user's zone; an account that signed up with a trial
+  consent checkbox, refuses an account with a key of its own, and sets
+  `provider` from the code (one of `InviteCode.trial_providers`, the
+  providers whose data notice exists, since consent is given to that
+  notice) and the end to the last day's end in the user's zone; an account that signed up with a trial
   code already holds its seat and only consents there, and
   `require_provider` sends it to `/trial` rather than Setup until it does.
   `trial_active?` needs the end in the future, `TrialMode.enabled?`
@@ -468,11 +470,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   ended trial. The service's `house_key?` reaches the per-section threads
   through `fresh_service`, is written to every usage row, and is what runs
   `TrialAllowance.check!` ahead of the call in `call_and_log`: the invite's
-  `daily_request_cap` on the user's own day and `HOUSE_<PROVIDER>_DAILY_GUARD`
+  `daily_request_cap` on the user's own day (`ApiUsage.requests_on`, counted
+  by when each row was written in the user's zone, since a job outside that
+  zone stamps `date` with the server's day) and `HOUSE_<PROVIDER>_DAILY_GUARD`
   over the provider's quota day (`AiService.quota_day`: Pacific for Gemini,
   UTC otherwise), attempts included, each raising
   `AiService::TrialAllowanceError` with the seconds until the count resets
-  and writing no row. `spec/services/trial_isolation_spec.rb` pins
+  and writing no row. The gate counts before its own row exists, so
+  concurrent calls can overshoot by the fan-out width per account, times
+  the accounts calling at once; the provider's spend limit is the hard
+  stop, by design. `spec/services/trial_isolation_spec.rb` pins
   byte-identical generation and judge calls for a trial and an own-key twin,
   and that nothing under `app/services`, `app/jobs` or the mastery and
   verdict models reads trial state. A trial account's failures read in the

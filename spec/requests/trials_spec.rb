@@ -45,6 +45,19 @@ RSpec.describe "Trials", type: :request do
     end
   end
 
+  it "refuses an account that has a key of its own, taking no seat" do
+    invite, code = mint_trial_code(provider: "fake")
+    own = create_user_with_key(email: "own@example.com")
+    login_as(own)
+
+    redeem(code)
+
+    expect(response).to redirect_to(setup_path)
+    expect(flash[:alert]).to eq("You already have an API key, so you don't need a trial.")
+    expect(invite.reload.redeemed_count).to eq(0)
+    expect(own.reload.start_trial!(code: code, consented_at: Time.current)).to be(false)
+  end
+
   it "refuses without consent, saving nothing" do
     _invite, code = mint_trial_code(provider: "fake")
     login_as(user)

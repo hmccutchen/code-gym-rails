@@ -1,6 +1,6 @@
 <%# Required locals: provider (a provider key, or nil when the code has not
     been checked yet and so the trial's provider is not known). %>
-<% noticed = AiProvider.keys.select { |key| I18n.exists?("trials.data_notice.#{key}") } %>
+<% noticed = InviteCode.trial_providers.select { |key| AiProvider.find(key).key_pattern } %>
 <% providers = provider ? [ provider ] : noticed %>
 <div class="data-notice">
   <p><%= t("trials.data_notice.shared", provider: providers.map { |key| AiProvider.label(key) }.to_sentence(two_words_connector: " or ")) %></p>
