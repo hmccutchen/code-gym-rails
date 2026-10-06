@@ -64,8 +64,11 @@
             "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
           }
         });
-        if (!response.ok) throw new Error("request failed");
-        poll();
+        if (response.ok) return poll();
+
+        const data = await response.json().catch(() => ({}));
+        button.disabled = false;
+        status.textContent = data.error || "<%= j t("learn.write_guide_failed") %>";
       } catch {
         button.disabled = false;
         status.textContent = "<%= j t("learn.write_guide_failed") %>";
