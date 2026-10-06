@@ -19,8 +19,15 @@ RSpec.describe TrialStatus, type: :model do
       expect(status).to be_active
       expect(status.ended_on).to be_nil
 
-      expect(described_class.for(user, now: Time.utc(2026, 10, 14, 3)).days_left).to eq(1)
-      expect(described_class.for(user, now: Time.utc(2026, 10, 14, 5)).days_left).to eq(0)
+      last_hour = described_class.for(user, now: Time.utc(2026, 10, 14, 3))
+      expect(last_hour.days_left).to eq(1)
+      expect(last_hour).to be_active
+      expect(last_hour.ended_on).to be_nil
+
+      after = described_class.for(user, now: Time.utc(2026, 10, 14, 5))
+      expect(after.days_left).to eq(0)
+      expect(after).not_to be_active
+      expect(after.ended_on).to eq(Date.new(2026, 10, 13))
     end
   end
 

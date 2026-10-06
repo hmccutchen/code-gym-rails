@@ -2002,6 +2002,23 @@ RSpec.describe User, "trials", type: :model do
     end
   end
 
+  it "reads a trial account that stored a key of its own as an own-key account, ended or not" do
+    trial = create_trial_user(provider: "fake")
+    expect(trial).to be_on_trial
+    expect(trial).to be_trial_active(now: trial.trial_ends_at - 1.second)
+    expect(trial).not_to be_trial_active(now: trial.trial_ends_at)
+
+    trial.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-own" })
+    expect(trial).not_to be_on_trial
+    expect(trial).not_to be_trial_ended
+    expect(trial).to be_provider_ready
+    travel_to(trial.trial_ends_at + 1.second) do
+      expect(trial).to be_trial
+      expect(trial).not_to be_trial_ended
+      expect(trial).to be_provider_ready
+    end
+  end
+
   it "ends the trial at the end of its last day in the user's zone" do
     _invite, code = mint_trial_code(provider: "fake", days: 3)
     user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")

@@ -15,11 +15,13 @@ class TrialsController < ApplicationController
              store: RATE_LIMIT_STORE, name: "redemptions_by_ip", only: :create
 
   # GET /trial — the form, or the trial's standing for an account on one. A
-  # first-run account answers the experience question first, as on Setup.
+  # first-run account answers the experience question first, as on Setup;
+  # an account with a key of its own has nothing to see here.
   def show
     return redirect_to welcome_path if current_user.first_run?
+    return redirect_to setup_path, alert: t("trials.has_own_key") if current_user.api_key_present?
 
-    @status = TrialStatus.for(current_user) if current_user.trial?
+    @status = TrialStatus.for(current_user) if current_user.on_trial?
   end
 
   def create

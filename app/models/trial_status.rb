@@ -15,7 +15,7 @@ class TrialStatus
     @used  = ApiUsage.requests_on(user, @local.to_date, provider: user.provider)
   end
 
-  def active? = @user.trial_active?
+  def active? = @user.trial_active?(now: @now)
 
   def ends_on = @user.trial_ends_at.in_time_zone(@user.effective_time_zone).to_date
 
@@ -24,5 +24,5 @@ class TrialStatus
 
   # Nil under the kill switch or with no house key, when the trial ended
   # without reaching its date.
-  def ended_on = @user.trial_ends_at.past? ? ends_on : nil
+  def ended_on = @user.trial_ends_at <= @now ? ends_on : nil
 end

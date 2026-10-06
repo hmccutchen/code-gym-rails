@@ -688,9 +688,15 @@ dashboard renders the trial-ended panel in place of a set, or the ended
 banner above a set that already exists. `/generate` refuses with the same
 sentence. Setup shows the existing key guide (`api_keys/_key_guide`) above
 the key field for an ended trial whether or not it is on the learning
-track, and pasting a key clears nothing about the trial but makes
-`provider_ready?` true through the own-key branch. `trial_ends_at` is kept
-so the screen can say when it ended.
+track. Pasting a key clears nothing about the trial, but `User#on_trial?`
+(a trial with no key of its own) is what every trial page and sentence
+reads, and `trial_ended?` is `on_trial?` and not active, so an account with
+a key is an own-key account everywhere: the dashboard generates, `/generate`
+accepts, Setup shows neither the trial note nor the key guide, `/trial`
+sends it to Setup, and its failures read in the own-key words.
+`trial_ends_at` is kept so the screen can say when it ended, and
+`trial_active?` takes the clock it is asked about, so `TrialStatus` reads
+one `now` for the days left, whether it is active and the day it ended.
 
 ### 6.9 Junior track, as built
 

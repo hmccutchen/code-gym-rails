@@ -69,6 +69,12 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
     it "refuses the review and the thinking partner with the trial-ended sentence, keeping the answers" do
       exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
                                        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } })
+
+      post duck_thread_responses_path, params: { section: "code_review", message: "Why?", thread: [] }, as: :json
+      expect(response).to have_http_status(:service_unavailable)
+      expect(response.parsed_body).to eq("status" => "error", "failure" => "trial_ended",
+                                         "error" => ended_sentence("the thinking partner didn't answer"))
+
       daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                              answers: { "code_review" => "a" * 20 }, section_ratings: { "code_review" => "right_level" },
                                              submitted_at: Time.current)
@@ -97,6 +103,46 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
       expect(response.body).to include("Your trial ended on October 13, 2026")
       expect(response.body).not_to include("requests used today")
     end
+  end
+
+  describe "once a key of its own is stored" do
+    before do
+      travel_to(user.trial_ends_at + 1.hour)
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-own" })
+      login_as(user)
+    end
+
+    it "generates on demand with no trial panel or banner, as for any own-key account" do
+      expect { get root_path }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
+
+      expect(response.body).to include("Generating your personalized exercise set")
+      expect(response.body).not_to include("Your trial", "trial-banner")
+    end
+
+    it "accepts an explicit generate" do
+      expect { post generate_path }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to be_nil
+    end
+
+    it "shows Setup without the trial note or the key guide, and sends the trial page to Setup" do
+      get setup_path
+      expect(response.body).not_to include("See how your trial is going.", "key-guide")
+
+      get trial_path
+      expect(response).to redirect_to(setup_path)
+      expect(flash[:alert]).to eq("You already have an API key, so you don't need a trial.")
+    end
+  end
+
+  it "hides the banner from a trial account that stored its own key while the trial runs" do
+    user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-own" })
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).not_to include("trial-banner")
   end
 
   it "says the trial has ended without a day under the kill switch" do

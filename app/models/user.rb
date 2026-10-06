@@ -337,11 +337,16 @@ class User < ApplicationRecord
   # a plain join code, or signed up with a trial code and has not consented.
   def trial? = trial_ends_at.present?
 
-  def trial_active?
-    trial? && trial_ends_at.future? && TrialMode.enabled? && HouseKeys.for(provider).present?
+  def trial_active?(now: Time.current)
+    trial? && trial_ends_at > now && TrialMode.enabled? && HouseKeys.for(provider).present?
   end
 
-  def trial_ended? = trial? && !trial_active?
+  # The trial is what pays. A trial account that pasted a key of its own is
+  # an own-key account on every page, whatever its dates say, because
+  # ProviderCredential hands the service that key first.
+  def on_trial? = trial? && !api_key_present?
+
+  def trial_ended? = on_trial? && !trial_active?
 
   def trial_pending? = !trial? && invite_code&.trial? == true
 

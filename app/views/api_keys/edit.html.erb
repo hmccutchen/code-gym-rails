@@ -36,7 +36,7 @@
 <div class="setup-wrap">
   <h1><%= t("api_keys.edit.heading") %></h1>
   <p><%= t("api_keys.edit.intro") %></p>
-  <% if current_user.trial_active? %>
+  <% if current_user.on_trial? && current_user.trial_active? %>
     <%= render "api_keys/trial_note" %>
   <% elsif current_user.trial_ended? || (current_user.on_learning_track? && !current_user.daily_exercises.exists?) %>
     <%= render "api_keys/key_guide" %>

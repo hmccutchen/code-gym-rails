@@ -40,7 +40,7 @@ class ProviderFailureText
   # Which credential's words a failure gets: a trial account reads the trial
   # variant, an account with its own key the own_key one.
   def self.variant_for(user)
-    user.trial? && !user.api_key_present? ? "trial" : "own_key"
+    user.on_trial? ? "trial" : "own_key"
   end
 
   private

@@ -36,7 +36,7 @@ class DashboardController < ApplicationController
     end
 
     @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
-    @trial_status = TrialStatus.for(current_user) if current_user.trial?
+    @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
 
     return unless @exercise.nil?
 
