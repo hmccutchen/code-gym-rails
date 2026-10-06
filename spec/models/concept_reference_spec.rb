@@ -46,15 +46,15 @@ RSpec.describe ConceptReference do
     end
 
     it "picks a never-featured concept ahead of one featured long ago" do
-      featurable("caching_strategy", featured_on: 5.days.ago.to_date)
+      featurable("caching_strategy", featured_on: this_week - 7)
       never = featurable("idempotency_at_scale")
 
       expect(ConceptReference.featured).to eq(never)
     end
 
     it "picks the longest-unfeatured concept once every one has had a turn" do
-      stalest = featurable("caching_strategy", featured_on: 9.days.ago.to_date)
-      featurable("idempotency_at_scale", featured_on: 2.days.ago.to_date)
+      stalest = featurable("caching_strategy", featured_on: this_week - 14)
+      featurable("idempotency_at_scale", featured_on: this_week - 7)
 
       expect(ConceptReference.featured).to eq(stalest)
     end
