@@ -483,24 +483,24 @@ RSpec.describe GeminiService do
     end
   end
 
-  describe "#call with history" do
-    def captured_body(**kwargs)
-      body = nil
-      conn = Faraday.new do |f|
-        f.adapter :test do |stub|
-          stub.post(GeminiService::API_URL) do |env|
-            body = JSON.parse(env.body)
-            [ 200, {}, { "steps" => [ { "type" => "model_output",
-                                        "content" => [ { "type" => "text", "text" => "ok" } ] } ],
-                         "usage" => { "total_input_tokens" => 1, "total_output_tokens" => 1 } }.to_json ]
-          end
+  def captured_body(**kwargs)
+    body = nil
+    conn = Faraday.new do |f|
+      f.adapter :test do |stub|
+        stub.post(GeminiService::API_URL) do |env|
+          body = JSON.parse(env.body)
+          [ 200, {}, { "steps" => [ { "type" => "model_output",
+                                      "content" => [ { "type" => "text", "text" => "ok" } ] } ],
+                       "usage" => { "total_input_tokens" => 1, "total_output_tokens" => 1 } }.to_json ]
         end
       end
-      service.instance_variable_set(:@conn, conn)
-      service.send(:call, system: "sys", prompt: "new turn", **kwargs)
-      body
     end
+    service.instance_variable_set(:@conn, conn)
+    service.send(:call, system: "sys", prompt: "new turn", **kwargs)
+    body
+  end
 
+  describe "#call with history" do
     # The Interactions API has no messages array; prior turns are folded back
     # into the single input string. See the design doc's Gemini section.
     it "folds prior turns into the input string" do
@@ -516,6 +516,47 @@ RSpec.describe GeminiService do
 
     it "sends the prompt unchanged when history is empty" do
       expect(captured_body["input"]).to eq("new turn")
+    end
+  end
+
+  describe "#call with response_schema" do
+    include AuthHelpers
+
+    let(:schema) { { "type" => "object", "properties" => { "status" => { "type" => "string" } }, "required" => [ "status" ], "additionalProperties" => false } }
+
+    it "asks for a JSON reply held to the schema" do
+      body = captured_body(response_schema: schema, max_tokens: 100, purpose: "judge_section")
+
+      expect(body["response_format"]).to eq("type" => "text", "mime_type" => "application/json", "schema" => schema)
+    end
+
+    it "keeps the cap and minimal thinking beside the schema" do
+      body = captured_body(response_schema: schema, max_tokens: 100, purpose: "judge_section")
+
+      expect(body["generation_config"]).to eq("max_output_tokens" => 100, "thinking_level" => GeminiService::MINIMAL_THINKING_LEVEL)
+    end
+
+    it "sends no response format when no schema is given" do
+      expect(captured_body(max_tokens: 100, purpose: "judge_section")).not_to have_key("response_format")
+    end
+
+    it "holds a judge reply to the kind's verdict schema" do
+      kind = ExerciseSection::DesignComparison
+      body = nil
+      service.instance_variable_set(:@conn, Faraday.new do |f|
+        f.adapter :test do |stub|
+          stub.post(GeminiService::API_URL) do |env|
+            body = JSON.parse(env.body)
+            [ 200, {}, success_body(text: { status: "keep", better: "a" }.to_json) ]
+          end
+        end
+      end)
+
+      verdict = service.judge_section(create_user_with_key, kind, { "title" => "t", "scenario" => "s", "question" => "q" },
+                                      rung: "senior", locked: false)
+
+      expect(body["response_format"]["schema"]).to eq(JSON.parse(JudgeVerdict.schema_for(kind).to_json))
+      expect(verdict.status).to eq(:keep)
     end
   end
 end

@@ -960,8 +960,13 @@ concept-specific difficulty descriptions for future generation, not a new set.
   prefilled `{` was the other option; every model `ClaudeService` routes to
   rejects a prefill with a 400. The schema is built from the same closed
   lists `.parse` checks, and `.parse` stays the boundary, since the schema
-  cannot bound string length. `GeminiService` accepts the keyword and does not
-  send it yet (#228), so a Gemini judge reply is held only by its prompt.
+  cannot bound string length. `GeminiService` sends the same schema as the
+  Interactions API's `response_format` (`type: "text"`, `mime_type:
+  "application/json"`) (#228). Gemini documents only part of JSON Schema, and
+  the verdict schemas use `anyOf`, `const` and `additionalProperties: false`;
+  a schema Gemini refuses fails the call, which falls back to the draft like
+  any judge failure. `script/check_gemini_structured_output.rb` sends judge
+  fixtures on the production route to confirm Gemini accepts them.
   `OpenaiService` answers the keyword with JSON mode (`text.format:
   json_object`) rather than the schema: OpenAI's strict schemas need an object
   at the root and every property required, and `VerdictSchema` builds an
@@ -1946,11 +1951,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   review start while the first is still running.
 
   **Claude only.** `AiService.judges_review_prose?` is false on the base class
-  and true on `ClaudeService` (and `FakeService`, for specs), because the
-  judge relies on structured output, which `GeminiService` does not send yet
-  (#228). A Gemini user is never judged. Neither is an OpenAI user: its JSON
-  mode does not hold the reply to the schema, and the comparison script that
-  gates the switch runs only Claude models.
+  and true on `ClaudeService` (and `FakeService`, for specs). The judge relies
+  on structured output, and the comparison script that gates the switch runs
+  only Claude models. `GeminiService` sends structured output now (#228), but
+  nothing has compared rewrites on its route, so a Gemini user is never
+  judged. Neither is an OpenAI user, whose JSON mode does not hold the reply
+  to the schema.
 
   **Logging.** The `[review_judge]` line records status, issue types, merge
   indexes and timing, never review text, and the reply is parsed with
@@ -2614,6 +2620,7 @@ always pull in the full suite — is stated once, in
 - `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
 - `app/models/ai_provider.rb` — closed provider registry for dispatch, key detection and user validation; provider classes own the key patterns and environment restrictions
 - `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, keep fixtures kept unedited, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Both judge modes also print blind-solve agreement (`SolveAgreement`) per model, rung and concept, with match or mismatch only, never a pick or a key. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read. `review_calibration` grades the fixtures in `spec/fixtures/review_calibration/` on the production review route (see "Grading rubric")
+- `script/check_gemini_structured_output.rb` (+ `script/gemini_structured_output_check.rb`) — sends judge fixtures through `GeminiService` on its production route with the verdict schema, and prints whether Gemini accepted the schema and whether each reply parsed. One request per fixture, two by default, billed to `GEMINI_API_KEY`; writes no `ApiUsage` rows
 - `app/models/rubric_check.rb` — `RubricCheck`: whether a graded review's rating agrees with the essential gaps it lists, under `AiService::RATING_RUBRIC`. Log-only and pure
 - `spec/fixtures/review_calibration/` — sections with a complete, a partial and a missed answer each, read by `ModelComparison#review_calibration`; a fixture may add `extra_answers`, each with its own expected ratings, which are graded and matched outside the rank-order check (the design comparison's vague matching pick and sound other pick)
 - `app/models/review_prose_verdict.rb` — `ReviewProseVerdict`: the prose judge's reply held to its closed lists, the structured-output schema, the projection the judge reads, and `#apply`, which stores the grader's original prose under `graded_prose`. Pure; its specs need no database

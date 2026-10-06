@@ -1,9 +1,10 @@
 require "rails_helper"
 
-# Each example states behavior the 2026-10-05 security audit recommends. One
-# the app does not have yet is pending. RSpec fails a pending example that
-# starts passing, which is the reminder to drop `pending` in the PR that fixes
-# it. Finding numbers refer to docs/security-audit-2026-10-05.md.
+# Each example states behavior the 2026-10-05 security audit recommends. An
+# example for behavior the app does not have yet is pending. RSpec fails a
+# pending example that starts passing, which is the reminder to drop `pending`
+# in the PR that fixes it. Finding numbers refer to
+# docs/security-audit-2026-10-05.md.
 RSpec.describe "Security hardening targets", type: :request do
   let(:user) { create_user_with_key }
 

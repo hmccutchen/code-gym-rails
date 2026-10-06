@@ -56,8 +56,6 @@ class GeminiService < AiService
 
   private
 
-  # response_schema is not sent yet, so a Gemini reply is held only by its
-  # prompt and the caller's parse (#228).
   def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     body = {
       model:              MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model],
@@ -78,6 +76,7 @@ class GeminiService < AiService
     if max_tokens
       body[:generation_config] = { max_output_tokens: max_tokens, thinking_level: MINIMAL_THINKING_LEVEL }
     end
+    body[:response_format] = json_format(response_schema) if response_schema
 
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
@@ -124,6 +123,12 @@ class GeminiService < AiService
   rescue Faraday::Error => e
     error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
     raise error_class, "Network error calling Gemini: #{e.message}"
+  end
+
+  # The schema holds the reply's shape, not its string lengths, so the
+  # caller's parse stays the boundary.
+  def json_format(schema)
+    { type: "text", mime_type: "application/json", schema: schema }
   end
 
   def build_connection
