@@ -246,7 +246,7 @@ RSpec.describe "Push subscriptions", type: :request do
       get account_path
 
       expect(response.body).to include("redirect: \"error\"")
-      expect(response.body).to include("if (!response.ok) throw new Error")
+      expect(response.body).to include("if (!response.ok) throw CodeGymServerMessage.error(")
     end
 
     # The launch re-subscribe is the whole iOS mitigation: a dropped endpoint is

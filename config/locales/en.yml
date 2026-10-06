@@ -102,6 +102,7 @@ en:
     code_rejected_retry: "Incorrect or expired code. Try again, or request a new one below."
     code_rejected_request_new: "Incorrect or expired code. Request a new one below."
     logged_out: "Logged out."
+    email_not_accepted: "That email address didn't work. Check it for typos and try again."
     rate_limited:
       code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
       code_requests: "Too many code requests. Try again in a few minutes."
@@ -528,6 +529,7 @@ en:
     no_gaps: "Your plan holds up — nothing worth flagging before you submit it."
     caption: "This is your plan implemented literally — gaps and all. It was not corrected."
     working: "Working…"
+    critique_failed: "Couldn't check your plan. Try again in a moment."
   responses:
     section:
       label: "%{slot} — %{name}"
@@ -592,7 +594,8 @@ en:
     alternate_added: "A different explanation was added above."
     alternate_added_last: "A different explanation was added above — that was the last one."
     alternate_failed: "Couldn't generate that — try again"
-    session_expired: "Your session expired — reload the page and try again."
+  server_message:
+    signed_out: "Your session expired — reload the page and try again."
   diagram:
     summary: "🗺️ Structure diagram"
   push:
