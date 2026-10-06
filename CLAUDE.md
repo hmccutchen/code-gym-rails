@@ -459,7 +459,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `trial_active?` needs the end in the future, `TrialMode.enabled?`
   (`TRIALS_DISABLED` is not `"1"`, the kill switch) and a house key for the
   provider (`HouseKeys.for`, `HOUSE_<PROVIDER>_API_KEY`, read from ENV at
-  call time and never stored). `provider_ready?` is own key or active trial,
+  call time and never stored), and an account that has not been deleted,
+  since jobs queued before a deletion still load the row by id.
+  `provider_ready?` is own key or active trial,
   behind `require_provider` and the dashboard's on-demand generation; the
   nightly batch still selects stored keys, so a trial is generated only when
   it opens the dashboard.
