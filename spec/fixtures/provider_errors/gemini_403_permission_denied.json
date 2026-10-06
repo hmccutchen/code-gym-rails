@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": 403,
+    "message": "Your API key AIzaSyTestFragment was reported as leaked and has been disabled.",
+    "status": "PERMISSION_DENIED"
+  }
+}
