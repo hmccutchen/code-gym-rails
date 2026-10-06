@@ -768,6 +768,7 @@
   <%# Defines window.CodeGymPush and, for a user who has reminders on,
       re-subscribes this browser on launch. Ahead of :page_scripts on purpose —
       the Account page's enable button binds against the global defined here. %>
+  <%= render "shared/server_message" if logged_in? %>
   <%= render "shared/push_script" if logged_in? && WebPushCredentials.configured? %>
   <%# Defines window.CodeGymSaveStatus, which the dashboard's and /setup's
       autosaves report through. Ahead of :page_scripts for the same reason as

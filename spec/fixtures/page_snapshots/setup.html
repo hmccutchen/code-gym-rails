@@ -1615,6 +1615,40 @@
       });
     })();
   </script>
+  <script>
+  window.CodeGymServerMessage = (function () {
+    const SIGNED_OUT = "Your session expired — reload the page and try again.";
+    const written = new WeakSet();
+
+    // null when the body is not JSON: an HTML error page, the login page a
+    // redirect landed on, or nothing at all.
+    async function read(response) {
+      try { return await response.json(); } catch (_) { return null; }
+    }
+
+    // An error whose message a person may read.
+    function error(text) {
+      const e = new Error(text);
+      written.add(e);
+      return e;
+    }
+
+    // fetch follows redirects, and the only redirect a JSON endpoint gives
+    // is to the login page once the session has expired.
+    function failure(response, data, fallback) {
+      if (response && response.redirected) return error(SIGNED_OUT);
+      const ours = data && data.status === "error" && typeof data.error === "string" && data.error;
+      return error(ours || fallback);
+    }
+
+    function message(e, fallback) {
+      return written.has(e) ? e.message : fallback;
+    }
+
+    return { read: read, error: error, failure: failure, message: message };
+  })();
+</script>
+
   
   <p id="save-status" class="save-status" hidden></p>
 <p id="save-status-announcer" class="visually-hidden" role="alert"></p>

@@ -94,8 +94,8 @@ class SessionsController < ApplicationController
 
     redirect_to login_path,
                 notice: t("sessions.code_sent", expiry: User.login_code_expiry_in_words)
-  rescue ActiveRecord::RecordInvalid => e
-    flash.now[:alert] = e.message
+  rescue ActiveRecord::RecordInvalid
+    flash.now[:alert] = t("sessions.email_not_accepted")
     render :new, status: :unprocessable_content
   end
 

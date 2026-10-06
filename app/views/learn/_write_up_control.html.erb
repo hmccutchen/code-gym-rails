@@ -72,9 +72,9 @@
         });
         if (response.ok) return poll();
 
-        const data = await response.json().catch(() => ({}));
+        const data = await CodeGymServerMessage.read(response);
         button.disabled = false;
-        status.textContent = data.error || "<%= j t("learn.write_guide_failed") %>";
+        status.textContent = CodeGymServerMessage.failure(response, data, "<%= j t("learn.write_guide_failed") %>").message;
       } catch {
         button.disabled = false;
         status.textContent = "<%= j t("learn.write_guide_failed") %>";

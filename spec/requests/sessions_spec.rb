@@ -47,6 +47,8 @@ RSpec.describe "Sessions", type: :request do
       }.not_to change(User, :count)
 
       expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("That email address didn&#39;t work. Check it for typos and try again.")
+      expect(response.body).not_to include("Validation failed")
     end
   end
 
