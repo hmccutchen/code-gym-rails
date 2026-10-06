@@ -2019,6 +2019,15 @@ RSpec.describe User, "trials", type: :model do
     end
   end
 
+  it "ends the trial when the account is deleted" do
+    trial = create_trial_user(provider: "fake")
+    trial.anonymize!
+
+    expect(trial.reload).not_to be_trial_active
+    expect(trial).not_to be_provider_ready
+    expect { AiService.for(trial) }.to raise_error(AiService::TrialEndedError)
+  end
+
   it "ends the trial at the end of its last day in the user's zone" do
     _invite, code = mint_trial_code(provider: "fake", days: 3)
     user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")

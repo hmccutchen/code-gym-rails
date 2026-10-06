@@ -337,8 +337,11 @@ class User < ApplicationRecord
   # a plain join code, or signed up with a trial code and has not consented.
   def trial? = trial_ends_at.present?
 
+  # Deleting an account leaves its trial dates in place, and jobs queued
+  # before the deletion still load the row, so an anonymized account must
+  # never reach the house key.
   def trial_active?(now: Time.current)
-    trial? && trial_ends_at > now && TrialMode.enabled? && HouseKeys.for(provider).present?
+    trial? && !anonymized? && trial_ends_at > now && TrialMode.enabled? && HouseKeys.for(provider).present?
   end
 
   # The trial is what pays. A trial account that pasted a key of its own is

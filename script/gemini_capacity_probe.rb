@@ -25,6 +25,10 @@ class GeminiCapacityProbe
   # three paces before and after. At 15 seconds no rolling minute holds more
   # than five requests.
   DEFAULT_PACE_SECONDS = 15
+  # The probe's connection has no retry middleware, so the longest a request
+  # can stay on the wire is one connect and one read. A step waits that long
+  # for its stragglers, so a late reply is never counted against the next one.
+  DRAIN_SECONDS = AiService.single_attempt_call_seconds(AiService::READ_TIMEOUT)
   OUTPUT_DIR = "tmp/gemini_probe".freeze
   FIXTURE_CAPTURE = "gemini_429_capture.json".freeze
 
@@ -211,7 +215,7 @@ class GeminiCapacityProbe
   # The review fan-out answers no error of its own, so a 429 inside it is
   # read off the attempts rather than raised.
   def record_attempts(day, label, error)
-    fresh = @attempts.drain(timeout: AiService::READ_TIMEOUT)
+    fresh = @attempts.drain(timeout: DRAIN_SECONDS)
     @last_step_attempts = fresh.size
     @stopped = true if fresh.any? { |attempt| attempt[:status] == 429 }
     if fresh.empty?
