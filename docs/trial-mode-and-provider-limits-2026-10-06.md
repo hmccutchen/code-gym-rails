@@ -623,6 +623,15 @@ mean writing the usage row ahead of the reply and amending it after, a
 change to `log_usage`'s one-row-after-the-call rule that the stack does not
 make.
 
+The audit's per-user request limits (`ProviderCallLimits`, `/generate` and
+the Learn prepares) now apply only to an account without a key of its own
+(`ApplicationController#own_key?`), so they guard the house key alongside the
+caps above. An account with its own key pays for its calls and is never
+limited by them, by decision. Each endpoint's own per-section or per-page
+cap, the login limits and the one-generation-at-a-time job permit stay for
+everyone: the first are part of each feature, the second guard accounts, and
+the third stops a duplicate generation the unique index would throw away.
+
 `ProviderFailure` gains `trial_allowance_used` and `trial_ended`;
 `ProviderFailureText` writes those in the `trial` variant whatever variant
 is asked for, and `ProviderFailureText.variant_for(user)` picks `trial` for
@@ -716,7 +725,9 @@ screen's link, which is the one page difference, and it is inside a
 ### 6.10 Existing accounts stay byte-identical, as built
 
 Every new branch tests `trial?` or `house_key?`, both false
-for every existing row, and no prompt reads trial state.
+for every existing row, and no prompt reads trial state. One change reaches
+existing accounts on purpose: an account with its own key is no longer held
+to the per-user request limits (section 6.4).
 `existing_account_pages_spec` holds the page snapshots, and
 `spec/services/trial_isolation_spec.rb`, modelled on
 `learning_track_isolation_spec`, pins that `AiService` builds byte-identical

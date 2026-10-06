@@ -8,7 +8,8 @@ class LearnController < ApplicationController
   PREPARE_PER_HOUR = 10
 
   rate_limit to: PREPARE_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { preparing_limited },
-             store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ]
+             store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ],
+             unless: :own_key?
 
   # GET /learn — every concept in this user's vocabularies, grouped, whether or
   # not they have ever been assigned one.

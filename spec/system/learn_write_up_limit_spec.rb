@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Learn write-up past the hourly limit", type: :system, with_csrf: true do
   it "shows the limit message instead of claiming work is in progress" do
-    user = create_fake_provider_user
+    user = create_trial_user
     user.update!(language: "ruby_rails")
     visit_as(user)
     store = ActiveSupport::Cache::MemoryStore.new
