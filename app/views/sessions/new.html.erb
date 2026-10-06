@@ -35,6 +35,10 @@
       <%= f.label :email, t("sessions.new.email_label") %>
       <%= f.email_field :email, placeholder: t("sessions.new.email_placeholder"), required: true, autocomplete: "email" %>
     </div>
+    <div class="form-field">
+      <%= f.label :invite_code, t("sessions.new.invite_code_label") %>
+      <%= f.text_field :invite_code, autocomplete: "off", spellcheck: false %>
+    </div>
     <%= f.submit t("sessions.new.submit"), class: "btn btn-primary", style: "width:100%;padding:.75rem;" %>
   <% end %>
 </div>

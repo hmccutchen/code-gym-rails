@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_150100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -112,6 +112,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id"
     t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
+  end
+
+  create_table "invite_codes", force: :cascade do |t|
+    t.string "code_digest", null: false
+    t.string "label"
+    t.string "provider"
+    t.integer "seats", null: false
+    t.integer "redeemed_count", default: 0, null: false
+    t.datetime "expires_at", null: false
+    t.integer "trial_days"
+    t.integer "daily_request_cap"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code_digest"], name: "index_invite_codes_on_code_digest", unique: true
   end
 
   create_table "push_subscriptions", force: :cascade do |t|
@@ -339,7 +353,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
     t.string "last_generation_failure_provider"
     t.datetime "last_generation_failed_at"
     t.integer "last_generation_retry_after"
+    t.bigint "invite_code_id"
+    t.datetime "trial_started_at"
+    t.datetime "trial_ends_at"
+    t.datetime "trial_consented_at"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
 
   add_foreign_key "api_usages", "users"
@@ -355,4 +374,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "users", "invite_codes"
 end

@@ -7,12 +7,15 @@
 # empty balance is never a limit of either kind, whatever status carried it:
 # the providers raise BillingError for those before this is asked.
 class ProviderFailure
-  KINDS = %w[daily_limit short_rate_limit bad_key out_of_credit outage timeout other].freeze
+  TRIAL_KINDS = %w[trial_allowance_used trial_ended].freeze
+  KINDS = (%w[daily_limit short_rate_limit bad_key out_of_credit outage timeout other] + TRIAL_KINDS).freeze
   DAILY_WAIT = 1.hour
   DAILY_QUOTA_PATTERN = /PerDay/i
 
   def self.classify(error)
     case error
+    when AiService::TrialAllowanceError then "trial_allowance_used"
+    when AiService::TrialEndedError     then "trial_ended"
     when AiService::BillingError        then "out_of_credit"
     when AiService::AuthenticationError then "bad_key"
     when AiService::RateLimitError      then daily?(error) ? "daily_limit" : "short_rate_limit"
@@ -28,4 +31,6 @@ class ProviderFailure
   end
 
   def self.kind?(value) = KINDS.include?(value.to_s)
+
+  def self.trial_kind?(value) = TRIAL_KINDS.include?(value.to_s)
 end

@@ -26,8 +26,13 @@ RSpec.describe ResetClock do
     expect(described_class.reset_at("short_rate_limit", provider: "anthropic", failed_at: failed_at)).to eq(failed_at + 60)
   end
 
+  it "resets a trial allowance when the gate that refused the call said it would" do
+    expect(described_class.reset_at("trial_allowance_used", provider: "gemini", failed_at: failed_at, retry_after: 1800))
+      .to eq(failed_at + 1800)
+  end
+
   it "has no reset for the other kinds" do
-    %w[bad_key out_of_credit outage timeout other].each do |kind|
+    %w[bad_key out_of_credit outage timeout other trial_ended].each do |kind|
       expect(described_class.reset_at(kind, provider: "gemini", failed_at: failed_at)).to be_nil
     end
   end

@@ -9,7 +9,7 @@ class PushSubscriptionsController < ApplicationController
   # on purpose. Without this skip a keyless user could see the control and not
   # be able to work it — and the layout's re-subscribe script would 302 to
   # /setup on every launch.
-  skip_before_action :require_api_key
+  skip_before_action :require_provider
 
   MAX_ENDPOINT_LENGTH = 2048
 

@@ -463,18 +463,23 @@ expiry and its clearing.
 - `DailyResponse#review_provider_label` and `User#provider_label` name the
   provider on pages; `PreviewSeed` stores a dummy Anthropic key.
 
-### 5.1 What a trial needs
+### 5.1 What a trial needs, as built
 
-`AiService.for(user)` becomes `provider.new(ProviderCredential.for(user))`,
-where `ProviderCredential.for` returns the user's own key when present, else
-the house key for `user.provider` when the user has an active trial, and
-raises `TrialEndedError` when the trial has ended or the kill switch is on.
-The key is read from `ENV` at that moment and never stored. `User` gains
-`provider_ready?` (own key, or active trial) and `require_api_key` becomes
-`require_provider`, reading it. The `provider_has_a_stored_key` validation
-is skipped for a trial account, whose `provider` comes from the invite and
-whose `api_keys` stays nil. The batch filter is unchanged, which is what
-keeps trial accounts off the nightly job.
+`AiService.for(user)` builds `provider.new(credential.key)` from
+`ProviderCredential.for(user)`, which returns the user's own key when they
+stored one, no key when they have neither key nor trial (as before trials
+existed), and the house key for `user.provider` while the trial is active.
+It raises `AiService::TrialEndedError` when the trial has ended, the kill
+switch is on, or the provider has no house key set. The key is read from
+`ENV` at that moment and never stored. The service carries `house_key?`,
+which the per-section review and judge threads inherit (`fresh_service`),
+which `log_usage` writes to the row, and which decides whether the trial
+gates run. `User#provider_ready?` (own key, or active trial) replaces
+`api_key_present?` behind `require_provider` and the dashboard's on-demand
+generation; the nightly batch still selects stored keys, so a trial account
+is generated only when it opens the dashboard. `provider_has_a_stored_key`
+already returns early for a nil `api_keys`, so a trial account's provider,
+set from the invite, needs no exception.
 
 Existing accounts: `api_keys` present, `invite_code_id` nil, so every new
 branch is false and `ProviderCredential.for` returns the same key
@@ -484,7 +489,7 @@ branch is false and `ProviderCredential.for` returns the same key
 
 ## 6. Trial mode
 
-### 6.1 Storage and migrations (flagged)
+### 6.1 Storage and migrations (flagged), as built
 
 `CreateInviteCodes`:
 
@@ -496,75 +501,89 @@ branch is false and `ProviderCredential.for` returns the same key
 | `seats` | integer, null false |
 | `redeemed_count` | integer, default 0, null false |
 | `expires_at` | datetime, null false (redemption deadline) |
-| `trial_days` | integer, null (nil for a join code) |
-| `daily_request_cap` | integer, null |
+| `trial_days` | integer, null (required for a trial code) |
+| `daily_request_cap` | integer, null (no cap when nil) |
 | timestamps | |
 
 `AddTrialToUsers`: `invite_code_id` (bigint, fk, null), `trial_started_at`,
-`trial_ends_at`, `trial_consented_at` (datetimes, null). A trial is active
-when `trial_ends_at` is in the future and the kill switch is off. No
-`is_trial` flag: `invite_code_id` with a `trial_ends_at` is the fact.
-
-Plus `AddOutcomeToApiUsages` (section 2.2) and, optionally,
-`last_failure` on `concept_references` (section 4.3). Four migrations in all,
-three required. No new runtime gem.
+`trial_ends_at`, `trial_consented_at` (datetimes, null). `User#trial?` is a
+present `trial_ends_at`; `trial_active?` adds that it is in the future, the
+kill switch is off and the provider's house key is set; `trial_pending?` is
+an account that signed up with a trial code and has not consented yet. No
+`is_trial` flag.
 
 Minting: `bin/rails runner script/mint_invite_code.rb --provider gemini
 --seats 2 --days 7 --cap 12 --expires 2026-10-31 --label "pilot"` prints the
-code once. There is no admin page; the `ADMIN_EMAILS` namespace exists but a
-runner is smaller and keeps the raw code off every page.
+code once, in groups of four; without `--provider` it mints a join code.
+`InviteCode.find_by_code` ignores case, spaces and dashes.
 
-### 6.2 Redemption
+### 6.2 Redemption, as built
 
-`GET /trial` shows the form and, for a trial account, the trial screen;
-`POST /trial` redeems. Login stays the emailed code, so every trial user has
-their own account first; `require_provider` lets `trials` through like
-`api_keys`. The form takes the code and a consent checkbox under the data
-notice (section 6.7). Rate limited at 10 per IP per hour and 5 per account
-per hour through `rate_limit` with `LazyCacheStore`, and the response for a
-wrong, expired, exhausted or already-used code is one sentence: "That code
-didn't work. Check it and try again, or ask the person who gave it to you."
-Redemption is one statement:
+`GET /trial` shows the form with the data notice and consent checkbox, or,
+for a trial account, the day the trial ends and the notice for its provider;
+`POST /trial` redeems. `require_provider` lets `trials` through like
+`api_keys`. Rate limited at 10 per IP and 5 per account per hour through
+`rate_limit` with `LazyCacheStore`. A missing consent is refused with its own
+sentence and saves nothing; a wrong, expired, exhausted, already-used or join
+code gets one sentence: "That code didn't work. Check it and try again, or
+ask the person who gave it to you."
+
+`User#start_trial!(code:, consented_at:)` runs under the user row lock and
+refuses an account that already has a trial or another code. Taking the seat
+is one statement, `InviteCode#redeem!`:
 
 ```sql
 UPDATE invite_codes SET redeemed_count = redeemed_count + 1
 WHERE id = ? AND redeemed_count < seats AND expires_at > now()
 ```
 
-and succeeds only when it updates one row and the account has no
-`invite_code_id` yet, under the user row lock. It sets `provider` from the
-code, `trial_started_at` now, `trial_ends_at` now plus `trial_days` at end
-of day in the user's zone, `trial_consented_at`. The param is named
-`invite_code`, which the `_key`-less filter list does not cover, so it joins
-`filter_parameters`.
+An account that signed up with a trial code already holds its seat, so
+consenting there takes none. It sets `provider` from the code,
+`trial_started_at` and `trial_consented_at` to the consent time, and
+`trial_ends_at` to the end of the trial's last day in the user's zone (a
+7-day trial started on a Tuesday ends at the end of the next Monday).
+`invite_code` joins `filter_parameters`, since `_key` does not cover it.
 
-### 6.3 House keys and the kill switch
+### 6.3 House keys and the kill switch, as built
 
-`HOUSE_GEMINI_API_KEY` and `HOUSE_ANTHROPIC_API_KEY`, one per provider,
-resolved by `HouseKeys.for(provider)` at call time; `TRIALS_DISABLED=1` is
-the kill switch, read by `TrialMode.enabled?` on every call and every page.
-A trial whose provider has no house key set behaves as ended. Neither value
-is written to the database, a log, a page or a diagnostics line; the key
-reaches `AiService` the way a user's key does, as a constructor argument,
-and `log_usage` writes `house_key: true`, never the key.
+`HOUSE_<PROVIDER>_API_KEY`, one per provider (`HOUSE_GEMINI_API_KEY`,
+`HOUSE_ANTHROPIC_API_KEY`), resolved by `HouseKeys.for(provider)` at call
+time; `TRIALS_DISABLED=1` is the kill switch, read by `TrialMode.enabled?`
+on every call and every page. A trial whose provider has no house key set
+behaves as ended. Neither value is written to the database, a log, a page or
+a diagnostics line; the key reaches `AiService` the way a user's key does, as
+a constructor argument, and `log_usage` writes `house_key: true`, never the
+key.
 
-### 6.4 Caps
+### 6.4 Caps, as built
 
-Two gates, both in `AiService#call_and_log` ahead of `call`, since that is
-the one funnel every provider call takes, and both only when the credential
-is a house key:
+`TrialAllowance.check!` runs in `AiService#call_and_log` ahead of `call`,
+only when the service holds a house key, and raises
+`AiService::TrialAllowanceError` with `retry_after` set to the seconds until
+the count resets; a refused call writes no usage row and never reaches the
+provider:
 
-- Per account: `ApiUsage.requests_on(user, day, provider:)` counted on the
-  user's day, attempts included, against the invite's `daily_request_cap`.
-  Over it raises `TrialAllowanceError`.
-- Global: `ApiUsage.house_requests_between(provider:, from:, to:)` against
-  `HOUSE_GEMINI_DAILY_GUARD` / `HOUSE_ANTHROPIC_DAILY_GUARD` from `ENV`,
-  counted in the provider's reset zone (Pacific for Gemini; a Claude key's
-  spend limit is monthly, so its guard is a request count per day you set).
-  Over it raises `TrialAllowanceError` too, with the Pacific reset time.
+- Per account: `ApiUsage.requests_on(user, day, provider:)` on the user's
+  own day, attempts included, against the invite's `daily_request_cap`;
+  resets at the user's next midnight. No cap when the invite sets none.
+- Global: `ApiUsage.house_requests_between(provider:, from:, to:)` over the
+  provider's quota day (`AiService.quota_day`: Pacific for Gemini, UTC for
+  a provider that states no boundary) against
+  `HOUSE_<PROVIDER>_DAILY_GUARD` from `ENV`; resets at the end of that day.
+  No guard when unset.
 
 A count-then-call gate overshoots by at most the fan-out width (a review on a
 two-section day makes three calls at once), which is acceptable and bounded.
+
+`ProviderFailure` gains `trial_allowance_used` and `trial_ended`;
+`ProviderFailureText` writes those in the `trial` variant whatever variant
+is asked for, and `ProviderFailureText.variant_for(user)` picks `trial` for
+a trial account with no key of its own. The `trial` variant also carries its
+own words for `daily_limit`, `bad_key` and `out_of_credit` ("The trial's
+Gemini key…", "Tell the person who runs Code Gym."), so a house-key spend
+limit or daily quota keeps its honest kind and reads as the trial's rather
+than being reclassified as `trial_allowance_used`, which the design had
+proposed; the other kinds fall back to the `own_key` words.
 
 Numbers, provisional until the probe runs. A judged two-section day costs
 one draft, two judge calls, up to two retries with re-judges, two grading
@@ -578,8 +597,7 @@ you, so:
 - Gemini guard: the probe's daily `quotaValue` minus four, kept for your own
   use; seats per Gemini code: `floor(guard / 12)`, which at 20 a day is one.
 - Claude house key: set the Anthropic workspace spend limit as the hard
-  stop and the guard at 60 requests a day, about five seats; a spend-limit
-  refusal classifies as `trial_allowance_used`.
+  stop and the guard at 60 requests a day, about five seats.
 
 The per-minute limit is the other constraint. Judge and review fan-outs are
 parallel, so one review on a two-section day makes three requests in the same
@@ -642,36 +660,37 @@ shown to on-track accounts is replaced on a trial account by the trial
 screen's link, which is the one page difference, and it is inside a
 `trial?` branch.
 
-### 6.10 Existing accounts stay byte-identical
+### 6.10 Existing accounts stay byte-identical, as built
 
-Every new branch tests `current_user.trial?` or `invite_code_id`, which is
-nil for every existing row, and no prompt reads trial state.
-`existing_account_pages_spec` holds the page snapshots; a new
+Every new branch tests `trial?`, `trial_pending?` or `house_key?`, all false
+for every existing row, and no prompt reads trial state.
+`existing_account_pages_spec` holds the page snapshots, and
 `spec/services/trial_isolation_spec.rb`, modelled on
 `learning_track_isolation_spec`, pins that `AiService` builds byte-identical
-requests for a trial account and an own-key account with equal settings.
-Grading, mastery, the judge and the prompts are untouched: the house key
-changes which credential the request carries and nothing in the request.
+generation and judge requests for a trial account and an own-key account
+with equal settings, with only the usage rows' `house_key` differing, and
+that nothing under `app/services`, `app/jobs`, `ConceptMastery`, the
+verdicts or `KindDifficulty` reads trial state. Grading, mastery, the judge
+and the prompts are untouched: the house key changes which credential the
+request carries and nothing in the request.
 
 ---
 
-## 7. Signup
+## 7. Signup, as built
 
-Today `SessionsController#create` creates an account for any unknown address
-before it is verified, limited per address and per IP (audit L2, open). Trial
-mode adds the first reason to tell accounts apart at creation.
-
-Recommendation: require a code to create an account. The login form gains an
-optional "Invite code" field read only when the address is unknown; a known
-address ignores it. An unknown address with no code or a bad one gets the
-same "check your email" notice and no account, no mail. A code with
-`provider` nil is a join code for a teammate (no trial, no cap; they add
-their own key as today), so one table serves both. Existing accounts are
-untouched, and this closes L2 without an allowlist. The cost is that a
-teammate who loses their code asks you for one. The alternative, open signup
-plus a per-IP daily cap, is already in place; it leaves anyone able to create
-accounts and request trial codes against them, which is why I would not keep
-it once house keys exist.
+A new account needs a seat on an invite code. The login form gains an
+"Invite code (first time only)" field, read only when the address is
+unknown; a known address ignores it. An unknown address with no code or a
+bad one gets the same "check your email" notice and pending state, and no
+account and no mail. A code with `provider` nil is a join code for a
+teammate (no trial, no cap; they add their own key as today), so one table
+serves both. The account and the seat are taken in one transaction
+(`SessionsController#create_invited_user`), so a lost race for the last seat
+creates nothing. A trial code at signup links the code and holds the seat;
+the trial itself starts on `/trial` once the person has read the data
+notice and consented, and `require_provider` sends such an account there
+rather than to Setup. This closes audit item L2 without an allowlist. The
+cost is that a teammate who loses their code asks you for one.
 
 ---
 
@@ -703,8 +722,10 @@ it once house keys exist.
    characterization spec turned into the target).
 2. Done: the probe, no behavior change. Still to do once it has run:
    replace the fixtures with its capture and set the cap numbers.
-3. Invite codes, trial accounts, `ProviderCredential`, `HouseKeys`, the
-   gates, the kill switch, the minting script, the signup code field.
+3. Done: invite codes, trial accounts, `ProviderCredential`, `HouseKeys`,
+   `TrialAllowance`, the kill switch, the minting script, the signup code
+   field, the redemption page with the data notice and consent, and the
+   trial words for every failure kind.
 4. The trial screen, redemption consent, trial end, the dashboard banner and
    the Setup branch.
 
@@ -717,6 +738,6 @@ it once house keys exist.
 4. Gemini per-minute limit versus the parallel judge and review fan-out:
    recommend Claude for trials, say so on the trial screen, or allow a
    house-key-only serialization as a separate change.
-5. Signup: require a code for new accounts.
+5. Decided and built: a code for every new account (section 7).
 6. Anthropic out-of-credit as its own class and sentence.
 7. When to run the probe, and on which key.

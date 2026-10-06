@@ -91,6 +91,7 @@ en:
       name_placeholder: "Your name"
       email_label: "Work email *"
       email_placeholder: "you@company.com"
+      invite_code_label: "Invite code (first time only)"
       submit: "Send code"
     pending:
       message: "Enter the 6-digit code we emailed you."
@@ -106,6 +107,22 @@ en:
       code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
       code_requests: "Too many code requests. Try again in a few minutes."
       code_attempts: "Too many attempts. Try again in a few minutes."
+  trials:
+    page_title: "Trial"
+    heading: "Trial"
+    intro: "Enter the invite code you were given to try Code Gym on a shared key."
+    code_label: "Invite code"
+    consent_label: "I understand what is sent and to whom."
+    submit: "Start trial"
+    started: "Your trial has started."
+    running_until: "Your trial runs until the end of %{day}."
+    code_rejected: "That code didn't work. Check it and try again, or ask the person who gave it to you."
+    consent_needed: "Tick the box to confirm you've read what is sent on a trial."
+    rate_limited: "Too many attempts. Try again in an hour."
+    data_notice:
+      shared: "On a trial, Code Gym sends your exercises, answers and messages to %{provider} using a key that belongs to the person who runs Code Gym, not to you. Usage counts against that key."
+      gemini: "Google's free tier lets Google use what is sent, including your answers, to improve its products, and people at Google may read it. Don't paste anything confidential."
+      anthropic: "Anthropic keeps API data for up to 30 days and does not train on it by default."
   user_mailer:
     login_code:
       subject: "Your Code Gym login code"
@@ -189,6 +206,21 @@ en:
         reset_at: "The allowance resets at %{time} your time, %{day}."
         reset_passed: "The allowance has reset since then, so you can try again."
         next: "Try again after that, or add a paid key in Setup."
+      trial:
+        title: "The trial's %{provider} key has used today's free allowance, so %{outcome}."
+        reset_at: "The allowance resets at %{time} your time, %{day}."
+        reset_passed: "The allowance has reset since then, so you can try again."
+        next: "Try again after that."
+    trial_allowance_used:
+      trial:
+        title: "Your trial has used its %{provider} calls for today, so %{outcome}."
+        reset_at: "The count resets at %{time} your time, %{day}."
+        reset_passed: "The count has reset since then, so you can try again."
+        next: "Try again after that."
+    trial_ended:
+      trial:
+        title: "Your trial has ended, so %{outcome}."
+        next: "Everything you did is still here. Add your own API key in Setup to keep going."
     short_rate_limit:
       own_key:
         title: "%{provider} is limiting requests right now, so %{outcome}."
@@ -198,10 +230,16 @@ en:
       own_key:
         title: "%{provider} didn't accept your API key, so %{outcome}."
         next: "Check the key in Setup."
+      trial:
+        title: "%{provider} didn't accept the trial's key, so %{outcome}."
+        next: "Tell the person who runs Code Gym."
     out_of_credit:
       own_key:
         title: "%{provider} reports that your account is out of credit or over its spend limit, so %{outcome}."
         next: "Add credit or raise the limit with %{provider}, then try again."
+      trial:
+        title: "The trial's %{provider} key is out of credit or over its spend limit, so %{outcome}."
+        next: "Tell the person who runs Code Gym."
     outage:
       own_key:
         title: "%{provider} isn't answering right now, so %{outcome}."

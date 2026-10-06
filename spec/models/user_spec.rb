@@ -1985,3 +1985,36 @@ RSpec.describe User, "#recent_exercise_history with dropped sections", type: :mo
     expect(entry.dropped).to eq(1)
   end
 end
+
+RSpec.describe User, "trials", type: :model do
+  it "is ready with its own key or an active trial, and nothing else" do
+    bare = User.create!(email: "bare@example.com", name: "Bare")
+    expect(bare).not_to be_provider_ready
+    expect(create_user_with_key).to be_provider_ready
+
+    trial = create_trial_user(provider: "fake")
+    expect(trial).to be_provider_ready
+    expect(trial).to be_trial
+    expect(trial).not_to be_trial_pending
+    travel_to(trial.trial_ends_at + 1.second) do
+      expect(trial).not_to be_provider_ready
+      expect(trial).to be_trial_ended
+    end
+  end
+
+  it "ends the trial at the end of its last day in the user's zone" do
+    _invite, code = mint_trial_code(provider: "fake", days: 3)
+    user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
+
+    expect(user.start_trial!(code: code, consented_at: Time.utc(2026, 10, 6, 14))).to be(true)
+
+    expect(user.trial_started_at).to eq(Time.utc(2026, 10, 6, 14))
+    expect(user.trial_ends_at.in_time_zone("Asia/Tokyo").strftime("%F %T")).to eq("2026-10-08 23:59:59")
+  end
+
+  it "keeps a provider with no stored key valid for a trial account" do
+    trial = create_trial_user(provider: "fake")
+    expect(trial.api_keys).to be_nil
+    expect(trial).to be_valid
+  end
+end

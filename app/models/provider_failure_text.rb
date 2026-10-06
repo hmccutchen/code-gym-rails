@@ -1,8 +1,8 @@
 # One provider failure as a sentence for a person, written at read time so
 # the reset is named in their zone and against the clock. The text lives in
 # config/locales under provider_failures; each kind has a variant per
-# credential (own_key today, trial next), so a new variant adds text and no
-# code. Nothing here carries provider text, a status code or a key: the only
+# credential (own_key, and trial where the words differ), so a new variant
+# adds text and no code. Nothing here carries provider text, a status code or a key: the only
 # inputs are the kind, the provider's label, the surface and two times.
 #
 # Surfaces name what did not happen (provider_failures.outcomes) and, where
@@ -21,7 +21,7 @@ class ProviderFailureText
     @zone        = zone
     @now         = now
     @retry_after = retry_after
-    @variant     = VARIANTS.include?(variant.to_s) ? variant.to_s : "own_key"
+    @variant     = variant_for_kind(variant)
     @reset_at    = ResetClock.reset_at(@kind, provider: provider, failed_at: @failed_at, retry_after: retry_after)
   end
 
@@ -37,7 +37,20 @@ class ProviderFailureText
 
   def reset_passed? = @reset_at.present? && @now >= @reset_at
 
+  # Which credential's words a failure gets: a trial account reads the trial
+  # variant, an account with its own key the own_key one.
+  def self.variant_for(user)
+    user.trial? && !user.api_key_present? ? "trial" : "own_key"
+  end
+
   private
+
+  # A kind only a trial can hit has text only under the trial variant.
+  def variant_for_kind(variant)
+    return "trial" if ProviderFailure.trial_kind?(@kind)
+
+    VARIANTS.include?(variant.to_s) ? variant.to_s : "own_key"
+  end
 
   def title
     entry(:title, outcome: I18n.t("provider_failures.outcomes.#{@surface}"))
@@ -60,7 +73,7 @@ class ProviderFailureText
   def next_step
     return if reset_passed?
 
-    entry(:next, default: nil)
+    entry(:next, optional: true)
   end
 
   def wait_in_words
@@ -68,8 +81,13 @@ class ProviderFailureText
     minutes <= 1 ? "a minute" : "#{minutes} minutes"
   end
 
-  def entry(name, default: :own_key, **interpolations)
-    fallback = default == :own_key ? I18n.t("provider_failures.#{@kind}.own_key.#{name}", provider: @provider, **interpolations) : default
-    I18n.t("provider_failures.#{@kind}.#{@variant}.#{name}", provider: @provider, default: fallback, **interpolations)
+  # Every kind has its words under the base variant, own_key, or trial for a
+  # kind only a trial can hit; a variant adds only the entries that differ.
+  def entry(name, optional: false, **interpolations)
+    candidates = [ @variant, variant_for_kind("own_key") ].uniq.map { |variant| "provider_failures.#{@kind}.#{variant}.#{name}" }
+    key = candidates.find { |candidate| I18n.exists?(candidate) }
+    return if key.nil? && optional
+
+    I18n.t(key || candidates.last, provider: @provider, **interpolations)
   end
 end

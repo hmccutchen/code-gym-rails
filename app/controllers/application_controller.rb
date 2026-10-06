@@ -5,7 +5,7 @@ class ApplicationController < ActionController::Base
   include PreviewAutoLogin
 
   before_action :require_login
-  before_action :require_api_key
+  before_action :require_provider
   around_action :use_time_zone
 
   # A stale CSRF token (e.g. a login page left open across a deploy restart)
@@ -62,11 +62,17 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  def require_api_key
+  # Own key or an active trial. An account that signed up with a trial code
+  # and has not yet consented is sent to the trial page instead of Setup.
+  def require_provider
     return unless logged_in?
-    return if current_user.api_key_present?
+    return if current_user.provider_ready?
     return if controller_name == "api_keys" || controller_name == "sessions"
 
-    redirect_to setup_path, notice: t("flash.application.api_key_needed")
+    if current_user.trial_pending?
+      redirect_to trial_path
+    else
+      redirect_to setup_path, notice: t("flash.application.api_key_needed")
+    end
   end
 end

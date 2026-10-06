@@ -14,3 +14,6 @@ Rails.application.config.filter_parameters += [
 Rails.application.config.filter_parameters += [
   /\Acode\z/, :answers, :message, :question, :pseudocode, :prior_alternates, :thread, :p256dh, :auth
 ]
+
+# An invite code is a secret, and `_key` does not cover its name.
+Rails.application.config.filter_parameters += [ :invite_code ]

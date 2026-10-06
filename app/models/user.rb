@@ -4,6 +4,7 @@ class User < ApplicationRecord
   has_many :api_usages,      dependent: :destroy
   has_many :concept_masteries, dependent: :destroy
   has_many :push_subscriptions, dependent: :destroy
+  belongs_to :invite_code, optional: true
 
   # One key per provider, encrypted at rest as a whole. provider names the
   # one in use. Requires RAILS_MASTER_KEY / credentials to be set (standard
@@ -205,7 +206,8 @@ class User < ApplicationRecord
 
     ProviderFailureText.new(last_generation_failure, provider: last_generation_failure_provider || provider,
                             surface: surface, failed_at: last_generation_failed_at, zone: effective_time_zone,
-                            now: now, retry_after: last_generation_retry_after).full
+                            now: now, retry_after: last_generation_retry_after,
+                            variant: ProviderFailureText.variant_for(self)).full
   end
 
   # Suppresses every generation the user didn't ask for — the cron batch and
@@ -322,6 +324,45 @@ class User < ApplicationRecord
 
   def api_key_present?
     api_key.present?
+  end
+
+  # Own key, or a trial that can still pay for a call: what every page that
+  # needs a provider reads, and what the dashboard's on-demand generation
+  # reads. The nightly batch keeps reading stored keys, so a trial account is
+  # generated only when it opens the dashboard.
+  def provider_ready? = api_key_present? || trial_active?
+
+  # ── Trial ──────────────────────────────────────────────────────────────────
+  # A trial_ends_at is the fact; an account with a code and no dates joined on
+  # a plain join code, or signed up with a trial code and has not consented.
+  def trial? = trial_ends_at.present?
+
+  def trial_active?
+    trial? && trial_ends_at.future? && TrialMode.enabled? && HouseKeys.for(provider).present?
+  end
+
+  def trial_ended? = trial? && !trial_active?
+
+  def trial_pending? = !trial? && invite_code&.trial? == true
+
+  # Starts the trial the code offers, taking a seat unless this account's own
+  # signup already took one. Under the row lock, so two submissions cannot
+  # start it twice, and the seat is taken only once the account is known to
+  # be eligible. Returns false for a code that is wrong, expired, exhausted,
+  # a join code, or when this account already has one.
+  def start_trial!(code:, consented_at:)
+    with_lock do
+      return false if trial? || invite_code_id.present? && !trial_pending?
+
+      invite = trial_pending? ? invite_code : InviteCode.find_by_code(code)
+      return false unless invite&.trial?
+      return false unless trial_pending? || invite.redeem!
+
+      ends = consented_at.in_time_zone(effective_time_zone).end_of_day + (invite.trial_days - 1).days
+      update!(invite_code: invite, provider: invite.provider, trial_started_at: consented_at,
+              trial_ends_at: ends, trial_consented_at: consented_at)
+    end
+    true
   end
 
   # In registry order, so Setup lists them the same way every time.

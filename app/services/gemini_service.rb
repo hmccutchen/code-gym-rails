@@ -7,11 +7,9 @@ class GeminiService < AiService
   def self.provider_key = "gemini"
 
   # Google's daily quotas reset at midnight Pacific, whatever the user's zone.
-  DAILY_QUOTA_RESET_ZONE = "America/Los_Angeles".freeze
+  def self.quota_day_zone = "America/Los_Angeles"
 
-  def self.daily_quota_reset_at(failed_at)
-    failed_at.in_time_zone(DAILY_QUOTA_RESET_ZONE).tomorrow.beginning_of_day
-  end
+  def self.daily_quota_reset_at(failed_at) = quota_day(failed_at).end
   def self.key_pattern = /\A(AIza|AQ\.)/
 
   # Keyed by the ApiUsage purpose string, like ClaudeService's. Generation and

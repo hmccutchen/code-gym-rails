@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe ProviderFailureText do
+RSpec.describe ProviderFailureText, type: :model do
   # Tuesday 10am Eastern; the Gemini allowance then resets at 3am Eastern on Wednesday.
   let(:failed_at) { Time.utc(2026, 10, 6, 14) }
   let(:zone) { "America/New_York" }
@@ -56,8 +56,37 @@ RSpec.describe ProviderFailureText do
       .to eq("Claude didn't accept your API key, so your question wasn't answered. Your question is still in the box. Check the key in Setup.")
   end
 
+  it "writes the trial kinds in trial words whatever variant is asked for" do
+    expect(text("trial_allowance_used", surface: :generation, retry_after: 1800, variant: "own_key").full).to eq(
+      "Your trial has used its Gemini calls for today, so nothing was generated. " \
+      "The count resets at 10:30 am your time, Tuesday. Try again after that."
+    )
+    expect(text("trial_ended", surface: :review, provider: "anthropic").full).to eq(
+      "Your trial has ended, so the review didn't run. Your answers are saved. " \
+      "Everything you did is still here. Add your own API key in Setup to keep going."
+    )
+  end
+
+  it "names the trial's key rather than the reader's on the trial variant, and falls back where the words are the same" do
+    expect(text("daily_limit", surface: :generation, variant: "trial").full).to eq(
+      "The trial's Gemini key has used today's free allowance, so nothing was generated. " \
+      "The allowance resets at 3:00 am your time, Wednesday. Try again after that."
+    )
+    expect(text("bad_key", surface: :duck, variant: "trial").full)
+      .to eq("Gemini didn't accept the trial's key, so the thinking partner didn't answer. Your message is still in the box. Tell the person who runs Code Gym.")
+    expect(text("timeout", surface: :duck, variant: "trial").full).to eq(text("timeout", surface: :duck).full)
+  end
+
+  it "picks the trial variant for a trial account with no key of its own" do
+    trial = create_trial_user(provider: "fake")
+    expect(described_class.variant_for(trial)).to eq("trial")
+    expect(described_class.variant_for(create_user_with_key)).to eq("own_key")
+    trial.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-own" })
+    expect(described_class.variant_for(trial)).to eq("own_key")
+  end
+
   it "reads an unknown kind as other and an unknown variant as own_key" do
-    sentence = text("trial_ended", surface: :critique, variant: "trial").full
+    sentence = text("nonsense", surface: :critique, variant: "nonsense").full
     expect(sentence).to start_with("Gemini sent back something Code Gym couldn't use, so the critique didn't run.")
   end
 

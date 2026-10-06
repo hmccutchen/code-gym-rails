@@ -639,7 +639,8 @@ class ResponsesController < ApplicationController
     kind    = failures.values.map { |f| f[:failure] }.tally.max_by { |_, count| count }.first
     example = failures.values.find { |f| f[:failure] == kind }
     ProviderFailureText.new(kind, provider: example[:provider] || current_user.provider, surface: surface,
-                            failed_at: Time.current, zone: current_user.effective_time_zone, retry_after: example[:retry_after])
+                            failed_at: Time.current, zone: current_user.effective_time_zone, retry_after: example[:retry_after],
+                            variant: ProviderFailureText.variant_for(current_user))
   end
 
   # What a failed section keeps: its kind, the quota named and when, never the

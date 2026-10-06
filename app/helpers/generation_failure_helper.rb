@@ -20,6 +20,7 @@ module GenerationFailureHelper
     kind = failure["kind"] || LEGACY_REVIEW_CODES.fetch(failure["code"], "other")
     failed_at = failure["at"].present? ? Time.zone.parse(failure["at"]) : response.updated_at
     ProviderFailureText.new(kind, provider: failure["provider"] || response.user.provider, surface: :review, failed_at: failed_at,
-                            zone: response.user.effective_time_zone, retry_after: failure["retry_after"]).full
+                            zone: response.user.effective_time_zone, retry_after: failure["retry_after"],
+                            variant: ProviderFailureText.variant_for(response.user)).full
   end
 end

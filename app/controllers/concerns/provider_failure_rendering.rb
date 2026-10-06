@@ -9,7 +9,7 @@ module ProviderFailureRendering
   def provider_failure_text(error, surface)
     ProviderFailureText.new(ProviderFailure.classify(error), provider: current_user.provider, surface: surface,
                             failed_at: Time.current, zone: current_user.effective_time_zone,
-                            retry_after: error.try(:retry_after))
+                            retry_after: error.try(:retry_after), variant: ProviderFailureText.variant_for(current_user))
   end
 
   def render_provider_failure(error, surface)

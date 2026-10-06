@@ -136,7 +136,7 @@ class LearnController < ApplicationController
 
     text = ProviderFailureText.new(failure["kind"], provider: failure["provider"] || current_user.provider, surface: :reference,
                                    failed_at: Time.zone.parse(failure["at"].to_s), zone: current_user.effective_time_zone,
-                                   retry_after: failure["retry_after"])
+                                   retry_after: failure["retry_after"], variant: ProviderFailureText.variant_for(current_user))
     { failed: text.kind, message: text.brief }
   end
 

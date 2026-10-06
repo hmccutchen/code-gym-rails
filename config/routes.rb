@@ -37,6 +37,10 @@ Rails.application.routes.draw do
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
 
+  # Redeem an invite code for a trial on a house key.
+  get  "trial", to: "trials#show"
+  post "trial", to: "trials#create"
+
   get "welcome", to: "welcome#show"
 
   # Account page: log out or permanently delete (anonymize) the account.

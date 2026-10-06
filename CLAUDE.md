@@ -295,10 +295,11 @@ Every page load, any day of the week:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
+| `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, provider (nil for a join code), seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
@@ -437,6 +438,50 @@ concept-specific difficulty descriptions for future generation, not a new set.
   operator's own key. A refresh rewrites the whole shared reference and guide,
   including rows that already have a guide, for every user. Production coverage,
   billed cost and completion remain unmeasured until this runs there.
+- **Invite codes and trials**: a new account needs a seat on an invite code,
+  typed into the login form's "Invite code (first time only)" field; an
+  unknown address without a valid code gets the same notice as everyone and
+  no account, no mail. `InviteCode` keeps only a SHA-256 digest of the
+  26-character base32 code `script/mint_invite_code.rb` prints once, and
+  `#redeem!` takes a seat in one statement against the seat count and the
+  deadline, so two redemptions cannot both win the last seat. A code with a
+  `provider` starts a trial on that provider's house key; one without is a
+  join code for a teammate who brings their own key.
+
+  **A trial is a `trial_ends_at`, nothing more.** `User#start_trial!` runs
+  under the row lock from `POST /trial`, after the data notice and the
+  consent checkbox, and sets `provider` from the code and the end to the
+  last day's end in the user's zone; an account that signed up with a trial
+  code already holds its seat and only consents there, and
+  `require_provider` sends it to `/trial` rather than Setup until it does.
+  `trial_active?` needs the end in the future, `TrialMode.enabled?`
+  (`TRIALS_DISABLED` is not `"1"`, the kill switch) and a house key for the
+  provider (`HouseKeys.for`, `HOUSE_<PROVIDER>_API_KEY`, read from ENV at
+  call time and never stored). `provider_ready?` is own key or active trial,
+  behind `require_provider` and the dashboard's on-demand generation; the
+  nightly batch still selects stored keys, so a trial is generated only when
+  it opens the dashboard.
+
+  **The house key changes the credential and nothing in the request.**
+  `ProviderCredential.for(user)` hands `AiService.for` the user's own key, no
+  key, or the house key, and raises `AiService::TrialEndedError` for an
+  ended trial. The service's `house_key?` reaches the per-section threads
+  through `fresh_service`, is written to every usage row, and is what runs
+  `TrialAllowance.check!` ahead of the call in `call_and_log`: the invite's
+  `daily_request_cap` on the user's own day and `HOUSE_<PROVIDER>_DAILY_GUARD`
+  over the provider's quota day (`AiService.quota_day`: Pacific for Gemini,
+  UTC otherwise), attempts included, each raising
+  `AiService::TrialAllowanceError` with the seconds until the count resets
+  and writing no row. `spec/services/trial_isolation_spec.rb` pins
+  byte-identical generation and judge calls for a trial and an own-key twin,
+  and that nothing under `app/services`, `app/jobs` or the mastery and
+  verdict models reads trial state. A trial account's failures read in the
+  `trial` variant (`ProviderFailureText.variant_for`): the two trial kinds
+  only exist there, and `daily_limit`, `bad_key` and `out_of_credit` name
+  the trial's key rather than the reader's, while the rest fall back to the
+  `own_key` words. The trial screen, the trial-ended panels and Setup's
+  branch are PR 4 of the stack; design in
+  `docs/trial-mode-and-provider-limits-2026-10-06.md`.
 - **Per-user API keys**: Each user provides their own Anthropic, Gemini or OpenAI key, and can keep one for each. Zero shared cost. A pasted key's prefix (`sk-ant-`, `AIza`/`AQ.`, or `sk-proj-`/`sk-svcacct-`/legacy `sk-`) decides which provider it is saved under; the OpenAI pattern requires alphanumerics straight after a bare `sk-`, so it can never claim an Anthropic key whatever order the patterns are tried in. Pasting a key replaces only that provider's key and selects it (`User#store_api_key`); Setup's "Provider in use" radios switch between saved keys without re-entering one, and list only providers with a saved key (`User#stored_providers`). `user.provider` names the one in use, `User#api_key` reads its key, and `AiService.for(user)` dispatches on it, so nothing downstream knows there is more than one. The keys are stored together in `users.api_keys`, a JSON map serialized and then encrypted with `encrypts :api_keys` (ActiveRecord Encryption); no keys stores as NULL, so `where.not(api_keys: nil)` finds the accounts that can call a provider. A map rather than a column per provider keeps adding a provider a matter of adding a class. `users.api_key`, the single-key column it replaced, is ignored for one release while the old code serves through the pre-deploy migration, and dropped afterwards; a key pasted in that window lands only in the old column and has to be pasted again. Each reviewed response records the provider that wrote it in `daily_responses.review_provider`, so History and the dashboard keep naming it after a switch; a part-reviewed day finished on another provider names the last one. A review old code wrote while the migration ran has none, so changing `provider` first records the outgoing provider on every reviewed response still missing one (`User#record_provider_on_unlabelled_reviews`), and a response with none can then only have come from the current provider. A user could already switch by pasting another provider's key, so the backfill stores `unknown` (labelled "AI") on the past reviews of a user whose `api_usages.model` rows name another provider. Models were recorded only from 2026-10-01, so a switch before that left no trace, and those reviews keep the current provider's name, as the page already showed. Deleting an account also clears the ignored `api_key` column, which still holds the copied key until it is dropped. Setup says nothing about how providers differ: the prose judge ships off, and structured output and caching change cost and reliability rather than anything an engineer does differently. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**: each provider picks its model from its own
@@ -2685,6 +2730,12 @@ always pull in the full suite — is stated once, in
 - `app/services/shared_concept.rb` — `SharedConcept`: which reduced-tier concept both fixed sections take, from a host the day left free; pure
 - `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
+- `app/models/invite_code.rb` — `InviteCode`: a code's digest, seats, deadline and trial terms; `.mint` prints the code once, `#redeem!` takes a seat atomically
+- `app/models/provider_credential.rb` — `ProviderCredential.for(user)`: own key, no key, or the house key for an active trial; raises for an ended one
+- `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
+- `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
+- `app/controllers/trials_controller.rb` — `GET`/`POST /trial`: the data notice, consent and redemption
+- `script/mint_invite_code.rb` — mints one invite or join code and prints it once
 - `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
 - `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
 - `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line

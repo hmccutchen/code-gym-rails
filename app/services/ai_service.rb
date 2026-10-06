@@ -33,6 +33,15 @@ class AiService
   # the same, so the providers tell the two apart before raising.
   class BillingError < Error; end
 
+  # The account is on a trial that has ended, or trials are switched off, and
+  # it stored no key of its own. Raised before anything is sent.
+  class TrialEndedError < Error; end
+
+  # A trial account has used its calls for today, or every trial together has
+  # used the house key's guard. Raised before anything is sent; retry_after is
+  # the wait until the count resets.
+  class TrialAllowanceError < Error; end
+
   # The request never got an HTTP answer and did not time out: a refused
   # connection, a reset, a DNS failure.
   class NetworkError < Error; end
@@ -1056,6 +1065,12 @@ class AiService
   # free of large/undesired provider content.
   RAW_SNIPPET_LIMIT = 500
 
+  # True when the key is a house key paid for by the deployment rather than
+  # the user: the usage row records it, and the trial gates run before a call.
+  attr_writer :house_key
+
+  def house_key? = @house_key == true
+
   def initialize(api_key)
     @api_key = api_key
     @conn    = build_connection
@@ -1068,7 +1083,18 @@ class AiService
       raise Error, "User #{user.id} has the test-only #{provider.provider_key} provider outside a local environment"
     end
 
-    provider.new(user.api_key)
+    credential = ProviderCredential.for(user)
+    provider.new(credential.key).tap { |service| service.house_key = credential.house }
+  end
+
+  # The calendar day a provider counts requests in, for the house-key guard.
+  # Gemini's day is Pacific; the base assumes UTC for a provider that states
+  # no boundary.
+  def self.quota_day_zone = "UTC"
+
+  def self.quota_day(now)
+    start = now.in_time_zone(quota_day_zone).beginning_of_day
+    start...start.tomorrow.beginning_of_day
   end
 
   def self.available? = true
@@ -1126,7 +1152,7 @@ class AiService
     draft = draft_exercise(user, language: language, blocking: false)
     JudgedGeneration.call(
       user: user, language: language, draft: draft,
-      providers: -> { self.class.new(@api_key).judged_generation_provider },
+      providers: -> { fresh_service.judged_generation_provider },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
     ).with(plan_notes: draft.plan.notes)
   end
@@ -1455,6 +1481,8 @@ class AiService
     when AuthenticationError  then "authentication"
     when RateLimitError       then "rate_limit"
     when BillingError         then "out_of_credit"
+    when TrialEndedError      then "trial_ended"
+    when TrialAllowanceError  then "trial_allowance_used"
     when InvalidResponseError then "invalid_response"
     else                           "other"
     end
@@ -2734,7 +2762,7 @@ class AiService
   # purpose rather than AiService::Error-wide.
 
   def safe_difficulty_assessment(user, exercise, sections)
-    self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections)
+    fresh_service.send(:assess_difficulty, user, exercise, sections: sections)
   rescue StandardError => e
     Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
     {}
@@ -2821,7 +2849,7 @@ class AiService
   end
 
   def grade_section(user, exercise, daily_response, section, context)
-    service = self.class.new(@api_key)
+    service = fresh_service
     result  = service.send(
       :call_and_log, user, purpose: "review_response",
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
@@ -3211,10 +3239,17 @@ class AiService
   # Rescues database failures only, the pool checkout included. Anything else
   # here is a bug, and swallowing it would silently empty the table that cost
   # questions are answered from.
+  # A service for another thread of the same call, carrying the same key and
+  # the same credential kind.
+  def fresh_service
+    self.class.new(@api_key).tap { |service| service.house_key = house_key? }
+  end
+
   def log_usage(user, result, purpose:)
     ActiveRecord::Base.connection_pool.with_connection do
       ApiUsage.create!(
         user:       user,
+        house_key:  house_key?,
         tokens_in:  result[:input_tokens].to_i,
         tokens_out: result[:output_tokens].to_i,
         model:      result[:model],
@@ -3263,6 +3298,7 @@ class AiService
   # caller sees.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
                    read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false, single_attempt: false)
+    TrialAllowance.check!(user, provider: self.class) if house_key?
     begin
       result = call(system: system, prompt: prompt, cache_system: cache_system,
                     read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,

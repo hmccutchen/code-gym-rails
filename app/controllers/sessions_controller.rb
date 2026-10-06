@@ -1,6 +1,6 @@
 class SessionsController < ApplicationController
   skip_before_action :require_login
-  skip_before_action :require_api_key
+  skip_before_action :require_provider
 
   helper_method :pending_login_email
 
@@ -79,12 +79,9 @@ class SessionsController < ApplicationController
     # `active` only: an anonymized row's email was rewritten anyway, so this
     # falls through to account creation and the person gets a fresh account.
     user = User.active.find_by(email: email)
+    user ||= create_invited_user(email, name)
 
-    if user.nil?
-      user = User.create!(email: email, name: name.presence || email.split("@").first)
-    end
-
-    UserMailer.login_code(user, user.generate_login_code!).deliver_later
+    UserMailer.login_code(user, user.generate_login_code!).deliver_later if user
 
     # Drives the code form on the login page across reloads in this same
     # browser. Stamped so the state can age out with the code it describes —
@@ -127,6 +124,23 @@ class SessionsController < ApplicationController
   end
 
   private
+
+  # A new account needs a seat on an invite code, taken with the account in
+  # one transaction so a lost race for the last seat creates nothing. No code
+  # or a bad one creates no account and sends no mail, behind the same notice
+  # a real request gets, so the page says nothing about which addresses exist.
+  def create_invited_user(email, name)
+    invite = InviteCode.find_by_code(params[:invite_code])
+    return if invite.nil?
+
+    User.transaction do
+      user = User.create!(email: email, name: name.presence || email.split("@").first, invite_code: invite)
+      raise ActiveRecord::Rollback unless invite.redeem!
+
+      return user
+    end
+    nil
+  end
 
   # The single normalization rule for a submitted email, so the #create
   # rate limit's `by:` lambda (instance_exec'd here, so it can call a

@@ -32,6 +32,7 @@ RSpec.describe ProviderFailure do
 
   it "answers only its own kinds" do
     expect(described_class::KINDS).to all(satisfy { |kind| described_class.kind?(kind) })
-    expect(described_class.kind?("trial_ended")).to be(false)
+    expect(described_class.kind?("trial_ended")).to be(true)
+    expect(described_class.kind?("nonsense")).to be(false)
   end
 end
