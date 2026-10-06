@@ -479,9 +479,22 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `trial` variant (`ProviderFailureText.variant_for`): the two trial kinds
   only exist there, and `daily_limit`, `bad_key` and `out_of_credit` name
   the trial's key rather than the reader's, while the rest fall back to the
-  `own_key` words. The trial screen, the trial-ended panels and Setup's
-  branch are PR 4 of the stack; design in
-  `docs/trial-mode-and-provider-limits-2026-10-06.md`.
+  `own_key` words.
+
+  **What a trial account sees.** `TrialStatus.for(user)` is the one reading
+  of a trial's standing: the day it ends and the days left in the user's
+  zone, today's calls against the cap (the gate's own query), and the day it
+  ended, or none when the kill switch or a missing house key ended it early.
+  `/trial` shows that with the data notice, the dashboard carries one banner
+  line linking there, and Setup swaps the on-track key guide for a note
+  linking there while the trial runs. An ended trial still reaches every
+  page: `require_provider` lets any trial through, each provider call then
+  fails with the trial-ended sentence through the rescues the surfaces
+  already have, the dashboard renders a trial-ended panel instead of
+  enqueuing a set, `/generate` refuses with the sentence, and Setup shows the
+  key guide whether or not the account is on the track. Every trial branch
+  renders only for a trial account, so existing pages stay byte-identical.
+  Design in `docs/trial-mode-and-provider-limits-2026-10-06.md`.
 - **Per-user API keys**: Each user provides their own Anthropic, Gemini or OpenAI key, and can keep one for each. Zero shared cost. A pasted key's prefix (`sk-ant-`, `AIza`/`AQ.`, or `sk-proj-`/`sk-svcacct-`/legacy `sk-`) decides which provider it is saved under; the OpenAI pattern requires alphanumerics straight after a bare `sk-`, so it can never claim an Anthropic key whatever order the patterns are tried in. Pasting a key replaces only that provider's key and selects it (`User#store_api_key`); Setup's "Provider in use" radios switch between saved keys without re-entering one, and list only providers with a saved key (`User#stored_providers`). `user.provider` names the one in use, `User#api_key` reads its key, and `AiService.for(user)` dispatches on it, so nothing downstream knows there is more than one. The keys are stored together in `users.api_keys`, a JSON map serialized and then encrypted with `encrypts :api_keys` (ActiveRecord Encryption); no keys stores as NULL, so `where.not(api_keys: nil)` finds the accounts that can call a provider. A map rather than a column per provider keeps adding a provider a matter of adding a class. `users.api_key`, the single-key column it replaced, is ignored for one release while the old code serves through the pre-deploy migration, and dropped afterwards; a key pasted in that window lands only in the old column and has to be pasted again. Each reviewed response records the provider that wrote it in `daily_responses.review_provider`, so History and the dashboard keep naming it after a switch; a part-reviewed day finished on another provider names the last one. A review old code wrote while the migration ran has none, so changing `provider` first records the outgoing provider on every reviewed response still missing one (`User#record_provider_on_unlabelled_reviews`), and a response with none can then only have come from the current provider. A user could already switch by pasting another provider's key, so the backfill stores `unknown` (labelled "AI") on the past reviews of a user whose `api_usages.model` rows name another provider. Models were recorded only from 2026-10-01, so a switch before that left no trace, and those reviews keep the current provider's name, as the page already showed. Deleting an account also clears the ignored `api_key` column, which still holds the copied key until it is dropped. Setup says nothing about how providers differ: the prose judge ships off, and structured output and caching change cost and reliability rather than anything an engineer does differently. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**: each provider picks its model from its own
@@ -2735,6 +2748,7 @@ always pull in the full suite — is stated once, in
 - `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
 - `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
 - `app/controllers/trials_controller.rb` — `GET`/`POST /trial`: the data notice, consent and redemption
+- `app/models/trial_status.rb` — `TrialStatus`: a trial's standing for its pages: days left, today's calls against the cap, the day it ended
 - `script/mint_invite_code.rb` — mints one invite or join code and prints it once
 - `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
 - `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure

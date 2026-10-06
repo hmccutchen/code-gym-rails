@@ -14,7 +14,12 @@ class TrialsController < ApplicationController
              with: -> { redirect_to trial_path, alert: t("trials.rate_limited") },
              store: RATE_LIMIT_STORE, name: "redemptions_by_ip", only: :create
 
+  # GET /trial — the form, or the trial's standing for an account on one. A
+  # first-run account answers the experience question first, as on Setup.
   def show
+    return redirect_to welcome_path if current_user.first_run?
+
+    @status = TrialStatus.for(current_user) if current_user.trial?
   end
 
   def create

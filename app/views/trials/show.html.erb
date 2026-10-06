@@ -13,8 +13,16 @@
 
 <div class="trial-wrap">
   <h1><%= t("trials.heading") %></h1>
-  <% if current_user.trial? %>
-    <p><%= t("trials.running_until", day: l(current_user.trial_ends_at.in_time_zone(current_user.effective_time_zone).to_date, format: :long)) %></p>
+  <% if @status %>
+    <% if @status.active? %>
+      <p><%= t("trials.running_until", day: l(@status.ends_on, format: :long), days: t("dashboard.trial_banner.days", count: @status.days_left)) %></p>
+      <p><%= @status.cap ? t("trials.used_today", used: @status.used, cap: @status.cap) : t("trials.used_today_no_cap", used: @status.used) %></p>
+      <p><%= t("trials.at_the_end") %></p>
+    <% else %>
+      <p><%= @status.ended_on ? t("dashboard.trial_ended.on_day", day: l(@status.ended_on, format: :long)) : t("dashboard.trial_ended.message") %>
+         <%= t("dashboard.trial_ended.kept") %></p>
+      <p><%= link_to t("dashboard.trial_ended.add_key"), setup_path %></p>
+    <% end %>
     <%= render "trials/data_notice", provider: current_user.provider %>
   <% else %>
     <p><%= t("trials.intro") %></p>

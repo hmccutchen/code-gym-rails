@@ -616,7 +616,7 @@ is to recommend the Claude key for trials and to say in the trial screen that
 Gemini trials may see "limiting requests right now" messages. Decision for
 you.
 
-### 6.5 Generation and the first-run wait
+### 6.5 Generation and the first-run wait, as built
 
 Trial accounts are never in the batch (section 5). Opening the dashboard on a
 weekday enqueues the judged on-demand generation exactly as for a new
@@ -625,48 +625,65 @@ Typical wait on Gemini Flash is the draft (20 to 60 seconds) plus the judge
 fan-out (5 to 15 seconds) plus any retry; worst case is the budget the
 poller already allows. The pause rule: `DashboardController#show` treats an
 ended trial like `paused_generation_at`, rendering the trial-ended panel
-instead of enqueuing, and `/generate` refuses with the same sentence.
+instead of enqueuing, and `/generate` refuses with the trial-ended sentence
+before it touches the day.
 
-### 6.6 Trial screen
+### 6.6 Trial screen, as built
 
-`/trial` for a trial account, and a one-line banner on the dashboard linking
-to it: days left (from `trial_ends_at` in the user's zone), requests used
-today of the cap (the same query the gate reads), what happens at the end
+`/trial` for a trial account, from `TrialStatus.for(user)`: the day the
+trial ends and the days left (today included, in the user's zone), requests
+used today against the cap (`ApiUsage.requests_on`, the same query the gate
+reads; "unlimited" when the invite sets no cap), what happens at the end
 (generation and reviews stop, everything stays, add a key to continue), and
-the data notice. Shown in full at redemption with the consent checkbox.
+the data notice for the trial's provider. Once ended, it says the day it
+ended, or only that it has ended when the kill switch or a missing house key
+ended it early, and links to Setup. The dashboard carries one banner line
+above the set linking here ("Trial: 7 days left. 2 of 12 requests used
+today." or "Your trial has ended."), rendered only for a trial account so
+every other page is byte-identical. A first-run account is sent to
+`/welcome` before this page, as Setup does.
 
-### 6.7 Data notice
+### 6.7 Data notice, as built
 
-Plain words, provider-specific locale keys:
+Plain words, provider-specific locale keys under `trials.data_notice`, with
+"the person who runs Code Gym" where the design had a placeholder for your
+name:
 
 - Both: "On a trial, Code Gym sends your exercises, answers and messages to
-  [Gemini / Claude] using a key that belongs to [your name], not to you.
-  Usage counts against that key."
+  [Gemini / Claude] using a key that belongs to the person who runs Code
+  Gym, not to you. Usage counts against that key."
 - Gemini free tier: "Google's free tier lets Google use what is sent,
   including your answers, to improve its products, and people at Google may
   read it. Don't paste anything confidential."
 - Claude: "Anthropic keeps API data for up to 30 days and does not train on
   it by default."
 
-### 6.8 Trial end
+Before the code is checked the provider is unknown, so the form shows the
+shared sentence naming both providers and both paragraphs.
+
+### 6.8 Trial end, as built
 
 At `trial_ends_at`, or at once under the kill switch: the account and every
-row stay; `ProviderCredential.for` raises `TrialEndedError`; the dashboard,
-`/generate`, the review button and the JSON endpoints show the trial-ended
-sentence; Setup shows the existing key guide (`api_keys/_key_guide`) above
-the key field for a trial account whether or not it is on the learning track,
-and pasting a key clears nothing about the trial but makes `provider_ready?`
-true through the own-key branch. `trial_ends_at` is kept so the screen can
-say when it ended.
+row stay. `require_provider` still lets a trial account through to every
+page; `ProviderCredential.for` raises `TrialEndedError`, so the review, the
+five JSON endpoints and the concept reference endpoint answer with the
+trial-ended sentence through the rescues they already have, and the
+dashboard renders the trial-ended panel in place of a set, or the ended
+banner above a set that already exists. `/generate` refuses with the same
+sentence. Setup shows the existing key guide (`api_keys/_key_guide`) above
+the key field for an ended trial whether or not it is on the learning
+track, and pasting a key clears nothing about the trial but makes
+`provider_ready?` true through the own-key branch. `trial_ends_at` is kept
+so the screen can say when it ended.
 
-### 6.9 Junior track
+### 6.9 Junior track, as built
 
 Unchanged. `first_run?` reads `learning_track` and the exercise count, so a
 new trial account is sent to `/welcome` before Setup and before `/trial`;
 joining sets the junior preset exactly as for any account. The key guide
-shown to on-track accounts is replaced on a trial account by the trial
-screen's link, which is the one page difference, and it is inside a
-`trial?` branch.
+shown to on-track accounts is replaced on an active trial by a note linking
+to the trial page (`api_keys/_trial_note`), which is the one page
+difference, inside a `trial_active?` branch.
 
 ### 6.10 Existing accounts stay byte-identical, as built
 
@@ -734,8 +751,8 @@ cost is that a teammate who loses their code asks you for one.
    `TrialAllowance`, the kill switch, the minting script, the signup code
    field, the redemption page with the data notice and consent, and the
    trial words for every failure kind.
-4. The trial screen, redemption consent, trial end, the dashboard banner and
-   the Setup branch.
+4. Done: the trial screen, trial end, the dashboard banner and the Setup
+   branch (redemption consent shipped with 3).
 
 ## 10. Decisions
 

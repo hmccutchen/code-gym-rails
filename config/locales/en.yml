@@ -115,7 +115,10 @@ en:
     consent_label: "I understand what is sent and to whom."
     submit: "Start trial"
     started: "Your trial has started."
-    running_until: "Your trial runs until the end of %{day}."
+    running_until: "Your trial runs until the end of %{day}: %{days} left."
+    used_today: "%{used} of %{cap} requests used today. The count resets at midnight your time."
+    used_today_no_cap: "%{used} requests used today."
+    at_the_end: "When the trial ends, generation and reviews stop. Everything you did stays, and adding your own API key in Setup picks up where you left off."
     code_rejected: "That code didn't work. Check it and try again, or ask the person who gave it to you."
     consent_needed: "Tick the box to confirm you've read what is sent on a trial."
     rate_limited: "Too many attempts. Try again in an hour."
@@ -323,6 +326,19 @@ en:
     paused_empty:
       message: "Automatic generation is paused, so today's set wasn't created. You can still generate one whenever you want it."
       resume: "Resume automatic generation"
+    trial_ended:
+      on_day: "Your trial ended on %{day}, so no set was generated today."
+      message: "Your trial has ended, so no set was generated today."
+      kept: "Everything you did is still here."
+      add_key: "Add your own API key in Setup to keep going."
+    trial_banner:
+      active: "Trial: %{days} left. %{used} of %{cap} requests used today."
+      days:
+        one: "1 day"
+        other: "%{count} days"
+      no_cap: "unlimited"
+      ended: "Your trial has ended."
+      details: "Details"
     weekend_empty:
       message: "No exercises are generated automatically on weekends — the morning job runs Monday–Friday."
     teaching_hint:
@@ -711,6 +727,10 @@ en:
       title: "Settings"
       heading: "Add your API key"
       intro: "Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency."
+      trial_note:
+        title: "You're on a trial"
+        body: "Your sets run on a shared key for now, so you don't need one of your own yet. A key you add here takes over from the trial's."
+        link: "See how your trial is going."
       api_key_label: "API key"
       api_key_placeholder: "sk-ant-..., AQ...., AIza... or sk-proj-..."
       api_key_hint_html: 'Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).'

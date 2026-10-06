@@ -1,0 +1,8 @@
+<%# Required locals: status (a TrialStatus). %>
+<div class="section" style="text-align:center;padding:3rem;">
+  <p style="color:var(--muted);margin-bottom:.5rem;">
+    <%= status.ended_on ? t("dashboard.trial_ended.on_day", day: l(status.ended_on, format: :long)) : t("dashboard.trial_ended.message") %>
+  </p>
+  <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem;"><%= t("dashboard.trial_ended.kept") %></p>
+  <p style="font-size:.85rem;"><%= link_to t("dashboard.trial_ended.add_key"), setup_path %></p>
+</div>

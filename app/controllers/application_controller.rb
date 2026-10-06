@@ -62,11 +62,13 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  # Own key or an active trial. An account that signed up with a trial code
-  # and has not yet consented is sent to the trial page instead of Setup.
+  # Own key or a trial. An ended trial still reaches every page, where each
+  # provider call fails with the trial-ended sentence and the dashboard says
+  # so; an account that signed up with a trial code and has not yet consented
+  # is sent to the trial page instead of Setup.
   def require_provider
     return unless logged_in?
-    return if current_user.provider_ready?
+    return if current_user.provider_ready? || current_user.trial?
     return if controller_name == "api_keys" || controller_name == "sessions"
 
     if current_user.trial_pending?

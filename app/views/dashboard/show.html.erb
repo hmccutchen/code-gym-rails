@@ -42,8 +42,13 @@
   </div>
 </div>
 
+<% if @trial_status %>
+  <%= render "dashboard/trial_banner", status: @trial_status %>
+<% end %>
 <div id="dashboard-content">
-  <% if @generating %>
+  <% if @trial_ended %>
+    <%= render "dashboard/trial_ended", status: @trial_status %>
+  <% elsif @generating %>
     <%= render "dashboard/generating" %>
   <% elsif @generation_failed %>
     <%= render "dashboard/generation_failed", message: current_user.generation_failure_message(surface: :generation) %>

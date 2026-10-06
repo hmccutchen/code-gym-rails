@@ -10,6 +10,10 @@ class DailyExercisesController < ApplicationController
   # fire (weekends). No-ops (just redirects) if today's exercise already
   # exists, so a duplicate click can't enqueue a second generation.
   def generate
+    if current_user.trial_ended?
+      return redirect_to root_path, alert: trial_ended_text(:generation)
+    end
+
     # "Today's set already exists" has to mean the same thing here as on the
     # dashboard, which carries a paused user's unfinished set forward on the
     # very redirect this action ends in; enqueuing first would bill a
@@ -70,6 +74,11 @@ class DailyExercisesController < ApplicationController
   end
 
   private
+
+  def trial_ended_text(surface)
+    ProviderFailureText.new("trial_ended", provider: current_user.provider, surface: surface, failed_at: Time.current,
+                            zone: current_user.effective_time_zone).full
+  end
 
   # Atomic claim against a concurrent double-submit, mirroring
   # ResponsesController#claim_review!: a single UPDATE ... WHERE is serialized by

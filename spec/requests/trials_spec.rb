@@ -40,7 +40,7 @@ RSpec.describe "Trials", type: :request do
 
       expect { get root_path }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
       get trial_path
-      expect(response.body).to include("Your trial runs until the end of October 13, 2026.")
+      expect(response.body).to include("Your trial runs until the end of October 13, 2026: 7 days left.")
       expect(response.body).not_to include('name="invite_code"')
     end
   end
@@ -89,6 +89,7 @@ RSpec.describe "Trials", type: :request do
     signed_up = User.find_by!(email: "signup@example.com")
     expect(signed_up.invite_code).to eq(invite)
     expect(signed_up).to be_trial_pending
+    signed_up.update!(learning_track: LearningTrack::OFF)
     login_as(signed_up)
 
     get root_path

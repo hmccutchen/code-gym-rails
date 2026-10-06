@@ -36,8 +36,17 @@ class DashboardController < ApplicationController
     end
 
     @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
+    @trial_status = TrialStatus.for(current_user) if current_user.trial?
 
-    return unless @exercise.nil? && current_user.provider_ready?
+    return unless @exercise.nil?
+
+    # Like a pause, an ended trial stops this trigger; unlike one, there is no
+    # button back in, only a key of the user's own.
+    if current_user.trial_ended?
+      @trial_ended = true
+      return
+    end
+    return unless current_user.provider_ready?
 
     if flash[:generating]
       # Set by DailyExercisesController#generate right after a manual weekend
