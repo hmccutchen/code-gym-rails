@@ -1,15 +1,13 @@
 require "rails_helper"
 
-# Each example states behavior the 2026-10-05 security audit recommends and
-# the app does not have yet, so each is pending. RSpec fails a pending example
-# that starts passing, which is the reminder to drop `pending` in the PR that
-# fixes it. Finding numbers refer to docs/security-audit-2026-10-05.md.
+# Each example states behavior the 2026-10-05 security audit recommends. One
+# the app does not have yet is pending. RSpec fails a pending example that
+# starts passing, which is the reminder to drop `pending` in the PR that fixes
+# it. Finding numbers refer to docs/security-audit-2026-10-05.md.
 RSpec.describe "Security hardening targets", type: :request do
   let(:user) { create_user_with_key }
 
   it "filters the login code out of request logs (finding L1)" do
-    pending "the login code param is not in filter_parameters"
-
     filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
 
     expect(filter.filter("code" => "123456")["code"]).to eq("[FILTERED]")

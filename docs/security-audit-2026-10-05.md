@@ -144,7 +144,7 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
 - **Fix:** add `/\Acode\z/` to `filter_parameters`. A bare `:code` would
   also match `pseudocode` and the `code_review` answer, because Rails matches
   filter names as substrings (`spec/script/security_audit/parameter_filter_report_spec.rb`
-  shows this), so it would also decide A5's question. The pending spec
+  shows this), so it would also decide A5's question. The hardening spec
   "filters the login code" covers it.
 - **Size:** XS.
 
