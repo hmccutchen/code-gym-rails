@@ -1,4 +1,8 @@
 class ConceptReferencesController < ApplicationController
+  include ProviderCallLimits
+
+  limit_provider_calls only: :explain_differently
+
   # How many alternate framings of one concept a single page-view may ask for.
   # Two is enough to find an angle that lands; past that the trouble is the
   # concept's difficulty rather than the wording, and the mastery loop is what

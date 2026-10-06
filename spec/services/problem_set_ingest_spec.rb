@@ -828,7 +828,8 @@ RSpec.describe ProblemSetIngest do
       # the renderer rejects anyway — dropping says the same thing without the
       # CDN round trip.
       it "drops an unusable diagram instead of persisting it" do
-        [ "", "   ", nil, 42, [ "flowchart TD" ], "x" * (ProblemSetIngest::MAX_DIAGRAM_LENGTH + 1) ].each do |bad|
+        [ "", "   ", nil, 42, [ "flowchart TD" ], "flowchart TD\n#{'x' * MermaidSource::MAX_LENGTH}",
+          "sequenceDiagram\n  A->>B: hi", "flowchart TD\n  A --> B\n  classDef hot fill:#f00" ].each do |bad|
           set = { "pattern" => { "question" => "q", "diagram" => bad } }
           expect(step(set)["pattern"]).not_to have_key("diagram")
         end
@@ -840,14 +841,18 @@ RSpec.describe ProblemSetIngest do
         expect(step(set)["security_review"]).not_to have_key("diagram")
       end
 
-      # Architecture's diagram lives at reference.diagram, not at the top level,
-      # and predates this field — normalizing the top level must not reach into
-      # it.
-      it "leaves architecture's existing reference diagram untouched" do
-        set = { "architecture" => { "reference" => { "diagram" => "flowchart TD\n  A --> B" } } }
+      it "keeps a usable architecture reference diagram" do
+        set = { "architecture" => { "reference" => { "diagram" => " flowchart TD\n  A --> B " } } }
 
         expect(step(set)["architecture"]["reference"]["diagram"])
           .to eq("flowchart TD\n  A --> B")
+      end
+
+      it "drops an architecture reference diagram MermaidSource refuses, keeping the rest of the reference" do
+        [ "", "sequenceDiagram\n  A->>B: hi", "%%{init: {}}%%\nflowchart TD\n  A --> B" ].each do |bad|
+          set = { "architecture" => { "reference" => { "tagline" => "t", "diagram" => bad } } }
+          expect(step(set)["architecture"]["reference"]).to eq("tagline" => "t")
+        end
       end
 
       it "leaves a section that carries no diagram alone" do

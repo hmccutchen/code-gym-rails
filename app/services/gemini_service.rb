@@ -85,10 +85,11 @@ class GeminiService < AiService
     end
 
     unless resp.success?
+      raise_if_key_rejected("Google", resp.status)
+
       log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
       message      = extract_provider_message(resp.body, fallback: "Gemini API error #{resp.status}")
       error_class  = case resp.status
-      when 401, 403 then AiService::AuthenticationError
       when 429      then AiService::RateLimitError
       else               AiService::Error
       end

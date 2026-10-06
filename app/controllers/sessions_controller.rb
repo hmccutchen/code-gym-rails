@@ -12,7 +12,7 @@ class SessionsController < ApplicationController
   # rather than the IP because the address is what an attacker targets and
   # the IP is what they can change.
   #
-  # All three limits need distinct `name:`s: Rails keys a limit on
+  # Every limit here needs a distinct `name:`: Rails keys a limit on
   # ["rate-limit", scope, name, by].compact.join(":"), scope defaults to the
   # controller, and `by` for #create is attacker-controlled (any email an
   # attacker submits) — unnamed, they would collide into one bucket, letting a
@@ -41,6 +41,28 @@ class SessionsController < ApplicationController
              store: RATE_LIMIT_STORE,
              name:  "code_requests_by_ip",
              only:  :create
+
+  # The 15-minute IP limit still allows about 1,900 requests, and so new
+  # accounts, a day from one address. This caps the day.
+  rate_limit to: 50, within: 1.day,
+             with:  -> { rate_limited(t("sessions.rate_limited.code_requests")) },
+             store: RATE_LIMIT_STORE,
+             name:  "code_requests_by_ip_daily",
+             only:  :create
+
+  # The IP limit on attempts does not hold against rotating IPs: each can
+  # request a fresh code for the same address and spend its five guesses.
+  # Keyed on the address this browser is logging in to, so guesses at one
+  # account are capped wherever they come from. Anyone can start a login for
+  # any address, so this also lets someone lock an address out of guessing
+  # for an hour; a shorter window keeps that short. With no login pending the
+  # attempt fails anyway, and the IP keeps those out of one shared bucket.
+  rate_limit to: 10, within: 1.hour,
+             by:    -> { pending_login_email || request.remote_ip },
+             with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
+             store: RATE_LIMIT_STORE,
+             name:  "code_attempts_for_address",
+             only:  :verify_code
 
   # GET /login
   def new

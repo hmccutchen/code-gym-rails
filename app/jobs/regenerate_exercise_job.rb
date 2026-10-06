@@ -72,7 +72,7 @@ class RegenerateExerciseJob < ApplicationJob
     return keep_reviewed_set(user, exercise, kept_for, claim) if kept_for
 
     user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
-    Rails.logger.info("Regenerated exercise for #{user.email} on #{Date.current}")
+    Rails.logger.info("Regenerated exercise for user #{user.id} on #{Date.current}")
   rescue AiService::AuthenticationError => e
     release(user, exercise, claim, "Your API key was rejected — check it in Settings.", e)
   rescue AiService::RateLimitError => e
@@ -98,7 +98,7 @@ class RegenerateExerciseJob < ApplicationJob
   # what took the claim, it cleared the day's error on purpose. Nothing to
   # release either, since the claim is no longer ours to release.
   def keep_superseded_set(user)
-    Rails.logger.info("Regeneration claim for #{user.email} on #{Date.current} was released or retaken under the call; discarded the regenerated one")
+    Rails.logger.info("Regeneration claim for user #{user.id} on #{Date.current} was released or retaken under the call; discarded the regenerated one")
   end
 
   # Same shape as a failed attempt — the claim is released and regenerated_at
@@ -106,7 +106,7 @@ class RegenerateExerciseJob < ApplicationJob
   # is no longer the reason to refuse. The generated set is discarded: it was
   # built for a day whose sections must not change.
   def keep_reviewed_set(user, exercise, kept_for, claim)
-    Rails.logger.info("Kept today's set (#{kept_for}) for #{user.email} on #{Date.current}; discarded the regenerated one")
+    Rails.logger.info("Kept today's set (#{kept_for}) for user #{user.id} on #{Date.current}; discarded the regenerated one")
     release_own_claim(exercise, claim)
     user.update!(last_generation_error_date: Date.current, last_generation_error: KEPT_SET_MESSAGES.fetch(kept_for))
   end
@@ -120,7 +120,7 @@ class RegenerateExerciseJob < ApplicationJob
   # regenerated_at is deliberately left untouched: a failed attempt must not
   # consume the user's one regeneration for the day.
   def release(user, exercise, claim, message, error)
-    Rails.logger.error("Failed to regenerate exercise for #{user.email}: #{error.message}")
+    Rails.logger.error("Failed to regenerate exercise for user #{user.id}: #{error.message}")
     release_own_claim(exercise, claim) if exercise
     user.update!(last_generation_error_date: Date.current, last_generation_error: message)
   end

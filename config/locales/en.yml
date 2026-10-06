@@ -139,6 +139,7 @@ en:
       preferences_saved: "Preferences saved!"
     daily_exercises:
       nothing_to_regenerate: "No exercise set to regenerate yet."
+      generate_limited: "You've asked for a new set several times in the last hour. Try again later."
       already_reviewed: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
       review_in_progress: "A review is being generated for today's set — try again in a moment."
       already_regenerated: "You've already generated a new set today."
@@ -165,6 +166,7 @@ en:
       save_failed: "Couldn't save your answers."
   errors:
     no_exercise_today: "No exercise set for today."
+    provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."
     section_not_in_exercise: "That section isn't part of this exercise."
     responses:
       alternates_used:
@@ -259,6 +261,7 @@ en:
       submit_failed: "Couldn't submit your answers — please try again."
       review_start_failed: "Your answers were saved, but the review couldn't start. Reloading so you can try the review again."
   learn:
+    preparing_limited: "You've started several write-ups in the last hour. Try again later."
     title: "Learn"
     intro: "Every concept your sets can draw from — read up on one whenever you like."
     encountered: "in your sets"

@@ -444,16 +444,29 @@ concept-specific difficulty descriptions for future generation, not a new set.
   and falls back to its `DEFAULT_ROUTE` for any purpose not listed. The tables
   are per provider because the providers share no model names and turn thinking down
   differently (`effort` on Claude, `thinking_level` on Gemini,
-  `reasoning.effort` on OpenAI). OpenAI routes generation and its retry to
-  `gpt-6.1-sol` at `high` effort and everything else to `gpt-6-sol` at an
-  explicit `medium`; none of those routes has been compared against another
-  model. A capped OpenAI call sends effort `none` from
-  `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`. GPT-6.1
-  Sol and GPT-6 Astra have no `none`, so like Opus 5.5 neither can take a
-  capped purpose, which is why only uncapped generation goes to 6.1 Sol. `call_and_log`
-  hands `purpose:` to `#call` for this. Because an unlisted purpose falls back
-  silently, `spec/services/model_routing_spec.rb` fails on a key that no call
-  site logs, so a typo cannot quietly route nothing.
+  `reasoning.effort` on OpenAI). `call_and_log` hands `purpose:` to `#call`
+  for this. Because an unlisted purpose falls back silently,
+  `spec/services/model_routing_spec.rb` fails on a key that no call site
+  logs, so a typo cannot quietly route nothing.
+
+  **OpenAI** sends generation and its retry to `gpt-6.1-sol` at `high`
+  effort, the section judge to `gpt-6-astra` at `low`, and everything else to
+  `gpt-6-sol` with reasoning off (`none`). None of these routes has been
+  compared against another model, because `script/compare_models.rb` runs
+  only Claude. A capped OpenAI call normally sends effort `none` from
+  `OpenaiService::REASONING_OFF`, its counterpart to `THINKING_OFF`, because
+  `max_output_tokens` caps reasoning and reply together. GPT-6.1 Sol and
+  Astra have no `none`, so a capped purpose can go to either only when its
+  route carries a `reasoning_allowance`. That allowance keeps the route's
+  effort and adds itself to the cap. The judge's is 25,000 tokens,
+  OpenAI's suggested starting reserve for reasoning and output, so a judge
+  call can cost up to 26,200 output tokens at Astra's $50 per million. The
+  judge still runs on the 45-second `READ_TIMEOUT`, and one that runs out of
+  time or budget falls back to the draft, like any other judge failure. A
+  route with an allowance also makes its timeout final, as a long-running
+  call's is, so a timed-out judge call is not sent again. Low is Astra's
+  lowest effort. Nobody has measured whether the judge fits that
+  timeout, or what it costs per day.
 
   `generate_exercise` goes to `claude-opus-5-5` at `medium`
   effort, not `low`, because nothing measures whether `low` holds quality.
@@ -581,15 +594,38 @@ concept-specific difficulty descriptions for future generation, not a new set.
   guessing bound is part of the design, not an optimization. `SessionsController`
   caps code requests at 5 per address, code requests at 20 per IP, and
   submissions at 10 per IP, all per `LOGIN_CODE_EXPIRY`, via Rails'
-  `rate_limit`. The per-IP request cap is the one that bounds an attacker who
-  varies the address rather than hammering one: an unrecognized address
-  creates an account and sends mail, so without it a single client could mint
-  unlimited rows and unlimited outbound deliveries. Each limit carries an
+  `rate_limit`, plus code requests at 50 per IP per day and submissions at
+  10 per address per hour. The per-IP request caps are the ones that bound an
+  attacker who varies the address rather than hammering one: an unrecognized
+  address creates an account and sends mail, so without them a single client
+  could mint unlimited rows and unlimited outbound deliveries. The
+  per-address submission cap bounds guessing from rotating IPs, which the
+  per-IP one cannot; its cost is that anyone can start a login for an
+  address and lock it out of guessing for an hour, which is why it is
+  hourly and no daily per-address cap exists. Each limit carries an
   explicit `name:`, without which Rails would key them into one shared
   bucket. `LazyCacheStore` exists solely
   because `rate_limit` binds its `store:` at class-load time; resolving
   `Rails.cache` per call keeps production on Solid Cache and keeps the limits
   testable against the test env's `:null_store`.
+- **Per-user request limits**: every endpoint that bills one provider call to
+  the user's key (`ResponsesController`'s duck, follow-ups, explain
+  differently and pseudocode critique, and
+  `ConceptReferencesController#explain_differently`) declares
+  `ProviderCallLimits`, which counts them together: `ProviderCallLimits::HOURLY`
+  (60) per user per hour and `DAILY` (300) per day, in one fixed scope so the
+  count is shared across both controllers. Each endpoint's own per-section or
+  per-page cap still applies; the shared count runs before every other check,
+  so a request those checks refuse still counts. `/generate` allows
+  `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
+  prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
+  `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per
+  user and discards an overlapping enqueue, because every dashboard load with
+  no set enqueues one and each would run a full billed generation before the
+  unique index threw it away; the hourly batch passes no user and is not
+  limited. These are starting values, not measured ones. All of them use
+  `LazyCacheStore`, so the test env's `:null_store` never trips them and a
+  spec that exercises one swaps in a real store.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**: `code_review` rolls one of three content modes per day (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`, roughly even) — `application_code` (realistic snippet, unchanged from before modes existed), `test_file` (a realistic test file exhibiting one test smell, in the day's `test_framework`), or `schema_review` (the day's `schema_artifact` — a Rails migration or a Prisma schema change with its migration — carrying one planted data-modeling flaw). Only `schema_review` narrows the vocabulary, to `AiService::DATA_MODELING_CONCEPTS` (`ProblemSetIngest.code_review_vocabulary`); the other two modes get the full list minus those concepts, unchanged from before modes existed. `pattern` and the rotating third deliberately keep the full vocabulary regardless of the day's `code_review` mode, so a due data-modeling retention check has somewhere to land on a non-schema-review day that includes either of them — a short day may include neither, and `DailyPlan` only offers a check a chosen kind can host. Because that lets a data-modeling concept surface where no schema artifact is shown, `AiService#data_modeling_idiom_guidance` adds one prompt line — stated once for all sections, named from the constant — telling the model to express such a concept in the host section's own idiom (a `pattern` question about `wrong_cardinality` asks how the relationship should be modeled, not for a migration to review). Advisory prompt text, no new machinery; `[retention]` logs are the check on whether it lands.
@@ -1346,8 +1382,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   status is an error, raised after usage recording even when partial prose
   is allowed. Its `incomplete` status is truncation unless the reason is
   `content_filter`, which is a refusal, as is a refusal content block.
-  OpenAI authentication errors use fixed guidance and log only the HTTP
-  status because the provider's error body can echo the key or its fragments.
+  An authentication error (401 or 403) from any provider gets fixed guidance
+  naming the company and logs only the HTTP status, through
+  `AiService#raise_if_key_rejected`, because the provider's error body can
+  echo the key or its fragments.
+- **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
+  filters what engineers write (`answers`, `message`, `question`,
+  `pseudocode`, `prior_alternates`, the duck's `thread`), the login `code`
+  and the push keys from request logs. Entries match as substrings, so `code`
+  is anchored (`/\Acode\z/`); a bare `:code` would also hide `pseudocode`
+  and every `code_review` key. The same list is Active Record's
+  `filter_attributes`, so these columns also read `[FILTERED]` in `inspect`.
+  A reply that can quote an engineer's answer (a review grade, a pseudocode
+  critique) is parsed with `log_raw: false`, and jobs log `user <id>`, never an
+  email.
 - **Daily sections setting**: `User#daily_section_count` is Automatic (nil)
   or a fixed count in `User::DAILY_SECTION_COUNTS`, which runs from
   `SectionCount::FLOOR` to `ExerciseSection::MAX_SECTIONS`. Setup shows it as a

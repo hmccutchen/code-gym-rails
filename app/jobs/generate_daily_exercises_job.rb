@@ -1,6 +1,18 @@
 class GenerateDailyExercisesJob < ApplicationJob
   queue_as :default
 
+  # One on-demand generation per user at a time. Every dashboard load with no
+  # set enqueues one, and each runs a full billed generation before the unique
+  # index throws the later ones away, so an overlap is discarded at enqueue.
+  # The hourly batch passes no user; with no key and no group it is not
+  # limited at all. The permit lasts the judged path's worst case from
+  # enqueue, so a job left waiting in the queue can outlive it; a request after
+  # that falls back to the unique index, as before.
+  limits_concurrency key: ->(args = {}) { args[:user_id] },
+                     group: ->(args = {}) { self.class.name if args[:user_id] },
+                     to: 1, on_conflict: :discard,
+                     duration: AiService::JUDGED_GENERATION_BUDGET.seconds
+
   # Called two ways:
   #   1. Cron (no args) — runs hourly; generates for users whose local time is
   #      a weekday morning at/after 8am, one exercise per local day
@@ -102,28 +114,28 @@ class GenerateDailyExercisesJob < ApplicationJob
     # for any future reader that checks these columns directly.
     user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
 
-    Rails.logger.info("Generated exercise for #{user.email} on #{Date.current}")
+    Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
   rescue AiService::AuthenticationError => e
-    Rails.logger.error("Auth failure generating exercise for #{user.email}: #{e.message}")
+    Rails.logger.error("Auth failure generating exercise for user #{user.id}: #{e.message}")
     persist_failure(user, "Your API key was rejected — check it in Settings.")
   rescue AiService::RateLimitError => e
-    Rails.logger.warn("Rate limited generating exercise for #{user.email}: #{e.message}")
+    Rails.logger.warn("Rate limited generating exercise for user #{user.id}: #{e.message}")
     persist_failure(user, "The AI provider is rate-limiting requests — try again shortly.")
   rescue AiService::TimeoutError => e
-    Rails.logger.warn("Timed out generating exercise for #{user.email}: #{e.message}")
+    Rails.logger.warn("Timed out generating exercise for user #{user.id}: #{e.message}")
     persist_failure(user, "Generation took longer than the provider's budget — try again.")
   rescue AiService::Error => e
-    Rails.logger.error("Failed to generate exercise for #{user.email}: #{e.message}")
+    Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
     persist_failure(user, e.message)
     # Don't re-raise — one failure shouldn't block other users in the batch
   rescue ActiveRecord::RecordNotUnique
     # Lost a race against a concurrent generation for this user/date (e.g. two
     # dashboard loads both finding no exercise before either could create
     # one). The other one won; nothing to do here.
-    Rails.logger.info("Skipped duplicate generation for #{user.email} on #{Date.current} (already generated concurrently)")
+    Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
-    Rails.logger.info("Skipped duplicate generation for #{user.email} on #{Date.current} (already generated concurrently)")
+    Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
   end
 
   # A failure only matters if the user has nothing to show for today. Two

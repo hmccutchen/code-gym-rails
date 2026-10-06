@@ -72,7 +72,7 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
-    # The three rate_limit declarations need distinct `name:`s or they alias:
+    # The rate_limit declarations need distinct `name:`s or they alias:
     # nameless, both key on `by`, and `by` for #create is attacker-controlled,
     # so submitting the request's own IP as the email makes both limits key
     # on "127.0.0.1". Eleven such posts land the shared key at 11 (posts
@@ -95,7 +95,48 @@ RSpec.describe "Login rate limits", type: :request do
     end
   end
 
+  describe "creating accounts from one IP over a day" do
+    # Each 15-minute window allows 20; the daily cap is what stops an IP that
+    # waits out every window.
+    it "stops a 51st request from one IP in a day" do
+      50.times do |n|
+        travel(16.minutes) if (n % 20).zero? && n.positive?
+        post login_path, params: { email: "dev#{n}@example.com", name: "Dev" }
+      end
+
+      expect {
+        post login_path, params: { email: "dev50@example.com" }
+      }.not_to have_enqueued_mail(UserMailer, :login_code)
+      expect(response).to have_http_status(:too_many_requests)
+    end
+  end
+
   describe "submitting codes" do
+    # Rotating IPs each get their own per-IP bucket, so only a limit keyed on
+    # the address being logged in to bounds guesses at one account.
+    it "stops an eleventh guess at one address even when each guess comes from a new IP" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      wrong = wrong_code_for(User.find_by(email: "dev@example.com").generate_login_code!)
+
+      10.times { |n| post verify_login_code_path, params: { code: wrong }, env: { "REMOTE_ADDR" => "10.0.0.#{n + 1}" } }
+      post verify_login_code_path, params: { code: wrong }, env: { "REMOTE_ADDR" => "10.0.0.99" }
+
+      expect(response).to have_http_status(:too_many_requests)
+      expect(flash[:alert]).to match(/too many/i)
+    end
+
+    it "keeps one address's guesses from limiting another address" do
+      post login_path, params: { email: "dev@example.com", name: "Dev" }
+      wrong = wrong_code_for(User.find_by(email: "dev@example.com").generate_login_code!)
+      10.times { |n| post verify_login_code_path, params: { code: wrong }, env: { "REMOTE_ADDR" => "10.0.0.#{n + 1}" } }
+
+      other = open_session
+      other.post login_path, params: { email: "other@example.com", name: "Other" }, env: { "REMOTE_ADDR" => "10.0.1.1" }
+      other.post verify_login_code_path, params: { code: "000000" }, env: { "REMOTE_ADDR" => "10.0.1.1" }
+
+      expect(other.response).to have_http_status(:unprocessable_content)
+    end
+
     it "stops an eleventh guess from one IP inside the window" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       user = User.find_by(email: "dev@example.com")

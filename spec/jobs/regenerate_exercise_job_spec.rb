@@ -27,6 +27,57 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     fake_service
   end
 
+  # Job logs name the user by id: an email in a log line is personal data in a
+  # place nobody deletes it from.
+  describe "the user named in log lines" do
+    let(:logged) { StringIO.new }
+
+    before { allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(logged)) }
+
+    def expect_logged_by_id
+      expect(logged.string).to include("user #{user.id}")
+      expect(logged.string).not_to include(user.email)
+    end
+
+    it "names the user by id on success" do
+      claimed_exercise
+      stub_provider({ "code_review" => { "question" => "new" } })
+      described_class.new.perform(user_id: user.id)
+      expect_logged_by_id
+    end
+
+    it "names the user by id on failure" do
+      claimed_exercise
+      stub_provider(AiService::Error.new("boom"))
+      described_class.new.perform(user_id: user.id)
+      expect_logged_by_id
+    end
+
+    it "names the user by id when the claim was released under the call" do
+      exercise = claimed_exercise
+      fake_service = instance_double(ClaudeService)
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+      allow(fake_service).to receive(:generate_unjudged_exercise) do
+        exercise.update_columns(regenerating_since: nil)
+        unjudged({ "code_review" => { "question" => "new" } })
+      end
+      described_class.new.perform(user_id: user.id)
+      expect_logged_by_id
+    end
+
+    { "reviewed" => { ai_review: { "code_review" => { "rating" => "developing" } } },
+      "being reviewed" => { reviewing_since: 10.seconds.ago } }.each do |state, attributes|
+      it "names the user by id when today's #{state} set is kept" do
+        exercise = claimed_exercise
+        DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                              submitted_at: Time.current, answers: { "code_review" => "a" * 20 }, **attributes)
+        stub_provider({ "code_review" => { "question" => "new" } })
+        described_class.new.perform(user_id: user.id)
+        expect_logged_by_id
+      end
+    end
+  end
+
   it "replaces the problem set in place and releases the claim" do
     exercise = claimed_exercise
     stub_provider({ "code_review" => { "question" => "new" } })

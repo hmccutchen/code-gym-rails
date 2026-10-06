@@ -1,4 +1,8 @@
 class ResponsesController < ApplicationController
+  include ProviderCallLimits
+
+  # Ahead of the other checks, so a request they refuse still counts.
+  limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
   before_action :set_response, only: [ :review, :email_review, :explain_differently, :follow_ups, :start_over ]
   before_action :require_reviewed_section!, only: [ :explain_differently, :follow_ups ]
 
