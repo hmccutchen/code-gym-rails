@@ -39,6 +39,9 @@ RSpec.describe InviteCode, type: :model do
       .to raise_error(ActiveRecord::RecordInvalid, /Trial days/)
     expect { described_class.mint(seats: 1, expires_at: 1.day.from_now, provider: "nope", trial_days: 7) }
       .to raise_error(ActiveRecord::RecordInvalid, /Provider/)
+    expect { described_class.mint(seats: 1, expires_at: 1.day.from_now, provider: "openai", trial_days: 7) }
+      .to raise_error(ActiveRecord::RecordInvalid, /Provider/)
+    expect(described_class.trial_providers).to match_array(%w[anthropic gemini fake])
     expect { described_class.mint(seats: 0, expires_at: 1.day.from_now) }
       .to raise_error(ActiveRecord::RecordInvalid, /Seats/)
   end

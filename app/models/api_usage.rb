@@ -16,9 +16,12 @@ class ApiUsage < ApplicationRecord
   scope :failed, -> { where.not(failure: nil) }
 
   # Calls one account made on one of its own local days, attempts included: a
-  # refused call still counted against the provider.
+  # refused call still counted against the provider. Counted by when the row
+  # was written rather than its `date`, which a job outside the user's zone
+  # stamps with the server's day.
   def self.requests_on(user, day, provider:)
-    where(user: user, date: day, provider: provider).count
+    start = day.in_time_zone(user.effective_time_zone)
+    where(user: user, provider: provider, created_at: start...start.tomorrow.beginning_of_day).count
   end
 
   # Calls billed to a house key inside one of the provider's own quota days,

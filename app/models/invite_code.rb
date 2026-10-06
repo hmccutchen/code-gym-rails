@@ -10,9 +10,16 @@ class InviteCode < ApplicationRecord
   validates :code_digest, presence: true, uniqueness: true
   validates :seats, numericality: { only_integer: true, greater_than: 0 }
   validates :expires_at, presence: true
-  validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
+  validates :provider, inclusion: { in: ->(_) { InviteCode.trial_providers } }, allow_nil: true
   validates :trial_days, numericality: { only_integer: true, greater_than: 0 }, if: :trial?
   validates :daily_request_cap, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
+
+  # A trial runs only on a provider whose data notice exists, since consent is
+  # given to that notice; the test provider counts where it is available.
+  def self.trial_providers
+    AiProvider.all.select { |provider| provider.available? && I18n.exists?("trials.data_notice.#{provider.provider_key}") }
+              .map(&:provider_key)
+  end
 
   # Returns the record and the raw code, which is not kept anywhere.
   def self.mint(seats:, expires_at:, label: nil, provider: nil, trial_days: nil, daily_request_cap: nil)

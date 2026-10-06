@@ -16,11 +16,22 @@ RSpec.describe ApiUsage, type: :model do
   it "counts one account's calls on one of its days per provider, attempts included" do
     described_class.create!(user: user, purpose: "duck_thread", date: Date.current, tokens_in: 1, tokens_out: 1, provider: "gemini")
     described_class.create!(user: user, purpose: "duck_thread", date: Date.current, tokens_in: 0, tokens_out: 0, provider: "gemini", failure: "rate_limit", http_status: 429)
-    described_class.create!(user: user, purpose: "duck_thread", date: Date.current - 1, tokens_in: 1, tokens_out: 1, provider: "gemini")
+    described_class.create!(user: user, purpose: "duck_thread", date: Date.current - 1, tokens_in: 1, tokens_out: 1, provider: "gemini", created_at: 1.day.ago)
     described_class.create!(user: user, purpose: "duck_thread", date: Date.current, tokens_in: 1, tokens_out: 1, provider: "anthropic")
 
     expect(described_class.requests_on(user, Date.current, provider: "gemini")).to eq(2)
     expect(described_class.failed.count).to eq(1)
+  end
+
+  # A job outside the user's zone stamps `date` with the server's day, so the
+  # count reads when the row was written, in the user's zone.
+  it "counts one account's calls on its own local day by when they were made" do
+    user.update!(time_zone: "America/New_York")
+    [ Time.utc(2026, 10, 7, 3, 59), Time.utc(2026, 10, 7, 4), Time.utc(2026, 10, 8, 3, 59), Time.utc(2026, 10, 8, 4) ].each do |at|
+      described_class.create!(user: user, purpose: "duck_thread", date: at.to_date, tokens_in: 1, tokens_out: 1, provider: "gemini", created_at: at)
+    end
+
+    expect(described_class.requests_on(user, Date.new(2026, 10, 7), provider: "gemini")).to eq(2)
   end
 
   it "counts house-key calls by when they were made" do

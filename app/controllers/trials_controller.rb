@@ -18,6 +18,7 @@ class TrialsController < ApplicationController
   end
 
   def create
+    return redirect_to setup_path, alert: t("trials.has_own_key") if current_user.api_key_present?
     unless params[:consent] == "1"
       return redirect_to trial_path, alert: t("trials.consent_needed")
     end

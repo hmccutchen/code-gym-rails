@@ -23,7 +23,7 @@ RSpec.describe TrialAllowance, type: :model do
   end
 
   it "counts attempts on the user's own day, and only this provider's" do
-    write_rows(3, provider: "gemini", date: Date.new(2026, 10, 5))
+    write_rows(3, provider: "gemini", date: Date.new(2026, 10, 5), created_at: now - 1.day)
     write_rows(3, provider: "anthropic")
 
     expect { described_class.check!(user, provider: GeminiService, now: now) }.not_to raise_error
