@@ -99,6 +99,9 @@
 // when new matching elements appear.
 // Inline script matching the app's convention; Stimulus is not wired here.
 (() => {
+  const ALTERNATE_FAILED = <%= t("review.alternate_failed").to_json.html_safe %>;
+  const FOLLOW_UP_FAILED = <%= t("review.follow_up_failed").to_json.html_safe %>;
+
   document.querySelectorAll(".explain-differently:not([data-alt-wired])").forEach(button => {
     button.dataset.altWired = "1";
     const container = button.parentElement;
@@ -116,8 +119,8 @@
           },
           body: JSON.stringify({ section: button.dataset.section })
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || res.status);
+        const data = await CodeGymServerMessage.read(res);
+        if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, ALTERNATE_FAILED);
 
         const p = document.createElement("p");
         p.className = "alternate-item";
@@ -130,7 +133,7 @@
           : <%= t("review.alternate_added_last").to_json.html_safe %>;
         if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
       } catch (e) {
-        status.textContent = e.message || <%= t("review.alternate_failed").to_json.html_safe %>;
+        status.textContent = CodeGymServerMessage.message(e, ALTERNATE_FAILED);
         button.disabled = false;
       }
     });
@@ -165,8 +168,8 @@
           },
           body: JSON.stringify({ section: input.dataset.section, question: question })
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || res.status);
+        const data = await CodeGymServerMessage.read(res);
+        if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, FOLLOW_UP_FAILED);
 
         addTurn("user", question);
         addTurn("assistant", data.answer);
@@ -183,7 +186,7 @@
           container.insertBefore(capped, status);
         }
       } catch (e) {
-        status.textContent = e.message || <%= t("review.follow_up_failed").to_json.html_safe %>;
+        status.textContent = CodeGymServerMessage.message(e, FOLLOW_UP_FAILED);
         button.disabled = false;
         input.disabled = false;
       }

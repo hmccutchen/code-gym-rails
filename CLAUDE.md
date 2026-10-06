@@ -1475,6 +1475,20 @@ concept-specific difficulty descriptions for future generation, not a new set.
   socket detail or key, and `provider_failure_text_spec` holds every kind on
   every surface to that.
 
+  **Page scripts show only the app's own words.** A fetch that fails can
+  reject with the browser's text ("Failed to fetch"), land on an HTML error
+  page whose parse error names a token, or come back as the JSON Rails writes
+  for an unhandled exception, whose `error` is a status phrase and whose
+  `status` is a number. `shared/_server_message` defines
+  `window.CodeGymServerMessage`, the one rule every script that calls a JSON
+  endpoint uses: it shows an `error` only when `status` is `"error"`, which
+  every reply the app writes carries, says the session expired when fetch
+  followed a redirect, and otherwise shows the page's own fallback wording.
+  A caught error's message is shown only when the helper made it.
+  `spec/system/server_message_spec.rb` drives each of those replies through
+  the thinking partner. The sign-up form's refused address gets
+  `sessions.email_not_accepted` rather than the validation exception.
+
   **Rendered when read, not when written.** A failed generation stores its
   class, provider, time and requested wait (`users.last_generation_failure`,
   `last_generation_failure_provider`, `last_generation_failed_at`,
@@ -2794,6 +2808,7 @@ always pull in the full suite — is stated once, in
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
+- `app/views/shared/_server_message.html.erb` — defines `window.CodeGymServerMessage`: what a page script may show when a request fails, the app's own sentence or the page's fallback
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing

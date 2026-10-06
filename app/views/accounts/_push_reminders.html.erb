@@ -61,7 +61,7 @@
             permission
               .then(function (state) {
                 if (state !== "granted") {
-                  throw new Error(state === "denied"
+                  throw CodeGymServerMessage.error(state === "denied"
                     ? <%= t("accounts.push_reminders.blocked", app_name: t("app_name")).to_json.html_safe %>
                     : <%= t("accounts.push_reminders.not_granted").to_json.html_safe %>);
                 }
@@ -73,7 +73,7 @@
               })
               .catch(function (error) {
                 button.disabled = false;
-                say(error.message || <%= t("accounts.push_reminders.failed").to_json.html_safe %>);
+                say(CodeGymServerMessage.message(error, <%= t("accounts.push_reminders.failed").to_json.html_safe %>));
               });
           });
         })();

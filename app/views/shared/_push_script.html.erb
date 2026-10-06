@@ -52,7 +52,7 @@
           auth: json.keys.auth
         })
       }).then(function (response) {
-        if (!response.ok) throw new Error(<%= t("push.register_failed").to_json.html_safe %>)
+        if (!response.ok) throw CodeGymServerMessage.error(<%= t("push.register_failed").to_json.html_safe %>)
 
         return response
       })
