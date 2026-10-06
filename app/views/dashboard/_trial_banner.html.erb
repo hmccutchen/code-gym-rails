@@ -2,8 +2,9 @@
     is what the page is for; the trial page carries the rest. %>
 <p class="trial-banner hint" style="margin:-1rem 0 1.5rem;">
   <% if status.active? %>
-    <%= t("dashboard.trial_banner.active", days: t("dashboard.trial_banner.days", count: status.days_left),
-          used: status.used, cap: status.cap || t("dashboard.trial_banner.no_cap")) %>
+    <% days = t("dashboard.trial_banner.days", count: status.days_left) %>
+    <%= status.cap ? t("dashboard.trial_banner.active", days: days, used: status.used, cap: status.cap)
+                   : t("dashboard.trial_banner.active_no_cap", days: days, used: status.used) %>
   <% else %>
     <%= t("dashboard.trial_banner.ended") %>
   <% end %>

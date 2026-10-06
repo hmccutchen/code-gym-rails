@@ -19,7 +19,7 @@
       <p><%= @status.cap ? t("trials.used_today", used: @status.used, cap: @status.cap) : t("trials.used_today_no_cap", used: @status.used) %></p>
       <p><%= t("trials.at_the_end") %></p>
     <% else %>
-      <p><%= @status.ended_on ? t("dashboard.trial_ended.on_day", day: l(@status.ended_on, format: :long)) : t("dashboard.trial_ended.message") %>
+      <p><%= @status.ended_on ? t("trials.ended_on", day: l(@status.ended_on, format: :long)) : t("dashboard.trial_banner.ended") %>
          <%= t("dashboard.trial_ended.kept") %></p>
       <p><%= link_to t("dashboard.trial_ended.add_key"), setup_path %></p>
     <% end %>

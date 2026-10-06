@@ -100,7 +100,8 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
     it "says on the trial page when it ended" do
       get trial_path
 
-      expect(response.body).to include("Your trial ended on October 13, 2026")
+      expect(response.body).to include("Your trial ended on October 13, 2026.")
+      expect(response.body).not_to include("so no set was generated today")
       expect(response.body).not_to include("requests used today")
     end
   end
@@ -116,7 +117,8 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
       expect { get root_path }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id)
 
       expect(response.body).to include("Generating your personalized exercise set")
-      expect(response.body).not_to include("Your trial", "trial-banner")
+      expect(response.body).not_to include("Your trial")
+      expect(response.body).not_to include("trial-banner")
     end
 
     it "accepts an explicit generate" do
@@ -128,7 +130,8 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
 
     it "shows Setup without the trial note or the key guide, and sends the trial page to Setup" do
       get setup_path
-      expect(response.body).not_to include("See how your trial is going.", "key-guide")
+      expect(response.body).not_to include("See how your trial is going.")
+      expect(response.body).not_to include("key-guide")
 
       get trial_path
       expect(response).to redirect_to(setup_path)
@@ -143,6 +146,38 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
     get root_path
 
     expect(response.body).not_to include("trial-banner")
+  end
+
+  it "says on the trial page only that it ended, when the kill switch ended it early" do
+    login_as(user)
+    stub_env("TRIALS_DISABLED" => "1")
+
+    get trial_path
+
+    expect(response.body).to include("Your trial has ended.")
+    expect(response.body).not_to include("Your trial ended on")
+    expect(response.body).not_to include("so no set was generated today")
+  end
+
+  it "keeps the banner while today's set is being regenerated" do
+    DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+                          regenerating_since: Time.current,
+                          problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } })
+    login_as(user)
+
+    get root_path
+
+    expect(response.body).to include("Trial: 7 days left. 0 of 12 requests used today.")
+  end
+
+  it "counts calls without a denominator when the invite sets no cap" do
+    uncapped = create_trial_user(provider: "fake", cap: nil, email: "uncapped@example.com")
+    login_as(uncapped)
+
+    get root_path
+
+    expect(response.body).to include("Trial: 7 days left. 0 requests used today.")
+    expect(response.body).not_to include("unlimited")
   end
 
   it "says the trial has ended without a day under the kill switch" do

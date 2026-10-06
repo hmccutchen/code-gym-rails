@@ -1,7 +1,7 @@
 # What a trial account is shown about its trial, in the user's zone and
-# against the clock: how long is left, how much of today's cap is used, and
-# when it ended. Pure over the user and the time it is given, except for the
-# one usage count the gate also reads.
+# against the clock it is given: how long is left, how much of today's cap is
+# used, and when it ended. Whether it is still active also reads the kill
+# switch and the house key, as the gate does.
 class TrialStatus
   attr_reader :used, :cap
 

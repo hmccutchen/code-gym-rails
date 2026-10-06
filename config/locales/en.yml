@@ -119,6 +119,7 @@ en:
     running_until: "Your trial runs until the end of %{day}: %{days} left."
     used_today: "%{used} of %{cap} requests used today. The count resets at midnight your time."
     used_today_no_cap: "%{used} requests used today."
+    ended_on: "Your trial ended on %{day}."
     at_the_end: "When the trial ends, generation and reviews stop. Everything you did stays, and adding your own API key in Setup picks up where you left off."
     code_rejected: "That code didn't work. Check it and try again, or ask the person who gave it to you."
     consent_needed: "Tick the box to confirm you've read what is sent on a trial."
@@ -336,10 +337,10 @@ en:
       add_key: "Add your own API key in Setup to keep going."
     trial_banner:
       active: "Trial: %{days} left. %{used} of %{cap} requests used today."
+      active_no_cap: "Trial: %{days} left. %{used} requests used today."
       days:
         one: "1 day"
         other: "%{count} days"
-      no_cap: "unlimited"
       ended: "Your trial has ended."
       details: "Details"
     weekend_empty:

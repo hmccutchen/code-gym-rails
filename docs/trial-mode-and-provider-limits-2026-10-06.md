@@ -660,14 +660,15 @@ before it touches the day.
 `/trial` for a trial account, from `TrialStatus.for(user)`: the day the
 trial ends and the days left (today included, in the user's zone), requests
 used today against the cap (`ApiUsage.requests_on`, the same query the gate
-reads; "unlimited" when the invite sets no cap), what happens at the end
+reads; the count alone when the invite sets no cap), what happens at the end
 (generation and reviews stop, everything stays, add a key to continue), and
 the data notice for the trial's provider. Once ended, it says the day it
 ended, or only that it has ended when the kill switch or a missing house key
 ended it early, and links to Setup. The dashboard carries one banner line
 above the set linking here ("Trial: 7 days left. 2 of 12 requests used
-today." or "Your trial has ended."), rendered only for a trial account so
-every other page is byte-identical. A first-run account is sent to
+today.", "Trial: 7 days left. 2 requests used today." with no cap, or "Your
+trial has ended."), including while today's set is being regenerated, and
+rendered only for a trial account so every other page is byte-identical. A first-run account is sent to
 `/welcome` before this page, as Setup does.
 
 ### 6.7 Data notice, as built
