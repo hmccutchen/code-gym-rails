@@ -117,11 +117,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_150100) do
   create_table "invite_codes", force: :cascade do |t|
     t.string "code_digest", null: false
     t.string "label"
-    t.string "provider"
     t.integer "seats", null: false
     t.integer "redeemed_count", default: 0, null: false
     t.datetime "expires_at", null: false
-    t.integer "trial_days"
+    t.integer "trial_days", null: false
     t.integer "daily_request_cap"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false

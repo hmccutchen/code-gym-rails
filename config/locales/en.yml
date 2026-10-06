@@ -91,7 +91,7 @@ en:
       name_placeholder: "Your name"
       email_label: "Work email *"
       email_placeholder: "you@company.com"
-      invite_code_label: "Invite code (first time only)"
+      trial_link: "Have an invite code? Start a trial."
       submit: "Send code"
     pending:
       message: "Enter the 6-digit code we emailed you."
@@ -111,8 +111,14 @@ en:
   trials:
     page_title: "Trial"
     heading: "Trial"
-    intro: "Enter the invite code you were given to try Code Gym on a shared key."
+    intro: "Enter the invite code you were given and choose a provider to try Code Gym on a shared key."
+    start_intro: "Try Code Gym on a shared key with the invite code you were given. We'll email you a code to confirm your address, and the trial starts when you enter it."
+    unavailable: "Trials aren't available right now. You can still use Code Gym with an API key of your own."
+    log_in_instead: "Have an account, or using your own key? Log in."
     code_label: "Invite code"
+    provider_label: "Provider"
+    provider_needed: "Choose the provider your trial runs on."
+    code_sent: "Check your email for a 6-digit login code. It expires in %{expiry}. Your trial starts when you enter it."
     consent_label: "I understand what is sent and to whom."
     submit: "Start trial"
     started: "Your trial has started."
@@ -125,6 +131,7 @@ en:
       shared: "On a trial, Code Gym sends your exercises, answers and messages to %{provider} using a key that belongs to the person who runs Code Gym, not to you. Usage counts against that key."
       gemini: "Google's free tier lets Google use what is sent, including your answers, to improve its products, and people at Google may read it. Don't paste anything confidential."
       anthropic: "Anthropic keeps API data for up to 30 days and does not train on it by default."
+      openai: "OpenAI keeps API data for up to 30 days to watch for abuse and does not train on it by default."
       fake: "The test provider sends nothing anywhere."
   user_mailer:
     login_code:

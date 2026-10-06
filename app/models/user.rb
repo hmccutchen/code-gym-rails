@@ -333,8 +333,7 @@ class User < ApplicationRecord
   def provider_ready? = api_key_present? || trial_active?
 
   # ── Trial ──────────────────────────────────────────────────────────────────
-  # A trial_ends_at is the fact; an account with a code and no dates joined on
-  # a plain join code, or signed up with a trial code and has not consented.
+  # A trial_ends_at is the fact; there is no flag.
   def trial? = trial_ends_at.present?
 
   # Deleting an account leaves its trial dates in place, and jobs queued
@@ -346,24 +345,20 @@ class User < ApplicationRecord
 
   def trial_ended? = trial? && !trial_active?
 
-  def trial_pending? = !trial? && invite_code&.trial? == true
-
-  # Starts the trial the code offers, taking a seat unless this account's own
-  # signup already took one. Under the row lock, so two submissions cannot
-  # start it twice, and the seat is taken only once the account is known to
-  # be eligible. Returns false for a code that is wrong, expired, exhausted,
-  # a join code, when this account already has one, or when it has a key of
-  # its own, which a trial would never be used over.
-  def start_trial!(code:, consented_at:)
+  # Starts a trial on the provider the person chose, taking one seat on the
+  # code. Under the row lock, so two submissions cannot start it twice, and
+  # the seat is taken only once the account is known to be eligible. Returns
+  # false for a missing, expired or full code, a provider no trial can start
+  # on, an account that has had a trial, or one with a key of its own, which
+  # a trial would never be used over.
+  def start_trial!(invite:, provider:, consented_at:)
     with_lock do
-      return false if api_key_present? || trial? || invite_code_id.present? && !trial_pending?
-
-      invite = trial_pending? ? invite_code : InviteCode.find_by_code(code)
-      return false unless invite&.trial?
-      return false unless trial_pending? || invite.redeem!
+      return false if api_key_present? || trial? || invite.nil?
+      return false unless TrialMode.providers.include?(provider)
+      return false unless invite.redeem!
 
       ends = consented_at.in_time_zone(effective_time_zone).end_of_day + (invite.trial_days - 1).days
-      update!(invite_code: invite, provider: invite.provider, trial_started_at: consented_at,
+      update!(invite_code: invite, provider: provider, trial_started_at: consented_at,
               trial_ends_at: ends, trial_consented_at: consented_at)
     end
     true

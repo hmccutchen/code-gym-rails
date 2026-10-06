@@ -299,7 +299,7 @@ Every page load, any day of the week:
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
-| `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, provider (nil for a join code), seats, redeemed_count, expires_at, trial_days, daily_request_cap |
+| `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
@@ -438,24 +438,31 @@ concept-specific difficulty descriptions for future generation, not a new set.
   operator's own key. A refresh rewrites the whole shared reference and guide,
   including rows that already have a guide, for every user. Production coverage,
   billed cost and completion remain unmeasured until this runs there.
-- **Invite codes and trials**: a new account needs a seat on an invite code,
-  typed into the login form's "Invite code (first time only)" field; an
-  unknown address without a valid code gets the same notice as everyone and
-  no account, no mail. `InviteCode` keeps only a SHA-256 digest of the
-  26-character base32 code `script/mint_invite_code.rb` prints once, and
-  `#redeem!` takes a seat in one statement against the seat count and the
-  deadline, so two redemptions cannot both win the last seat. A code with a
-  `provider` starts a trial on that provider's house key; one without is a
-  join code for a teammate who brings their own key.
+- **Invite codes and trials**: anyone can sign up with an email, as before,
+  and bring their own key; no code is needed to use the app. An invite code
+  starts a trial on a house key instead. `InviteCode` keeps only a SHA-256
+  digest of the 26-character base32 code `script/mint_invite_code.rb` prints
+  once, with its seats, deadline, trial length and daily cap, and `#redeem!`
+  takes a seat in one statement against the seat count and the deadline, so
+  two redemptions cannot both win the last seat. The person picks the
+  provider: `TrialMode.providers` lists those with a data notice to consent
+  to and a house key set (Gemini, Claude and OpenAI), and none under the kill
+  switch.
+
+  **Two ways in.** `/trial/start` is public: a name, an email, the code, a
+  provider and the consent checkbox. It checks the code (`#available?`)
+  before mailing anything, mails a login code through the same
+  `LoginCodeRequests` concern and limits the login form uses, and keeps a
+  `PendingTrial` in the session. Entering the emailed code takes the seat and
+  starts the trial, so nobody can spend a seat on an address they cannot
+  read; asking for a plain login code drops the pending trial. A signed-in
+  account with no key uses `/trial`, which asks for the code and provider
+  only.
 
   **A trial is a `trial_ends_at`, nothing more.** `User#start_trial!` runs
-  under the row lock from `POST /trial`, after the data notice and the
-  consent checkbox, refuses an account with a key of its own, and sets
-  `provider` from the code (one of `InviteCode.trial_providers`, the
-  providers whose data notice exists, since consent is given to that
-  notice) and the end to the last day's end in the user's zone; an account that signed up with a trial
-  code already holds its seat and only consents there, and
-  `require_provider` sends it to `/trial` rather than Setup until it does.
+  under the row lock, refuses an account with a key of its own or one that
+  has had a trial, takes the seat, and sets `provider` to the choice and the
+  end to the last day's end in the user's zone.
   `trial_active?` needs the end in the future, `TrialMode.enabled?`
   (`TRIALS_DISABLED` is not `"1"`, the kill switch) and a house key for the
   provider (`HouseKeys.for`, `HOUSE_<PROVIDER>_API_KEY`, read from ENV at
@@ -2754,11 +2761,13 @@ always pull in the full suite — is stated once, in
 - `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
 - `app/models/invite_code.rb` — `InviteCode`: a code's digest, seats, deadline and trial terms; `.mint` prints the code once, `#redeem!` takes a seat atomically
+- `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, kept in the session until the emailed code is entered
+- `app/controllers/concerns/login_code_requests.rb` — `LoginCodeRequests`: mailing a login code and the limits on asking, shared by the login form and the trial form
 - `app/models/provider_credential.rb` — `ProviderCredential.for(user)`: own key, no key, or the house key for an active trial; raises for an ended one
 - `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
 - `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
-- `app/controllers/trials_controller.rb` — `GET`/`POST /trial`: the data notice, consent and redemption
-- `script/mint_invite_code.rb` — mints one invite or join code and prints it once
+- `app/controllers/trials_controller.rb` — `/trial/start` for someone signed out and `/trial` for a keyless account: the code, the provider, the data notice and consent
+- `script/mint_invite_code.rb` — mints one invite code and prints it once
 - `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
 - `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
 - `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line
