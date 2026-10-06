@@ -511,6 +511,17 @@ RSpec.describe ClaudeService do
         }
     end
 
+    it "falls back to the status when the error envelope is null" do
+      allow(Rails.logger).to receive(:warn)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "type" => "error", "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_error") }
+
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 400, { "type" => "error", "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt") }
+        .to raise_error(AiService::Error) { |e| expect(e).not_to be_a(AiService::BillingError) }
+    end
+
     it "falls back to the error type as the quota id when no family reads zero" do
       conn = Faraday.new do |f|
         f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { [ 529, {}, { "type" => "error", "error" => { "type" => "overloaded_error", "message" => "x" } }.to_json ] } }

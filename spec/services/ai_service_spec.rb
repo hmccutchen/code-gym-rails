@@ -379,6 +379,7 @@ RSpec.describe AiService do
         purpose: "duck_thread", tokens_in: 0, tokens_out: 0, failure: "rate_limit", http_status: 429,
         quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", provider: double_class.provider_key
       )
+      expect(error.provider).to eq(double_class.provider_key)
     end
 
     { AiService::AuthenticationError.new("x", http_status: 401) => "authentication",
@@ -3618,7 +3619,8 @@ RSpec.describe AiService do
       results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
 
       expect(results["code_review"][:ok]).to be(true)
-      expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", failure: "short_rate_limit", quota_id: nil, retry_after: nil)
+      expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", failure: "short_rate_limit",
+                                       provider: failing_class.provider_key, quota_id: nil, retry_after: nil)
     end
 
     it "keeps the graded sections when usage logging cannot check out a connection" do

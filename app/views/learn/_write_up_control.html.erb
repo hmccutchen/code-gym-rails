@@ -58,6 +58,7 @@
     }
 
     button.addEventListener("click", async () => {
+      attempts = 0;
       button.disabled = true;
       status.textContent = "<%= j t("learn.writing_guide") %>";
 

@@ -1424,20 +1424,27 @@ concept-specific difficulty descriptions for future generation, not a new set.
   every surface to that.
 
   **Rendered when read, not when written.** A failed generation stores its
-  class and time (`users.last_generation_failure`,
-  `last_generation_failed_at`) and `User#generation_failure_message` writes
+  class, provider, time and requested wait (`users.last_generation_failure`,
+  `last_generation_failure_provider`, `last_generation_failed_at`,
+  `last_generation_retry_after`) and `User#generation_failure_message` writes
   the sentence for the page or `/dashboard/status` in the user's zone against
-  the clock, through `ResetClock`: a Gemini daily limit resets at the next
-  midnight Pacific after the failure, a short limit after the wait the
+  the clock, through `ResetClock`: a daily limit resets when the provider
+  class's `daily_quota_reset_at` says (Gemini's quota day ends at midnight
+  Pacific; the base class gives a day), a short limit after the wait the
   provider asked for or a minute, and once the reset has passed the sentence
   says the allowance has reset rather than naming a time behind the reader.
+  The provider is stored because `call_and_log` stamps every
+  `AiService::Error` with the provider whose call raised
+  (`AiService::Error#provider`), and a user can switch keys before reading:
+  the sentence names the provider that failed, and a stored failure with no
+  provider reads as the current one.
   `last_generation_error` keeps text that is not a provider failure (a
   reviewed set kept, an unusable draft, every section rejected) and rows from
   before the columns existed, which render as they did. A failed review
-  section stores `{kind, quota_id, retry_after, at}` in `review_errors`,
-  never the message; the submitted dashboard renders the newest one beside
-  the retry button, and rows that still carry the old `code` read as the
-  nearest kind.
+  section stores `{kind, provider, quota_id, retry_after, at}` in
+  `review_errors`, never the message; the submitted dashboard renders the
+  newest one beside the retry button, and rows that still carry the old
+  `code` read as the nearest kind.
 
   **Out of credit is never a rate limit.** Per platform.claude.com's error
   and rate-limit pages, Anthropic returns a 402 `billing_error`, a 400 whose
@@ -1453,7 +1460,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Learn keeps a failure per user, not on the shared row.** A failed
   write-up is noted in the Rails cache by user and concept
   (`ConceptReferenceFailures`, `EXPIRY` one hour, shorter than any quota's
-  reset) and `/learn/:bucket/:concept/status` returns `failed` and the
+  reset), with the provider the job used, and `/learn/:bucket/:concept/status` returns `failed` and the
   sentence, on which the page stops polling. Production's cache is Solid
   Cache in the one Postgres database, shared by web and worker, which is what
   lets the worker's job write what the web reads; development's memory store

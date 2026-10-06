@@ -722,6 +722,22 @@ RSpec.describe "Responses", type: :request do
       expect(daily_response.review_errors["code_review"]).not_to have_key("message")
     end
 
+    it "stores the provider the section's call went to and keeps naming it after a switch" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections)
+        .and_return("code_review" => { ok: false, error_code: "rate_limit", failure: "short_rate_limit", provider: "openai", retry_after: 30 })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(flash[:alert]).to start_with("GPT is limiting requests right now, so the review didn't run.")
+      expect(daily_response.reload.review_errors["code_review"]).to include("provider" => "openai", "retry_after" => 30)
+
+      get root_path
+      expect(response.body).to include(ERB::Util.html_escape("GPT is limiting requests right now, so the review didn't run."))
+    end
+
     it "shows the wait for a short rate limit and the reset for a daily one" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)

@@ -17,8 +17,8 @@ RSpec.describe GenerateDailyExercisesJob do
 
   def stub_provider_failure(error, message, u = user)
     svc = instance_double(ClaudeService)
-    allow(svc).to receive(:generate_unjudged_exercise).and_raise(error, message)
-    allow(svc).to receive(:generate_judged_exercise).and_raise(error, message)
+    allow(svc).to receive(:generate_unjudged_exercise).and_raise(*[ error, message ].compact)
+    allow(svc).to receive(:generate_judged_exercise).and_raise(*[ error, message ].compact)
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
 
@@ -117,6 +117,24 @@ RSpec.describe GenerateDailyExercisesJob do
 
     expect(user.reload.last_generation_failure).to eq("short_rate_limit")
     expect(user.generation_failure_message(surface: :generation)).to start_with("Claude is limiting requests right now, so nothing was generated.")
+  end
+
+  # The sentence is written when the dashboard is read, so the row keeps the
+  # provider the call went to and the wait it asked for: a switch to another
+  # key before reading must not relabel the failure.
+  it "stores the provider tried and its wait, and keeps naming that provider after a switch" do
+    error = AiService::RateLimitError.new("rate limited", retry_after: 300).tap { |e| e.provider = "anthropic" }
+    stub_provider_failure(error, nil)
+    allow(Rails.logger).to receive(:error)
+
+    described_class.new.perform(user_id: user.id)
+
+    user.reload
+    expect(user.last_generation_failure_provider).to eq("anthropic")
+    expect(user.last_generation_retry_after).to eq(300)
+    user.update!(provider: "gemini", api_keys: { "gemini" => "AIzaTestKey" })
+    expect(user.generation_failure_message(surface: :generation))
+      .to eq("Claude is limiting requests right now, so nothing was generated. Try again in about 5 minutes.")
   end
 
   it "records a generic AiService::Error as other and never stores its message" do

@@ -11,8 +11,13 @@ RSpec.describe ResetClock do
     expect(reset.in_time_zone("America/Los_Angeles").strftime("%F %T")).to eq("2026-10-06 00:00:00")
   end
 
-  it "gives another provider's daily limit a day" do
+  it "asks the provider class for the boundary, and gives any other daily limit a day" do
+    expect(GeminiService).to receive(:daily_quota_reset_at).with(failed_at).and_call_original
+    described_class.reset_at("daily_limit", provider: "gemini", failed_at: failed_at)
+
     expect(described_class.reset_at("daily_limit", provider: "openai", failed_at: failed_at)).to eq(failed_at + 1.day)
+    expect(described_class.reset_at("daily_limit", provider: "unknown", failed_at: failed_at)).to eq(failed_at + 1.day)
+    expect(described_class.reset_at("daily_limit", provider: nil, failed_at: failed_at)).to eq(failed_at + 1.day)
   end
 
   it "lifts a short limit after the wait asked for, and never under a minute" do

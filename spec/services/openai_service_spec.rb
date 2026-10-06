@@ -265,6 +265,16 @@ RSpec.describe OpenaiService do
         }
     end
 
+    it "falls back to the status when the error envelope is null" do
+      allow(Rails.logger).to receive(:warn)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_exceeded") }
+
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 402, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::BillingError)
+    end
+
     it "names the exhausted limit and the wait on a rate-limit 429" do
       body = { "error" => { "message" => "Rate limit reached", "type" => "requests", "code" => "rate_limit_exceeded" } }.to_json
       conn = Faraday.new do |f|

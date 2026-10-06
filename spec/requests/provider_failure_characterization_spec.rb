@@ -202,7 +202,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
         expect(daily_response.submitted?).to be(true)
         expect(daily_response.reviewed?).to be(false)
         expect(daily_response.reviewing?).to be(false)
-        expect(daily_response.review_errors["code_review"]).to include("kind" => kind)
+        expect(daily_response.review_errors["code_review"]).to include("kind" => kind, "provider" => "gemini")
         expect(daily_response.review_errors["code_review"]).not_to have_key("message")
 
         get root_path
