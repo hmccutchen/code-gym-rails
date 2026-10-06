@@ -134,7 +134,7 @@ class LearnController < ApplicationController
     failure = ConceptReferenceFailures.read(user_id: current_user.id, concept: concept, language: bucket)
     return {} if failure.nil?
 
-    text = ProviderFailureText.new(failure["kind"], provider: current_user.provider, surface: :reference,
+    text = ProviderFailureText.new(failure["kind"], provider: failure["provider"] || current_user.provider, surface: :reference,
                                    failed_at: Time.zone.parse(failure["at"].to_s), zone: current_user.effective_time_zone,
                                    retry_after: failure["retry_after"])
     { failed: text.kind, message: text.brief }

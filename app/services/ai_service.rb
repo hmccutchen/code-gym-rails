@@ -7,6 +7,9 @@ class AiService
   # seconds; both are read by ProviderFailure and the usage row, never shown.
   class Error < StandardError
     attr_reader :http_status, :quota_id, :retry_after
+    # Stamped by call_and_log with the provider whose call raised, so a stored
+    # failure names the provider that was tried even after the user switches.
+    attr_accessor :provider
 
     def initialize(message = nil, http_status: nil, quota_id: nil, retry_after: nil)
       super(message)
@@ -2833,6 +2836,7 @@ class AiService
     [ section, { ok: true, review: review } ]
   rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: error_code_for(e), failure: ProviderFailure.classify(e),
+                 provider: e.try(:provider) || service.class.provider_key,
                  quota_id: e.try(:quota_id), retry_after: e.try(:retry_after) } ]
   end
 
@@ -3264,6 +3268,7 @@ class AiService
                     read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,
                     response_schema: response_schema, single_attempt: single_attempt)
     rescue Error => e
+      e.provider ||= self.class.provider_key
       log_usage(user, failed_call_result(e, purpose), purpose: purpose)
       raise
     end
@@ -3308,6 +3313,19 @@ class AiService
     parsed.is_a?(Hash) ? parsed : {}
   rescue JSON::ParserError
     {}
+  end
+
+  # The provider's error object, or an empty one when the body is not JSON,
+  # carries no "error" or carries a null one, so the status alone decides.
+  def error_envelope(body)
+    error = parse_error_body(body)["error"]
+    error.is_a?(Hash) ? error : {}
+  end
+
+  # When a daily request limit hit at failed_at lifts. A provider whose quota
+  # day has a known boundary overrides this; the base gives a day.
+  def self.daily_quota_reset_at(failed_at)
+    failed_at + 1.day
   end
 
   # The provider's requested wait in whole seconds, from the standard header.

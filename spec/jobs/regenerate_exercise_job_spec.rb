@@ -366,6 +366,20 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.reload.last_generation_failure).to eq("short_rate_limit")
   end
 
+  it "stores the provider tried and its wait, so the line survives a key switch" do
+    claimed_exercise
+    stub_provider(AiService::RateLimitError.new("rate limited", retry_after: 120).tap { |e| e.provider = "anthropic" })
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(user.reload).to have_attributes(last_generation_failure_provider: "anthropic", last_generation_retry_after: 120)
+    user.update!(provider: "gemini", api_keys: { "gemini" => "AIzaTestKey" })
+    expect(user.generation_failure_message(surface: :regeneration))
+      .to eq("Claude is limiting requests right now, so the new set wasn't generated. Try again in about 2 minutes.")
+    user.clear_generation_failure!
+    expect(user).to have_attributes(last_generation_failure_provider: nil, last_generation_retry_after: nil)
+  end
+
   it "records a timeout without leaking the socket internals it came from" do
     claimed_exercise
     stub_provider(AiService::TimeoutError.new("Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>"))

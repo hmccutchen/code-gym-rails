@@ -464,6 +464,28 @@ RSpec.describe GeminiService do
         }
     end
 
+    it "prefers the daily quota when a 429 lists it beside a per-minute one" do
+      body = JSON.parse(quota_fixture("gemini_429_minute.json"))
+      failure = body["error"]["details"].find { |d| d["@type"].end_with?("QuotaFailure") }
+      failure["violations"] << { "quotaMetric" => "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+                                 "quotaId" => "GenerateRequestsPerDayPerProjectPerModel-FreeTier", "quotaValue" => "20" }
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, body.to_json ] ]))
+
+      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("GenerateRequestsPerDayPerProjectPerModel-FreeTier") }
+    end
+
+    it "falls back to the status when the error envelope is null" do
+      allow(Rails.logger).to receive(:error)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to be_nil }
+
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 400, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt") }
+        .to raise_error(AiService::Error, /Gemini API error 400/) { |e| expect(e).not_to be_a(AiService::AuthenticationError) }
+    end
+
     # Gemini answers a bad key with a 400 whose details say API_KEY_INVALID,
     # not a 401, and the body can echo the key.
     it "reads a 400 API_KEY_INVALID as a rejected key without logging the body" do

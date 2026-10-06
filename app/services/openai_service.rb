@@ -106,7 +106,7 @@ class OpenaiService < AiService
 
   def raise_for_status(resp)
     raise_if_key_rejected("OpenAI", resp.status)
-    error = parse_error_body(resp.body).fetch("error", {})
+    error = error_envelope(resp.body)
     raise_if_out_of_credit(error, resp.status)
 
     if resp.status == 429

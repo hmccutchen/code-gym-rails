@@ -14,8 +14,9 @@ module ConceptReferenceFailures
 
   def self.record(user_id:, concept:, language:, error:)
     Rails.cache.write(key(user_id, concept, language),
-                      { "kind" => ProviderFailure.classify(error), "quota_id" => error.try(:quota_id),
-                        "retry_after" => error.try(:retry_after), "at" => Time.current.iso8601 },
+                      { "kind" => ProviderFailure.classify(error), "provider" => error.try(:provider),
+                        "quota_id" => error.try(:quota_id), "retry_after" => error.try(:retry_after),
+                        "at" => Time.current.iso8601 }.compact,
                       expires_in: EXPIRY)
   end
 

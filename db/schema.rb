@@ -336,7 +336,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
     t.integer "daily_section_count"
     t.text "api_keys"
     t.string "last_generation_failure"
+    t.string "last_generation_failure_provider"
     t.datetime "last_generation_failed_at"
+    t.integer "last_generation_retry_after"
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 

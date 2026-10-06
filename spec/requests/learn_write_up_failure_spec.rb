@@ -42,6 +42,15 @@ RSpec.describe "Learn write-up failures", type: :request do
     end
   end
 
+  it "names the provider the job used, not the one the user has since switched to" do
+    travel_to(Time.utc(2026, 10, 6, 14)) do
+      run_job_against(429, Rails.root.join("spec/fixtures/provider_errors/gemini_429_daily.json").read)
+      user.update!(provider: "anthropic", api_keys: user.api_keys.merge("anthropic" => "sk-ant-test"))
+
+      expect(status_body["message"]).to start_with("Your Gemini key has used today's free allowance")
+    end
+  end
+
   it "forgets the note after its expiry, so the page can ask again" do
     travel_to(Time.utc(2026, 10, 6, 14)) do
       run_job_against(503, "<html>down</html>")

@@ -336,9 +336,12 @@ detail or key.
 Reset times come from `ResetClock.reset_at(kind, provider:, failed_at:,
 retry_after:)` and are rendered in the user's `effective_time_zone`:
 
-- `daily_limit` on Gemini: the next midnight Pacific after the failure,
-  shown as "The allowance resets at 3:00 am your time, Wednesday." Another
-  provider's daily limit is given a day from the failure.
+- `daily_limit`: the provider class's `daily_quota_reset_at`, looked up
+  through `AiProvider.find`, so the clock holds no provider branch.
+  `GeminiService` answers the next midnight Pacific after the failure, shown
+  as "The allowance resets at 3:00 am your time, Wednesday."; the base
+  class, and so every other or unknown provider, gives a day from the
+  failure.
 - `short_rate_limit`: the wait the provider asked for, never under a
   minute: "Try again in about a minute" or "about 3 minutes".
 - Once the reset has passed, the sentence says so instead ("The allowance
@@ -369,18 +372,24 @@ surface):
 
 ### 4.3 Where it lands
 
-- Generation and regeneration store the class and time
-  (`AddLastGenerationFailureToUsers`, flagged: `users.last_generation_failure`
-  string, `last_generation_failed_at` datetime) through
+- Generation and regeneration store the class, the provider the call went
+  to, the time and the wait it asked for (`AddLastGenerationFailureToUsers`,
+  flagged: `users.last_generation_failure` string,
+  `last_generation_failure_provider` string, `last_generation_failed_at`
+  datetime, `last_generation_retry_after` integer) through
   `User#record_generation_failure!`, and the dashboard panel, the
   regeneration line and `/dashboard/status` render
-  `User#generation_failure_message` when read. `last_generation_error` keeps
+  `User#generation_failure_message` when read. The provider is stored
+  because `AiService::Error#provider`, stamped by `call_and_log` with the
+  class whose call raised, is what the sentence names: a user who switches
+  keys before reading still sees which provider failed, and a row with no
+  provider falls back to the current one. `last_generation_error` keeps
   text that is not a provider failure (`record_generation_message!`: a
   reviewed set kept, an unusable draft, every section rejected) and rows from
   before the columns existed, which render as before.
-- The review fan-out's per-section result carries `failure`, `quota_id` and
-  `retry_after` instead of the message; `review_errors` stores
-  `{kind, quota_id, retry_after, at}`; the flash for a wholly failed review
+- The review fan-out's per-section result carries `failure`, `provider`,
+  `quota_id` and `retry_after` instead of the message; `review_errors`
+  stores `{kind, provider, quota_id, retry_after, at}`; the flash for a wholly failed review
   is the commonest kind's full sentence, a partial review's notice ends with
   that kind's brief one, and the submitted dashboard renders the newest
   stored failure beside the retry button. Old rows with `code` read as the

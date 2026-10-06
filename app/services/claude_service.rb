@@ -136,7 +136,7 @@ class ClaudeService < AiService
 
   def raise_for_status(resp)
     raise_if_key_rejected("Anthropic", resp.status)
-    error = parse_error_body(resp.body).fetch("error", {})
+    error = error_envelope(resp.body)
     raise_if_out_of_credit(error, resp.status)
 
     case resp.status

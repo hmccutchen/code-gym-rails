@@ -5,6 +5,13 @@ class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
   def self.provider_key = "gemini"
+
+  # Google's daily quotas reset at midnight Pacific, whatever the user's zone.
+  DAILY_QUOTA_RESET_ZONE = "America/Los_Angeles".freeze
+
+  def self.daily_quota_reset_at(failed_at)
+    failed_at.in_time_zone(DAILY_QUOTA_RESET_ZONE).tomorrow.beginning_of_day
+  end
   def self.key_pattern = /\A(AIza|AQ\.)/
 
   # Keyed by the ApiUsage purpose string, like ClaudeService's. Generation and
@@ -122,7 +129,7 @@ class GeminiService < AiService
   # QuotaFailure and the wait in RetryInfo; neither is logged either.
   def raise_for_status(resp)
     raise_if_key_rejected("Google", resp.status)
-    error = parse_error_body(resp.body).fetch("error", {})
+    error = error_envelope(resp.body)
     raise_if_key_invalid(error, resp.status)
 
     if resp.status == 429
@@ -151,10 +158,12 @@ class GeminiService < AiService
     error_details(error, "ErrorInfo").map { |detail| detail["reason"] }
   end
 
+  # A 429 can list several violations; the daily one is the one that decides
+  # how long the wait is, so it wins over a per-minute limit beside it.
   def quota_id_from(error)
-    error_details(error, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }
-                                        .filter_map { |violation| violation["quotaId"] if violation.is_a?(Hash) }
-                                        .first
+    ids = error_details(error, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }
+                                              .filter_map { |violation| violation["quotaId"] if violation.is_a?(Hash) }
+    ids.find { |id| id.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || ids.first
   end
 
   # RetryInfo's delay is a duration string such as "39s"; the header, when

@@ -178,28 +178,34 @@ class User < ApplicationRecord
   # only when read (#generation_failure_message), in the reader's zone and
   # against the clock. A message that is not a provider failure (a reviewed
   # set kept, a draft the app could not use) is stored as text, as before.
+  NO_GENERATION_FAILURE = { last_generation_failure: nil, last_generation_failure_provider: nil,
+                            last_generation_failed_at: nil, last_generation_retry_after: nil }.freeze
+
   def record_generation_failure!(error)
     update!(last_generation_error_date: Date.current, last_generation_error: nil,
-            last_generation_failure: ProviderFailure.classify(error), last_generation_failed_at: Time.current)
+            last_generation_failure: ProviderFailure.classify(error),
+            last_generation_failure_provider: error.try(:provider) || provider,
+            last_generation_failed_at: Time.current, last_generation_retry_after: error.try(:retry_after))
   end
 
   def record_generation_message!(message)
-    update!(last_generation_error_date: Date.current, last_generation_error: message,
-            last_generation_failure: nil, last_generation_failed_at: nil)
+    update!(last_generation_error_date: Date.current, last_generation_error: message, **NO_GENERATION_FAILURE)
   end
 
   def clear_generation_failure!
-    update!(last_generation_error_date: nil, last_generation_error: nil,
-            last_generation_failure: nil, last_generation_failed_at: nil)
+    update!(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
   end
 
   def generation_failed_today? = last_generation_error_date == Date.current
 
+  # Names the provider the failed call went to, which the user may have
+  # switched away from since, and the wait it asked for.
   def generation_failure_message(surface:, now: Time.current)
     return last_generation_error if last_generation_failure.blank?
 
-    ProviderFailureText.new(last_generation_failure, provider: provider, surface: surface,
-                            failed_at: last_generation_failed_at, zone: effective_time_zone, now: now).full
+    ProviderFailureText.new(last_generation_failure, provider: last_generation_failure_provider || provider,
+                            surface: surface, failed_at: last_generation_failed_at, zone: effective_time_zone,
+                            now: now, retry_after: last_generation_retry_after).full
   end
 
   # Suppresses every generation the user didn't ask for — the cron batch and

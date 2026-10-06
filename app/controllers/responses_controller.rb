@@ -638,15 +638,15 @@ class ResponsesController < ApplicationController
   def review_failure_text(failures, surface)
     kind    = failures.values.map { |f| f[:failure] }.tally.max_by { |_, count| count }.first
     example = failures.values.find { |f| f[:failure] == kind }
-    ProviderFailureText.new(kind, provider: current_user.provider, surface: surface, failed_at: Time.current,
-                            zone: current_user.effective_time_zone, retry_after: example[:retry_after])
+    ProviderFailureText.new(kind, provider: example[:provider] || current_user.provider, surface: surface,
+                            failed_at: Time.current, zone: current_user.effective_time_zone, retry_after: example[:retry_after])
   end
 
   # What a failed section keeps: its kind, the quota named and when, never the
   # error's text. The page writes the sentence when it is read.
   def stored_review_failure(result)
-    { "kind" => result[:failure], "quota_id" => result[:quota_id], "retry_after" => result[:retry_after],
-      "at" => Time.current.iso8601 }.compact
+    { "kind" => result[:failure], "provider" => result[:provider], "quota_id" => result[:quota_id],
+      "retry_after" => result[:retry_after], "at" => Time.current.iso8601 }.compact
   end
 
   def response_params

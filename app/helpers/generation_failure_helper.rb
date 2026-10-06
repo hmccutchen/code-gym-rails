@@ -7,9 +7,10 @@ module GenerationFailureHelper
     user.last_generation_failure.present? ? message : t("dashboard.exercise.regeneration_failed", error: message)
   end
 
-  # The newest stored review failure, as the sentence its kind earns today.
-  # Rows written before kinds were stored carry a code instead and read as the
-  # nearest kind.
+  # The newest stored review failure, as the sentence its kind earns today,
+  # naming the provider that was tried. Rows written before kinds were stored
+  # carry a code instead and read as the nearest kind, and rows with no
+  # provider can only have come from the current one.
   LEGACY_REVIEW_CODES = { "rate_limit" => "short_rate_limit", "authentication" => "bad_key" }.freeze
 
   def review_failure_sentence(response)
@@ -18,7 +19,7 @@ module GenerationFailureHelper
 
     kind = failure["kind"] || LEGACY_REVIEW_CODES.fetch(failure["code"], "other")
     failed_at = failure["at"].present? ? Time.zone.parse(failure["at"]) : response.updated_at
-    ProviderFailureText.new(kind, provider: response.user.provider, surface: :review, failed_at: failed_at,
+    ProviderFailureText.new(kind, provider: failure["provider"] || response.user.provider, surface: :review, failed_at: failed_at,
                             zone: response.user.effective_time_zone, retry_after: failure["retry_after"]).full
   end
 end
