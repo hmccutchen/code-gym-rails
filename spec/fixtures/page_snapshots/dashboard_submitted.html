@@ -941,6 +941,40 @@
       });
     })();
   </script>
+  <script>
+  window.CodeGymServerMessage = (function () {
+    const SIGNED_OUT = "Your session expired — reload the page and try again.";
+    const written = new WeakSet();
+
+    // null when the body is not JSON: an HTML error page, the login page a
+    // redirect landed on, or nothing at all.
+    async function read(response) {
+      try { return await response.json(); } catch (_) { return null; }
+    }
+
+    // An error whose message a person may read.
+    function error(text) {
+      const e = new Error(text);
+      written.add(e);
+      return e;
+    }
+
+    // fetch follows redirects, and the only redirect a JSON endpoint gives
+    // is to the login page once the session has expired.
+    function failure(response, data, fallback) {
+      if (response && response.redirected) return error(SIGNED_OUT);
+      const ours = data && data.status === "error" && typeof data.error === "string" && data.error;
+      return error(ours || fallback);
+    }
+
+    function message(e, fallback) {
+      return written.has(e) ? e.message : fallback;
+    }
+
+    return { read: read, error: error, failure: failure, message: message };
+  })();
+</script>
+
   
   <p id="save-status" class="save-status" hidden></p>
 <p id="save-status-announcer" class="visually-hidden" role="alert"></p>
@@ -1281,6 +1315,9 @@
 // when new matching elements appear.
 // Inline script matching the app's convention; Stimulus is not wired here.
 (() => {
+  const ALTERNATE_FAILED = "Couldn't generate that — try again";
+  const FOLLOW_UP_FAILED = "Couldn't send that — try again";
+
   document.querySelectorAll(".explain-differently:not([data-alt-wired])").forEach(button => {
     button.dataset.altWired = "1";
     const container = button.parentElement;
@@ -1298,8 +1335,8 @@
           },
           body: JSON.stringify({ section: button.dataset.section })
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || res.status);
+        const data = await CodeGymServerMessage.read(res);
+        if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, ALTERNATE_FAILED);
 
         const p = document.createElement("p");
         p.className = "alternate-item";
@@ -1312,7 +1349,7 @@
           : "A different explanation was added above — that was the last one.";
         if (data.remaining > 0) { button.disabled = false; } else { button.remove(); }
       } catch (e) {
-        status.textContent = e.message || "Couldn't generate that — try again";
+        status.textContent = CodeGymServerMessage.message(e, ALTERNATE_FAILED);
         button.disabled = false;
       }
     });
@@ -1347,8 +1384,8 @@
           },
           body: JSON.stringify({ section: input.dataset.section, question: question })
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || res.status);
+        const data = await CodeGymServerMessage.read(res);
+        if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, FOLLOW_UP_FAILED);
 
         addTurn("user", question);
         addTurn("assistant", data.answer);
@@ -1365,7 +1402,7 @@
           container.insertBefore(capped, status);
         }
       } catch (e) {
-        status.textContent = e.message || "Couldn't send that — try again";
+        status.textContent = CodeGymServerMessage.message(e, FOLLOW_UP_FAILED);
         button.disabled = false;
         input.disabled = false;
       }

@@ -14,6 +14,7 @@
 // reload, deliberately (see ConceptReferencesController#explain_differently).
 (() => {
   const MAX = <%= ConceptReferencesController::MAX_ALTERNATES_PER_CONCEPT %>;
+  const ALTERNATE_FAILED = <%= t("concept_reference.alternate_failed").to_json.html_safe %>;
 
   // Keyed by reference id rather than by container, because one reference can
   // render several times on a page — two sections of a day can carry the same
@@ -48,11 +49,10 @@
         // therefore has to fail CLOSED — an earlier version fell back to {},
         // which passed the res.ok check and then appended an undefined framing
         // and removed the control. A proxy or unhandled 500 lands here too.
-        let data = null;
-        try { data = await res.json(); } catch { data = null; }
-        if (!res.ok) throw new Error((data && data.error) || res.status);
-        if (res.redirected) throw new Error(<%= t("concept_reference.session_expired").to_json.html_safe %>);
-        if (!data || data.status !== "ok" || !data.alternate) throw new Error(<%= t("concept_reference.alternate_failed").to_json.html_safe %>);
+        const data = await CodeGymServerMessage.read(res);
+        if (!res.ok || res.redirected || !data || data.status !== "ok" || !data.alternate) {
+          throw CodeGymServerMessage.failure(res, data, ALTERNATE_FAILED);
+        }
 
         framings.set(refId, [...(framings.get(refId) || []), data.alternate]);
         let focused = null;
@@ -83,7 +83,7 @@
           buttons.forEach(b => b.remove());
         }
       } catch (e) {
-        status.textContent = e.message || <%= t("concept_reference.alternate_failed").to_json.html_safe %>;
+        status.textContent = CodeGymServerMessage.message(e, ALTERNATE_FAILED);
         // Only re-enable what the cap still allows: a failure spends nothing
         // server-side, but a retry after the cap was reached in another copy
         // of this reference would just 422.
