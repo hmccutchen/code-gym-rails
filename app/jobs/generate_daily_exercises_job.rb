@@ -1,6 +1,18 @@
 class GenerateDailyExercisesJob < ApplicationJob
   queue_as :default
 
+  # One on-demand generation per user at a time. Every dashboard load with no
+  # set enqueues one, and each runs a full billed generation before the unique
+  # index throws the later ones away, so an overlap is discarded at enqueue.
+  # The hourly batch passes no user; with no key and no group it is not
+  # limited at all. The permit lasts the judged path's worst case from
+  # enqueue, so a job left waiting in the queue can outlive it; a request after
+  # that falls back to the unique index, as before.
+  limits_concurrency key: ->(args = {}) { args[:user_id] },
+                     group: ->(args = {}) { self.class.name if args[:user_id] },
+                     to: 1, on_conflict: :discard,
+                     duration: AiService::JUDGED_GENERATION_BUDGET.seconds
+
   # Called two ways:
   #   1. Cron (no args) — runs hourly; generates for users whose local time is
   #      a weekday morning at/after 8am, one exercise per local day

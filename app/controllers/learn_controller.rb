@@ -3,6 +3,13 @@ class LearnController < ApplicationController
 
   helper_method :encountered?
 
+  # Each press queues one billed job per missing concept, so the count is per
+  # press rather than per job: enough to retry a partial run, not to loop.
+  PREPARE_PER_HOUR = 10
+
+  rate_limit to: PREPARE_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { preparing_limited },
+             store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ]
+
   # GET /learn — every concept in this user's vocabularies, grouped, whether or
   # not they have ever been assigned one.
   def index
@@ -116,6 +123,13 @@ class LearnController < ApplicationController
   end
 
   private
+
+  def preparing_limited
+    message = t("learn.preparing_limited")
+    return render json: { status: "error", error: message }, status: :too_many_requests if request.format.json?
+
+    redirect_back fallback_location: learn_path, alert: message
+  end
 
   # Names of the targeted kinds a guided, ladderless row would ground. Empty
   # means no rewrite is offered: the ladder would ground nothing for this user.

@@ -1,4 +1,10 @@
 class DailyExercisesController < ApplicationController
+  GENERATE_PER_HOUR = 3
+
+  rate_limit to: GENERATE_PER_HOUR, within: 1.hour, by: -> { current_user.id },
+             with: -> { redirect_to root_path, alert: t("flash.daily_exercises.generate_limited") },
+             store: LazyCacheStore.new, name: "generate", only: :generate
+
   # POST /generate — manually trigger on-demand generation for today, for the
   # case where DashboardController#show's automatic weekday trigger didn't
   # fire (weekends). No-ops (just redirects) if today's exercise already

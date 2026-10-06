@@ -594,15 +594,38 @@ concept-specific difficulty descriptions for future generation, not a new set.
   guessing bound is part of the design, not an optimization. `SessionsController`
   caps code requests at 5 per address, code requests at 20 per IP, and
   submissions at 10 per IP, all per `LOGIN_CODE_EXPIRY`, via Rails'
-  `rate_limit`. The per-IP request cap is the one that bounds an attacker who
-  varies the address rather than hammering one: an unrecognized address
-  creates an account and sends mail, so without it a single client could mint
-  unlimited rows and unlimited outbound deliveries. Each limit carries an
+  `rate_limit`, plus code requests at 50 per IP per day and submissions at
+  10 per address per hour. The per-IP request caps are the ones that bound an
+  attacker who varies the address rather than hammering one: an unrecognized
+  address creates an account and sends mail, so without them a single client
+  could mint unlimited rows and unlimited outbound deliveries. The
+  per-address submission cap bounds guessing from rotating IPs, which the
+  per-IP one cannot; its cost is that anyone can start a login for an
+  address and lock it out of guessing for an hour, which is why it is
+  hourly and no daily per-address cap exists. Each limit carries an
   explicit `name:`, without which Rails would key them into one shared
   bucket. `LazyCacheStore` exists solely
   because `rate_limit` binds its `store:` at class-load time; resolving
   `Rails.cache` per call keeps production on Solid Cache and keeps the limits
   testable against the test env's `:null_store`.
+- **Per-user request limits**: every endpoint that bills one provider call to
+  the user's key (`ResponsesController`'s duck, follow-ups, explain
+  differently and pseudocode critique, and
+  `ConceptReferencesController#explain_differently`) declares
+  `ProviderCallLimits`, which counts them together: `ProviderCallLimits::HOURLY`
+  (60) per user per hour and `DAILY` (300) per day, in one fixed scope so the
+  count is shared across both controllers. Each endpoint's own per-section or
+  per-page cap still applies; the shared count runs before every other check,
+  so a request those checks refuse still counts. `/generate` allows
+  `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
+  prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
+  `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per
+  user and discards an overlapping enqueue, because every dashboard load with
+  no set enqueues one and each would run a full billed generation before the
+  unique index threw it away; the hourly batch passes no user and is not
+  limited. These are starting values, not measured ones. All of them use
+  `LazyCacheStore`, so the test env's `:null_store` never trips them and a
+  spec that exercises one swaps in a real store.
 - **JSONB problem sets**: `problem_set` column stores `{ code_review: {...}, pattern: {...}, challenge: {...} }`. Accessed via convenience methods on `DailyExercise`.
 - **Closed concept vocabulary**: each section is tagged with one concept from a fixed per-language list (`AiService::RAILS_CONCEPTS` / `JS_CONCEPTS`), narrowed further at generation time for a schema-review `code_review` day (see below); anything a provider invents is normalized to `"other"` so concept history stays aggregatable.
 - **`code_review` content modes**: `code_review` rolls one of three content modes per day (`DailyPlan::CODE_REVIEW_MODE_WEIGHTS`, roughly even) — `application_code` (realistic snippet, unchanged from before modes existed), `test_file` (a realistic test file exhibiting one test smell, in the day's `test_framework`), or `schema_review` (the day's `schema_artifact` — a Rails migration or a Prisma schema change with its migration — carrying one planted data-modeling flaw). Only `schema_review` narrows the vocabulary, to `AiService::DATA_MODELING_CONCEPTS` (`ProblemSetIngest.code_review_vocabulary`); the other two modes get the full list minus those concepts, unchanged from before modes existed. `pattern` and the rotating third deliberately keep the full vocabulary regardless of the day's `code_review` mode, so a due data-modeling retention check has somewhere to land on a non-schema-review day that includes either of them — a short day may include neither, and `DailyPlan` only offers a check a chosen kind can host. Because that lets a data-modeling concept surface where no schema artifact is shown, `AiService#data_modeling_idiom_guidance` adds one prompt line — stated once for all sections, named from the constant — telling the model to express such a concept in the host section's own idiom (a `pattern` question about `wrong_cardinality` asks how the relationship should be modeled, not for a migration to review). Advisory prompt text, no new machinery; `[retention]` logs are the check on whether it lands.
