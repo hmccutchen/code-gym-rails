@@ -299,7 +299,7 @@ en:
       already: "You're already drilling %{name}."
       stopped: "Stopped drilling %{name}."
     featured:
-      label: "Today's concept"
+      label: "This week's concept"
     recognition:
       summary: "How to look for these"
       questions: "What to ask"
