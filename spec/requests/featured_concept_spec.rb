@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Daily featured concept", type: :request do
+RSpec.describe "Weekly featured concept", type: :request do
   let(:user) { create_user_with_key }
 
   before { login_as(user) }

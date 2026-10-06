@@ -39,6 +39,8 @@ RSpec.describe ConceptReference do
       ConceptReference.create!(concept: concept, language: "architecture", featured_on: featured_on)
     end
 
+    def this_week = ConceptReference.featured_week_of(ConceptReference.team_today)
+
     it "is nil when nothing has been written up yet" do
       expect(ConceptReference.featured).to be_nil
     end
@@ -57,35 +59,48 @@ RSpec.describe ConceptReference do
       expect(ConceptReference.featured).to eq(stalest)
     end
 
-    it "stamps the pick with the date it was asked about" do
+    it "stamps the pick with the Monday of the week it was asked about" do
       featurable("idempotency_at_scale")
+      wednesday = Date.new(2026, 3, 4)
 
-      expect(ConceptReference.featured(Date.new(2026, 3, 4)).featured_on).to eq(Date.new(2026, 3, 4))
+      expect(ConceptReference.featured(wednesday).featured_on).to eq(Date.new(2026, 3, 2))
     end
 
-    it "returns the same concept on every later visit that day" do
+    it "keeps one concept from Monday through Sunday" do
       featurable("idempotency_at_scale")
       featurable("caching_strategy")
+      monday = Date.new(2026, 9, 7)
+      picked = ConceptReference.featured(monday)
 
-      expect(ConceptReference.featured).to eq(ConceptReference.featured)
+      expect((monday..monday + 6).map { |day| ConceptReference.featured(day) }).to all(eq(picked))
     end
 
-    it "moves on to another concept the next day" do
+    it "moves on to another concept the next Monday" do
       featurable("idempotency_at_scale")
       featurable("caching_strategy")
-      today = ConceptReference.featured
+      sunday = Date.new(2026, 9, 13)
+      this_week = ConceptReference.featured(sunday)
 
-      expect(ConceptReference.featured(ConceptReference.team_today + 1)).not_to eq(today)
+      expect(ConceptReference.featured(sunday + 1)).not_to eq(this_week)
     end
 
     # Weekends are not a case the picker knows about — the date it is asked
-    # about is its only input — so this pins that nothing weekday-shaped crept
-    # in the way it has to elsewhere in this app.
-    it "picks on a weekend exactly as on a weekday" do
+    # about is its only input — so this pins that a first visit on a Saturday
+    # picks for the week that began on Monday.
+    it "picks on a weekend for the week it belongs to" do
       featurable("idempotency_at_scale")
       saturday = Date.new(2026, 9, 12)
 
-      expect(ConceptReference.featured(saturday)&.featured_on).to eq(saturday)
+      expect(ConceptReference.featured(saturday)&.featured_on).to eq(Date.new(2026, 9, 7))
+    end
+
+    # Rows featured while the pick was daily carry any weekday. They count as
+    # recently featured, and one stamped on a Monday is that week's pick.
+    it "takes a daily pick stamped on this week's Monday as the week's concept" do
+      featurable("caching_strategy")
+      monday_pick = featurable("idempotency_at_scale", featured_on: Date.new(2026, 9, 7))
+
+      expect(ConceptReference.featured(Date.new(2026, 9, 9))).to eq(monday_pick)
     end
 
     it "ignores a language vocabulary, which not every user can reach" do
@@ -124,7 +139,7 @@ RSpec.describe ConceptReference do
 
     it "hands back the winner's pick when its own stamp loses the race" do
       featurable("caching_strategy")
-      winner = featurable("idempotency_at_scale", featured_on: ConceptReference.team_today)
+      winner = featurable("idempotency_at_scale", featured_on: this_week)
 
       losing_the_race { expect(ConceptReference.featured).to eq(winner) }
     end
@@ -138,7 +153,7 @@ RSpec.describe ConceptReference do
     # opens one today; this pins the guard before one does.
     it "recovers from the collision inside a caller's own transaction" do
       featurable("caching_strategy")
-      winner = featurable("idempotency_at_scale", featured_on: ConceptReference.team_today)
+      winner = featurable("idempotency_at_scale", featured_on: this_week)
 
       losing_the_race do
         expect(ConceptReference.transaction { ConceptReference.featured }).to eq(winner)
@@ -146,25 +161,26 @@ RSpec.describe ConceptReference do
     end
 
     # ApplicationController runs every action inside the viewer's own zone, so a
-    # date resolved there would differ between teammates across midnight and
-    # each would stamp their own concept. Driven at an instant where the team
-    # zone and the viewer's zone genuinely disagree about the date.
-    it "resolves the day in the team's zone, not the viewer's" do
+    # week resolved there would differ between teammates across Sunday midnight
+    # and each would stamp their own concept. Driven at an instant where the
+    # team zone and the viewer's zone genuinely disagree about the week.
+    it "resolves the week in the team's zone, not the viewer's" do
       reference = featurable("idempotency_at_scale")
 
-      # 03:00 UTC on the 12th is still the 11th in America/New_York.
-      travel_to Time.utc(2026, 9, 12, 3, 0, 0) do
+      # 03:00 UTC on Monday the 14th is still Sunday the 13th in
+      # America/New_York, so the team's week began on the 7th.
+      travel_to Time.utc(2026, 9, 14, 3, 0, 0) do
         Time.use_zone("Asia/Tokyo") { ConceptReference.featured }
       end
 
-      expect(reference.reload.featured_on).to eq(Date.new(2026, 9, 11))
+      expect(reference.reload.featured_on).to eq(Date.new(2026, 9, 7))
     end
 
     it "gives two teammates in different zones the same concept" do
       featurable("idempotency_at_scale")
       featurable("caching_strategy")
 
-      travel_to Time.utc(2026, 9, 12, 3, 0, 0) do
+      travel_to Time.utc(2026, 9, 14, 3, 0, 0) do
         tokyo    = Time.use_zone("Asia/Tokyo") { ConceptReference.featured }
         honolulu = Time.use_zone("Pacific/Honolulu") { ConceptReference.featured }
 

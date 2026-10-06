@@ -286,8 +286,8 @@ User browses /learn (independent of the daily flow above):
        guide, generating either on demand when the row is missing or stale
 
 Every page load, any day of the week:
-  └→ ConceptReference.featured        → the day's one globally-featured concept,
-       picked on the first visit that asks and read by every visit after —
+  └→ ConceptReference.featured        → the week's one globally-featured concept,
+       picked on the first visit of the week and read by every visit after —
        rendered at the top of /learn and as a small callout on the dashboard
 ```
 
@@ -305,8 +305,8 @@ Every page load, any day of the week:
 below) now also carries `guide_plain_language`, `guide_worked_example`,
 `guide_pitfalls` (all nullable text) and `featured_on` (nullable date, uniquely
 indexed). `ConceptReference#guide?` — all three guide fields present — is the
-single authority for "does this row carry a guide"; `featured_on` is the day
-the row was the featured concept, and nil means it never has been. It also
+single authority for "does this row carry a guide"; `featured_on` is the Monday
+of the week the row was the featured concept, and nil means it never has been. It also
 carries `ladder_junior`, `ladder_senior`, `ladder_principal_engineer` (all
 nullable text), and `ConceptReference#ladder?` — all three ladder fields
 present, derived from the field list the same way `#guide?` is — is the
@@ -2111,18 +2111,25 @@ concept-specific difficulty descriptions for future generation, not a new set.
   recalled rather than checked is a fabrication that reads as authoritative.
   Audit behind the current entries:
   `docs/superpowers/specs/2026-09-12-four-book-concept-audit.md`.
-- **The daily featured concept**: one concept surfaced each day, the same one
-  for the whole team — `ConceptReference.featured`, read at the top of `/learn`
-  and as a small callout on the dashboard. **Global, not per-user**, because
-  `ConceptReference` is itself a shared row with no `user_id`; no per-user state
-  exists for this and none should be added.
+- **The weekly featured concept**: one concept surfaced each week, the same
+  one for the whole team — `ConceptReference.featured`, read at the top of
+  `/learn` and as a small callout on the dashboard ("This week's concept"). A
+  week rather than a day, so a teammate who opens the app only a few times
+  has time to read the whole guide. **Global, not per-user**, because
+  `ConceptReference` is itself a shared row with no `user_id`; no per-user
+  state exists for this and none should be added.
 
-  **Picked lazily on visit, not by a cron entry.** The first page load of a day
-  that asks finds no row stamped with that date, takes the stalest one and
-  stamps it; every load after reads it. The date being asked about is the
-  method's only input, so a Saturday behaves exactly like a Tuesday with
-  nothing to configure — unlike generation, which `config/recurring.yml` and
-  `GenerateDailyExercisesJob` deliberately gate to 8am weekdays. Ordering is
+  **Picked lazily on visit, not by a cron entry.** `featured_on` holds the
+  Monday of the week a row was featured (`ConceptReference.featured_week_of`).
+  The first page load of a week finds no row stamped with that Monday, takes
+  the stalest one and stamps it; every load after reads it. Monday rather
+  than Sunday, so a weekend visit still shows the concept the working week
+  began with. The date being asked about is the method's only input, so
+  nothing has to be configured or fire on schedule — unlike generation,
+  which `config/recurring.yml` and `GenerateDailyExercisesJob` deliberately
+  gate to 8am weekdays. Rows featured while the pick was daily keep their
+  weekday stamps: they count as recently featured, and one stamped on a
+  Monday is that week's pick. No migration was needed. Ordering is
   `featured_on ASC NULLS FIRST`: a never-featured concept outranks every dated
   one, the same "unseen outranks stale" rule `SectionRotation` applies to
   exercise kinds.
@@ -2147,19 +2154,19 @@ concept-specific difficulty descriptions for future generation, not a new set.
   vocabulary only lengthens it; two specs hold the exclusion itself, which is
   the part that can break.
 
-  **The day is the team's, never the viewer's.** `ApplicationController`'s
+  **The week is the team's, never the viewer's.** `ApplicationController`'s
   `around_action :use_time_zone` runs every action inside the current user's
   zone, so a bare `Date.current` in `.featured` would resolve per viewer — two
-  teammates either side of midnight would ask about different dates, each stamp
-  a row, and each get their own "today's concept", which is the one global pick
-  this feature exists to be, broken. The unique index cannot catch that, since
-  the two dates genuinely differ. `ConceptReference.team_today` resolves it in
+  teammates either side of Sunday midnight would ask about different weeks,
+  each stamp a row, and each get their own "this week's concept", which is the
+  one global pick this feature exists to be, broken. The unique index cannot
+  catch that, since the two weeks genuinely differ. `ConceptReference.team_today` resolves it in
   `User::DEFAULT_TIME_ZONE` — the zone `User` already falls back to and
   `config/recurring.yml` already calls the team default — rather than a second
   constant of the same value that could later disagree. UTC was the alternative
-  and is worse: it rolls the concept over mid-evening for this team.
+  and is worse: it rolls the concept over on Sunday evening for this team.
 
-  **The same-day race guard is the unique index on `featured_on`**, not a row
+  **The same-week race guard is the unique index on `featured_on`**, not a row
   lock. Two first-visits landing together both read nothing and both try to
   stamp; the loser's write violates the index, and `.claim_feature` rescues
   `RecordNotUnique` by re-reading the winner's pick, so both visitors see one
@@ -2676,7 +2683,7 @@ always pull in the full suite — is stated once, in
 - `app/controllers/concept_drills_controller.rb` — the four drill endpoints
   under `/learn`, per concept and per group; turns `ConceptDrills`' answers
   into a redirect and a flash and persists nothing itself.
-- `app/views/shared/_featured_concept.html.erb` — the daily featured concept's
+- `app/views/shared/_featured_concept.html.erb` — the weekly featured concept's
   one rendering, shared by the Learn tab and the dashboard; its styles live in
   the layout for that reason, like `responses/_answered_sections`
 - `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
