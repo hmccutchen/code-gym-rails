@@ -95,6 +95,15 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     expect(log.drain(timeout: 1)).to eq([])
   end
 
+  it "waits out a whole connect and read before giving up on a straggler" do
+    expect(described_class::DRAIN_SECONDS).to eq(AiService::OPEN_TIMEOUT + AiService::READ_TIMEOUT)
+
+    probe = described_class.new(user: create_user_with_key, api_key: "probe-key", out: StringIO.new, sleeper: ->(_) { })
+    log = probe.instance_variable_get(:@attempts)
+    expect(log).to receive(:drain).with(timeout: described_class::DRAIN_SECONDS).and_return([])
+    probe.send(:record_attempts, 1, "duck", nil)
+  end
+
   it "writes one file per refused reply and leaves out a body that can echo the key" do
     fake = FakeService.new("fake")
     refusing = Faraday::Adapter::Test::Stubs.new do |stub|
