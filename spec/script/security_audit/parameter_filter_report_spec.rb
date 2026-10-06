@@ -4,22 +4,21 @@ require Rails.root.join("script/security_audit/parameter_filter_report")
 RSpec.describe ParameterFilterReport do
   let(:out) { StringIO.new }
 
-  it "reports the app's current filter as the audit describes it" do
+  it "reports the app's current filter, with the L1 and A5 fixes in place" do
     expect(described_class.new.results.to_h).to eq(
       "email" => :filtered,
-      "code" => :logged,
+      "code" => :filtered,
       "api_key" => :filtered,
       "user.name" => :logged,
       "user.api_keys" => :filtered,
-      "response.answers.code_review" => :logged,
-      "message" => :logged,
-      "thread.role" => :logged,
-      "thread.content" => :logged,
-      "question" => :logged,
-      "pseudocode" => :logged,
-      "prior_alternates" => :logged,
-      "p256dh" => :logged,
-      "auth" => :logged,
+      "response.answers" => :filtered,
+      "message" => :filtered,
+      "thread" => :filtered,
+      "question" => :filtered,
+      "pseudocode" => :filtered,
+      "prior_alternates" => :filtered,
+      "p256dh" => :filtered,
+      "auth" => :filtered,
       "endpoint" => :logged
     )
   end
@@ -35,7 +34,7 @@ RSpec.describe ParameterFilterReport do
   it "prints one line per parameter" do
     described_class.new(out: out).report
 
-    expect(out.string.lines.size).to eq(15)
-    expect(out.string).to match(/^code\s+LOGGED$/).and match(/^email\s+filtered$/)
+    expect(out.string.lines.size).to eq(14)
+    expect(out.string).to match(/^code\s+filtered$/).and match(/^endpoint\s+LOGGED$/)
   end
 end
