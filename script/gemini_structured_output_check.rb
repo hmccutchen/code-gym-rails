@@ -47,10 +47,13 @@ class GeminiStructuredOutputCheck
     Row.new(name: name, outcome: outcome, detail: "#{e.class} #{e.http_status}: #{e.message}", tokens_out: usage.sum)
   end
 
+  # One attempt per fixture: a retried request would spend the free tier's
+  # daily budget on the same fixture.
   def service(usage)
     Class.new(GeminiService) do
+      define_method(:call) { |**kwargs| super(**kwargs.merge(single_attempt: true)) }
       define_method(:log_usage) { |_user, result, purpose:| usage << result[:output_tokens].to_i }
-      private :log_usage
+      private :call, :log_usage
     end.new(@api_key)
   end
 end
