@@ -3,9 +3,10 @@ require "rails_helper"
 # The test environment uses :null_store, whose #increment returns nil, so no
 # limit trips in the rest of the suite. These examples swap in a real store.
 # Requests here are refused by each action's own checks after the limit has
-# counted them, so no provider is called.
+# counted them, so no provider is called. The limits guard a trial's house
+# key, so the account is a trial unless an example says otherwise.
 RSpec.describe "Per-user request limits", type: :request do
-  let(:user) { create_user_with_key }
+  let(:user) { create_trial_user }
 
   before do
     allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
@@ -68,8 +69,16 @@ RSpec.describe "Per-user request limits", type: :request do
     it "counts each user separately" do
       ProviderCallLimits::HOURLY.times { critique }
 
-      login_as(create_user_with_key(email: "other@example.com"))
+      login_as(create_trial_user(email: "other@example.com"))
       critique
+
+      expect(response).not_to have_http_status(:too_many_requests)
+    end
+
+    it "never limits an account with its own key" do
+      login_as(create_user_with_key(email: "own@example.com"))
+
+      (ProviderCallLimits::DAILY + 1).times { critique }
 
       expect(response).not_to have_http_status(:too_many_requests)
     end
@@ -82,6 +91,13 @@ RSpec.describe "Per-user request limits", type: :request do
       expect { post generate_path }.not_to have_enqueued_job(GenerateDailyExercisesJob)
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to match(/several times in the last hour/)
+    end
+
+    it "never limits an account with its own key" do
+      login_as(create_user_with_key(email: "own@example.com"))
+      (DailyExercisesController::GENERATE_PER_HOUR + 1).times { post generate_path }
+
+      expect(flash[:alert]).to be_nil
     end
   end
 
@@ -114,6 +130,16 @@ RSpec.describe "Per-user request limits", type: :request do
 
       expect(response).to redirect_to(learn_path)
       expect(flash[:alert]).to match(/several write-ups/)
+    end
+
+    it "never limits an account with its own key" do
+      own = create_user_with_key(email: "own@example.com")
+      own.update!(language: "ruby_rails")
+      login_as(own)
+
+      (LearnController::PREPARE_PER_HOUR + 1).times { post concept_path, as: :json }
+
+      expect(response).not_to have_http_status(:too_many_requests)
     end
   end
 end

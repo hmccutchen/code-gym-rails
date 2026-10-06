@@ -688,8 +688,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   because `rate_limit` binds its `store:` at class-load time; resolving
   `Rails.cache` per call keeps production on Solid Cache and keeps the limits
   testable against the test env's `:null_store`.
-- **Per-user request limits**: every endpoint that bills one provider call to
-  the user's key (`ResponsesController`'s duck, follow-ups, explain
+- **Per-user request limits**: they guard a trial's house key, so an account
+  with a key of its own is never held to them (`ApplicationController#own_key?`,
+  the `unless:` on each limit below). Every endpoint that bills one provider
+  call (`ResponsesController`'s duck, follow-ups, explain
   differently and pseudocode critique, and
   `ConceptReferencesController#explain_differently`) declares
   `ProviderCallLimits`, which counts them together: `ProviderCallLimits::HOURLY`
@@ -699,7 +701,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   so a request those checks refuse still counts. `/generate` allows
   `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
   prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
-  `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per
+  Those per-endpoint caps and the job permit below apply to every
+  account. `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per
   user and discards an overlapping enqueue, because every dashboard load with
   no set enqueues one and each would run a full billed generation before the
   unique index threw it away; the hourly batch passes no user and is not

@@ -55,6 +55,12 @@ class ApplicationController < ActionController::Base
     current_user.present?
   end
 
+  # The per-user limits on billed requests guard a trial's house key. An
+  # account with a key of its own pays for its calls, so it is never limited.
+  def own_key?
+    current_user.api_key_present?
+  end
+
   def require_login
     unless logged_in?
       session[:return_to] = request.fullpath
