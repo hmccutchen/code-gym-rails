@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_02_170100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_120100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -25,6 +25,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_02_170100) do
     t.string "model"
     t.integer "cache_read_tokens"
     t.integer "cache_write_tokens"
+    t.string "provider"
+    t.integer "http_status"
+    t.string "failure"
+    t.string "quota_id"
+    t.boolean "house_key", default: false, null: false
+    t.index ["provider", "house_key", "created_at"], name: "index_api_usages_on_provider_and_house_key_and_created_at"
     t.index ["user_id", "date"], name: "index_api_usages_on_user_id_and_date"
     t.index ["user_id"], name: "index_api_usages_on_user_id"
   end
@@ -329,6 +335,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_02_170100) do
     t.jsonb "track_evidence_cutoffs", default: {}, null: false
     t.integer "daily_section_count"
     t.text "api_keys"
+    t.string "last_generation_failure"
+    t.datetime "last_generation_failed_at"
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 

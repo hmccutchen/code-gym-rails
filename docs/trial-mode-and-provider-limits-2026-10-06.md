@@ -1,7 +1,8 @@
 # Provider limits, informative errors and trial mode: investigation and design, 2026-10-06
 
-Investigation and design only. No app code, config, prompt, gem or migration
-changed. Beside this document the branch adds:
+Sections 1, 2 and 4 describe what the first PR of the stack built, and say
+so where the build departed from the design; sections 3 and 5 to 8 remain
+the design for the PRs that follow. The investigation branch added:
 
 - `spec/requests/provider_failure_characterization_spec.rb`: 49 passing
   examples that drive every provider-calling path against a stubbed Gemini
@@ -9,9 +10,11 @@ changed. Beside this document the branch adds:
   revoked key (403), an outage (503) and a timeout. They pin what the app
   shows today, including the parts the work below changes.
 - `spec/fixtures/provider_errors/`: the stubbed bodies. They follow Google's
-  documented `generateContent` error shape. The Interactions API's real 429
-  is unconfirmed until the probe (section 3) records one; the fixtures are
-  to be replaced with what it captures.
+  documented `generateContent` error shape. **Pending replacement:** the
+  Interactions API's real 429 is unconfirmed until the probe (section 3)
+  records one, and the fixtures are to be replaced with what it captures.
+  The `quotaId` strings are what `ProviderFailure` keys on (`PerDay`), so
+  the capture decides whether that pattern holds.
 
 How it was checked: code reading with every claim cited to a file, the
 characterization specs run locally against PostgreSQL 16, the security audit
@@ -30,9 +33,11 @@ This document builds on those.
 
 ---
 
-## 1. What users see today, by path and failure
+## 1. What users saw before this work, by path and failure
 
-Observed with the characterization spec. "Requests" is how many HTTP attempts
+Observed with the characterization spec as it was on the investigation
+branch. The spec is now the target (section 4.4), and every row below is
+what the first PR replaced. "Requests" is how many HTTP attempts
 one call made: `faraday-retry` retries 429 and 5xx twice with 0.5 to 8 second
 backoff, and refuses to retry at all when the reply carries a `Retry-After`
 longer than 8 seconds (`faraday-retry` 2.4.0, `calculate_sleep_amount`
@@ -155,42 +160,46 @@ PR #242, which added `model` and the cache columns. What this work adds on
 top is the provider column the issue left as optional, the HTTP status, and
 rows for failed calls.
 
-### 2.2 Proposal
+### 2.2 What was built
 
 One migration, `AddOutcomeToApiUsages` (flagged):
 
 | Column | Type | Meaning |
 |---|---|---|
-| `provider` | string, null | `anthropic` / `gemini` / `openai` / `fake`; backfilled from `model` in the same migration, since every model name identifies its provider, and left null where `model` is null |
-| `http_status` | integer, null | the provider's status; null for a reply that never arrived |
-| `failure` | string, null | null on success; otherwise a fixed code: `rate_limit`, `authentication`, `provider_error`, `timeout`, `network`, `refusal`, `truncated`, `invalid_response` |
-| `quota_id` | string, null | the provider's quota identifier on a 429: Gemini's `QuotaFailure.violations[].quotaId`, Anthropic's `error.type` plus the `anthropic-ratelimit-*-limit` header that read zero remaining |
-| `house_key` | boolean, default false, null false | the call was billed to a house key (section 6) |
+| `provider` | string, null | `anthropic` / `gemini` / `openai` / `fake`, the provider class that wrote the row; backfilled from `model` in the same migration, since every model name identifies its provider, and left null where `model` is null |
+| `http_status` | integer, null | the reply's status; null for a reply that never arrived |
+| `failure` | string, null | null when the reply was used; otherwise one of `ApiUsage::FAILURES`: `rate_limit`, `authentication`, `out_of_credit`, `timeout`, `network`, `refusal`, `truncated`, `invalid_response`, `provider_error` |
+| `quota_id` | string, null | the limit a 429 named, in the provider's vocabulary: Gemini's `QuotaFailure.violations[].quotaId`; on Claude the first `anthropic-ratelimit-{requests,input-tokens,output-tokens,tokens}-remaining` header reading zero, as `anthropic-ratelimit-<family>`, else the error type; on OpenAI the first `x-ratelimit-remaining-{requests,tokens}` reading zero, else the error code |
+| `house_key` | boolean, default false, null false | the call was billed to a house key (section 6); nothing sets it yet |
 
-Index to add: `[provider, house_key, created_at]`, for the global guard's
+Index added: `[provider, house_key, created_at]`, for the global guard's
 count.
 
 Rows for failures carry zero tokens. `call_and_log` writes them: it rescues
-`AiService::Error` around `call`, logs the row from the error's `http_status`,
-`quota_id` and class, and re-raises. The providers only have to put
-`quota_id` on the `RateLimitError` they already build, which means reading
-the 429 body's `details` on Gemini and the rate-limit headers on Anthropic,
-both without logging the body. One row per `call`, not per HTTP attempt:
-`faraday-retry`'s retries stay inside the adapter. The probe measures per
-attempt by turning retries off.
+`AiService::Error` around `call`, builds a result from the error's
+`http_status`, `quota_id` and class (`AiService.failure_code_for`) and the
+routed model, writes it through the same `#log_usage`, which never raises,
+and re-raises the same error. The providers put `quota_id` and
+`retry_after` on the `RateLimitError` they already build, reading the 429
+body's `details` on Gemini (`QuotaFailure` and `RetryInfo`) and the
+rate-limit headers on Anthropic and OpenAI, none of it logged. A refusal or
+truncation is marked on the row that carries its tokens. One row per
+`call`, not per HTTP attempt: `faraday-retry`'s retries stay inside the
+adapter, and the probe measures per attempt by turning retries off. Two
+departures from the design: `provider_error` names a non-2xx reply with no
+narrower class, and `out_of_credit` was added for section 4.1.
 
-The query the caps and the trial screen need:
+The queries the caps and the trial screen need, as built:
 
 ```ruby
 # app/models/api_usage.rb
-scope :on_day, ->(day) { where(date: day) }
-def self.requests_today_for(user, provider:)      # the user's local day
-def self.house_requests_in_quota_day(provider:, zone:)   # created_at in the provider's reset zone
+ApiUsage.requests_on(user, day, provider:)               # the user's local day, attempts included
+ApiUsage.house_requests_between(provider:, from:, to:)   # created_at inside a window the caller sets
 ```
 
-The second counts by `created_at` in the provider's own reset zone because
-Google's daily quota resets at midnight Pacific, which is not any user's
-`date`.
+The second counts by `created_at` because Google's daily quota resets at
+midnight Pacific, which is not any user's `date`; trial mode hands it the
+quota day's bounds from `ResetClock`.
 
 Usage dating: `GenerateRecognitionGuideJob` wraps its call in the user's zone
 so `date` is their day; `GenerateConceptReferenceJob` does not, so a
@@ -285,94 +294,123 @@ it"; the probe replaces that recollection with a measured figure.
 
 ---
 
-## 4. Informative errors
+## 4. Informative errors, as built
 
 ### 4.1 Classification
 
-A pure value object, `ProviderFailure.classify(error, trial: …)`, read from
-the error class, `http_status`, `quota_id` and the trial state, at the
-boundary where each caller already rescues. No prompt or grading changes.
+`ProviderFailure.classify(error)`, pure, read from the error class,
+`http_status`, `quota_id` and `retry_after` at the boundary where each
+caller already rescues. No prompt or grading changes. The trial classes
+arrive with trial mode.
 
 | Class | From |
 |---|---|
-| `daily_limit` | `RateLimitError` whose `quota_id` contains `PerDay`, or any 429 whose `Retry-After` exceeds an hour |
+| `daily_limit` | `RateLimitError` whose `quota_id` contains `PerDay`, or whose `retry_after` is an hour or more |
 | `short_rate_limit` | any other `RateLimitError`, including Anthropic's 429 and 529 |
-| `bad_key` | `AuthenticationError`, which now also covers Gemini's 400 `API_KEY_INVALID`; Anthropic 402 `billing_error` is reported as its own line, "out of credit", since a prepaid key with no balance is the realistic Claude failure |
-| `outage` | `Error` with a 5xx `http_status`, a network error, or an unreadable envelope |
-| `timeout` | `TimeoutError` |
-| `trial_allowance_used` | the new `TrialAllowanceError` (section 6.4), before the call |
-| `trial_ended` | the new `TrialEndedError`, before the call, from the end date or the kill switch |
-| `other` | everything else; shows a fixed sentence, never the provider's message |
+| `bad_key` | `AuthenticationError`: 401 and 403 on every provider, and Gemini's 400 with `details[].reason == "API_KEY_INVALID"`, read from the body without logging it |
+| `out_of_credit` | the new `AiService::BillingError`. Anthropic, per platform.claude.com/docs/en/api/errors and /rate-limits (read 2026-10-06): a 402 `billing_error`; a 400 `invalid_request_error` beginning "You have reached your specified ... API usage limits" (a spend limit the account set) or naming the credit balance; a 429 `rate_limit_error` whose `details.error_code` is `enforced_spend_limit_reached` (the tier's monthly cap, sent with no `retry-after`). OpenAI: a 429 whose `error.code` is `insufficient_quota`, or a 402. OpenAI's reference (platform.openai.com/docs/guides/error-codes) could not be fetched from the build environment, so that code string is from memory of the page and should be checked against it once |
+| `outage` | `NetworkError` (a refused or reset connection) or an `Error` with a 5xx status |
+| `timeout` | `TimeoutError`, or a `Timeout::Error` from the review fan-out |
+| `other` | everything else: an unreadable or invalid reply, a 4xx with no narrower class, a refusal |
+
+`BillingError` is raised by the provider before a 429 can become a
+`RateLimitError`, so an empty balance is never retried as a limit by
+anything downstream and never told to wait.
 
 ### 4.2 Text
 
-One locale table, `provider_failures.<class>`, each entry with a `title` (what
-happened), a `saved` line where answers exist, a `reset` line that
-interpolates a time in the user's zone, and a `next` line (what to do). The
-same table serves the dashboard's generation panel, the review flash, the
-JSON endpoints' `error` and the Learn status line, so each surface shows the
-same words for the same failure. Every surface stops passing `e.message`.
+One locale table, `provider_failures`. Each class has a variant per
+credential (`own_key` now; `trial` is added as text alone, falling back to
+`own_key` for any entry it leaves out) with `title`, `reset_at`,
+`reset_passed` and `next`. The surface supplies what did not happen
+(`provider_failures.outcomes.<surface>`) and what is still there
+(`provider_failures.saved.<surface>`), so one title serves every surface.
+`ProviderFailureText#full` is title, saved, reset, next; `#brief` is title
+and the reset or the next step, for a status line. The same table serves the
+dashboard's generation panel, the review flash, the JSON endpoints' `error`
+and Learn's status line. Every surface stopped passing `e.message`, and
+`provider_failure_text_spec` holds every kind on every surface for every
+provider and variant to carrying no provider text, status code, socket
+detail or key.
 
-Reset times, in the user's `effective_time_zone`:
+Reset times come from `ResetClock.reset_at(kind, provider:, failed_at:,
+retry_after:)` and are rendered in the user's `effective_time_zone`:
 
-- `daily_limit` on Gemini: the next midnight Pacific, shown as "Resets at
-  3:00 am your time, Wednesday" (`ResetClock.gemini_daily(now)` in the
-  user's zone).
-- `short_rate_limit`: "Try again in about a minute", or the `Retry-After`
-  rounded up to minutes when one came back.
-- `trial_allowance_used`: midnight in the user's own zone, since the
-  per-account cap is counted on their day, or the Pacific reset when the
-  global guard tripped.
-- `trial_ended`: no reset; the next step is the key guide.
+- `daily_limit` on Gemini: the next midnight Pacific after the failure,
+  shown as "The allowance resets at 3:00 am your time, Wednesday." Another
+  provider's daily limit is given a day from the failure.
+- `short_rate_limit`: the wait the provider asked for, never under a
+  minute: "Try again in about a minute" or "about 3 minutes".
+- Once the reset has passed, the sentence says so instead ("The allowance
+  has reset since then, so you can try again." / "You can try again now.")
+  and drops the next step, which would point at a time behind the reader.
+- `trial_allowance_used` and `trial_ended` arrive with trial mode.
 
-Drafts, following `PLAIN_LANGUAGE_STANDARD`:
+The sentences as shipped (the `own_key` variant, Gemini, the review
+surface):
 
-- daily limit, review: "Your Gemini key has used today's free allowance, so
-  the review didn't run. Your answers are saved. The allowance resets at
-  3:00 am your time, Wednesday. Try the review after that, or add a paid
-  key in Setup."
-- short rate limit, duck: "Gemini is limiting requests right now. Your
-  message is still in the box. Try again in about a minute."
-- bad key, generation: "Gemini didn't accept your API key, so nothing was
-  generated. Check the key in Setup." (No provider text.)
-- outage: "Gemini isn't answering right now. Nothing was lost. Try again in
-  a few minutes."
-- timeout, generation: "Gemini took longer than five minutes to answer, so
-  the set wasn't finished. Try again."
-- trial allowance used: "You've used today's 12 trial requests. Your
-  answers are saved. Your allowance resets at midnight your time."
-- trial ended: "Your trial has ended, so Code Gym isn't generating new
-  sets or reviews for you. Everything you did is still here. To keep
-  going, add your own API key in Setup."
+- daily limit: "Your Gemini key has used today's free allowance, so the
+  review didn't run. Your answers are saved. The allowance resets at 3:00 am
+  your time, Wednesday. Try again after that, or add a paid key in Setup."
+- short rate limit: "Gemini is limiting requests right now, so the review
+  didn't run. Your answers are saved. Try again in about a minute."
+- bad key: "Gemini didn't accept your API key, so the review didn't run.
+  Your answers are saved. Check the key in Setup."
+- out of credit: "Gemini reports that your account is out of credit or over
+  its spend limit, so the review didn't run. Your answers are saved. Add
+  credit or raise the limit with Gemini, then try again."
+- outage: "Gemini isn't answering right now, so the review didn't run. Your
+  answers are saved. Nothing was lost. Try again in a few minutes."
+- timeout: "Gemini took too long to answer, so the review didn't run. Your
+  answers are saved. Try again."
+- other: "Gemini sent back something Code Gym couldn't use, so the review
+  didn't run. Your answers are saved. Try again. If it keeps happening,
+  tell the person who runs Code Gym."
 
 ### 4.3 Where it lands
 
-- `GenerateDailyExercisesJob#generate_for` and `RegenerateExerciseJob` store
-  the class code in `last_generation_error` (a new `last_generation_failure`
-  string holding the code would be cleaner, but it is a migration; storing the
-  rendered text, as today, needs none and keeps the status endpoint's shape).
-  Decision for you: text, as today, or code plus a migration. I recommend
-  text now, since the sentence is rendered in the user's zone at write time
-  by a job already running in that zone.
-- `ResponsesController#review` and `zero_success_alert` classify from the
-  stored `error_code` and the new `quota_id`; `review_partial` names the
-  class too.
-- The five JSON endpoints and `ConceptReferencesController` render the short
-  form.
-- Learn: the jobs record the failure code on the row they tried to write
-  (`concept_references.last_failure`, nullable string, cleared on success,
-  one more migration) so `/learn/:bucket/:concept/status` can return
-  `{ready: false, failed: "daily_limit"}` and the page can stop polling with
-  a sentence. Without that column the page cannot know. Flagged; it is
-  optional and the rest stands without it.
+- Generation and regeneration store the class and time
+  (`AddLastGenerationFailureToUsers`, flagged: `users.last_generation_failure`
+  string, `last_generation_failed_at` datetime) through
+  `User#record_generation_failure!`, and the dashboard panel, the
+  regeneration line and `/dashboard/status` render
+  `User#generation_failure_message` when read. `last_generation_error` keeps
+  text that is not a provider failure (`record_generation_message!`: a
+  reviewed set kept, an unusable draft, every section rejected) and rows from
+  before the columns existed, which render as before.
+- The review fan-out's per-section result carries `failure`, `quota_id` and
+  `retry_after` instead of the message; `review_errors` stores
+  `{kind, quota_id, retry_after, at}`; the flash for a wholly failed review
+  is the commonest kind's full sentence, a partial review's notice ends with
+  that kind's brief one, and the submitted dashboard renders the newest
+  stored failure beside the retry button. Old rows with `code` read as the
+  nearest kind.
+- The five JSON endpoints and `ConceptReferencesController` render
+  `{status: "error", error: <brief>, failure: <kind>}` through
+  `ProviderFailureRendering`.
+- Learn: a departure from the design. The row is shared by every user, so no
+  column was added; `ConceptReferenceFailures` keeps the failure in the Rails
+  cache by user and concept for `EXPIRY` (one hour, shorter than any quota's
+  reset), `/learn/:bucket/:concept/status` returns `failed` and the sentence,
+  and the page stops polling on it. Asking again clears the note, and so does
+  a write-up landing. Production's cache is Solid Cache in the one Postgres
+  database, shared by web and worker; development's memory store is per
+  process, where the jobs run in the web process anyway.
+- The judge's fallback and the difficulty check are unchanged: a judge
+  failure ships the draft and the difficulty note is dropped, as before.
 
 ### 4.4 Specs
 
-The characterization spec becomes the target: each expectation changes to
-the new sentence, and it gains the trial classes. Every path keeps one
-example per failure class with a stubbed 429 body carrying the real
-`quotaId` once the probe has it. `ai_service_spec` gains examples for the
-failure row and the `quota_id` extraction on each provider.
+`provider_failure_characterization_spec` is the target: one example per
+failure class per path, with the stubbed bodies, asserting the sentence and
+that it carries nothing from the provider. `provider_failure_text_spec` holds
+the before-and-after-reset sentences under `travel_to` and the no-leak rule
+over every kind, surface, provider and variant. `provider_failure_spec`,
+`reset_clock_spec` and `api_usage_spec` cover the pure pieces;
+`ai_service_spec` the failure rows and refusal and truncation marks; the
+three provider specs the `quota_id`, `retry_after`, `API_KEY_INVALID` and
+out-of-credit readings; `learn_write_up_failure_spec` the cache note, its
+expiry and its clearing.
 
 ---
 
@@ -491,10 +529,10 @@ Two gates, both in `AiService#call_and_log` ahead of `call`, since that is
 the one funnel every provider call takes, and both only when the credential
 is a house key:
 
-- Per account: `ApiUsage.requests_today_for(user, provider:)` counted on the
+- Per account: `ApiUsage.requests_on(user, day, provider:)` counted on the
   user's day, attempts included, against the invite's `daily_request_cap`.
   Over it raises `TrialAllowanceError`.
-- Global: `ApiUsage.house_requests_in_quota_day(provider:, zone:)` against
+- Global: `ApiUsage.house_requests_between(provider:, from:, to:)` against
   `HOUSE_GEMINI_DAILY_GUARD` / `HOUSE_ANTHROPIC_DAILY_GUARD` from `ENV`,
   counted in the provider's reset zone (Pacific for Gemini; a Claude key's
   spend limit is monthly, so its guard is a request count per day you set).
@@ -632,11 +670,12 @@ it once house keys exist.
 
 ## 9. Order of work
 
-1. Usage record and informative errors: `AddOutcomeToApiUsages`,
-   `ProviderFailure`, `quota_id` on `RateLimitError`, Gemini 400
-   `API_KEY_INVALID` as `AuthenticationError`, the locale table, every
-   surface off `e.message`, the characterization spec turned into the target.
-   Optional: `concept_references.last_failure`.
+1. Done: usage record and informative errors (`AddOutcomeToApiUsages`,
+   `AddLastGenerationFailureToUsers`, `ProviderFailure`, `ResetClock`,
+   `ProviderFailureText`, `BillingError`, `quota_id` on `RateLimitError`,
+   Gemini 400 `API_KEY_INVALID` as `AuthenticationError`, the locale table,
+   every surface off `e.message`, the per-user Learn failure note, the
+   characterization spec turned into the target).
 2. The probe, no behavior change; then replace the fixtures with its output
    and set the cap numbers.
 3. Invite codes, trial accounts, `ProviderCredential`, `HouseKeys`, the
@@ -644,12 +683,10 @@ it once house keys exist.
 4. The trial screen, redemption consent, trial end, the dashboard banner and
    the Setup branch.
 
-## 10. Decisions for you
+## 10. Decisions
 
-1. Store the rendered failure sentence in `last_generation_error` (no
-   migration) or a code with a migration.
-2. Add `concept_references.last_failure` so Learn can say why a write-up
-   stopped, or leave Learn's "Still working on it".
+1. Decided: a code with a migration (section 4.3).
+2. Decided: no column on the shared row; a per-user cache note (section 4.3).
 3. Caps: accept the provisional 12 per account and the guard formula, to be
    fixed after the probe.
 4. Gemini per-minute limit versus the parallel judge and review fan-out:

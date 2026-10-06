@@ -47,6 +47,11 @@
         .then((data) => {
           if (data.ready) return window.location.reload();
           if (data.rewritten) return window.location.assign(window.location.pathname + "?ladder=missing");
+          if (data.failed) {
+            status.textContent = data.message;
+            button.disabled = false;
+            return;
+          }
           setTimeout(poll, INTERVAL_MS);
         })
         .catch(() => setTimeout(poll, INTERVAL_MS));

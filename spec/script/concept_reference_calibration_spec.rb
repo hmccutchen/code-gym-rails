@@ -177,7 +177,7 @@ RSpec.describe ConceptReferenceCalibration do
 
       records = calibration(repeats: 1, concurrency: 0).run([ [ "ruby_rails", "n_plus_one" ], [ "javascript", js_concept ] ])
 
-      expect(records.map(&:outcome)).to eq([ "AiService::AuthenticationError", "AiService::Error" ])
+      expect(records.map(&:outcome)).to eq([ "AiService::AuthenticationError", "AiService::NetworkError" ])
       expect(calibration.summary(records)[:sequential]).to eq(
         n: 2, measured: 0, min: nil, median: nil, p90: nil, max: nil,
         timeouts: 0, failures: 2, over_deployed: 0

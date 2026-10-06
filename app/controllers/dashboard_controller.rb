@@ -76,7 +76,7 @@ class DashboardController < ApplicationController
     elsif exercise
       render json: { status: "ready" }
     elsif current_user.last_generation_error_date == Date.current
-      render json: { status: "failed", message: current_user.last_generation_error }
+      render json: { status: "failed", message: current_user.generation_failure_message(surface: :generation) }
     else
       render json: { status: "pending" }
     end

@@ -152,11 +152,8 @@ en:
       already_reviewed: "Already reviewed."
       review_already_running: "A review is already being generated for this — check back in a moment."
       review_ready: "Review ready!"
-      review_partial: "%{reviewed} of %{total} sections reviewed — %{failed} couldn't be reviewed, try again."
+      review_partial: "%{reviewed} of %{total} sections reviewed. %{reason}"
       set_cleared_during_review: "This set was cleared while the review was running — nothing was saved."
-      api_key_rejected: "Your API key was rejected — check it in Settings."
-      rate_limited: "The AI provider is rate-limiting requests — try again shortly."
-      review_failed: "Couldn't generate the review: %{message}"
       start_over_after_review: "This set has already been reviewed — nothing to start over."
       start_over_not_today: "You can only start over on today's set."
       start_over_while_reviewing: "A review is being generated for this — try again in a moment."
@@ -164,6 +161,59 @@ en:
       no_review_to_email: "No review to email yet."
       review_emailed: "Review sent to %{email}."
       save_failed: "Couldn't save your answers."
+  # One sentence group per kind of provider failure, written when a page is
+  # read (ProviderFailureText). Each kind has a variant per credential; a
+  # variant missing an entry falls back to own_key. %{outcome} is the surface's
+  # line from outcomes, %{provider} the provider's label, %{time} and %{day}
+  # the reset in the reader's zone, %{wait} a short wait in words.
+  provider_failures:
+    outcomes:
+      generation: "nothing was generated"
+      regeneration: "the new set wasn't generated"
+      review: "the review didn't run"
+      review_partial: "the others weren't reviewed"
+      duck: "the thinking partner didn't answer"
+      follow_up: "your question wasn't answered"
+      alternate: "that explanation didn't come back"
+      critique: "the critique didn't run"
+      reference: "the write-up didn't finish"
+    saved:
+      review: "Your answers are saved."
+      review_partial: "Your answers are saved."
+      duck: "Your message is still in the box."
+      follow_up: "Your question is still in the box."
+      critique: "Your pseudocode is still there."
+    daily_limit:
+      own_key:
+        title: "Your %{provider} key has used today's free allowance, so %{outcome}."
+        reset_at: "The allowance resets at %{time} your time, %{day}."
+        reset_passed: "The allowance has reset since then, so you can try again."
+        next: "Try again after that, or add a paid key in Setup."
+    short_rate_limit:
+      own_key:
+        title: "%{provider} is limiting requests right now, so %{outcome}."
+        reset_at: "Try again in about %{wait}."
+        reset_passed: "You can try again now."
+    bad_key:
+      own_key:
+        title: "%{provider} didn't accept your API key, so %{outcome}."
+        next: "Check the key in Setup."
+    out_of_credit:
+      own_key:
+        title: "%{provider} reports that your account is out of credit or over its spend limit, so %{outcome}."
+        next: "Add credit or raise the limit with %{provider}, then try again."
+    outage:
+      own_key:
+        title: "%{provider} isn't answering right now, so %{outcome}."
+        next: "Nothing was lost. Try again in a few minutes."
+    timeout:
+      own_key:
+        title: "%{provider} took too long to answer, so %{outcome}."
+        next: "Try again."
+    other:
+      own_key:
+        title: "%{provider} sent back something Code Gym couldn't use, so %{outcome}."
+        next: "Try again. If it keeps happening, tell the person who runs Code Gym."
   errors:
     no_exercise_today: "No exercise set for today."
     provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."

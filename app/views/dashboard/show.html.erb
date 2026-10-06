@@ -46,7 +46,7 @@
   <% if @generating %>
     <%= render "dashboard/generating" %>
   <% elsif @generation_failed %>
-    <%= render "dashboard/generation_failed", message: current_user.last_generation_error %>
+    <%= render "dashboard/generation_failed", message: current_user.generation_failure_message(surface: :generation) %>
   <% elsif @generation_paused %>
     <%= render "dashboard/paused_empty" %>
   <% elsif @weekend_no_exercise %>

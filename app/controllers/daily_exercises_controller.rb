@@ -20,7 +20,7 @@ class DailyExercisesController < ApplicationController
     # Clear any stale failure from an earlier attempt today so /dashboard/status
     # doesn't report "failed" (with yesterday's message) while this retry is
     # still in flight — see GenerateDailyExercisesJob's status-polling comment.
-    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
+    current_user.clear_generation_failure!
     GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
     redirect_to root_path, flash: { generating: true }
   end
@@ -54,7 +54,7 @@ class DailyExercisesController < ApplicationController
       return redirect_to root_path, alert: t("flash.daily_exercises.already_regenerated")
     end
 
-    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
+    current_user.clear_generation_failure!
     # The claim is already committed, so an enqueue failure would strand the
     # user behind a spinner no worker will ever clear — release it before
     # reporting, so a retry is possible immediately rather than in six minutes.

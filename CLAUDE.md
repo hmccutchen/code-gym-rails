@@ -1368,8 +1368,23 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Gemini rows from before this under-count output by however much the model
   thought and over-count input by whatever was cached, and every row from
   before this has a null model and null cache counts: unknown, not zero, and
-  nothing backfills them, since a user's provider can change. Calls that fail
-  before a response arrives still write no row.
+  nothing backfills them, since a user's provider can change.
+
+  **A row also records the call's outcome.** `provider` names the provider
+  class the row was written by (backfilled from `model` for older rows, since
+  every model name identifies its provider), `http_status` is the reply's
+  status, `failure` is one of `ApiUsage::FAILURES` or null when the reply was
+  used, `quota_id` is the limit a 429 named in the provider's own vocabulary
+  (Gemini's `QuotaFailure.violations[].quotaId`; the first
+  `anthropic-ratelimit-*-remaining` header reading zero on Claude; the first
+  `x-ratelimit-remaining-*` reading zero, else the error code, on OpenAI), and
+  `house_key` says whether a house key paid for it, false until trial mode
+  arrives. A call that fails before a reply arrives writes one row with zero
+  tokens, through the same `#log_usage`, from `call_and_log`'s rescue: one row
+  per call, whatever faraday-retry did inside it, and the write never changes
+  the error the caller sees. A refusal or truncation is marked on the row its
+  tokens were billed to. `AiService.failure_code_for` is the one map from an
+  error class to a code.
 - **How a cut-off reply is recognized**: each provider reports truncation as
   data and `AiService#call_and_log` decides it is fatal, after writing the
   usage row. Claude reads `stop_reason == "max_tokens"`. Gemini reads the
@@ -1390,7 +1405,60 @@ concept-specific difficulty descriptions for future generation, not a new set.
   An authentication error (401 or 403) from any provider gets fixed guidance
   naming the company and logs only the HTTP status, through
   `AiService#raise_if_key_rejected`, because the provider's error body can
-  echo the key or its fragments.
+  echo the key or its fragments. Gemini reports an invalid key as a 400 whose
+  details carry `API_KEY_INVALID`, so `GeminiService` reads that body for the
+  reason, never logs it, and raises the same `AuthenticationError`.
+- **What a person is told when a provider fails**: every surface that
+  rescues an `AiService::Error` classifies it with `ProviderFailure.classify`
+  (pure: `daily_limit`, `short_rate_limit`, `bad_key`, `out_of_credit`,
+  `outage`, `timeout`, `other`) and renders the class through
+  `ProviderFailureText`, whose words live in the `provider_failures` locale
+  table, one entry set per kind and per credential variant (`own_key` now;
+  `trial` is added by text alone). Nothing passes an error's message to a
+  user any more: not a flash, a JSON `error`, the dashboard's generation
+  panel, the status endpoint or Learn's status line. A sentence names the
+  provider's label, what did not happen on that surface
+  (`provider_failures.outcomes`), what is still there (`provider_failures.saved`),
+  the reset and the next step; it can carry no provider text, status code,
+  socket detail or key, and `provider_failure_text_spec` holds every kind on
+  every surface to that.
+
+  **Rendered when read, not when written.** A failed generation stores its
+  class and time (`users.last_generation_failure`,
+  `last_generation_failed_at`) and `User#generation_failure_message` writes
+  the sentence for the page or `/dashboard/status` in the user's zone against
+  the clock, through `ResetClock`: a Gemini daily limit resets at the next
+  midnight Pacific after the failure, a short limit after the wait the
+  provider asked for or a minute, and once the reset has passed the sentence
+  says the allowance has reset rather than naming a time behind the reader.
+  `last_generation_error` keeps text that is not a provider failure (a
+  reviewed set kept, an unusable draft, every section rejected) and rows from
+  before the columns existed, which render as they did. A failed review
+  section stores `{kind, quota_id, retry_after, at}` in `review_errors`,
+  never the message; the submitted dashboard renders the newest one beside
+  the retry button, and rows that still carry the old `code` read as the
+  nearest kind.
+
+  **Out of credit is never a rate limit.** Per platform.claude.com's error
+  and rate-limit pages, Anthropic returns a 402 `billing_error`, a 400 whose
+  message begins "You have reached your specified ... API usage limits" or
+  names the credit balance, or a 429 whose `details.error_code` is
+  `enforced_spend_limit_reached` with no `retry-after`; OpenAI returns a 429
+  whose `error.code` is `insufficient_quota`. Each provider raises
+  `AiService::BillingError` for those before a 429 can become a
+  `RateLimitError`, so waiting is never advised for an empty balance. A
+  per-day quota id or a wait of an hour or more makes a 429 a daily limit;
+  any other is a short one.
+
+  **Learn keeps a failure per user, not on the shared row.** A failed
+  write-up is noted in the Rails cache by user and concept
+  (`ConceptReferenceFailures`, `EXPIRY` one hour, shorter than any quota's
+  reset) and `/learn/:bucket/:concept/status` returns `failed` and the
+  sentence, on which the page stops polling. Production's cache is Solid
+  Cache in the one Postgres database, shared by web and worker, which is what
+  lets the worker's job write what the web reads; development's memory store
+  is per process, where the jobs run in the web process anyway. Asking for
+  the write-up again clears the note, and so does a write-up landing.
 - **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
   filters what engineers write (`answers`, `message`, `question`,
   `pseudocode`, `prior_alternates`, the duck's `thread`), the login `code`
@@ -2610,6 +2678,11 @@ always pull in the full suite — is stated once, in
 - `app/services/shared_concept.rb` — `SharedConcept`: which reduced-tier concept both fixed sections take, from a host the day left free; pure
 - `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
+- `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
+- `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
+- `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line
+- `app/models/concept_reference_failures.rb` — `ConceptReferenceFailures`: the per-user, cache-held note of why a write-up stopped, read by Learn's status endpoint
+- `app/controllers/concerns/provider_failure_rendering.rb` — `ProviderFailureRendering`: the one way a controller turns a provider error into a sentence or a JSON error
 - `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence or reason is invalid output rather than a judgment. Pure; its specs need no database
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
 - `app/models/kind_preferences.rb` — `KindPreferences`: a user's stated weight and exclusion bias over rotating kinds, as plain values `SectionRotation` takes instead of a `User`, so its specs need no database. `.none` is the untouched default; a stored value outside `MULTIPLIERS` reads back as that default rather than reaching `WeightedRoll`

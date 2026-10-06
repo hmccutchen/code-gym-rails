@@ -1,6 +1,6 @@
 <% if @regeneration_failed %>
   <div class="flash alert" style="margin-bottom:1.5rem;">
-    <%= t("dashboard.exercise.regeneration_failed", error: current_user.last_generation_error) %>
+    <%= regeneration_failure_line(current_user) %>
   </div>
 <% end %>
 <% submitted = response.persisted? && response.submitted? %>

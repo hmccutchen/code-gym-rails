@@ -170,7 +170,36 @@ class User < ApplicationRecord
   def clear_stale_generation_error!
     return unless last_generation_error_date == Date.current
 
-    update!(last_generation_error_date: nil, last_generation_error: nil)
+    clear_generation_failure!
+  end
+
+  # ── Generation failures ───────────────────────────────────────────────────
+  # A provider failure is stored as its kind and time, and written into words
+  # only when read (#generation_failure_message), in the reader's zone and
+  # against the clock. A message that is not a provider failure (a reviewed
+  # set kept, a draft the app could not use) is stored as text, as before.
+  def record_generation_failure!(error)
+    update!(last_generation_error_date: Date.current, last_generation_error: nil,
+            last_generation_failure: ProviderFailure.classify(error), last_generation_failed_at: Time.current)
+  end
+
+  def record_generation_message!(message)
+    update!(last_generation_error_date: Date.current, last_generation_error: message,
+            last_generation_failure: nil, last_generation_failed_at: nil)
+  end
+
+  def clear_generation_failure!
+    update!(last_generation_error_date: nil, last_generation_error: nil,
+            last_generation_failure: nil, last_generation_failed_at: nil)
+  end
+
+  def generation_failed_today? = last_generation_error_date == Date.current
+
+  def generation_failure_message(surface:, now: Time.current)
+    return last_generation_error if last_generation_failure.blank?
+
+    ProviderFailureText.new(last_generation_failure, provider: provider, surface: surface,
+                            failed_at: last_generation_failed_at, zone: effective_time_zone, now: now).full
   end
 
   # Suppresses every generation the user didn't ask for — the cron batch and
