@@ -223,7 +223,11 @@ rows and no exercise, response or reference. It builds an anonymous
 `GeminiService` subclass that overrides `log_usage` to write nothing and
 `build_connection` to use no retry middleware and a `Recorder` middleware
 that keeps every HTTP attempt's status, response headers, latency and
-usage block. The prompts are the production ones: it goes through
+usage block in an `AttemptLog` shared by every service thread of a step;
+a step reads its attempts only once none is still on the wire, since the
+review's difficulty thread can outlive `review_sections` by its grace
+period. It runs in the user's `effective_time_zone`, as generation does,
+so the day and a mixed account's language are theirs. The prompts are the production ones: it goes through
 `AiService`'s entry points, as `ModelComparison` does.
 
 ```
@@ -247,10 +251,12 @@ setting is untouched (pinned by the spec). One tester-day, in order:
 
 `GeminiCapacityProbe.calls_per_day` derives the ten from the fixed-kind
 count and `DUCK_TURNS`. It repeats tester-days until a provider reply is a
-429 or `--max-days N` is reached, pacing steps `--pace SECONDS` apart
-(default 15, under a 5 RPM limit) so the daily limit is what trips, with
-`--no-pace` to measure the per-minute limit instead. The review fan-out
-still sends its three calls together. A reply the app could not use (a
+429 or `--max-days N` is reached, pacing steps with `--pace SECONDS`
+(default 15) so the daily limit is what trips, with `--no-pace` to measure
+the per-minute limit instead. The review fan-out still sends its three
+calls together, so the wait before a step is the pace times the requests on
+either side of it (three paces before and after the fan-out); at the default
+no rolling minute holds more than five requests, which the spec checks. A reply the app could not use (a
 judge verdict that fails `JudgeVerdict.parse`, an unparseable reference) is
 recorded with its error and the day goes on, since the probe measures quota,
 not output quality. A 429 inside the review fan-out raises nothing of its
@@ -259,8 +265,10 @@ own, so it is read off the recorded attempts and still ends the run.
 Per attempt it prints: day, step, HTTP status, latency, `total_input_tokens`,
 `total_output_tokens`, `total_thought_tokens`, `total_cached_tokens`. On a
 non-2xx it writes the status, response headers and full body to
-`tmp/gemini_probe/<timestamp>-<status>.json` (`tmp/` is gitignored; request
-headers are never captured, so the key is never written) and prints the
+`tmp/gemini_probe/<timestamp>-<sequence>-<status>.json`, one file per
+attempt (`tmp/` is gitignored; request headers are never captured, and the
+body of a 401, 403 or `API_KEY_INVALID` reply is left out, since Google's
+rejected-key reply can echo the key) and prints the
 `quotaId`, `quotaValue`, `retryDelay` and any `Retry-After` header. The
 first 429 body is also written as `tmp/gemini_probe/gemini_429_capture.json`,
 the shape `spec/fixtures/provider_errors/` holds, so replacing a fixture is a

@@ -20,7 +20,10 @@ class GeminiCapacityProbe
   SAMPLE_ANSWER = "The loop fetches related records one row at a time; load them together before the loop instead.".freeze
 
   # Pacing keeps the per-minute limit out of the way so the daily limit is the
-  # one that trips. The review fan-out still sends its calls together.
+  # one that trips: the wait before a step is the pace times the requests on
+  # either side of it, so a fan-out that sends three calls together is given
+  # three paces before and after. At 15 seconds no rolling minute holds more
+  # than five requests.
   DEFAULT_PACE_SECONDS = 15
   OUTPUT_DIR = "tmp/gemini_probe".freeze
   FIXTURE_CAPTURE = "gemini_429_capture.json".freeze
@@ -32,22 +35,53 @@ class GeminiCapacityProbe
     def tokens = input_tokens.to_i + output_tokens.to_i + thought_tokens.to_i
   end
 
+  # Every HTTP attempt as the provider answered it, shared by every service
+  # thread of a step. A step reads its attempts only once none is still on
+  # the wire: the review's difficulty thread can outlive review_sections by
+  # its grace period, and its reply belongs to the review, not the next step.
+  class AttemptLog
+    def initialize
+      @attempts  = []
+      @in_flight = 0
+      @lock      = Mutex.new
+    end
+
+    def start! = @lock.synchronize { @in_flight += 1 }
+
+    def record(attempt) = @lock.synchronize { @attempts << attempt; @in_flight -= 1 }
+
+    def abandon! = @lock.synchronize { @in_flight -= 1 }
+
+    def in_flight = @lock.synchronize { @in_flight }
+
+    def drain(timeout:)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+      sleep(0.1) while in_flight.positive? && Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
+      @lock.synchronize { @attempts.shift(@attempts.size) }
+    end
+  end
+
   # Records every HTTP attempt as the provider answered it, so the report
   # counts requests the way the quota does. The response body is kept only
   # for a non-2xx reply, where it names the quota; a successful reply is
   # reduced to its usage block.
   class Recorder < Faraday::Middleware
-    def initialize(app, sink)
+    def initialize(app, log)
       super(app)
-      @sink = sink
+      @log = log
     end
 
     def call(env)
-      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      @log.start!
+      started  = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      recorded = false
       @app.call(env).on_complete do |response|
-        @sink << { status: response.status, headers: response.response_headers.to_h, body: response.body.to_s,
-                   ms: ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round }
+        recorded = true
+        @log.record(status: response.status, headers: response.response_headers.to_h, body: response.body.to_s,
+                    ms: ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round)
       end
+    ensure
+      @log.abandon! unless recorded
     end
   end
 
@@ -63,24 +97,29 @@ class GeminiCapacityProbe
     @output_dir = Pathname(output_dir)
     @adapter    = adapter
     @sleeper    = sleeper
-    @attempts   = []
+    @attempts   = AttemptLog.new
     @records    = []
-    @consumed   = 0
+    @captured   = 0
     @calls_made = 0
+    @last_step_attempts = 0
     # In memory only: a two-section plan without touching the stored setting.
     @user.daily_section_count = SectionCount::FLOOR
   end
 
+  # In the user's zone, as generation runs: the day, and so the language of
+  # a mixed account, is theirs rather than the server's.
   def run
-    @output_dir.mkpath
-    @out.puts "Probing with user #{@user.id} (#{language}); #{self.class.calls_per_day} calls per tester-day, pace #{@pace}s."
-    day = 0
-    loop do
-      day += 1
-      break if @max_days && day > @max_days
-      break unless tester_day(day)
+    Time.use_zone(@user.effective_time_zone) do
+      @output_dir.mkpath
+      @out.puts "Probing with user #{@user.id} (#{language}); #{self.class.calls_per_day} calls per tester-day, pace #{@pace}s."
+      day = 0
+      loop do
+        day += 1
+        break if @max_days && day > @max_days
+        break unless tester_day(day)
+      end
+      print_report
     end
-    print_report
     @records
   end
 
@@ -117,7 +156,9 @@ class GeminiCapacityProbe
     response = DailyResponse.new(user: @user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                                  answers: sections.index_with { |key| sample_answer(key) },
                                  section_ratings: sections.index_with { "right_level" })
-    step(day, "review (#{sections.size} grading + difficulty)") { service.review_sections(@user, exercise, response, sections: sections) }
+    step(day, "review (#{sections.size} grading + difficulty)", requests: sections.size + 1) do
+      service.review_sections(@user, exercise, response, sections: sections)
+    end
     !stopped?
   end
 
@@ -150,8 +191,8 @@ class GeminiCapacityProbe
   # fatal except on a 429, which is what the probe is looking for. A reply
   # the app could not use still counted against the quota, so it is recorded
   # and the day goes on.
-  def step(day, label)
-    @sleeper.call(@pace) if @pace.positive? && @calls_made.positive?
+  def step(day, label, requests: 1)
+    @sleeper.call(@pace * [ @last_step_attempts, requests, 1 ].max) if @pace.positive? && @calls_made.positive?
     @calls_made += 1
     outcome = yield
     record_attempts(day, label, nil)
@@ -170,8 +211,8 @@ class GeminiCapacityProbe
   # The review fan-out answers no error of its own, so a 429 inside it is
   # read off the attempts rather than raised.
   def record_attempts(day, label, error)
-    fresh = @attempts.drop(@consumed)
-    @consumed = @attempts.size
+    fresh = @attempts.drain(timeout: AiService::READ_TIMEOUT)
+    @last_step_attempts = fresh.size
     @stopped = true if fresh.any? { |attempt| attempt[:status] == 429 }
     if fresh.empty?
       @records << Record.new(day: day, step: label, status: nil, ms: nil, input_tokens: nil, output_tokens: nil, thought_tokens: nil,
@@ -218,16 +259,22 @@ class GeminiCapacityProbe
   end
 
   # The full body and response headers of a refused reply, for reading and
-  # for replacing spec/fixtures/provider_errors. Request headers are never
-  # captured, so the key is never written.
+  # for replacing spec/fixtures/provider_errors, one file per attempt.
+  # Request headers are never captured, and a rejected key's body is left
+  # out, since Google's API_KEY_INVALID reply can echo the key.
   def capture(attempt, record)
     stamp = Time.current.utc.strftime("%Y%m%dT%H%M%S")
-    path  = @output_dir.join("#{stamp}-#{record.status}.json")
-    path.write(JSON.pretty_generate(status: record.status, headers: attempt[:headers], body: attempt[:body]))
+    path  = @output_dir.join("#{stamp}-#{format('%03d', @captured += 1)}-#{record.status}.json")
+    body  = key_rejected?(attempt) ? "[omitted: an authentication error can echo the key]" : attempt[:body]
+    path.write(JSON.pretty_generate(status: record.status, headers: attempt[:headers], body: body))
     if record.rate_limited? && !@output_dir.join(FIXTURE_CAPTURE).exist?
       @output_dir.join(FIXTURE_CAPTURE).write(attempt[:body])
     end
     @out.puts "  wrote #{path}"
+  end
+
+  def key_rejected?(attempt)
+    [ 401, 403 ].include?(attempt[:status]) || attempt[:body].to_s.include?("API_KEY_INVALID")
   end
 
   def format_record(record)
@@ -277,7 +324,7 @@ class GeminiCapacityProbe
   end
 
   def service
-    sink    = @attempts
+    log     = @attempts
     adapter = @adapter
     @service ||= Class.new(GeminiService) do
       define_method(:log_usage) { |_user, _result, purpose:| }
@@ -287,7 +334,7 @@ class GeminiCapacityProbe
           f.options.timeout           = AiService::READ_TIMEOUT
           f.headers["x-goog-api-key"] = @api_key
           f.headers["content-type"]   = "application/json"
-          f.use Recorder, sink
+          f.use Recorder, log
           f.adapter(*adapter)
         end
       end
