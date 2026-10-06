@@ -1,5 +1,5 @@
-# One invite: how many accounts it admits, by when, and whether each starts a
-# trial on a house key. The raw code is shown once, by the minting script,
+# One invite: how many trials it starts, by when, for how many days and at
+# how many calls a day. The raw code is shown once, by the minting script,
 # and only its digest is kept, so no page or row can give a code away.
 class InviteCode < ApplicationRecord
   CODE_LENGTH = 26
@@ -10,22 +10,14 @@ class InviteCode < ApplicationRecord
   validates :code_digest, presence: true, uniqueness: true
   validates :seats, numericality: { only_integer: true, greater_than: 0 }
   validates :expires_at, presence: true
-  validates :provider, inclusion: { in: ->(_) { InviteCode.trial_providers } }, allow_nil: true
-  validates :trial_days, numericality: { only_integer: true, greater_than: 0 }, if: :trial?
+  validates :trial_days, numericality: { only_integer: true, greater_than: 0 }
   validates :daily_request_cap, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
 
-  # A trial runs only on a provider whose data notice exists, since consent is
-  # given to that notice; the test provider counts where it is available.
-  def self.trial_providers
-    AiProvider.all.select { |provider| provider.available? && I18n.exists?("trials.data_notice.#{provider.provider_key}") }
-              .map(&:provider_key)
-  end
-
   # Returns the record and the raw code, which is not kept anywhere.
-  def self.mint(seats:, expires_at:, label: nil, provider: nil, trial_days: nil, daily_request_cap: nil)
+  def self.mint(seats:, expires_at:, trial_days:, label: nil, daily_request_cap: nil)
     code = Array.new(CODE_LENGTH) { CODE_ALPHABET[SecureRandom.random_number(CODE_ALPHABET.size)] }.join
-    record = create!(code_digest: digest(code), label: label, provider: provider, seats: seats,
-                     expires_at: expires_at, trial_days: trial_days, daily_request_cap: daily_request_cap)
+    record = create!(code_digest: digest(code), label: label, seats: seats, expires_at: expires_at,
+                     trial_days: trial_days, daily_request_cap: daily_request_cap)
     [ record, code ]
   end
 
@@ -41,7 +33,9 @@ class InviteCode < ApplicationRecord
     find_by(code_digest: digest(normalized))
   end
 
-  def trial? = provider.present?
+  # Whether a seat is left before the deadline now. #redeem! decides again
+  # when it takes one, since another redemption can win the last seat between.
+  def available? = expires_at.future? && redeemed_count < seats
 
   # Takes one seat, or none: a single statement decides against the seat count
   # and the deadline together, so two redemptions racing for the last seat

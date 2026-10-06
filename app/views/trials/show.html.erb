@@ -1,15 +1,5 @@
 <% page_title t("trials.page_title") %>
-<style>
-  .trial-wrap { max-width: 520px; margin: 3rem auto; }
-  .trial-wrap h1 { font-size: 1.6rem; margin-bottom: .75rem; }
-  .trial-wrap p { color: var(--muted); margin-bottom: 1rem; }
-  .form-field { margin-bottom: 1rem; }
-  .form-field label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
-  .form-field input[type=text] { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); }
-  .data-notice { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
-  .data-notice p:last-child { margin-bottom: 0; }
-  .consent { display: flex; gap: .5rem; align-items: flex-start; margin-bottom: 1.25rem; }
-</style>
+<%= render "trials/styles" %>
 
 <div class="trial-wrap">
   <h1><%= t("trials.heading") %></h1>
@@ -23,22 +13,11 @@
          <%= t("dashboard.trial_ended.kept") %></p>
       <p><%= link_to t("dashboard.trial_ended.add_key"), setup_path %></p>
     <% end %>
-    <%= render "trials/data_notice", provider: current_user.provider %>
-  <% else %>
+    <%= render "trials/data_notice", providers: [ current_user.provider ] %>
+  <% elsif (providers = TrialMode.providers).any? %>
     <p><%= t("trials.intro") %></p>
-    <%= form_with url: trial_path, method: :post do |f| %>
-      <% unless current_user.trial_pending? %>
-        <div class="form-field">
-          <%= f.label :invite_code, t("trials.code_label") %>
-          <%= f.text_field :invite_code, required: true, autocomplete: "off", spellcheck: false %>
-        </div>
-      <% end %>
-      <%= render "trials/data_notice", provider: current_user.trial_pending? ? current_user.invite_code.provider : nil %>
-      <div class="consent">
-        <%= f.check_box :consent, { id: "consent" }, "1", "0" %>
-        <%= f.label :consent, t("trials.consent_label"), for: "consent" %>
-      </div>
-      <%= f.submit t("trials.submit"), class: "btn btn-primary" %>
-    <% end %>
+    <%= render "trials/form", url: trial_path, providers: providers, signed_out: false %>
+  <% else %>
+    <p><%= t("trials.unavailable") %></p>
   <% end %>
 </div>

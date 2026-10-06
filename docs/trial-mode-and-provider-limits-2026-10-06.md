@@ -498,7 +498,7 @@ gates run. `User#provider_ready?` (own key, or active trial) replaces
 generation; the nightly batch still selects stored keys, so a trial account
 is generated only when it opens the dashboard. `provider_has_a_stored_key`
 already returns early for a nil `api_keys`, so a trial account's provider,
-set from the invite, needs no exception.
+set from the person's choice, needs no exception.
 
 Existing accounts: `api_keys` present, `invite_code_id` nil, so every new
 branch is false and `ProviderCredential.for` returns the same key
@@ -516,57 +516,70 @@ branch is false and `ProviderCredential.for` returns the same key
 |---|---|
 | `code_digest` | string, null false, unique index (SHA-256 of the code; a 26-character base32 code from `SecureRandom` has 130 bits, so a digest lookup is enough and no slow hash is needed) |
 | `label` | string (for you; never shown) |
-| `provider` | string, null (nil means a plain join code, see section 7) |
 | `seats` | integer, null false |
 | `redeemed_count` | integer, default 0, null false |
 | `expires_at` | datetime, null false (redemption deadline) |
-| `trial_days` | integer, null (required for a trial code) |
+| `trial_days` | integer, null false |
 | `daily_request_cap` | integer, null (no cap when nil) |
 | timestamps | |
 
 `AddTrialToUsers`: `invite_code_id` (bigint, fk, null), `trial_started_at`,
 `trial_ends_at`, `trial_consented_at` (datetimes, null). `User#trial?` is a
 present `trial_ends_at`; `trial_active?` adds that it is in the future, the
-kill switch is off and the provider's house key is set; `trial_pending?` is
-an account that signed up with a trial code and has not consented yet. No
-`is_trial` flag.
+kill switch is off, the provider's house key is set and the account has not
+been deleted. No `is_trial` flag. A code names no provider: the person picks
+one when they redeem it.
 
-Minting: `bin/rails runner script/mint_invite_code.rb --provider gemini
---seats 2 --days 7 --cap 12 --expires 2026-10-31 --label "pilot"` prints the
-code once, in groups of four; without `--provider` it mints a join code.
-`InviteCode.find_by_code` ignores case, spaces and dashes.
+Minting: `bin/rails runner script/mint_invite_code.rb --seats 2 --days 7
+--cap 12 --expires 2026-10-31 --label "pilot"` prints the code once, in
+groups of four. `InviteCode.find_by_code` ignores case, spaces and dashes.
 
 ### 6.2 Redemption, as built
 
-`GET /trial` shows the form with the data notice and consent checkbox, or,
-for a trial account, the day the trial ends and the notice for its provider;
-`POST /trial` redeems. `require_provider` lets `trials` through like
-`api_keys`. Rate limited at 10 per IP and 5 per account per hour through
-`rate_limit` with `LazyCacheStore`. A missing consent is refused with its own
-sentence and saves nothing; a wrong, expired, exhausted, already-used or join
-code gets one sentence: "That code didn't work. Check it and try again, or
-ask the person who gave it to you."
+Two pages, one rule. `/trial/start` is public: a name, an email, the invite
+code, a provider and the consent checkbox under the data notice.
+`POST /trial/start` checks the code (`InviteCode#available?`: a seat left
+before the deadline), the consent and the provider before it mails anything,
+and refuses each on the form with what was typed kept. It then mails a login
+code through `LoginCodeRequests`, the concern the login form uses, so the two
+forms share one set of request limits (5 per address and 20 per IP per code
+lifetime, 50 per IP a day), and keeps a `PendingTrial` (email, code id,
+provider, consent time) in the session. Entering the emailed code on the
+login page takes the seat and starts the trial; nobody can spend a seat on
+an address they cannot read. If the seat went in between, the person is
+signed in without a trial and sent to `/trial`; an account with a key of its
+own is sent to Setup. Asking for a plain login code afterwards drops the
+pending trial.
 
-`User#start_trial!(code:, consented_at:)` runs under the user row lock and
-refuses an account that already has a trial or another code, or a key of
-its own (which a trial would never be used over; the page sends such an
-account to Setup instead). A trial code names only a provider whose data
-notice exists (`InviteCode.trial_providers`: Gemini and Claude, plus the
-test provider where it is available), since consent is given to that
-notice; minting an OpenAI trial code is refused. Taking the seat
-is one statement, `InviteCode#redeem!`:
+`/trial` is the same form for a signed-in account with no key, without the
+name and email, and, for a trial account, the trial's standing. A signed-out
+visit to `/trial` goes to `/trial/start`. Code guessing is limited at 10 per
+IP and 5 per account per hour. A missing consent, a provider with no house
+key, and a wrong, expired or full code each get one sentence; for the code:
+"That code didn't work. Check it and try again, or ask the person who gave
+it to you."
+
+The provider list is `TrialMode.providers`: a provider is offered when its
+data notice exists, since consent is given to that notice, and its house
+key is set. That is Gemini, Claude and OpenAI, plus the test provider where
+it is available, and none under the kill switch, when the page says trials
+are not available.
+
+`User#start_trial!(invite:, provider:, consented_at:)` runs under the user
+row lock and refuses an account that has had a trial or has a key of its
+own, which a trial would never be used over, and a provider outside that
+list. Taking the seat is one statement, `InviteCode#redeem!`:
 
 ```sql
 UPDATE invite_codes SET redeemed_count = redeemed_count + 1
 WHERE id = ? AND redeemed_count < seats AND expires_at > now()
 ```
 
-An account that signed up with a trial code already holds its seat, so
-consenting there takes none. It sets `provider` from the code,
-`trial_started_at` and `trial_consented_at` to the consent time, and
-`trial_ends_at` to the end of the trial's last day in the user's zone (a
-7-day trial started on a Tuesday ends at the end of the next Monday).
-`invite_code` joins `filter_parameters`, since `_key` does not cover it.
+It sets `provider` to the choice, `trial_started_at` and
+`trial_consented_at` to the consent time, and `trial_ends_at` to the end of
+the trial's last day in the user's zone (a 7-day trial started on a Tuesday
+ends at the end of the next Monday). `invite_code` joins
+`filter_parameters`, since `_key` does not cover it.
 
 ### 6.3 House keys and the kill switch, as built
 
@@ -677,14 +690,19 @@ Plain words, provider-specific locale keys under `trials.data_notice`, with
 "the person who runs Code Gym" where the design had a placeholder for your
 name:
 
-- Both: "On a trial, Code Gym sends your exercises, answers and messages to
-  [Gemini / Claude] using a key that belongs to the person who runs Code
-  Gym, not to you. Usage counts against that key."
+- Every provider: "On a trial, Code Gym sends your exercises, answers and
+  messages to [Gemini / Claude / OpenAI] using a key that belongs to the
+  person who runs Code Gym, not to you. Usage counts against that key."
 - Gemini free tier: "Google's free tier lets Google use what is sent,
   including your answers, to improve its products, and people at Google may
   read it. Don't paste anything confidential."
 - Claude: "Anthropic keeps API data for up to 30 days and does not train on
   it by default."
+- OpenAI: "OpenAI keeps API data for up to 30 days to watch for abuse and
+  does not train on it by default." From OpenAI's data controls guide
+  (developers.openai.com, read 2026-10-06): API data is not used for
+  training unless the organization opts in, and abuse monitoring logs are
+  kept up to 30 days.
 
 Before the code is checked the provider is unknown, so the form shows the
 shared sentence naming both providers and both paragraphs.
@@ -721,7 +739,7 @@ difference, inside a `trial_active?` branch.
 
 ### 6.10 Existing accounts stay byte-identical, as built
 
-Every new branch tests `trial?`, `trial_pending?` or `house_key?`, all false
+Every new branch tests `trial?` or `house_key?`, both false
 for every existing row, and no prompt reads trial state.
 `existing_account_pages_spec` holds the page snapshots, and
 `spec/services/trial_isolation_spec.rb`, modelled on
@@ -737,19 +755,14 @@ request carries and nothing in the request.
 
 ## 7. Signup, as built
 
-A new account needs a seat on an invite code. The login form gains an
-"Invite code (first time only)" field, read only when the address is
-unknown; a known address ignores it. An unknown address with no code or a
-bad one gets the same "check your email" notice and pending state, and no
-account and no mail. A code with `provider` nil is a join code for a
-teammate (no trial, no cap; they add their own key as today), so one table
-serves both. The account and the seat are taken in one transaction
-(`SessionsController#create_invited_user`), so a lost race for the last seat
-creates nothing. A trial code at signup links the code and holds the seat;
-the trial itself starts on `/trial` once the person has read the data
-notice and consented, and `require_provider` sends such an account there
-rather than to Setup. This closes audit item L2 without an allowlist. The
-cost is that a teammate who loses their code asks you for one.
+Signup is unchanged from before this work: anyone with an email gets a
+login code and an account, and brings their own key. An earlier version of
+this stack required an invite code on the login form for every new account,
+with join codes for teammates; that was reversed, so using the app needs no
+code and a code only ever starts a trial (section 6.2). The cost is that
+audit item L2, unbounded account creation, stays as it was before this
+work: the per-address and per-IP limits on mailing a code bound it, as
+they did then.
 
 ---
 
@@ -782,9 +795,9 @@ cost is that a teammate who loses their code asks you for one.
 2. Done: the probe, no behavior change. Still to do once it has run:
    replace the fixtures with its capture and set the cap numbers.
 3. Done: invite codes, trial accounts, `ProviderCredential`, `HouseKeys`,
-   `TrialAllowance`, the kill switch, the minting script, the signup code
-   field, the redemption page with the data notice and consent, and the
-   trial words for every failure kind.
+   `TrialAllowance`, the kill switch, the minting script, the public trial
+   page and the signed-in one with the provider choice, the data notice and
+   consent, and the trial words for every failure kind.
 4. Done: the trial screen, trial end, the dashboard banner and the Setup
    branch (redemption consent shipped with 3).
 
@@ -797,6 +810,7 @@ cost is that a teammate who loses their code asks you for one.
 4. Gemini per-minute limit versus the parallel judge and review fan-out:
    recommend Claude for trials, say so on the trial screen, or allow a
    house-key-only serialization as a separate change.
-5. Decided and built: a code for every new account (section 7).
+5. Decided: no code for using the app; a code only starts a trial, on the
+   provider the person picks (sections 6.2 and 7).
 6. Anthropic out-of-credit as its own class and sentence.
 7. When to run the probe, and on which key.

@@ -64,17 +64,12 @@ class ApplicationController < ActionController::Base
 
   # Own key or a trial. An ended trial still reaches every page, where each
   # provider call fails with the trial-ended sentence and the dashboard says
-  # so; an account that signed up with a trial code and has not yet consented
-  # is sent to the trial page instead of Setup.
+  # so.
   def require_provider
     return unless logged_in?
     return if current_user.provider_ready? || current_user.trial?
     return if controller_name == "api_keys" || controller_name == "sessions"
 
-    if current_user.trial_pending?
-      redirect_to trial_path
-    else
-      redirect_to setup_path, notice: t("flash.application.api_key_needed")
-    end
+    redirect_to setup_path, notice: t("flash.application.api_key_needed")
   end
 end

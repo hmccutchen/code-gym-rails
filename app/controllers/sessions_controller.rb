@@ -1,4 +1,6 @@
 class SessionsController < ApplicationController
+  include LoginCodeRequests
+
   skip_before_action :require_login
   skip_before_action :require_provider
 
@@ -6,49 +8,18 @@ class SessionsController < ApplicationController
 
   RATE_LIMIT_STORE = LazyCacheStore.new
 
-  # Capping requests per address is the one that matters: a fresh code resets
-  # login_code_attempts, so uncapped re-requests would turn the five-guess
-  # ceiling into five guesses per request, forever. Keyed on the address
-  # rather than the IP because the address is what an attacker targets and
-  # the IP is what they can change.
-  #
-  # Every limit here needs a distinct `name:`: Rails keys a limit on
-  # ["rate-limit", scope, name, by].compact.join(":"), scope defaults to the
-  # controller, and `by` for #create is attacker-controlled (any email an
-  # attacker submits) — unnamed, they would collide into one bucket, letting a
-  # `POST /login` with a chosen IP as the email lock that IP out of
-  # #verify_code.
-  rate_limit to: 5, within: User::LOGIN_CODE_EXPIRY,
-             by:    -> { normalized_email },
-             with:  -> { rate_limited(t("sessions.rate_limited.code_requests_for_address")) },
-             store: RATE_LIMIT_STORE,
-             name:  "code_requests",
-             only:  :create
+  limit_login_code_requests only: :create
 
+  # Every limit here needs a distinct `name:`: Rails keys a limit on
+  # ["rate-limit", scope, name, by].compact.join(":") and scope defaults to the
+  # controller. The request limits above live in their own scope, so a
+  # `POST /login` with a chosen IP as the email cannot lock that IP out of
+  # #verify_code.
   rate_limit to: 10, within: User::LOGIN_CODE_EXPIRY,
              with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts",
              only:  :verify_code
-
-  # The address-keyed limit above can't bound an attacker who varies the
-  # address on every request — and an unrecognized address creates an
-  # account and sends real mail, so unbounded #create is unbounded outbound
-  # mail from a public, internet-reachable page. `by:` defaults to
-  # request.remote_ip, which is the axis that matters here.
-  rate_limit to: 20, within: User::LOGIN_CODE_EXPIRY,
-             with:  -> { rate_limited(t("sessions.rate_limited.code_requests")) },
-             store: RATE_LIMIT_STORE,
-             name:  "code_requests_by_ip",
-             only:  :create
-
-  # The 15-minute IP limit still allows about 1,900 requests, and so new
-  # accounts, a day from one address. This caps the day.
-  rate_limit to: 50, within: 1.day,
-             with:  -> { rate_limited(t("sessions.rate_limited.code_requests")) },
-             store: RATE_LIMIT_STORE,
-             name:  "code_requests_by_ip_daily",
-             only:  :create
 
   # The IP limit on attempts does not hold against rotating IPs: each can
   # request a fresh code for the same address and spend its five guesses.
@@ -72,22 +43,11 @@ class SessionsController < ApplicationController
   # POST /login — mail a 6-digit code. It is redeemable only in the browser
   # that requested it (see #verify_code), so the pending state written here is
   # what makes the code usable at all, not merely a UI convenience.
+  # Asking for a plain login code drops a trial asked for earlier in this
+  # browser, so a later sign-in never starts one by surprise.
   def create
-    email = normalized_email
-    name  = params[:name].to_s.strip
-
-    # `active` only: an anonymized row's email was rewritten anyway, so this
-    # falls through to account creation and the person gets a fresh account.
-    user = User.active.find_by(email: email)
-    user ||= create_invited_user(email, name)
-
-    UserMailer.login_code(user, user.generate_login_code!).deliver_later if user
-
-    # Drives the code form on the login page across reloads in this same
-    # browser. Stamped so the state can age out with the code it describes —
-    # see #pending_login_email.
-    session[:pending_login_email] = email
-    session[:pending_login_at]    = Time.current.iso8601
+    PendingTrial.forget(session)
+    mail_login_code(normalized_email, params[:name].to_s.strip)
 
     redirect_to login_path,
                 notice: t("sessions.code_sent", expiry: User.login_code_expiry_in_words)
@@ -105,7 +65,10 @@ class SessionsController < ApplicationController
     user  = email.present? ? User.authenticate_login_code(email: email, code: params[:code].to_s) : nil
 
     if user
+      trial = PendingTrial.take(session)
       destination = start_new_session_for(user)
+      return finish_pending_trial(user, trial) if trial
+
       redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
     else
       @code_rejected = true
@@ -125,29 +88,17 @@ class SessionsController < ApplicationController
 
   private
 
-  # A new account needs a seat on an invite code, taken with the account in
-  # one transaction so a lost race for the last seat creates nothing. No code
-  # or a bad one creates no account and sends no mail, behind the same notice
-  # a real request gets, so the page says nothing about which addresses exist.
-  def create_invited_user(email, name)
-    invite = InviteCode.find_by_code(params[:invite_code])
-    return if invite.nil?
-
-    User.transaction do
-      user = User.create!(email: email, name: name.presence || email.split("@").first, invite_code: invite)
-      raise ActiveRecord::Rollback unless invite.redeem!
-
-      return user
+  # The emailed code proved the address, so the trial asked for on the trial
+  # page can take its seat now.
+  def finish_pending_trial(user, trial)
+    case trial.start_for(user)
+    when :started     then redirect_to root_path, notice: t("trials.started")
+    when :has_own_key then redirect_to setup_path, alert: t("trials.has_own_key")
+    else                   redirect_to trial_path, alert: t("trials.code_rejected")
     end
-    nil
   end
 
-  # The single normalization rule for a submitted email, so the #create
-  # rate limit's `by:` lambda (instance_exec'd here, so it can call a
-  # private method) and #create itself can never drift apart.
-  def normalized_email
-    params[:email].to_s.strip.downcase
-  end
+  def login_code_requests_limited(message) = rate_limited(message)
 
   # A bare 429 would drop someone out of the flow with no way back; this keeps
   # them on the page that can request a new code.

@@ -1,0 +1,33 @@
+<%# Required locals: url (where the form posts), providers (the provider keys a
+    trial can start on), signed_out (whether to ask for a name and email). %>
+<%= form_with url: url, method: :post do |f| %>
+  <% if signed_out %>
+    <div class="form-field">
+      <%= f.label :name, t("sessions.new.name_label") %>
+      <%= f.text_field :name, value: params[:name], placeholder: t("sessions.new.name_placeholder"), autocomplete: "name" %>
+    </div>
+    <div class="form-field">
+      <%= f.label :email, t("sessions.new.email_label") %>
+      <%= f.email_field :email, value: params[:email], placeholder: t("sessions.new.email_placeholder"), required: true, autocomplete: "email" %>
+    </div>
+  <% end %>
+  <div class="form-field">
+    <%= f.label :invite_code, t("trials.code_label") %>
+    <%= f.text_field :invite_code, value: params[:invite_code], required: true, autocomplete: "off", spellcheck: false %>
+  </div>
+  <fieldset class="form-field trial-providers">
+    <legend><%= t("trials.provider_label") %></legend>
+    <% providers.each_with_index do |key, index| %>
+      <label class="trial-provider">
+        <%= f.radio_button :provider, key, checked: params[:provider].present? ? params[:provider] == key : index.zero?, required: true %>
+        <%= AiProvider.label(key) %>
+      </label>
+    <% end %>
+  </fieldset>
+  <%= render "trials/data_notice", providers: providers %>
+  <div class="consent">
+    <%= f.check_box :consent, { id: "consent" }, "1", "0" %>
+    <%= f.label :consent, t("trials.consent_label"), for: "consent" %>
+  </div>
+  <%= f.submit t("trials.submit"), class: "btn btn-primary" %>
+<% end %>

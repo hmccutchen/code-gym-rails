@@ -1,10 +1,8 @@
-<%# Required locals: provider (a provider key, or nil when the code has not
-    been checked yet and so the trial's provider is not known). %>
-<% noticed = InviteCode.trial_providers.select { |key| AiProvider.find(key).key_pattern } %>
-<% providers = provider ? [ provider ] : noticed %>
+<%# Required locals: providers (the provider keys the trial runs on, or can
+    be started on when the person has not chosen yet). %>
 <div class="data-notice">
-  <p><%= t("trials.data_notice.shared", provider: providers.map { |key| AiProvider.label(key) }.to_sentence(two_words_connector: " or ")) %></p>
-  <% (providers & noticed).each do |key| %>
+  <p><%= t("trials.data_notice.shared", provider: providers.map { |key| AiProvider.label(key) }.to_sentence(two_words_connector: " or ", last_word_connector: " or ")) %></p>
+  <% providers.each do |key| %>
     <p><%= t("trials.data_notice.#{key}") %></p>
   <% end %>
 </div>
