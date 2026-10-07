@@ -1,0 +1,13 @@
+<% page_title t("trials.page_title") %>
+<%= render "trials/styles" %>
+
+<div class="trial-wrap">
+  <h1><%= t("trials.heading") %></h1>
+  <% if @providers.any? %>
+    <p><%= t("trials.start_intro") %></p>
+    <%= render "trials/form", url: start_trial_path, providers: @providers, signed_out: true %>
+  <% else %>
+    <p><%= t("trials.unavailable") %></p>
+  <% end %>
+  <p><%= link_to t("trials.log_in_instead"), login_path %></p>
+</div>

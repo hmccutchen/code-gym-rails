@@ -46,6 +46,7 @@ class GenerateConceptReferenceJob < ApplicationJob
       ConceptReference.create!(attributes.merge("concept" => concept, "language" => language, "generation_version" => 1))
     end
 
+    ConceptReferenceFailures.clear(user_id: user_id, concept: concept, language: language)
     Rails.logger.info("Generated concept reference for #{concept}/#{language}")
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
     # Uniqueness is enforced twice here, the same as User#resume_generation!'s
@@ -59,6 +60,12 @@ class GenerateConceptReferenceJob < ApplicationJob
 
     Rails.logger.info("Skipped duplicate concept reference for #{concept}/#{language}")
   rescue AiService::Error => e
-    Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language}: #{e.message}")
+    # The row is shared, so the failure is noted for the user who asked, not
+    # on the row, and the concept page reads it to stop polling. An error
+    # raised after the call (an unusable reply) carries no provider stamp, so
+    # the provider this job called is named instead.
+    e.provider ||= user&.provider
+    ConceptReferenceFailures.record(user_id: user_id, concept: concept, language: language, error: e)
+    Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language} (#{ProviderFailure.classify(e)}): #{e.message}")
   end
 end

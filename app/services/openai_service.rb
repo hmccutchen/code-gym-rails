@@ -71,9 +71,9 @@ class OpenaiService < AiService
     end
     raise_for_status(resp) unless resp.success?
 
-    read_result(parse_provider_envelope(resp.body, provider: "OpenAI"), route)
+    read_result(parse_provider_envelope(resp.body, provider: "OpenAI"), route).merge(http_status: resp.status)
   rescue Faraday::Error => e
-    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
+    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::NetworkError
     raise error_class, "Network error calling OpenAI: #{e.message}"
   end
 
@@ -97,17 +97,41 @@ class OpenaiService < AiService
     body
   end
 
+  # OpenAI answers an account with no credit with a 429 whose error code is
+  # insufficient_quota, the same status as a rate limit. It is not one:
+  # waiting never clears it, so it is told apart here and never retried as a
+  # rate limit by anything downstream. A 402 is read the same way.
+  INSUFFICIENT_QUOTA = "insufficient_quota".freeze
+  RATE_LIMIT_FAMILIES = %w[requests tokens].freeze
+
   def raise_for_status(resp)
     raise_if_key_rejected("OpenAI", resp.status)
+    error = error_envelope(resp.body)
+    raise_if_out_of_credit(error, resp.status)
+
+    if resp.status == 429
+      raise AiService::RateLimitError.new("OpenAI API error 429", http_status: 429,
+                                          quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+    end
 
     log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
-    message     = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")
-    error_class = case resp.status
-    when 429      then AiService::RateLimitError
-    else               AiService::Error
-    end
-    raise error_class.new(message, http_status: resp.status)
+    message = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")
+    raise AiService::Error.new(message, http_status: resp.status)
   end
+
+  def raise_if_out_of_credit(error, status)
+    return unless status == 402 || (status == 429 && error["code"] == INSUFFICIENT_QUOTA)
+
+    Rails.logger.warn("OpenAI reports the account is out of credit (HTTP #{status}, #{error['code']})")
+    raise AiService::BillingError.new("OpenAI reports the account is out of credit", http_status: status)
+  end
+
+  def quota_id_from(resp, error)
+    family = RATE_LIMIT_FAMILIES.find { |name| resp.headers["x-ratelimit-remaining-#{name}"].to_s == "0" }
+    family ? "x-ratelimit-#{family}" : error["code"].presence || "rate_limit_exceeded"
+  end
+
+  def routed_model(purpose) = route_for(purpose)[:model]
 
   def read_result(parsed, route)
     usage = read_usage(parsed["usage"] || {}, route)

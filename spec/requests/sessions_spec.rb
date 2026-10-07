@@ -47,6 +47,8 @@ RSpec.describe "Sessions", type: :request do
       }.not_to change(User, :count)
 
       expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("That email address didn&#39;t work. Check it for typos and try again.")
+      expect(response.body).not_to include("Validation failed")
     end
   end
 
@@ -56,6 +58,13 @@ RSpec.describe "Sessions", type: :request do
 
       expect(response.body).to include("Work email *")
       expect(response.body).not_to include("Name *")
+    end
+
+    it "asks for no invite code and links to the trial page" do
+      get login_path
+
+      expect(response.body).not_to include('name="invite_code"')
+      expect(response.body).to include(%(href="#{new_trial_path}"), "Have an invite code? Start a trial.")
     end
 
     it "renders no app nav, since its brand and links only mean anything once logged in" do

@@ -91,6 +91,7 @@ en:
       name_placeholder: "Your name"
       email_label: "Work email *"
       email_placeholder: "you@company.com"
+      trial_link: "Have an invite code? Start a trial."
       submit: "Send code"
     pending:
       message: "Enter the 6-digit code we emailed you."
@@ -102,10 +103,40 @@ en:
     code_rejected_retry: "Incorrect or expired code. Try again, or request a new one below."
     code_rejected_request_new: "Incorrect or expired code. Request a new one below."
     logged_out: "Logged out."
+    email_not_accepted: "That email address didn't work. Check it for typos and try again."
     rate_limited:
       code_requests_for_address: "Too many code requests for that address. Try again in a few minutes."
       code_requests: "Too many code requests. Try again in a few minutes."
       code_attempts: "Too many attempts. Try again in a few minutes."
+  trials:
+    page_title: "Trial"
+    heading: "Trial"
+    intro: "Enter the invite code you were given and choose a provider to try Code Gym on a shared key."
+    start_intro: "Try Code Gym on a shared key with the invite code you were given. We'll email you a code to confirm your address, and the trial starts when you enter it."
+    unavailable: "Trials aren't available right now. You can still use Code Gym with an API key of your own."
+    log_in_instead: "Have an account, or using your own key? Log in."
+    code_label: "Invite code"
+    provider_label: "Provider"
+    provider_needed: "Choose the provider your trial runs on."
+    code_sent: "Check your email for a 6-digit login code. It expires in %{expiry}. Your trial starts when you enter it."
+    consent_label: "I understand what is sent and to whom."
+    submit: "Start trial"
+    started: "Your trial has started."
+    running_until: "Your trial runs until the end of %{day}: %{days} left."
+    used_today: "%{used} of %{cap} requests used today. The count resets at midnight your time."
+    used_today_no_cap: "Requests used today: %{used}."
+    ended_on: "Your trial ended on %{day}."
+    at_the_end: "When the trial ends, generation and reviews stop. Everything you did stays, and adding your own API key in Setup picks up where you left off."
+    code_rejected: "That code didn't work. Check it and try again, or ask the person who gave it to you."
+    consent_needed: "Tick the box to confirm you've read what is sent on a trial."
+    has_own_key: "You already have an API key, so you don't need a trial."
+    rate_limited: "Too many attempts. Try again in an hour."
+    data_notice:
+      shared: "On a trial, Code Gym sends your exercises, answers and messages to %{provider} using a key that belongs to the person who runs Code Gym, not to you. Usage counts against that key."
+      gemini: "Google's free tier lets Google use what is sent, including your answers, to improve its products, and people at Google may read it. Don't paste anything confidential."
+      anthropic: "Anthropic keeps API data for up to 30 days and does not train on it by default."
+      openai: "OpenAI keeps API data for up to 30 days to watch for abuse and does not train on it by default."
+      fake: "The test provider sends nothing anywhere."
   user_mailer:
     login_code:
       subject: "Your Code Gym login code"
@@ -152,11 +183,8 @@ en:
       already_reviewed: "Already reviewed."
       review_already_running: "A review is already being generated for this — check back in a moment."
       review_ready: "Review ready!"
-      review_partial: "%{reviewed} of %{total} sections reviewed — %{failed} couldn't be reviewed, try again."
+      review_partial: "%{reviewed} of %{total} sections reviewed. %{reason}"
       set_cleared_during_review: "This set was cleared while the review was running — nothing was saved."
-      api_key_rejected: "Your API key was rejected — check it in Settings."
-      rate_limited: "The AI provider is rate-limiting requests — try again shortly."
-      review_failed: "Couldn't generate the review: %{message}"
       start_over_after_review: "This set has already been reviewed — nothing to start over."
       start_over_not_today: "You can only start over on today's set."
       start_over_while_reviewing: "A review is being generated for this — try again in a moment."
@@ -164,6 +192,80 @@ en:
       no_review_to_email: "No review to email yet."
       review_emailed: "Review sent to %{email}."
       save_failed: "Couldn't save your answers."
+  # One sentence group per kind of provider failure, written when a page is
+  # read (ProviderFailureText). Each kind has a variant per credential; a
+  # variant missing an entry falls back to own_key. %{outcome} is the surface's
+  # line from outcomes, %{provider} the provider's label, %{time} and %{day}
+  # the reset in the reader's zone, %{wait} a short wait in words.
+  provider_failures:
+    outcomes:
+      generation: "nothing was generated"
+      regeneration: "the new set wasn't generated"
+      review: "the review didn't run"
+      review_partial: "the others weren't reviewed"
+      duck: "the thinking partner didn't answer"
+      follow_up: "your question wasn't answered"
+      alternate: "that explanation didn't come back"
+      critique: "the critique didn't run"
+      reference: "the write-up didn't finish"
+    saved:
+      review: "Your answers are saved."
+      review_partial: "Your answers are saved."
+      duck: "Your message is still in the box."
+      follow_up: "Your question is still in the box."
+      critique: "Your pseudocode is still there."
+    daily_limit:
+      own_key:
+        title: "Your %{provider} key has reached its daily limit, so %{outcome}."
+        reset_at: "The limit resets at %{time} your time, %{day}."
+        reset_passed: "The limit has reset since then, so you can try again."
+        next: "Try again after that."
+      trial:
+        title: "The trial's %{provider} key has reached its daily limit, so %{outcome}."
+        reset_at: "The limit resets at %{time} your time, %{day}."
+        reset_passed: "The limit has reset since then, so you can try again."
+        next: "Try again after that."
+    trial_allowance_used:
+      trial:
+        title: "Your trial has used its %{provider} calls for today, so %{outcome}."
+        reset_at: "The count resets at %{time} your time, %{day}."
+        reset_passed: "The count has reset since then, so you can try again."
+        next: "Try again after that."
+    trial_ended:
+      trial:
+        title: "Your trial has ended, so %{outcome}."
+        next: "Everything you did is still here. Add your own API key in Setup to keep going."
+    short_rate_limit:
+      own_key:
+        title: "%{provider} is limiting requests right now, so %{outcome}."
+        reset_at: "Try again in about %{wait}."
+        reset_passed: "You can try again now."
+    bad_key:
+      own_key:
+        title: "%{provider} didn't accept your API key, so %{outcome}."
+        next: "Check the key in Setup."
+      trial:
+        title: "%{provider} didn't accept the trial's key, so %{outcome}."
+        next: "Tell the person who runs Code Gym."
+    out_of_credit:
+      own_key:
+        title: "%{provider} reports that your account is out of credit or over its spend limit, so %{outcome}."
+        next: "Add credit or raise the limit with %{provider}, then try again."
+      trial:
+        title: "The trial's %{provider} key is out of credit or over its spend limit, so %{outcome}."
+        next: "Tell the person who runs Code Gym."
+    outage:
+      own_key:
+        title: "%{provider} isn't answering right now, so %{outcome}."
+        next: "Nothing was lost. Try again in a few minutes."
+    timeout:
+      own_key:
+        title: "%{provider} took too long to answer, so %{outcome}."
+        next: "Try again."
+    other:
+      own_key:
+        title: "%{provider} sent back something Code Gym couldn't use, so %{outcome}."
+        next: "Try again. If it keeps happening, tell the person who runs Code Gym."
   errors:
     no_exercise_today: "No exercise set for today."
     provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."
@@ -235,6 +337,19 @@ en:
     paused_empty:
       message: "Automatic generation is paused, so today's set wasn't created. You can still generate one whenever you want it."
       resume: "Resume automatic generation"
+    trial_ended:
+      on_day: "Your trial ended on %{day}, so no set was generated today."
+      message: "Your trial has ended, so no set was generated today."
+      kept: "Everything you did is still here."
+      add_key: "Add your own API key in Setup to keep going."
+    trial_banner:
+      active: "Trial: %{days} left. %{used} of %{cap} requests used today."
+      active_no_cap: "Trial: %{days} left. Requests used today: %{used}."
+      days:
+        one: "1 day"
+        other: "%{count} days"
+      ended: "Your trial has ended."
+      details: "Details"
     weekend_empty:
       message: "No exercises are generated automatically on weekends — the morning job runs Monday–Friday."
     teaching_hint:
@@ -478,6 +593,7 @@ en:
     no_gaps: "Your plan holds up — nothing worth flagging before you submit it."
     caption: "This is your plan implemented literally — gaps and all. It was not corrected."
     working: "Working…"
+    critique_failed: "Couldn't check your plan. Try again in a moment."
   responses:
     section:
       label: "%{slot} — %{name}"
@@ -542,7 +658,8 @@ en:
     alternate_added: "A different explanation was added above."
     alternate_added_last: "A different explanation was added above — that was the last one."
     alternate_failed: "Couldn't generate that — try again"
-    session_expired: "Your session expired — reload the page and try again."
+  server_message:
+    signed_out: "Your session expired — reload the page and try again."
   diagram:
     summary: "🗺️ Structure diagram"
   push:
@@ -623,6 +740,10 @@ en:
       title: "Settings"
       heading: "Add your API key"
       intro: "Your key is encrypted at rest and only used to generate your personal exercise sets and reviews. Usage is tracked per-user for transparency."
+      trial_note:
+        title: "You're on a trial"
+        body: "Your sets run on a shared key for now, so you don't need one of your own yet. A key you add here takes over from the trial's."
+        link: "See how your trial is going."
       api_key_label: "API key"
       api_key_placeholder: "sk-ant-..., AQ...., AIza... or sk-proj-..."
       api_key_hint_html: 'Paste an Anthropic key (<a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>, starts with <code>sk-ant-</code>), a Google Gemini key (<a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>, starts with <code>AQ.</code> or the older <code>AIza</code>), or an OpenAI key (<a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>, starts with <code>sk-proj-</code>).'

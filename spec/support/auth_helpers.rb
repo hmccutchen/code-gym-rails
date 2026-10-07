@@ -1,4 +1,21 @@
 module AuthHelpers
+  # Returns the record and the raw code, as the minting script prints it.
+  def mint_trial_code(seats: 1, days: 7, cap: 12, expires_at: 1.week.from_now)
+    InviteCode.mint(seats: seats, expires_at: expires_at, trial_days: days, daily_request_cap: cap)
+  end
+
+  # A trial account: no key of its own, a redeemed invite code, and the house
+  # key for its provider stubbed into ENV.
+  def create_trial_user(email: nil, name: "Trial User", time_zone: "UTC", provider: "fake", cap: 12, days: 7,
+                        house_key: "fake-house-key")
+    invite, _code = mint_trial_code(cap: cap, days: days)
+    stub_env(HouseKeys.variable(provider, "API_KEY") => house_key)
+    User.create!(email: email || "trial-#{SecureRandom.hex(4)}@example.com", name: name,
+                 time_zone: time_zone, learning_track: LearningTrack::OFF).tap do |user|
+      user.start_trial!(invite: invite, provider: provider, consented_at: Time.current)
+    end
+  end
+
   # Both builders stand for accounts that already exist, which the learning
   # track backfill marked "none". A first-run spec passes learning_track: nil.
   def create_user_with_key(email: "dev@example.com", name: "Dev", time_zone: "UTC", learning_track: LearningTrack::OFF)

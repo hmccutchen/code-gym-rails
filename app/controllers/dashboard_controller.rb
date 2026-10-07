@@ -30,6 +30,8 @@ class DashboardController < ApplicationController
     @track_proposal = TrackGraduation.for(current_user) if current_user.on_learning_track? && @response&.submitted?
     @size_change = SizeForecast.for(current_user, @exercise) if @response&.submitted?
 
+    @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
+
     if @exercise&.regenerating?
       @generating = true
       return
@@ -37,7 +39,15 @@ class DashboardController < ApplicationController
 
     @regeneration_failed = @exercise.present? && current_user.last_generation_error_date == Date.current
 
-    return unless @exercise.nil? && current_user.api_key_present?
+    return unless @exercise.nil?
+
+    # Like a pause, an ended trial stops this trigger; unlike one, there is no
+    # button back in, only a key of the user's own.
+    if current_user.trial_ended?
+      @trial_ended = true
+      return
+    end
+    return unless current_user.provider_ready?
 
     if flash[:generating]
       # Set by DailyExercisesController#generate right after a manual weekend
@@ -76,7 +86,7 @@ class DashboardController < ApplicationController
     elsif exercise
       render json: { status: "ready" }
     elsif current_user.last_generation_error_date == Date.current
-      render json: { status: "failed", message: current_user.last_generation_error }
+      render json: { status: "failed", message: current_user.generation_failure_message(surface: :generation) }
     else
       render json: { status: "pending" }
     end

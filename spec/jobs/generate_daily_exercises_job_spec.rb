@@ -17,8 +17,8 @@ RSpec.describe GenerateDailyExercisesJob do
 
   def stub_provider_failure(error, message, u = user)
     svc = instance_double(ClaudeService)
-    allow(svc).to receive(:generate_unjudged_exercise).and_raise(error, message)
-    allow(svc).to receive(:generate_judged_exercise).and_raise(error, message)
+    allow(svc).to receive(:generate_unjudged_exercise).and_raise(*[ error, message ].compact)
+    allow(svc).to receive(:generate_judged_exercise).and_raise(*[ error, message ].compact)
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
 
@@ -92,29 +92,52 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
   end
 
-  it "persists a Settings-pointing error when AiService::AuthenticationError is raised" do
+  # A provider failure is stored as its kind and time, never as text: the
+  # sentence is written when the dashboard reads it.
+  it "records a rejected key as bad_key and renders a Setup-pointing sentence" do
     stub_provider_failure(AiService::AuthenticationError, "invalid x-api-key")
 
-    expect(Rails.logger).to receive(:error).with(/Auth failure generating exercise.*invalid x-api-key/)
+    expect(Rails.logger).to receive(:error).with(/Failed to generate exercise.*\(bad_key\).*invalid x-api-key/)
     described_class.new.perform(user_id: user.id)
 
     user.reload
     expect(user.last_generation_error_date).to eq(Date.current)
-    expect(user.last_generation_error).to eq("Your API key was rejected — check it in Settings.")
+    expect(user.last_generation_failure).to eq("bad_key")
+    expect(user.last_generation_failed_at).to be_within(1.minute).of(Time.current)
+    expect(user.last_generation_error).to be_nil
+    expect(user.generation_failure_message(surface: :generation))
+      .to eq("Claude didn't accept your API key, so nothing was generated. Check the key in Setup.")
   end
 
-  it "persists a try-again error when AiService::RateLimitError is raised" do
+  it "records a 429 as a short rate limit" do
     stub_provider_failure(AiService::RateLimitError, "rate limited")
+    allow(Rails.logger).to receive(:error)
 
-    expect(Rails.logger).to receive(:warn).with(/Rate limited generating exercise.*rate limited/)
+    described_class.new.perform(user_id: user.id)
+
+    expect(user.reload.last_generation_failure).to eq("short_rate_limit")
+    expect(user.generation_failure_message(surface: :generation)).to start_with("Claude is limiting requests right now, so nothing was generated.")
+  end
+
+  # The sentence is written when the dashboard is read, so the row keeps the
+  # provider the call went to and the wait it asked for: a switch to another
+  # key before reading must not relabel the failure.
+  it "stores the provider tried and its wait, and keeps naming that provider after a switch" do
+    error = AiService::RateLimitError.new("rate limited", retry_after: 300).tap { |e| e.provider = "anthropic" }
+    stub_provider_failure(error, nil)
+    allow(Rails.logger).to receive(:error)
+
     described_class.new.perform(user_id: user.id)
 
     user.reload
-    expect(user.last_generation_error_date).to eq(Date.current)
-    expect(user.last_generation_error).to eq("The AI provider is rate-limiting requests — try again shortly.")
+    expect(user.last_generation_failure_provider).to eq("anthropic")
+    expect(user.last_generation_retry_after).to eq(300)
+    user.update!(provider: "gemini", api_keys: { "gemini" => "AIzaTestKey" })
+    expect(user.generation_failure_message(surface: :generation))
+      .to eq("Claude is limiting requests right now, so nothing was generated. Try again in about 5 minutes.")
   end
 
-  it "persists the raw message when a generic AiService::Error is raised" do
+  it "records a generic AiService::Error as other and never stores its message" do
     stub_provider_failure(AiService::Error, "boom")
     allow(Rails.logger).to receive(:error)
 
@@ -122,7 +145,9 @@ RSpec.describe GenerateDailyExercisesJob do
 
     user.reload
     expect(user.last_generation_error_date).to eq(Date.current)
-    expect(user.last_generation_error).to eq("boom")
+    expect(user.last_generation_failure).to eq("other")
+    expect(user.last_generation_error).to be_nil
+    expect(user.generation_failure_message(surface: :generation)).not_to include("boom")
   end
 
   it "persists a failure and writes no day when the judge rejects every section" do
@@ -172,16 +197,17 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.reload.last_generation_error_date).to be_nil
   end
 
-  it "persists a wait-and-retry error when AiService::TimeoutError is raised" do
+  it "records a timeout without the socket internals it came from" do
     stub_provider_failure(AiService::TimeoutError, "Network error calling Claude: Net::ReadTimeout with #<TCPSocket:(closed)>")
-    allow(Rails.logger).to receive(:warn)
+    allow(Rails.logger).to receive(:error)
 
     described_class.new.perform(user_id: user.id)
 
     user.reload
     expect(user.last_generation_error_date).to eq(Date.current)
-    expect(user.last_generation_error).to eq("Generation took longer than the provider's budget — try again.")
-    expect(user.last_generation_error).not_to include("TCPSocket")
+    expect(user.last_generation_failure).to eq("timeout")
+    expect(user.generation_failure_message(surface: :generation))
+      .to eq("Claude took too long to answer, so nothing was generated. Try again.")
   end
 
   # A lost race: a concurrent generation created today's set while this one was

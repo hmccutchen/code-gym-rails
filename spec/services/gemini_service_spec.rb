@@ -286,7 +286,7 @@ RSpec.describe GeminiService do
       end
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
-      expect(result).to eq(text: "hello", input_tokens: 8, output_tokens: 12, truncated: false,
+      expect(result).to eq(text: "hello", input_tokens: 8, output_tokens: 12, truncated: false, http_status: 200,
                            model: GeminiService::DEFAULT_ROUTE[:model], cache_read_tokens: 0, cache_write_tokens: 0)
     end
 
@@ -441,20 +441,60 @@ RSpec.describe GeminiService do
     end
 
     it "surfaces the provider's own error message when the body includes one" do
-      body = {
-        "error" => {
-          "code"    => 429,
-          "message" => "Resource has been exhausted (e.g. check quota).",
-          "status"  => "RESOURCE_EXHAUSTED"
-        }
-      }.to_json
-      fake_response = instance_double(Faraday::Response, success?: false, status: 429, body: body)
+      body = { "error" => { "code" => 400, "message" => "Invalid JSON payload received.", "status" => "INVALID_ARGUMENT" } }.to_json
+      fake_response = instance_double(Faraday::Response, success?: false, status: 400, body: body)
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, "Resource has been exhausted (e.g. check quota).")
+      }.to raise_error(AiService::Error, "Invalid JSON payload received.")
+    end
+
+    def quota_fixture(name) = Rails.root.join("spec/fixtures/provider_errors", name).read
+
+    it "names the quota and the delay from a 429 body, and never its message" do
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, quota_fixture("gemini_429_daily.json") ] ]))
+
+      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e|
+          expect(e.quota_id).to eq("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+          expect(e.retry_after).to eq(39)
+          expect(e.message).not_to include("quota")
+        }
+    end
+
+    it "prefers the daily quota when a 429 lists it beside a per-minute one" do
+      body = JSON.parse(quota_fixture("gemini_429_minute.json"))
+      failure = body["error"]["details"].find { |d| d["@type"].end_with?("QuotaFailure") }
+      failure["violations"] << { "quotaMetric" => "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+                                 "quotaId" => "GenerateRequestsPerDayPerProjectPerModel-FreeTier", "quotaValue" => "20" }
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, body.to_json ] ]))
+
+      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("GenerateRequestsPerDayPerProjectPerModel-FreeTier") }
+    end
+
+    it "falls back to the status when the error envelope is null" do
+      allow(Rails.logger).to receive(:error)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to be_nil }
+
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 400, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt") }
+        .to raise_error(AiService::Error, /Gemini API error 400/) { |e| expect(e).not_to be_a(AiService::AuthenticationError) }
+    end
+
+    # Gemini answers a bad key with a 400 whose details say API_KEY_INVALID,
+    # not a 401, and the body can echo the key.
+    it "reads a 400 API_KEY_INVALID as a rejected key without logging the body" do
+      allow(Rails.logger).to receive(:error)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 400, quota_fixture("gemini_400_api_key_invalid.json") ] ]))
+
+      expect { service.send(:call, system: "sys", prompt: "prompt") }
+        .to raise_error(AiService::AuthenticationError, /\AGoogle rejected your API key/) { |e| expect(e.http_status).to eq(400) }
+      expect(Rails.logger).not_to have_received(:error).with(/API key not valid/)
     end
 
     it "does not leak the raw response body into the exception message" do

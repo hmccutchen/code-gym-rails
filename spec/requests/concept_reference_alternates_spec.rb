@@ -131,7 +131,10 @@ RSpec.describe "Concept reference alternate framings", type: :request do
     post_alternate
 
     expect(response).to have_http_status(:service_unavailable)
-    expect(JSON.parse(response.body)).to eq("status" => "error", "error" => "slow down")
+    expect(JSON.parse(response.body)).to eq(
+      "status" => "error", "failure" => "short_rate_limit",
+      "error" => "Claude is limiting requests right now, so that explanation didn't come back. Try again in about a minute."
+    )
   end
 
   it "requires a login" do

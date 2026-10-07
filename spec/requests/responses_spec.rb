@@ -696,39 +696,99 @@ RSpec.describe "Responses", type: :request do
       expect(response).to redirect_to(root_path(anchor: "ai-review"))
     end
 
-    it "redirects with an alert when the provider raises" do
+    it "redirects with the failure's sentence when no section could be reviewed" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "other", message: "rate limited" })
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "other", failure: "other" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
 
       expect(response).to redirect_to(root_path)
-      expect(flash[:alert]).to eq("Couldn't generate the review: rate limited")
+      expect(flash[:alert]).to eq("Claude sent back something Code Gym couldn't use, so the review didn't run. Your answers are saved. " \
+                                  "Try again. If it keeps happening, tell the person who runs Code Gym.")
     end
 
-    it "shows a Settings-pointing alert without leaking the provider message when the provider raises AuthenticationError" do
+    it "shows a Setup-pointing sentence for a rejected key and stores the kind, never the message" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "authentication", message: "invalid x-api-key" })
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "authentication", failure: "bad_key" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
 
-      expect(flash[:alert]).to eq("Your API key was rejected — check it in Settings.")
-      expect(flash[:alert]).not_to include("x-api-key")
+      expect(flash[:alert]).to eq("Claude didn't accept your API key, so the review didn't run. Your answers are saved. Check the key in Setup.")
+      expect(daily_response.reload.review_errors["code_review"]).to include("kind" => "bad_key", "at" => be_present)
+      expect(daily_response.review_errors["code_review"]).not_to have_key("message")
     end
 
-    it "shows a try-again alert when the provider raises RateLimitError" do
+    it "stores the provider the section's call went to and keeps naming it after a switch" do
       daily_response = create_submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "rate_limit", message: "rate limited" })
+      allow(fake_service).to receive(:review_sections)
+        .and_return("code_review" => { ok: false, error_code: "rate_limit", failure: "short_rate_limit", provider: "openai", retry_after: 30 })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(daily_response)
 
-      expect(flash[:alert]).to eq("The AI provider is rate-limiting requests — try again shortly.")
+      expect(flash[:alert]).to start_with("GPT is limiting requests right now, so the review didn't run.")
+      expect(daily_response.reload.review_errors["code_review"]).to include("provider" => "openai", "retry_after" => 30)
+
+      get root_path
+      expect(response.body).to include(ERB::Util.html_escape("GPT is limiting requests right now, so the review didn't run."))
+    end
+
+    it "shows the wait for a short rate limit and the reset for a daily one" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "rate_limit", failure: "short_rate_limit", retry_after: 30 })
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(flash[:alert]).to eq("Claude is limiting requests right now, so the review didn't run. Your answers are saved. Try again in about a minute.")
+    end
+
+    it "explains the failed sections after a partial review, and the dashboard repeats it" do
+      daily_response = create_submitted_response
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "rating" => "solid" } },
+        "pattern"     => { ok: false, error_code: "rate_limit", failure: "daily_limit", quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" },
+        "challenge"   => { ok: false, error_code: "rate_limit", failure: "daily_limit", quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }
+      )
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(flash[:notice]).to start_with("1 of 3 sections reviewed. Your Claude key has reached its daily limit, so the others weren't reviewed.")
+      expect(daily_response.reload.review_errors["pattern"]).to include("kind" => "daily_limit", "quota_id" => "GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+
+      get root_path
+      expect(response.body).to include("review-failure")
+      expect(response.body).to include(ERB::Util.html_escape("Your Claude key has reached its daily limit, so the others weren't reviewed."))
+      expect(response.body).not_to include(ERB::Util.html_escape("so the review didn't run"))
+    end
+
+    # The review waits for its slowest section, so a reset counted from the
+    # end of the review can land a day late across Gemini's midnight.
+    it "keeps the time each section failed, not the time the review finished" do
+      daily_response = create_submitted_response
+      failed_at = Time.utc(2026, 10, 7, 6, 59, 30)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections) do
+        travel_to(Time.utc(2026, 10, 7, 7, 1))
+        { "code_review" => { ok: false, error_code: "rate_limit", failure: "daily_limit", provider: "gemini",
+                             quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", failed_at: failed_at } }
+      end
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(daily_response.reload.review_errors["code_review"]["at"]).to eq(failed_at.iso8601)
+      expect(flash[:alert]).to include("The limit has reset since then")
+    ensure
+      travel_back
     end
   end
 
@@ -816,7 +876,7 @@ RSpec.describe "Responses", type: :request do
     it "clears the claim when the provider raises, so an immediate retry can proceed" do
       resp = submitted_response
       fake_service = instance_double(ClaudeService)
-      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "other", message: "boom" })
+      allow(fake_service).to receive(:review_sections).and_return("code_review" => { ok: false, error_code: "other", failure: "other" })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)
@@ -855,7 +915,7 @@ RSpec.describe "Responses", type: :request do
     it "leaves it standing when no section could be reviewed" do
       resp = submitted_response
       user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
-      stub_review({ ok: false, error_code: "other", message: "provider down" })
+      stub_review({ ok: false, error_code: "other", failure: "outage" })
 
       post review_response_path(resp)
 
@@ -893,17 +953,19 @@ RSpec.describe "Responses", type: :request do
       fake_service = instance_double(ClaudeService, review_sections: {
         "code_review" => { ok: true, review: { "rating" => "solid" } },
         "pattern"     => { ok: true, review: { "rating" => "developing" } },
-        "challenge"   => { ok: false, error_code: "rate_limit", message: "rate limited" }
+        "challenge"   => { ok: false, error_code: "rate_limit", failure: "short_rate_limit", retry_after: 20 }
       })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
 
       post review_response_path(resp)
 
       expect(response).to redirect_to(root_path(anchor: "ai-review"))
-      expect(flash[:notice]).to eq("2 of 3 sections reviewed — 1 couldn't be reviewed, try again.")
+      expect(flash[:notice]).to eq("2 of 3 sections reviewed. Claude is limiting requests right now, so the others weren't reviewed. Try again in about a minute.")
       resp.reload
       expect(resp.ai_review.keys).to match_array(%w[code_review pattern])
-      expect(resp.review_errors).to eq("challenge" => { "code" => "rate_limit", "message" => "rate limited" })
+      expect(resp.review_errors.keys).to eq([ "challenge" ])
+      expect(resp.review_errors["challenge"]).to include("kind" => "short_rate_limit", "retry_after" => 20, "at" => be_present)
+      expect(resp.review_errors["challenge"]).not_to have_key("message")
       expect(resp).not_to be_fully_reviewed
       expect(resp).to be_reviewed
     end
@@ -948,7 +1010,7 @@ RSpec.describe "Responses", type: :request do
       fake_service = instance_double(ClaudeService, review_sections: {
         "code_review" => { ok: true, review: { "rating" => "solid" } },
         "pattern"     => { ok: true, review: { "rating" => "solid" } },
-        "challenge"   => { ok: false, error_code: "other", message: "boom" }
+        "challenge"   => { ok: false, error_code: "other", failure: "other" }
       })
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
       post review_response_path(resp)

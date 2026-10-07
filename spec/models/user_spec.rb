@@ -1985,3 +1985,93 @@ RSpec.describe User, "#recent_exercise_history with dropped sections", type: :mo
     expect(entry.dropped).to eq(1)
   end
 end
+
+RSpec.describe User, "trials", type: :model do
+  it "is ready with its own key or an active trial, and nothing else" do
+    bare = User.create!(email: "bare@example.com", name: "Bare")
+    expect(bare).not_to be_provider_ready
+    expect(create_user_with_key).to be_provider_ready
+
+    trial = create_trial_user(provider: "fake")
+    expect(trial).to be_provider_ready
+    expect(trial).to be_trial
+    travel_to(trial.trial_ends_at + 1.second) do
+      expect(trial).not_to be_provider_ready
+      expect(trial).to be_trial_ended
+    end
+  end
+
+  it "reads a trial account that stored a key of its own as an own-key account, ended or not" do
+    trial = create_trial_user(provider: "fake")
+    expect(trial).to be_on_trial
+    expect(trial).to be_trial_active(now: trial.trial_ends_at - 1.second)
+    expect(trial).not_to be_trial_active(now: trial.trial_ends_at)
+
+    trial.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-own" })
+    expect(trial).not_to be_on_trial
+    expect(trial).not_to be_trial_ended
+    expect(trial).to be_provider_ready
+    travel_to(trial.trial_ends_at + 1.second) do
+      expect(trial).to be_trial
+      expect(trial).not_to be_trial_ended
+      expect(trial).to be_provider_ready
+    end
+  end
+
+  it "ends the trial when the account is deleted" do
+    trial = create_trial_user(provider: "fake")
+    trial.anonymize!
+
+    expect(trial.reload).not_to be_trial_active
+    expect(trial).not_to be_provider_ready
+    expect { AiService.for(trial) }.to raise_error(AiService::TrialEndedError)
+  end
+
+  it "ends the trial at the end of its last day in the user's zone, on the chosen provider" do
+    invite, = mint_trial_code(days: 3)
+    stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+    user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
+
+    expect(user.start_trial!(invite: invite, provider: "fake", consented_at: Time.utc(2026, 10, 6, 14),
+                             now: Time.utc(2026, 10, 6, 14))).to be(true)
+
+    expect(user.provider).to eq("fake")
+    expect(user.trial_started_at).to eq(Time.utc(2026, 10, 6, 14))
+    expect(user.trial_ends_at.in_time_zone("Asia/Tokyo").strftime("%F %T")).to eq("2026-10-08 23:59:59")
+  end
+
+  # Consent on the signed-out page comes before the emailed code; a code
+  # entered after the user's midnight must not cost the first day.
+  it "counts the trial from when the seat is taken, keeping consent as its own time" do
+    invite, = mint_trial_code(days: 3)
+    stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+    user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
+    consented = Time.utc(2026, 10, 6, 14, 55)  # 23:55 in Tokyo
+    redeemed  = Time.utc(2026, 10, 6, 15, 5)   # 00:05 the next day
+
+    expect(user.start_trial!(invite: invite, provider: "fake", consented_at: consented, now: redeemed)).to be(true)
+
+    expect(user).to have_attributes(trial_consented_at: consented, trial_started_at: redeemed)
+    expect(user.trial_ends_at.in_time_zone("Asia/Tokyo").strftime("%F %T")).to eq("2026-10-09 23:59:59")
+  end
+
+  it "refuses a trial on a provider with no house key, a missing code, or a second trial, taking no seat" do
+    invite, = mint_trial_code(seats: 3)
+    user = User.create!(email: "z@example.com", name: "Z")
+
+    expect(user.start_trial!(invite: invite, provider: "openai", consented_at: Time.current)).to be(false)
+    expect(user.start_trial!(invite: nil, provider: "fake", consented_at: Time.current)).to be(false)
+    expect(invite.reload.redeemed_count).to eq(0)
+
+    stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+    expect(user.start_trial!(invite: invite, provider: "fake", consented_at: Time.current)).to be(true)
+    expect(user.start_trial!(invite: invite, provider: "fake", consented_at: Time.current)).to be(false)
+    expect(invite.reload.redeemed_count).to eq(1)
+  end
+
+  it "keeps a provider with no stored key valid for a trial account" do
+    trial = create_trial_user(provider: "fake")
+    expect(trial.api_keys).to be_nil
+    expect(trial).to be_valid
+  end
+end

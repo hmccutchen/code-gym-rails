@@ -28,6 +28,10 @@ RSpec.describe "Request log parameter filtering" do
                                                 "an earlier framing", "an earlier turn")
   end
 
+  it "filters an invite code" do
+    expect(outcome("invite_code" => "ABCD")).to eq("invite_code" => "[FILTERED]")
+  end
+
   it "filters a browser install's push keys but keeps its endpoint" do
     expect(outcome("p256dh" => "k", "auth" => "a", "endpoint" => "https://fcm.googleapis.com/x"))
       .to eq("p256dh" => "[FILTERED]", "auth" => "[FILTERED]", "endpoint" => "https://fcm.googleapis.com/x")

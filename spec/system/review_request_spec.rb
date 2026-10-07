@@ -89,7 +89,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers"
 
-      expect(page).to have_content("rate-limiting", wait: 10)
+      expect(page).to have_content("is limiting requests right now", wait: 10)
       expect(page).to have_content("✓ Submitted")
       expect(page).to have_selector("form.review-form button")
       expect(page).to have_button("Start over")

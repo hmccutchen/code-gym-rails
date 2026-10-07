@@ -1,0 +1,23 @@
+<% page_title t("trials.page_title") %>
+<%= render "trials/styles" %>
+
+<div class="trial-wrap">
+  <h1><%= t("trials.heading") %></h1>
+  <% if @status %>
+    <% if @status.active? %>
+      <p><%= t("trials.running_until", day: l(@status.ends_on, format: :long), days: t("dashboard.trial_banner.days", count: @status.days_left)) %></p>
+      <p><%= @status.cap ? t("trials.used_today", used: @status.used, cap: @status.cap) : t("trials.used_today_no_cap", used: @status.used) %></p>
+      <p><%= t("trials.at_the_end") %></p>
+    <% else %>
+      <p><%= @status.ended_on ? t("trials.ended_on", day: l(@status.ended_on, format: :long)) : t("dashboard.trial_banner.ended") %>
+         <%= t("dashboard.trial_ended.kept") %></p>
+      <p><%= link_to t("dashboard.trial_ended.add_key"), setup_path %></p>
+    <% end %>
+    <%= render "trials/data_notice", providers: [ current_user.provider ] %>
+  <% elsif (providers = TrialMode.providers).any? %>
+    <p><%= t("trials.intro") %></p>
+    <%= render "trials/form", url: trial_path, providers: providers, signed_out: false %>
+  <% else %>
+    <p><%= t("trials.unavailable") %></p>
+  <% end %>
+</div>

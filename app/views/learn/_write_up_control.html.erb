@@ -47,12 +47,18 @@
         .then((data) => {
           if (data.ready) return window.location.reload();
           if (data.rewritten) return window.location.assign(window.location.pathname + "?ladder=missing");
+          if (data.failed) {
+            status.textContent = data.message;
+            button.disabled = false;
+            return;
+          }
           setTimeout(poll, INTERVAL_MS);
         })
         .catch(() => setTimeout(poll, INTERVAL_MS));
     }
 
     button.addEventListener("click", async () => {
+      attempts = 0;
       button.disabled = true;
       status.textContent = "<%= j t("learn.writing_guide") %>";
 
@@ -64,11 +70,11 @@
             "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
           }
         });
-        if (response.ok) return poll();
+        if (response.ok && !response.redirected) return poll();
 
-        const data = await response.json().catch(() => ({}));
+        const data = await CodeGymServerMessage.read(response);
         button.disabled = false;
-        status.textContent = data.error || "<%= j t("learn.write_guide_failed") %>";
+        status.textContent = CodeGymServerMessage.failure(response, data, "<%= j t("learn.write_guide_failed") %>").message;
       } catch {
         button.disabled = false;
         status.textContent = "<%= j t("learn.write_guide_failed") %>";

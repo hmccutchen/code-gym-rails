@@ -17,6 +17,9 @@
           form: { class: "review-form", data: { turbo: false } } %>
   <% end %>
 </div>
+<% if !response.fully_reviewed? && (failure = review_failure_sentence(response)) %>
+  <p class="hint review-failure"><%= failure %></p>
+<% end %>
 
 <% if response.reviewed? %>
   <div class="review-section" id="ai-review">

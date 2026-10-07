@@ -5,6 +5,11 @@ class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
   def self.provider_key = "gemini"
+
+  # Google's daily quotas reset at midnight Pacific, whatever the user's zone.
+  def self.quota_day_zone = "America/Los_Angeles"
+
+  def self.daily_quota_reset_at(failed_at) = quota_day(failed_at).end
   def self.key_pattern = /\A(AIza|AQ\.)/
 
   # Keyed by the ApiUsage purpose string, like ClaudeService's. Generation and
@@ -83,17 +88,7 @@ class GeminiService < AiService
       req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
     end
 
-    unless resp.success?
-      raise_if_key_rejected("Google", resp.status)
-
-      log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
-      message      = extract_provider_message(resp.body, fallback: "Gemini API error #{resp.status}")
-      error_class  = case resp.status
-      when 429      then AiService::RateLimitError
-      else               AiService::Error
-      end
-      raise error_class.new(message, http_status: resp.status)
-    end
+    raise_for_status(resp) unless resp.success?
 
     parsed       = parse_provider_envelope(resp.body, provider: "Gemini")
     model_output = Array(parsed["steps"]).find { |s| s["type"] == "model_output" }
@@ -118,12 +113,67 @@ class GeminiService < AiService
       # hitting max_tokens being one cause, so the status decides and token
       # counts are not consulted: a live call capped at 60 stopped at 56
       # output tokens with this status.
-      truncated: parsed["status"] == "incomplete"
+      truncated: parsed["status"] == "incomplete",
+      http_status: resp.status
     }
   rescue Faraday::Error => e
-    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
+    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::NetworkError
     raise error_class, "Network error calling Gemini: #{e.message}"
   end
+
+  # Gemini reports an invalid key as a 400 whose details carry reason
+  # API_KEY_INVALID, not as a 401, so that body is read for the reason and
+  # never logged: it can echo the key. A 429's body names the quota in
+  # QuotaFailure and the wait in RetryInfo; neither is logged either.
+  def raise_for_status(resp)
+    raise_if_key_rejected("Google", resp.status)
+    error = error_envelope(resp.body)
+    raise_if_key_invalid(error, resp.status)
+
+    if resp.status == 429
+      raise AiService::RateLimitError.new("Gemini API error 429", http_status: 429,
+                                          quota_id: quota_id_from(error), retry_after: retry_delay_from(resp, error))
+    end
+
+    log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
+    message = extract_provider_message(resp.body, fallback: "Gemini API error #{resp.status}")
+    raise AiService::Error.new(message, http_status: resp.status)
+  end
+
+  def raise_if_key_invalid(error, status)
+    return unless error_reasons(error).include?("API_KEY_INVALID")
+
+    Rails.logger.error("Google authentication failed (HTTP #{status}, API_KEY_INVALID)")
+    raise AiService::AuthenticationError.new("Google rejected your API key or its permissions. Check it in Settings.",
+                                             http_status: status)
+  end
+
+  def error_details(error, type)
+    Array(error["details"]).select { |detail| detail.is_a?(Hash) && detail["@type"].to_s.end_with?(type) }
+  end
+
+  def error_reasons(error)
+    error_details(error, "ErrorInfo").map { |detail| detail["reason"] }
+  end
+
+  # A 429 can list several violations; the daily one is the one that decides
+  # how long the wait is, so it wins over a per-minute limit beside it.
+  def quota_id_from(error)
+    ids = error_details(error, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }
+                                              .filter_map { |violation| violation["quotaId"] if violation.is_a?(Hash) }
+    ids.find { |id| id.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || ids.first
+  end
+
+  # RetryInfo's delay is a duration string such as "39s"; the header, when
+  # sent, is whole seconds.
+  def retry_delay_from(resp, error)
+    delay = error_details(error, "RetryInfo").filter_map { |detail| detail["retryDelay"] }.first.to_s
+    return delay.to_f.ceil if delay.match?(/\A\d+(\.\d+)?s\z/)
+
+    retry_after_seconds(resp)
+  end
+
+  def routed_model(purpose) = MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model]
 
   # The schema holds the reply's shape, not its string lengths, so the
   # caller's parse stays the boundary.

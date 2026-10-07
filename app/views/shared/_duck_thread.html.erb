@@ -38,6 +38,7 @@
 (() => {
   const MAX_TURNS = <%= ResponsesController::MAX_DUCK_TURNS_PER_SECTION %>;
   const DUCK_URL = "<%= duck_thread_responses_path %>";
+  const SEND_FAILED = <%= t("duck.send_failed").to_json.html_safe %>;
 
   const SPEAKER = { user: <%= t("duck.speakers.user").to_json.html_safe %>, assistant: <%= t("duck.speakers.assistant").to_json.html_safe %> };
 
@@ -128,12 +129,12 @@
           },
           body: JSON.stringify({ section: box.dataset.section, message: message, thread: priorThread })
         });
-        const data = await res.json();
+        const data = await CodeGymServerMessage.read(res);
         // Clear ran while this was in flight: the reply belongs to a
         // conversation the user has discarded, so dropping it (rather than
         // pushing it) is what keeps a cleared thread cleared.
         if (generation !== box.duckGeneration) return;
-        if (!res.ok) throw new Error(data.error || res.status);
+        if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, SEND_FAILED);
 
         box.duckThread.push({ role: "user", content: message }, { role: "assistant", content: data.answer });
         renderTurns(box);
@@ -141,7 +142,7 @@
         status.textContent = "";
       } catch (e) {
         if (generation !== box.duckGeneration) return;
-        status.textContent = e.message || <%= t("duck.send_failed").to_json.html_safe %>;
+        status.textContent = CodeGymServerMessage.message(e, SEND_FAILED);
       } finally {
         if (generation === box.duckGeneration) refreshCap(box);
       }

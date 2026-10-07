@@ -1,5 +1,6 @@
 class ResponsesController < ApplicationController
   include ProviderCallLimits
+  include ProviderFailureRendering
 
   # Ahead of the other checks, so a request they refuse still counts.
   limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
@@ -109,7 +110,7 @@ class ResponsesController < ApplicationController
       end
       @response.review_errors = @response.review_errors
                                           .except(*successes.keys)
-                                          .merge(failures.transform_values { |r| { "code" => r[:error_code], "message" => r[:message] } })
+                                          .merge(failures.transform_values { |r| stored_review_failure(r) })
       @response.save!
     end
     release_review_claim!
@@ -119,21 +120,16 @@ class ResponsesController < ApplicationController
     if failures.empty?
       redirect_to review_anchor, notice: t("flash.responses.review_ready")
     elsif successes.any?
-      redirect_to review_anchor, notice: t("flash.responses.review_partial", reviewed: successes.size, total: missing.size, failed: failures.size)
+      redirect_to review_anchor, notice: t("flash.responses.review_partial", reviewed: successes.size, total: missing.size,
+                                             reason: review_failure_text(failures, :review_partial).brief)
     else
-      redirect_to root_path, alert: zero_success_alert(failures)
+      redirect_to root_path, alert: review_failure_text(failures, :review).full
     end
   rescue ActiveRecord::RecordNotFound
     redirect_to root_path, alert: t("flash.responses.set_cleared_during_review")
-  rescue AiService::AuthenticationError
-    release_review_claim!
-    redirect_to root_path, alert: t("flash.responses.api_key_rejected")
-  rescue AiService::RateLimitError
-    release_review_claim!
-    redirect_to root_path, alert: t("flash.responses.rate_limited")
   rescue AiService::Error => e
     release_review_claim!
-    redirect_to root_path, alert: t("flash.responses.review_failed", message: e.message)
+    redirect_to root_path, alert: provider_failure_text(e, :review).full
   end
 
   # DELETE /responses/:id/start_over — abandon today's saved answers and
@@ -206,7 +202,7 @@ class ResponsesController < ApplicationController
       render json: { status: "ok", alternate: alternate, remaining: remaining }
     end
   rescue AiService::Error => e
-    render json: { status: "error", error: e.message }, status: :service_unavailable
+    render_provider_failure(e, :alternate)
   end
 
   # POST /responses/:id/follow_ups — ask one clarifying question about a section's
@@ -254,7 +250,7 @@ class ResponsesController < ApplicationController
       render json: { status: "ok", answer: answer, remaining: remaining }
     end
   rescue AiService::Error => e
-    render json: { status: "error", error: e.message }, status: :service_unavailable
+    render_provider_failure(e, :follow_up)
   end
 
   # POST /responses/duck_thread — one turn of the pre-submission Socratic
@@ -307,7 +303,7 @@ class ResponsesController < ApplicationController
 
     render json: { status: "ok", answer: answer }
   rescue AiService::Error => e
-    render json: { status: "error", error: e.message }, status: :service_unavailable
+    render_provider_failure(e, :duck)
   end
 
   # POST /responses/pseudocode_critique — round 1: one text-only critique of the
@@ -331,7 +327,7 @@ class ResponsesController < ApplicationController
     render json: { status: "ok", gaps_found: result[:gaps_found], gaps: result[:gaps] }
   rescue AiService::Error => e
     release_pseudocode_claim!(row, section, "critique")
-    render json: { status: "error", error: e.message }, status: :service_unavailable
+    render_provider_failure(e, :critique)
   end
 
   private
@@ -636,16 +632,24 @@ class ResponsesController < ApplicationController
     review.dig(ReviewProseVerdict::ORIGINAL_KEY, "missed") || review["missed"]
   end
 
-  def zero_success_alert(failures)
-    codes = failures.values.map { |f| f[:error_code] }.uniq
-    case codes
-    in [ "authentication" ]
-      t("flash.responses.api_key_rejected")
-    in [ "rate_limit" ]
-      t("flash.responses.rate_limited")
-    else
-      t("flash.responses.review_failed", message: failures.values.first[:message])
-    end
+  # The kind most of the failed sections share, written for this surface. A
+  # fan-out usually fails every section the same way; when it does not, the
+  # commonest kind is the one worth explaining.
+  def review_failure_text(failures, surface)
+    kind    = failures.values.map { |f| f[:failure] }.tally.max_by { |_, count| count }.first
+    example = failures.values.find { |f| f[:failure] == kind }
+    ProviderFailureText.new(kind, provider: example[:provider] || current_user.provider, surface: surface,
+                            failed_at: example[:failed_at] || Time.current, zone: current_user.effective_time_zone,
+                            retry_after: example[:retry_after], variant: ProviderFailureText.variant_for(current_user))
+  end
+
+  # What a failed section keeps: its kind, the quota named and when it failed,
+  # never the error's text. The page writes the sentence when it is read. The
+  # time is the section's own, since the review waits for its slowest sibling
+  # and a reset counted from then can land a day late.
+  def stored_review_failure(result)
+    { "kind" => result[:failure], "provider" => result[:provider], "quota_id" => result[:quota_id],
+      "retry_after" => result[:retry_after], "at" => (result[:failed_at] || Time.current).iso8601 }.compact
   end
 
   def response_params

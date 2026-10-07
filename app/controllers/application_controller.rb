@@ -5,7 +5,7 @@ class ApplicationController < ActionController::Base
   include PreviewAutoLogin
 
   before_action :require_login
-  before_action :require_api_key
+  before_action :require_provider
   around_action :use_time_zone
 
   # A stale CSRF token (e.g. a login page left open across a deploy restart)
@@ -55,6 +55,12 @@ class ApplicationController < ActionController::Base
     current_user.present?
   end
 
+  # The per-user limits on billed requests guard a trial's house key. An
+  # account with a key of its own pays for its calls, so it is never limited.
+  def own_key?
+    current_user.api_key_present?
+  end
+
   def require_login
     unless logged_in?
       session[:return_to] = request.fullpath
@@ -62,9 +68,12 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  def require_api_key
+  # Own key or a trial. An ended trial still reaches every page, where each
+  # provider call fails with the trial-ended sentence and the dashboard says
+  # so.
+  def require_provider
     return unless logged_in?
-    return if current_user.api_key_present?
+    return if current_user.provider_ready? || current_user.trial?
     return if controller_name == "api_keys" || controller_name == "sessions"
 
     redirect_to setup_path, notice: t("flash.application.api_key_needed")

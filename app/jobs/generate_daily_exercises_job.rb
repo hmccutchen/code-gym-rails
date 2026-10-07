@@ -112,21 +112,16 @@ class GenerateDailyExercisesJob < ApplicationJob
     # Defense-in-depth: #status/#show both check exercise-existence before
     # these columns, so this isn't load-bearing today, but clears the slate
     # for any future reader that checks these columns directly.
-    user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
+    user.clear_generation_failure! if user.last_generation_error_date.present?
 
     Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
-  rescue AiService::AuthenticationError => e
-    Rails.logger.error("Auth failure generating exercise for user #{user.id}: #{e.message}")
-    persist_failure(user, "Your API key was rejected — check it in Settings.")
-  rescue AiService::RateLimitError => e
-    Rails.logger.warn("Rate limited generating exercise for user #{user.id}: #{e.message}")
-    persist_failure(user, "The AI provider is rate-limiting requests — try again shortly.")
-  rescue AiService::TimeoutError => e
-    Rails.logger.warn("Timed out generating exercise for user #{user.id}: #{e.message}")
-    persist_failure(user, "Generation took longer than the provider's budget — try again.")
-  rescue AiService::Error => e
+  rescue AiService::AllSectionsRejectedError => e
+    # An app decision, not a provider failure: its message is the explanation.
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
-    persist_failure(user, e.message)
+    persist_failure(user) { user.record_generation_message!(e.message) }
+  rescue AiService::Error => e
+    Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
+    persist_failure(user) { user.record_generation_failure!(e) }
     # Don't re-raise — one failure shouldn't block other users in the batch
   rescue ActiveRecord::RecordNotUnique
     # Lost a race against a concurrent generation for this user/date (e.g. two
@@ -145,12 +140,12 @@ class GenerateDailyExercisesJob < ApplicationJob
   # that timed out would otherwise leave a "couldn't generate" banner sitting
   # above a perfectly good set for the rest of the day. If a set exists, clear
   # the slate instead of reporting.
-  def persist_failure(user, message)
+  def persist_failure(user)
     if DailyExercise.exists?(user: user, date: Date.current)
-      user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
+      user.clear_generation_failure! if user.last_generation_error_date.present?
       return
     end
 
-    user.update!(last_generation_error_date: Date.current, last_generation_error: message)
+    yield
   end
 end

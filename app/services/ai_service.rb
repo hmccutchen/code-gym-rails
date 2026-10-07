@@ -2,23 +2,49 @@ require "json"
 
 class AiService
   # http_status is set when the provider answered with a non-success status,
-  # so a fallback can say which.
+  # so a fallback can say which. quota_id names the limit a 429 hit, in the
+  # provider's own vocabulary, and retry_after is the wait it asked for in
+  # seconds; both are read by ProviderFailure and the usage row, never shown.
   class Error < StandardError
-    attr_reader :http_status
+    attr_reader :http_status, :quota_id, :retry_after
+    # Stamped by call_and_log with the provider whose call raised, so a stored
+    # failure names the provider that was tried even after the user switches.
+    attr_accessor :provider
 
-    def initialize(message = nil, http_status: nil)
+    def initialize(message = nil, http_status: nil, quota_id: nil, retry_after: nil)
       super(message)
       @http_status = http_status
+      @quota_id    = quota_id
+      @retry_after = retry_after
     end
   end
 
-  # Bad/revoked API key (HTTP 401/403) — user-actionable: they need to fix
-  # their key in Settings. Never worth retrying.
+  # Bad/revoked API key (HTTP 401/403, or Gemini's 400 API_KEY_INVALID) —
+  # user-actionable: they need to fix their key in Settings. Never worth
+  # retrying.
   class AuthenticationError < Error; end
 
   # Transient rate limiting (HTTP 429) that survived Faraday's own retries.
   # User-actionable in the sense of "try again shortly", but not a bug.
   class RateLimitError < Error; end
+
+  # The account behind the key is out of credit or over a spend limit. Not a
+  # rate limit: waiting does not clear it, and OpenAI reports it as a 429 all
+  # the same, so the providers tell the two apart before raising.
+  class BillingError < Error; end
+
+  # The account is on a trial that has ended, or trials are switched off, and
+  # it stored no key of its own. Raised before anything is sent.
+  class TrialEndedError < Error; end
+
+  # A trial account has used its calls for today, or every trial together has
+  # used the house key's guard. Raised before anything is sent; retry_after is
+  # the wait until the count resets.
+  class TrialAllowanceError < Error; end
+
+  # The request never got an HTTP answer and did not time out: a refused
+  # connection, a reset, a DNS failure.
+  class NetworkError < Error; end
 
   # The read budget ran out before the provider answered. Separated from a
   # generic Error so callers can report it in the user's terms: the raw
@@ -1039,6 +1065,12 @@ class AiService
   # free of large/undesired provider content.
   RAW_SNIPPET_LIMIT = 500
 
+  # True when the key is a house key paid for by the deployment rather than
+  # the user: the usage row records it, and the trial gates run before a call.
+  attr_writer :house_key
+
+  def house_key? = @house_key == true
+
   def initialize(api_key)
     @api_key = api_key
     @conn    = build_connection
@@ -1051,11 +1083,25 @@ class AiService
       raise Error, "User #{user.id} has the test-only #{provider.provider_key} provider outside a local environment"
     end
 
-    provider.new(user.api_key)
+    credential = ProviderCredential.for(user)
+    provider.new(credential.key).tap { |service| service.house_key = credential.house }
+  end
+
+  # The calendar day a provider counts requests in, for the house-key guard.
+  # Gemini's day is Pacific; the base assumes UTC for a provider that states
+  # no boundary.
+  def self.quota_day_zone = "UTC"
+
+  def self.quota_day(now)
+    start = now.in_time_zone(quota_day_zone).beginning_of_day
+    start...start.tomorrow.beginning_of_day
   end
 
   def self.available? = true
   def self.key_pattern = nil
+  # Named by every registered provider; nil only on a bare subclass, such as a
+  # spec's double, whose usage rows then carry no provider.
+  def self.provider_key = nil
 
   # Whether this provider can hold the prose judge's reply to a schema. The
   # base answers false; a provider that can opts in. Turning the judge on is
@@ -1106,7 +1152,7 @@ class AiService
     draft = draft_exercise(user, language: language, blocking: false)
     JudgedGeneration.call(
       user: user, language: language, draft: draft,
-      providers: -> { self.class.new(@api_key).judged_generation_provider },
+      providers: -> { fresh_service.judged_generation_provider },
       finish: ->(set, **logs) { finish_generation(user, language, draft, set, **logs) }
     ).with(plan_notes: draft.plan.notes)
   end
@@ -1434,8 +1480,28 @@ class AiService
     case error
     when AuthenticationError  then "authentication"
     when RateLimitError       then "rate_limit"
+    when BillingError         then "out_of_credit"
+    when TrialEndedError      then "trial_ended"
+    when TrialAllowanceError  then "trial_allowance_used"
     when InvalidResponseError then "invalid_response"
     else                           "other"
+    end
+  end
+
+  # The failure a usage row records for a call that returned nothing usable.
+  # Closed list in ApiUsage::FAILURES; a refusal or truncation is recorded on
+  # the row its tokens were billed to, since the provider charged for them.
+  def self.failure_code_for(error)
+    case error
+    when RateLimitError         then "rate_limit"
+    when AuthenticationError    then "authentication"
+    when BillingError           then "out_of_credit"
+    when TimeoutError           then "timeout"
+    when NetworkError           then "network"
+    when TruncatedResponseError then "truncated"
+    when InvalidResponseError   then "invalid_response"
+    when RefusalError           then "refusal"
+    else                             "provider_error"
     end
   end
 
@@ -2696,7 +2762,7 @@ class AiService
   # purpose rather than AiService::Error-wide.
 
   def safe_difficulty_assessment(user, exercise, sections)
-    self.class.new(@api_key).send(:assess_difficulty, user, exercise, sections: sections)
+    fresh_service.send(:assess_difficulty, user, exercise, sections: sections)
   rescue StandardError => e
     Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
     {}
@@ -2783,7 +2849,7 @@ class AiService
   end
 
   def grade_section(user, exercise, daily_response, section, context)
-    service = self.class.new(@api_key)
+    service = fresh_service
     result  = service.send(
       :call_and_log, user, purpose: "review_response",
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
@@ -2797,7 +2863,9 @@ class AiService
     review = service.send(:gaps_beside_their_prose, service.send(:judged_review, user, exercise, section, review))
     [ section, { ok: true, review: review } ]
   rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
-    [ section, { ok: false, error_code: error_code_for(e), message: e.message } ]
+    [ section, { ok: false, error_code: error_code_for(e), failure: ProviderFailure.classify(e),
+                 provider: e.try(:provider) || service.class.provider_key,
+                 quota_id: e.try(:quota_id), retry_after: e.try(:retry_after), failed_at: Time.current } ]
   end
 
   # A kind that computes its own rating replaces the grader's, and the
@@ -3171,15 +3239,26 @@ class AiService
   # Rescues database failures only, the pool checkout included. Anything else
   # here is a bug, and swallowing it would silently empty the table that cost
   # questions are answered from.
+  # A service for another thread of the same call, carrying the same key and
+  # the same credential kind.
+  def fresh_service
+    self.class.new(@api_key).tap { |service| service.house_key = house_key? }
+  end
+
   def log_usage(user, result, purpose:)
     ActiveRecord::Base.connection_pool.with_connection do
       ApiUsage.create!(
         user:       user,
+        house_key:  house_key?,
         tokens_in:  result[:input_tokens].to_i,
         tokens_out: result[:output_tokens].to_i,
         model:      result[:model],
+        provider:   self.class.provider_key,
         cache_read_tokens:  result[:cache_read_tokens],
         cache_write_tokens: result[:cache_write_tokens],
+        http_status: result[:http_status],
+        failure:     result[:failure],
+        quota_id:    result[:quota_id],
         purpose:    purpose,
         date:       Date.current
       )
@@ -3211,12 +3290,25 @@ class AiService
   # stops early is unusable, but prose that stops a sentence early still is.
   # A refusal always raises, after the usage row is written: the provider
   # billed the input even though it returned no text.
+  #
+  # A call that fails before a reply arrives writes a row too, with zero
+  # tokens and the failure's code, status and quota id: one row per call,
+  # whatever faraday-retry did inside it. The write goes through #log_usage,
+  # which never raises, so recording a failure cannot change which error the
+  # caller sees.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
                    read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false, single_attempt: false)
-    result = call(system: system, prompt: prompt, cache_system: cache_system,
-                  read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,
-                  response_schema: response_schema, single_attempt: single_attempt)
-    log_usage(user, result, purpose: purpose)
+    TrialAllowance.check!(user, provider: self.class) if house_key?
+    begin
+      result = call(system: system, prompt: prompt, cache_system: cache_system,
+                    read_timeout: read_timeout, max_tokens: max_tokens, history: history, purpose: purpose,
+                    response_schema: response_schema, single_attempt: single_attempt)
+    rescue Error => e
+      e.provider ||= self.class.provider_key
+      log_usage(user, failed_call_result(e, purpose), purpose: purpose)
+      raise
+    end
+    log_usage(user, result.merge(failure: reply_failure_code(result, allow_truncated)), purpose: purpose)
 
     raise Error, result[:error] if result[:error]
     raise RefusalError, "The provider declined this request (#{result[:refusal]})" if result[:refusal]
@@ -3228,5 +3320,53 @@ class AiService
     end
 
     result
+  end
+
+  def failed_call_result(error, purpose)
+    { input_tokens: 0, output_tokens: 0, model: routed_model(purpose),
+      http_status: error.http_status, failure: self.class.failure_code_for(error), quota_id: error.quota_id }
+  end
+
+  # A reply that arrived but is unusable is still billed, so its row keeps the
+  # tokens and names why it was not used.
+  def reply_failure_code(result, allow_truncated)
+    return "provider_error" if result[:error]
+    return "refusal" if result[:refusal]
+    return "truncated" if result[:truncated] && !allow_truncated
+
+    nil
+  end
+
+  # The model a purpose routes to on this provider, for a failure row that
+  # never reached a reply. Providers override; the base knows no routes.
+  def routed_model(_purpose) = nil
+
+  # A provider error body as a Hash, or {} when it is not a JSON object. Read
+  # for a quota id or an error code, never logged: an error body can carry the
+  # key or fragments of it.
+  def parse_error_body(body)
+    parsed = JSON.parse(body.to_s)
+    parsed.is_a?(Hash) ? parsed : {}
+  rescue JSON::ParserError
+    {}
+  end
+
+  # The provider's error object, or an empty one when the body is not JSON,
+  # carries no "error" or carries a null one, so the status alone decides.
+  def error_envelope(body)
+    error = parse_error_body(body)["error"]
+    error.is_a?(Hash) ? error : {}
+  end
+
+  # When a daily request limit hit at failed_at lifts. A provider whose quota
+  # day has a known boundary overrides this; the base gives a day.
+  def self.daily_quota_reset_at(failed_at)
+    failed_at + 1.day
+  end
+
+  # The provider's requested wait in whole seconds, from the standard header.
+  def retry_after_seconds(resp)
+    value = resp.headers["retry-after"].to_s
+    value.match?(/\A\d+\z/) ? value.to_i : nil
   end
 end

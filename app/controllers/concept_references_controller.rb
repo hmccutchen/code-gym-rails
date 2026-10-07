@@ -1,5 +1,6 @@
 class ConceptReferencesController < ApplicationController
   include ProviderCallLimits
+  include ProviderFailureRendering
 
   limit_provider_calls only: :explain_differently
 
@@ -57,7 +58,7 @@ class ConceptReferencesController < ApplicationController
     # ResponsesController#duck_thread's missing-exercise branch).
     render json: { status: "error", error: t("errors.concept_references.reference_missing") }, status: :not_found
   rescue AiService::Error => e
-    render json: { status: "error", error: e.message }, status: :service_unavailable
+    render_provider_failure(e, :alternate)
   end
 
   private

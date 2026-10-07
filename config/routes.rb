@@ -37,6 +37,13 @@ Rails.application.routes.draw do
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
 
+  # Start a trial on a house key with an invite code: signed out with an
+  # email, or signed in on an account with no key.
+  get  "trial/start", to: "trials#new", as: :new_trial
+  post "trial/start", to: "trials#start", as: :start_trial
+  get  "trial", to: "trials#show"
+  post "trial", to: "trials#create"
+
   get "welcome", to: "welcome#show"
 
   # Account page: log out or permanently delete (anonymize) the account.

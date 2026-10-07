@@ -295,10 +295,11 @@ Every page load, any day of the week:
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}) |
+| `User`          | email, name, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; nil = no decision), track_evidence_cutoffs (non-null jsonb, default {}) |
 | `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `coverage`, `shared_concept`) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
+| `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
 
 `ConceptReference` (not listed above — it has no `user_id`; see "The Learn tab"
@@ -437,6 +438,89 @@ concept-specific difficulty descriptions for future generation, not a new set.
   operator's own key. A refresh rewrites the whole shared reference and guide,
   including rows that already have a guide, for every user. Production coverage,
   billed cost and completion remain unmeasured until this runs there.
+- **Invite codes and trials**: anyone can sign up with an email, as before,
+  and bring their own key; no code is needed to use the app. An invite code
+  starts a trial on a house key instead. `InviteCode` keeps only a SHA-256
+  digest of the 26-character base32 code `script/mint_invite_code.rb` prints
+  once, with its seats, deadline, trial length and daily cap, and `#redeem!`
+  takes a seat in one statement against the seat count and the deadline, so
+  two redemptions cannot both win the last seat. The person picks the
+  provider: `TrialMode.providers` lists those with a data notice to consent
+  to and a house key set (Gemini, Claude and OpenAI), and none under the kill
+  switch.
+
+  **Two ways in.** `/trial/start` is public: a name, an email, the code, a
+  provider and the consent checkbox. It checks the code (`#available?`)
+  before mailing anything, mails a login code through the same
+  `LoginCodeRequests` concern and limits the login form uses, and keeps a
+  `PendingTrial` in the session. Entering the emailed code takes the seat and
+  starts the trial, so nobody can spend a seat on an address they cannot
+  read; asking for a plain login code drops the pending trial. A signed-in
+  account with no key uses `/trial`, which asks for the code and provider
+  only.
+
+  **A trial is a `trial_ends_at`, nothing more.** `User#start_trial!` runs
+  under the row lock, refuses an account with a key of its own or one that
+  has had a trial, takes the seat, and sets `provider` to the choice and the
+  end to the last day's end in the user's zone, counted from when the seat
+  is taken rather than from consent, which can come the day before.
+  `trial_active?` needs the end in the future, `TrialMode.enabled?`
+  (`TRIALS_DISABLED` is not `"1"`, the kill switch) and a house key for the
+  provider (`HouseKeys.for`, `HOUSE_<PROVIDER>_API_KEY`, read from ENV at
+  call time and never stored), and an account that has not been deleted,
+  since jobs queued before a deletion still load the row by id.
+  `provider_ready?` is own key or active trial,
+  behind `require_provider` and the dashboard's on-demand generation; the
+  nightly batch still selects stored keys, so a trial is generated only when
+  it opens the dashboard.
+
+  **The house key changes the credential and nothing in the request.**
+  `ProviderCredential.for(user)` hands `AiService.for` the user's own key, no
+  key, or the house key, and raises `AiService::TrialEndedError` for an
+  ended trial. The service's `house_key?` reaches the per-section threads
+  through `fresh_service`, is written to every usage row, and is what runs
+  `TrialAllowance.check!` ahead of the call in `call_and_log`: a trial still
+  active, since a service built during the trial keeps its house key through
+  a fan-out or a long job (`AiService::TrialEndedError` otherwise), the invite's
+  `daily_request_cap` on the user's own day (`ApiUsage.requests_on`, counted
+  by when each row was written in the user's zone, since a job outside that
+  zone stamps `date` with the server's day) and `HOUSE_<PROVIDER>_DAILY_GUARD`
+  over the provider's quota day (`AiService.quota_day`: Pacific for Gemini,
+  UTC otherwise), attempts included, each raising
+  `AiService::TrialAllowanceError` with the seconds until the count resets
+  and writing no row. The gate counts before its own row exists, so
+  concurrent calls can overshoot by the fan-out width per account, times
+  the accounts calling at once; the provider's spend limit is the hard
+  stop, by design. `spec/services/trial_isolation_spec.rb` pins
+  byte-identical generation and judge calls for a trial and an own-key twin,
+  and that nothing under `app/services`, `app/jobs` or the mastery and
+  verdict models reads trial state. A trial account's failures read in the
+  `trial` variant (`ProviderFailureText.variant_for`): the two trial kinds
+  only exist there, and `daily_limit`, `bad_key` and `out_of_credit` name
+  the trial's key rather than the reader's, while the rest fall back to the
+  `own_key` words.
+
+  **What a trial account sees.** `TrialStatus.for(user)` is the one reading
+  of a trial's standing: the day it ends and the days left in the user's
+  zone, today's calls against the cap (the gate's own query), and the day it
+  ended, or none when the kill switch or a missing house key ended it early.
+  `/trial` shows that with the data notice, the dashboard carries one banner
+  line linking there, and Setup swaps the on-track key guide for a note
+  linking there while the trial runs. An ended trial still reaches every
+  page: `require_provider` lets any trial through, each provider call then
+  fails with the trial-ended sentence through the rescues the surfaces
+  already have, the dashboard renders a trial-ended panel instead of
+  enqueuing a set, `/generate` and `/regenerate` refuse with the sentence
+  (an existing set shows no Generate new set button), and Setup shows the
+  key guide whether or not the account is on the track. `User#on_trial?`, a
+  trial with no key of its own, is what every trial page and sentence reads,
+  and `trial_ended?` is `on_trial?` and not active: a trial account that
+  pastes a key is an own-key account everywhere, ended or not, since
+  `ProviderCredential` hands the service that key first. `trial_active?`
+  takes the clock it is asked about, so `TrialStatus` reads one `now`
+  throughout. Every trial branch renders only for a trial account, so
+  existing pages stay byte-identical.
+  Design in `docs/trial-mode-and-provider-limits-2026-10-06.md`.
 - **Per-user API keys**: Each user provides their own Anthropic, Gemini or OpenAI key, and can keep one for each. Zero shared cost. A pasted key's prefix (`sk-ant-`, `AIza`/`AQ.`, or `sk-proj-`/`sk-svcacct-`/legacy `sk-`) decides which provider it is saved under; the OpenAI pattern requires alphanumerics straight after a bare `sk-`, so it can never claim an Anthropic key whatever order the patterns are tried in. Pasting a key replaces only that provider's key and selects it (`User#store_api_key`); Setup's "Provider in use" radios switch between saved keys without re-entering one, and list only providers with a saved key (`User#stored_providers`). `user.provider` names the one in use, `User#api_key` reads its key, and `AiService.for(user)` dispatches on it, so nothing downstream knows there is more than one. The keys are stored together in `users.api_keys`, a JSON map serialized and then encrypted with `encrypts :api_keys` (ActiveRecord Encryption); no keys stores as NULL, so `where.not(api_keys: nil)` finds the accounts that can call a provider. A map rather than a column per provider keeps adding a provider a matter of adding a class. `users.api_key`, the single-key column it replaced, is ignored for one release while the old code serves through the pre-deploy migration, and dropped afterwards; a key pasted in that window lands only in the old column and has to be pasted again. Each reviewed response records the provider that wrote it in `daily_responses.review_provider`, so History and the dashboard keep naming it after a switch; a part-reviewed day finished on another provider names the last one. A review old code wrote while the migration ran has none, so changing `provider` first records the outgoing provider on every reviewed response still missing one (`User#record_provider_on_unlabelled_reviews`), and a response with none can then only have come from the current provider. A user could already switch by pasting another provider's key, so the backfill stores `unknown` (labelled "AI") on the past reviews of a user whose `api_usages.model` rows name another provider. Models were recorded only from 2026-10-01, so a switch before that left no trace, and those reviews keep the current provider's name, as the page already showed. Deleting an account also clears the ignored `api_key` column, which still holds the copied key until it is dropped. Setup says nothing about how providers differ: the prose judge ships off, and structured output and caching change cost and reliability rather than anything an engineer does differently. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**: each provider picks its model from its own
@@ -608,8 +692,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   because `rate_limit` binds its `store:` at class-load time; resolving
   `Rails.cache` per call keeps production on Solid Cache and keeps the limits
   testable against the test env's `:null_store`.
-- **Per-user request limits**: every endpoint that bills one provider call to
-  the user's key (`ResponsesController`'s duck, follow-ups, explain
+- **Per-user request limits**: they guard a trial's house key, so an account
+  with a key of its own is never held to them (`ApplicationController#own_key?`,
+  the `unless:` on each limit below). Every endpoint that bills one provider
+  call (`ResponsesController`'s duck, follow-ups, explain
   differently and pseudocode critique, and
   `ConceptReferencesController#explain_differently`) declares
   `ProviderCallLimits`, which counts them together: `ProviderCallLimits::HOURLY`
@@ -619,7 +705,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   so a request those checks refuse still counts. `/generate` allows
   `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
   prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
-  `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per
+  Those per-endpoint caps and the job permit below apply to every
+  account. `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per
   user and discards an overlapping enqueue, because every dashboard load with
   no set enqueues one and each would run a full billed generation before the
   unique index threw it away; the hourly batch passes no user and is not
@@ -1368,8 +1455,23 @@ concept-specific difficulty descriptions for future generation, not a new set.
   Gemini rows from before this under-count output by however much the model
   thought and over-count input by whatever was cached, and every row from
   before this has a null model and null cache counts: unknown, not zero, and
-  nothing backfills them, since a user's provider can change. Calls that fail
-  before a response arrives still write no row.
+  nothing backfills them, since a user's provider can change.
+
+  **A row also records the call's outcome.** `provider` names the provider
+  class the row was written by (backfilled from `model` for older rows, since
+  every model name identifies its provider), `http_status` is the reply's
+  status, `failure` is one of `ApiUsage::FAILURES` or null when the reply was
+  used, `quota_id` is the limit a 429 named in the provider's own vocabulary
+  (Gemini's `QuotaFailure.violations[].quotaId`; the first
+  `anthropic-ratelimit-*-remaining` header reading zero on Claude; the first
+  `x-ratelimit-remaining-*` reading zero, else the error code, on OpenAI), and
+  `house_key` says whether a house key paid for it, false until trial mode
+  arrives. A call that fails before a reply arrives writes one row with zero
+  tokens, through the same `#log_usage`, from `call_and_log`'s rescue: one row
+  per call, whatever faraday-retry did inside it, and the write never changes
+  the error the caller sees. A refusal or truncation is marked on the row its
+  tokens were billed to. `AiService.failure_code_for` is the one map from an
+  error class to a code.
 - **How a cut-off reply is recognized**: each provider reports truncation as
   data and `AiService#call_and_log` decides it is fatal, after writing the
   usage row. Claude reads `stop_reason == "max_tokens"`. Gemini reads the
@@ -1390,7 +1492,81 @@ concept-specific difficulty descriptions for future generation, not a new set.
   An authentication error (401 or 403) from any provider gets fixed guidance
   naming the company and logs only the HTTP status, through
   `AiService#raise_if_key_rejected`, because the provider's error body can
-  echo the key or its fragments.
+  echo the key or its fragments. Gemini reports an invalid key as a 400 whose
+  details carry `API_KEY_INVALID`, so `GeminiService` reads that body for the
+  reason, never logs it, and raises the same `AuthenticationError`.
+- **What a person is told when a provider fails**: every surface that
+  rescues an `AiService::Error` classifies it with `ProviderFailure.classify`
+  (pure: `daily_limit`, `short_rate_limit`, `bad_key`, `out_of_credit`,
+  `outage`, `timeout`, `other`) and renders the class through
+  `ProviderFailureText`, whose words live in the `provider_failures` locale
+  table, one entry set per kind and per credential variant (`own_key` now;
+  `trial` is added by text alone). Nothing passes an error's message to a
+  user any more: not a flash, a JSON `error`, the dashboard's generation
+  panel, the status endpoint or Learn's status line. A sentence names the
+  provider's label, what did not happen on that surface
+  (`provider_failures.outcomes`), what is still there (`provider_failures.saved`),
+  the reset and the next step; it can carry no provider text, status code,
+  socket detail or key, and `provider_failure_text_spec` holds every kind on
+  every surface to that.
+
+  **Page scripts show only the app's own words.** A fetch that fails can
+  reject with the browser's text ("Failed to fetch"), land on an HTML error
+  page whose parse error names a token, or come back as the JSON Rails writes
+  for an unhandled exception, whose `error` is a status phrase and whose
+  `status` is a number. `shared/_server_message` defines
+  `window.CodeGymServerMessage`, the one rule every script that calls a JSON
+  endpoint uses: it shows an `error` only when `status` is `"error"`, which
+  every reply the app writes carries, says the session expired when fetch
+  followed a redirect, and otherwise shows the page's own fallback wording.
+  A caught error's message is shown only when the helper made it.
+  `spec/system/server_message_spec.rb` drives each of those replies through
+  the thinking partner. The sign-up form's refused address gets
+  `sessions.email_not_accepted` rather than the validation exception.
+
+  **Rendered when read, not when written.** A failed generation stores its
+  class, provider, time and requested wait (`users.last_generation_failure`,
+  `last_generation_failure_provider`, `last_generation_failed_at`,
+  `last_generation_retry_after`) and `User#generation_failure_message` writes
+  the sentence for the page or `/dashboard/status` in the user's zone against
+  the clock, through `ResetClock`: a daily limit resets when the provider
+  class's `daily_quota_reset_at` says (Gemini's quota day ends at midnight
+  Pacific; the base class gives a day), a short limit after the wait the
+  provider asked for or a minute, and once the reset has passed the sentence
+  says the limit has reset rather than naming a time behind the reader.
+  The provider is stored because `call_and_log` stamps every
+  `AiService::Error` with the provider whose call raised
+  (`AiService::Error#provider`), and a user can switch keys before reading:
+  the sentence names the provider that failed, and a stored failure with no
+  provider reads as the current one.
+  `last_generation_error` keeps text that is not a provider failure (a
+  reviewed set kept, an unusable draft, every section rejected) and rows from
+  before the columns existed, which render as they did. A failed review
+  section stores `{kind, provider, quota_id, retry_after, at}` in
+  `review_errors`, never the message; the submitted dashboard renders the
+  newest one beside the retry button, and rows that still carry the old
+  `code` read as the nearest kind.
+
+  **Out of credit is never a rate limit.** Per platform.claude.com's error
+  and rate-limit pages, Anthropic returns a 402 `billing_error`, a 400 whose
+  message begins "You have reached your specified ... API usage limits" or
+  names the credit balance, or a 429 whose `details.error_code` is
+  `enforced_spend_limit_reached` with no `retry-after`; OpenAI returns a 429
+  whose `error.code` is `insufficient_quota`. Each provider raises
+  `AiService::BillingError` for those before a 429 can become a
+  `RateLimitError`, so waiting is never advised for an empty balance. A
+  per-day quota id or a wait of an hour or more makes a 429 a daily limit;
+  any other is a short one.
+
+  **Learn keeps a failure per user, not on the shared row.** A failed
+  write-up is noted in the Rails cache by user and concept
+  (`ConceptReferenceFailures`, `EXPIRY` one hour, shorter than any quota's
+  reset), with the provider the job used, and `/learn/:bucket/:concept/status` returns `failed` and the
+  sentence, on which the page stops polling. Production's cache is Solid
+  Cache in the one Postgres database, shared by web and worker, which is what
+  lets the worker's job write what the web reads; development's memory store
+  is per process, where the jobs run in the web process anyway. Asking for
+  the write-up again clears the note, and so does a write-up landing.
 - **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
   filters what engineers write (`answers`, `message`, `question`,
   `pseudocode`, `prior_alternates`, the duck's `thread`), the login `code`
@@ -2610,6 +2786,20 @@ always pull in the full suite — is stated once, in
 - `app/services/shared_concept.rb` — `SharedConcept`: which reduced-tier concept both fixed sections take, from a host the day left free; pure
 - `app/services/day_hosts.rb` — `DayHosts`: which kinds can tag a concept today, bucket and strict no-rung vocabulary; pure
 - `app/models/real_source.rb` — `RealSource`: the curated registry of Code Gym's own methods and migrations a `code_review` may be grounded in, the per-user least-recently-seen pick over it, and the trace it reads back from `problem_set`. Closed lists, one class per excerpt kind — adding an entry is a line, adding a kind is a class
+- `app/models/invite_code.rb` — `InviteCode`: a code's digest, seats, deadline and trial terms; `.mint` prints the code once, `#redeem!` takes a seat atomically
+- `app/models/pending_trial.rb` — `PendingTrial`: a trial asked for on the public trial page, kept in the session until the emailed code is entered
+- `app/controllers/concerns/login_code_requests.rb` — `LoginCodeRequests`: mailing a login code and the limits on asking, shared by the login form and the trial form
+- `app/models/provider_credential.rb` — `ProviderCredential.for(user)`: own key, no key, or the house key for an active trial; raises for an ended one
+- `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
+- `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
+- `app/controllers/trials_controller.rb` — `/trial/start` for someone signed out and `/trial` for a keyless account: the code, the provider, the data notice and consent, and a trial's standing once it has begun
+- `app/models/trial_status.rb` — `TrialStatus`: a trial's standing for its pages: days left, today's calls against the cap, the day it ended
+- `script/mint_invite_code.rb` — mints one invite code and prints it once
+- `app/models/provider_failure.rb` — `ProviderFailure`: the kind of failure a page can explain, from the error the boundary rescued; pure
+- `app/models/reset_clock.rb` — `ResetClock`: when a failed call's limit lifts, for the sentence's reset time; pure
+- `app/models/provider_failure_text.rb` — `ProviderFailureText`: one failure as a sentence for a person, from the `provider_failures` locale table, in the reader's zone and against the clock; `#full` for a page, `#brief` for a status line
+- `app/models/concept_reference_failures.rb` — `ConceptReferenceFailures`: the per-user, cache-held note of why a write-up stopped, read by Learn's status endpoint
+- `app/controllers/concerns/provider_failure_rendering.rb` — `ProviderFailureRendering`: the one way a controller turns a provider error into a sentence or a JSON error
 - `app/models/judge_verdict.rb` — `JudgeVerdict`: the judge's reply held to its closed vocabulary, the way `ProblemSetIngest` holds a problem set. A status outside three, an issue type or principle outside the lists, a rewrite of a field that is not prose, or blank evidence or reason is invalid output rather than a judgment. Pure; its specs need no database
 - `app/models/concept_bucket.rb` — which vocabulary bucket a concept's history records under (architecture/plan_review/ambiguity_hunt are each language-independent; everything else buckets by the day's language)
 - `app/models/kind_preferences.rb` — `KindPreferences`: a user's stated weight and exclusion bias over rotating kinds, as plain values `SectionRotation` takes instead of a `User`, so its specs need no database. `.none` is the untouched default; a stored value outside `MULTIPLIERS` reads back as that default rather than reaching `WeightedRoll`
@@ -2627,6 +2817,7 @@ always pull in the full suite — is stated once, in
 - `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
 - `app/models/ai_provider.rb` — closed provider registry for dispatch, key detection and user validation; provider classes own the key patterns and environment restrictions
 - `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, keep fixtures kept unedited, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Both judge modes also print blind-solve agreement (`SolveAgreement`) per model, rung and concept, with match or mismatch only, never a pick or a key. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read. `review_calibration` grades the fixtures in `spec/fixtures/review_calibration/` on the production review route (see "Grading rubric")
+- `script/probe_gemini_capacity.rb` (+ `script/gemini_capacity_probe.rb`) — replays realistic two-section tester-days (draft, judge, review fan-out, a reference, duck turns) against `GEMINI_API_KEY` with the production prompts until a 429 or a refused key, recording every HTTP attempt, replies or not, and reports which limit was hit, the wait returned and tester-days per quota day. Spends that key's daily allowance; writes no `ApiUsage` rows; never in CI. Refused replies land in `tmp/gemini_probe/`
 - `script/check_gemini_structured_output.rb` (+ `script/gemini_structured_output_check.rb`) — sends judge fixtures through `GeminiService` on its production route with the verdict schema, and prints whether Gemini accepted the schema and whether each reply parsed. One request per fixture, two by default, billed to `GEMINI_API_KEY`; writes no `ApiUsage` rows
 - `app/models/rubric_check.rb` — `RubricCheck`: whether a graded review's rating agrees with the essential gaps it lists, under `AiService::RATING_RUBRIC`. Log-only and pure
 - `spec/fixtures/review_calibration/` — sections with a complete, a partial and a missed answer each, read by `ModelComparison#review_calibration`; a fixture may add `extra_answers`, each with its own expected ratings, which are graded and matched outside the rank-order check (the design comparison's vague matching pick and sound other pick)
@@ -2655,6 +2846,7 @@ always pull in the full suite — is stated once, in
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it
 - `app/views/shared/_pull_to_refresh.html.erb` — the installed app's pull-to-refresh indicator and gesture; inert outside standalone mode, which it reads from the layout's media query through the indicator's visibility
+- `app/views/shared/_server_message.html.erb` — defines `window.CodeGymServerMessage`: what a page script may show when a request fails, the app's own sentence or the page's fallback
 - `app/views/shared/_push_script.html.erb` — defines `window.CodeGymPush` and re-subscribes on launch; rendered from the layout ahead of `yield :page_scripts`
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives
 - `app/views/pwa/service-worker.js` — shows the notification. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing

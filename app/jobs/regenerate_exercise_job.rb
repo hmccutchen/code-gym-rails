@@ -71,18 +71,12 @@ class RegenerateExerciseJob < ApplicationJob
     return keep_superseded_set(user) if kept_for == :superseded
     return keep_reviewed_set(user, exercise, kept_for, claim) if kept_for
 
-    user.update!(last_generation_error_date: nil, last_generation_error: nil) if user.last_generation_error_date.present?
+    user.clear_generation_failure! if user.last_generation_error_date.present?
     Rails.logger.info("Regenerated exercise for user #{user.id} on #{Date.current}")
-  rescue AiService::AuthenticationError => e
-    release(user, exercise, claim, "Your API key was rejected — check it in Settings.", e)
-  rescue AiService::RateLimitError => e
-    release(user, exercise, claim, "The AI provider is rate-limiting requests — try again shortly.", e)
-  rescue AiService::TimeoutError => e
-    release(user, exercise, claim, "Generation took longer than the provider's budget — try again.", e)
   rescue AiService::Error => e
-    release(user, exercise, claim, e.message, e)
+    release(user, exercise, claim, e) { user.record_generation_failure!(e) }
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
-    release(user, exercise, claim, "Generation returned an unusable set — try again.", e)
+    release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end
 
   # Rendered after the dashboard's "Couldn't generate a new set: " prefix. A
@@ -108,7 +102,7 @@ class RegenerateExerciseJob < ApplicationJob
   def keep_reviewed_set(user, exercise, kept_for, claim)
     Rails.logger.info("Kept today's set (#{kept_for}) for user #{user.id} on #{Date.current}; discarded the regenerated one")
     release_own_claim(exercise, claim)
-    user.update!(last_generation_error_date: Date.current, last_generation_error: KEPT_SET_MESSAGES.fetch(kept_for))
+    user.record_generation_message!(KEPT_SET_MESSAGES.fetch(kept_for))
   end
 
   # Releases only the claim this worker holds: a where-guarded UPDATE, so a
@@ -119,9 +113,9 @@ class RegenerateExerciseJob < ApplicationJob
 
   # regenerated_at is deliberately left untouched: a failed attempt must not
   # consume the user's one regeneration for the day.
-  def release(user, exercise, claim, message, error)
+  def release(user, exercise, claim, error)
     Rails.logger.error("Failed to regenerate exercise for user #{user.id}: #{error.message}")
     release_own_claim(exercise, claim) if exercise
-    user.update!(last_generation_error_date: Date.current, last_generation_error: message)
+    yield
   end
 end

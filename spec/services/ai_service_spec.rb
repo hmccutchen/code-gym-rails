@@ -353,6 +353,69 @@ RSpec.describe AiService do
     it "accepts a row with no model or cache counts" do
       expect(ApiUsage.new(user: user, purpose: "duck_thread", date: Date.current, tokens_in: 1, tokens_out: 1)).to be_valid
     end
+
+    it "records the provider and status of a reply it used" do
+      svc = double_class.new
+      allow(svc).to receive(:call).and_return(text: "{}", input_tokens: 1, output_tokens: 1, truncated: false, http_status: 200)
+
+      svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p")
+
+      expect(ApiUsage.last).to have_attributes(provider: double_class.provider_key, http_status: 200, failure: nil, quota_id: nil, house_key: false)
+    end
+
+    # A call that fails before a reply arrives is still a call the provider
+    # counted, so it leaves one row: zero tokens, the failure, its status and
+    # the quota it named. One row per call, whatever faraday-retry did inside.
+    it "writes one zero-token row for a failed call and re-raises the same error" do
+      svc = double_class.new
+      error = AiService::RateLimitError.new("Gemini API error 429", http_status: 429, quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+      allow(svc).to receive(:call).and_raise(error)
+
+      expect {
+        expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error { |e| expect(e).to equal(error) }
+      }.to change(ApiUsage, :count).by(1)
+
+      expect(ApiUsage.last).to have_attributes(
+        purpose: "duck_thread", tokens_in: 0, tokens_out: 0, failure: "rate_limit", http_status: 429,
+        quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", provider: double_class.provider_key
+      )
+      expect(error.provider).to eq(double_class.provider_key)
+    end
+
+    { AiService::AuthenticationError.new("x", http_status: 401) => "authentication",
+      AiService::BillingError.new("x", http_status: 402)        => "out_of_credit",
+      AiService::TimeoutError.new("x")                          => "timeout",
+      AiService::NetworkError.new("x")                          => "network",
+      AiService::InvalidResponseError.new("x")                  => "invalid_response",
+      AiService::Error.new("x", http_status: 503)               => "provider_error" }.each do |error, code|
+      it "records #{error.class.name.demodulize} as #{code}" do
+        svc = double_class.new
+        allow(svc).to receive(:call).and_raise(error)
+
+        expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(error.class)
+        expect(ApiUsage.last).to have_attributes(failure: code, http_status: error.http_status)
+      end
+    end
+
+    it "marks a refused or truncated reply on the row that carries its tokens" do
+      svc = double_class.new
+      allow(svc).to receive(:call).and_return(text: nil, input_tokens: 700, output_tokens: 0, truncated: false, refusal: "cyber")
+      expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(AiService::RefusalError)
+      expect(ApiUsage.last).to have_attributes(failure: "refusal", tokens_in: 700)
+
+      allow(svc).to receive(:call).and_return(text: "{", input_tokens: 10, output_tokens: 400, truncated: true)
+      expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(AiService::TruncatedResponseError)
+      expect(ApiUsage.last).to have_attributes(failure: "truncated", tokens_out: 400)
+    end
+
+    it "lets a failed usage write change nothing about the error the caller sees" do
+      svc = double_class.new
+      allow(svc).to receive(:call).and_raise(AiService::TimeoutError, "slow")
+      allow(ApiUsage).to receive(:create!).and_raise(ActiveRecord::StatementInvalid, "table gone")
+      allow(Rails.logger).to receive(:warn)
+
+      expect { svc.send(:call_and_log, user, purpose: "duck_thread", system: "s", prompt: "p") }.to raise_error(AiService::TimeoutError, "slow")
+    end
   end
 
   # A truncated response is still a billed response, so the usage row has to
@@ -3553,10 +3616,14 @@ RSpec.describe AiService do
       end
       svc = failing_class.new(canned_text: { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }.to_json)
 
-      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+      freeze_time do
+        results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
 
-      expect(results["code_review"][:ok]).to be(true)
-      expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", message: "rate limited")
+        expect(results["code_review"][:ok]).to be(true)
+        expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", failure: "short_rate_limit",
+                                         provider: failing_class.provider_key, quota_id: nil, retry_after: nil,
+                                         failed_at: Time.current)
+      end
     end
 
     it "keeps the graded sections when usage logging cannot check out a connection" do
@@ -6577,7 +6644,7 @@ RSpec.describe AiService, "judging graded reviews" do
     _, result = svc.send(:grade_section, user, exercise, response, "code_review", context)
 
     expect(result[:ok]).to be(false)
-    expect(result[:message]).not_to include("SENTINEL")
+    expect(result.values.join).not_to include("SENTINEL")
     expect(Rails.logger).not_to have_received(:error).with(/SENTINEL/)
   end
 

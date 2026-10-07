@@ -4,6 +4,7 @@ class User < ApplicationRecord
   has_many :api_usages,      dependent: :destroy
   has_many :concept_masteries, dependent: :destroy
   has_many :push_subscriptions, dependent: :destroy
+  belongs_to :invite_code, optional: true
 
   # One key per provider, encrypted at rest as a whole. provider names the
   # one in use. Requires RAILS_MASTER_KEY / credentials to be set (standard
@@ -170,7 +171,43 @@ class User < ApplicationRecord
   def clear_stale_generation_error!
     return unless last_generation_error_date == Date.current
 
-    update!(last_generation_error_date: nil, last_generation_error: nil)
+    clear_generation_failure!
+  end
+
+  # ── Generation failures ───────────────────────────────────────────────────
+  # A provider failure is stored as its kind and time, and written into words
+  # only when read (#generation_failure_message), in the reader's zone and
+  # against the clock. A message that is not a provider failure (a reviewed
+  # set kept, a draft the app could not use) is stored as text, as before.
+  NO_GENERATION_FAILURE = { last_generation_failure: nil, last_generation_failure_provider: nil,
+                            last_generation_failed_at: nil, last_generation_retry_after: nil }.freeze
+
+  def record_generation_failure!(error)
+    update!(last_generation_error_date: Date.current, last_generation_error: nil,
+            last_generation_failure: ProviderFailure.classify(error),
+            last_generation_failure_provider: error.try(:provider) || provider,
+            last_generation_failed_at: Time.current, last_generation_retry_after: error.try(:retry_after))
+  end
+
+  def record_generation_message!(message)
+    update!(last_generation_error_date: Date.current, last_generation_error: message, **NO_GENERATION_FAILURE)
+  end
+
+  def clear_generation_failure!
+    update!(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
+  end
+
+  def generation_failed_today? = last_generation_error_date == Date.current
+
+  # Names the provider the failed call went to, which the user may have
+  # switched away from since, and the wait it asked for.
+  def generation_failure_message(surface:, now: Time.current)
+    return last_generation_error if last_generation_failure.blank?
+
+    ProviderFailureText.new(last_generation_failure, provider: last_generation_failure_provider || provider,
+                            surface: surface, failed_at: last_generation_failed_at, zone: effective_time_zone,
+                            now: now, retry_after: last_generation_retry_after,
+                            variant: ProviderFailureText.variant_for(self)).full
   end
 
   # Suppresses every generation the user didn't ask for — the cron batch and
@@ -287,6 +324,51 @@ class User < ApplicationRecord
 
   def api_key_present?
     api_key.present?
+  end
+
+  # Own key, or a trial that can still pay for a call: what every page that
+  # needs a provider reads, and what the dashboard's on-demand generation
+  # reads. The nightly batch keeps reading stored keys, so a trial account is
+  # generated only when it opens the dashboard.
+  def provider_ready? = api_key_present? || trial_active?
+
+  # ── Trial ──────────────────────────────────────────────────────────────────
+  # A trial_ends_at is the fact; there is no flag.
+  def trial? = trial_ends_at.present?
+
+  # Deleting an account leaves its trial dates in place, and jobs queued
+  # before the deletion still load the row, so an anonymized account must
+  # never reach the house key.
+  def trial_active?(now: Time.current)
+    trial? && !anonymized? && trial_ends_at > now && TrialMode.enabled? && HouseKeys.for(provider).present?
+  end
+
+  # The trial is what pays. A trial account that pasted a key of its own is
+  # an own-key account on every page, whatever its dates say, because
+  # ProviderCredential hands the service that key first.
+  def on_trial? = trial? && !api_key_present?
+
+  def trial_ended? = on_trial? && !trial_active?
+
+  # Starts a trial on the provider the person chose, taking one seat on the
+  # code. Under the row lock, so two submissions cannot start it twice, and
+  # the seat is taken only once the account is known to be eligible. Returns
+  # false for a missing, expired or full code, a provider no trial can start
+  # on, an account that has had a trial, or one with a key of its own, which
+  # a trial would never be used over. The trial runs from now, when the seat
+  # is taken, rather than from consent, which on the signed-out page comes
+  # before the emailed code and can fall on the day before.
+  def start_trial!(invite:, provider:, consented_at:, now: Time.current)
+    with_lock do
+      return false if api_key_present? || trial? || invite.nil?
+      return false unless TrialMode.providers.include?(provider)
+      return false unless invite.redeem!
+
+      ends = now.in_time_zone(effective_time_zone).end_of_day + (invite.trial_days - 1).days
+      update!(invite_code: invite, provider: provider, trial_started_at: now,
+              trial_ends_at: ends, trial_consented_at: consented_at)
+    end
+    true
   end
 
   # In registry order, so Setup lists them the same way every time.
@@ -782,7 +864,8 @@ class User < ApplicationRecord
   end
 
   # An account with no key at all may still name a provider: an anonymized
-  # account keeps its provider after its keys are cleared.
+  # account keeps its provider after its keys are cleared, and a trial
+  # account names the provider it chose while its keys stay nil.
   def provider_has_a_stored_key
     return unless api_keys.is_a?(Hash) && provider.present?
 

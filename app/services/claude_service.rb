@@ -92,17 +92,7 @@ class ClaudeService < AiService
       req.options.context = (req.options.context || {}).merge(long_running: read_timeout > READ_TIMEOUT, single_attempt: single_attempt)
     end
 
-    unless resp.success?
-      raise_if_key_rejected("Anthropic", resp.status)
-
-      log_raw_snippet("Claude API error #{resp.status} body", resp.body)
-      message      = extract_provider_message(resp.body, fallback: "Claude API error #{resp.status}")
-      error_class  = case resp.status
-      when 429, 529 then AiService::RateLimitError # 529 is Anthropic's own "overloaded" status — same transient/retry semantics as 429
-      else               AiService::Error
-      end
-      raise error_class.new(message, http_status: resp.status)
-    end
+    raise_for_status(resp) unless resp.success?
 
     parsed = parse_provider_envelope(resp.body, provider: "Claude")
     usage  = parsed["usage"] || {}
@@ -122,12 +112,63 @@ class ClaudeService < AiService
       truncated:     parsed["stop_reason"] == "max_tokens",
       # Reported as data, like truncation, so call_and_log records the billed
       # usage before it raises: a refused request still charges its input.
-      refusal:       refusal_category(parsed)
+      refusal:       refusal_category(parsed),
+      http_status:   resp.status
     }
   rescue Faraday::Error => e
-    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::Error
+    error_class = e.is_a?(Faraday::TimeoutError) ? AiService::TimeoutError : AiService::NetworkError
     raise error_class, "Network error calling Claude: #{e.message}"
   end
+
+  # Anthropic's out-of-credit replies, per platform.claude.com/docs/en/api/errors
+  # and /rate-limits: a 402 billing_error, a 400 whose message begins "You have
+  # reached your specified ... API usage limits" (a spend limit the account
+  # set) or names the credit balance, and a 429 whose details carry
+  # enforced_spend_limit_reached (the tier's monthly cap, sent with no
+  # retry-after). None is a rate limit, so none is retried as one.
+  SPEND_LIMIT_MESSAGE = /\A(You have reached your specified|Your credit balance)/
+  ENFORCED_SPEND_LIMIT = "enforced_spend_limit_reached".freeze
+
+  # Which limit a 429 hit, from the rate-limit headers: the first family whose
+  # remaining count reads zero. 529 is Anthropic's own "overloaded" status,
+  # with the same transient semantics as a 429.
+  RATE_LIMIT_FAMILIES = %w[requests input-tokens output-tokens tokens].freeze
+
+  def raise_for_status(resp)
+    raise_if_key_rejected("Anthropic", resp.status)
+    error = error_envelope(resp.body)
+    raise_if_out_of_credit(error, resp.status)
+
+    case resp.status
+    when 429
+      raise AiService::RateLimitError.new("Claude API error 429", http_status: 429,
+                                          quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+    when 529
+      raise AiService::RateLimitError.new("Claude API error 529", http_status: 529, quota_id: "overloaded_error")
+    end
+
+    log_raw_snippet("Claude API error #{resp.status} body", resp.body)
+    message = extract_provider_message(resp.body, fallback: "Claude API error #{resp.status}")
+    raise AiService::Error.new(message, http_status: resp.status)
+  end
+
+  def raise_if_out_of_credit(error, status)
+    out_of_credit = status == 402 ||
+                    (status == 400 && error["message"].to_s.match?(SPEND_LIMIT_MESSAGE)) ||
+                    (status == 429 && error.dig("details", "error_code") == ENFORCED_SPEND_LIMIT)
+    return unless out_of_credit
+
+    Rails.logger.warn("Anthropic reports the account is out of credit or over its spend limit (HTTP #{status})")
+    raise AiService::BillingError.new("Anthropic reports the account is out of credit or over its spend limit",
+                                      http_status: status)
+  end
+
+  def quota_id_from(resp, error)
+    family = RATE_LIMIT_FAMILIES.find { |name| resp.headers["anthropic-ratelimit-#{name}-remaining"].to_s == "0" }
+    family ? "anthropic-ratelimit-#{family}" : error["type"].presence || "rate_limit_error"
+  end
+
+  def routed_model(purpose) = route_for(purpose)[:model]
 
   # Structured outputs rather than a prefilled "{": every model this service
   # routes to rejects an assistant prefill with a 400.

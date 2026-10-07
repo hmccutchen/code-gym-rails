@@ -3,7 +3,7 @@ class ProfileController < ApplicationController
 
   # Name editing needs a logged-in user but not an API key, so this endpoint
   # stays a clean JSON surface regardless of key state.
-  skip_before_action :require_api_key
+  skip_before_action :require_provider
 
   # PATCH /profile — inline profile autosave (JSON)
   def update

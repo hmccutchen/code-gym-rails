@@ -247,7 +247,46 @@ RSpec.describe OpenaiService do
         "reasoning" => { "effort" => OpenaiService::DEFAULT_ROUTE[:effort] }
       )
       expect(result).to eq(text: "hello", input_tokens: 1, output_tokens: 1, model: OpenaiService::DEFAULT_ROUTE[:model],
-                           cache_read_tokens: 0, cache_write_tokens: 0, truncated: false, refusal: nil)
+                           cache_read_tokens: 0, cache_write_tokens: 0, truncated: false, refusal: nil, http_status: 200)
+    end
+
+    # OpenAI reports an empty balance as a 429 with error code insufficient_quota,
+    # the status a rate limit uses. It is not one, and is never read as one.
+    it "reads a 429 insufficient_quota as out of credit, not a rate limit" do
+      allow(Rails.logger).to receive(:warn)
+      body = { "error" => { "message" => "You exceeded your current quota, please check your plan and billing details.",
+                            "type" => "insufficient_quota", "code" => "insufficient_quota" } }.to_json
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, body ] ]))
+
+      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }
+        .to raise_error(AiService::BillingError) { |e|
+          expect(e.http_status).to eq(429)
+          expect(e.message).not_to include("exceeded")
+        }
+    end
+
+    it "falls back to the status when the error envelope is null" do
+      allow(Rails.logger).to receive(:warn)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "p", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_exceeded") }
+
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 402, { "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "p") }.to raise_error(AiService::BillingError)
+    end
+
+    it "names the exhausted limit and the wait on a rate-limit 429" do
+      body = { "error" => { "message" => "Rate limit reached", "type" => "requests", "code" => "rate_limit_exceeded" } }.to_json
+      conn = Faraday.new do |f|
+        f.adapter(:test) { |stub| stub.post(OpenaiService::API_URL) { [ 429, { "retry-after" => "20", "x-ratelimit-remaining-requests" => "0" }, body ] } }
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      expect { service.send(:call, system: "sys", prompt: "p") }
+        .to raise_error(AiService::RateLimitError) { |e|
+          expect(e.quota_id).to eq("x-ratelimit-requests")
+          expect(e.retry_after).to eq(20)
+        }
     end
 
     it "sends history as real turns ahead of the new prompt" do

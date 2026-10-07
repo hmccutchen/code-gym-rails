@@ -1,5 +1,5 @@
 class WelcomeController < ApplicationController
-  skip_before_action :require_api_key
+  skip_before_action :require_provider
 
   # GET /welcome
   def show

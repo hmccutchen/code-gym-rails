@@ -3,13 +3,17 @@ class DailyExercisesController < ApplicationController
 
   rate_limit to: GENERATE_PER_HOUR, within: 1.hour, by: -> { current_user.id },
              with: -> { redirect_to root_path, alert: t("flash.daily_exercises.generate_limited") },
-             store: LazyCacheStore.new, name: "generate", only: :generate
+             store: LazyCacheStore.new, name: "generate", only: :generate, unless: :own_key?
 
   # POST /generate — manually trigger on-demand generation for today, for the
   # case where DashboardController#show's automatic weekday trigger didn't
   # fire (weekends). No-ops (just redirects) if today's exercise already
   # exists, so a duplicate click can't enqueue a second generation.
   def generate
+    if current_user.trial_ended?
+      return redirect_to root_path, alert: trial_ended_text(:generation)
+    end
+
     # "Today's set already exists" has to mean the same thing here as on the
     # dashboard, which carries a paused user's unfinished set forward on the
     # very redirect this action ends in; enqueuing first would bill a
@@ -20,7 +24,7 @@ class DailyExercisesController < ApplicationController
     # Clear any stale failure from an earlier attempt today so /dashboard/status
     # doesn't report "failed" (with yesterday's message) while this retry is
     # still in flight — see GenerateDailyExercisesJob's status-polling comment.
-    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
+    current_user.clear_generation_failure!
     GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
     redirect_to root_path, flash: { generating: true }
   end
@@ -37,6 +41,8 @@ class DailyExercisesController < ApplicationController
   # standing with no evidence behind it. Guarded here rather than only in the
   # view, since the view's button is not what makes the destroy unsafe.
   def regenerate
+    return redirect_to root_path, alert: trial_ended_text(:regeneration) if current_user.trial_ended?
+
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
 
@@ -54,7 +60,7 @@ class DailyExercisesController < ApplicationController
       return redirect_to root_path, alert: t("flash.daily_exercises.already_regenerated")
     end
 
-    current_user.update!(last_generation_error_date: nil, last_generation_error: nil)
+    current_user.clear_generation_failure!
     # The claim is already committed, so an enqueue failure would strand the
     # user behind a spinner no worker will ever clear — release it before
     # reporting, so a retry is possible immediately rather than in six minutes.
@@ -70,6 +76,11 @@ class DailyExercisesController < ApplicationController
   end
 
   private
+
+  def trial_ended_text(surface)
+    ProviderFailureText.new("trial_ended", provider: current_user.provider, surface: surface, failed_at: Time.current,
+                            zone: current_user.effective_time_zone).full
+  end
 
   # Atomic claim against a concurrent double-submit, mirroring
   # ResponsesController#claim_review!: a single UPDATE ... WHERE is serialized by

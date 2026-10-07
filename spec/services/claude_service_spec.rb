@@ -294,7 +294,8 @@ RSpec.describe ClaudeService do
 
       result = service.send(:call, system: "sys", prompt: "prompt text")
       expect(result).to eq(text: "hello", input_tokens: 10, output_tokens: 20, truncated: false, refusal: nil,
-                           model: ClaudeService::DEFAULT_ROUTE[:model], cache_read_tokens: 0, cache_write_tokens: 0)
+                           model: ClaudeService::DEFAULT_ROUTE[:model], cache_read_tokens: 0, cache_write_tokens: 0,
+                           http_status: 200)
     end
 
     # input_tokens excludes cached tokens, and reads and writes are billed at
@@ -462,17 +463,73 @@ RSpec.describe ClaudeService do
     end
 
     it "surfaces the provider's own error message when the body includes one" do
-      body = {
-        "type"  => "error",
-        "error" => { "type" => "insufficient_quota", "message" => "Your credit balance is too low to access the Anthropic API." }
-      }.to_json
+      body = { "type" => "error", "error" => { "type" => "invalid_request_error", "message" => "messages: at least one message is required" } }.to_json
       fake_response = instance_double(Faraday::Response, success?: false, status: 400, body: body)
       fake_conn = instance_double(Faraday::Connection, post: fake_response)
       service.instance_variable_set(:@conn, fake_conn)
 
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
-      }.to raise_error(AiService::Error, "Your credit balance is too low to access the Anthropic API.")
+      }.to raise_error(AiService::Error, "messages: at least one message is required")
+    end
+
+    # platform.claude.com/docs/en/api/errors and /rate-limits: a 402 is a
+    # billing problem, a 400 beginning "You have reached your specified" is a
+    # spend limit the account set, and a 429 with enforced_spend_limit_reached
+    # is the tier's monthly cap. None is a rate limit, and the message never
+    # repeats the provider's text.
+    {
+      "a credit-balance 400"   => [ 400, { "type" => "invalid_request_error", "message" => "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits." } ],
+      "a spend-limit 400"      => [ 400, { "type" => "invalid_request_error", "message" => "You have reached your specified API usage limits. You will regain access on 2026-11-01 at 00:00 UTC." } ],
+      "a 402 billing_error"    => [ 402, { "type" => "billing_error", "message" => "There is an issue with your billing." } ],
+      "a tier spend-cap 429"   => [ 429, { "type" => "rate_limit_error", "message" => "You have reached your API usage limits.", "details" => { "error_code" => "enforced_spend_limit_reached" } } ]
+    }.each do |label, (status, error)|
+      it "reads #{label} as out of credit, not a rate limit" do
+        allow(Rails.logger).to receive(:warn)
+        service.instance_variable_set(:@conn, stubbed_connection([ [ status, { "type" => "error", "error" => error }.to_json ] ]))
+
+        expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+          .to raise_error(AiService::BillingError) { |e|
+            expect(e.http_status).to eq(status)
+            expect(e.message).not_to include("credit balance", "regain access")
+          }
+      end
+    end
+
+    it "names the exhausted limit family and the wait on a 429" do
+      headers = { "retry-after" => "17", "anthropic-ratelimit-requests-remaining" => "40",
+                  "anthropic-ratelimit-input-tokens-remaining" => "0" }
+      conn = Faraday.new do |f|
+        f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { [ 429, headers, { "type" => "error", "error" => { "type" => "rate_limit_error", "message" => "x" } }.to_json ] } }
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      expect { service.send(:call, system: "sys", prompt: "prompt") }
+        .to raise_error(AiService::RateLimitError) { |e|
+          expect(e.quota_id).to eq("anthropic-ratelimit-input-tokens")
+          expect(e.retry_after).to eq(17)
+        }
+    end
+
+    it "falls back to the status when the error envelope is null" do
+      allow(Rails.logger).to receive(:warn)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 429, { "type" => "error", "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt", single_attempt: true) }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("rate_limit_error") }
+
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 400, { "type" => "error", "error" => nil }.to_json ] ]))
+      expect { service.send(:call, system: "sys", prompt: "prompt") }
+        .to raise_error(AiService::Error) { |e| expect(e).not_to be_a(AiService::BillingError) }
+    end
+
+    it "falls back to the error type as the quota id when no family reads zero" do
+      conn = Faraday.new do |f|
+        f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { [ 529, {}, { "type" => "error", "error" => { "type" => "overloaded_error", "message" => "x" } }.to_json ] } }
+      end
+      service.instance_variable_set(:@conn, conn)
+
+      expect { service.send(:call, system: "sys", prompt: "prompt") }
+        .to raise_error(AiService::RateLimitError) { |e| expect(e.quota_id).to eq("overloaded_error") }
     end
 
     it "does not leak the raw response body into the exception message" do

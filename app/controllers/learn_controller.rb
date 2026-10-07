@@ -8,7 +8,8 @@ class LearnController < ApplicationController
   PREPARE_PER_HOUR = 10
 
   rate_limit to: PREPARE_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { preparing_limited },
-             store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ]
+             store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ],
+             unless: :own_key?
 
   # GET /learn — every concept in this user's vocabularies, grouped, whether or
   # not they have ever been assigned one.
@@ -62,6 +63,7 @@ class LearnController < ApplicationController
     if awaiting == "ladder"
       body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
     end
+    body.merge!(write_up_failure(concept, bucket)) unless body[:ready]
 
     render json: body
   end
@@ -77,6 +79,9 @@ class LearnController < ApplicationController
     bucket  = validated_bucket
     concept = validated_concept(bucket)
 
+    # A note from an earlier failed attempt would answer the first poll of
+    # this one before the job has run.
+    ConceptReferenceFailures.clear(user_id: current_user.id, concept: concept, language: bucket)
     GenerateConceptReferenceJob.perform_later(
       concept: concept, language: bucket, user_id: current_user.id, refresh: true
     )
@@ -123,6 +128,18 @@ class LearnController < ApplicationController
   end
 
   private
+
+  # Why this user's last write-up of the concept stopped, if the job said so
+  # within ConceptReferenceFailures::EXPIRY: the page stops polling on it.
+  def write_up_failure(concept, bucket)
+    failure = ConceptReferenceFailures.read(user_id: current_user.id, concept: concept, language: bucket)
+    return {} if failure.nil?
+
+    text = ProviderFailureText.new(failure["kind"], provider: failure["provider"] || current_user.provider, surface: :reference,
+                                   failed_at: Time.zone.parse(failure["at"].to_s), zone: current_user.effective_time_zone,
+                                   retry_after: failure["retry_after"], variant: ProviderFailureText.variant_for(current_user))
+    { failed: text.kind, message: text.brief }
+  end
 
   def preparing_limited
     message = t("learn.preparing_limited")
