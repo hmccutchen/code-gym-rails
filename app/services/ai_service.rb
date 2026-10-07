@@ -2837,7 +2837,7 @@ class AiService
   rescue AiService::Error, *INFRASTRUCTURE_ERRORS => e
     [ section, { ok: false, error_code: error_code_for(e), failure: ProviderFailure.classify(e),
                  provider: e.try(:provider) || service.class.provider_key,
-                 quota_id: e.try(:quota_id), retry_after: e.try(:retry_after) } ]
+                 quota_id: e.try(:quota_id), retry_after: e.try(:retry_after), failed_at: Time.current } ]
   end
 
   # A kind that computes its own rating replaces the grader's, and the

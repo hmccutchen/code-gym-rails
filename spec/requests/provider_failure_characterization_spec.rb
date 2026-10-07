@@ -36,17 +36,17 @@ RSpec.describe "Provider failures as users see them", type: :request do
   }.freeze
 
   # Each class's sentence on each surface, for a Gemini key at 10am Eastern on
-  # Tuesday: the free allowance then resets at 3am Eastern on Wednesday, and
+  # Tuesday: the daily limit then resets at 3am Eastern on Wednesday, and
   # the per-minute fixture asks for a 20-second wait.
   def expected(kind, outcome, saved: nil, wait: "a minute")
-    reset = { "daily_limit" => "The allowance resets at 3:00 am your time, Wednesday.",
+    reset = { "daily_limit" => "The limit resets at 3:00 am your time, Wednesday.",
               "short_rate_limit" => "Try again in about #{wait}." }[kind]
-    title = { "daily_limit"      => "Your Gemini key has used today's free allowance, so #{outcome}.",
+    title = { "daily_limit"      => "Your Gemini key has reached its daily limit, so #{outcome}.",
               "short_rate_limit" => "Gemini is limiting requests right now, so #{outcome}.",
               "bad_key"          => "Gemini didn't accept your API key, so #{outcome}.",
               "outage"           => "Gemini isn't answering right now, so #{outcome}.",
               "timeout"          => "Gemini took too long to answer, so #{outcome}." }.fetch(kind)
-    next_step = { "daily_limit" => "Try again after that, or add a paid key in Setup.",
+    next_step = { "daily_limit" => "Try again after that.",
                   "bad_key"     => "Check the key in Setup.",
                   "outage"      => "Nothing was lost. Try again in a few minutes.",
                   "timeout"     => "Try again." }[kind]
