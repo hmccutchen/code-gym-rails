@@ -2015,11 +2015,27 @@ RSpec.describe User, "trials", type: :model do
     stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
     user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
 
-    expect(user.start_trial!(invite: invite, provider: "fake", consented_at: Time.utc(2026, 10, 6, 14))).to be(true)
+    expect(user.start_trial!(invite: invite, provider: "fake", consented_at: Time.utc(2026, 10, 6, 14),
+                             now: Time.utc(2026, 10, 6, 14))).to be(true)
 
     expect(user.provider).to eq("fake")
     expect(user.trial_started_at).to eq(Time.utc(2026, 10, 6, 14))
     expect(user.trial_ends_at.in_time_zone("Asia/Tokyo").strftime("%F %T")).to eq("2026-10-08 23:59:59")
+  end
+
+  # Consent on the signed-out page comes before the emailed code; a code
+  # entered after the user's midnight must not cost the first day.
+  it "counts the trial from when the seat is taken, keeping consent as its own time" do
+    invite, = mint_trial_code(days: 3)
+    stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
+    user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
+    consented = Time.utc(2026, 10, 6, 14, 55)  # 23:55 in Tokyo
+    redeemed  = Time.utc(2026, 10, 6, 15, 5)   # 00:05 the next day
+
+    expect(user.start_trial!(invite: invite, provider: "fake", consented_at: consented, now: redeemed)).to be(true)
+
+    expect(user).to have_attributes(trial_consented_at: consented, trial_started_at: redeemed)
+    expect(user.trial_ends_at.in_time_zone("Asia/Tokyo").strftime("%F %T")).to eq("2026-10-09 23:59:59")
   end
 
   it "refuses a trial on a provider with no house key, a missing code, or a second trial, taking no seat" do

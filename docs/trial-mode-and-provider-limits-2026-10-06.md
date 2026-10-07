@@ -581,10 +581,12 @@ UPDATE invite_codes SET redeemed_count = redeemed_count + 1
 WHERE id = ? AND redeemed_count < seats AND expires_at > now()
 ```
 
-It sets `provider` to the choice, `trial_started_at` and
-`trial_consented_at` to the consent time, and `trial_ends_at` to the end of
-the trial's last day in the user's zone (a 7-day trial started on a Tuesday
-ends at the end of the next Monday). `invite_code` joins
+It sets `provider` to the choice, `trial_consented_at` to the consent time,
+`trial_started_at` to the moment the seat is taken, and `trial_ends_at` to
+the end of the trial's last day, counted from that moment, in the user's
+zone (a 7-day trial started on a Tuesday ends at the end of the next
+Monday). On the signed-out page consent comes before the emailed code, so a
+code entered after midnight still gets its full first day. `invite_code` joins
 `filter_parameters`, since `_key` does not cover it.
 
 ### 6.3 House keys and the kill switch, as built
@@ -601,8 +603,10 @@ key.
 ### 6.4 Caps, as built
 
 `TrialAllowance.check!` runs in `AiService#call_and_log` ahead of `call`,
-only when the service holds a house key, and raises
-`AiService::TrialAllowanceError` with `retry_after` set to the seconds until
+only when the service holds a house key. It first raises
+`AiService::TrialEndedError` unless the trial is still active, since a
+service built while the trial ran keeps its house key through a fan-out or
+a long job. Then it raises `AiService::TrialAllowanceError` with `retry_after` set to the seconds until
 the count resets; a refused call writes no usage row and never reaches the
 provider:
 
