@@ -211,6 +211,10 @@ module Glossary
     TERMS[term.to_s.strip.downcase]
   end
 
+  def self.learn_text
+    TERMS.transform_keys { |term| "glossary:#{term}" }
+  end
+
   # One compiled alternation over every curated term, built once at load time
   # rather than looping GlossaryHelper's word-boundary match per term per
   # render (~170 terms × every text field on every section, on every page

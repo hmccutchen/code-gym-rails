@@ -104,6 +104,11 @@
               <% end %>
             </li>
           <% end %>
+          <% LearnLessons.in_group(group_key).each do |lesson| %>
+            <li class="learn-entry" data-concept="<%= lesson %>" data-search="<%= "#{lesson} #{lesson.humanize}".downcase %>">
+              <%= link_to lesson.humanize, learn_lesson_path(lesson: lesson) %>
+            </li>
+          <% end %>
         </ul>
       </div>
     <% end %>
