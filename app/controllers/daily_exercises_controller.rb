@@ -41,6 +41,8 @@ class DailyExercisesController < ApplicationController
   # standing with no evidence behind it. Guarded here rather than only in the
   # view, since the view's button is not what makes the destroy unsafe.
   def regenerate
+    return redirect_to root_path, alert: trial_ended_text(:regeneration) if current_user.trial_ended?
+
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
 

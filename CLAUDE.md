@@ -507,7 +507,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   page: `require_provider` lets any trial through, each provider call then
   fails with the trial-ended sentence through the rescues the surfaces
   already have, the dashboard renders a trial-ended panel instead of
-  enqueuing a set, `/generate` refuses with the sentence, and Setup shows the
+  enqueuing a set, `/generate` and `/regenerate` refuse with the sentence
+  (an existing set shows no Generate new set button), and Setup shows the
   key guide whether or not the account is on the track. `User#on_trial?`, a
   trial with no key of its own, is what every trial page and sentence reads,
   and `trial_ended?` is `on_trial?` and not active: a trial account that

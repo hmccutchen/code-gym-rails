@@ -66,6 +66,22 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
       expect(GenerateDailyExercisesJob).not_to have_been_enqueued
     end
 
+    it "keeps today's set but offers no new one, and refuses regeneration with the trial-ended sentence" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
+                                       problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } })
+
+      get root_path
+      expect(response.body).to include("Your trial has ended.")
+      expect(response.body).not_to include(regenerate_path)
+
+      post regenerate_path
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq(ended_sentence("the new set wasn't generated"))
+      expect(RegenerateExerciseJob).not_to have_been_enqueued
+      expect(exercise.reload).to have_attributes(regenerating_since: nil, regenerated_at: nil)
+    end
+
     it "refuses the review and the thinking partner with the trial-ended sentence, keeping the answers" do
       exercise = DailyExercise.create!(user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,
                                        problem_set: { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" } })
@@ -102,7 +118,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
 
       expect(response.body).to include("Your trial ended on October 13, 2026.")
       expect(response.body).not_to include("so no set was generated today")
-      expect(response.body).not_to include("requests used today")
+      expect(response.body).not_to include("used today")
     end
   end
 
@@ -176,7 +192,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
 
     get root_path
 
-    expect(response.body).to include("Trial: 7 days left. 0 requests used today.")
+    expect(response.body).to include("Trial: 7 days left. Requests used today: 0.")
     expect(response.body).not_to include("unlimited")
   end
 

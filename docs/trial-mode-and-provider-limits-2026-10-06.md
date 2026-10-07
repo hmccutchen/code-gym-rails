@@ -719,8 +719,9 @@ name:
   training unless the organization opts in, and abuse monitoring logs are
   kept up to 30 days.
 
-Before the code is checked the provider is unknown, so the form shows the
-shared sentence naming both providers and both paragraphs.
+The form lists every provider in `TrialMode.providers`, so it shows the
+shared sentence naming each of them and one paragraph per provider. Once a
+trial has begun, `/trial` shows the paragraph for its own provider only.
 
 ### 6.8 Trial end, as built
 
@@ -730,8 +731,8 @@ page; `ProviderCredential.for` raises `TrialEndedError`, so the review, the
 five JSON endpoints and the concept reference endpoint answer with the
 trial-ended sentence through the rescues they already have, and the
 dashboard renders the trial-ended panel in place of a set, or the ended
-banner above a set that already exists. `/generate` refuses with the same
-sentence. Setup shows the existing key guide (`api_keys/_key_guide`) above
+banner above a set that already exists, without its Generate new set
+button. `/generate` and `/regenerate` refuse with the same sentence. Setup shows the existing key guide (`api_keys/_key_guide`) above
 the key field for an ended trial whether or not it is on the learning
 track. Pasting a key clears nothing about the trial, but `User#on_trial?`
 (a trial with no key of its own) is what every trial page and sentence

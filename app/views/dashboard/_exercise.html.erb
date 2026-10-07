@@ -13,6 +13,10 @@
       <p class="hint"><%= t("dashboard.exercise.reviewed") %></p>
     <% elsif exercise.regenerated_at.present? %>
       <p class="hint"><%= t("dashboard.exercise.already_regenerated") %></p>
+    <% elsif current_user.trial_ended? %>
+      <%# Nothing: an ended trial has no provider to regenerate with, and the
+          banner above already says so. DailyExercisesController#regenerate
+          refuses it too. %>
     <% else %>
       <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
       <% confirm_msg = has_progress ?
