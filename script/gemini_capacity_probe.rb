@@ -32,7 +32,9 @@ class GeminiCapacityProbe
   OUTPUT_DIR = "tmp/gemini_probe".freeze
   FIXTURE_CAPTURE = "gemini_429_capture.json".freeze
 
-  Record = Data.define(:day, :step, :status, :ms, :input_tokens, :output_tokens, :thought_tokens, :cached_tokens,
+  # `sent` is false only for a step that put nothing on the wire; an attempt
+  # that ended without a reply was still sent and still counts.
+  Record = Data.define(:day, :step, :sent, :status, :ms, :input_tokens, :output_tokens, :thought_tokens, :cached_tokens,
                        :quota_id, :quota_value, :retry_delay, :retry_after, :error) do
     def rate_limited? = status == 429
     def ok? = status.to_i.between?(200, 299)
@@ -68,7 +70,9 @@ class GeminiCapacityProbe
   # Records every HTTP attempt as the provider answered it, so the report
   # counts requests the way the quota does. The response body is kept only
   # for a non-2xx reply, where it names the quota; a successful reply is
-  # reduced to its usage block.
+  # reduced to its usage block. An attempt that ends without a reply, such as
+  # a timeout or a reset, is recorded too, since the provider may have
+  # counted it.
   class Recorder < Faraday::Middleware
     def initialize(app, log)
       super(app)
@@ -82,11 +86,21 @@ class GeminiCapacityProbe
       @app.call(env).on_complete do |response|
         recorded = true
         @log.record(status: response.status, headers: response.response_headers.to_h, body: response.body.to_s,
-                    ms: ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round)
+                    ms: elapsed_ms(started))
       end
+    rescue StandardError => e
+      unless recorded
+        recorded = true
+        @log.record(status: nil, headers: {}, body: "", ms: elapsed_ms(started), error: e.class.name)
+      end
+      raise
     ensure
       @log.abandon! unless recorded
     end
+
+    private
+
+    def elapsed_ms(started) = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
   end
 
   def self.calls_per_day = 1 + ExerciseSection.fixed.size + ExerciseSection.fixed.size + 1 + 1 + DUCK_TURNS
@@ -192,9 +206,10 @@ class GeminiCapacityProbe
   end
 
   # One step of a tester-day: paced, recorded per HTTP attempt, and never
-  # fatal except on a 429, which is what the probe is looking for. A reply
-  # the app could not use still counted against the quota, so it is recorded
-  # and the day goes on.
+  # fatal except on a 429, which is what the probe is looking for, or a
+  # refused key, which no later request can get past. A reply the app could
+  # not use still counted against the quota, so it is recorded and the day
+  # goes on.
   def step(day, label, requests: 1)
     @sleeper.call(@pace * [ @last_step_attempts, requests, 1 ].max) if @pace.positive? && @calls_made.positive?
     @calls_made += 1
@@ -203,23 +218,28 @@ class GeminiCapacityProbe
     outcome
   rescue AiService::RateLimitError => e
     record_attempts(day, label, e)
-    @stopped = true
+    @stop_reason ||= :rate_limited
+    nil
+  rescue AiService::AuthenticationError => e
+    record_attempts(day, label, e)
+    @stop_reason ||= :key_refused
     nil
   rescue AiService::Error, JudgeVerdict::Invalid => e
     record_attempts(day, label, e)
     nil
   end
 
-  def stopped? = @stopped
+  def stopped? = @stop_reason.present?
 
-  # The review fan-out answers no error of its own, so a 429 inside it is
-  # read off the attempts rather than raised.
+  # The review fan-out answers no error of its own, so a 429 or a refused key
+  # inside it is read off the attempts rather than raised.
   def record_attempts(day, label, error)
     fresh = @attempts.drain(timeout: DRAIN_SECONDS)
     @last_step_attempts = fresh.size
-    @stopped = true if fresh.any? { |attempt| attempt[:status] == 429 }
+    @stop_reason ||= :rate_limited if fresh.any? { |attempt| attempt[:status] == 429 }
+    @stop_reason ||= :key_refused if fresh.any? { |attempt| key_rejected?(attempt) }
     if fresh.empty?
-      @records << Record.new(day: day, step: label, status: nil, ms: nil, input_tokens: nil, output_tokens: nil, thought_tokens: nil,
+      @records << Record.new(day: day, step: label, sent: false, status: nil, ms: nil, input_tokens: nil, output_tokens: nil, thought_tokens: nil,
                              cached_tokens: nil, quota_id: nil, quota_value: nil, retry_delay: nil, retry_after: nil,
                              error: error && "#{error.class.name.demodulize}: #{error.message}")
       return
@@ -227,7 +247,7 @@ class GeminiCapacityProbe
     fresh.each_with_index do |attempt, index|
       record = record_for(day, fresh.size > 1 ? "#{label} [#{index + 1}]" : label, attempt, error)
       @records << record
-      capture(attempt, record) unless record.ok?
+      capture(attempt, record) unless record.ok? || record.status.nil?
       @out.puts format_record(record)
     end
   end
@@ -237,25 +257,34 @@ class GeminiCapacityProbe
     usage = body.fetch("usage", {})
     quota = quota_violation(body)
     Record.new(
-      day: day, step: label, status: attempt[:status], ms: attempt[:ms],
+      day: day, step: label, sent: true, status: attempt[:status], ms: attempt[:ms],
       input_tokens: usage["total_input_tokens"], output_tokens: usage["total_output_tokens"],
       thought_tokens: usage["total_thought_tokens"], cached_tokens: usage["total_cached_tokens"],
       quota_id: quota["quotaId"], quota_value: quota["quotaValue"],
       retry_delay: retry_info(body), retry_after: attempt[:headers]["retry-after"],
-      error: attempt[:status].to_i.between?(200, 299) && error ? "#{error.class.name.demodulize}: #{error.message}" : nil
+      error: attempt_error(attempt, error)
     )
   rescue JSON::ParserError
-    Record.new(day: day, step: label, status: attempt[:status], ms: attempt[:ms], input_tokens: nil, output_tokens: nil,
+    Record.new(day: day, step: label, sent: true, status: attempt[:status], ms: attempt[:ms], input_tokens: nil, output_tokens: nil,
                thought_tokens: nil, cached_tokens: nil, quota_id: nil, quota_value: nil, retry_delay: nil,
                retry_after: attempt[:headers]["retry-after"], error: "unreadable body")
+  end
+
+  def attempt_error(attempt, error)
+    return "no reply: #{attempt[:error]}" if attempt[:status].nil?
+
+    "#{error.class.name.demodulize}: #{error.message}" if attempt[:status].to_i.between?(200, 299) && error
   end
 
   def error_details(body, type)
     Array(body.dig("error", "details")).select { |detail| detail.is_a?(Hash) && detail["@type"].to_s.end_with?(type) }
   end
 
+  # The daily violation wins over a per-minute one listed beside it, as in
+  # GeminiService#quota_id_from, since the daily one is what the run measures.
   def quota_violation(body)
-    error_details(body, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }.find { |v| v.is_a?(Hash) } || {}
+    violations = error_details(body, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }.select { |v| v.is_a?(Hash) }
+    violations.find { |v| v["quotaId"].to_s.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || violations.first || {}
   end
 
   def retry_info(body)
@@ -291,12 +320,14 @@ class GeminiCapacityProbe
   def print_report
     first = @records.index(&:rate_limited?)
     @out.puts "=== report"
-    @out.puts "Requests made: #{@records.count { |r| r.status }}."
+    @out.puts "Requests made: #{@records.count(&:sent)}."
     if first
       hit = @records[first]
       @out.puts "First 429 on request #{first + 1}: #{limit_kind(hit.quota_id)} (quotaId=#{hit.quota_id}, quotaValue=#{hit.quota_value})."
       @out.puts "Retry delay returned: retryDelay=#{hit.retry_delay.inspect}, Retry-After=#{hit.retry_after.inspect}."
       @out.puts "Tester-days per quota day: #{tester_days_per_quota_day(hit)}."
+    elsif @stop_reason == :key_refused
+      @out.puts "Stopped before any 429: Gemini refused the key."
     else
       @out.puts "No 429 reached."
     end
@@ -307,14 +338,14 @@ class GeminiCapacityProbe
   def limit_kind(quota_id)
     case quota_id.to_s
     when /PerMinute/i then "per-minute limit"
-    when /PerDay/i    then "per-day limit"
+    when ProviderFailure::DAILY_QUOTA_PATTERN then "per-day limit"
     when /Token/i     then "token limit"
     else                   "unrecognized limit"
     end
   end
 
   def tester_days_per_quota_day(hit)
-    return "not a daily limit" unless hit.quota_id.to_s.match?(/PerDay/i)
+    return "not a daily limit" unless hit.quota_id.to_s.match?(ProviderFailure::DAILY_QUOTA_PATTERN)
     return "unknown (no quotaValue)" unless hit.quota_value.to_s.match?(/\A\d+\z/)
 
     hit.quota_value.to_i / self.class.calls_per_day

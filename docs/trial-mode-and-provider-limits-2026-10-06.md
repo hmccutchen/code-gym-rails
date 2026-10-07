@@ -223,7 +223,9 @@ rows and no exercise, response or reference. It builds an anonymous
 `GeminiService` subclass that overrides `log_usage` to write nothing and
 `build_connection` to use no retry middleware and a `Recorder` middleware
 that keeps every HTTP attempt's status, response headers, latency and
-usage block in an `AttemptLog` shared by every service thread of a step;
+usage block in an `AttemptLog` shared by every service thread of a step,
+including an attempt that ended without a reply (a timeout or a reset),
+which is recorded with no status and counted as a request;
 a step reads its attempts only once none is still on the wire, since the
 review's difficulty thread can outlive `review_sections` by its grace
 period. It runs in the user's `effective_time_zone`, as generation does,
@@ -251,7 +253,8 @@ setting is untouched (pinned by the spec). One tester-day, in order:
 
 `GeminiCapacityProbe.calls_per_day` derives the ten from the fixed-kind
 count and `DUCK_TURNS`. It repeats tester-days until a provider reply is a
-429 or `--max-days N` is reached, pacing steps with `--pace SECONDS`
+429, Gemini refuses the key (a 401, 403 or `API_KEY_INVALID`, after which no
+request could reach a quota), or `--max-days N` is reached, pacing steps with `--pace SECONDS`
 (default 15) so the daily limit is what trips, with `--no-pace` to measure
 the per-minute limit instead. The review fan-out still sends its three
 calls together, so the wait before a step is the pace times the requests on
@@ -259,8 +262,9 @@ either side of it (three paces before and after the fan-out); at the default
 no rolling minute holds more than five requests, which the spec checks. A reply the app could not use (a
 judge verdict that fails `JudgeVerdict.parse`, an unparseable reference) is
 recorded with its error and the day goes on, since the probe measures quota,
-not output quality. A 429 inside the review fan-out raises nothing of its
-own, so it is read off the recorded attempts and still ends the run.
+not output quality. A 429 or a refused key inside the review fan-out raises
+nothing of its own, so it is read off the recorded attempts and still ends
+the run.
 
 Per attempt it prints: day, step, HTTP status, latency, `total_input_tokens`,
 `total_output_tokens`, `total_thought_tokens`, `total_cached_tokens`. On a
@@ -276,7 +280,9 @@ copy.
 
 The report at the end: requests made; the request number of the first 429
 and which limit by `quotaId` (`PerMinute`, `PerDay`, a token quota, or
-unrecognized); the `retryDelay` and `Retry-After` returned; tokens per
+unrecognized), reading the daily violation first when a 429 lists a
+per-minute one beside it, as `GeminiService` does, or that the key was
+refused before any 429; the `retryDelay` and `Retry-After` returned; tokens per
 completed tester-day (a day the 429 cut short is left out); tester-days per
 quota day as `quotaValue / calls_per_day` when the quota is per day; and the
 largest single request's input tokens, to read against the per-minute token
