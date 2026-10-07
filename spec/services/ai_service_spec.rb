@@ -3616,11 +3616,14 @@ RSpec.describe AiService do
       end
       svc = failing_class.new(canned_text: { "rating" => "solid", "correct" => [], "missed" => [], "better_questions" => [], "next_step" => "", "improved_code" => "" }.to_json)
 
-      results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
+      freeze_time do
+        results = svc.review_sections(user, exercise, response, sections: %w[code_review pattern])
 
-      expect(results["code_review"][:ok]).to be(true)
-      expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", failure: "short_rate_limit",
-                                       provider: failing_class.provider_key, quota_id: nil, retry_after: nil)
+        expect(results["code_review"][:ok]).to be(true)
+        expect(results["pattern"]).to eq(ok: false, error_code: "rate_limit", failure: "short_rate_limit",
+                                         provider: failing_class.provider_key, quota_id: nil, retry_after: nil,
+                                         failed_at: Time.current)
+      end
     end
 
     it "keeps the graded sections when usage logging cannot check out a connection" do

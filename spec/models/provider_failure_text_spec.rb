@@ -12,15 +12,15 @@ RSpec.describe ProviderFailureText, type: :model do
   describe "a daily limit, before and after it resets" do
     it "names the reset in the reader's zone while it is ahead" do
       expect(text("daily_limit").full).to eq(
-        "Your Gemini key has used today's free allowance, so the review didn't run. Your answers are saved. " \
-        "The allowance resets at 3:00 am your time, Wednesday. Try again after that, or add a paid key in Setup."
+        "Your Gemini key has reached its daily limit, so the review didn't run. Your answers are saved. " \
+        "The limit resets at 3:00 am your time, Wednesday. Try again after that."
       )
     end
 
-    it "says the allowance has reset once the time has passed, and drops the wait" do
+    it "says the limit has reset once the time has passed, and drops the wait" do
       expect(text("daily_limit", now: Time.utc(2026, 10, 7, 7, 1)).full).to eq(
-        "Your Gemini key has used today's free allowance, so the review didn't run. Your answers are saved. " \
-        "The allowance has reset since then, so you can try again."
+        "Your Gemini key has reached its daily limit, so the review didn't run. Your answers are saved. " \
+        "The limit has reset since then, so you can try again."
       )
     end
 
@@ -31,7 +31,7 @@ RSpec.describe ProviderFailureText, type: :model do
       end
       travel_to(Time.utc(2026, 10, 7, 12)) do
         expect(described_class.new("daily_limit", provider: "gemini", surface: :generation, failed_at: failed_at, zone: zone).full)
-          .to eq("Your Gemini key has used today's free allowance, so nothing was generated. The allowance has reset since then, so you can try again.")
+          .to eq("Your Gemini key has reached its daily limit, so nothing was generated. The limit has reset since then, so you can try again.")
       end
     end
   end
@@ -69,8 +69,8 @@ RSpec.describe ProviderFailureText, type: :model do
 
   it "names the trial's key rather than the reader's on the trial variant, and falls back where the words are the same" do
     expect(text("daily_limit", surface: :generation, variant: "trial").full).to eq(
-      "The trial's Gemini key has used today's free allowance, so nothing was generated. " \
-      "The allowance resets at 3:00 am your time, Wednesday. Try again after that."
+      "The trial's Gemini key has reached its daily limit, so nothing was generated. " \
+      "The limit resets at 3:00 am your time, Wednesday. Try again after that."
     )
     expect(text("bad_key", surface: :duck, variant: "trial").full)
       .to eq("Gemini didn't accept the trial's key, so the thinking partner didn't answer. Your message is still in the box. Tell the person who runs Code Gym.")

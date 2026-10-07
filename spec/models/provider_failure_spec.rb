@@ -15,6 +15,11 @@ RSpec.describe ProviderFailure do
     expect(classify(AiService::RateLimitError.new("x", retry_after: 59))).to eq("short_rate_limit")
   end
 
+  it "reads a server error raised as a rate limit, such as Claude's 529, as an outage" do
+    expect(classify(AiService::RateLimitError.new("x", http_status: 529, quota_id: "overloaded_error"))).to eq("outage")
+    expect(classify(AiService::RateLimitError.new("x", http_status: 429))).to eq("short_rate_limit")
+  end
+
   it "never reads an empty balance as a limit" do
     expect(classify(AiService::BillingError.new("x", http_status: 429))).to eq("out_of_credit")
   end

@@ -18,12 +18,19 @@ class ProviderFailure
     when AiService::TrialEndedError     then "trial_ended"
     when AiService::BillingError        then "out_of_credit"
     when AiService::AuthenticationError then "bad_key"
-    when AiService::RateLimitError      then daily?(error) ? "daily_limit" : "short_rate_limit"
+    when AiService::RateLimitError      then rate_limit_kind(error)
     when AiService::TimeoutError, Timeout::Error then "timeout"
     when AiService::NetworkError        then "outage"
     when AiService::Error               then error.http_status.to_i >= 500 ? "outage" : "other"
     else                                     "other"
     end
+  end
+
+  # A 5xx raised as a rate limit (Claude's 529, "overloaded") is the provider
+  # being down for everyone, not this key's limit.
+  def self.rate_limit_kind(error)
+    return "outage" if error.http_status.to_i >= 500
+    daily?(error) ? "daily_limit" : "short_rate_limit"
   end
 
   def self.daily?(error)
