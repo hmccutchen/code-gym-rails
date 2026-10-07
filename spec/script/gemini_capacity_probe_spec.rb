@@ -104,7 +104,11 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     probe.send(:record_attempts, 1, "duck", nil)
   end
 
-  it "writes one file per refused reply and leaves out a body that can echo the key" do
+  def key_invalid_body
+    Rails.root.join("spec/fixtures/provider_errors/gemini_400_api_key_invalid.json").read.sub("API key not valid", "AIzaProbe is not valid")
+  end
+
+  it "writes one file per refused reply, leaves out a body that can echo the key, and stops on the refused key" do
     fake = FakeService.new("fake")
     refusing = Faraday::Adapter::Test::Stubs.new do |stub|
       stub.post(GeminiService::API_URL) do |env|
@@ -112,21 +116,70 @@ RSpec.describe GeminiCapacityProbe, type: :model do
         posted << body
         case posted.size
         when 1 then [ 200, {}, reply(fake.send(:call, system: body["system_instruction"], prompt: body["input"])[:text]) ]
-        when 2 then [ 400, {}, Rails.root.join("spec/fixtures/provider_errors/gemini_400_api_key_invalid.json").read.sub("API key not valid", "AIzaProbe is not valid") ]
+        when 5 then [ 400, {}, key_invalid_body ]
         else [ 503, {}, "<html>down</html>" ]
         end
       end
     end
     described_class.new(api_key: "AIzaProbe", user: user, out: out, output_dir: output_dir,
-                        adapter: [ :test, refusing ], sleeper: ->(_) { }, max_days: 1).run
+                        adapter: [ :test, refusing ], sleeper: ->(_) { }).run
 
     captures = Dir[File.join(output_dir, "*.json")].sort
-    expect(captures.size).to be >= 4
     expect(captures.count { |path| path.end_with?("-400.json") }).to eq(1)
-    expect(captures.count { |path| path.end_with?("-503.json") }).to be >= 3
+    expect(captures.count { |path| path.end_with?("-503.json") }).to eq(4)
     rejected = File.read(captures.find { |path| path.end_with?("-400.json") })
     expect(rejected).to include("omitted")
     expect(rejected).not_to include("AIzaProbe")
+    expect(posted.size).to eq(6)
+    expect(out.string).to include("Stopped before any 429: Gemini refused the key.")
+  end
+
+  # With no day limit, a key that can never reach a quota would otherwise be
+  # retried forever.
+  it "stops at once when the key is refused outside a fan-out" do
+    refusing = Faraday::Adapter::Test::Stubs.new do |stub|
+      stub.post(GeminiService::API_URL) { |env| posted << env.body; [ 400, {}, key_invalid_body ] }
+    end
+    records = described_class.new(api_key: "AIzaProbe", user: user, out: out, output_dir: output_dir,
+                                  adapter: [ :test, refusing ], sleeper: ->(_) { }).run
+
+    expect(posted.size).to eq(1)
+    expect(records.map(&:step)).to eq([ "draft" ])
+    expect(out.string).to include("Requests made: 1.").and include("Gemini refused the key")
+  end
+
+  it "counts an attempt that ended without a reply as a request" do
+    fake = FakeService.new("fake")
+    stalling = Faraday::Adapter::Test::Stubs.new do |stub|
+      stub.post(GeminiService::API_URL) do |env|
+        body = JSON.parse(env.body)
+        posted << body
+        raise Faraday::TimeoutError, "read timeout" if posted.size == 4
+
+        [ 200, {}, reply(fake.send(:call, system: body["system_instruction"], prompt: body["input"])[:text]) ]
+      end
+    end
+    records = described_class.new(api_key: "AIzaProbe", user: user, out: out, output_dir: output_dir,
+                                  adapter: [ :test, stalling ], sleeper: ->(_) { }, max_days: 1).run
+
+    unanswered = records.select { |record| record.sent && record.status.nil? }
+    expect(unanswered).not_to be_empty
+    expect(unanswered).to all(have_attributes(error: "no reply: Faraday::TimeoutError"))
+    expect(records.count(&:sent)).to eq(posted.size)
+    expect(out.string).to include("Requests made: #{posted.size}.")
+    expect(Dir[File.join(output_dir, "*.json")]).to be_empty
+  end
+
+  it "reads the daily violation when a per-minute one is listed first" do
+    body = { "error" => { "details" => [ { "@type" => "type.googleapis.com/google.rpc.QuotaFailure", "violations" => [
+      { "quotaId" => "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", "quotaValue" => "5" },
+      { "quotaId" => "GenerateRequestsPerDayPerProjectPerModel-FreeTier", "quotaValue" => "20" }
+    ] } ] } }
+
+    violation = probe.send(:quota_violation, body)
+
+    expect(violation).to include("quotaId" => "GenerateRequestsPerDayPerProjectPerModel-FreeTier", "quotaValue" => "20")
+    expect(probe.send(:quota_violation, { "error" => { "details" => [] } })).to eq({})
   end
 
   it "plans a two-section day without changing the stored setting" do
