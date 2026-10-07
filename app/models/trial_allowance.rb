@@ -27,7 +27,7 @@ class TrialAllowance
   private
 
   def check_trial_active!
-    raise AiService::TrialEndedError, "Trial ended for user #{@user.id}" unless @user.trial_active?
+    raise AiService::TrialEndedError, "Trial ended for user #{@user.id}" unless @user.trial_active?(now: @now)
   end
 
   def check_account_cap!
