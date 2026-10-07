@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "junior",
+  "locked": false,
+  "expected": "keep",
+  "principle": null,
+  "expected_better": "b",
+  "section": {
+    "title": "Sorting a shared grocery list",
+    "scenario": "Housemates share one grocery list in a phone app. Everyone sees the same items, shown in the same order. None of the app's environments sets a sort variable.",
+    "question": "The product owner says items are always listed A to Z, and no one has asked for any other order. Which piece should the list use, and which stated fact decides it?",
+    "piece_a": "class GroceryList < ApplicationRecord\n  has_many :items\n  SORT_COLUMNS = %w[name created_at quantity].freeze\n\n  def sorted_items(column: ENV.fetch(\"GROCERY_SORT\", \"name\"))\n    column = \"name\" unless SORT_COLUMNS.include?(column)\n    items.order(column)\n  end\nend",
+    "piece_b": "class GroceryList < ApplicationRecord\n  has_many :items\n\n  def sorted_items\n    items.order(:name)\n  end\nend",
+    "concept": "proportionality"
+  }
+}

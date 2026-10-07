@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "senior",
+  "locked": false,
+  "expected": "keep",
+  "principle": null,
+  "expected_better": "a",
+  "section": {
+    "title": "Exporting a card statement",
+    "scenario": "Cardholders can download each monthly statement from the account page. The bank's compliance team set the export layout, a CSV with date, merchant and amount columns, and has said it is the only download format the bank will offer. About 300 statements are downloaded a month.",
+    "question": "Which piece should produce the download, and which stated fact decides it?",
+    "piece_a": "class StatementExport\n  HEADERS = %w[date merchant amount].freeze\n\n  def initialize(statement)\n    @statement = statement\n  end\n\n  def render\n    CSV.generate do |csv|\n      csv << HEADERS\n      @statement.purchases.each do |purchase|\n        csv << [purchase.posted_on, purchase.merchant, purchase.amount.to_s(\"F\")]\n      end\n    end\n  end\nend",
+    "piece_b": "class StatementExport\n  FORMATTERS = { csv: \"StatementExport::CsvFormatter\" }.freeze\n\n  def initialize(statement, format: :csv)\n    @statement = statement\n    @formatter = FORMATTERS.fetch(format).constantize.new\n  end\n\n  def render\n    @formatter.render(@statement.purchases.map { |purchase| [purchase.posted_on, purchase.merchant, purchase.amount.to_s(\"F\")] })\n  end\n\n  class CsvFormatter\n    def render(rows)\n      CSV.generate { |csv| ([%w[date merchant amount]] + rows).each { |row| csv << row } }\n    end\n  end\nend",
+    "concept": "proportionality"
+  }
+}
