@@ -178,7 +178,11 @@ class ModelComparison
   def judge_concept(user_id, concept, per_rung: 2)
     user   = User.find(user_id)
     forced = ForcedConceptDrafts.new(concept)
-    drafts = forced.with_concept { draft_concept_sections(forced, user, concept, per_rung) }
+    # The plan and today's language read Date.current, so the drafts are
+    # planned on the user's own day, as GenerateDailyExercisesJob plans them.
+    drafts = Time.use_zone(user.effective_time_zone) do
+      forced.with_concept { draft_concept_sections(forced, user, concept, per_rung) }
+    end
 
     CANDIDATES.fetch("judge").each { |route| print_concept_judgments(route, user, concept, drafts) }
   end

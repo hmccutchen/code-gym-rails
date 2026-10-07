@@ -82,6 +82,19 @@ RSpec.describe ForcedConceptDrafts do
     expect(ProblemSetIngest.vocabulary_for(kind.key, "ruby_rails")).not_to include(concept)
   end
 
+  it "judge_concept plans the drafts on the user's own day" do
+    user.update!(time_zone: "Tokyo")
+    zones = []
+    allow_any_instance_of(AiService).to receive(:retry_section).and_wrap_original do |original, *args|
+      zones << Time.zone.name
+      original.call(*args)
+    end
+
+    ModelComparison.new(api_key: "sk-ant-runner", out: out).judge_concept(user.id, concept, per_rung: 1)
+
+    expect(zones).to eq([ "Tokyo" ] * KindDifficulty::LEVELS.size)
+  end
+
   it "judge_concept prints a failed draft as an error row and judges the rest" do
     calls = 0
     allow_any_instance_of(AiService).to receive(:retry_section).and_wrap_original do |original, *args|
