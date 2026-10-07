@@ -2303,9 +2303,12 @@ concept-specific difficulty descriptions for future generation, not a new set.
   `HandWrittenLearnText::MODULES` lists every module of static reader-facing
   text (`Glossary`, `ConceptBookSources`' pointers, `LearnLessons`), each
   answering `.learn_text`, and `spec/models/hand_written_learn_text_spec.rb`
-  holds all of it to the standard's checkable rules: the placeholder phrases,
-  read from the standard itself, and no text whose every sentence opens with
-  the same word. The rest of the standard needs a reader's judgment.
+  holds all of it to the standard's checkable rules, which live in
+  `PlainLanguageChecks`: the placeholder phrases, read from the standard
+  itself, and no text whose every sentence opens with the same word. The rest
+  of the standard needs a reader's judgment. `PlainLanguageChecks` also flags
+  what a reader should look at without failing it (a "not X, but Y", a long
+  sentence, an exclamation point), for the lesson comparison script.
 - **The weekly featured concept**: one concept surfaced each week, the same
   one for the whole team — `ConceptReference.featured`, read at the top of
   `/learn` and as a small callout on the dashboard ("This week's concept"). A
@@ -2836,6 +2839,7 @@ always pull in the full suite — is stated once, in
 - `app/services/claude_service.rb` / `gemini_service.rb` / `openai_service.rb` — per-provider HTTP call, connection, and model-per-purpose table
 - `app/models/ai_provider.rb` — closed provider registry for dispatch, key detection and user validation; provider classes own the key patterns and environment restrictions
 - `script/compare_models.rb` (+ `script/model_comparison.rb`) — standalone side-by-side run of one stored input through two Claude models, for manual reading. Billed to `ANTHROPIC_API_KEY`, writes no `ApiUsage` rows, and nothing in `app/` loads it. Two of its modes are for the judge: `judge <user_id>` drafts one day and prints each candidate's verdict with its evidence, and `judge_fixtures` runs the candidates over `spec/fixtures/judge/`, printing one row per fixture (an edit's row lists each issue type with the text it quotes, and a provider failure prints as an error row rather than ending the run), then valid-output rate, detection per principle, false rejections, keep fixtures kept unedited, and latency and cost per model from `LIST_PRICE_PER_MILLION`. Both judge modes also print blind-solve agreement (`SolveAgreement`) per model, rung and concept, with match or mismatch only, never a pick or a key. Two more modes are for the review prose judge: `review_prose <user_id> [limit]` runs stored reviews through the judge, and `review_prose_fixtures` runs the candidates over `spec/fixtures/review_judge/`, each printing rewrites beside their sources for a person to read. `review_calibration` grades the fixtures in `spec/fixtures/review_calibration/` on the production review route (see "Grading rubric"). `judge_concept <user_id> <concept> [per_rung]` drafts design comparisons tagged with a concept no vocabulary holds yet, through the production retry route, and judges each with both candidates. `ForcedConceptDrafts` (`script/forced_concept_drafts.rb`) accepts the concept and adds the draft guidance line from its design note for that process only, then puts both back; drafts carry their key, so they are written to `tmp/judge_concept/` and the terminal prints only file, verdict and match or mismatch
+- `script/compare_concept_lessons.rb` (+ `script/concept_lesson_comparison.rb`) — writes concepts' Learn write-ups with today's prompt, or with `--candidate`, a prompt that adds a short phone-sized lesson, into `tmp/concept_lessons/comparison.md` beside each other and the hand-written target in `docs/lesson-shape-idempotency-target.md`, with a reviewer checklist and `PlainLanguageChecks` per lesson. Billed to `ANTHROPIC_API_KEY`; writes no `ConceptReference`, exercise or `ApiUsage` row. A pilot: nothing in `app/` asks for the lesson
 - `script/probe_gemini_capacity.rb` (+ `script/gemini_capacity_probe.rb`) — replays realistic two-section tester-days (draft, judge, review fan-out, a reference, duck turns) against `GEMINI_API_KEY` with the production prompts until a 429 or a refused key, recording every HTTP attempt, replies or not, and reports which limit was hit, the wait returned and tester-days per quota day. Spends that key's daily allowance; writes no `ApiUsage` rows; never in CI. Refused replies land in `tmp/gemini_probe/`
 - `script/check_gemini_structured_output.rb` (+ `script/gemini_structured_output_check.rb`) — sends judge fixtures through `GeminiService` on its production route with the verdict schema, and prints whether Gemini accepted the schema and whether each reply parsed. One request per fixture, two by default, billed to `GEMINI_API_KEY`; writes no `ApiUsage` rows
 - `app/models/rubric_check.rb` — `RubricCheck`: whether a graded review's rating agrees with the essential gaps it lists, under `AiService::RATING_RUBRIC`. Log-only and pure
@@ -2902,6 +2906,7 @@ always pull in the full suite — is stated once, in
   array-valued, and never read by any prompt — extend it by adding a line
 - `app/models/learn_lessons.rb` — `LearnLessons`: hand-written Learn-only lessons, outside every vocabulary; rendered by `LearnLessonsController` at `/learn/lessons/:lesson`
 - `app/models/hand_written_learn_text.rb` — `HandWrittenLearnText::MODULES`: every module of static reader-facing text, which the plain-language spec checks
+- `app/models/plain_language_checks.rb` — `PlainLanguageChecks`: the rules in `PLAIN_LANGUAGE_STANDARD` that code can check, as failures and flags; pure
 - `app/models/recognition_guide.rb` — `RecognitionGuide`: the cached "how to
   look for these" piece per recognition group, which groups have one, and
   what the prompt says each group is about.
