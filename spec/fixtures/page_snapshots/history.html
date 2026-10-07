@@ -1320,6 +1320,88 @@
         return lines;
       }
 
+      // Code often pads names so a column lines up (`kind     = value` under
+      // `description = value`). Once a block wraps, the column is gone and the
+      // padding is just a gap, so a block with any wrapped line shows each
+      // such run as one space. A run counts when it sits before `=`, `#` or
+      // `//`, or after `:`, `,` or `=`, and not inside a highlighted string or
+      // comment; leading indentation never counts. Only the display changes:
+      // each run keeps its original spaces and gets them back when the block
+      // has room again.
+      const ALIGNMENT_RUN = /(?<=\S) {2,}(?==|#|\/\/)|(?<=[:,=]) {2,}(?=\S)/g;
+      const LITERAL = ".hljs-string, .hljs-comment";
+
+      function markAlignment(line) {
+        const nodes = [];
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+        let offset = 0;
+        while (walker.nextNode()) {
+          nodes.push({ node: walker.currentNode, start: offset });
+          offset += walker.currentNode.length;
+        }
+
+        [...line.textContent.matchAll(ALIGNMENT_RUN)].reverse().forEach((match) => {
+          const owner = nodes.find(({ node, start }) => match.index >= start && match.index + match[0].length <= start + node.length);
+          if (!owner || owner.node.parentElement.closest(LITERAL)) return;
+
+          const run = owner.node.splitText(match.index - owner.start);
+          run.splitText(match[0].length);
+          const span = document.createElement("span");
+          span.className = "code-align";
+          span.dataset.spaces = run.data;
+          run.replaceWith(span);
+          span.append(run);
+        });
+      }
+
+      // A long call chain has no space to wrap at, so the layout's
+      // overflow-wrap would split it mid-name (`f` / `etch`). A <wbr> after
+      // each `.` or `(` gives it better places to break, and adds no text.
+      const CHAIN_BREAK = /(?<=[.(])(?=[^\s.(])/;
+
+      function addChainBreaks(line) {
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        nodes.forEach((node) => {
+          if (node.parentElement.closest(LITERAL)) return;
+          const parts = node.data.split(CHAIN_BREAK);
+          if (parts.length === 1) return;
+          node.replaceWith(...parts.flatMap((part, index) => (index === 0 ? [part] : [document.createElement("wbr"), part])));
+        });
+      }
+
+      // A hidden block (a closed disclosure) measures zero and is fitted when
+      // it opens, through the observer below.
+      function fitAlignment(code) {
+        const runs = code.querySelectorAll(".code-align");
+        if (runs.length === 0) return;
+        runs.forEach((run) => { run.textContent = run.dataset.spaces; });
+
+        const probe = document.createElement("span");
+        probe.className = "code-line";
+        probe.textContent = "x";
+        code.append(probe);
+        const row = probe.getBoundingClientRect().height;
+        probe.remove();
+        if (row === 0) return;
+
+        const wraps = [...code.children].some((line) => line.getBoundingClientRect().height > row * 1.5);
+        if (wraps) runs.forEach((run) => { run.textContent = " "; });
+      }
+
+      // Watches the <pre>, since an inline <code> reports no size. Fitting
+      // changes a block's height, never its width, so reacting to width alone
+      // cannot loop.
+      const widths = new WeakMap();
+      const fitOnResize = new ResizeObserver((entries) => {
+        entries.forEach(({ target, contentRect }) => {
+          if (widths.get(target) === contentRect.width) return;
+          widths.set(target, contentRect.width);
+          fitAlignment(target.querySelector(":scope > code"));
+        });
+      });
+
       for (const code of document.querySelectorAll("pre.snippet > code:not([data-lines-done])")) {
         code.dataset.linesDone = "1";
         const lines = splitIntoLines(code);
@@ -1328,8 +1410,11 @@
           // which a leftover empty highlight span would defeat.
           if (line.textContent === "") line.replaceChildren();
           line.style.setProperty("--indent", leadingColumns(line.textContent));
+          markAlignment(line);
+          addChainBreaks(line);
         });
         code.replaceChildren(...lines);
+        fitOnResize.observe(code.parentElement);
       }
     </script>
     <script>
