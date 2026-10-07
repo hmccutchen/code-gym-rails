@@ -639,14 +639,17 @@ class ResponsesController < ApplicationController
     kind    = failures.values.map { |f| f[:failure] }.tally.max_by { |_, count| count }.first
     example = failures.values.find { |f| f[:failure] == kind }
     ProviderFailureText.new(kind, provider: example[:provider] || current_user.provider, surface: surface,
-                            failed_at: Time.current, zone: current_user.effective_time_zone, retry_after: example[:retry_after])
+                            failed_at: example[:failed_at] || Time.current, zone: current_user.effective_time_zone,
+                            retry_after: example[:retry_after])
   end
 
-  # What a failed section keeps: its kind, the quota named and when, never the
-  # error's text. The page writes the sentence when it is read.
+  # What a failed section keeps: its kind, the quota named and when it failed,
+  # never the error's text. The page writes the sentence when it is read. The
+  # time is the section's own, since the review waits for its slowest sibling
+  # and a reset counted from then can land a day late.
   def stored_review_failure(result)
     { "kind" => result[:failure], "provider" => result[:provider], "quota_id" => result[:quota_id],
-      "retry_after" => result[:retry_after], "at" => Time.current.iso8601 }.compact
+      "retry_after" => result[:retry_after], "at" => (result[:failed_at] || Time.current).iso8601 }.compact
   end
 
   def response_params

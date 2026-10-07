@@ -1446,7 +1446,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   class's `daily_quota_reset_at` says (Gemini's quota day ends at midnight
   Pacific; the base class gives a day), a short limit after the wait the
   provider asked for or a minute, and once the reset has passed the sentence
-  says the allowance has reset rather than naming a time behind the reader.
+  says the limit has reset rather than naming a time behind the reader.
   The provider is stored because `call_and_log` stamps every
   `AiService::Error` with the provider whose call raised
   (`AiService::Error#provider`), and a user can switch keys before reading:

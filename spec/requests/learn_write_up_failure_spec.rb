@@ -36,7 +36,7 @@ RSpec.describe "Learn write-up failures", type: :request do
       expect(ConceptReference.count).to eq(0)
       expect(status_body).to eq(
         "ready" => false, "failed" => "daily_limit",
-        "message" => "Your Gemini key has used today's free allowance, so the write-up didn't finish. The allowance resets at 3:00 am your time, Wednesday."
+        "message" => "Your Gemini key has reached its daily limit, so the write-up didn't finish. The limit resets at 3:00 am your time, Wednesday."
       )
       expect(status_body["message"]).not_to include("quota")
     end
@@ -47,8 +47,21 @@ RSpec.describe "Learn write-up failures", type: :request do
       run_job_against(429, Rails.root.join("spec/fixtures/provider_errors/gemini_429_daily.json").read)
       user.update!(provider: "anthropic", api_keys: user.api_keys.merge("anthropic" => "sk-ant-test"))
 
-      expect(status_body["message"]).to start_with("Your Gemini key has used today's free allowance")
+      expect(status_body["message"]).to start_with("Your Gemini key has reached its daily limit")
     end
+  end
+
+  # An unusable reply raises after the call, so the error carries no provider
+  # stamp of its own.
+  it "names the job's provider for a reply it could not use, after a switch" do
+    unusable = { "status" => "completed", "outputs" => [ { "type" => "text", "text" => "not json" } ],
+                 "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "not json" } ] } ],
+                 "usage" => { "total_input_tokens" => 10, "total_output_tokens" => 5 } }.to_json
+    run_job_against(200, unusable)
+    user.update!(provider: "anthropic", api_keys: user.api_keys.merge("anthropic" => "sk-ant-test"))
+
+    expect(status_body["failed"]).to eq("other")
+    expect(status_body["message"]).to start_with("Gemini sent back something Code Gym couldn't use")
   end
 
   it "forgets the note after its expiry, so the page can ask again" do

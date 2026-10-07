@@ -247,8 +247,10 @@ measures quota, not output quality.
 Per call it prints: step, HTTP status, latency, `total_input_tokens`,
 `total_output_tokens`, `total_thought_tokens`, `total_cached_tokens`. On a
 non-2xx it writes the full body and response headers to
-`tmp/gemini_probe/<timestamp>-<status>.json` (`tmp/` is gitignored; the body
-carries no request header, so the key is never in it) and prints the
+`tmp/gemini_probe/<timestamp>-<status>.json` (`tmp/` is gitignored; no
+request header is captured, but a rejected key's reply body can echo the key,
+so a capture is read and redacted before it is copied into a fixture) and
+prints the
 `quotaId`, `quotaValue`, `retryDelay` and any `Retry-After` header.
 
 The report at the end: requests until the first 429; which limit by
@@ -350,12 +352,12 @@ retry_after:)` and are rendered in the user's `effective_time_zone`:
 - `daily_limit`: the provider class's `daily_quota_reset_at`, looked up
   through `AiProvider.find`, so the clock holds no provider branch.
   `GeminiService` answers the next midnight Pacific after the failure, shown
-  as "The allowance resets at 3:00 am your time, Wednesday."; the base
+  as "The limit resets at 3:00 am your time, Wednesday."; the base
   class, and so every other or unknown provider, gives a day from the
   failure.
 - `short_rate_limit`: the wait the provider asked for, never under a
   minute: "Try again in about a minute" or "about 3 minutes".
-- Once the reset has passed, the sentence says so instead ("The allowance
+- Once the reset has passed, the sentence says so instead ("The limit
   has reset since then, so you can try again." / "You can try again now.")
   and drops the next step, which would point at a time behind the reader.
 - `trial_allowance_used` and `trial_ended` arrive with trial mode.
@@ -363,9 +365,9 @@ retry_after:)` and are rendered in the user's `effective_time_zone`:
 The sentences as shipped (the `own_key` variant, Gemini, the review
 surface):
 
-- daily limit: "Your Gemini key has used today's free allowance, so the
-  review didn't run. Your answers are saved. The allowance resets at 3:00 am
-  your time, Wednesday. Try again after that, or add a paid key in Setup."
+- daily limit: "Your Gemini key has reached its daily limit, so the
+  review didn't run. Your answers are saved. The limit resets at 3:00 am
+  your time, Wednesday. Try again after that."
 - short rate limit: "Gemini is limiting requests right now, so the review
   didn't run. Your answers are saved. Try again in about a minute."
 - bad key: "Gemini didn't accept your API key, so the review didn't run.

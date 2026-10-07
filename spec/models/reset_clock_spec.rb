@@ -20,6 +20,13 @@ RSpec.describe ResetClock do
     expect(described_class.reset_at("daily_limit", provider: nil, failed_at: failed_at)).to eq(failed_at + 1.day)
   end
 
+  it "waits out a daily limit's requested wait when it runs past the provider's boundary" do
+    expect(described_class.reset_at("daily_limit", provider: "openai", failed_at: failed_at, retry_after: 2.days.to_i))
+      .to eq(failed_at + 2.days)
+    expect(described_class.reset_at("daily_limit", provider: "openai", failed_at: failed_at, retry_after: 2.hours.to_i))
+      .to eq(failed_at + 1.day)
+  end
+
   it "lifts a short limit after the wait asked for, and never under a minute" do
     expect(described_class.reset_at("short_rate_limit", provider: "anthropic", failed_at: failed_at, retry_after: 90)).to eq(failed_at + 90)
     expect(described_class.reset_at("short_rate_limit", provider: "anthropic", failed_at: failed_at, retry_after: 5)).to eq(failed_at + 60)

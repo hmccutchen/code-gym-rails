@@ -186,10 +186,10 @@ en:
       critique: "Your pseudocode is still there."
     daily_limit:
       own_key:
-        title: "Your %{provider} key has used today's free allowance, so %{outcome}."
-        reset_at: "The allowance resets at %{time} your time, %{day}."
-        reset_passed: "The allowance has reset since then, so you can try again."
-        next: "Try again after that, or add a paid key in Setup."
+        title: "Your %{provider} key has reached its daily limit, so %{outcome}."
+        reset_at: "The limit resets at %{time} your time, %{day}."
+        reset_passed: "The limit has reset since then, so you can try again."
+        next: "Try again after that."
     short_rate_limit:
       own_key:
         title: "%{provider} is limiting requests right now, so %{outcome}."
