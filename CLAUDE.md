@@ -2287,6 +2287,25 @@ concept-specific difficulty descriptions for future generation, not a new set.
   recalled rather than checked is a fabrication that reads as authoritative.
   Audit behind the current entries:
   `docs/superpowers/specs/2026-09-12-four-book-concept-audit.md`.
+- **Hand-written lessons**: `LearnLessons` holds lessons for concepts that
+  belong on the Learn tab but in no vocabulary, because a generated section
+  cannot test them. `reading_unfamiliar_code` is the first: moving through a
+  change and its callers across files is more than a short snippet can hold.
+  A lesson is static and hand-curated like `Glossary`, never sent to a
+  provider, and lives outside every `LANGUAGE_CONFIG` vocabulary, so it never
+  reaches generation, `ConceptMastery`, retention, drills or Progress. The
+  Learn index lists it inside the `ConceptGroup` it names, beside its
+  siblings, and `/learn/lessons/:lesson` renders it read-only.
+
+  **Hand-written Learn text meets the plain-language standard through a
+  spec.** Generated lessons get `PLAIN_LANGUAGE_STANDARD` through their
+  prompt; text written into code has no prompt.
+  `HandWrittenLearnText::MODULES` lists every module of static reader-facing
+  text (`Glossary`, `ConceptBookSources`' pointers, `LearnLessons`), each
+  answering `.learn_text`, and `spec/models/hand_written_learn_text_spec.rb`
+  holds all of it to the standard's checkable rules: the placeholder phrases,
+  read from the standard itself, and no text whose every sentence opens with
+  the same word. The rest of the standard needs a reader's judgment.
 - **The weekly featured concept**: one concept surfaced each week, the same
   one for the whole team — `ConceptReference.featured`, read at the top of
   `/learn` and as a small callout on the dashboard ("This week's concept"). A
@@ -2881,6 +2900,8 @@ always pull in the full suite — is stated once, in
 - `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
   book pointers a Learn page renders under "Where this comes from". Closed,
   array-valued, and never read by any prompt — extend it by adding a line
+- `app/models/learn_lessons.rb` — `LearnLessons`: hand-written Learn-only lessons, outside every vocabulary; rendered by `LearnLessonsController` at `/learn/lessons/:lesson`
+- `app/models/hand_written_learn_text.rb` — `HandWrittenLearnText::MODULES`: every module of static reader-facing text, which the plain-language spec checks
 - `app/models/recognition_guide.rb` — `RecognitionGuide`: the cached "how to
   look for these" piece per recognition group, which groups have one, and
   what the prompt says each group is about.

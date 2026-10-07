@@ -1,0 +1,23 @@
+<% page_title "#{@key.humanize} – #{t("learn.title")}" %>
+<p><%= link_to t("learn.back"), learn_path, class: "learn-back" %></p>
+<h1><%= @key.humanize %></h1>
+<p class="learn-bucket-label"><%= t("learn.groups.#{@lesson[:group]}") %></p>
+<p><strong><%= @lesson[:summary] %></strong></p>
+
+<% @lesson[:sections].each do |section| %>
+  <h2><%= section[:heading] %></h2>
+  <% section[:blocks].each do |type, content| %>
+    <% case type %>
+    <% when :paragraph %>
+      <p><%= content %></p>
+    <% when :steps %>
+      <ol class="learn-lesson-steps">
+        <% content.each do |label, text| %>
+          <li><strong><%= label %>.</strong> <%= text %></li>
+        <% end %>
+      </ol>
+    <% when :code %>
+      <pre class="snippet"><code><%= content %></code></pre>
+    <% end %>
+  <% end %>
+<% end %>

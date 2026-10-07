@@ -179,4 +179,14 @@ module ConceptBookSources
   def self.for(concept)
     SOURCES.fetch(concept.to_s, [])
   end
+
+  # The pointers are the only hand-written words here; titles and authors are
+  # the books' own.
+  def self.learn_text
+    SOURCES.each_with_object({}) do |(concept, sources), texts|
+      sources.each_with_index do |source, index|
+        texts["sources:#{concept}:#{index}"] = source[:pointer] if source[:pointer]
+      end
+    end
+  end
 end
