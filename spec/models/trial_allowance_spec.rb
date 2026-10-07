@@ -49,6 +49,31 @@ RSpec.describe TrialAllowance, type: :model do
     expect { described_class.check!(user, provider: GeminiService, now: now) }.not_to raise_error
   end
 
+  it "refuses a call once the trial has ended or the kill switch is set, before counting anything" do
+    ends = user.trial_ends_at
+    expect(ApiUsage).not_to receive(:requests_on)
+
+    stub_env("TRIALS_DISABLED" => "1")
+    expect { described_class.check!(user, provider: GeminiService, now: now) }.to raise_error(AiService::TrialEndedError)
+
+    stub_env("TRIALS_DISABLED" => nil)
+    travel_to(ends + 1.minute) do
+      expect { described_class.check!(user, provider: GeminiService) }.to raise_error(AiService::TrialEndedError)
+    end
+  end
+
+  # The service keeps the house key it was built with, so a fan-out or a long
+  # job would otherwise go on calling after the trial stopped.
+  it "stops a house-key service built during the trial from calling once it ends" do
+    trial = create_trial_user(provider: "fake", email: "built@example.com")
+    service = AiService.for(trial)
+    stub_env("TRIALS_DISABLED" => "1")
+
+    expect { service.send(:call_and_log, trial, purpose: "duck_thread", system: "s", prompt: "p") }
+      .to raise_error(AiService::TrialEndedError)
+    expect(ApiUsage.count).to eq(0)
+  end
+
   it "applies no cap when the invite sets none and no guard when ENV sets none" do
     open = create_trial_user(provider: "gemini", cap: nil, email: "open@example.com", house_key: "AIzaHouse")
     5.times do

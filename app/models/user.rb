@@ -355,15 +355,17 @@ class User < ApplicationRecord
   # the seat is taken only once the account is known to be eligible. Returns
   # false for a missing, expired or full code, a provider no trial can start
   # on, an account that has had a trial, or one with a key of its own, which
-  # a trial would never be used over.
-  def start_trial!(invite:, provider:, consented_at:)
+  # a trial would never be used over. The trial runs from now, when the seat
+  # is taken, rather than from consent, which on the signed-out page comes
+  # before the emailed code and can fall on the day before.
+  def start_trial!(invite:, provider:, consented_at:, now: Time.current)
     with_lock do
       return false if api_key_present? || trial? || invite.nil?
       return false unless TrialMode.providers.include?(provider)
       return false unless invite.redeem!
 
-      ends = consented_at.in_time_zone(effective_time_zone).end_of_day + (invite.trial_days - 1).days
-      update!(invite_code: invite, provider: provider, trial_started_at: consented_at,
+      ends = now.in_time_zone(effective_time_zone).end_of_day + (invite.trial_days - 1).days
+      update!(invite_code: invite, provider: provider, trial_started_at: now,
               trial_ends_at: ends, trial_consented_at: consented_at)
     end
     true
@@ -863,7 +865,7 @@ class User < ApplicationRecord
 
   # An account with no key at all may still name a provider: an anonymized
   # account keeps its provider after its keys are cleared, and a trial
-  # account's provider comes from its invite while its keys stay nil.
+  # account names the provider it chose while its keys stay nil.
   def provider_has_a_stored_key
     return unless api_keys.is_a?(Hash) && provider.present?
 

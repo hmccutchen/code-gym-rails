@@ -462,7 +462,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **A trial is a `trial_ends_at`, nothing more.** `User#start_trial!` runs
   under the row lock, refuses an account with a key of its own or one that
   has had a trial, takes the seat, and sets `provider` to the choice and the
-  end to the last day's end in the user's zone.
+  end to the last day's end in the user's zone, counted from when the seat
+  is taken rather than from consent, which can come the day before.
   `trial_active?` needs the end in the future, `TrialMode.enabled?`
   (`TRIALS_DISABLED` is not `"1"`, the kill switch) and a house key for the
   provider (`HouseKeys.for`, `HOUSE_<PROVIDER>_API_KEY`, read from ENV at
@@ -478,7 +479,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   key, or the house key, and raises `AiService::TrialEndedError` for an
   ended trial. The service's `house_key?` reaches the per-section threads
   through `fresh_service`, is written to every usage row, and is what runs
-  `TrialAllowance.check!` ahead of the call in `call_and_log`: the invite's
+  `TrialAllowance.check!` ahead of the call in `call_and_log`: a trial still
+  active, since a service built during the trial keeps its house key through
+  a fan-out or a long job (`AiService::TrialEndedError` otherwise), the invite's
   `daily_request_cap` on the user's own day (`ApiUsage.requests_on`, counted
   by when each row was written in the user's zone, since a job outside that
   zone stamps `date` with the server's day) and `HOUSE_<PROVIDER>_DAILY_GUARD`
