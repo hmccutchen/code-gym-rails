@@ -1,11 +1,12 @@
-<%# Renders from any of the four code-bearing partials (dashboard/_exercise,
-    responses/_answered_sections, shared/_ai_review, shared/_concept_reference),
-    each of which may itself render multiple times on one page — e.g. every
-    entry on /history. The guard below pushes the script into :page_scripts
-    only on the FIRST call anywhere on the page, mirroring the Mermaid diagram
-    script's dedup pattern exactly. The script itself scans every matching
-    element on the page, not just the caller's own, so one copy still handles
-    every block regardless of how many call sites triggered the emission. %>
+<%# Renders from every partial that shows a code block (dashboard/_exercise,
+    responses/_answered_sections, shared/_ai_review, shared/_concept_reference,
+    learn/show, learn_lessons/show), each of which may itself render multiple
+    times on one page — e.g. every entry on /history. The guard below pushes
+    the script into :page_scripts only on the FIRST call anywhere on the page,
+    mirroring the Mermaid diagram script's dedup pattern exactly. The script
+    itself scans every matching element on the page, not just the caller's
+    own, so one copy still handles every block regardless of how many call
+    sites triggered the emission. %>
 <% unless @syntax_highlighting_script_emitted %>
   <% @syntax_highlighting_script_emitted = true %>
   <% content_for :page_scripts do %>
@@ -25,7 +26,7 @@
         // never gets a data-hljs attribute) — mirrors the Mermaid script's own
         // presence check (`arch.dig("reference", "diagram").present?`), just
         // evaluated client-side since this guard's render call is unconditional
-        // across all four call sites rather than gated per-site on content.
+        // across all call sites rather than gated per-site on content.
         if (document.querySelector("code[data-hljs]:not([data-hljs-done])")) {
           // highlight.js's own jsDelivr "es/" build re-exports from its CJS
           // "lib/core.js" (see https://github.com/highlightjs/highlight.js/blob/main/es/core.js) —
@@ -57,6 +58,67 @@
       } catch {
         // CDN unreachable or a module failed to load — blocks stay plain text,
         // exactly as they render without this script at all.
+      }
+
+      // A wrapped line used to continue at column 0, so `kind   = value` could
+      // put `value` under `kind` and read as a line of its own. Each source
+      // line becomes its own block with a hanging indent (the `.code-line`
+      // rule in the layout), so a continuation sits two columns past the
+      // line's own indentation. Runs after highlighting, since highlighting
+      // replaces the block's markup, and whether or not highlighting loaded.
+      const TAB_COLUMNS = 8;
+
+      function leadingColumns(text) {
+        let columns = 0;
+        for (const char of text) {
+          if (char === " ") columns += 1;
+          else if (char === "\t") columns += TAB_COLUMNS;
+          else break;
+        }
+        return columns;
+      }
+
+      // A highlighted string or comment can span several lines inside one
+      // <span>, so each line re-opens a shallow copy of every element still
+      // open when its newline arrived.
+      function splitIntoLines(code) {
+        const lines = [];
+        let current;
+        const startLine = (openElements) => {
+          const line = document.createElement("span");
+          line.className = "code-line";
+          lines.push(line);
+          current = openElements.reduce((parent, element) => parent.appendChild(element.cloneNode(false)), line);
+        };
+        const walk = (node, openElements) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            node.textContent.split("\n").forEach((part, index) => {
+              if (index > 0) startLine(openElements);
+              if (part) current.appendChild(document.createTextNode(part));
+            });
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            current = current.appendChild(node.cloneNode(false));
+            node.childNodes.forEach((child) => walk(child, [...openElements, node]));
+            current = current.parentNode;
+          }
+        };
+
+        startLine([]);
+        code.childNodes.forEach((child) => walk(child, []));
+        if (lines.length > 1 && lines.at(-1).textContent === "") lines.pop();
+        return lines;
+      }
+
+      for (const code of document.querySelectorAll("pre.snippet > code:not([data-lines-done])")) {
+        code.dataset.linesDone = "1";
+        const lines = splitIntoLines(code);
+        lines.forEach((line) => {
+          // An empty line keeps its height through the layout's :empty rule,
+          // which a leftover empty highlight span would defeat.
+          if (line.textContent === "") line.replaceChildren();
+          line.style.setProperty("--indent", leadingColumns(line.textContent));
+        });
+        code.replaceChildren(...lines);
       }
     </script>
   <% end %>
