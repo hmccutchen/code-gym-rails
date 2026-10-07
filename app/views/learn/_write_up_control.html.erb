@@ -70,7 +70,7 @@
             "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
           }
         });
-        if (response.ok) return poll();
+        if (response.ok && !response.redirected) return poll();
 
         const data = await CodeGymServerMessage.read(response);
         button.disabled = false;

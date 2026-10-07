@@ -761,12 +761,34 @@ RSpec.describe "Responses", type: :request do
 
       post review_response_path(daily_response)
 
-      expect(flash[:notice]).to start_with("1 of 3 sections reviewed. Your Claude key has used today's free allowance, so the others weren't reviewed.")
+      expect(flash[:notice]).to start_with("1 of 3 sections reviewed. Your Claude key has reached its daily limit, so the others weren't reviewed.")
       expect(daily_response.reload.review_errors["pattern"]).to include("kind" => "daily_limit", "quota_id" => "GenerateRequestsPerDayPerProjectPerModel-FreeTier")
 
       get root_path
       expect(response.body).to include("review-failure")
-      expect(response.body).to include(ERB::Util.html_escape("Your Claude key has used today's free allowance, so the review didn't run."))
+      expect(response.body).to include(ERB::Util.html_escape("Your Claude key has reached its daily limit, so the others weren't reviewed."))
+      expect(response.body).not_to include(ERB::Util.html_escape("so the review didn't run"))
+    end
+
+    # The review waits for its slowest section, so a reset counted from the
+    # end of the review can land a day late across Gemini's midnight.
+    it "keeps the time each section failed, not the time the review finished" do
+      daily_response = create_submitted_response
+      failed_at = Time.utc(2026, 10, 7, 6, 59, 30)
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:review_sections) do
+        travel_to(Time.utc(2026, 10, 7, 7, 1))
+        { "code_review" => { ok: false, error_code: "rate_limit", failure: "daily_limit", provider: "gemini",
+                             quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", failed_at: failed_at } }
+      end
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post review_response_path(daily_response)
+
+      expect(daily_response.reload.review_errors["code_review"]["at"]).to eq(failed_at.iso8601)
+      expect(flash[:alert]).to include("The limit has reset since then")
+    ensure
+      travel_back
     end
   end
 
