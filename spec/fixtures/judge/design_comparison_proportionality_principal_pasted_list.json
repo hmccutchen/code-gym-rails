@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "principal_engineer",
+  "locked": false,
+  "expected": "keep_or_edit",
+  "principle": null,
+  "expected_better": "a",
+  "section": {
+    "title": "Turning a pasted list into grocery items",
+    "scenario": "The grocery app lets someone paste a list from their notes, one item per line, and adds each line as an item. About 3% of lists are started this way. The team has talked about importing recipe ingredients one day, with quantities and units, but it has no date and no design yet.",
+    "question": "Both pieces add the same items from the same pasted text. Which cost should the app pay now, and which stated facts decide it?",
+    "piece_a": "class PastedList\n  def initialize(text)\n    @text = text\n  end\n\n  def items\n    @text.to_s.lines.filter_map do |line|\n      name = line.strip.delete_prefix(\"- \").strip\n      { name: name, quantity: 1 } if name.present?\n    end\n  end\nend",
+    "piece_b": "class PastedList\n  STEPS = %i[strip_line drop_bullet build_item].freeze\n\n  def initialize(text, steps: STEPS)\n    @text = text\n    @steps = steps\n  end\n\n  def items\n    @text.to_s.lines.filter_map do |line|\n      @steps.reduce(line) { |value, step| value && send(step, value) }\n    end\n  end\n\n  private\n\n  def strip_line(line) = line.strip.presence\n  def drop_bullet(line) = line.delete_prefix(\"- \").strip.presence\n  def build_item(name) = { name: name, quantity: 1 }\nend",
+    "concept": "proportionality"
+  }
+}

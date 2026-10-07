@@ -1,0 +1,16 @@
+{
+  "kind": "design_comparison",
+  "rung": "senior",
+  "locked": false,
+  "expected": "keep",
+  "principle": null,
+  "expected_better": "b",
+  "section": {
+    "title": "Reminding a borrower before a due date",
+    "scenario": "A town library's app emails borrowers two days before a book is due. The reminder went out to every branch last spring, and the team's release notes record that the old no-reminder behavior was retired from the product plan. The flag service is still in the codebase for other features.",
+    "question": "Which piece should send the reminder, and which stated fact decides it?",
+    "piece_a": "class LoanReminder\n  def initialize(loan)\n    @loan = loan\n  end\n\n  def deliver\n    return unless FeatureFlag.enabled?(:due_date_reminders, default: true)\n    return unless @loan.due_on == 2.days.from_now.to_date\n\n    LoanMailer.due_soon(@loan).deliver_later\n  end\nend",
+    "piece_b": "class LoanReminder\n  def initialize(loan)\n    @loan = loan\n  end\n\n  def deliver\n    return unless @loan.due_on == 2.days.from_now.to_date\n\n    LoanMailer.due_soon(@loan).deliver_later\n  end\nend",
+    "concept": "proportionality"
+  }
+}

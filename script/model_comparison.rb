@@ -1,4 +1,5 @@
 require_relative "solve_agreement"
+require_relative "forced_concept_drafts"
 
 # Runs one stored input through two Claude models and prints both results
 # side by side, for a person to read and judge. Nothing in app/ loads this.
@@ -29,6 +30,9 @@ class ModelComparison
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
   REVIEW_PROSE_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_judge")
   REVIEW_CALIBRATION_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_calibration")
+  # Forced-concept drafts carry their answer key, so they are written here for
+  # a person to read rather than printed where output gets pasted around.
+  CONCEPT_DRAFT_DIR = Rails.root.join("tmp/judge_concept")
 
   # What AiService::RATING_RUBRIC should give each answer a calibration
   # fixture carries, in descending order of quality. A fixture may also carry
@@ -45,6 +49,7 @@ class ModelComparison
   # is what #judge_fixtures prices a candidate's run against, for a person
   # comparing them, never anything billed.
   LIST_PRICE_PER_MILLION = {
+    "claude-opus-5-5"   => { input: 4.0, output: 20.0 },
     "claude-sonnet-5-5" => { input: 2.0, output: 10.0 },
     "claude-haiku-4-5"  => { input: 1.0, output: 5.0 }
   }.freeze
@@ -165,6 +170,19 @@ class ModelComparison
     end
   end
 
+  # Drafts per_rung design comparisons at every rung, tagged with a concept no
+  # vocabulary holds yet (see ForcedConceptDrafts), through the production
+  # retry route, and judges each draft with every judge candidate. Each draft
+  # is saved with its key under CONCEPT_DRAFT_DIR; the terminal shows only the
+  # file, the verdict and match or mismatch, so disagreements are read there.
+  def judge_concept(user_id, concept, per_rung: 2)
+    user   = User.find(user_id)
+    forced = ForcedConceptDrafts.new(concept)
+    drafts = forced.with_concept { draft_concept_sections(forced, user, concept, per_rung) }
+
+    CANDIDATES.fetch("judge").each { |route| print_concept_judgments(route, user, concept, drafts) }
+  end
+
   # Grades each calibration fixture's complete, partial and missed answers
   # through the real review prompt. A fixture passes when the three ratings
   # fall in rank order; the expected ratings are printed beside the actual
@@ -181,6 +199,68 @@ class ModelComparison
   end
 
   private
+
+  def draft_concept_sections(forced, user, concept, per_rung)
+    route = ClaudeService::MODEL_FOR_PURPOSE.fetch("retry_section")
+    usage = []
+    service = pinned_service(route, usage)
+    drafts = KindDifficulty::LEVELS.product((1..per_rung).to_a).map do |rung, index|
+      draft_concept_section(forced, service, user, CONCEPT_DRAFT_DIR.join(concept, "#{rung}-#{index}.json"), rung)
+    end
+
+    @out.puts "=== judge_concept: #{concept}, #{drafts.size} drafts on #{route[:model]} · #{usage_cost_line(route, usage)} ==="
+    drafts
+  end
+
+  def draft_concept_section(forced, service, user, path, rung)
+    section = forced.draft(service, user, rung: rung)
+    FileUtils.mkdir_p(path.dirname)
+    path.write(JSON.pretty_generate(section))
+    { name: path.relative_path_from(Rails.root).to_s, rung: rung, section: section }
+  rescue AiService::Error => e
+    { name: path.relative_path_from(Rails.root).to_s, rung: rung, error: "#{e.class}: #{e.message}" }
+  end
+
+  def print_concept_judgments(route, user, concept, drafts)
+    usage   = []
+    service = pinned_service(route, usage)
+    rows    = drafts.map { |draft| concept_judgment(service, user, draft).merge(concept: concept) }
+
+    @out.puts "=== judge_concept: #{route[:model]} · #{usage_cost_line(route, usage)} ==="
+    rows.each { |row| @out.puts "#{row[:name]}: rung=#{row[:rung]} status=#{row[:status]}#{concept_row_detail(row)}" }
+    SolveAgreement.new(rows.map { |row| row.slice(:rung, :concept, :matched, :status).merge(false_reject: false) }, out: @out)
+                  .print(route[:model])
+    @out.puts
+  end
+
+  # Locked, as the drafts were asked for: the judge measures against exactly
+  # the rung the section was written to.
+  def concept_judgment(service, user, draft)
+    row = draft.slice(:name, :rung)
+    return row.merge(status: :error, detail: draft[:error], matched: nil) if draft[:error]
+
+    kind    = ForcedConceptDrafts::KIND
+    verdict = service.judge_section(user, kind, draft[:section], rung: draft[:rung], locked: true)
+    row.merge(status: verdict.status, principle: verdict.principle,
+              matched: verdict.solve && kind.solve_matches_key?(draft[:section], verdict.solve))
+  rescue JudgeVerdict::Invalid => e
+    row.merge(status: :invalid, detail: "#{e.class}: #{e.message}", matched: nil)
+  rescue AiService::Error => e
+    row.merge(status: :error, detail: "#{e.class}: #{e.message}", matched: nil)
+  end
+
+  def concept_row_detail(row)
+    solve = row[:matched].nil? ? "" : " solve=#{row[:matched] ? 'match' : 'mismatch'}"
+    "#{" principle=#{row[:principle]}" if row[:principle]}#{solve}#{" #{row[:detail]}" if row[:detail]}"
+  end
+
+  def usage_cost_line(route, usage)
+    tokens_in  = usage.sum { |call| call[:tokens_in] }
+    tokens_out = usage.sum { |call| call[:tokens_out] }
+    "#{tokens_in} in / #{tokens_out} out · $#{format('%.4f', fixture_cost(route[:model], tokens_in, tokens_out,
+                                                                           cache_read: usage.sum { |call| call[:cache_read] },
+                                                                           cache_write: usage.sum { |call| call[:cache_write] }))}"
+  end
 
   def load_fixture(path)
     JSON.parse(File.read(path)).merge("name" => File.basename(path, ".json"))
