@@ -120,7 +120,10 @@
       const ALIGNMENT_RUN = /(?<=\S) {2,}(?==|#|\/\/)|(?<=[:,=]) {2,}(?=\S)/g;
       const LITERAL = ".hljs-string, .hljs-comment";
 
-      function markAlignment(line) {
+      // Each text node in a line with where it starts in the line's text, so a
+      // match found in the whole line can be traced back to the node holding
+      // it. Highlighting puts each token in its own node.
+      function textNodesOf(line) {
         const nodes = [];
         const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
         let offset = 0;
@@ -128,6 +131,11 @@
           nodes.push({ node: walker.currentNode, start: offset });
           offset += walker.currentNode.length;
         }
+        return nodes;
+      }
+
+      function markAlignment(line) {
+        const nodes = textNodesOf(line);
 
         [...line.textContent.matchAll(ALIGNMENT_RUN)].reverse().forEach((match) => {
           const owner = nodes.find(({ node, start }) => match.index >= start && match.index + match[0].length <= start + node.length);
@@ -146,17 +154,20 @@
       // A long call chain has no space to wrap at, so the layout's
       // overflow-wrap would split it mid-name (`f` / `etch`). A <wbr> after
       // each `.` or `(` gives it better places to break, and adds no text.
-      const CHAIN_BREAK = /(?<=[.(])(?=[^\s.(])/;
+      // The match runs over the whole line, since highlighting can put the
+      // `.` and the name after it in separate nodes.
+      const CHAIN_BREAK = /(?<=[.(])(?=[^\s.(])/g;
 
       function addChainBreaks(line) {
-        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
-        const nodes = [];
-        while (walker.nextNode()) nodes.push(walker.currentNode);
-        nodes.forEach((node) => {
-          if (node.parentElement.closest(LITERAL)) return;
-          const parts = node.data.split(CHAIN_BREAK);
-          if (parts.length === 1) return;
-          node.replaceWith(...parts.flatMap((part, index) => (index === 0 ? [part] : [document.createElement("wbr"), part])));
+        const nodes = textNodesOf(line);
+        [...line.textContent.matchAll(CHAIN_BREAK)].reverse().forEach((match) => {
+          const punctuation = match.index - 1;
+          const owner = nodes.find(({ node, start }) => punctuation >= start && punctuation < start + node.length);
+          if (!owner || owner.node.parentElement.closest(LITERAL)) return;
+
+          const after = punctuation - owner.start + 1;
+          if (after < owner.node.length) owner.node.splitText(after);
+          owner.node.after(document.createElement("wbr"));
         });
       }
 

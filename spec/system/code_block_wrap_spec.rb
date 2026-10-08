@@ -31,7 +31,9 @@ RSpec.describe "Code block wrapping", type: :system do
 
   # Highlighting loads from a CDN, so the spec decides that request's outcome
   # rather than leaving it to the runner's network. The stub's highlighter
-  # marks each double-quoted string, across lines, as highlight.js does.
+  # marks each double-quoted string, across lines, and puts each name in a
+  # span of its own, so a `.` sits in a separate node from the names around
+  # it, as highlight.js does.
   def stub_highlighter(outcome, width:)
     page.driver.with_playwright_page do |pw|
       pw.set_viewport_size(width: width, height: 844)
@@ -45,7 +47,8 @@ RSpec.describe "Code block wrapping", type: :system do
               getLanguage() { return true; },
               highlight(text) {
                 const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-                return { value: escaped.replace(/"[^"]*"/g, (string) => `<span class="hljs-string">${string}</span>`) };
+                return { value: escaped.replace(/"[^"]*"|[A-Za-z_]\w*/g, (token) =>
+                  token.startsWith('"') ? `<span class="hljs-string">${token}</span>` : `<span class="hljs-title">${token}</span>`) };
               }
             };
           JS
@@ -144,33 +147,35 @@ RSpec.describe "Code block wrapping", type: :system do
     expect(page).to have_css("pre.snippet .code-line", text: "kind     =", wait: 5)
   end
 
-  it "breaks a long call chain after a dot or parenthesis, never mid-name" do
-    ConceptReference.last.update!(code_example: 'kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
-    open_reference(highlighter: :blocked)
+  [ :loaded, :blocked ].each do |highlighter|
+    it "breaks a long call chain after a dot or parenthesis, never mid-name, when highlighting has #{highlighter}" do
+      ConceptReference.last.update!(code_example: 'kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
+      open_reference(highlighter: highlighter)
 
-    # The character before each row break, found by walking the line one
-    # character at a time and noting where its top edge moves down.
-    before_breaks = page.evaluate_script(<<~JS)
-      (() => {
-        const line = document.querySelector("pre.snippet .code-line");
-        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
-        const chars = [];
-        while (walker.nextNode()) {
-          const node = walker.currentNode;
-          for (let i = 0; i < node.length; i++) {
-            const range = document.createRange();
-            range.setStart(node, i);
-            range.setEnd(node, i + 1);
-            chars.push({ char: node.data[i], top: range.getBoundingClientRect().top });
+      # The character before each row break, found by walking the line one
+      # character at a time and noting where its top edge moves down.
+      before_breaks = page.evaluate_script(<<~JS)
+        (() => {
+          const line = document.querySelector("pre.snippet .code-line");
+          const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+          const chars = [];
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            for (let i = 0; i < node.length; i++) {
+              const range = document.createRange();
+              range.setStart(node, i);
+              range.setEnd(node, i + 1);
+              chars.push({ char: node.data[i], top: range.getBoundingClientRect().top });
+            }
           }
-        }
-        return chars.slice(1).filter((c, i) => c.top > chars[i].top + 1).map((c) => chars[chars.indexOf(c) - 1].char);
-      })()
-    JS
+          return chars.slice(1).filter((c, i) => c.top > chars[i].top + 1).map((c) => chars[chars.indexOf(c) - 1].char);
+        })()
+      JS
 
-    expect(before_breaks).not_to be_empty
-    expect(before_breaks).to all(match(/[.( ]/))
-    expect(line_texts.first).to eq('kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
+      expect(before_breaks).not_to be_empty
+      expect(before_breaks).to all(match(/[.( ]/))
+      expect(line_texts.first).to eq('kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
+    end
   end
 
   it "re-opens a highlight span that crosses lines on every line it covers" do
