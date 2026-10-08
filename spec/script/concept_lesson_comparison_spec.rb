@@ -116,6 +116,29 @@ RSpec.describe ConceptLessonComparison do
     expect(comparison).to include("Press it five times")
   end
 
+  it "makes one call for a concept named twice, in either form" do
+    run("idempotency", "ruby_rails/idempotency", candidate: false)
+
+    expect(prompts.size).to eq(1)
+  end
+
+  it "keeps concepts saved by earlier runs in the report" do
+    run("caching_strategy", candidate: false)
+    run("idempotency", candidate: true)
+
+    expect(comparison).to include("## idempotency (ruby_rails)", "## caching_strategy (architecture)")
+    expect(comparison.index("## idempotency")).to be < comparison.index("## caching_strategy")
+    expect(comparison).to include("### Current lesson\n\n**tagline**")
+  end
+
+  it "leaves a saved file that names no vocabulary concept out of the report" do
+    FileUtils.mkdir_p(dir.join("current"))
+    dir.join("current", "ruby_rails-proportionality.json").write("{}")
+    dir.join("current", "nowhere-idempotency.json").write("{}")
+
+    expect(described_class.saved_pairs(dir)).to be_empty
+  end
+
   it "says which variant has not been run yet" do
     run("caching_strategy", candidate: false)
 

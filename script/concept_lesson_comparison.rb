@@ -115,6 +115,17 @@ class ConceptLessonComparison
     dir.join(variant, "#{bucket}-#{concept}.json")
   end
 
+  # Every pair either variant has saved, so a run for one concept keeps the
+  # others in the report. A bucket name never holds a hyphen, so the first
+  # one separates it from the concept; a file that no longer names a
+  # vocabulary concept is left out.
+  def self.saved_pairs(dir)
+    VARIANTS.flat_map { |variant| dir.glob("#{variant}/*.json") }
+            .map { |path| path.basename(".json").to_s.split("-", 2) }
+            .select { |bucket, concept| AiService::LANGUAGE_CONFIG.key?(bucket) && ConceptBucket.vocabulary_for(bucket).include?(concept) }
+            .uniq.sort
+  end
+
   def self.target_for(concept)
     text = TARGETS[concept]&.read&.[](TARGET_PATTERN, 1)
     return unless text
@@ -150,9 +161,9 @@ class ConceptLessonComparison
   end
 
   def run(arguments)
-    pairs = arguments.map { |argument| self.class.resolve(argument) }
+    pairs = arguments.map { |argument| self.class.resolve(argument) }.uniq
     pairs.each { |bucket, concept| write_variant(bucket, concept) }
-    write_comparison(pairs)
+    write_comparison(pairs | self.class.saved_pairs(@dir))
   end
 
   private
