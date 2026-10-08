@@ -233,7 +233,7 @@ GEM
       racc (~> 1.4)
     openssl (4.0.2)
     ostruct (0.6.3)
-    pagy (43.6.3)
+    pagy (43.7.0)
       json
       uri
       yaml
@@ -453,7 +453,7 @@ DEPENDENCIES
   jbuilder
   kamal
   letter_opener
-  pagy (~> 43.6)
+  pagy (~> 43.7)
   parallel_tests
   pg (~> 1.7)
   prism (~> 1.9)
