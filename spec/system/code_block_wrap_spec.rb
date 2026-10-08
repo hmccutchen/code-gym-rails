@@ -71,6 +71,15 @@ RSpec.describe "Code block wrapping", type: :system do
     expect(page).to have_css("pre.snippet code[data-lines-done]", wait: 5)
   end
 
+  # Fitting runs from a ResizeObserver, a moment after the block opens or
+  # resizes, so a check on its result retries until the line matches.
+  def expect_line(index, text)
+    page.document.synchronize(5) do
+      actual = line_texts[index]
+      raise Capybara::ExpectationNotMet, "line #{index} was #{actual.inspect}, expected #{text.inspect}" unless actual == text
+    end
+  end
+
   def line_texts
     page.evaluate_script(<<~JS)
       [...document.querySelectorAll("pre.snippet .code-line")].map((line) => line.textContent)
@@ -121,13 +130,14 @@ RSpec.describe "Code block wrapping", type: :system do
       end
 
       it "shows alignment padding as one space once the block wraps" do
-        expect(line_texts[1]).to eq('  kind = "a string that is too long for a phone"')
+        expect_line(1, '  kind = "a string that is too long for a phone"')
       end
     end
   end
 
   it "keeps the padding inside a highlighted string" do
     open_reference(highlighter: :loaded)
+    expect_line(1, '  kind = "a string that is too long for a phone"')
 
     expect(line_texts[2]).to eq('  label = "a,  b')
   end
