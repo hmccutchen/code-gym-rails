@@ -115,8 +115,8 @@
       // such run as one space. A run counts when it sits before `=`, `#` or
       // `//`, or after `:`, `,` or `=`, and not inside a highlighted string or
       // comment; leading indentation never counts. Only the display changes:
-      // each run keeps its original spaces and gets them back when the block
-      // has room again.
+      // every space after the first stays in the text, so copying the block
+      // copies the original line, and shows again when the block has room.
       const ALIGNMENT_RUN = /(?<=\S) {2,}(?==|#|\/\/)|(?<=[:,=]) {2,}(?=\S)/g;
       const LITERAL = ".hljs-string, .hljs-comment";
 
@@ -141,13 +141,12 @@
           const owner = nodes.find(({ node, start }) => match.index >= start && match.index + match[0].length <= start + node.length);
           if (!owner || owner.node.parentElement.closest(LITERAL)) return;
 
-          const run = owner.node.splitText(match.index - owner.start);
-          run.splitText(match[0].length);
+          const extraSpaces = owner.node.splitText(match.index - owner.start + 1);
+          extraSpaces.splitText(match[0].length - 1);
           const span = document.createElement("span");
-          span.className = "code-align";
-          span.dataset.spaces = run.data;
-          run.replaceWith(span);
-          span.append(run);
+          span.className = "code-align-extra";
+          extraSpaces.replaceWith(span);
+          span.append(extraSpaces);
         });
       }
 
@@ -174,9 +173,8 @@
       // A hidden block (a closed disclosure) measures zero and is fitted when
       // it opens, through the observer below.
       function fitAlignment(code) {
-        const runs = code.querySelectorAll(".code-align");
-        if (runs.length === 0) return;
-        runs.forEach((run) => { run.textContent = run.dataset.spaces; });
+        if (!code.querySelector(".code-align-extra")) return;
+        code.removeAttribute("data-wraps");
 
         const probe = document.createElement("span");
         probe.className = "code-line";
@@ -187,7 +185,7 @@
         if (row === 0) return;
 
         const wraps = [...code.children].some((line) => line.getBoundingClientRect().height > row * 1.5);
-        if (wraps) runs.forEach((run) => { run.textContent = " "; });
+        code.toggleAttribute("data-wraps", wraps);
       }
 
       // Watches the <pre>, since an inline <code> reports no size. Fitting
@@ -206,9 +204,9 @@
         code.dataset.linesDone = "1";
         const lines = splitIntoLines(code);
         lines.forEach((line) => {
-          // An empty line keeps its height through the layout's :empty rule,
-          // which a leftover empty highlight span would defeat.
-          if (line.textContent === "") line.replaceChildren();
+          // A blank line holds its own newline: an empty block keeps no
+          // height and is dropped from a copy.
+          if (line.textContent === "") line.replaceChildren("\n");
           line.style.setProperty("--indent", leadingColumns(line.textContent));
           markAlignment(line);
           addChainBreaks(line);

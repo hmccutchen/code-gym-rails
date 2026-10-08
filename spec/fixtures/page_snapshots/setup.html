@@ -27,6 +27,7 @@
       --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
       --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
       --green: #4ade80; --red: #f87171; --yellow: #fbbf24;
+      --code-bg: #0d0d1a; --code-symbol: #a78bfa; --code-builtin: #7dd3fc;
       --pattern-mask: url("/assets/gym-pattern-tile-dark-4382d7e8.png");
       --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .08;
       /* iOS auto-zooms a focused input below 16px, which shifts the layout and
@@ -213,39 +214,47 @@
       .pull-refresh.is-settling, .pull-settling { transition: none; }
     }
 
-    /* pre-wrap keeps each line's leading whitespace (indentation) intact; it only
-       allows breaks at spaces/newlines, so snippets wrap on phones instead of
-       forcing horizontal scroll. */
-    pre.snippet { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+    /* A lone generic `monospace` makes browsers drop the default size to 13px,
+       so inline code would shrink beside 16px prose. Naming it twice is the
+       known way to opt out; the face is unchanged. */
+    code, kbd, samp, pre { font-family: monospace, monospace; }
+    /* pre-wrap keeps each line's leading whitespace (indentation) intact, so
+       snippets wrap on phones instead of forcing horizontal scroll;
+       overflow-wrap breaks a token too long for the line. iOS would otherwise
+       enlarge code text on its own in landscape. */
+    pre.snippet, .pseudocode-code pre { white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    pre.snippet { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; }
     /* shared/_syntax_highlighting_script splits each snippet into one
        .code-line per source line and sets --indent to its leading columns.
        The first line starts at column 0 and keeps its own spaces; a wrapped
-       continuation starts two columns past that indentation. */
+       continuation starts two columns past that indentation. The script marks
+       a block that wraps, and its alignment padding then shows as one space
+       while the rest stays in the text, so a copy keeps the original line. */
     pre.snippet .code-line { display: block; padding-left: calc((var(--indent, 0) + 2) * 1ch); text-indent: calc((var(--indent, 0) + 2) * -1ch); }
-    pre.snippet .code-line:empty::before { content: "\200b"; }
+    pre.snippet code[data-wraps] .code-align-extra { font-size: 0; }
     /* Plan-review excerpts are prose, not code — a left-border quote block
        instead of the monospace snippet treatment, so multi-paragraph text
        reads as an excerpt from a doc rather than malformed code. */
-    .plan-excerpt { background: #0d0d1a; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    .plan-excerpt { background: var(--code-bg); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
     /* The pseudocode_to_code rounds. Here rather than in a per-page block for
        the same reason .answer-display is: _answered_sections renders these on
        the dashboard's submitted state AND on every history entry. */
-    .problem-statement { background: #0d0d1a; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    .problem-statement { background: var(--code-bg); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
     .pseudocode-rounds { margin-top: .75rem; }
     .pseudocode-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
     .pseudocode-status { font-size: .8rem; color: var(--muted); }
     .pseudocode-critique-label { font-size: .85rem; color: var(--muted); margin: .6rem 0 .2rem; }
     .pseudocode-critique ul { margin: 0 0 .4rem 1.1rem; font-size: .9rem; }
     .pseudocode-critique li { margin-bottom: .25rem; }
-    .pseudocode-code pre { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .85rem; overflow-x: auto; white-space: pre; margin: .6rem 0 .2rem; }
+    .pseudocode-code pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .85rem; margin: .6rem 0 .2rem; }
     .pseudocode-caption { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
     .hljs { color: var(--text); }
     .hljs-keyword, .hljs-title.function_, .hljs-title.class_ { color: var(--accent-text); }
     .hljs-string, .hljs-regexp { color: var(--green); }
     .hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
     .hljs-number, .hljs-literal { color: var(--yellow); }
-    .hljs-symbol, .hljs-attr, .hljs-params { color: #a78bfa; }
-    .hljs-built_in, .hljs-title { color: #7dd3fc; }
+    .hljs-symbol, .hljs-attr, .hljs-params { color: var(--code-symbol); }
+    .hljs-built_in, .hljs-title { color: var(--code-builtin); }
     .hljs-variable { color: var(--text); }
     .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .75rem; }
     .review-block h3 { color: var(--accent-text); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
@@ -346,7 +355,7 @@
     details.ref summary { cursor: pointer; font-size: .85rem; color: var(--accent-text); padding: .4rem 0; list-style: none; }
     details.ref summary::before { content: "▶ "; }
     details.ref[open] summary::before { content: "▼ "; }
-    .ref-body { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
+    .ref-body { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
     /* Hides only the diagram box itself while it's still empty (before render
        fills it) — the enclosing <details> summary/triangle stays visible and
        clickable regardless, since that's the point of the disclosure. A
@@ -369,7 +378,7 @@
       content: attr(data-definition);
       position: absolute; left: 0; bottom: 100%; margin-bottom: .35rem;
       width: max-content; max-width: 16rem;
-      background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
       padding: .5rem .65rem; font-size: .8rem; line-height: 1.5; color: var(--text);
       white-space: normal; z-index: 10;
       display: none;
@@ -396,7 +405,7 @@
 
     .submit-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 1.5rem; }
     .submitted-badge { display: inline-block; background: rgba(74,222,128,.1); color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: .2rem .6rem; font-size: .8rem; font-weight: 600; }
-    .answer-display { background: #0d0d1a; border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
+    .answer-display { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
     .review-section { margin-top: 1.5rem; }
     .history-pill { border: 1px solid var(--border); border-radius: 4px; padding: .15rem .5rem; font-size: .85rem; color: var(--muted); }
 
@@ -467,7 +476,7 @@
     .learn-drill-paused { color: var(--accent-text); }
     .learn-group-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
     .learn-group-head h3 { margin: 0; }
-    .learn-worked-example { white-space: pre-wrap; }
+    .learn-worked-example { white-space: pre-wrap; overflow-wrap: anywhere; }
     .learn-lesson { margin: .75rem 0 1rem; }
     .learn-lesson p { margin-bottom: .75rem; }
     .learn-lesson ul { padding-left: 1.25rem; margin: 0 0 .75rem; }
@@ -497,8 +506,8 @@
                    border-radius: 6px; color: var(--text); font-size: .85rem;
                    box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
   </style>
-    <link rel="stylesheet" href="/assets/display-720262ba.css" />
-    <link rel="stylesheet" href="/assets/display_light-d18a4a80.css" media="not all" data-light-palette-media="true" />
+    <link rel="stylesheet" href="/assets/display-8b30f561.css" />
+    <link rel="stylesheet" href="/assets/display_light-86861e6a.css" media="not all" data-light-palette-media="true" />
 </head>
 <body>
     <div id="background-pattern" aria-hidden="true"></div>

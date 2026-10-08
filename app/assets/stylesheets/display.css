@@ -43,7 +43,3 @@ html[data-font="atkinson"] :is(p, li, dd, .question, .section-scenario, .why-box
   .problem-statement, .hint-body, .ref-body, .review-item, .alternate-item, .follow-up-turn, .duck-turn) {
   font-family: "Atkinson Hyperlegible", sans-serif;
 }
-
-/* Code inside prose keeps its monospace face. Browsers already give these
-   elements one, but a reading font must never be one selector away from it. */
-html[data-font] :is(pre, code, kbd, samp) { font-family: monospace; }

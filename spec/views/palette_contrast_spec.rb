@@ -88,6 +88,15 @@ RSpec.describe "palette contrast" do
       end
     end
 
+    it "keeps every highlighting color at 4.5:1 or more on code" do
+      colors = rules.select { |rule| rule.selectors.any? { |selector| selector.include?(".hljs") } }
+        .filter_map { |rule| rule.declaration("color") }.uniq
+        .to_h { |color| [ color, vars.fetch(color[/\Avar\(--([\w-]+)\)\z/, 1], color) ] }
+
+      expect(colors.size).to be >= 6
+      expect(colors.transform_values { |color| contrast(color, code_background).round(2) }.values).to all(be >= 4.5), colors.inspect
+    end
+
     it "keeps white text at 4.5:1 or more on the button fill, at rest and on hover" do
       expect(contrast("#ffffff", vars["button-bg"])).to be >= 4.5
       expect(contrast("#ffffff", vars["button-bg-hover"])).to be >= 4.5
@@ -106,7 +115,7 @@ RSpec.describe "palette contrast" do
 
   context "dark, the default" do
     let(:vars) { ViewStyles.root_variables(layout) }
-    let(:code_background) { background_of("pre.snippet") }
+    let(:code_background) { vars["code-bg"] }
 
     it_behaves_like "an accessible palette"
   end
@@ -132,13 +141,6 @@ RSpec.describe "palette contrast" do
     it "keeps a field's border at 3:1 or more, since the border is what marks the field" do
       [ vars["bg"], vars["surface"], code_background ].each do |background|
         expect(contrast(vars["field-border"], background)).to be >= 3
-      end
-    end
-
-    it "keeps the two literal highlighting colors at 4.5:1 or more on code" do
-      %w[.hljs-symbol .hljs-built_in].each do |selector|
-        color = light_rules.find { |rule| rule.selectors.any? { |s| s.include?(selector) } }.declaration("color")
-        expect(contrast(color, code_background)).to be >= 4.5
       end
     end
 
