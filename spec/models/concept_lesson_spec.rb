@@ -41,6 +41,25 @@ RSpec.describe ConceptLesson do
     expect(lesson["situations"].size).to eq(described_class::MAX_SITUATIONS)
   end
 
+  it "drops the comparison and its limit together when either is unusable" do
+    without_limit = described_class.from_provider(reply.merge("comparison_limit" => " "))
+    without_comparison = described_class.from_provider(reply.except("comparison"))
+
+    [ without_limit, without_comparison ].each do |lesson|
+      expect(lesson.keys).not_to include("comparison", "comparison_limit")
+      expect(lesson).to include("definition", "habits")
+    end
+  end
+
+  it "describes the prompt's shape for every section, lists included" do
+    schema = described_class.schema
+
+    expect(schema.keys).to eq(described_class::SECTIONS)
+    expect(schema.values_at(*described_class::TEXT_SECTIONS).uniq).to eq([ "string" ])
+    expect(schema["situations"]).to eq([ "string" ])
+    expect(schema["habits"]).to eq([ { "habit" => "string", "catch" => "string" } ])
+  end
+
   it "is nil for a reply with nothing usable or no lesson at all" do
     expect(described_class.from_provider({ "definition" => "", "habits" => [] })).to be_nil
     expect(described_class.from_provider(nil)).to be_nil

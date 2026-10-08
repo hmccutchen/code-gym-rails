@@ -3057,16 +3057,7 @@ class AiService
         "ladder_junior":             "string — a junior-level problem about this concept",
         "ladder_senior":             "string — a senior-level problem about this concept",
         "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept",
-        "lesson": {
-          "definition":       "string",
-          "comparison":       "string",
-          "comparison_limit": "string",
-          "misunderstanding": "string",
-          "situations":       ["string"],
-          "habits":           [{ "habit": "string", "catch": "string" }],
-          "carry_question":   "string",
-          "quick_test":       "string"
-        }
+        "lesson": #{JSON.generate(ConceptLesson.schema)}
       }
     PROMPT
   end
@@ -3090,7 +3081,7 @@ class AiService
       the code example and the worked example already show the code.
       - definition: one sentence saying what the concept is.
       - comparison: an everyday comparison that maps onto the concept exactly.
-      - comparison_limit: one sentence saying where that comparison stops working. Include it whenever you include comparison.
+      - comparison_limit: one sentence saying where that comparison stops working. Give it with comparison or leave both out; one without the other is dropped.
       - misunderstanding: the most common wrong idea about this concept, and what is true instead.
       - situations: two to #{ConceptLesson::MAX_SITUATIONS} concrete situations where an engineer runs into it, each one short.
       - #{habits}

@@ -7,8 +7,18 @@
 # .from_provider holds a reply to them at the boundary, and learn/show
 # renders them in this order. Pure.
 module ConceptLesson
-  TEXT_SECTIONS = %w[definition comparison comparison_limit misunderstanding carry_question quick_test].freeze
   SECTIONS = %w[definition comparison comparison_limit misunderstanding situations habits carry_question quick_test].freeze
+
+  # The shape the prompt asks for. Every key not listed here is a string.
+  LIST_SHAPES = {
+    "situations" => [ "string" ],
+    "habits" => [ { "habit" => "string", "catch" => "string" } ]
+  }.freeze
+  TEXT_SECTIONS = (SECTIONS - LIST_SHAPES.keys).freeze
+
+  # The comparison and its limit show together or not at all, so a reader
+  # never meets an analogy without the line saying where it breaks.
+  PAIRED_SECTIONS = %w[comparison comparison_limit].freeze
 
   WORD_TARGET = 350
   MAX_TEXT_LENGTH = 600
@@ -24,7 +34,12 @@ module ConceptLesson
     lesson = TEXT_SECTIONS.index_with { |key| usable_text(value[key]) }
     lesson["situations"] = usable_list(value["situations"], MAX_SITUATIONS) { |entry| usable_text(entry) }
     lesson["habits"] = usable_list(value["habits"], MAX_HABITS) { |entry| usable_habit(entry) }
+    lesson.except!(*PAIRED_SECTIONS) unless PAIRED_SECTIONS.all? { |key| lesson[key] }
     lesson.compact_blank.presence
+  end
+
+  def self.schema
+    SECTIONS.index_with { |key| LIST_SHAPES.fetch(key, "string") }
   end
 
   def self.usable_text(value)

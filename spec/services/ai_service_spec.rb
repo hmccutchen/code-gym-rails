@@ -1226,7 +1226,7 @@ RSpec.describe AiService do
       config = service.send(:config_for, "ruby_rails")
       prompt = service.send(:build_concept_reference_prompt, "idempotency", config)
 
-      ConceptLesson::SECTIONS.each { |key| expect(prompt).to include(%("#{key}":)) }
+      expect(prompt).to include(%("lesson": #{JSON.generate(ConceptLesson.schema)}))
       expect(prompt).to include("under about #{ConceptLesson::WORD_TARGET} words")
       expect(prompt).to include("This standard applies to the guide fields and the lesson")
       expect(prompt).to include("small habits or fixes")
