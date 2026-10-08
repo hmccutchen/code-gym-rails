@@ -9,12 +9,17 @@
       guides existed) still has to show its full reference rather than half
       of it. Only the three guide fields and their headings are gated on
       guide?, and only the single if/else below decides guide content vs the
-      write-guide control. %>
+      write-guide control. A row with a lesson shows the lesson in place of
+      the explanation and the guide's prose, which it covers in less space. %>
   <p><strong><%= @reference.tagline %></strong></p>
-  <p><%= @reference.explanation %></p>
+  <% if @reference.lesson? %>
+    <%= render "learn/lesson", lesson: @reference.lesson %>
+  <% else %>
+    <p><%= @reference.explanation %></p>
+  <% end %>
 <% end %>
 
-<% if @reference&.guide? %>
+<% if @reference&.guide? && !@reference.lesson? %>
   <%# The reference fields render INSIDE the guide rather than beside it: one
       account of the concept, deepened, not two competing ones. That ordering is
       the visible half of generating both in a single response. %>
@@ -22,20 +27,28 @@
 <% end %>
 
 <% if @reference %>
-  <pre class="snippet"><code<% if (lang = hljs_language(@bucket)) %> data-hljs="<%= lang %>"<% end %>><%= @reference.code_example %></code></pre>
+  <%# Folded so the page reads short on a phone; the code is there for
+      whoever wants to see it. %>
+  <details class="ref learn-code-examples">
+    <summary><%= t("learn.code_examples") %></summary>
+    <pre class="snippet"><code<% if (lang = hljs_language(@bucket)) %> data-hljs="<%= lang %>"<% end %>><%= @reference.code_example %></code></pre>
+    <% if @reference.guide? %>
+      <h2><%= t("learn.worked_example") %></h2>
+      <p class="learn-worked-example"><%= @reference.guide_worked_example %></p>
+    <% end %>
+  </details>
 <% end %>
 
-<% if @reference&.guide? %>
-  <h2><%= t("learn.worked_example") %></h2>
-  <p class="learn-worked-example"><%= @reference.guide_worked_example %></p>
-
+<% if @reference&.guide? && !@reference.lesson? %>
   <h2><%= t("learn.pitfalls") %></h2>
   <p><%= @reference.guide_pitfalls %></p>
 <% end %>
 
 <% if @reference %>
-  <h2><%= t("learn.senior_lens") %></h2>
-  <p>🔭 <%= @reference.senior_lens %></p>
+  <details class="ref learn-senior-lens">
+    <summary><%= t("learn.senior_lens") %></summary>
+    <p>🔭 <%= @reference.senior_lens %></p>
+  </details>
 <% end %>
 
 <%= render "learn/drill_control" %>
@@ -71,4 +84,10 @@
   <%= render "learn/write_up_control", awaiting: "ladder", generation_version: @reference.generation_version,
              message: t("learn.ladder_offer", targets: @ladder_targets.to_sentence),
              button: t("learn.write_ladder") %>
+<% elsif !@reference.lesson? %>
+  <% if @lesson_missing %>
+    <p class="learn-ladder-missing"><%= t("learn.lesson_missing") %></p>
+  <% end %>
+  <%= render "learn/write_up_control", awaiting: "lesson", generation_version: @reference.generation_version,
+             message: t("learn.lesson_offer"), button: t("learn.write_lesson") %>
 <% end %>

@@ -25,20 +25,20 @@ class GenerateConceptReferenceJob < ApplicationJob
 
     # Another job may have generated it in the enqueue/run gap.
     existing = ConceptReference.find_by(concept: concept, language: language)
-    return if existing && (existing.complete? || !refresh)
+    return if existing && (existing.fully_written? || !refresh)
 
     user = User.find_by(id: user_id)
     return unless user
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    attributes = (AiService::CONCEPT_REFERENCE_FIELDS + AiService::CONCEPT_GUIDE_FIELDS + AiService::CONCEPT_LADDER_FIELDS)
+    attributes = (AiService::CONCEPT_REFERENCE_FIELDS + AiService::CONCEPT_GUIDE_FIELDS + AiService::CONCEPT_LADDER_FIELDS + [ "lesson" ])
                    .index_with { |field| reference[field] }
 
     if existing
       # Keep the write guard even with queue concurrency control: an expired
       # permit or a direct perform_now caller can bypass that control.
       existing.with_lock do
-        next if existing.complete?
+        next if existing.fully_written?
 
         existing.update!(attributes.merge(generation_version: existing.generation_version + 1))
       end

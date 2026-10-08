@@ -1222,6 +1222,25 @@ RSpec.describe AiService do
       expect(prompt.downcase).to include("pseudocode")
     end
 
+    it "asks for the lesson's sections, from ConceptLesson, under the plain-language standard" do
+      config = service.send(:config_for, "ruby_rails")
+      prompt = service.send(:build_concept_reference_prompt, "idempotency", config)
+
+      expect(prompt).to include(%("lesson": #{JSON.generate(ConceptLesson.schema)}))
+      expect(prompt).to include("under about #{ConceptLesson::WORD_TARGET} words")
+      expect(prompt).to include("This standard applies to the guide fields and the lesson")
+      expect(prompt).to include("small habits or fixes")
+    end
+
+    it "asks a tradeoff concept's lesson for options and what each costs" do
+      concept = AiService::TRADEOFF_CONCEPTS.first
+      config = service.send(:config_for, (DailyExercise::LANGUAGES + ConceptBucket::LANGUAGE_INDEPENDENT).find { |bucket| ConceptBucket.vocabulary_for(bucket).include?(concept) })
+      prompt = service.send(:build_concept_reference_prompt, concept, config)
+
+      expect(prompt).to include("options a team can choose between")
+      expect(prompt).not_to include("small habits or fixes")
+    end
+
     it "still frames code_example as annotated language code for a normal language config" do
       config = service.send(:config_for, "ruby_rails")
       prompt = service.send(:build_concept_reference_prompt, "n_plus_one", config)
@@ -4827,6 +4846,17 @@ RSpec.describe AiService do
       expect(result).to include(
         "tagline", "explanation", "code_example", "senior_lens"
       )
+      expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
+    end
+
+    it "holds the lesson to ConceptLesson and keeps a reference whose lesson is unusable" do
+      with_lesson = JSON.parse(valid_json).merge("lesson" => { "definition" => " Once or twice, same state. ", "habits" => [ { "habit" => "no catch" } ] })
+      result = double_class.new(canned_text: with_lesson.to_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      expect(result["lesson"]).to eq("definition" => "Once or twice, same state.")
+
+      broken = JSON.parse(valid_json).merge("lesson" => "not an object")
+      result = double_class.new(canned_text: broken.to_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      expect(result["lesson"]).to be_nil
       expect(result["tagline"]).to eq("Avoid N+1 by eager loading.")
     end
 

@@ -307,6 +307,70 @@ RSpec.describe "Learn", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
+    describe "a row with a lesson" do
+      let(:lesson) do
+        { "definition" => "LESSON DEFINITION", "situations" => [ "SITUATION ONE" ],
+          "habits" => [ { "habit" => "HABIT ONE", "catch" => "CATCH ONE" } ] }
+      end
+
+      before do
+        full_reference.update!(ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "q", lesson: lesson)
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      end
+
+      it "shows the lesson in place of the explanation and the guide's prose" do
+        expect(response.body).to include("TAGLINE", "LESSON DEFINITION", "SITUATION ONE", "HABIT ONE", "CATCH ONE")
+        expect(response.body).not_to include("EXPLANATION", "PLAIN LANGUAGE", "PITFALLS")
+        expect(response.body).not_to include(I18n.t("learn.lesson.comparison"))
+      end
+
+      it "folds the code examples and the senior lens closed" do
+        page = Nokogiri::HTML(response.body)
+        code = page.at_css("details.learn-code-examples")
+        senior = page.at_css("details.learn-senior-lens")
+
+        expect(code["open"]).to be_nil
+        expect(code.text).to include("User.includes(:posts)", "WORKED EXAMPLE")
+        expect(senior["open"]).to be_nil
+        expect(senior.text).to include("SENIOR LENS")
+      end
+
+      it "offers no write-up control" do
+        expect(response.body).not_to include(I18n.t("learn.write_lesson"), I18n.t("learn.write_guide"))
+      end
+    end
+
+    describe "the lesson control" do
+      let!(:written) do
+        full_reference.tap { |row| row.update!(ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "q") }
+      end
+
+      it "offers the lesson on a guided row without one, polling for the version it saw" do
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(response.body).to include(I18n.t("learn.write_lesson"))
+        status_url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-status-url"]
+        expect(Rack::Utils.parse_query(URI.parse(status_url).query))
+          .to include("awaiting" => "lesson", "generation_version" => written.generation_version.to_s)
+        expect(response.body).to include("PLAIN LANGUAGE", "PITFALLS")
+      end
+
+      it "says the lesson did not come back after a rewrite without one" do
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one", lesson: "missing")
+
+        expect(response.body).to include(ERB::Util.h(I18n.t("learn.lesson_missing")))
+      end
+
+      it "offers the ladder instead when a target still needs one, since that rewrite writes the lesson too" do
+        written.update!(ladder_junior: nil)
+        user.update!(section_kind_levels: { "challenge" => "senior" })
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(response.body).to include(I18n.t("learn.write_ladder"))
+        expect(response.body).not_to include(I18n.t("learn.write_lesson"))
+      end
+    end
+
     describe "the ladder control" do
       before { user.update!(language: "ruby_rails") }
 
@@ -394,6 +458,27 @@ RSpec.describe "Learn", type: :request do
       status(awaiting: "guide")
 
       expect(response.parsed_body["ready"]).to be(true)
+    end
+
+    it "waits on the lesson and reports a rewrite that landed without one" do
+      row = reference(**guide, **ladder)
+      status(awaiting: "lesson", generation_version: row.generation_version)
+      expect(response.parsed_body).to include("ready" => false, "rewritten" => false)
+
+      row.update!(generation_version: row.generation_version + 1)
+      status(awaiting: "lesson", generation_version: row.generation_version - 1)
+      expect(response.parsed_body).to include("ready" => false, "rewritten" => true)
+
+      row.update!(lesson: { "definition" => "d" })
+      status(awaiting: "lesson", generation_version: row.generation_version - 1)
+      expect(response.parsed_body["ready"]).to be(true)
+    end
+
+    it "refuses a lesson poll without the version the page saw" do
+      reference(**guide)
+      status(awaiting: "lesson")
+
+      expect(response).to have_http_status(:bad_request)
     end
 
     it "is not ready for ladder until the row is complete" do

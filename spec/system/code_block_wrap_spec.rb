@@ -60,11 +60,24 @@ RSpec.describe "Code block wrapping", type: :system do
     end
   end
 
+  # The Learn page folds its code examples closed, so every example here also
+  # covers a block that was hidden at load and fitted when it opened.
   def open_reference(highlighter:, width: 390)
     stub_highlighter(highlighter, width: width)
     visit_as(user)
     visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
-    expect(page).to have_css("pre.snippet code[data-lines-done]", wait: 10)
+    expect(page).to have_css("pre.snippet code[data-lines-done]", visible: :all, wait: 10)
+    find("details.learn-code-examples summary").click
+    expect(page).to have_css("pre.snippet code[data-lines-done]", wait: 5)
+  end
+
+  # Fitting runs from a ResizeObserver, a moment after the block opens or
+  # resizes, so a check on its result retries until the line matches.
+  def expect_line(index, text)
+    page.document.synchronize(5) do
+      actual = line_texts[index]
+      raise Capybara::ExpectationNotMet, "line #{index} was #{actual.inspect}, expected #{text.inspect}" unless actual == text
+    end
   end
 
   def line_texts
@@ -117,13 +130,14 @@ RSpec.describe "Code block wrapping", type: :system do
       end
 
       it "shows alignment padding as one space once the block wraps" do
-        expect(line_texts[1]).to eq('  kind = "a string that is too long for a phone"')
+        expect_line(1, '  kind = "a string that is too long for a phone"')
       end
     end
   end
 
   it "keeps the padding inside a highlighted string" do
     open_reference(highlighter: :loaded)
+    expect_line(1, '  kind = "a string that is too long for a phone"')
 
     expect(line_texts[2]).to eq('  label = "a,  b')
   end

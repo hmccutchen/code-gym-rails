@@ -1,0 +1,27 @@
+<%# Required locals: lesson (Hash, as ConceptLesson.from_provider stored it).
+    Sections render in ConceptLesson::SECTIONS order; a missing one renders
+    nothing. %>
+<div class="learn-lesson">
+  <% ConceptLesson::SECTIONS.each do |key| %>
+    <% value = lesson[key] %>
+    <% next if value.blank? %>
+    <% case key %>
+    <% when "situations" %>
+      <p><strong><%= t("learn.lesson.#{key}") %></strong></p>
+      <ul>
+        <% value.each do |situation| %>
+          <li><%= situation %></li>
+        <% end %>
+      </ul>
+    <% when "habits" %>
+      <p><strong><%= t("learn.lesson.#{key}") %></strong></p>
+      <ul>
+        <% value.each do |habit| %>
+          <li><%= habit["habit"] %> <em><%= t("learn.lesson.catch") %></em> <%= habit["catch"] %></li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p><strong><%= t("learn.lesson.#{key}") %></strong> <%= value %></p>
+    <% end %>
+  <% end %>
+</div>
