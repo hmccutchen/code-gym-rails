@@ -60,11 +60,15 @@ RSpec.describe "Code block wrapping", type: :system do
     end
   end
 
+  # The Learn page folds its code examples closed, so every example here also
+  # covers a block that was hidden at load and fitted when it opened.
   def open_reference(highlighter:, width: 390)
     stub_highlighter(highlighter, width: width)
     visit_as(user)
     visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
-    expect(page).to have_css("pre.snippet code[data-lines-done]", wait: 10)
+    expect(page).to have_css("pre.snippet code[data-lines-done]", visible: :all, wait: 10)
+    find("details.learn-code-examples summary").click
+    expect(page).to have_css("pre.snippet code[data-lines-done]", wait: 5)
   end
 
   def line_texts
