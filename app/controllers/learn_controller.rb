@@ -32,6 +32,7 @@ class LearnController < ApplicationController
     @reference = ConceptReference.find_by(concept: @concept, language: @bucket)
     @ladder_targets = ladder_targets_for(@reference)
     @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
+    @lesson_missing = @reference.present? && !@reference.lesson? && params[:lesson] == "missing"
     @drills = ConceptDrills.for(current_user)
     @paused = current_user.concept_masteries.tier_paused.exists?(concept: @concept, language: @bucket)
   end
@@ -40,7 +41,11 @@ class LearnController < ApplicationController
   # row's current state cannot: once a no-guide page's guide lands, the row looks
   # like a ladder candidate, and a flubbed ladder would then never read ready.
   # Absent reads as guide, the only value pages sent before this existed.
-  AWAITING = { "guide" => :guide?, "ladder" => :complete? }.freeze
+  AWAITING = { "guide" => :guide?, "ladder" => :complete?, "lesson" => :lesson? }.freeze
+  # A rewrite can land without the part the page asked for, which the row's
+  # state alone never reads as ready; these name the version the page saw, so
+  # the poll can tell a finished rewrite from queued work.
+  AWAITING_REWRITE = %w[ladder lesson].freeze
   GENERATION_VERSION_FORMAT = /\A\d+\z/
 
   # GET /learn/:bucket/:concept/status — is the write-up the page asked for done?
@@ -56,11 +61,11 @@ class LearnController < ApplicationController
     awaiting  = params.fetch(:awaiting, "guide").to_s
     predicate = AWAITING[awaiting]
     return head :bad_request if predicate.nil?
-    return head :bad_request if awaiting == "ladder" && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
+    return head :bad_request if AWAITING_REWRITE.include?(awaiting) && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
 
     reference = ConceptReference.find_by(concept: concept, language: bucket)
     body = { ready: reference&.public_send(predicate) || false }
-    if awaiting == "ladder"
+    if AWAITING_REWRITE.include?(awaiting)
       body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
     end
     body.merge!(write_up_failure(concept, bucket)) unless body[:ready]

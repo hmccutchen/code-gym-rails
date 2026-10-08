@@ -253,7 +253,17 @@ class FakeService < AiService
       "read by someone who did not write it, which is usually sooner.",
     "ladder_junior" => "One obvious instance in a short method, where the fix is a single change.",
     "ladder_senior" => "The instance hides behind a helper or a callback, so finding it means tracing a call path.",
-    "ladder_principal_engineer" => "The fix has a real cost elsewhere, and the answer weighs that cost against leaving it."
+    "ladder_principal_engineer" => "The fix has a real cost elsewhere, and the answer weighs that cost against leaving it.",
+    "lesson" => {
+      "definition" => "One rule that decides how the code behaves.",
+      "comparison" => "Like a recipe step you skip once and pay for in every dish after.",
+      "comparison_limit" => "A recipe fails where you can taste it; code can fail where nobody looks.",
+      "misunderstanding" => "People think it only matters later. It matters as soon as someone else reads the code.",
+      "situations" => [ "A page that slows down as data grows.", "A loop that touches a related record." ],
+      "habits" => [ { "habit" => "Count what the code does per row.", "catch" => "A count can look fine on small test data." } ],
+      "carry_question" => "What does this do once per row?",
+      "quick_test" => "Run it with ten rows, then a thousand, and compare."
+    }
   }.freeze
 
   RECOGNITION_GUIDE = {

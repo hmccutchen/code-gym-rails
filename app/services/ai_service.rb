@@ -1683,6 +1683,7 @@ class AiService
   def normalize_optional_reference_fields!(reference)
     CONCEPT_GUIDE_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_CONCEPT_GUIDE_LENGTH) }
     CONCEPT_LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_LADDER_RUNG_LENGTH) }
+    reference["lesson"] = ConceptLesson.from_provider(reference["lesson"])
   end
 
   def usable_optional_text(value, max_length)
@@ -3032,7 +3033,7 @@ class AiService
       at most two short paragraphs, except guide_worked_example, which carries
       its own bound below.
 
-      This standard applies to the guide fields only:
+      This standard applies to the guide fields and the lesson:
       #{PLAIN_LANGUAGE_STANDARD}
 
       Then write a difficulty ladder: for each of #{KindDifficulty::LEVELS.join(', ')}, what a
@@ -3041,6 +3042,8 @@ class AiService
       unindexed foreign key, senior is composite index column order, principal_engineer is
       the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
       #{MAX_LADDER_RUNG_LENGTH} characters.
+
+      #{concept_lesson_instruction(concept)}
 
       Return JSON matching this schema exactly:
       {
@@ -3053,9 +3056,47 @@ class AiService
         "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
         "ladder_junior":             "string — a junior-level problem about this concept",
         "ladder_senior":             "string — a senior-level problem about this concept",
-        "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept"
+        "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept",
+        "lesson": {
+          "definition":       "string",
+          "comparison":       "string",
+          "comparison_limit": "string",
+          "misunderstanding": "string",
+          "situations":       ["string"],
+          "habits":           [{ "habit": "string", "catch": "string" }],
+          "carry_question":   "string",
+          "quick_test":       "string"
+        }
       }
     PROMPT
+  end
+
+  # The lesson's keys come from ConceptLesson, which also holds the reply to
+  # them. A choice between two defensible options has no wrong side, so its
+  # habits are the options and each catch is what that option costs.
+  def concept_lesson_instruction(concept)
+    habits =
+      if TRADEOFF_CONCEPTS.include?(concept)
+        "habits: one to #{ConceptLesson::MAX_HABITS} options a team can choose between. Each carries \"catch\": what that option costs."
+      else
+        "habits: one to #{ConceptLesson::MAX_HABITS} small habits or fixes. Each carries \"catch\": the real limit or cost of that habit, which the reader sees directly after it."
+      end
+
+    <<~TEXT.chomp
+      Then write a short lesson for someone reading this concept on a phone, under
+      "lesson". Every key in it is optional: leave a key out when it does not fit
+      this concept, and never pad one to fill it.
+      Keep the whole lesson under about #{ConceptLesson::WORD_TARGET} words, in plain prose with no code;
+      the code example and the worked example already show the code.
+      - definition: one sentence saying what the concept is.
+      - comparison: an everyday comparison that maps onto the concept exactly.
+      - comparison_limit: one sentence saying where that comparison stops working. Include it whenever you include comparison.
+      - misunderstanding: the most common wrong idea about this concept, and what is true instead.
+      - situations: two to #{ConceptLesson::MAX_SITUATIONS} concrete situations where an engineer runs into it, each one short.
+      - #{habits}
+      - carry_question: one question the reader can ask about their own work.
+      - quick_test: a quick way to check their own code or plan for it.
+    TEXT
   end
 
   def build_recognition_guide_prompt(group_key)

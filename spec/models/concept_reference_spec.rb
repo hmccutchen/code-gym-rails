@@ -263,6 +263,17 @@ RSpec.describe ConceptReference do
       expect(reference(concept: "memoization", guide_pitfalls: nil, **full_ladder)).not_to be_complete
     end
 
+    it "stays complete without a lesson, and is fully written only with one" do
+      row = reference(**full_ladder)
+      expect(row).to be_complete
+      expect(row).not_to be_lesson
+      expect(row).not_to be_fully_written
+
+      row.update!(lesson: { "definition" => "d" })
+      expect(row).to be_lesson
+      expect(row).to be_fully_written
+    end
+
     it "defaults historical rows to no completed generation and keeps unrelated updates out of the counter" do
       row = reference(**full_ladder)
       expect(row.generation_version).to eq(0)

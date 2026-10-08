@@ -239,10 +239,11 @@ RSpec.describe GenerateConceptReferenceJob do
       expect(row).not_to be_complete
     end
 
-    it "leaves a complete row alone even when asked to refresh" do
+    it "leaves a fully written row alone even when asked to refresh" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept",
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
-                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p",
+                               lesson: { "definition" => "d" })
       expect(AiService).not_to receive(:for)
 
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
@@ -251,10 +252,33 @@ RSpec.describe GenerateConceptReferenceJob do
       expect(ConceptReference.last.generation_version).to eq(0)
     end
 
-    # Two jobs can both pass the initial existing.complete? check before either
-    # writes. The second one to reach the write must discard its result rather
-    # than clobber the winner's write.
-    it "does not overwrite a row that became complete between the check and the write" do
+    it "rewrites a row with a guide and ladder but no lesson when asked to refresh, and stores the lesson" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old",
+                               guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
+                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+      stub_service(returning: reference_hash.merge("lesson" => { "definition" => "d" }))
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+
+      expect(ConceptReference.last.tagline).to eq("Avoid N+1 by eager loading.")
+      expect(ConceptReference.last.lesson).to eq("definition" => "d")
+    end
+
+    it "leaves a row with a guide and ladder but no lesson alone without a refresh" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept",
+                               guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
+                               ladder_junior: "j", ladder_senior: "s", ladder_principal_engineer: "p")
+      expect(AiService).not_to receive(:for)
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+
+      expect(ConceptReference.last.tagline).to eq("kept")
+    end
+
+    # Two jobs can both pass the initial existing.fully_written? check before
+    # either writes. The second one to reach the write must discard its result
+    # rather than clobber the winner's write.
+    it "does not overwrite a row that became fully written between the check and the write" do
       row = legacy_row
       stub_service
 
@@ -263,7 +287,7 @@ RSpec.describe GenerateConceptReferenceJob do
           guide_plain_language: "winner plain", guide_worked_example: "winner worked",
           guide_pitfalls: "winner pitfalls",
           ladder_junior: "winner j", ladder_senior: "winner s", ladder_principal_engineer: "winner p",
-          generation_version: 1
+          lesson: { "definition" => "winner" }, generation_version: 1
         )
         block.call
       end

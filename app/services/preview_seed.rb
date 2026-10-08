@@ -117,12 +117,37 @@ class PreviewSeed
     end
   end
 
+  PREVIEW_LESSON = {
+    "definition" => "An N+1 query is a loop that runs one extra database query for every row it touches.",
+    "comparison" => "Fetching groceries one item per trip instead of taking a list.",
+    "comparison_limit" => "You notice every grocery trip. The database runs each query quietly, so the cost stays hidden until there are many rows.",
+    "misunderstanding" => "People expect a slow page to come from one slow query. Here every query is fast, and there are just too many of them.",
+    "situations" => [
+      "A list page that shows a related name on each row.",
+      "A serializer that reads an association for each record.",
+      "A view partial rendered once per item that touches a parent record."
+    ],
+    "habits" => [
+      { "habit" => "Load what the loop needs with includes before the loop starts.",
+        "catch" => "Loading an association the page never shows costs memory for nothing." },
+      { "habit" => "Watch the query count in the log when you load the page.",
+        "catch" => "Five rows of development data can hide a problem that five thousand rows show." }
+    ],
+    "carry_question" => "What does this loop ask the database for on every pass?",
+    "quick_test" => "Load the page with ten rows, then a hundred, and compare how many queries the log shows."
+  }.freeze
+
   def seed_concept_reference
     ConceptReference.find_or_create_by!(concept: "n_plus_one", language: "ruby_rails") do |reference|
       reference.tagline      = "Load the association once, not once per row."
       reference.explanation  = "A query inside a loop issues one statement per record. Eager loading fetches them in a single additional query."
       reference.code_example = "orders = Order.includes(:customer)\norders.each { |order| puts order.customer.name }"
       reference.senior_lens  = "Ask what the query count is as a function of rows, not whether the code reads cleanly."
+      reference.guide_plain_language = "Each time the loop touches an order's customer, Rails runs another query, so the page runs one query per order."
+      reference.guide_worked_example = "orders.each { |order| puts order.customer.name }\n\nOrder.includes(:customer).each { |order| puts order.customer.name }\n\n" \
+                                       "The first loads each customer when it is touched, which is what makes one query per row. The second loads them all in one extra query."
+      reference.guide_pitfalls = "It looks fine in development, where there are five orders. It shows up in production, where there are five thousand."
+      reference.lesson = PREVIEW_LESSON
     end
   end
 

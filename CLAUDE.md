@@ -312,7 +312,11 @@ carries `ladder_junior`, `ladder_senior`, `ladder_principal_engineer` (all
 nullable text), and `ConceptReference#ladder?` — all three ladder fields
 present, derived from the field list the same way `#guide?` is — is the
 authority for "does this row carry the difficulty ladder"; `#complete?` is
-`guide? && ladder?`.
+`guide? && ladder?`. It also carries `lesson` (nullable jsonb): the short
+lesson the Learn page shows, in `ConceptLesson`'s shape. `#lesson?` says
+whether a row has one and stays out of `#complete?`, so the ladder poll and
+`LadderCoverage` never wait on it; `#fully_written?` is `complete? &&
+lesson?`, the check `GenerateConceptReferenceJob` skips a row on.
 
 `generation_version` advances on each successful generation write, even when
 the provider returns unchanged text or an incomplete ladder. Learn polls that
@@ -2232,6 +2236,27 @@ concept-specific difficulty descriptions for future generation, not a new set.
   deliberately opens.** `prepare_ladders` is the one scoped exception to that
   rule: it rewrites rows on demand, but only for concepts behind a target the
   user set, from a click whose own copy says the wording may change.
+
+  **The short lesson.** The same call also writes `lesson`: a definition, an
+  everyday comparison and where it stops, the common mix-up, two to four
+  situations, habits each with their catch, a question to carry and a quick
+  test, all optional and under about `ConceptLesson::WORD_TARGET` words of
+  prose with no code. `ConceptLesson` owns the keys, the prompt reads them,
+  and `ConceptLesson.from_provider` holds the reply at the boundary, dropping
+  an unusable section (a habit without its catch included) rather than
+  failing the call; the lesson sits outside the required fields like the
+  guide and ladder. A tradeoff concept's habits are options, each with what
+  it costs. `PLAIN_LANGUAGE_STANDARD` covers the lesson as well as the guide.
+  A row with a lesson shows it in place of the explanation, the plain-language
+  guide and the pitfalls, which it covers in less space; the tagline stays.
+  The code example and worked example fold under "Code examples", and the
+  senior lens folds under "How a senior sees it", both closed by default.
+  A guided row without a lesson offers "Write the short lesson", the same
+  on-demand rewrite as the guide's, with the same once-for-a-concept-someone-
+  opens wording change; it rewrites the whole row for the team. Nothing
+  backfills lessons. The inline reference above a section and the featured
+  callout are unchanged.
+
   `ConceptReference` has no `user_id` — it's a shared, team-wide cache
   keyed on `(concept, language)`, so the first person to run the backfill pays
   for everyone and every later teammate pays almost nothing. Roughly $0.02 per
@@ -2900,6 +2925,7 @@ always pull in the full suite — is stated once, in
 - `app/models/concept_book_sources.rb` — `ConceptBookSources`: the hand-curated
   book pointers a Learn page renders under "Where this comes from". Closed,
   array-valued, and never read by any prompt — extend it by adding a line
+- `app/models/concept_lesson.rb` — `ConceptLesson`: the Learn page's short-lesson sections, the limits on them, and the boundary check on a provider's lesson; pure. Rendered by `learn/_lesson`
 - `app/models/learn_lessons.rb` — `LearnLessons`: hand-written Learn-only lessons, outside every vocabulary; rendered by `LearnLessonsController` at `/learn/lessons/:lesson`
 - `app/models/hand_written_learn_text.rb` — `HandWrittenLearnText::MODULES`: every module of static reader-facing text, which the plain-language spec checks
 - `app/models/recognition_guide.rb` — `RecognitionGuide`: the cached "how to

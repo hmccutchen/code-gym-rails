@@ -97,6 +97,19 @@ class ConceptReference < ApplicationRecord
     guide? && ladder?
   end
 
+  # Kept apart from complete? so a row's guide and ladder read as they did
+  # before lessons existed: the ladder status poll and LadderCoverage never
+  # wait on a lesson.
+  def lesson?
+    lesson.present?
+  end
+
+  # Nothing left for a rewrite to add, which is what GenerateConceptReferenceJob
+  # skips on.
+  def fully_written?
+    complete? && lesson?
+  end
+
   # Truncated on read as well as bounded on write, the way
   # DailyResponse.usable_difficulty is applied both ways. No LIMIT: the unique
   # (concept, language) index and the vocabulary filter already bound the rows.

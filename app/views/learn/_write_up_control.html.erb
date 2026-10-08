@@ -1,6 +1,6 @@
-<%# Required locals: awaiting ("guide" or "ladder"), message (String),
-    button (String), generation_version (Integer or nil — the completed
-    generation counter when awaiting "ladder"). %>
+<%# Required locals: awaiting ("guide", "ladder" or "lesson"), message
+    (String), button (String), generation_version (Integer or nil — the
+    completed generation counter when awaiting "ladder" or "lesson"). %>
 <div id="learn-guide"
      data-url="<%= prepare_learn_concept_path(bucket: @bucket, concept: @concept) %>"
      data-status-url="<%= learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, generation_version: generation_version) %>">
@@ -46,7 +46,7 @@
         .then((response) => response.json())
         .then((data) => {
           if (data.ready) return window.location.reload();
-          if (data.rewritten) return window.location.assign(window.location.pathname + "?ladder=missing");
+          if (data.rewritten) return window.location.assign(window.location.pathname + "?<%= awaiting %>=missing");
           if (data.failed) {
             status.textContent = data.message;
             button.disabled = false;
