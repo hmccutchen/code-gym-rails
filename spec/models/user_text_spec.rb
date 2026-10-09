@@ -56,6 +56,23 @@ RSpec.describe UserText do
       expect(fenced.scan(/<[^>]*#{tag}[^>]*>/i).size).to eq(2)
       expect(fenced).to start_with("<#{tag}>").and end_with("</#{tag}>")
     end
+
+    # Submitted work can be indentation-sensitive, and the grader has to read
+    # what the page shows. Stripping the first line's indentation changed a
+    # Python fragment's meaning before the grader ever saw it.
+    it "keeps the indentation a submitted answer was stored with" do
+      fenced = described_class.tagged("    if x:\n        return 1\n")
+
+      expect(fenced).to include("\n    if x:\n        return 1\n")
+    end
+
+    it "strips an inline value, which has to stay on one prompt line" do
+      expect(described_class.tagged("  Ada  ", inline: true)).to eq("<#{described_class::TAG}>Ada</#{described_class::TAG}>")
+    end
+
+    it "reads a value that is only whitespace as blank" do
+      expect(described_class.tagged("   \n  ")).to eq("(skipped)")
+    end
   end
 
   describe ".tag_history" do

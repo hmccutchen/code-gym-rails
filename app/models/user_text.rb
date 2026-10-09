@@ -70,9 +70,15 @@ module UserText
   # provider unbounded. Clamping on the way out needs no backfill and holds for
   # any row a later import or console edit writes around the boundary.
   def self.tagged(value, blank: "(skipped)", inline: false, limit: MAX_ANSWER_LENGTH)
-    text = clean(value, limit: limit).strip
-    return blank if text.empty?
+    text = clean(value, limit: limit)
+    return blank if text.strip.empty?
 
+    # Only the inline form strips. Submitted work can be indentation-sensitive
+    # — a Python fragment loses its meaning if its first line is shifted left —
+    # so the block form fences what was stored, and the grader reads the same
+    # text the page shows. An inline value sits on a prompt line of its own and
+    # has to stay one line, so that one is stripped.
+    text = text.strip if inline
     fenced = text.gsub(%r{<\s*/?\s*#{TAG}\b[^<>]*>}i) { |tag| tag.tr("<>", "[]") }
     break_at = inline ? "" : "\n"
     "<#{TAG}>#{break_at}#{fenced}#{break_at}</#{TAG}>"
