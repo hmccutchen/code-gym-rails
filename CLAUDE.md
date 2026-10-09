@@ -440,8 +440,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   It writes nothing. Adding `--run` queues missing ladders through
   `GenerateConceptReferenceJob` with `refresh: true`, billed to that active
   operator's own key. A refresh rewrites the whole shared reference and guide,
-  including rows that already have a guide, for every user. Production coverage,
-  billed cost and completion remain unmeasured until this runs there.
+  including rows that already have a guide, for every user.
+
+  **Production coverage before any run, 2026-10-08.** The report step, run
+  against production, grounded 5 of 90 code review pairs, 3 of 48 design
+  comparison, 5 of 90 pattern, 5 of 90 challenge, 5 of 42 Parsons, and none
+  of architecture (0/15), security review (0/4), plan review (0/4), ambiguity
+  hunt (0/5) or pseudocode to code (0/8), leaving 117 concept and language
+  pairs without a ladder once duplicates across kinds are counted once. The
+  `--run` step has not been taken, so the billed cost and the coverage after
+  it stay unmeasured.
 - **Invite codes and trials**: anyone can sign up with an email, as before,
   and bring their own key; no code is needed to use the app. An invite code
   starts a trial on a house key instead. `InviteCode` keeps only a SHA-256
