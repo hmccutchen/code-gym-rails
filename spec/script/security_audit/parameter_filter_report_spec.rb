@@ -9,7 +9,7 @@ RSpec.describe ParameterFilterReport do
       "email" => :filtered,
       "code" => :filtered,
       "api_key" => :filtered,
-      "user.name" => :logged,
+      "user.name" => :filtered,
       "user.api_keys" => :filtered,
       "response.answers" => :filtered,
       "message" => :filtered,
