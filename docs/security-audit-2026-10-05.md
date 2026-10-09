@@ -696,7 +696,7 @@ that user alone, so the cost is a self-inflicted wrong difficulty rather
 than anything another account can read. That bound is why this is A3's
 priority and not an incident.
 
-**The other two injection shapes held.** A fake review JSON object with a
+**The other two injection shapes changed no rating.** A fake review JSON object with a
 fake `Assistant:` turn produced no rating override, which matches the
 deterministic check below: the answer is never parsed, only the provider's
 reply is. It did move the missed count from five to four, so the answer
