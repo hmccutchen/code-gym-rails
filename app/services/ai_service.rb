@@ -537,13 +537,17 @@ class AiService
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
-  # Measured on 2026-10-09 with script/compare_models.rb: across the eight
-  # fixtures and four stored reviews, the largest reply on the production
-  # route was 347 output tokens, under a quarter of this cap, and the slowest
-  # took 3.1 seconds of the 30-second timeout. Review output has no length
-  # bound, so a much longer review could still hit the cap and fall back
-  # unedited as `truncated`; nothing measured has come close. Passing this
-  # turns thinking off.
+  # The largest reply script/compare_models.rb measured on the production
+  # route, across the eight fixtures and four stored reviews of the
+  # 2026-10-09 run. The cap below is justified by its headroom over this, so
+  # the number lives here rather than in the prose that reasons about it, and
+  # ai_service_spec asserts the headroom the reasoning claims.
+  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 347
+
+  # Review output has no length bound, so a much longer review could still
+  # hit this and fall back unedited as `truncated`; nothing measured has come
+  # close. The slowest measured call took 3.1 seconds of
+  # REVIEW_JUDGE_READ_TIMEOUT. Passing this turns thinking off.
   REVIEW_JUDGE_MAX_TOKENS = 1_500
 
   REVIEW_PROSE_ISSUE_GUIDANCE = {

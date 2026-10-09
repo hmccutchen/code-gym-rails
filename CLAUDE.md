@@ -2228,14 +2228,16 @@ concept-specific difficulty descriptions for future generation, not a new set.
   that came from a four-review sample is not tight.
 
   Every Sonnet rewrite was read beside its source; no negation, condition or
-  identifier changed. Two are judgment calls rather than clean wins:
-  `string_fields` sharpened "essentially a performance thing" to "slows the
-  page down", which is plainer but states more than the source did, and
+  identifier changed. Two did change a claim, which is what the gate asks
+  about: `string_fields` sharpened "essentially a performance thing" to
+  "slows the page down", stating more than the source did, and
   `verbose_jargon` compressed a four-topic next step to "Study ActiveRecord
-  preloading", which drops three topics. Both change what the engineer is
-  told to do next. Deciding whether those two
-  changes are acceptable is the remaining step before turning the switch on.
-  The switch stays off until then.
+  preloading", dropping three topics. Both change what the engineer is told
+  to do next, so **the gate is not met and the switch stays off.** Turning it
+  on needs the prompt or the boundary changed so those two shapes stop
+  happening, and both modes read again. Accepting them instead would be a
+  change to the gate itself, which is a decision to state here rather than a
+  box this run ticked.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
