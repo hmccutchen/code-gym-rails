@@ -1,6 +1,12 @@
-# Text a person typed, cleaned once where it enters and bounded to a length a
-# prompt can carry. Every later reader — the page, the database and every
-# prompt that quotes it — then sees the same string.
+# Text a person typed, cleaned where it enters and bounded to a length a
+# prompt can carry, so the page, the database and every prompt that quotes it
+# agree on the string.
+#
+# Cleaned again when a prompt reads it, because the caps arrived after the
+# rows did and nothing was backfilled: a row written before this shipped, or
+# around the write boundary by an import or a console, is bounded at the read
+# instead. For those rows alone the prompt sees a shorter string than the page
+# does, which is the point.
 #
 # The characters removed here are invisible in a browser and are text to a
 # model, which is the gap the 2026-10-05 audit's finding A2 names: an

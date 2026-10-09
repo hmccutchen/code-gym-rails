@@ -74,6 +74,37 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(FakeService.new(user).send(:build_system_prompt, "ruby_rails"))
         .to include(UserText::PROMPT_RULE)
     end
+
+    # The write boundary cleans a name only when it changes, so a row stored
+    # before the cap shipped keeps its length. Nothing backfills it, which
+    # leaves the prompt read as the only place it is bounded.
+    it "caps a name stored before the cap shipped when the generation prompt reads it (finding A1)" do
+      user.update_column(:name, "N" * 5_000)
+
+      prompt = FakeService.new(user.reload).send(:build_exercise_prompt, user.reload, "ruby_rails")
+
+      expect(prompt).to include("N" * UserText::MAX_NAME_LENGTH)
+      expect(prompt).not_to include("N" * (UserText::MAX_NAME_LENGTH + 1))
+    end
+
+    # Same gap on the other side of a follow-up thread: turn one was stored
+    # before the cap, and every later turn sends it back.
+    it "caps a follow-up turn stored before the cap shipped when the thread is replayed (finding A1)" do
+      exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
+      resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => { "missed" => [] } })
+      service = FakeService.new(user)
+      sent = nil
+      allow(service).to receive(:call).and_wrap_original do |original, **kwargs|
+        sent = kwargs[:history]
+        original.call(**kwargs)
+      end
+
+      service.answer_follow_up(user, exercise, resp, section: "code_review", question: "Why?",
+                                                     thread: [ { role: "user", content: "q" * 5_000 } ])
+
+      expect(sent.first[:content]).to include("q" * UserText::MAX_QUESTION_LENGTH)
+      expect(sent.first[:content]).not_to include("q" * (UserText::MAX_QUESTION_LENGTH + 1))
+    end
   end
 
   it "does not reveal a Parsons problem's correct order in the page before submission (finding A6)" do

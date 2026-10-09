@@ -1344,11 +1344,12 @@ class AiService
         The review you gave:
         #{review_summary.presence || "(no detail recorded)"}
       SYSTEM
-      history: UserText.tag_history(thread),
+      history: UserText.tag_history(thread, limit: UserText::MAX_QUESTION_LENGTH),
       prompt: <<~PROMPT
         #{UserText.labelled("Their answer was:", daily_response.answer_for(section))}
 
-        #{UserText.labelled("Their new question:", question, blank: "(none asked)")}
+        #{UserText.labelled("Their new question:", question, blank: "(none asked)",
+                            limit: UserText::MAX_QUESTION_LENGTH)}
 
         Answer it directly. Stay on this concept — if they drift far off topic, say
         so briefly and bring it back. Two short paragraphs at most.
@@ -2290,7 +2291,8 @@ class AiService
       Generate a daily Code Gym exercise set for this engineer.
 
       Engineer profile:
-      - Name: #{UserText.tagged(user.name, blank: "(not given)", inline: true)}
+      - Name: #{UserText.tagged(user.name, blank: "(not given)", inline: true,
+                                limit: UserText::MAX_NAME_LENGTH)}
       - Skill level: #{user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
