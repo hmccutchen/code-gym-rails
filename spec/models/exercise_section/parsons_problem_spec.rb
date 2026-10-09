@@ -18,10 +18,13 @@ RSpec.describe ExerciseSection::ParsonsProblem do
       expect(decode("order:#{token(2)},#{token(0)},#{token(1)}")).to eq("order:2,0,1")
     end
 
-    it "says nothing about the correct order: sorting the tokens is not sorting the blocks" do
-      tokens = (0..2).map { |id| token(id) }
+    it "says nothing about a block's position: the token is a signature over it" do
+      digest = OpenSSL::HMAC.hexdigest(
+        "SHA256", Rails.application.secret_key_base, "parsons:7:parsons_problem:0"
+      )
 
-      expect(tokens.sort).not_to eq(tokens)
+      expect(token(0)).to eq(digest.first(described_class::TOKEN_LENGTH))
+      expect(token(0)).to eq(token(0))
     end
 
     it "gives a different exercise and a different section different tokens for the same block" do
@@ -29,14 +32,15 @@ RSpec.describe ExerciseSection::ParsonsProblem do
       expect(token(0)).not_to eq(token(0, key: "pattern"))
     end
 
-    it "leaves a token from another exercise alone rather than inventing a position" do
+    it "refuses a token from another exercise rather than inventing a position" do
       other = token(0, for_exercise: instance_double(DailyExercise, id: 8))
 
-      expect(decode("order:#{other},#{token(1)},#{token(2)}")).to eq("order:#{other},#{token(1)},#{token(2)}")
+      expect(decode("order:#{other},#{token(1)},#{token(2)}")).to be_nil
     end
 
-    it "carries a stored positional answer through unchanged" do
-      expect(decode("order:2,0,1")).to eq("order:2,0,1")
+    it "refuses a positional order, which is the mapping the tokens withhold" do
+      expect(decode("order:0,1,2")).to be_nil
+      expect(decode("order:2,0,1")).to be_nil
     end
 
     it "leaves an answer alone when the section has no blocks to map it to" do

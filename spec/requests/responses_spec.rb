@@ -149,18 +149,22 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "POST /responses (parsons_problem answer)" do
-    it "round-trips a parsons_problem answer through create and answered_sections" do
+    it "keeps a saved order out of reach of a posted positional one" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
       )
+      tokens = [ 2, 0, 4, 1, 3 ].map { |id|
+        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem")
+      }
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{tokens.join(',')}" } } },
+           as: :json
 
-      post responses_path, params: { response: { answers: { "parsons_problem" => "order:2,0,4,1,3" } } },
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:0,1,2,3,4" } } },
            as: :json
 
       expect(response).to have_http_status(:ok)
       saved = DailyResponse.find_by(user: user, daily_exercise: exercise)
       expect(saved.answers["parsons_problem"]).to eq("order:2,0,4,1,3")
-      expect(saved.answered_sections).to include("parsons_problem")
     end
 
     it "stores the positions a page's block tokens stand for" do

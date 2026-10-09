@@ -48,9 +48,12 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       ).first(TOKEN_LENGTH)
     end
 
-    # Tokens back to the stored positional order. A value that is not entirely
-    # tokens is left alone, which is what carries a page loaded before this
-    # shipped, and every stored answer, through unchanged.
+    # Tokens back to the stored positional order. An order this page's tokens
+    # cannot account for is refused rather than stored: taking it at its word
+    # would accept the positional form the tokens exist to withhold, and
+    # "order:0,1,2" counted off the blocks on screen is the whole answer. A
+    # refusal drops the section from the payload, so the draft already stored
+    # survives a page loaded before this shipped and the reload sends tokens.
     def decode_answer(value, exercise: nil, key: nil, section_data: nil)
       count = Array(section_data&.dig("blocks")).size
       text  = value.to_s
@@ -58,7 +61,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
       tokens = token_ids(exercise: exercise, key: key, block_count: count)
       ids    = text.delete_prefix(ANSWER_PREFIX).split(",").map { |t| tokens[t.strip] }
-      return value if ids.any?(&:nil?)
+      return if ids.any?(&:nil?)
 
       ANSWER_PREFIX + ids.join(",")
     end

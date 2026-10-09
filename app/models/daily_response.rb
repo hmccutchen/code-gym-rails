@@ -255,6 +255,8 @@ class DailyResponse < ApplicationRecord
       section_data = exercise&.problem_set&.dig(section.to_s)
       kind         = ExerciseSection.find(section) || ExerciseSection
       value        = kind.decode_answer(value, exercise: exercise, key: section.to_s, section_data: section_data)
+      next if value.nil?
+
       normalized[section] = substantive_answer(section, value, section_data).empty? ? "" : value
     end
   end
