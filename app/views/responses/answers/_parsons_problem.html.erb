@@ -34,7 +34,7 @@
      ) %>
   <ol class="parsons-list" data-parsons-blocks>
     <% initial_order.each do |block_id| %>
-      <li class="parsons-block" data-block-id="<%= ExerciseSection::ParsonsProblem.block_token(block_id, exercise: exercise, key: key) %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
+      <li class="parsons-block" data-block-id="<%= ExerciseSection::ParsonsProblem.block_token(block_id, exercise: exercise, key: key, section_data: data) %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
         <pre class="snippet"><%= highlighted_code(blocks[block_id], language) %></pre>
       </li>
     <% end %>
@@ -50,7 +50,7 @@
       keeps it out of the way of the people who will never need it. %>
   <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
   <p class="parsons-status" aria-live="polite"></p>
-  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, block_count: blocks.size) %></textarea>
+  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
 <% end %>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>

@@ -1051,7 +1051,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       exercise = DailyExercise.last
       ids = ExerciseSection::ParsonsProblem.token_ids(
         exercise: exercise, key: "parsons_problem",
-        block_count: exercise.problem_set.dig("parsons_problem", "blocks").size
+        section_data: exercise.problem_set["parsons_problem"]
       )
       Nokogiri::HTML(body).css("[data-parsons-blocks] [data-block-id]").map { |block| ids[block["data-block-id"]] }
     end
@@ -1093,7 +1093,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       field = Nokogiri::HTML(response.body).at_css('textarea[data-field="parsons_problem"]')
       ids = ExerciseSection::ParsonsProblem.token_ids(
-        exercise: exercise, key: "parsons_problem", block_count: 3
+        exercise: exercise, key: "parsons_problem",
+        section_data: exercise.problem_set["parsons_problem"]
       )
 
       expect(field.text).not_to include("order:1,2,0")

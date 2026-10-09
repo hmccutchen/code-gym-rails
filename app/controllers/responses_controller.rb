@@ -47,6 +47,7 @@ class ResponsesController < ApplicationController
   def create
     exercise = current_user.daily_exercises.for_date.first
     return head :not_found unless exercise
+    return render_stale_answers if stale_answer_sections(exercise).any?
 
     @response = persisted_response_for(exercise)
     newly_submitted = false
@@ -331,6 +332,30 @@ class ResponsesController < ApplicationController
   end
 
   private
+
+  # A kind can refuse an answer whose encoding this page no longer speaks —
+  # today only Parsons, whose draft arrives as signed block tokens, and whose
+  # tokens change when the problem is regenerated or the signing secret
+  # rotates. Nothing is written for a refusal, so the alternative to saying so
+  # is a 200 for a save that dropped the section, with the engineer's
+  # rearrangement lost behind a reported success. The page reloads instead and
+  # comes back speaking the current tokens; the work already stored is intact,
+  # since the refusal never reached the record.
+  def stale_answer_sections(exercise)
+    submitted = response_params[:answers]&.slice(*exercise.active_section_keys)
+    return [] if submitted.blank?
+
+    submitted.keys.map(&:to_s) - DailyResponse.normalize_answers(submitted, exercise).keys.map(&:to_s)
+  end
+
+  def render_stale_answers
+    respond_to do |format|
+      format.json do
+        render json: { status: "stale", errors: [ t("flash.responses.stale_answers") ] }, status: :conflict
+      end
+      format.html { redirect_to root_path, alert: t("flash.responses.stale_answers") }
+    end
+  end
 
   def assign_draft_response(exercise)
     submitted_answers = response_params[:answers]&.slice(*exercise.active_section_keys)

@@ -40,11 +40,27 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
     # The page cannot show a block's position in the correct order, or sorting
     # by that attribute would solve the puzzle. It shows an opaque token
-    # instead, signed per exercise and section so one day's tokens say nothing
-    # about another's.
-    def block_token(block_id, exercise:, key:)
+    # instead, signed per exercise, section and problem so one day's tokens say
+    # nothing about another's.
+    #
+    # The problem is in the signature because the exercise id is not enough:
+    # RegenerateExerciseJob writes the new problem_set onto the same row, so
+    # without it today's replacement puzzle would reuse today's tokens, and a
+    # token sequence learned from the set it replaced would submit the correct
+    # order for blocks nobody had read.
+    def block_token(block_id, exercise:, key:, section_data:)
       OpenSSL::HMAC.hexdigest(
-        "SHA256", Rails.application.secret_key_base, "parsons:#{exercise&.id}:#{key}:#{block_id}"
+        "SHA256", Rails.application.secret_key_base,
+        "parsons:#{exercise&.id}:#{key}:#{problem_digest(section_data)}:#{block_id}"
+      ).first(TOKEN_LENGTH)
+    end
+
+    # The blocks are stored in their correct order, so this changes whenever
+    # the puzzle does — including a regeneration that happens to keep the
+    # block count.
+    def problem_digest(section_data)
+      OpenSSL::Digest::SHA256.hexdigest(
+        Array(section_data&.dig("blocks")).map(&:to_s).join("\u0000")
       ).first(TOKEN_LENGTH)
     end
 
@@ -59,7 +75,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       text  = value.to_s
       return value if count.zero? || !text.start_with?(ANSWER_PREFIX)
 
-      tokens = token_ids(exercise: exercise, key: key, block_count: count)
+      tokens = token_ids(exercise: exercise, key: key, section_data: section_data)
       ids    = text.delete_prefix(ANSWER_PREFIX).split(",").map { |t| tokens[t.strip] }
       return if ids.any?(&:nil?)
 
@@ -71,15 +87,16 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
     # visible position with its real id, which is the whole mapping. A draft
     # that is not a complete permutation renders blank, since the page is
     # showing the scramble rather than the learner's work.
-    def token_answer(answer:, exercise:, key:, block_count:)
-      ids = submitted_order(answer, block_count)
+    def token_answer(answer:, exercise:, key:, section_data:)
+      ids = submitted_order(answer, Array(section_data&.dig("blocks")).size)
       return "" if ids.empty?
 
-      ANSWER_PREFIX + ids.map { |id| block_token(id, exercise: exercise, key: key) }.join(",")
+      ANSWER_PREFIX + ids.map { |id| block_token(id, exercise: exercise, key: key, section_data: section_data) }.join(",")
     end
 
-    def token_ids(exercise:, key:, block_count:)
-      (0...block_count).to_h { |id| [ block_token(id, exercise: exercise, key: key), id ] }
+    def token_ids(exercise:, key:, section_data:)
+      count = Array(section_data&.dig("blocks")).size
+      (0...count).to_h { |id| [ block_token(id, exercise: exercise, key: key, section_data: section_data), id ] }
     end
 
     def judge_task

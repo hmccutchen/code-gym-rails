@@ -149,12 +149,17 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "POST /responses (parsons_problem answer)" do
+    # The refusal used to read as a save: 200, the section quietly dropped from
+    # the payload. It answers 409 now, which is what the page needs to know it
+    # must reload before another save can land. The guarantee this example was
+    # written for is unchanged and still asserted — the stored order stands.
     it "keeps a saved order out of reach of a posted positional one" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
       )
       tokens = [ 2, 0, 4, 1, 3 ].map { |id|
-        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem")
+        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem",
+                                                        section_data: exercise.problem_set["parsons_problem"])
       }
       post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{tokens.join(',')}" } } },
            as: :json
@@ -162,9 +167,47 @@ RSpec.describe "Responses", type: :request do
       post responses_path, params: { response: { answers: { "parsons_problem" => "order:0,1,2,3,4" } } },
            as: :json
 
-      expect(response).to have_http_status(:ok)
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["status"]).to eq("stale")
       saved = DailyResponse.find_by(user: user, daily_exercise: exercise)
       expect(saved.answers["parsons_problem"]).to eq("order:2,0,4,1,3")
+    end
+
+    # A refused encoding stored nothing, so reporting it as saved loses the
+    # rearrangement behind a reported success. Nothing is written at all, which
+    # is what makes the reload safe: the draft the page comes back with is the
+    # last one that did land.
+    it "refuses a stale encoding outright rather than reporting a save that dropped it" do
+      exercise = create_exercise(
+        "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] },
+        "code_review" => { "title" => "T", "question" => "Q", "code" => "x" }
+      )
+
+      post responses_path,
+           params: { response: { answers: { "parsons_problem" => "order:0,1,2",
+                                            "code_review" => "A real answer about the query." } } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
+    end
+
+    it "refuses a stale submit without submitting, so the day stays open" do
+      exercise = create_exercise(
+        "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] }
+      )
+      token = ExerciseSection::ParsonsProblem.block_token(
+        0, exercise: exercise, key: "parsons_problem", section_data: exercise.problem_set["parsons_problem"]
+      )
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{token}" } } }, as: :json
+
+      post responses_path,
+           params: { response: { answers: { "parsons_problem" => "order:0,1,2" },
+                                 section_ratings: { "parsons_problem" => "right_level" }, submit: "1" } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).not_to be_submitted
     end
 
     it "stores the positions a page's block tokens stand for" do
@@ -172,7 +215,8 @@ RSpec.describe "Responses", type: :request do
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
       )
       tokens = [ 2, 0, 4, 1, 3 ].map { |id|
-        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem")
+        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem",
+                                                        section_data: exercise.problem_set["parsons_problem"])
       }
 
       post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{tokens.join(',')}" } } },

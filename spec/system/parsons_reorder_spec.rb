@@ -60,7 +60,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
     exercise = user.daily_exercises.sole
     ExerciseSection::ParsonsProblem.token_ids(
       exercise: exercise, key: "parsons_problem",
-      block_count: exercise.problem_set.dig("parsons_problem", "blocks").size
+      section_data: exercise.problem_set["parsons_problem"]
     )
   end
 

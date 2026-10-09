@@ -914,7 +914,12 @@ What would be easy to get wrong or worth testing:
       // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
         saveTimer = null;
-        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, data }) => {
+        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
+          // A refused encoding (see ResponsesController#stale_answer_sections)
+          // stored nothing, so the page has to come back before another save
+          // can land. Reloading is the whole recovery: the server re-renders
+          // the section in the encoding it now expects.
+          if (!ok && status === 409 && data?.status === "stale") { window.location.reload(); return; }
           if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
         });
       }, 800);
@@ -997,6 +1002,7 @@ What would be easy to get wrong or worth testing:
       submitButton.textContent = "Submitting…";
 
       let submissionSaved = false;
+      let reloading = false;
       try {
         const res = await fetch(form.action, {
           method: "POST",
@@ -1015,6 +1021,11 @@ What would be easy to get wrong or worth testing:
           requestReview(data.review_url);
           reviewRequested = true;
         } else {
+          // The same refusal the autosave handles, on the path that matters
+          // more: nothing was submitted, so reloading is what lets the next
+          // press reach the server. The form stays inert behind the reload:
+          // restoring it would queue an autosave of the payload just refused.
+          if (res.status === 409) { reloading = true; window.location.reload(); return; }
           alert("Couldn't submit your answers — please try again.");
         }
       } catch (error) {
@@ -1025,7 +1036,7 @@ What would be easy to get wrong or worth testing:
           alert("Couldn't submit your answers — please try again.");
         }
       } finally {
-        if (!reviewRequested && !submissionSaved) {
+        if (!reviewRequested && !submissionSaved && !reloading) {
           form.inert = false;
           submitButton.classList.remove("btn-loading");
           submitButton.textContent = "Submit answers";
