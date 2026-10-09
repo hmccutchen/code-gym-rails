@@ -48,38 +48,11 @@ class ResponsesController < ApplicationController
     exercise = current_user.daily_exercises.for_date.first
     return head :not_found unless exercise
 
-    newly_submitted = false
-    stale = false
-    saved = false
+    outcome = save_answers_under_lock(exercise)
+    return render_stale_answers if outcome == :stale
 
-    ActiveRecord::Base.transaction do
-      # Lock the exercise before reading the problem_set the block tokens are
-      # checked against, then the response — RegenerateExerciseJob's order, so
-      # the two serialize rather than deadlock. Checking outside the lock let
-      # the job replace problem_set between the check and the save, which
-      # stored an arrangement against blocks this page never showed and
-      # reported it as a success.
-      exercise.lock!
-
-      if stale_answer_sections(exercise).any?
-        stale = true
-        raise ActiveRecord::Rollback
-      end
-
-      @response = persisted_response_for(exercise)
-      @response.lock!
-
-      unless @response.submitted?
-        assign_draft_response(exercise)
-        newly_submitted = @response.submitted?
-      end
-      saved = @response.save
-    end
-
-    return render_stale_answers if stale
-
-    enqueue_concept_references(exercise) if saved && newly_submitted
-    render_save_result(saved)
+    enqueue_concept_references(exercise) if outcome == :newly_submitted
+    render_save_result(outcome != :failed)
   end
 
   # POST /responses/:id/review — trigger the inline AI review. Synchronous: the
@@ -365,6 +338,30 @@ class ResponsesController < ApplicationController
     return [] if submitted.blank?
 
     submitted.keys.map(&:to_s) - DailyResponse.normalize_answers(submitted, exercise).keys.map(&:to_s)
+  end
+
+  # Lock the exercise before reading the problem_set the block tokens are
+  # checked against, then the response — RegenerateExerciseJob's order, so the
+  # two serialize rather than deadlock. Checking outside the lock let the job
+  # replace problem_set between the check and the save, which stored an
+  # arrangement against blocks this page never showed and reported it as a
+  # success.
+  def save_answers_under_lock(exercise)
+    ActiveRecord::Base.transaction do
+      exercise.lock!
+      next :stale if stale_answer_sections(exercise).any?
+
+      @response = persisted_response_for(exercise)
+      @response.lock!
+      newly_submitted = false
+      unless @response.submitted?
+        assign_draft_response(exercise)
+        newly_submitted = @response.submitted?
+      end
+      next :failed unless @response.save
+
+      newly_submitted ? :newly_submitted : :saved
+    end
   end
 
   def render_stale_answers
