@@ -21,7 +21,8 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   # provider calls read it from two different entry points — the critique
   # endpoint validates a request param against it, and
   # AiService#translate_before_grading checks the submitted answer, which
-  # ResponsesController#create does not length-bound.
+  # ResponsesController#create bounds only by UserText::MAX_ANSWER_LENGTH,
+  # which is wider than this kind allows.
   MAX_PSEUDOCODE_LENGTH = 6_000
 
   def self.vocabulary_key
@@ -137,7 +138,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
       Pseudocode to Code (#{section["title"]}): #{section["question"]}
       Problem statement: #{section["problem_statement"]}
       #{critique_lines(rounds)}
-      Their final pseudocode: #{answer.presence || "(skipped)"}
+      #{UserText.labelled("Their final pseudocode:", answer)}
       #{translation_lines(rounds, answer)}
       #{answer_lines(answer, rating)}
     CONTEXT
@@ -152,7 +153,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     points = normalize_critique(rounds["critique"])
     raised = points.any? ? points.join("; ") : "nothing — the critique found no genuine gap"
 
-    "Their first pseudocode: #{rounds["initial_pseudocode"].presence || "(blank)"}\n" \
+    "#{UserText.labelled("Their first pseudocode:", rounds["initial_pseudocode"], blank: "(blank)")}\n" \
     "The critique they were shown raised: #{raised}"
   end
   private_class_method :critique_lines

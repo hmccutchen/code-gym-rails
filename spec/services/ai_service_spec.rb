@@ -3098,7 +3098,7 @@ RSpec.describe AiService do
 
       resp.answers["pseudocode_to_code"] = "For each item, collect its unique identifier"
       expect(service.send(:build_review_day_context, "Rails", exercise, resp))
-        .to include("Their final pseudocode: For each item, collect its unique identifier")
+        .to include("Their final pseudocode:\n#{UserText.tagged('For each item, collect its unique identifier')}")
     end
 
     def exercise_with_third(third_key, third_section)
@@ -3982,7 +3982,8 @@ RSpec.describe AiService do
       expect(result).to eq("Because the database round-trip dominates.")
       expect(svc.last_prompt).to include("Does eager loading always help?")
       expect(svc.last_system).to include("loads per row")
-      expect(svc.last_history).to eq(thread)
+      expect(svc.last_history).to eq(UserText.tag_history(thread))
+      expect(svc.last_history.last[:content]).to eq("Each row triggers its own query.")
       expect(svc.last_prompt).not_to include("Why is that slow?")
       expect(svc.last_prompt).not_to include("Each row triggers its own query.")
     end
@@ -4278,7 +4279,8 @@ RSpec.describe AiService do
       expect(result).to eq("What would change if the list had a thousand rows instead of ten?")
       expect(svc.last_system).to include("Find the N+1")
       expect(svc.last_system).to include("a billing job")
-      expect(svc.last_history).to eq(thread)
+      expect(svc.last_history).to eq(UserText.tag_history(thread))
+      expect(svc.last_history.last[:content]).to eq("What happens inside that loop on each iteration?")
       expect(svc.last_prompt).to include("I don't see anything wrong")
       expect(svc.last_prompt).not_to include("What's slow here?")
     end
@@ -4546,7 +4548,9 @@ RSpec.describe AiService do
 
       kwargs = captured_call(thread: thread)
 
-      expect(kwargs[:history]).to eq(thread)
+      expect(kwargs[:history]).to eq(UserText.tag_history(thread))
+      expect(kwargs[:history].map { |turn| turn[:role] }).to eq(%w[user assistant])
+      expect(kwargs[:history].last[:content]).to eq("what does the loop do?")
       expect(kwargs[:prompt]).not_to include("Conversation so far:")
       expect(kwargs[:prompt]).not_to include("is this N+1?")
     end
@@ -4622,7 +4626,9 @@ RSpec.describe AiService do
 
       kwargs = captured_call(thread: thread)
 
-      expect(kwargs[:history]).to eq(thread)
+      expect(kwargs[:history]).to eq(UserText.tag_history(thread))
+      expect(kwargs[:history].map { |turn| turn[:role] }).to eq(%w[user assistant])
+      expect(kwargs[:history].last[:content]).to eq("the eager load")
       expect(kwargs[:prompt]).not_to include("Conversation so far:")
       expect(kwargs[:prompt]).not_to include("what did I miss?")
     end

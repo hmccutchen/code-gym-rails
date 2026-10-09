@@ -1344,7 +1344,7 @@ class AiService
         The review you gave:
         #{review_summary.presence || "(no detail recorded)"}
       SYSTEM
-      history: thread,
+      history: UserText.tag_history(thread),
       prompt: <<~PROMPT
         #{UserText.labelled("Their answer was:", daily_response.answer_for(section))}
 
@@ -1374,7 +1374,7 @@ class AiService
       # threads the bet can absorb; they are external facts that move, so they
       # live in one place rather than three.
       cache_system: true,
-      history: thread,
+      history: UserText.tag_history(thread),
       prompt: <<~PROMPT
         Their new message:
         #{UserText.tagged(message, blank: "(nothing said)")}

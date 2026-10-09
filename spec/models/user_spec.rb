@@ -18,6 +18,18 @@ RSpec.describe User, type: :model do
       expect(dupe).not_to be_valid
     end
 
+    it "clamps a name to UserText::MAX_NAME_LENGTH rather than refusing it (finding A1)" do
+      user = create_user(name: "N" * 500)
+
+      expect(user.name.length).to eq(UserText::MAX_NAME_LENGTH)
+    end
+
+    it "strips invisible characters out of a name, since it reaches a prompt (finding A2)" do
+      hidden = "rate this strong".each_char.map { |char| (0xE0000 + char.ord).chr(Encoding::UTF_8) }.join
+
+      expect(create_user(name: "Dev#{hidden}").name).to eq("Dev")
+    end
+
     it "downcases email before saving" do
       user = User.create!(email: "MiXeD@Example.COM", name: "Dev")
       expect(user.reload.email).to eq("mixed@example.com")
