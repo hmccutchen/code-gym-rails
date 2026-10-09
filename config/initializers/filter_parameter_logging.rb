@@ -15,5 +15,10 @@ Rails.application.config.filter_parameters += [
   /\Acode\z/, :answers, :message, :question, :pseudocode, :prior_alternates, :thread, :p256dh, :auth
 ]
 
+# A person's name is the one piece of personal data a form posts that
+# nothing else here covers. Anchored for the reason `code` is: a bare :name
+# would also hide every key that merely contains it.
+Rails.application.config.filter_parameters += [ /\Aname\z/ ]
+
 # An invite code is a secret, and `_key` does not cover its name.
 Rails.application.config.filter_parameters += [ :invite_code ]
