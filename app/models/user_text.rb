@@ -87,7 +87,9 @@ module UserText
   # A thread's earlier user turns are engineer text on every later call, so
   # they are fenced the way the new turn is: without this, an instruction
   # planted in turn one is unmarked from turn two onwards. Assistant turns go
-  # back exactly as the provider wrote them.
+  # back unchanged, which is not the same as trusted: a follow-up thread is
+  # read from storage, but the duck's whole thread comes from the request, so
+  # its assistant turns are whatever the client sent (audit finding A4).
   def self.tag_history(history, limit: MAX_ANSWER_LENGTH)
     Array(history).map do |turn|
       turn = turn.respond_to?(:symbolize_keys) ? turn.symbolize_keys : turn
