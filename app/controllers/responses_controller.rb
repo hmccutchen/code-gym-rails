@@ -47,17 +47,36 @@ class ResponsesController < ApplicationController
   def create
     exercise = current_user.daily_exercises.for_date.first
     return head :not_found unless exercise
-    return render_stale_answers if stale_answer_sections(exercise).any?
 
-    @response = persisted_response_for(exercise)
     newly_submitted = false
-    saved = @response.with_lock do
+    stale = false
+    saved = false
+
+    ActiveRecord::Base.transaction do
+      # Lock the exercise before reading the problem_set the block tokens are
+      # checked against, then the response — RegenerateExerciseJob's order, so
+      # the two serialize rather than deadlock. Checking outside the lock let
+      # the job replace problem_set between the check and the save, which
+      # stored an arrangement against blocks this page never showed and
+      # reported it as a success.
+      exercise.lock!
+
+      if stale_answer_sections(exercise).any?
+        stale = true
+        raise ActiveRecord::Rollback
+      end
+
+      @response = persisted_response_for(exercise)
+      @response.lock!
+
       unless @response.submitted?
         assign_draft_response(exercise)
         newly_submitted = @response.submitted?
       end
-      @response.save
+      saved = @response.save
     end
+
+    return render_stale_answers if stale
 
     enqueue_concept_references(exercise) if saved && newly_submitted
     render_save_result(saved)
@@ -490,8 +509,14 @@ class ResponsesController < ApplicationController
   # The dashboard's debounced autosave makes this race the common case, not the
   # exotic one. Re-found by date alone, which is the uniqueness scope — a
   # regenerated day swaps daily_exercise_id.
+  # A SAVEPOINT, because #create calls this inside its own transaction: an
+  # unrescued unique violation there would abort the whole thing, and the
+  # recovery read below would raise PG::InFailedSqlTransaction instead of
+  # returning the row that won (same reasoning as ConceptReference.claim_feature).
   def persisted_response_for(exercise)
-    current_user.daily_responses.find_or_create_by!(daily_exercise: exercise, date: Date.current)
+    ActiveRecord::Base.transaction(requires_new: true) do
+      current_user.daily_responses.find_or_create_by!(daily_exercise: exercise, date: Date.current)
+    end
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
     current_user.daily_responses.find_by!(date: Date.current)
   end

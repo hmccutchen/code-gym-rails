@@ -405,12 +405,19 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   on the server when the answer is saved.
 - **Size:** S.
 - **Fixed 2026-10-09.** `ExerciseSection::ParsonsProblem.block_token` signs
-  the exercise, the section key and the block id with `secret_key_base` and
-  truncates the digest, so the attribute sorts randomly and a token from one
-  day says nothing about another. `DailyResponse.normalize_answers` decodes
-  through the kind's new `decode_answer` hook, leaving a value it cannot
-  fully resolve alone, which carries both stored answers and a page loaded
-  before the change. Storage, grading, replay and history are unchanged.
+  the exercise, the section key, the block id and a digest of the section's
+  blocks with `secret_key_base`, then truncates. So the attribute sorts
+  randomly, a token from one day says nothing about another, and
+  regenerating the day invalidates every token it issued.
+  `DailyResponse.normalize_answers` decodes through the kind's new
+  `decode_answer` hook, which returns nil for an order it cannot fully
+  resolve; the section is then dropped, and `ResponsesController#create`
+  refuses the whole write with 409 rather than reporting a save that stored
+  nothing. A page loaded before the change posts positions, so it is refused
+  and reloads. The stale check and the save run in one transaction that
+  locks the exercise first and the response second, which is
+  `RegenerateExerciseJob`'s order, so a regeneration cannot commit between
+  the two. Storage, grading, replay and history are unchanged.
 
 ### Web push
 

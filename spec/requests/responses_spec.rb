@@ -192,6 +192,35 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
     end
 
+    # The check and the save have to see one problem set. RegenerateExerciseJob
+    # takes the exercise lock before it writes, so reading problem_set before
+    # that lock let a replacement commit in between: the tokens validated
+    # against the old blocks and the arrangement was then stored against the
+    # new ones, reported as a successful save.
+    it "re-reads the problem set under the lock, so a regeneration cannot land between the check and the save" do
+      exercise = create_exercise(
+        "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] }
+      )
+      tokens = [ 0, 1, 2 ].map { |id|
+        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem",
+                                                        section_data: exercise.problem_set["parsons_problem"])
+      }
+      allow_any_instance_of(DailyExercise).to receive(:lock!).and_wrap_original do |original, *args|
+        DailyExercise.where(id: exercise.id).update_all(
+          problem_set: exercise.problem_set.merge(
+            "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[x y z] }
+          )
+        )
+        original.call(*args)
+      end
+
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{tokens.join(',')}" } } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
+    end
+
     it "refuses a stale submit without submitting, so the day stays open" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] }
