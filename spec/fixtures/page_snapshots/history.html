@@ -223,14 +223,14 @@
        enlarge code text on its own in landscape. */
     pre.snippet, .pseudocode-code pre { white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     pre.snippet { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; }
-    /* shared/_syntax_highlighting_script splits each snippet into one
-       .code-line per source line and sets --indent to its leading columns.
-       The first line starts at column 0 and keeps its own spaces; a wrapped
-       continuation starts two columns past that indentation. The script marks
-       a block that wraps, and its alignment padding then shows as one space
-       while the rest stays in the text, so a copy keeps the original line. */
-    pre.snippet .code-line { display: block; padding-left: calc((var(--indent, 0) + 2) * 1ch); text-indent: calc((var(--indent, 0) + 2) * -1ch); }
-    pre.snippet code[data-wraps] .code-align-extra { font-size: 0; }
+    /* CodeHighlight renders each line as a .code-line and sets --indent to
+       its leading columns. The first line starts at column 0 and keeps its
+       own spaces; a wrapped continuation starts two columns past that
+       indentation. shared/_code_lines_script marks a block that wraps, and
+       its alignment padding then shows as one space while the rest stays in
+       the text, so a copy keeps the original line. */
+    code.highlight .code-line { display: block; padding-left: calc((var(--indent, 0) + 2) * 1ch); text-indent: calc((var(--indent, 0) + 2) * -1ch); }
+    code.highlight[data-wraps] .code-align-extra { font-size: 0; }
     /* Plan-review excerpts are prose, not code — a left-border quote block
        instead of the monospace snippet treatment, so multi-paragraph text
        reads as an excerpt from a doc rather than malformed code. */
@@ -247,14 +247,15 @@
     .pseudocode-critique li { margin-bottom: .25rem; }
     .pseudocode-code pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .85rem; margin: .6rem 0 .2rem; }
     .pseudocode-caption { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
-    .hljs { color: var(--text); }
-    .hljs-keyword, .hljs-title.function_, .hljs-title.class_ { color: var(--accent-text); }
-    .hljs-string, .hljs-regexp { color: var(--green); }
-    .hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
-    .hljs-number, .hljs-literal { color: var(--yellow); }
-    .hljs-symbol, .hljs-attr, .hljs-params { color: var(--code-symbol); }
-    .hljs-built_in, .hljs-title { color: var(--code-builtin); }
-    .hljs-variable { color: var(--text); }
+    /* Rouge's token classes, colored from the palette, so both themes and
+       Match my device need no second color source. */
+    code.highlight { color: var(--text); }
+    code.highlight :is(.k, .kd, .kn, .kp, .kr, .kt, .kv, .ow, .nc, .nf, .nn) { color: var(--accent-text); }
+    code.highlight :is(.s, .s1, .s2, .sa, .sb, .sc, .sd, .se, .sh, .si, .sr, .sx, .dl) { color: var(--green); }
+    code.highlight :is(.c, .c1, .cm, .cs, .cp, .ch, .cpf) { color: var(--muted); font-style: italic; }
+    code.highlight :is(.m, .mb, .mf, .mh, .mi, .il, .mo, .mx, .kc) { color: var(--yellow); }
+    code.highlight :is(.ss, .na, .vi, .vc, .vg) { color: var(--code-symbol); }
+    code.highlight :is(.nb, .bp, .no, .nt) { color: var(--code-builtin); }
     .review-block { background: rgba(124,106,247,.06); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .75rem; }
     .review-block h3 { color: var(--accent-text); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
     .review-rating { display: inline-block; background: rgba(124,106,247,.15); border-radius: 4px; padding: .1rem .5rem; font-size: .75rem; margin-left: .5rem; text-transform: none; letter-spacing: 0; }
@@ -692,7 +693,7 @@
   
   <div class="question">Find the bug</div>
 
-  <pre class="snippet"><code data-hljs="ruby">def a; end</code></pre>
+  <pre class="snippet"><code class="highlight"><span class="code-line" style="--indent: 0"><span class="k">def</span> <span class="nf">a</span><span class="p">;</span> <span class="k">end</span></span></code></pre>
 
   
 
@@ -1235,104 +1236,6 @@
 </script>
 
       <script type="module">
-      // Version pinned exactly (not "@11"), matching the Mermaid CDN import's
-      // reasoning: a highlight.js release can't change behavior under us without
-      // a deliberate bump. Core + only the two grammars actually used, not the
-      // ~35-language "common" bundle.
-      //
-      // Degradation is simpler than Mermaid's: the code is already fully correct,
-      // readable plain text before this script runs — highlighting is a pure
-      // enhancement, not something the page depends on. A blocked CDN or a parse
-      // failure just leaves every block exactly as it renders without this script.
-      try {
-        // Bail before fetching anything if this page has no highlightable block
-        // at all (e.g. an architecture-only concept reference, whose pseudocode
-        // never gets a data-hljs attribute) — mirrors the Mermaid script's own
-        // presence check (`arch.dig("reference", "diagram").present?`), just
-        // evaluated client-side since this guard's render call is unconditional
-        // across all call sites rather than gated per-site on content.
-        if (document.querySelector("code[data-hljs]:not([data-hljs-done])")) {
-          // highlight.js's own jsDelivr "es/" build re-exports from its CJS
-          // "lib/core.js" (see https://github.com/highlightjs/highlight.js/blob/main/es/core.js) —
-          // that CJS-to-ESM interop only works in Node/bundlers, not a native
-          // browser `import()`, where it throws "does not provide an export
-          // named 'default'" and silently disables highlighting on every page.
-          // esm.sh re-transpiles the same CJS source into real ESM, so it
-          // works here. Version pinned exactly, same reasoning as before.
-          const [{ default: hljs }, { default: ruby }, { default: javascript }] = await Promise.all([
-            import("https://esm.sh/highlight.js@11.11.1/lib/core"),
-            import("https://esm.sh/highlight.js@11.11.1/lib/languages/ruby"),
-            import("https://esm.sh/highlight.js@11.11.1/lib/languages/javascript"),
-          ]);
-          hljs.registerLanguage("ruby", ruby);
-          hljs.registerLanguage("javascript", javascript);
-
-          for (const el of document.querySelectorAll("code[data-hljs]:not([data-hljs-done])")) {
-            el.dataset.hljsDone = "1";
-            const lang = el.dataset.hljs;
-            if (!hljs.getLanguage(lang)) continue;
-            // el.textContent reads the already-rendered, already-escaped source out
-            // rather than re-parsing HTML. hljs.highlight()'s .value output is
-            // guaranteed pre-escaped by the library, so it's safe to set as innerHTML.
-            const { value } = hljs.highlight(el.textContent, { language: lang });
-            el.innerHTML = value;
-            el.classList.add("hljs");
-          }
-        }
-      } catch {
-        // CDN unreachable or a module failed to load — blocks stay plain text,
-        // exactly as they render without this script at all.
-      }
-
-      // A wrapped line used to continue at column 0, so `kind   = value` could
-      // put `value` under `kind` and read as a line of its own. Each source
-      // line becomes its own block with a hanging indent (the `.code-line`
-      // rule in the layout), so a continuation sits two columns past the
-      // line's own indentation. Runs after highlighting, since highlighting
-      // replaces the block's markup, and whether or not highlighting loaded.
-      const TAB_COLUMNS = 8;
-
-      function leadingColumns(text) {
-        let columns = 0;
-        for (const char of text) {
-          if (char === " ") columns += 1;
-          else if (char === "\t") columns += TAB_COLUMNS;
-          else break;
-        }
-        return columns;
-      }
-
-      // A highlighted string or comment can span several lines inside one
-      // <span>, so each line re-opens a shallow copy of every element still
-      // open when its newline arrived.
-      function splitIntoLines(code) {
-        const lines = [];
-        let current;
-        const startLine = (openElements) => {
-          const line = document.createElement("span");
-          line.className = "code-line";
-          lines.push(line);
-          current = openElements.reduce((parent, element) => parent.appendChild(element.cloneNode(false)), line);
-        };
-        const walk = (node, openElements) => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            node.textContent.split("\n").forEach((part, index) => {
-              if (index > 0) startLine(openElements);
-              if (part) current.appendChild(document.createTextNode(part));
-            });
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            current = current.appendChild(node.cloneNode(false));
-            node.childNodes.forEach((child) => walk(child, [...openElements, node]));
-            current = current.parentNode;
-          }
-        };
-
-        startLine([]);
-        code.childNodes.forEach((child) => walk(child, []));
-        if (lines.length > 1 && lines.at(-1).textContent === "") lines.pop();
-        return lines;
-      }
-
       // Code often pads names so a column lines up (`kind     = value` under
       // `description = value`). Once a block wraps, the column is gone and the
       // padding is just a gap, so a block with any wrapped line shows each
@@ -1342,11 +1245,11 @@
       // every space after the first stays in the text, so copying the block
       // copies the original line, and shows again when the block has room.
       const ALIGNMENT_RUN = /(?<=\S) {2,}(?==|#|\/\/)|(?<=[:,=]) {2,}(?=\S)/g;
-      const LITERAL = ".hljs-string, .hljs-comment";
+      const LITERAL = ".code-literal";
 
       // Each text node in a line with where it starts in the line's text, so a
       // match found in the whole line can be traced back to the node holding
-      // it. Highlighting puts each token in its own node.
+      // it. Each token sits in a node of its own.
       function textNodesOf(line) {
         const nodes = [];
         const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
@@ -1424,18 +1327,12 @@
         });
       });
 
-      for (const code of document.querySelectorAll("pre.snippet > code:not([data-lines-done])")) {
+      for (const code of document.querySelectorAll("code.highlight:not([data-lines-done])")) {
         code.dataset.linesDone = "1";
-        const lines = splitIntoLines(code);
-        lines.forEach((line) => {
-          // A blank line holds its own newline: an empty block keeps no
-          // height and is dropped from a copy.
-          if (line.textContent === "") line.replaceChildren("\n");
-          line.style.setProperty("--indent", leadingColumns(line.textContent));
+        for (const line of code.children) {
           markAlignment(line);
           addChainBreaks(line);
-        });
-        code.replaceChildren(...lines);
+        }
         fitOnResize.observe(code.parentElement);
       }
     </script>

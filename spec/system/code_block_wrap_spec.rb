@@ -17,7 +17,7 @@ RSpec.describe "Code block wrapping", type: :system do
       kind
     end
   RUBY
-  HLJS_URL = "**esm.sh/highlight.js**"
+  HIGHLIGHT_JS = "**/*highlight*"
 
   let(:user) { create_fake_provider_user.tap { |u| u.update!(language: "ruby_rails") } }
 
@@ -29,46 +29,28 @@ RSpec.describe "Code block wrapping", type: :system do
     )
   end
 
-  # Highlighting loads from a CDN, so the spec decides that request's outcome
-  # rather than leaving it to the runner's network. The stub's highlighter
-  # marks each double-quoted string, across lines, and puts each name in a
-  # span of its own, so a `.` sits in a separate node from the names around
-  # it, as highlight.js does.
-  def stub_highlighter(outcome, width:)
+  # Highlighting happens on the server, so the page must not ask for a
+  # browser highlighter at all. Every such request is counted and refused.
+  def watch_for_highlighter(width:)
+    @highlighter_requests = []
     page.driver.with_playwright_page do |pw|
       pw.set_viewport_size(width: width, height: 844)
-      pw.route(HLJS_URL, ->(route, request) {
-        next route.abort if outcome == :blocked
-
-        body = if request.url.include?("/lib/core")
-          <<~JS
-            export default {
-              registerLanguage() {},
-              getLanguage() { return true; },
-              highlight(text) {
-                const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-                return { value: escaped.replace(/"[^"]*"|[A-Za-z_]\w*/g, (token) =>
-                  token.startsWith('"') ? `<span class="hljs-string">${token}</span>` : `<span class="hljs-title">${token}</span>`) };
-              }
-            };
-          JS
-        else
-          "export default function () { return {}; };"
-        end
-        route.fulfill(status: 200, contentType: "application/javascript", body: body)
+      pw.route(HIGHLIGHT_JS, ->(route, request) {
+        @highlighter_requests << request.url
+        route.abort
       })
     end
   end
 
   # The Learn page folds its code examples closed, so every example here also
   # covers a block that was hidden at load and fitted when it opened.
-  def open_reference(highlighter:, width: 390)
-    stub_highlighter(highlighter, width: width)
+  def open_reference(width: 390)
+    watch_for_highlighter(width: width)
     visit_as(user)
     visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
-    expect(page).to have_css("pre.snippet code[data-lines-done]", visible: :all, wait: 10)
+    expect(page).to have_css("pre.snippet code.highlight[data-lines-done]", visible: :all, wait: 10)
     find("details.learn-code-examples summary").click
-    expect(page).to have_css("pre.snippet code[data-lines-done]", wait: 5)
+    expect(page).to have_css("pre.snippet code.highlight[data-lines-done]", wait: 5)
   end
 
   # Fitting runs from a ResizeObserver, a moment after the block opens or
@@ -143,49 +125,53 @@ RSpec.describe "Code block wrapping", type: :system do
     JS
   end
 
-  [ :loaded, :blocked ].each do |highlighter|
-    context "when highlighting has #{highlighter}" do
-      before { open_reference(highlighter: highlighter) }
+  context "on a phone" do
+    before { open_reference }
 
-      it "gives every source line its own block, blank lines included" do
-        lines = all("pre.snippet .code-line", visible: :all)
+    it "gives every source line its own block, blank lines included" do
+      lines = all("pre.snippet .code-line", visible: :all)
 
-        expect(lines.map { |line| line[:style][/--indent:\s*(\d+)/, 1] }).to eq(%w[0 2 2 2 0 2 0])
-        expect(page.evaluate_script(<<~JS)).to be > 0
-          document.querySelectorAll("pre.snippet .code-line")[4].getBoundingClientRect().height
-        JS
-      end
+      expect(lines.map { |line| line[:style][/--indent:\s*(\d+)/, 1] }).to eq(%w[0 2 2 2 0 2 0])
+      expect(page.evaluate_script(<<~JS)).to be > 0
+        document.querySelectorAll("pre.snippet .code-line")[4].getBoundingClientRect().height
+      JS
+    end
 
-      it "starts a wrapped continuation two columns past the line's indentation" do
-        offsets = fragment_offsets(1)
+    it "starts a wrapped continuation two columns past the line's indentation" do
+      offsets = fragment_offsets(1)
 
-        expect(offsets["fragments"]).to be > 1
-        expect(offsets["first"]).to be_within(1).of(0)
-        expect(offsets["continuation"]).to be_within(1).of(offsets["padding"])
-        expect(offsets["padding"]).to be_within(1).of(4 * offsets["ch"])
-      end
+      expect(offsets["fragments"]).to be > 1
+      expect(offsets["first"]).to be_within(1).of(0)
+      expect(offsets["continuation"]).to be_within(1).of(offsets["padding"])
+      expect(offsets["padding"]).to be_within(1).of(4 * offsets["ch"])
+    end
 
-      it "shows alignment padding as one space once the block wraps" do
-        expect_gap(1, 1)
-      end
+    it "shows alignment padding as one space once the block wraps" do
+      expect_gap(1, 1)
+    end
 
-      it "copies the original lines, padding and blank line included" do
-        expect_gap(1, 1)
+    it "copies the original lines, padding and blank line included" do
+      expect_gap(1, 1)
 
-        expect(copied_text).to eq(SOURCE)
-      end
+      expect(copied_text).to eq(SOURCE)
+    end
+
+    it "keeps the server's highlighting and asks for no browser highlighter" do
+      expect(page).to have_css("pre.snippet code.highlight .code-line .nf", text: "total")
+      expect(page).to have_no_css(".hljs, [data-hljs]")
+      expect(@highlighter_requests).to be_empty
     end
   end
 
   it "keeps the padding inside a highlighted string" do
-    open_reference(highlighter: :loaded)
+    open_reference
     expect_gap(1, 1)
 
     expect(gap_columns(2, before: "b")).to eq(2)
   end
 
   it "keeps every line as written where the block fits" do
-    open_reference(highlighter: :loaded, width: 1280)
+    open_reference(width: 1280)
 
     expect(gap_columns(1)).to eq(5)
     expect(line_texts).to eq(SOURCE.lines.map(&:chomp).map { |line| line.empty? ? "\n" : line })
@@ -194,7 +180,7 @@ RSpec.describe "Code block wrapping", type: :system do
   # The same observer fits a block that was in a closed disclosure at load,
   # since opening it changes its width from zero.
   it "fits the block again when its width changes" do
-    open_reference(highlighter: :loaded, width: 1280)
+    open_reference(width: 1280)
     expect(gap_columns(1)).to eq(5)
 
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 390, height: 844) }
@@ -204,51 +190,50 @@ RSpec.describe "Code block wrapping", type: :system do
     expect_gap(1, 5)
   end
 
-  [ :loaded, :blocked ].each do |highlighter|
-    it "breaks a long call chain after a dot or parenthesis, never mid-name, when highlighting has #{highlighter}" do
-      ConceptReference.last.update!(code_example: 'kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
-      open_reference(highlighter: highlighter)
+  it "breaks a long call chain after a dot or parenthesis, never mid-name" do
+    ConceptReference.last.update!(code_example: 'kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
+    open_reference
 
-      # The character before each row break, found by walking the line one
-      # character at a time and noting where its top edge moves down.
-      before_breaks = page.evaluate_script(<<~JS)
-        (() => {
-          const line = document.querySelector("pre.snippet .code-line");
-          const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
-          const chars = [];
-          while (walker.nextNode()) {
-            const node = walker.currentNode;
-            for (let i = 0; i < node.length; i++) {
-              const range = document.createRange();
-              range.setStart(node, i);
-              range.setEnd(node, i + 1);
-              chars.push({ char: node.data[i], top: range.getBoundingClientRect().top });
-            }
+    # The character before each row break, found by walking the line one
+    # character at a time and noting where its top edge moves down.
+    before_breaks = page.evaluate_script(<<~JS)
+      (() => {
+        const line = document.querySelector("pre.snippet .code-line");
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+        const chars = [];
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          for (let i = 0; i < node.length; i++) {
+            const range = document.createRange();
+            range.setStart(node, i);
+            range.setEnd(node, i + 1);
+            chars.push({ char: node.data[i], top: range.getBoundingClientRect().top });
           }
-          return chars.slice(1).filter((c, i) => c.top > chars[i].top + 1).map((c) => chars[chars.indexOf(c) - 1].char);
-        })()
-      JS
+        }
+        return chars.slice(1).filter((c, i) => c.top > chars[i].top + 1).map((c) => chars[chars.indexOf(c) - 1].char);
+      })()
+    JS
 
-      expect(before_breaks).not_to be_empty
-      expect(before_breaks).to all(match(/[.( ]/))
-      expect(line_texts.first).to eq('kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
-    end
+    expect(before_breaks).not_to be_empty
+    expect(before_breaks).to all(match(/[.( ]/))
+    expect(line_texts.first).to eq('kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
   end
 
-  it "re-opens a highlight span that crosses lines on every line it covers" do
-    open_reference(highlighter: :loaded)
+  it "marks a string that crosses lines as literal on every line it covers" do
+    open_reference
 
     spans_per_line = page.evaluate_script(<<~JS)
-      [...document.querySelectorAll("pre.snippet .code-line")].map((line) => line.querySelectorAll(".hljs-string").length)
+      [...document.querySelectorAll("pre.snippet .code-line")].map((line) => line.querySelectorAll(".code-literal").length)
     JS
     expect(spans_per_line).to eq([ 0, 1, 1, 1, 0, 0, 0 ])
   end
 
-  it "wraps a hand-written lesson's code, which is never highlighted" do
+  it "wraps a hand-written lesson's code, which has no language and stays plain" do
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 390, height: 844) }
     visit_as(user)
     visit learn_lesson_path(lesson: "reading_unfamiliar_code")
 
-    expect(page).to have_css("pre.snippet code[data-lines-done] .code-line", minimum: 2, wait: 10)
+    expect(page).to have_css("pre.snippet code.highlight[data-lines-done] .code-line", minimum: 2, wait: 10)
+    expect(page).to have_no_css("pre.snippet code.highlight .code-line span:not(.code-align-extra)")
   end
 end

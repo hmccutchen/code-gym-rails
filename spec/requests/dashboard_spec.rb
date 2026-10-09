@@ -1033,13 +1033,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  it "marks the unsubmitted form's code_review snippet for syntax highlighting" do
+  it "highlights the unsubmitted form's code_review snippet on the server" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
 
     get root_path
 
-    expect(response.body).to include('data-hljs="ruby"')
+    expect(Nokogiri::HTML(response.body).css("pre.snippet code.highlight .code-line")).not_to be_empty
+    expect(response.body).not_to include("data-hljs")
   end
 
   describe "parsons_problem third section" do
@@ -1220,14 +1221,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  it "marks submitted code blocks for syntax highlighting even when unreviewed" do
+  it "highlights submitted code blocks on the server even when unreviewed, with no browser highlighter" do
     exercise = create_exercise
     create_response(exercise, submitted: true)
 
     get root_path
 
-    expect(response.body).to include('data-hljs="ruby"')
-    expect(response.body).to include("highlight.js@11.11.1/lib/core")
+    expect(Nokogiri::HTML(response.body).css("pre.snippet code.highlight .code-line")).not_to be_empty
+    expect(response.body).not_to include("highlight.js")
   end
 
   describe "while a regeneration is in flight" do
@@ -1352,10 +1353,11 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to match(
-        %r{<pre class="snippet"><code[^>]*>def a; end</code></pre>\s*<details class="ref">\s*<summary>#{Regexp.escape(label)}</summary>}m
-      )
-      expect(response.body).to include("create_table &quot;push_subscriptions&quot;")
+      snippet = Nokogiri::HTML(response.body).css("pre.snippet").first
+      expect(code_block_text(snippet.at_css("code.highlight"))).to eq("def a; end")
+      expect(snippet.next_element.matches?("details.ref")).to be(true)
+      expect(snippet.next_element.at_css("summary").text).to eq(label)
+      expect(code_block_text(snippet.next_element.at_css("code.highlight"))).to include(%(create_table "push_subscriptions"))
     end
 
     it "renders in the read-only view once the set is submitted" do
@@ -1365,7 +1367,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
 
       expect(response.body).to include("<summary>#{label}</summary>")
-      expect(response.body).to include("create_table &quot;push_subscriptions&quot;")
+      schema = Nokogiri::HTML(response.body).css("details.ref code.highlight").map { |code| code_block_text(code) }
+      expect(schema.join).to include(%(create_table "push_subscriptions"))
     end
 
     it "renders nothing for a day without one" do

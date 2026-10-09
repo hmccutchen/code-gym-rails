@@ -201,6 +201,7 @@ advisory signal; it is not evidence that anything was verified.
 - **Solid Queue** — background jobs + recurring hourly cron, gated per user to 8am weekdays for generation and to early afternoon for reminder nudges (no Redis needed)
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
+- **Rouge** — server-side syntax highlighting for every code block (`CodeHighlight`)
 - **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
 - **BCrypt** — login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
@@ -2476,6 +2477,24 @@ concept-specific difficulty descriptions for future generation, not a new set.
   gone. An out-of-range page raises and redirects to the last real page rather
   than rendering the empty state to someone who has sessions. No redirect
   targets a particular entry, so nothing has to work out which page holds one.
+- **Code blocks are highlighted on the server**: every code block on a
+  page, exercise snippets, schemas, comparison pieces, Parsons blocks,
+  improved code, pseudocode translations, Learn code examples and
+  hand-written lessons, renders through `highlighted_code`, which calls
+  `CodeHighlight.html`. That is the one place code becomes HTML: Rouge's own
+  HTML formatter escapes each token, and only its output is marked safe.
+  `CodeHighlight::LineFormatter` wraps each source line in a `.code-line`
+  carrying `--indent`, so the layout can give a wrapped line a hanging
+  indent, and puts strings and comments in `.code-literal`. The language
+  picks the lexer (`CodeHighlight::LEXERS`); anything else, architecture
+  pseudocode or a lesson's diff, is plain text, which still escapes. Output
+  is cached under the code's digest, the lexer and `CodeHighlight::VERSION`,
+  never stored on a row, so raise the version when the markup or the
+  theme's token classes change. No page loads a browser highlighter.
+  `shared/_code_lines_script` does only what needs the rendered width:
+  showing alignment padding as one space and adding break points once a
+  block wraps. Duck, follow-up and alternate-explanation replies are built
+  by page scripts as plain text and show no code blocks.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
   stalls for 3s. Because dragging is pointer-only, every block is focusable and
@@ -2856,6 +2875,7 @@ always pull in the full suite — is stated once, in
 - `app/models/rung_ledger.rb` — `RungLedger`: the rung a user holds per concept, from stored responses and the `pitched_at` stamps; pure over the rows it is given
 - `app/controllers/progress_controller.rb` — the `/progress` page: Learn's grouping, `RungLedger`'s standings, `ConceptHosts` for what is offered
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, design_comparison, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt, pseudocode_to_code); one class per kind answers which are fixed (`.fixed?`, each in a slot of its own, which `.slots`, `SectionRotation::OPTIONAL_SLOTS` and `MANDATORY_SLOT_COUNT` derive from), which are thirds, which are fourths, which vocabulary they draw from and how it narrows that list for generation (`.narrow_vocabulary`, given an optional rung), which fields are answer key (`.answer_key_fields`), what the provider boundary refuses (`.reject_unusable!`), how many judge retries a rejection buys (`.judge_retries`) and any extra judge instructions (`.judge_guidance`), how a resolved section is arranged after it is accepted (`.arrange!`), whether the judge solves it blind (`.judge_solve_options`, `.solve_matches_key?`), which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns the language config; it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
+- `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/models/exercise_section/design_comparison.rb` — the second fixed kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets
 - `app/views/responses/bodies/_design_comparison.html.erb` / `answers/_design_comparison.html.erb` — the two pieces in their own disclosures; the pick fieldset, reason textarea and the script that writes the hidden answer, plus "What decides it" once reviewed

@@ -1,8 +1,7 @@
 <%# Locals: data, exercise, response, submitted. %>
-<% lang = hljs_language(exercise.language) %>
 <% ExerciseSection::DesignComparison::PIECES.each do |piece| %>
   <details class="comparison-piece" open>
     <summary><%= t("sections.design_comparison.piece", piece: piece.upcase) %></summary>
-    <pre class="snippet"><code<% if lang %> data-hljs="<%= lang %>"<% end %>><%= data["piece_#{piece}"] %></code></pre>
+    <pre class="snippet"><%= highlighted_code(data["piece_#{piece}"], exercise.language) %></pre>
   </details>
 <% end %>

@@ -91,6 +91,8 @@ RSpec.describe "section rendering", type: :request do
   }.freeze
 
   # Body content unique to each kind — the part no shared wrapper can render.
+  # Read from the page's text, since a highlighted snippet puts each token in
+  # a span of its own.
   BODY_MARKERS = {
     "code_review"     => [ "CR-SNIPPET" ],
     "pattern"         => [ "PAT-WHY" ],
@@ -111,6 +113,10 @@ RSpec.describe "section rendering", type: :request do
   # for the stored string. "order:0,2,1" against three blocks puts the first
   # block right and the other two wrong, exercising both rendered states.
   PARSONS_ANSWER = "order:0,2,1".freeze
+
+  def page_text
+    Nokogiri::HTML(response.body).text
+  end
 
   def answer_for(key)
     key == "parsons_problem" ? PARSONS_ANSWER : "ANSWER-#{key.upcase}"
@@ -159,7 +165,7 @@ RSpec.describe "section rendering", type: :request do
               expect(response.body).to include(SLOT_LABELS.fetch(key))
               expect(response.body).to include(PAYLOADS.fetch(key)["question"])
               expect(response.body).to include(PAYLOADS.fetch(key)["scenario"])
-              BODY_MARKERS.fetch(key).each { |marker| expect(response.body).to include(marker) }
+              BODY_MARKERS.fetch(key).each { |marker| expect(page_text).to include(marker) }
             end
           end
 
@@ -185,7 +191,7 @@ RSpec.describe "section rendering", type: :request do
             keys.each do |key|
               expect(response.body).to include(SLOT_LABELS.fetch(key))
               expect(response.body).to include(PAYLOADS.fetch(key)["question"])
-              BODY_MARKERS.fetch(key).each { |marker| expect(response.body).to include(marker) }
+              BODY_MARKERS.fetch(key).each { |marker| expect(page_text).to include(marker) }
               submitted_answer_markers(key).each { |marker| expect(response.body).to include(marker) }
             end
           end
@@ -206,7 +212,7 @@ RSpec.describe "section rendering", type: :request do
             keys.each do |key|
               expect(response.body).to include(SLOT_LABELS.fetch(key))
               expect(response.body).to include(PAYLOADS.fetch(key)["question"])
-              BODY_MARKERS.fetch(key).each { |marker| expect(response.body).to include(marker) }
+              BODY_MARKERS.fetch(key).each { |marker| expect(page_text).to include(marker) }
               submitted_answer_markers(key).each { |marker| expect(response.body).to include(marker) }
             end
           end

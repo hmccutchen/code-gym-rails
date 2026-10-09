@@ -1,4 +1,4 @@
 <%# Read-only render of a submitted day's sections. Shared by the dashboard's
     submitted state and each entry on the history page. Locals: exercise, response. %>
-<%= render "shared/syntax_highlighting_script" %>
+<%= render "shared/code_lines_script" %>
 <%= render "responses/sections", exercise: exercise, response: response, submitted: true %>
