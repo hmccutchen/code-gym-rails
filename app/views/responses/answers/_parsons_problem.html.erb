@@ -34,7 +34,7 @@
      ) %>
   <ol class="parsons-list" data-parsons-blocks>
     <% initial_order.each do |block_id| %>
-      <li class="parsons-block" data-block-id="<%= block_id %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
+      <li class="parsons-block" data-block-id="<%= ExerciseSection::ParsonsProblem.block_token(block_id, exercise: exercise, key: key) %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
         <pre class="snippet"><%= highlighted_code(blocks[block_id], language) %></pre>
       </li>
     <% end %>

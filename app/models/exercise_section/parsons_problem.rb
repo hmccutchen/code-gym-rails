@@ -5,6 +5,10 @@
 class ExerciseSection::ParsonsProblem < ExerciseSection
   ANSWER_PREFIX = "order:".freeze
 
+  # Long enough that guessing one of the few block tokens on a page is not
+  # worth trying, short enough to read in a DOM inspector without scrolling.
+  TOKEN_LENGTH = 16
+
   class << self
     def improved_code?
       false
@@ -32,6 +36,35 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       return if blocks.empty?
 
       grade(submitted_order(answer, blocks.size), blocks.size)[:rating]
+    end
+
+    # The page cannot show a block's position in the correct order, or sorting
+    # by that attribute would solve the puzzle. It shows an opaque token
+    # instead, signed per exercise and section so one day's tokens say nothing
+    # about another's.
+    def block_token(block_id, exercise:, key:)
+      OpenSSL::HMAC.hexdigest(
+        "SHA256", Rails.application.secret_key_base, "parsons:#{exercise&.id}:#{key}:#{block_id}"
+      ).first(TOKEN_LENGTH)
+    end
+
+    # Tokens back to the stored positional order. A value that is not entirely
+    # tokens is left alone, which is what carries a page loaded before this
+    # shipped, and every stored answer, through unchanged.
+    def decode_answer(value, exercise: nil, key: nil, section_data: nil)
+      count = Array(section_data&.dig("blocks")).size
+      text  = value.to_s
+      return value if count.zero? || !text.start_with?(ANSWER_PREFIX)
+
+      tokens = token_ids(exercise: exercise, key: key, block_count: count)
+      ids    = text.delete_prefix(ANSWER_PREFIX).split(",").map { |t| tokens[t.strip] }
+      return value if ids.any?(&:nil?)
+
+      ANSWER_PREFIX + ids.join(",")
+    end
+
+    def token_ids(exercise:, key:, block_count:)
+      (0...block_count).to_h { |id| [ block_token(id, exercise: exercise, key: key), id ] }
     end
 
     def judge_task

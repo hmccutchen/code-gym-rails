@@ -70,7 +70,7 @@ sections, and that user's duck conversation.
 | R3 | Rendering | low | CDN scripts (jsdelivr, esm.sh) load without Subresource Integrity | S |
 | R4 | Headers | low | No Permissions-Policy and no `frame-ancestors` (X-Frame-Options SAMEORIGIN is set) | XS |
 | A4 | AI inputs | low | Duck history is client-supplied, so a user can forge assistant turns and reset the six-turn cap | S |
-| A6 | Answer keys | low | Parsons `data-block-id` is each block's index in the correct order, so the page gives away the answer before submission | S |
+| A6 | Answer keys | low | Fixed 2026-10-09: the page renders a signed per-exercise token per block, decoded on save | done |
 | P1 | Push | low | Logout leaves push subscriptions in place, so a shared device keeps getting the previous user's reminders | S |
 | P2 | Push | low | A malformed `p256dh` raises an error `PushDelivery` doesn't rescue; no explicit timeouts; any port allowed on allowlisted hosts | XS |
 | L4 | Login | low | Rate limits fail open if the Solid Cache table errors | XS |
@@ -404,6 +404,13 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
 - **Fix:** render an opaque per-exercise token for each block, mapped back
   on the server when the answer is saved.
 - **Size:** S.
+- **Fixed 2026-10-09.** `ExerciseSection::ParsonsProblem.block_token` signs
+  the exercise, the section key and the block id with `secret_key_base` and
+  truncates the digest, so the attribute sorts randomly and a token from one
+  day says nothing about another. `DailyResponse.normalize_answers` decodes
+  through the kind's new `decode_answer` hook, leaving a value it cannot
+  fully resolve alone, which carries both stored answers and a page loaded
+  before the change. Storage, grading, replay and history are unchanged.
 
 ### Web push
 

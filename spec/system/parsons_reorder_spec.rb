@@ -54,12 +54,27 @@ RSpec.describe "Parsons reorder controls", type: :system do
     expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]", wait: 10)
   end
 
+  # The page shows an opaque token per block, so these read the arrangement
+  # back through the same mapping the server decodes a submission with.
+  def block_positions
+    exercise = user.daily_exercises.sole
+    ExerciseSection::ParsonsProblem.token_ids(
+      exercise: exercise, key: "parsons_problem",
+      block_count: exercise.problem_set.dig("parsons_problem", "blocks").size
+    )
+  end
+
   def block_ids
-    all("ol[data-parsons-blocks] .parsons-block").map { |li| li["data-block-id"] }
+    positions = block_positions
+    all("ol[data-parsons-blocks] .parsons-block").map { |li| positions[li["data-block-id"]].to_s }
   end
 
   def hidden_answer
-    find("textarea[data-field='parsons_problem']", visible: :all).value
+    value = find("textarea[data-field='parsons_problem']", visible: :all).value
+    ExerciseSection::ParsonsProblem.decode_answer(
+      value, exercise: user.daily_exercises.sole, key: "parsons_problem",
+      section_data: user.daily_exercises.sole.problem_set["parsons_problem"]
+    )
   end
 
   [ 1, 2, 3 ].each do |count|
@@ -168,7 +183,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(:down)
 
       expect(block_ids).to eq([ "2", "0", "1" ])
-      expect(page.evaluate_script("document.activeElement.dataset.blockId")).to eq("0")
+      expect(block_positions[page.evaluate_script("document.activeElement.dataset.blockId")]).to eq(0)
     end
   end
 end

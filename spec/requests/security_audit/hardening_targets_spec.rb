@@ -59,7 +59,6 @@ RSpec.describe "Security hardening targets", type: :request do
   end
 
   it "does not reveal a Parsons problem's correct order in the page before submission (finding A6)" do
-    pending "data-block-id is each block's index in the correct order"
     DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, problem_set: {
       "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
       "parsons_problem" => { "title" => "Sort names", "question" => "Arrange these blocks",

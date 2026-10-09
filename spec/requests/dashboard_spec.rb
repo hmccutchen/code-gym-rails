@@ -1044,6 +1044,18 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   describe "parsons_problem third section" do
+    # The page shows an opaque token per block rather than its position in the
+    # correct order, so a spec reads the arrangement back through the same
+    # mapping the server decodes a submission with.
+    def rendered_block_ids(body)
+      exercise = DailyExercise.last
+      ids = ExerciseSection::ParsonsProblem.token_ids(
+        exercise: exercise, key: "parsons_problem",
+        block_count: exercise.problem_set.dig("parsons_problem", "blocks").size
+      )
+      Nokogiri::HTML(body).css("[data-parsons-blocks] [data-block-id]").map { |block| ids[block["data-block-id"]] }
+    end
+
     it "renders the reorder list and a hidden answer field when today's third section is parsons_problem" do
       create_exercise(problem_set: {
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
@@ -1059,7 +1071,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("Parsons Problem: Sort names")
       expect(response.body).to include('data-field="parsons_problem"')
       expect(response.body).to include("data-parsons-blocks")
-      expect(response.body.index('data-block-id="2"')).to be < response.body.index('data-block-id="0"')
+      expect(rendered_block_ids(response.body)).to eq([ 2, 0, 1 ])
     end
 
     # Every move already records the order, so the button is only for a single
@@ -1092,9 +1104,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       })
       get root_path
 
-      expect(response.body).to include('data-block-id="0"')
-      expect(response.body).to include('data-block-id="1"')
-      expect(response.body).to include('data-block-id="2"')
+      expect(rendered_block_ids(response.body)).to eq([ 0, 1, 2 ])
     end
 
     it "renders every block once when a tampered answer order was saved" do
@@ -1112,9 +1122,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body.scan('data-block-id="0"').size).to eq(1)
-      expect(response.body).to include('data-block-id="1"')
-      expect(response.body).to include('data-block-id="2"')
+      expect(rendered_block_ids(response.body)).to match_array([ 0, 1, 2 ])
     end
 
     it "renders the blocks without server-side move controls, since drag is the primary input" do
