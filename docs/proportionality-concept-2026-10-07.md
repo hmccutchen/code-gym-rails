@@ -107,15 +107,54 @@ a design comparison's concept against the language vocabulary, and mastery
 filters rows by it, so hosting the concept in design comparison alone would
 need new machinery rather than a list entry.
 
+## Run results, 2026-10-09
+
+Both runs the follow-up asks for are done. The commands were
+`script/compare_models.rb judge_fixtures` and
+`judge_concept 1 proportionality 2`, billed to a local `ANTHROPIC_API_KEY`.
+
+**The six drafts read well.** `judge_concept` drafted two sections per rung
+on `claude-opus-5-5` (41,642 in / 17,752 out, $0.5216) under the guidance
+line above, unchanged. Reading each draft's title, scenario and question:
+
+- Each states the deciding fact where its rung requires — in the question at
+  junior, in the system description at senior, and at principal_engineer in a
+  scenario where both pieces carry a real cost that the stated facts still
+  settle.
+- The scenarios vary across both flavor pools rather than converging on one
+  setting.
+- None reads as a defect hunt. The larger piece is correct in every one of
+  them; what it adds is machinery the scenario gives no reason for, which is
+  what the concept is for.
+
+So item 3 below is met: the drafts are good enough to host the concept in
+design comparison.
+
+**The judge agrees, on Sonnet.** The production judge route kept all six and
+solved all six blind with a matching pick ($0.0494). Haiku rejected 3 of the
+6 — one junior as `scope_mismatch`, both principal_engineer as
+`reasoning_failure` — while solving all six correctly ($0.0219). That is the
+same pattern `judge_fixtures` shows elsewhere and is a reason to leave the
+judge on Sonnet, not a finding about this concept.
+
+**Read with the surface-parity caveat above.** Sonnet's six matching solves
+do not show it reasoned from the scenario, because picking the shorter piece
+would have produced the same six. The fixtures where the stated facts
+justify the larger piece, which that section calls for, are still the
+missing evidence.
+
+**The guidance line is unchanged.** It is edited only when the drafts read
+badly, and they did not.
+
 ## What the follow-up needs
 
-1. The run results: `judge_fixtures`, then `judge_concept`, read by a person
-   (commands and costs are in the PR that added this note).
+1. ~~The run results: `judge_fixtures`, then `judge_concept`, read by a
+   person~~ — done, see "Run results" above.
 2. A vocabulary entry in both language vocabularies, with a group decision:
    join module design, which keeps it out of Parsons, or a new group with its
    own constant.
-3. Hosting: add it to `ExerciseSection::DesignComparison.hosted_concepts` only
-   if the drafts read well.
+3. Hosting: add it to `ExerciseSection::DesignComparison.hosted_concepts`.
+   The drafts read well, so this condition is met.
 4. The guidance line above as `AiService#proportionality_guidance`, under the
    one-line-per-group rule.
 5. A prompt snapshot rebaseline and a Setup page snapshot rebaseline.
