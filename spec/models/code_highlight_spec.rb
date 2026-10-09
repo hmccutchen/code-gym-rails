@@ -94,15 +94,25 @@ RSpec.describe CodeHighlight do
     end
 
     it "reads a cached block instead of highlighting it again" do
-      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      described_class::CACHE.clear
       first = html("x = 1")
       expect(Rouge::Lexers::Ruby).not_to receive(:new)
 
       expect(html("x = 1")).to eq(first)
     end
 
+    it "caches in process memory, never in Rails.cache, so a block costs no database query" do
+      expect(Rails.cache).not_to receive(:fetch)
+      expect(Rails.cache).not_to receive(:read)
+
+      queries = []
+      callback = ->(*, payload) { queries << payload[:sql] }
+      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { html("y = 2") }
+      expect(queries).to be_empty
+    end
+
     it "keys the cache on the lexer and the code" do
-      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      described_class::CACHE.clear
 
       expect(html("x = 1", lexer: "ruby")).not_to eq(html("x = 1", lexer: nil))
       expect(html("x = 2")).to include("2")

@@ -2488,12 +2488,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   indent. Outside strings and comments it also puts alignment padding past
   its first space in `.code-align-extra` and a `<wbr>` after each `.` or
   `(`, so a wrapping block can hide the padding and break a call chain
-  between names. The language
-  picks the lexer (`CodeHighlight::LEXERS`); anything else, architecture
-  pseudocode or a lesson's diff, is plain text, which still escapes. Output
-  is cached under the code's digest, the lexer and `CodeHighlight::VERSION`,
-  never stored on a row, so raise the version when the markup or the
-  theme's token classes change. No page loads a browser highlighter.
+  between names. The language picks the lexer (`CodeHighlight::LEXERS`);
+  anything else, architecture pseudocode or a lesson's diff, is plain text,
+  which still escapes. Output is cached under the lexer and the code's
+  digest in `CodeHighlight::CACHE`, a bounded store in each process's
+  memory, and never stored on a row. It is deliberately not `Rails.cache`:
+  production's Solid Cache would make every block a database query, and
+  /history renders dozens. A deploy starts it empty, so it can never serve
+  old markup. No page loads a browser highlighter.
   `shared/_code_lines_script`, rendered once from the layout, decides only
   what needs the rendered width: whether a block wraps, which hides its
   padding. Duck, follow-up and alternate-explanation replies are built

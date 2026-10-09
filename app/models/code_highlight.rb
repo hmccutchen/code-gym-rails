@@ -1,11 +1,12 @@
 # Highlights a code block on the server with Rouge. The one place code becomes
 # HTML: Rouge escapes every token, and only that output is marked safe.
-# Cached by the code's digest, so a stored exercise is highlighted once, and
-# never written back to the row it came from.
+# Never written back to the row the code came from.
 module CodeHighlight
-  # Part of the cache key. Raise it when the markup or the token classes the
-  # layout's theme reads change, so no page serves HTML from the old shape.
-  VERSION = 1
+  # In this process's memory, not Rails.cache: production's Solid Cache would
+  # make every block on a page its own database query, and /history renders
+  # dozens. Losing it on a deploy costs only highlighting again, a few
+  # milliseconds a block, and a new deploy can never serve the old markup.
+  CACHE = ActiveSupport::Cache::MemoryStore.new(size: 16.megabytes)
 
   # Exercise and reference languages to Rouge lexers. Anything else, such as
   # architecture pseudocode or a hand-written lesson, is plain text.
@@ -23,8 +24,8 @@ module CodeHighlight
   def self.html(code, lexer:)
     code = code.to_s
     rouge_lexer = Rouge::Lexer.find(lexer.to_s) || Rouge::Lexers::PlainText
-    key = [ "code_highlight", VERSION, rouge_lexer.tag, Digest::SHA256.hexdigest(code) ]
-    Rails.cache.fetch(key) { LineFormatter.new.format(rouge_lexer.new.lex(code)) }.html_safe
+    key = [ rouge_lexer.tag, Digest::SHA256.hexdigest(code) ]
+    CACHE.fetch(key) { LineFormatter.new.format(rouge_lexer.new.lex(code)) }.html_safe
   end
 
   # One <span class="code-line"> per source line, carrying its leading columns
