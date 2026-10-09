@@ -63,6 +63,18 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       ANSWER_PREFIX + ids.join(",")
     end
 
+    # The draft field is re-encoded in tokens for the same reason the blocks
+    # are: rendering the stored "order:2,0,1" beside the token list pairs each
+    # visible position with its real id, which is the whole mapping. A draft
+    # that is not a complete permutation renders blank, since the page is
+    # showing the scramble rather than the learner's work.
+    def token_answer(answer:, exercise:, key:, block_count:)
+      ids = submitted_order(answer, block_count)
+      return "" if ids.empty?
+
+      ANSWER_PREFIX + ids.map { |id| block_token(id, exercise: exercise, key: key) }.join(",")
+    end
+
     def token_ids(exercise:, key:, block_count:)
       (0...block_count).to_h { |id| [ block_token(id, exercise: exercise, key: key), id ] }
     end

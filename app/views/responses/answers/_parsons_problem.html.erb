@@ -50,7 +50,7 @@
       keeps it out of the way of the people who will never need it. %>
   <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
   <p class="parsons-status" aria-live="polite"></p>
-  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= response.answers[key] %></textarea>
+  <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, block_count: blocks.size) %></textarea>
 <% end %>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>

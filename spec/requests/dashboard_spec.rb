@@ -1074,6 +1074,33 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(rendered_block_ids(response.body)).to eq([ 2, 0, 1 ])
     end
 
+    # Rendering the saved "order:2,0,1" beside the token list would pair each
+    # visible position with its real id, which is the whole mapping the tokens
+    # exist to hide.
+    it "re-encodes a saved draft order as tokens rather than positions" do
+      exercise = create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date,
+                            answers: { "parsons_problem" => "order:1,2,0" })
+      get root_path
+
+      field = Nokogiri::HTML(response.body).at_css('textarea[data-field="parsons_problem"]')
+      ids = ExerciseSection::ParsonsProblem.token_ids(
+        exercise: exercise, key: "parsons_problem", block_count: 3
+      )
+
+      expect(field.text).not_to include("order:1,2,0")
+      expect(field.text.delete_prefix("order:").split(",").map { |token| ids[token] }).to eq([ 1, 2, 0 ])
+      expect(rendered_block_ids(response.body)).to eq([ 1, 2, 0 ])
+    end
+
     # Every move already records the order, so the button is only for a single
     # block, which has nothing to move and could not be answered without it.
     { 1 => true, 2 => false, 3 => false }.each do |count, shown|
