@@ -681,13 +681,38 @@ Whether the model *obeys* an injected instruction can only be measured with
 the live script. Even if it does, the effect stays within that user's own
 review, as A3 explains.
 
+**The other two audit scripts have now been run, 2026-10-08.** Neither needs
+a provider key, so neither waited on the red team.
+
+`parameter_filter_check.rb`, run locally, filters every parameter that
+carries an answer, a message or a secret: `email`, `code`, `api_key`,
+`user.api_keys`, `response.answers`, `message`, `thread`, `question`,
+`pseudocode`, `prior_alternates`, `p256dh` and `auth`. Two reach the logs,
+and neither is in the category the audit asked about: `user.name`, the
+display name someone types on Setup, and `endpoint`, the push URL the
+browser mints. The endpoint is not a secret on its own, since sending to it
+also needs the VAPID private key, but it names one browser install and is
+worth filtering if the name is being filtered anyway. Nothing marked
+`LOGGED` is an answer, a message or a credential, so A5 is unaffected.
+
+`account_counts.rb`, run against production, gives the numbers decision 1
+was waiting on: 5 accounts in total, 2 anonymized, 3 active. Of the active
+three, 1 has never added a key and so has never generated a set, 0 added a
+key and then never generated, and 2 have both generated and submitted at
+least one day. Two accounts were created in the last 30 days, one of them
+without a key. At this size the open-signup question is not yet answerable
+from abuse that has happened; the counts show no keyless account backlog.
+
 ---
 
 ## 6. Decisions for you
 
 1. **Open signup (L2).** Keep it open and tighten, add an allowlist of
-   addresses or domains, or make it invite-only? Run `account_counts.rb` first
-   to see how many keyless, never-used accounts exist.
+   addresses or domains, or make it invite-only? `account_counts.rb` has now
+   been run (section 5): 3 active accounts, 1 of them keyless and unused, no
+   account holding a key it never generated with. One keyless account is not
+   evidence of abuse, so there is nothing here forcing the question either
+   way. Re-run the script before deciding if signups pick up.
 2. **Prompt changes (A3).** Approve tag-wrapping, the data line, and moving
    the answer out of the review system prompt. This is the only item that
    changes grading prompts.
