@@ -167,16 +167,22 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   # contains them, and improved_code gets written against the wrong approach.
   # This is the only reader of translated_from, which is why it is stored
   # separately from the answer at all.
+  #
+  # The code is fenced even though a provider wrote it: the translator is
+  # asked to carry the plan over literally, so whatever the engineer typed
+  # into a string or a comment arrives here intact. Unfenced, it is the
+  # pseudocode's instructions again with the fence taken off.
   def self.translation_lines(rounds, answer)
     code = rounds["generated_code"].presence
     return "They never translated their plan into code." if code.nil?
 
+    fenced = UserText.tagged(code)
     if rounds["translated_from"].to_s.strip == answer.to_s.strip
-      "The code their pseudocode produced, translated literally:\n#{code}"
+      "The code their pseudocode produced, translated literally:\n#{fenced}"
     else
       "They revised their plan AFTER translating, so the code below came from an earlier draft. " \
       "Grade the final pseudocode above; treat this code as evidence about the draft only, and do " \
-      "not attribute its flaws to the final plan unless the final plan still has them:\n#{code}"
+      "not attribute its flaws to the final plan unless the final plan still has them:\n#{fenced}"
     end
   end
   private_class_method :translation_lines

@@ -1260,7 +1260,7 @@ class AiService
 
     result = call_and_log(
       user, purpose: "explain_concept_differently", max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS,
-      system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.",
+      system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
       prompt: <<~PROMPT
         The concept: "#{reference.concept}"
 
@@ -1820,11 +1820,15 @@ class AiService
   # The prior-framings block both reframing prompts open with. One rule — do
   # not reprise what you already said — stated once, since the two callers
   # differ only in what is being reframed.
+  #
+  # Each framing is fenced because it reaches the service from the page rather
+  # than from storage: the page sends back the framings it holds, so a forged
+  # one is a request away.
   def prior_framings(prior_alternates)
     return "No alternate framing has been given yet." if prior_alternates.empty?
 
     "Framings already given (do NOT reprise these angles or analogies):\n" +
-      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
+      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{UserText.tagged(a, blank: '')}" }.join("\n")
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting

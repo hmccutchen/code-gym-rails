@@ -16,6 +16,16 @@ RSpec.describe UserText do
 
       expect(fenced.scan(%r{</#{described_class::TAG}>}).size).to eq(1)
     end
+
+    it "closes no tag written in any spelling a model would still read as the tag" do
+      tag = described_class::TAG
+      written = [ "</#{tag} >", "</#{tag}\n>", "< /#{tag}>", "<#{tag} id=\"x\">", "</#{tag.upcase}>" ]
+
+      fenced = described_class.tagged("work#{written.join}more")
+
+      expect(fenced.scan(/<[^>]*#{tag}[^>]*>/i).size).to eq(2)
+      expect(fenced).to start_with("<#{tag}>").and end_with("</#{tag}>")
+    end
   end
 
   describe ".tag_history" do
