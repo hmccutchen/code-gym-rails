@@ -28,6 +28,14 @@ RSpec.describe "Request log parameter filtering" do
                                                 "an earlier framing", "an earlier turn")
   end
 
+  it "filters a person's name" do
+    expect(outcome("user" => { "name" => "Ada" })).to eq("user" => { "name" => "[FILTERED]" })
+  end
+
+  it "matches a name exactly, not every key that contains it" do
+    expect(outcome("filename" => "plan.rb")).to eq("filename" => "plan.rb")
+  end
+
   it "filters an invite code" do
     expect(outcome("invite_code" => "ABCD")).to eq("invite_code" => "[FILTERED]")
   end
