@@ -138,21 +138,22 @@ class AiService
   # blocking, thinking-on call, so this one was sized the same order.
   #
   # Re-measured on 2026-10-09 with script/calibrate_concept_references.rb on
-  # the current routes. 36 claude-sonnet-5-5 calls ran 18.8-36.8 seconds,
-  # median 25.7, six of them concurrently; none timed out and none came within
-  # 50 seconds of this value. So Claude has well over twice the room it needs,
-  # which is what the 2026-09-19 run on claude-sonnet-5 also found.
+  # the current routes. 30 sequential claude-sonnet-5-5 calls ran 18.8-34.4
+  # seconds, median 25.7, and 6 concurrent ones 23.7-36.8, median 26.5; none
+  # timed out and none came within 50 seconds of this value. So Claude has
+  # well over twice the room it needs, which is what the 2026-09-19 run on
+  # claude-sonnet-5 also found.
   #
-  # Gemini's tail is still the open question, and for a different reason than
-  # before: 16 gemini-3.5-flash calls completed in 12.7-21.6 seconds, median
-  # 17.0, but the key's per-minute quota refused the remaining 14 sequential
-  # calls and all 6 concurrent ones. Every call that returned was fast; a
-  # single 2026-09-19 call that outlasted 90 seconds has not recurred and was
-  # never repeated, so how long such a call needs is still unmeasured. The
-  # value stays until a Gemini run under the harness's --timeout produces that
-  # number: a value raised without it would be sized by guess again. No
-  # ordering against REVIEW_READ_TIMEOUT is claimed; a longer visible reply is
-  # not evidence it takes longer to produce.
+  # Gemini's tail is still the open question. 16 gemini-3.5-flash calls
+  # completed in 12.7-21.6 seconds, median 17.0, but the key's per-minute
+  # quota refused the remaining 14 sequential calls and all 6 concurrent ones.
+  # In the 2026-09-19 run, completed calls took up to 70 seconds and one hit
+  # the 90-second timeout. No run since has let such a call finish, so how
+  # long it needs is still unmeasured. The value stays until a Gemini run
+  # under the harness's --timeout produces that number: a value raised
+  # without it would be sized by guess again. No ordering against
+  # REVIEW_READ_TIMEOUT is claimed; a longer visible reply is not evidence it
+  # takes longer to produce.
   #
   # The second thing this buys: RETRY_TIMEOUT_GUARD only marks a timeout final
   # (rather than retryable) when the call is tagged `long_running`, and that
