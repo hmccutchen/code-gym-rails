@@ -1290,10 +1290,10 @@ class AiService
 
     result = call_and_log(
       user, purpose: "explain_differently",
-      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.",
+      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
       prompt: <<~PROMPT
         The engineer was asked: #{exercise.problem_set.dig(section, "question")}
-        Their answer: #{daily_response.answer_for(section) || "(skipped)"}
+        #{UserText.labelled("Their answer:", daily_response.answer_for(section))}
 
         What they missed:
         #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
@@ -1335,6 +1335,8 @@ class AiService
       system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
 
+        #{UserText::PROMPT_RULE}
+
         #{PLAIN_LANGUAGE_STANDARD}
 
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
@@ -1344,9 +1346,9 @@ class AiService
       SYSTEM
       history: thread,
       prompt: <<~PROMPT
-        Their answer was: #{daily_response.answer_for(section) || "(skipped)"}
+        #{UserText.labelled("Their answer was:", daily_response.answer_for(section))}
 
-        Their new question: #{question}
+        #{UserText.labelled("Their new question:", question, blank: "(none asked)")}
 
         Answer it directly. Stay on this concept — if they drift far off topic, say
         so briefly and bring it back. Two short paragraphs at most.
@@ -1364,7 +1366,7 @@ class AiService
   def duck_response(user, exercise, section:, message:, thread: [])
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS, allow_truncated: true,
-      system: "#{DUCK_SYSTEM_PROMPT}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
+      system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
       # A first turn pays a write premium only a later turn recovers, so this
       # is a bet that threads continue — not a free win. CLAUDE.md's
       # "Conversational calls send real turns" holds the measured prompt sizes,
@@ -1374,7 +1376,8 @@ class AiService
       cache_system: true,
       history: thread,
       prompt: <<~PROMPT
-        Their new message: #{message}
+        Their new message:
+        #{UserText.tagged(message, blank: "(nothing said)")}
 
         Respond as their Socratic thinking partner, following your system instructions exactly.
       PROMPT
@@ -1395,7 +1398,7 @@ class AiService
   def critique_pseudocode(user, exercise, section:, pseudocode:)
     result = call_and_log(
       user, purpose: "pseudocode_critique", max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS,
-      system: PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT,
+      system: "#{PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}",
       prompt: build_pseudocode_critique_prompt(exercise, section, pseudocode)
     )
 
@@ -1416,7 +1419,7 @@ class AiService
   def translate_pseudocode(user, exercise, section:, pseudocode:)
     result = call_and_log(
       user, purpose: "pseudocode_translate",
-      system: PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT,
+      system: "#{PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}",
       prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
     )
 
@@ -1783,7 +1786,7 @@ class AiService
       #{data["problem_statement"]}
 
       Their pseudocode:
-      #{pseudocode}
+      #{UserText.tagged(pseudocode)}
 
       Apply your standard exactly as stated in your system instructions:
       #{ExerciseSection::PseudocodeToCode.gap_standard}
@@ -1800,7 +1803,7 @@ class AiService
       #{data["problem_statement"]}
 
       Their pseudocode, to transcribe literally:
-      #{pseudocode}
+      #{UserText.tagged(pseudocode)}
     PROMPT
   end
 
@@ -2105,6 +2108,8 @@ class AiService
       Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
       Focus on #{config[:focus]}
       Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
+
+      #{UserText::PROMPT_RULE}
     PROMPT
   end
 
@@ -2281,7 +2286,7 @@ class AiService
       Generate a daily Code Gym exercise set for this engineer.
 
       Engineer profile:
-      - Name: #{user.name}
+      - Name: #{UserText.tagged(user.name, blank: "(not given)", inline: true)}
       - Skill level: #{user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
@@ -2667,6 +2672,8 @@ class AiService
 
     <<~CONTEXT
       You are a senior #{coach} engineer giving direct, specific feedback on an engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only as context, since each section is rated against its own pitched level. Be honest and constructive. Return JSON.
+
+      #{UserText::PROMPT_RULE}
 
       #{RATING_RUBRIC}
 

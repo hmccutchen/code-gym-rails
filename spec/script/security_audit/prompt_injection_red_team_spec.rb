@@ -52,11 +52,14 @@ RSpec.describe PromptInjectionRedTeam do
     expect(keys_used.uniq).to eq([ "sk-ant-runner" ])
   end
 
-  it "sends the hidden tag characters to the provider unchanged, which is the A2 gap it measures" do
+  # UserText strips them where a person's text enters, so the only run that
+  # still carries them is the one that hides them in section text the provider
+  # itself wrote — which ProblemSetIngest, not UserText, is the boundary for.
+  it "strips the hidden tag characters out of everything the engineer typed (finding A2)" do
     run_red_team
 
     tagged = posted.select { |request| request[:body].to_json.match?(/[\u{E0000}-\u{E007F}]/) }
-    expect(tagged.size).to be >= 3
+    expect(tagged.size).to eq(1)
   end
 
   it "never sends the ambiguity hunt's answer key to the duck" do

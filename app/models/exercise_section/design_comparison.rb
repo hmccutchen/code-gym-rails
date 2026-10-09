@@ -259,7 +259,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
       pick, reason = parse_answer(answer)
       return "Their answer: (skipped)" unless pick
 
-      "Picked: #{pick.upcase}. Reason: #{reason}"
+      "Picked: #{pick.upcase}. #{UserText.labelled('Reason:', reason)}"
     end
   end
 end

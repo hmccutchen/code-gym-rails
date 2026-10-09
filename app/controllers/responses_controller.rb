@@ -210,7 +210,7 @@ class ResponsesController < ApplicationController
   # Both turns are written in one transaction, so a provider failure can never
   # leave an orphaned question with no answer in the thread.
   def follow_ups
-    question = params[:question].to_s.strip
+    question = UserText.clean(params[:question], limit: UserText::MAX_QUESTION_LENGTH).strip
     return render_section_error(t("errors.responses.question_blank")) if question.blank?
 
     asked = @response.review_follow_ups.where(section: @section, role: :user).count
@@ -275,7 +275,7 @@ class ResponsesController < ApplicationController
     existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
     return render_section_error(t("errors.responses.duck_after_submit")) if existing&.submitted?
 
-    message = params[:message].to_s.strip
+    message = UserText.normalize(params[:message]).strip
     return render_section_error(t("errors.responses.message_blank")) if message.blank?
     if message.length > MAX_DUCK_MESSAGE_LENGTH
       return render_section_error(t("errors.responses.message_too_long", max: MAX_DUCK_MESSAGE_LENGTH))
@@ -395,7 +395,7 @@ class ResponsesController < ApplicationController
       role = turn[:role].to_s.downcase
       next unless %w[user assistant].include?(role)
 
-      content = turn[:content].to_s
+      content = UserText.normalize(turn[:content])
       next if content.blank?
 
       { role: role, content: content }
@@ -439,7 +439,7 @@ class ResponsesController < ApplicationController
   end
 
   def validated_pseudocode
-    value = params[:pseudocode].to_s.strip
+    value = UserText.normalize(params[:pseudocode]).strip
     return pseudocode_error(t("errors.responses.pseudocode.blank")) if value.blank?
     if value.length > ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
       return pseudocode_error(t("errors.responses.pseudocode.too_long", max: ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH))

@@ -250,10 +250,14 @@ class DailyResponse < ApplicationRecord
   # Scaffold-only drafts store as blank so reloading can offer the scaffold
   # again without storing its labels as the user's work. Other draft text stays
   # intact; #answered? decides whether it counts.
+  #
+  # UserText runs first, so what is stored, shown and quoted into every later
+  # prompt is the same cleaned, bounded string.
   def self.normalize_answers(answers, exercise)
-    answers.to_h.transform_values(&:to_s).each_with_object({}) do |(section, value), normalized|
+    answers.to_h.each_with_object({}) do |(section, value), normalized|
+      cleaned = UserText.clean(value, limit: UserText::MAX_ANSWER_LENGTH)
       section_data = exercise&.problem_set&.dig(section.to_s)
-      normalized[section] = substantive_answer(section, value, section_data).empty? ? "" : value
+      normalized[section] = substantive_answer(section, cleaned, section_data).empty? ? "" : cleaned
     end
   end
 

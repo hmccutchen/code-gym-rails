@@ -38,6 +38,10 @@ class User < ApplicationRecord
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
+  # Clamped rather than refused: the name goes into the generation prompt, so
+  # it needs a bound, but sign-up creates the row from a typed name and a
+  # refusal there would turn a long name into a failed login.
+  before_validation :clean_name, if: :name_changed?
   validates :skill_level, inclusion: { in: SKILL_LEVELS }
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
   validate :api_keys_name_providers, if: :api_keys_changed?
@@ -651,6 +655,10 @@ class User < ApplicationRecord
   def provider_label = AiProvider.label(provider)
 
   private
+
+  def clean_name
+    self.name = UserText.clean(name, limit: UserText::MAX_NAME_LENGTH).strip
+  end
 
   # Moves the held set onto today. The draft moves with its exercise: a response
   # is only ever created against today's exercise, so leaving it behind would

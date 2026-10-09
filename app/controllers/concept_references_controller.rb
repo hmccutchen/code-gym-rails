@@ -72,7 +72,7 @@ class ConceptReferencesController < ApplicationController
   # detectably over cap.
   def prior_alternates_param
     Array(params[:prior_alternates]).first(MAX_ALTERNATES_PER_CONCEPT + 1)
-                                    .filter_map { |framing| framing.to_s.presence if framing.is_a?(String) }
+                                    .filter_map { |framing| UserText.normalize(framing).presence if framing.is_a?(String) }
   end
 
   def render_error(message)
