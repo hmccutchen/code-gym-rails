@@ -39,7 +39,7 @@
       button here. %>
   <div class="pseudocode-code">
     <% if round["generated_code"].present? %>
-      <pre><%= round["generated_code"] %></pre>
+      <pre><%= highlighted_code(round["generated_code"], exercise.language) %></pre>
       <%# Load-bearing copy, not decoration: without it the generated code reads
           as a model answer, which is exactly the misreading the faithfulness
           constraint exists to prevent. %>

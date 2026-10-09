@@ -41,9 +41,12 @@ RSpec.describe "Learn lessons", type: :request do
 
       expect(response).to have_http_status(:ok)
       body = CGI.unescapeHTML(response.body)
+      code_blocks = Nokogiri::HTML(response.body).css("code.highlight").map { |code| code_block_text(code) }
       LearnLessons.find(lesson)[:sections].each do |section|
         expect(body).to include(section[:heading])
         section[:blocks].each do |type, content|
+          next expect(code_blocks).to include(content) if type == :code
+
           texts = type == :steps ? content.flatten : [ content ]
           texts.each { |text| expect(body).to include(text) }
         end

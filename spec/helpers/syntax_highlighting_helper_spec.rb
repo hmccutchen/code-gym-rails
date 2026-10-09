@@ -1,23 +1,17 @@
 require "rails_helper"
 
 RSpec.describe SyntaxHighlightingHelper, type: :helper do
-  describe "#hljs_language" do
-    it "maps ruby_rails to ruby" do
-      expect(helper.hljs_language("ruby_rails")).to eq("ruby")
+  describe "#highlighted_code" do
+    it "wraps the server-highlighted lines in a code element for the theme" do
+      code = Nokogiri::HTML.fragment(helper.highlighted_code("puts 1", "ruby_rails")).at_css("code")
+
+      expect(code["class"]).to eq("highlight")
+      expect(code.css(".code-line").map(&:text)).to eq([ "puts 1" ])
+      expect(code.css(".nb, .mi")).not_to be_empty
     end
 
-    it "maps javascript to javascript" do
-      expect(helper.hljs_language("javascript")).to eq("javascript")
-    end
-
-    it "returns nil for architecture (pseudocode is never highlighted)" do
-      expect(helper.hljs_language("architecture")).to be_nil
-    end
-
-    it "returns nil for blank or unrecognized values" do
-      expect(helper.hljs_language(nil)).to be_nil
-      expect(helper.hljs_language("")).to be_nil
-      expect(helper.hljs_language("cobol")).to be_nil
+    it "leaves no hook for a browser highlighter" do
+      expect(helper.highlighted_code("puts 1", "ruby_rails")).not_to include("data-hljs")
     end
   end
 end

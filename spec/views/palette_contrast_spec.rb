@@ -89,7 +89,7 @@ RSpec.describe "palette contrast" do
     end
 
     it "keeps every highlighting color at 4.5:1 or more on code" do
-      colors = rules.select { |rule| rule.selectors.any? { |selector| selector.include?(".hljs") } }
+      colors = rules.select { |rule| rule.selectors.any? { |selector| selector.start_with?("code.highlight") } }
         .filter_map { |rule| rule.declaration("color") }.uniq
         .to_h { |color| [ color, vars.fetch(color[/\Avar\(--([\w-]+)\)\z/, 1], color) ] }
 

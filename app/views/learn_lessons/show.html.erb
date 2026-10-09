@@ -17,9 +17,8 @@
         <% end %>
       </ol>
     <% when :code %>
-      <pre class="snippet"><code><%= content %></code></pre>
+      <pre class="snippet"><%= highlighted_code(content, nil) %></pre>
     <% end %>
   <% end %>
 <% end %>
 
-<%= render "shared/syntax_highlighting_script" %>

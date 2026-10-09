@@ -25,6 +25,10 @@ gem "resend"
 
 # Offset pagination for the History page (HistoryController)
 gem "pagy", "~> 43.7"
+
+# Server-side syntax highlighting for code blocks [https://github.com/rouge-ruby/rouge]
+gem "rouge", "~> 5.1"
+
 # Slices RealSource method excerpts out of their files by AST position.
 # Declared, not left to irb's transitive dependency: a production boot never
 # requires it on its own, and a Rails upgrade could drop that path silently.

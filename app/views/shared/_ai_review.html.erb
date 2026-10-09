@@ -42,7 +42,7 @@
         <p class="review-item"><strong><%= kind.improved_code_label %>:</strong></p>
         <div class="plan-excerpt" style="margin-top:.4rem"><%= improved_code %></div>
       <% else %>
-        <pre class="snippet" style="margin-top:.75rem"><code<% if (lang = hljs_language(exercise_language)) %> data-hljs="<%= lang %>"<% end %>><%= improved_code %></code></pre>
+        <pre class="snippet" style="margin-top:.75rem"><%= highlighted_code(improved_code, exercise_language) %></pre>
       <% end %>
     <% end %>
     <div class="alternates" data-section="<%= section %>">
@@ -79,7 +79,6 @@
   </div>
 <% end %>
 
-<%= render "shared/syntax_highlighting_script" %>
 
 <%# This partial can render once per history entry (up to one per reviewed
     session on the page), so the script below is emitted into the layout's

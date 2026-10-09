@@ -18,7 +18,7 @@
   <ol class="parsons-list parsons-list-readonly">
     <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>
       <li class="parsons-block <%= block_id == position ? "parsons-correct" : "parsons-misplaced" %>">
-        <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= ExerciseSection::ParsonsProblem.valid_id?(block_id, blocks.size) ? blocks[block_id] : t("responses.answered.skipped") %></code></pre>
+        <pre class="snippet"><% if ExerciseSection::ParsonsProblem.valid_id?(block_id, blocks.size) %><%= highlighted_code(blocks[block_id], language) %><% else %><%= highlighted_code(t("responses.answered.skipped"), nil) %><% end %></pre>
       </li>
     <% end %>
   </ol>
@@ -35,7 +35,7 @@
   <ol class="parsons-list" data-parsons-blocks>
     <% initial_order.each do |block_id| %>
       <li class="parsons-block" data-block-id="<%= block_id %>" tabindex="0" aria-keyshortcuts="Control+ArrowUp Control+ArrowDown">
-        <pre class="snippet"><code<% if (lang = hljs_language(language)) %> data-hljs="<%= lang %>"<% end %>><%= blocks[block_id] %></code></pre>
+        <pre class="snippet"><%= highlighted_code(blocks[block_id], language) %></pre>
       </li>
     <% end %>
   </ol>

@@ -31,7 +31,7 @@ RSpec.describe "Code blocks under display preferences", type: :system do
     visit_as(user)
     visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
     find("details.learn-code-examples summary").click
-    expect(page).to have_css("pre.snippet code[data-lines-done]")
+    expect(page).to have_css("pre.snippet code.highlight")
   end
 
   def page_scrolls_sideways?

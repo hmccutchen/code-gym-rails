@@ -33,7 +33,7 @@ RSpec.describe "The design comparison section", type: :request do
 
       pieces = page.css("details.comparison-piece[open]")
       expect(pieces.map { |piece| piece.at_css("summary").text.strip }).to eq([ "Piece A", "Piece B" ])
-      expect(pieces.map { |piece| piece.at_css("code").text }).to eq([ "class OtherPiece\nend", "class BetterPiece\nend" ])
+      expect(pieces.map { |piece| code_block_text(piece.at_css("code.highlight")) }).to eq([ "class OtherPiece\nend", "class BetterPiece\nend" ])
     end
 
     it "asks for the pick as a labelled radio group and the reason in a labelled textarea" do

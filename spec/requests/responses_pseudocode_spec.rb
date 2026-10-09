@@ -227,7 +227,8 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
       get root_path
 
-      expect(response.body).to include("&lt;script&gt;alert(1)&lt;/script&gt;")
+      page = Nokogiri::HTML(response.body)
+      expect(code_block_text(page.at_css(".pseudocode-code code.highlight"))).to eq("<script>alert(1)</script>")
       expect(response.body).to include("&lt;img src=x onerror=alert(1)&gt;")
       expect(response.body).not_to include("<script>alert(1)</script>")
     end

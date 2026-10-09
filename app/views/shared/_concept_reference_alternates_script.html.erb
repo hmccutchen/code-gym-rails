@@ -2,7 +2,7 @@
     renders once per section that has a cached reference, and /history renders
     every entry's sections, so this is emitted into the layout's shared
     :page_scripts region only on the FIRST call anywhere on the page — same
-    guard and reasoning as shared/_syntax_highlighting_script. The single copy
+    guard and reasoning as shared/_mermaid_diagram. The single copy
     still reaches every control because the script scans the whole document,
     not just the caller's own markup. %>
 <% unless @concept_reference_alternates_script_emitted %>

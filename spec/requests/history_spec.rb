@@ -93,8 +93,8 @@ RSpec.describe "History", type: :request do
       get history_path
 
       parsons_list = response.body[/<ol class="parsons-list parsons-list-readonly">.*?<\/ol>/m]
-      expect(parsons_list.scan("(skipped)").size).to eq(2)
-      expect(parsons_list).to include("names.sort")
+      expect(Nokogiri::HTML(parsons_list).text.scan("(skipped)").size).to eq(2)
+      expect(Nokogiri::HTML(parsons_list).text).to include("names.sort")
     end
   end
 
@@ -257,7 +257,6 @@ RSpec.describe "History", type: :request do
       get history_path
 
       expect(response.body.scan("This script is emitted once").size).to eq(1)
-      # Check for mermaid script specifically, since highlight.js script also uses cdn.jsdelivr.net
       expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
 
@@ -310,7 +309,7 @@ RSpec.describe "History", type: :request do
 
       expect(response.body).to include("Revised plan")
       expect(response.body).to include(%(<div class="plan-excerpt" style="margin-top:.4rem">revised_plan_marker</div>))
-      expect(response.body).not_to include(%(<code data-hljs="ruby">revised_plan_marker</code>))
+      expect(Nokogiri::HTML(response.body).css("code.highlight").map(&:text).join).not_to include("revised_plan_marker")
     end
 
     it "lists only the current user's submitted responses, newest first" do
@@ -481,7 +480,7 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include("self-explanation")
     end
 
-    it "marks code_review and improved_code with the exercise's highlight.js language" do
+    it "highlights code_review and improved_code in the exercise's language" do
       session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
       session.update!(ai_review: { "code_review" => { "rating" => "solid", "improved_code" => "User.includes(:posts)" } })
 
@@ -489,9 +488,13 @@ RSpec.describe "History", type: :request do
       get history_path
 
       # create_session_for's challenge section has no starter_code, so the only
-      # two data-hljs="ruby" occurrences on this page are the code_review
-      # snippet (responses/_answered_sections) and improved_code (shared/_ai_review).
-      expect(response.body.scan('data-hljs="ruby"').size).to eq(2)
+      # two code blocks on this page are the code_review snippet
+      # (responses/_answered_sections) and improved_code (shared/_ai_review).
+      blocks = Nokogiri::HTML(response.body).css("code.highlight")
+      expect(blocks.size).to eq(2)
+      improved = blocks.find { |block| code_block_text(block) == "User.includes(:posts)" }
+      expect(improved.css(".no").map(&:text)).to eq([ "User" ])
+      expect(improved.css(".ss").map(&:text)).to eq([ ":posts" ])
     end
 
     it "marks a javascript exercise's snippet as javascript, not ruby" do
@@ -507,8 +510,8 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body).to include('data-hljs="javascript"')
-      expect(response.body).not_to include('data-hljs="ruby"')
+      snippet = Nokogiri::HTML(response.body).at_css("code.highlight")
+      expect(snippet.css(".kd").map(&:text)).to eq([ "const" ])
     end
 
     it "never marks an architecture concept reference's pseudocode example for highlighting" do
@@ -526,12 +529,12 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body).to include("shard_by(:tenant_id)")
-      # Check for data-hljs as an HTML attribute, not in script code
-      expect(response.body).not_to include('data-hljs="')
+      pseudocode = Nokogiri::HTML(response.body).css("code.highlight").find { |code| code.text.include?("shard_by") }
+      expect(code_block_text(pseudocode)).to eq("shard_by(:tenant_id)  # pseudocode")
+      expect(pseudocode.css(".code-line span:not(.code-align-extra)")).to be_empty
     end
 
-    it "loads the highlight.js script exactly once across multiple reviewed entries" do
+    it "emits the code line script exactly once across multiple reviewed entries" do
       3.times do |i|
         session = create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true)
         session.update!(ai_review: { "code_review" => { "rating" => "solid", "improved_code" => "improved" } })
@@ -540,10 +543,11 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      expect(response.body.scan("highlight.js@11.11.1/lib/core").size).to eq(1)
+      expect(response.body.scan("function fitAlignment(").size).to eq(1)
+      expect(response.body).not_to include("highlight.js")
     end
 
-    it "marks a reviewed session with no improved_code in any section and still loads the script" do
+    it "highlights a reviewed session with no improved_code in any section and still emits the script" do
       session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
       # Update to ensure NO improved_code in any section
       session.update!(ai_review: { "code_review" => { "rating" => "solid", "correct" => "Good job" } })
@@ -551,10 +555,8 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # The code_review snippet should be marked
-      expect(response.body).to include('data-hljs="ruby"')
-      # The script should load even though there's no improved_code
-      expect(response.body).to include("highlight.js@11.11.1/lib/core")
+      expect(Nokogiri::HTML(response.body).css("code.highlight").size).to eq(1)
+      expect(response.body).to include("function fitAlignment(")
     end
   end
 
