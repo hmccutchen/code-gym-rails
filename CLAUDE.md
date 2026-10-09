@@ -2485,15 +2485,18 @@ concept-specific difficulty descriptions for future generation, not a new set.
   HTML formatter escapes each token, and only its output is marked safe.
   `CodeHighlight::LineFormatter` wraps each source line in a `.code-line`
   carrying `--indent`, so the layout can give a wrapped line a hanging
-  indent, and puts strings and comments in `.code-literal`. The language
+  indent. Outside strings and comments it also puts alignment padding past
+  its first space in `.code-align-extra` and a `<wbr>` after each `.` or
+  `(`, so a wrapping block can hide the padding and break a call chain
+  between names. The language
   picks the lexer (`CodeHighlight::LEXERS`); anything else, architecture
   pseudocode or a lesson's diff, is plain text, which still escapes. Output
   is cached under the code's digest, the lexer and `CodeHighlight::VERSION`,
   never stored on a row, so raise the version when the markup or the
   theme's token classes change. No page loads a browser highlighter.
-  `shared/_code_lines_script` does only what needs the rendered width:
-  showing alignment padding as one space and adding break points once a
-  block wraps. Duck, follow-up and alternate-explanation replies are built
+  `shared/_code_lines_script`, rendered once from the layout, decides only
+  what needs the rendered width: whether a block wraps, which hides its
+  padding. Duck, follow-up and alternate-explanation replies are built
   by page scripts as plain text and show no code blocks.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or

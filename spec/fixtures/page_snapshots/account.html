@@ -1082,6 +1082,46 @@
   })();
 </script>
 
+  <script>
+  (() => {
+    // A block with any wrapped line shows its alignment padding as one space,
+    // and gets the rest back when it has room again. A hidden block (a closed
+    // disclosure) measures zero and is fitted when it opens.
+    function fitAlignment(code) {
+      code.removeAttribute("data-wraps");
+
+      const probe = document.createElement("span");
+      probe.className = "code-line";
+      probe.textContent = "x";
+      code.append(probe);
+      const row = probe.getBoundingClientRect().height;
+      probe.remove();
+      if (row === 0) return;
+
+      const wraps = [...code.children].some((line) => line.getBoundingClientRect().height > row * 1.5);
+      code.toggleAttribute("data-wraps", wraps);
+    }
+
+    // Watches the <pre>, since an inline <code> reports no size. Fitting
+    // changes a block's height, never its width, so reacting to width alone
+    // cannot loop.
+    const widths = new WeakMap();
+    const fitOnResize = new ResizeObserver((entries) => {
+      entries.forEach(({ target, contentRect }) => {
+        if (widths.get(target) === contentRect.width) return;
+        widths.set(target, contentRect.width);
+        fitAlignment(target.querySelector(":scope > code"));
+      });
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+      for (const code of document.querySelectorAll("code.highlight")) {
+        if (code.querySelector(".code-align-extra")) fitOnResize.observe(code.parentElement);
+      }
+    });
+  })();
+</script>
+
   
 </body>
 </html>

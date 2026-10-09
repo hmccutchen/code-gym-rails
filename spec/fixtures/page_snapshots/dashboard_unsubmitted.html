@@ -669,7 +669,6 @@
 
 </div>
 
-  
   <div class="progress-sticky">
     <div class="progress-bar">
       <div class="progress-fill" id="progress-fill" style="width:0%"></div>
@@ -1459,108 +1458,47 @@ What would be easy to get wrong or worth testing:
   })();
 </script>
 
-      <script type="module">
-      // Code often pads names so a column lines up (`kind     = value` under
-      // `description = value`). Once a block wraps, the column is gone and the
-      // padding is just a gap, so a block with any wrapped line shows each
-      // such run as one space. A run counts when it sits before `=`, `#` or
-      // `//`, or after `:`, `,` or `=`, and not inside a highlighted string or
-      // comment; leading indentation never counts. Only the display changes:
-      // every space after the first stays in the text, so copying the block
-      // copies the original line, and shows again when the block has room.
-      const ALIGNMENT_RUN = /(?<=\S) {2,}(?==|#|\/\/)|(?<=[:,=]) {2,}(?=\S)/g;
-      const LITERAL = ".code-literal";
+  <script>
+  (() => {
+    // A block with any wrapped line shows its alignment padding as one space,
+    // and gets the rest back when it has room again. A hidden block (a closed
+    // disclosure) measures zero and is fitted when it opens.
+    function fitAlignment(code) {
+      code.removeAttribute("data-wraps");
 
-      // Each text node in a line with where it starts in the line's text, so a
-      // match found in the whole line can be traced back to the node holding
-      // it. Each token sits in a node of its own.
-      function textNodesOf(line) {
-        const nodes = [];
-        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
-        let offset = 0;
-        while (walker.nextNode()) {
-          nodes.push({ node: walker.currentNode, start: offset });
-          offset += walker.currentNode.length;
-        }
-        return nodes;
-      }
+      const probe = document.createElement("span");
+      probe.className = "code-line";
+      probe.textContent = "x";
+      code.append(probe);
+      const row = probe.getBoundingClientRect().height;
+      probe.remove();
+      if (row === 0) return;
 
-      function markAlignment(line) {
-        const nodes = textNodesOf(line);
+      const wraps = [...code.children].some((line) => line.getBoundingClientRect().height > row * 1.5);
+      code.toggleAttribute("data-wraps", wraps);
+    }
 
-        [...line.textContent.matchAll(ALIGNMENT_RUN)].reverse().forEach((match) => {
-          const owner = nodes.find(({ node, start }) => match.index >= start && match.index + match[0].length <= start + node.length);
-          if (!owner || owner.node.parentElement.closest(LITERAL)) return;
-
-          const extraSpaces = owner.node.splitText(match.index - owner.start + 1);
-          extraSpaces.splitText(match[0].length - 1);
-          const span = document.createElement("span");
-          span.className = "code-align-extra";
-          extraSpaces.replaceWith(span);
-          span.append(extraSpaces);
-        });
-      }
-
-      // A long call chain has no space to wrap at, so the layout's
-      // overflow-wrap would split it mid-name (`f` / `etch`). A <wbr> after
-      // each `.` or `(` gives it better places to break, and adds no text.
-      // The match runs over the whole line, since highlighting can put the
-      // `.` and the name after it in separate nodes.
-      const CHAIN_BREAK = /(?<=[.(])(?=[^\s.(])/g;
-
-      function addChainBreaks(line) {
-        const nodes = textNodesOf(line);
-        [...line.textContent.matchAll(CHAIN_BREAK)].reverse().forEach((match) => {
-          const punctuation = match.index - 1;
-          const owner = nodes.find(({ node, start }) => punctuation >= start && punctuation < start + node.length);
-          if (!owner || owner.node.parentElement.closest(LITERAL)) return;
-
-          const after = punctuation - owner.start + 1;
-          if (after < owner.node.length) owner.node.splitText(after);
-          owner.node.after(document.createElement("wbr"));
-        });
-      }
-
-      // A hidden block (a closed disclosure) measures zero and is fitted when
-      // it opens, through the observer below.
-      function fitAlignment(code) {
-        if (!code.querySelector(".code-align-extra")) return;
-        code.removeAttribute("data-wraps");
-
-        const probe = document.createElement("span");
-        probe.className = "code-line";
-        probe.textContent = "x";
-        code.append(probe);
-        const row = probe.getBoundingClientRect().height;
-        probe.remove();
-        if (row === 0) return;
-
-        const wraps = [...code.children].some((line) => line.getBoundingClientRect().height > row * 1.5);
-        code.toggleAttribute("data-wraps", wraps);
-      }
-
-      // Watches the <pre>, since an inline <code> reports no size. Fitting
-      // changes a block's height, never its width, so reacting to width alone
-      // cannot loop.
-      const widths = new WeakMap();
-      const fitOnResize = new ResizeObserver((entries) => {
-        entries.forEach(({ target, contentRect }) => {
-          if (widths.get(target) === contentRect.width) return;
-          widths.set(target, contentRect.width);
-          fitAlignment(target.querySelector(":scope > code"));
-        });
+    // Watches the <pre>, since an inline <code> reports no size. Fitting
+    // changes a block's height, never its width, so reacting to width alone
+    // cannot loop.
+    const widths = new WeakMap();
+    const fitOnResize = new ResizeObserver((entries) => {
+      entries.forEach(({ target, contentRect }) => {
+        if (widths.get(target) === contentRect.width) return;
+        widths.set(target, contentRect.width);
+        fitAlignment(target.querySelector(":scope > code"));
       });
+    });
 
-      for (const code of document.querySelectorAll("code.highlight:not([data-lines-done])")) {
-        code.dataset.linesDone = "1";
-        for (const line of code.children) {
-          markAlignment(line);
-          addChainBreaks(line);
-        }
-        fitOnResize.observe(code.parentElement);
+    document.addEventListener("DOMContentLoaded", () => {
+      for (const code of document.querySelectorAll("code.highlight")) {
+        if (code.querySelector(".code-align-extra")) fitOnResize.observe(code.parentElement);
       }
-    </script>
-    <script>
+    });
+  })();
+</script>
+
+      <script>
 (() => {
   const MAX_TURNS = 6;
   const DUCK_URL = "/responses/duck_thread";

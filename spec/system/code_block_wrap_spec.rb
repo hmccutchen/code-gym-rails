@@ -48,9 +48,9 @@ RSpec.describe "Code block wrapping", type: :system do
     watch_for_highlighter(width: width)
     visit_as(user)
     visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
-    expect(page).to have_css("pre.snippet code.highlight[data-lines-done]", visible: :all, wait: 10)
+    expect(page).to have_css("pre.snippet code.highlight", visible: :all)
     find("details.learn-code-examples summary").click
-    expect(page).to have_css("pre.snippet code.highlight[data-lines-done]", wait: 5)
+    expect(page).to have_css("pre.snippet code.highlight")
   end
 
   # Fitting runs from a ResizeObserver, a moment after the block opens or
@@ -219,11 +219,11 @@ RSpec.describe "Code block wrapping", type: :system do
     expect(line_texts.first).to eq('kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
   end
 
-  it "marks a string that crosses lines as literal on every line it covers" do
+  it "re-opens a highlighted string on every line it covers" do
     open_reference
 
     spans_per_line = page.evaluate_script(<<~JS)
-      [...document.querySelectorAll("pre.snippet .code-line")].map((line) => line.querySelectorAll(".code-literal").length)
+      [...document.querySelectorAll("pre.snippet .code-line")].map((line) => line.querySelectorAll(".s2").length)
     JS
     expect(spans_per_line).to eq([ 0, 1, 1, 1, 0, 0, 0 ])
   end
@@ -233,7 +233,7 @@ RSpec.describe "Code block wrapping", type: :system do
     visit_as(user)
     visit learn_lesson_path(lesson: "reading_unfamiliar_code")
 
-    expect(page).to have_css("pre.snippet code.highlight[data-lines-done] .code-line", minimum: 2, wait: 10)
+    expect(page).to have_css("pre.snippet code.highlight .code-line", minimum: 2)
     expect(page).to have_no_css("pre.snippet code.highlight .code-line span:not(.code-align-extra)")
   end
 end

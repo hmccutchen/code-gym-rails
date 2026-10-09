@@ -93,7 +93,7 @@ RSpec.describe "History", type: :request do
       get history_path
 
       parsons_list = response.body[/<ol class="parsons-list parsons-list-readonly">.*?<\/ol>/m]
-      expect(parsons_list.scan("(skipped)").size).to eq(2)
+      expect(Nokogiri::HTML(parsons_list).text.scan("(skipped)").size).to eq(2)
       expect(Nokogiri::HTML(parsons_list).text).to include("names.sort")
     end
   end
@@ -309,7 +309,7 @@ RSpec.describe "History", type: :request do
 
       expect(response.body).to include("Revised plan")
       expect(response.body).to include(%(<div class="plan-excerpt" style="margin-top:.4rem">revised_plan_marker</div>))
-      expect(response.body).not_to include(%(<code data-hljs="ruby">revised_plan_marker</code>))
+      expect(Nokogiri::HTML(response.body).css("code.highlight").map(&:text).join).not_to include("revised_plan_marker")
     end
 
     it "lists only the current user's submitted responses, newest first" do
@@ -531,7 +531,7 @@ RSpec.describe "History", type: :request do
 
       pseudocode = Nokogiri::HTML(response.body).css("code.highlight").find { |code| code.text.include?("shard_by") }
       expect(code_block_text(pseudocode)).to eq("shard_by(:tenant_id)  # pseudocode")
-      expect(pseudocode.css(".code-line span")).to be_empty
+      expect(pseudocode.css(".code-line span:not(.code-align-extra)")).to be_empty
     end
 
     it "emits the code line script exactly once across multiple reviewed entries" do
