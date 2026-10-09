@@ -7,8 +7,8 @@ class ClaudeService < AiService
   def self.provider_key = "anthropic"
   def self.key_pattern = /\Ask-ant-/
 
-  # The measured rewrites still need human sign-off before REVIEW_PROSE_JUDGE
-  # is enabled; see CLAUDE.md.
+  # Still gated by REVIEW_PROSE_JUDGE, which stays off until the activation
+  # gate in CLAUDE.md's "Review prose judge" is met.
   def self.judges_review_prose? = true
 
   # Keyed by the ApiUsage purpose string, so usage rows and routes name calls

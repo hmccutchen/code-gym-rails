@@ -633,8 +633,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **Review against `claude-opus-5-5`:** the two agreed on all three of a
   stored day's ratings (beginner, beginner, solid). Opus took roughly twice
   as long on every section (16.5s against 7.1s, 24.4s against 9.3s, 13.3s
-  against 8.4s) and wrote far more output at four times the price, for the
-  same grades. Review is a request the engineer waits on, so paying four
+  against 8.4s) and wrote far more output at twice Sonnet's list price per
+  token, so the run cost about four times as much for the same grades. Review is a request the engineer waits on, so paying four
   times as much to wait twice as long for the same answer is the wrong
   trade.
 
@@ -654,6 +654,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the engineer's plan implemented literally, and the engineer is graded on
   it, so a silent aliasing bug in the demonstration is worse than its cost.
   One sample is thin evidence; re-run it before moving the route on this.
+  No production response had a `pseudocode_to_code` answer to replay, so the
+  input was a local section built from `FakeService`'s canned problem set;
+  only the two models' output is real.
 
   Two constraints apply before routing any of them, both noted beside
   the table. `#call` turns thinking off whenever a caller passes `max_tokens`,
@@ -2186,9 +2189,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   reason code from `AiService.judge_fallback_reason`, the table the section
   judge also reads, never the error message, which can carry provider text. The call is billed as `judge_review`, which is in
   `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). The
-  cap was re-checked against the comparison script on 2026-10-09: the largest
-  reply measured was 347 output tokens and the slowest call 3.1 seconds, so
-  both the cap and the 30-second timeout have room.
+  cap was re-checked against the comparison script on 2026-10-09; the run
+  record at the end of this bullet has the measured figures.
 
   **One attempt, and a 12-minute claim.** The call passes `single_attempt:
   true`, which refuses every retry, status retries included, and runs on
