@@ -73,4 +73,29 @@ RSpec.describe "Security hardening targets", type: :request do
     ids = Nokogiri::HTML(response.body).css("[data-parsons-blocks] [data-block-id]").map { |block| block["data-block-id"] }
     expect(ids).not_to match_array(%w[0 1 2])
   end
+
+  it "does not reveal the order through a reloaded draft either (finding A6)" do
+    exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, problem_set: {
+      "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+      "parsons_problem" => { "title" => "Sort names", "question" => "Arrange these blocks",
+                             "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+                             "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one" }
+    })
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          answers: { "parsons_problem" => "order:2,0,1" })
+    user.update!(daily_section_count: 4)
+    login_as(user)
+
+    get root_path
+
+    page = Nokogiri::HTML(response.body)
+    draft = page.css("textarea[data-field='parsons_problem']").text
+    ids = page.css("[data-parsons-blocks] [data-block-id]").map { |block| block["data-block-id"] }
+
+    # Pairing each visible position with its draft entry is what would
+    # reconstruct the mapping, so the draft has to speak the same opaque
+    # language the blocks do.
+    expect(draft).not_to include("order:2,0,1")
+    expect(draft.delete_prefix("order:").split(",")).to match_array(ids)
+  end
 end

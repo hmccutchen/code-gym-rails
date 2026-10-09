@@ -49,6 +49,39 @@ RSpec.describe ExerciseSection::ParsonsProblem do
     end
   end
 
+  describe ".token_answer" do
+    let(:exercise) { instance_double(DailyExercise, id: 7) }
+
+    def token_answer(answer, block_count: 3)
+      described_class.token_answer(answer: answer, exercise: exercise, key: "parsons_problem",
+                                   block_count: block_count)
+    end
+
+    def token(block_id)
+      described_class.block_token(block_id, exercise: exercise, key: "parsons_problem")
+    end
+
+    it "renders a stored order as the tokens the blocks carry, never the positions" do
+      expect(token_answer("order:2,0,1")).to eq("order:#{token(2)},#{token(0)},#{token(1)}")
+    end
+
+    it "round-trips through .decode_answer, so a reloaded draft saves as itself" do
+      decoded = described_class.decode_answer(
+        token_answer("order:2,0,1"), exercise: exercise, key: "parsons_problem",
+        section_data: { "blocks" => %w[a b c] }
+      )
+
+      expect(decoded).to eq("order:2,0,1")
+    end
+
+    it "renders blank for a draft that is not a complete permutation" do
+      expect(token_answer("order:0,0,1")).to eq("")
+      expect(token_answer("order:9")).to eq("")
+      expect(token_answer(nil)).to eq("")
+      expect(token_answer("")).to eq("")
+    end
+  end
+
   describe ".arrange!" do
     it "writes a display order that is a permutation of the blocks" do
       section = { "blocks" => %w[a b c d e] }
