@@ -2227,15 +2227,15 @@ concept-specific difficulty descriptions for future generation, not a new set.
   call **3,099 ms of the 30,000 ms `REVIEW_JUDGE_READ_TIMEOUT`**, so the cap
   that came from a four-review sample is not tight.
 
-  Every Sonnet rewrite was read beside its source and no negation, condition
-  or identifier changed. Two are judgment calls rather than clean wins:
+  Every Sonnet rewrite was read beside its source; no negation, condition or
+  identifier changed. Two are judgment calls rather than clean wins:
   `string_fields` sharpened "essentially a performance thing" to "slows the
   page down", which is plainer but states more than the source did, and
   `verbose_jargon` compressed a four-topic next step to "Study ActiveRecord
-  preloading", which drops three topics. Neither changes a claim; both
-  change what the engineer is told to do next. Reading those two is the
-  remaining step before turning the switch on, and the switch stays off
-  until someone does.
+  preloading", which drops three topics. Both change what the engineer is
+  told to do next. Deciding whether those two
+  changes are acceptable is the remaining step before turning the switch on.
+  The switch stays off until then.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a

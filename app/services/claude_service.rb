@@ -7,8 +7,8 @@ class ClaudeService < AiService
   def self.provider_key = "anthropic"
   def self.key_pattern = /\Ask-ant-/
 
-  # Not yet measured: script/compare_models.rb's review_prose modes measure it,
-  # and that has to happen before this switch is turned on.
+  # The measured rewrites still need human sign-off before REVIEW_PROSE_JUDGE
+  # is enabled; see CLAUDE.md.
   def self.judges_review_prose? = true
 
   # Keyed by the ApiUsage purpose string, so usage rows and routes name calls
