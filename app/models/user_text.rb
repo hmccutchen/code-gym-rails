@@ -8,9 +8,14 @@
 # screen. ZWJ survives, since removing it breaks emoji a person meant to type.
 module UserText
   TAGS = "\u{E0000}-\u{E007F}"
-  ZERO_WIDTH = "\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\uFEFF"
+  # U+061C and the U+2066-U+2069 isolates belong here with the older U+202A-E
+  # embeddings: all of them reorder what a browser draws without changing the
+  # logical string a model reads, which is the whole of the Trojan Source
+  # trick. Leaving the isolates out left the newer half of that attack intact.
+  BIDI = "\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069"
+  ZERO_WIDTH = "\u200B\u200C\u2060-\u2064\uFEFF"
   CONTROLS = "\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F"
-  STRIPPED = /[#{TAGS}#{ZERO_WIDTH}#{CONTROLS}]/o
+  STRIPPED = /[#{TAGS}#{BIDI}#{ZERO_WIDTH}#{CONTROLS}]/o
 
   # Per section. Long enough for any answer the form invites and short enough
   # that one section cannot dominate every later prompt that quotes it.
@@ -47,14 +52,19 @@ module UserText
   # A labelled piece of engineer text: on its own lines when there is any,
   # inline when there is not, so a skipped answer stays the one short line it
   # has always been.
-  def self.labelled(label, value, blank: "(skipped)")
+  def self.labelled(label, value, blank: "(skipped)", limit: MAX_ANSWER_LENGTH)
     return "#{label} #{blank}" if normalize(value).strip.empty?
 
-    "#{label}\n#{tagged(value)}"
+    "#{label}\n#{tagged(value, limit: limit)}"
   end
 
-  def self.tagged(value, blank: "(skipped)", inline: false)
-    text = normalize(value).strip
+  # Capped here as well as at the write boundary, because the caps arrived
+  # after the rows did: an answer or a follow-up stored before this shipped is
+  # as long as it ever was, and a prompt read is where it would still reach a
+  # provider unbounded. Clamping on the way out needs no backfill and holds for
+  # any row a later import or console edit writes around the boundary.
+  def self.tagged(value, blank: "(skipped)", inline: false, limit: MAX_ANSWER_LENGTH)
+    text = clean(value, limit: limit).strip
     return blank if text.empty?
 
     fenced = text.gsub(%r{<\s*/?\s*#{TAG}\b[^<>]*>}i) { |tag| tag.tr("<>", "[]") }
@@ -66,12 +76,12 @@ module UserText
   # they are fenced the way the new turn is: without this, an instruction
   # planted in turn one is unmarked from turn two onwards. Assistant turns go
   # back exactly as the provider wrote them.
-  def self.tag_history(history)
+  def self.tag_history(history, limit: MAX_ANSWER_LENGTH)
     Array(history).map do |turn|
       turn = turn.respond_to?(:symbolize_keys) ? turn.symbolize_keys : turn
       next turn unless turn.is_a?(Hash) && turn[:role].to_s == "user"
 
-      turn.merge(content: tagged(turn[:content], blank: ""))
+      turn.merge(content: tagged(turn[:content], blank: "", limit: limit))
     end
   end
 end

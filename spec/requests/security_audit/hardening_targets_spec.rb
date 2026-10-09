@@ -65,6 +65,15 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(context.scan("</#{UserText::TAG}>").size).to eq(1)
       expect(context).to include("[/#{UserText::TAG}]")
     end
+
+    # The generation prompt is where the tagged name arrives, so the rule that
+    # says what a tag means has to travel with it. Nothing else asserts this,
+    # and dropping the line would leave the fence without its meaning while
+    # every other example still passed.
+    it "states the rule in the generation system prompt, which carries the tagged name (finding A3)" do
+      expect(FakeService.new(user).send(:build_system_prompt, "ruby_rails"))
+        .to include(UserText::PROMPT_RULE)
+    end
   end
 
   it "does not reveal a Parsons problem's correct order in the page before submission (finding A6)" do
