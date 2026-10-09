@@ -176,6 +176,23 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
+  # The page's tokens stop decoding once the problem is regenerated under it.
+  # The server refuses that save with 409, and the only recovery is a reload,
+  # which brings back blocks the page can save again.
+  it "reloads when a save is refused because the problem changed under the page" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      exercise = user.daily_exercises.sole
+      exercise.problem_set["parsons_problem"]["blocks"] = [ "def replaced(names)", "  names.uniq", "end" ]
+      exercise.save!
+
+      find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
+
+      expect(page).to have_css("ol[data-parsons-blocks] .parsons-block", text: "names.uniq", wait: 10)
+      expect(user.daily_responses.reload).to be_empty
+    end
+  end
+
   it "moves focus between blocks with a bare arrow key" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
