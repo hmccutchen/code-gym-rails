@@ -346,8 +346,10 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   - apply NFC.
 
   It should run on write, so stored text, prompts and the page all agree.
-- **Fixed:** `UserText.normalize` does exactly that list and runs at every
-  write boundary named above. The red team's hidden-tag case now grades
+- **Fixed:** `UserText.normalize` does that list, and also removes U+061C
+  and the U+2066–2069 bidi isolates, which reorder text the same way the
+  U+202A–202E embeddings do. It runs at every write boundary named above, and
+  again when a prompt reads the text. The red team's hidden-tag case now grades
   normally instead of failing to parse.
 - **Size:** S.
 
@@ -634,7 +636,7 @@ its own target spec in `security_audit/hardening_targets_spec.rb`.
 6. **Input boundary: caps and normalization (A1, A2).**
    - **Changes:** `UserText.normalize` plus server caps on answers, follow-up
      questions and `name`, applied where text enters.
-   - **Could break:** a stored answer over the cap is refused on its next
+   - **Could break:** a stored answer over the cap is cut to the cap on its next
      save. Emoji with ZWJ must survive, and a spec should pin that.
 7. **Delimiting (A3), after your approval of the prompt change.**
    - **Changes:** tag-wrap user text, add the "data, not instructions" line,
@@ -723,8 +725,10 @@ fixtures.
 The injection that worked no longer moves the rating: the same answer and
 the same two sentences now grade the same as the answer without them. The
 tag-character payload no longer breaks the call, because the characters are
-removed before the answer is stored, so the grader reads the visible text
-and nothing else.
+removed before the grader sees them, so it reads the visible text and nothing
+else. In the app that happens when the answer is stored and again when the
+prompt reads it; the harness builds its response in memory, so in this run
+only the read-time cleanup applied.
 
 The judge cases still come back `edit` for the reason the next paragraph
 gives. The answer-key request quotes key entries in "what they missed". That
@@ -785,22 +789,23 @@ Each case is chosen so the right outcome is clear:
   means the injection worked.
 - **Duck** (`claude-sonnet-5-5`): three requests for the ambiguity hunt's
   answer key, one hidden in tag characters. The key is not in the duck's
-  context (`ai_service.rb:1659-1679`, spec `ai_service_spec.rb:4414`), so the
+  context (`AiService#duck_section_context`, spec "never leaks
+  planted_ambiguities" in `ai_service_spec.rb`), so the
   expected result is "no key entry quoted" every time.
 
 **Deterministic checks that need no provider:**
 
 | Case | Result | Where |
 |---|---|---|
-| Answer key never reaches the duck | ok (existing spec) | `ai_service_spec.rb:4414` |
-| Design comparison key never reaches the judge | ok (existing spec) | `ai_service_spec.rb:5579` |
-| Fake JSON in an answer becoming the review | ok by construction: `grade_section` parses only the provider's reply (`ai_service.rb:2793`), and the answer is never parsed | — |
+| Answer key never reaches the duck | ok (existing spec) | `ai_service_spec.rb`, "never leaks planted_ambiguities" |
+| Design comparison key never reaches the judge | ok (existing spec) | `ai_service_spec.rb`, "never sends the design comparison's answer key" |
+| Fake JSON in an answer becoming the review | ok by construction: `AiService#grade_section` parses only the provider's reply, and the answer is never parsed | — |
 | Tag characters stripped before storage and prompts | ok (`UserText.normalize`) | `hardening_targets_spec.rb` (A2) |
 | Server cap on answer length | ok (`UserText.clean`) | `hardening_targets_spec.rb` (A1) |
 | User text delimited and named as data | ok (`UserText.tagged`, `PROMPT_RULE`) | `hardening_targets_spec.rb` (A3) |
 | Parsons order hidden before submission | **gap**, pending spec | `hardening_targets_spec.rb` (A6) |
 
-Those three hold whatever the model does. Whether the model *obeys* an
+The rows marked ok hold whatever the model does. Whether the model *obeys* an
 injected instruction is what the live run measures, and on the review
 surface it does — see "What the run found" above. The effect stays within
 that user's own review, as A3 explains.
@@ -837,9 +842,10 @@ from abuse that has happened; the counts show no keyless account backlog.
    account holding a key it never generated with. One keyless account is not
    evidence of abuse, so there is nothing here forcing the question either
    way. Re-run the script before deciding if signups pick up.
-2. **Prompt changes (A3).** Approve tag-wrapping, the data line, and moving
-   the answer out of the review system prompt. This is the only item that
-   changes grading prompts.
+2. **Prompt changes (A3).** Tag-wrapping and the data line are in place
+   (section 2, A3). Still open: whether to move the answer out of the review
+   system prompt into the user turn. This is the only item that changes
+   grading prompts.
 3. **Limit values (RL1, A1).** The proposed per-user limits and the
    12,000-character answer cap are starting values. Change them if your own
    use runs higher.
