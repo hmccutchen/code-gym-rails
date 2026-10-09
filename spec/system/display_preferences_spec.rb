@@ -188,8 +188,8 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
 
       family = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).fontFamily") }
       expect(family.call(".question")).to include("Atkinson Hyperlegible")
-      expect(family.call("pre.snippet")).to eq("monospace")
-      expect(family.call("pre.snippet code")).to eq("monospace")
+      expect(family.call("pre.snippet")).to eq("monospace, monospace")
+      expect(family.call("pre.snippet code")).to eq("monospace, monospace")
       expect(family.call("textarea.code-answer")).to include("Fira Code")
     end
   end

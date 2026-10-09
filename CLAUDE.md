@@ -2575,8 +2575,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   containers), never code. iOS reads the status bar style when the installed
   app launches, so only an explicit Light asks for the white bar, and the copy
   says to fully close and reopen the app. Mermaid already draws with its light
-  theme, so the light palette needs nothing for it. `palette_contrast_spec`
-  holds both palettes to WCAG AA. Design:
+  theme, so the light palette needs nothing for it. Code blocks and the other
+  code-colored panels take `--code-bg`, and highlighting takes the palette
+  plus `--code-symbol` and `--code-builtin`, so each palette states them once;
+  code is sized in rem, so text size scales it. `palette_contrast_spec`
+  holds both palettes to WCAG AA, every highlighting color on code included. Design:
   `docs/superpowers/specs/2026-09-30-display-preferences-design.md`.
 - **Push reminders**: an optional notification each weekday when the day's set
   is ready, and an optional afternoon nudge on days it is left unfinished,

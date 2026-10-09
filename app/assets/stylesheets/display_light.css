@@ -18,21 +18,14 @@
   --green: #116530; --red: #b42318; --yellow: #8a5a00;
   --pattern-mask: url("gym-pattern-tile.png");
   --pattern-tint: rgb(52, 97, 154); --pattern-opacity: .07;
-  --code-bg: #f0f0f6;
+  --code-bg: #f0f0f6; --code-symbol: #6d28d9; --code-builtin: #0b6394;
   /* Form fields are identified by their border, so it has to reach 3:1. */
   --field-border: #7a7a92;
 }
 
-html :is(pre.snippet, .plan-excerpt, .problem-statement, .pseudocode-code pre, .ref-body,
-  .answer-display, textarea.answer),
-html .gloss-term::after { background: var(--code-bg); }
-
 /* Not while focused, so each page's own accent border on focus still shows. */
 html :is(textarea, select, .form-field input:not([type="checkbox"], [type="radio"], [type="range"]),
   .duck-input, .follow-up-input, .learn-filter input[type="search"]):not(:focus) { border-color: var(--field-border); }
-
-html :is(.hljs-symbol, .hljs-attr, .hljs-params) { color: #6d28d9; }
-html :is(.hljs-built_in, .hljs-title) { color: #0b6394; }
 
 html :is(.rung-principal_engineer, .rung-developing_principal_engineer) { --rung: var(--accent); }
 html :is(.rung-senior, .rung-developing_senior) { --rung: #15803d; }

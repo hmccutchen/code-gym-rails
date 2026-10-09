@@ -3,8 +3,8 @@ require "rails_helper"
 # A wrapped code line used to continue at column 0, and the padding that lines
 # up a column (`kind     = value`) stayed as a wide gap once the block wrapped.
 # These pin the hanging indent, which starts a continuation two columns past
-# the line's own indentation, and the alignment padding shown as one space in
-# a block that wraps.
+# the line's own indentation, the alignment padding shown as one space in a
+# block that wraps, and a copy that still holds the original lines.
 RSpec.describe "Code block wrapping", type: :system do
   # Line 1 is too long for a phone but fits the desktop column. Line 2 opens a
   # string that crosses into line 3 and holds padding of its own after a comma.
@@ -72,12 +72,48 @@ RSpec.describe "Code block wrapping", type: :system do
   end
 
   # Fitting runs from a ResizeObserver, a moment after the block opens or
-  # resizes, so a check on its result retries until the line matches.
-  def expect_line(index, text)
+  # resizes, so a check on its result retries until the gap matches.
+  def expect_gap(index, columns, before: "=")
     page.document.synchronize(5) do
-      actual = line_texts[index]
-      raise Capybara::ExpectationNotMet, "line #{index} was #{actual.inspect}, expected #{text.inspect}" unless actual == text
+      actual = gap_columns(index, before: before)
+      raise Capybara::ExpectationNotMet, "line #{index} showed #{actual} columns before `#{before}`, expected #{columns}" unless actual == columns
     end
+  end
+
+  # How many columns the line shows before the last `before` character in it,
+  # back to the text ahead of the gap.
+  def gap_columns(index, before: "=")
+    page.evaluate_script(<<~JS)
+      (() => {
+        const line = document.querySelectorAll("pre.snippet .code-line")[#{index}];
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+        const chars = [];
+        while (walker.nextNode()) {
+          for (let i = 0; i < walker.currentNode.length; i++) {
+            const range = document.createRange();
+            range.setStart(walker.currentNode, i);
+            range.setEnd(walker.currentNode, i + 1);
+            chars.push({ char: walker.currentNode.data[i], rect: range.getBoundingClientRect() });
+          }
+        }
+        const target = chars.findLastIndex((c) => c.char === #{before.to_json});
+        const name = chars.slice(0, target).findLastIndex((c) => c.char !== " ");
+        const ch = chars[name].rect.width;
+        return Math.round((chars[target].rect.left - chars[name].rect.right) / ch);
+      })()
+    JS
+  end
+
+  def copied_text
+    page.evaluate_script(<<~JS)
+      (() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector("pre.snippet"));
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        return getSelection().toString();
+      })()
+    JS
   end
 
   def line_texts
@@ -130,35 +166,42 @@ RSpec.describe "Code block wrapping", type: :system do
       end
 
       it "shows alignment padding as one space once the block wraps" do
-        expect_line(1, '  kind = "a string that is too long for a phone"')
+        expect_gap(1, 1)
+      end
+
+      it "copies the original lines, padding and blank line included" do
+        expect_gap(1, 1)
+
+        expect(copied_text).to eq(SOURCE)
       end
     end
   end
 
   it "keeps the padding inside a highlighted string" do
     open_reference(highlighter: :loaded)
-    expect_line(1, '  kind = "a string that is too long for a phone"')
+    expect_gap(1, 1)
 
-    expect(line_texts[2]).to eq('  label = "a,  b')
+    expect(gap_columns(2, before: "b")).to eq(2)
   end
 
   it "keeps every line as written where the block fits" do
     open_reference(highlighter: :loaded, width: 1280)
 
-    expect(line_texts).to eq(SOURCE.lines.map(&:chomp))
+    expect(gap_columns(1)).to eq(5)
+    expect(line_texts).to eq(SOURCE.lines.map(&:chomp).map { |line| line.empty? ? "\n" : line })
   end
 
   # The same observer fits a block that was in a closed disclosure at load,
   # since opening it changes its width from zero.
   it "fits the block again when its width changes" do
     open_reference(highlighter: :loaded, width: 1280)
-    expect(line_texts[1]).to start_with("  kind     =")
+    expect(gap_columns(1)).to eq(5)
 
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 390, height: 844) }
-    expect(page).to have_css("pre.snippet .code-line", text: 'kind = "a string', wait: 5)
+    expect_gap(1, 1)
 
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 1280, height: 844) }
-    expect(page).to have_css("pre.snippet .code-line", text: "kind     =", wait: 5)
+    expect_gap(1, 5)
   end
 
   [ :loaded, :blocked ].each do |highlighter|
