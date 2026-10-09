@@ -56,8 +56,15 @@ RSpec.describe ExerciseSection::ParsonsProblem do
       expect(decode("order:#{replaced},#{token(1)},#{token(2)}")).to be_nil
     end
 
-    it "keeps a token stable while the problem is unchanged, however it is read" do
-      expect(token(0, data: { "blocks" => %w[a b c] })).to eq(token(0))
+    # Blocks are provider output and nothing rejects a separator inside one,
+    # so a digest over the blocks joined on one would read these two puzzles
+    # as the same and carry every token across a regeneration between them.
+    it "tells apart two block lists a separator alone cannot" do
+      expect(token(0, data: { "blocks" => [ "a\u0000b", "c" ] }))
+        .not_to eq(token(0, data: { "blocks" => [ "a", "b\u0000c" ] }))
+    end
+
+    it "keeps a token stable while the problem is unchanged, however it is read" do      expect(token(0, data: { "blocks" => %w[a b c] })).to eq(token(0))
     end
 
     it "leaves an answer alone when the section has no blocks to map it to" do

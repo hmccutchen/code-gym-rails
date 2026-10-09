@@ -57,10 +57,13 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
 
     # The blocks are stored in their correct order, so this changes whenever
     # the puzzle does — including a regeneration that happens to keep the
-    # block count.
+    # block count. Serialized as JSON rather than joined on a separator:
+    # blocks are provider output and nothing rejects a separator inside one,
+    # so a join would give ["a\0b", "c"] and ["a", "b\0c"] the same digest
+    # and carry every token across a regeneration between them.
     def problem_digest(section_data)
       OpenSSL::Digest::SHA256.hexdigest(
-        Array(section_data&.dig("blocks")).map(&:to_s).join("\u0000")
+        Array(section_data&.dig("blocks")).map(&:to_s).to_json
       ).first(TOKEN_LENGTH)
     end
 

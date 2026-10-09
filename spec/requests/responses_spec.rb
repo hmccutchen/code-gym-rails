@@ -252,7 +252,9 @@ RSpec.describe "Responses", type: :request do
            as: :json
 
       saved = DailyResponse.find_by(user: user, daily_exercise: exercise)
+      expect(response).to have_http_status(:ok)
       expect(saved.answers["parsons_problem"]).to eq("order:2,0,4,1,3")
+      expect(saved.answered_sections).to include("parsons_problem")
     end
   end
 
