@@ -109,9 +109,13 @@ need new machinery rather than a list entry.
 
 ## Run results, 2026-10-09
 
-Both runs the follow-up asks for are done. The commands were
-`script/compare_models.rb judge_fixtures` and
-`judge_concept 1 proportionality 2`, billed to a local `ANTHROPIC_API_KEY`.
+Both runs the follow-up asks for are done, billed to a local
+`ANTHROPIC_API_KEY`:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb judge_fixtures
+ANTHROPIC_API_KEY=sk-ant-... bin/rails runner script/compare_models.rb judge_concept 1 proportionality 2
+```
 
 **The six drafts read well.** `judge_concept` drafted two sections per rung
 on `claude-opus-5-5` (41,642 in / 17,752 out, $0.5216) under the guidance
@@ -146,8 +150,8 @@ missing evidence.
 **The six hand-written fixtures, which `judge_fixtures` runs.** These are
 `spec/fixtures/judge/design_comparison_proportionality_*`, two per rung, and
 they are the half of the evidence that is not the model's own drafts. On the
-production route every one came back as the fixture expects, with a matching
-blind solve:
+production route, Sonnet 5.5, every one came back as the fixture expects,
+with a matching blind solve:
 
 | Fixture | Expected | Sonnet 5.5 | Haiku 4.5 |
 | --- | --- | --- | --- |
@@ -166,6 +170,10 @@ six, and every disagreement is Haiku refusing or failing a section Sonnet kept
 leave the judge on Sonnet. The single mismatch sits at principal_engineer,
 where `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` never rejects on a mismatch
 anyway, so it would change nothing even with that switch on.
+
+The surface-parity caveat applies here too: in all six fixtures the expected
+piece is also the one with fewer non-blank lines, so a judge that always
+picked the shorter piece would match all six as well.
 
 Taken together with the drafts, the concept reads as hostable on the
 production route; nothing here argues for the switch or for a different judge
