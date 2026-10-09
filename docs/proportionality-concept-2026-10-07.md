@@ -143,6 +143,34 @@ would have produced the same six. The fixtures where the stated facts
 justify the larger piece, which that section calls for, are still the
 missing evidence.
 
+**The six hand-written fixtures, which `judge_fixtures` runs.** These are
+`spec/fixtures/judge/design_comparison_proportionality_*`, two per rung, and
+they are the half of the evidence that is not the model's own drafts. On the
+production route every one came back as the fixture expects, with a matching
+blind solve:
+
+| Fixture | Expected | Sonnet 5.5 | Haiku 4.5 |
+| --- | --- | --- | --- |
+| `junior_grocery_sort` | keep | keep, solve match | keep, solve match |
+| `junior_rates_file` | keep | keep, solve match | reject `reasoning_failure`, solve match |
+| `senior_library_reminder` | keep | keep, solve match | keep, solve match |
+| `senior_statement_export` | keep | keep, solve match | reject `scope_mismatch`, solve match |
+| `principal_pasted_list` | keep_or_edit | keep, solve match | error, reply truncated at 1,200 output tokens |
+| `principal_rate_quote` | keep_or_edit | keep, solve match | reject `reasoning_failure`, solve MISMATCH |
+
+Sonnet: 6/6 as expected, blind-solve agreement 6/6, no rejections. Haiku: three
+false rejections and one truncated reply, and the one blind-solve mismatch in
+the whole set. Read for disagreements, the two models disagree on four of the
+six, and every disagreement is Haiku refusing or failing a section Sonnet kept
+— the same shape the rest of `judge_fixtures` shows, and the same reason to
+leave the judge on Sonnet. The single mismatch sits at principal_engineer,
+where `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` never rejects on a mismatch
+anyway, so it would change nothing even with that switch on.
+
+Taken together with the drafts, the concept reads as hostable on the
+production route; nothing here argues for the switch or for a different judge
+model.
+
 **The guidance line is unchanged.** It is edited only when the drafts read
 badly, and they did not.
 
