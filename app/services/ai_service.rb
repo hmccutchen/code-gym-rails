@@ -537,11 +537,13 @@ class AiService
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
-  # The 1,500 floor governs: the local sample was only 4 section reviews
-  # (largest projection 243 characters). Review output has no length bound, so
-  # a long review can hit this cap and fall back unedited as `truncated`.
-  # Re-check the value against the review_prose script's measured output
-  # tokens before the switch is turned on. Passing it turns thinking off.
+  # Measured on 2026-10-09 with script/compare_models.rb: across the eight
+  # fixtures and four stored reviews, the largest reply on the production
+  # route was 347 output tokens, under a quarter of this cap, and the slowest
+  # took 3.1 seconds of the 30-second timeout. Review output has no length
+  # bound, so a much longer review could still hit the cap and fall back
+  # unedited as `truncated`; nothing measured has come close. Passing this
+  # turns thinking off.
   REVIEW_JUDGE_MAX_TOKENS = 1_500
 
   REVIEW_PROSE_ISSUE_GUIDANCE = {

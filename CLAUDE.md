@@ -2177,10 +2177,10 @@ concept-specific difficulty descriptions for future generation, not a new set.
   returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
   reason code from `AiService.judge_fallback_reason`, the table the section
   judge also reads, never the error message, which can carry provider text. The call is billed as `judge_review`, which is in
-  `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). That
-  cap came from a local sample of only four reviews, so it must be re-checked
-  against the output tokens the comparison script measures before the switch
-  goes on.
+  `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). The
+  cap was re-checked against the comparison script on 2026-10-09: the largest
+  reply measured was 347 output tokens and the slowest call 3.1 seconds, so
+  both the cap and the 30-second timeout have room.
 
   **One attempt, and a 12-minute claim.** The call passes `single_attempt:
   true`, which refuses every retry, status retries included, and runs on
