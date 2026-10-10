@@ -209,6 +209,21 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
+  # The message is for the page the reload lands on and nowhere else. A reader
+  # who navigates away instead of reloading, or whose reload never happens,
+  # must not meet the explanation again on a page it says nothing about.
+  it "does not follow the reader to another page" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      page.execute_script("window.CodeGymSaveStatus.carry('answers', 'Reload to see the current problem.')")
+
+      visit learn_path
+
+      expect(page).to have_css("h1")
+      expect(page).to have_no_css("#save-status", text: "Reload to see the current problem.")
+    end
+  end
+
   it "moves focus between blocks with a bare arrow key" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
