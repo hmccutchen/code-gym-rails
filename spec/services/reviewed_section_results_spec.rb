@@ -60,8 +60,7 @@ RSpec.describe ReviewedSectionResults do
     end
   end
 
-  # A rung is read as a level, so a value outside KindDifficulty::LEVELS can
-  # neither earn nor cost anything.
+  # A value outside KindDifficulty::LEVELS can neither earn nor cost anything.
   [ "expert", "SENIOR", "", [ "junior" ] ].each do |rung|
     it "leaves out a rung outside the closed list: #{rung.inspect}" do
       expect(described_class.for(response({ "code_review" => { rung: rung } }))).to eq([])

@@ -1,13 +1,10 @@
 require "rails_helper"
 
-# Holds hand-written Learn text to the rules in AiService::PLAIN_LANGUAGE_STANDARD
-# that code can check. The rest of the standard needs a reader's judgment, and
-# the PR that added this spec lists which items those are.
+# Checks the machine-checkable rules of AiService::PLAIN_LANGUAGE_STANDARD; the rest needs a reader.
 RSpec.describe HandWrittenLearnText do
   standard = AiService::PLAIN_LANGUAGE_STANDARD
 
-  # Read from the standard rather than restated, so a phrase added there is
-  # checked here too.
+  # Read from the standard, so a phrase added there is checked here too.
   placeholder_phrases = standard.lines.find { |line| line.include?("Placeholder phrases") }
                                 .scan(/"([^"]+)"/).flatten
                                 .map { |phrase| phrase.sub(/[,.]\z/, "").downcase }
@@ -16,8 +13,7 @@ RSpec.describe HandWrittenLearnText do
     text.split(/(?<=[.?!])\s+/).map(&:strip).reject(&:empty?)
   end
 
-  # The first word stands in for a sentence's construction. That is narrower
-  # than the standard's wording, so it only catches the plainest repetition.
+  # The first word stands in for a sentence's construction, so only the plainest repetition is caught.
   def self.opening_word(sentence)
     sentence[/[[:alpha:]']+/]&.downcase
   end

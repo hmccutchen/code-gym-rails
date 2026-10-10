@@ -29,8 +29,7 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(user.push_subscriptions.sole.endpoint).to eq("https://fcm.googleapis.com/fcm/send/abc")
     end
 
-    # Provider-shaped input from the browser, held at the boundary so
-    # PushDelivery can assume an endpoint it can actually sign for.
+    # Held at the boundary so PushDelivery can assume an endpoint it can sign for.
     [
       [ "a non-https endpoint", { endpoint: "http://fcm.googleapis.com/fcm/send/abc" } ],
       [ "a missing endpoint",   { endpoint: "" } ],
@@ -48,11 +47,7 @@ RSpec.describe "Push subscriptions", type: :request do
       end
     end
 
-    # Postgres `character varying` with no length specifier is unlimited — the
-    # 255-byte default is a MySQL convention, not a Rails one — and 2048 bytes
-    # sits under the ~2704-byte btree limit the UNIQUE index on this column
-    # imposes. Both halves matter, so this drives a real endpoint at the bound
-    # through to a persisted row rather than asserting the column type.
+    # Postgres varchar is unlimited and 2048 bytes fits under the unique index's btree limit; drive both.
     it "stores an endpoint at the full permitted length" do
       configure_vapid
       login_as(user)
@@ -75,10 +70,7 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    # A push endpoint is minted by the browser's own push service. Accepting an
-    # arbitrary URL would hand any logged-in teammate a blind, authenticated
-    # SSRF primitive: the worker POSTs to whatever is stored here every morning,
-    # from inside the deployment's network.
+    # Accepting any URL would give a logged-in user a blind SSRF: the worker POSTs to whatever is stored.
     [
       [ "an internal host",        "https://10.0.0.5/hook" ],
       [ "localhost",               "https://localhost:5432/hook" ],
@@ -98,8 +90,7 @@ RSpec.describe "Push subscriptions", type: :request do
       end
     end
 
-    # Suffix matching, so per-region and per-tenant subdomains work without
-    # every one being enumerated.
+    # Suffix matching, so per-region and per-tenant subdomains work without listing each one.
     [
       "https://fcm.googleapis.com/fcm/send/abc",
       "https://updates.push.services.mozilla.com/wpush/v2/abc",
@@ -167,9 +158,7 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(user.reload.reminders_ready?).to be(true)
     end
 
-    # The dial is a plain form post. Enrolment has to happen inside a click
-    # handler for iOS to grant permission, so this must never be a way to turn
-    # reminders on from nothing.
+    # iOS grants permission only inside a click handler, so this form post must never enrol from nothing.
     it "cannot enrol a user who has never turned reminders on" do
       configure_vapid
       login_as(user)
@@ -189,8 +178,7 @@ RSpec.describe "Push subscriptions", type: :request do
   end
 
   describe "DELETE /push_subscription" do
-    # The endpoints go too, not just the flag: leaving rows behind would keep
-    # tomorrow's job pushing at a browser whose owner just asked it to stop.
+    # Rows left behind would keep the job pushing to a browser whose owner asked it to stop.
     it "drops the endpoints as well as the intent" do
       configure_vapid
       login_as(user)
@@ -223,10 +211,7 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).not_to include("Turn on daily reminders")
     end
 
-    # iOS gives a permission prompt only to a request made synchronously inside
-    # the click, so nothing the handler needs may be fetched first. Embedding
-    # the key in the page is what removes the one round trip that would
-    # otherwise have to happen before Notification.requestPermission().
+    # iOS prompts only for a synchronous request inside the click, so the key must be in the page, not fetched.
     it "embeds the VAPID public key rather than leaving the click to fetch it" do
       configure_vapid
       login_as(user)
@@ -236,9 +221,7 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).to include("const VAPID_KEY = \"public\"")
     end
 
-    # fetch resolves for a 4xx and would follow a logged-out redirect to a 200,
-    # so without both of these a rejected enrolment reloads the page looking
-    # like success and the user is never told it failed.
+    # fetch resolves for a 4xx and follows a logged-out redirect to a 200, so both must count as failure.
     it "treats a rejected or redirected enrolment as a failure, not a success" do
       configure_vapid
       login_as(user)
@@ -249,8 +232,7 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).to include("if (!response.ok) throw CodeGymServerMessage.error(")
     end
 
-    # The launch re-subscribe is the whole iOS mitigation: a dropped endpoint is
-    # replaced with one the server has never seen, and nothing else repairs it.
+    # The launch re-subscribe is the only repair for an endpoint iOS dropped.
     it "re-subscribes on launch for a user who has reminders on" do
       configure_vapid
       user.update!(reminder_level: :ready)

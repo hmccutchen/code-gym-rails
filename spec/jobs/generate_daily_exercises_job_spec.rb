@@ -5,9 +5,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   let(:user) { User.create!(email: "cronuser@example.com", name: "Cron", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC") }
 
-  # On-demand generation is judged on a weekday and single-stage on a weekend,
-  # and examples without a travel_to run on whatever day the suite does, so
-  # these stubs answer both paths the same way.
+  # Examples without travel_to may run on a weekday or weekend, so these stubs answer both paths.
   def stub_provider(u = user, problem_set: { "code_review" => {} })
     judged = AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: [], outcomes: {})
     svc = instance_double(ClaudeService, generate_unjudged_exercise: judged, generate_judged_exercise: judged)
@@ -22,8 +20,7 @@ RSpec.describe GenerateDailyExercisesJob do
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
 
-  # Job logs name the user by id: an email in a log line is personal data in a
-  # place nobody deletes it from.
+  # An email in a log line is personal data nobody deletes.
   describe "the user named in log lines" do
     let(:logged) { StringIO.new }
 
@@ -92,8 +89,7 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
   end
 
-  # A provider failure is stored as its kind and time, never as text: the
-  # sentence is written when the dashboard reads it.
+  # The failure is stored as kind and time; the sentence is written when the dashboard reads it.
   it "records a rejected key as bad_key and renders a Setup-pointing sentence" do
     stub_provider_failure(AiService::AuthenticationError, "invalid x-api-key")
 
@@ -119,9 +115,7 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(user.generation_failure_message(surface: :generation)).to start_with("Claude is limiting requests right now, so nothing was generated.")
   end
 
-  # The sentence is written when the dashboard is read, so the row keeps the
-  # provider the call went to and the wait it asked for: a switch to another
-  # key before reading must not relabel the failure.
+  # A key switch before the dashboard reads the failure must not relabel it.
   it "stores the provider tried and its wait, and keeps naming that provider after a switch" do
     error = AiService::RateLimitError.new("rate limited", retry_after: 300).tap { |e| e.provider = "anthropic" }
     stub_provider_failure(error, nil)
@@ -185,7 +179,6 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(exercise.language).to eq("javascript")
   end
 
-
   it "logs and continues when a concurrent job already created today's exercise (unique index race)" do
     stub_provider
     allow(DailyExercise).to receive(:create!).and_raise(
@@ -210,9 +203,7 @@ RSpec.describe GenerateDailyExercisesJob do
       .to eq("Claude took too long to answer, so nothing was generated. Try again.")
   end
 
-  # A lost race: a concurrent generation created today's set while this one was
-  # still waiting on the provider. Reporting the loser's failure would leave a
-  # "couldn't generate" banner sitting above a perfectly good set all day.
+  # A failure banner above a set a concurrent generation already created would stay all day.
   it "does not persist a failure when today's exercise already exists" do
     DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} },
                           generated_at: Time.current, language: "ruby_rails")
@@ -412,9 +403,7 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
 
-    # The cron runs hourly. Reading "is there a set for today" only inside
-    # generate_now would leave every run after the generating one free to
-    # enqueue again, and the nudge would repeat every hour until midnight.
+    # The cron runs hourly, so a check only inside generate_now would let later runs re-enqueue the nudge.
     it "does not enqueue again on later runs the same day" do
       stub_generation_for(pac)
 
@@ -461,8 +450,6 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
 
-    # Starting the set is no longer the stopping rule — a half-answered day is
-    # exactly what the nudge exists to reach.
     it "nudges a day that was answered in part and then left alone" do
       user.update!(reminder_level: :ready_and_nudges)
 

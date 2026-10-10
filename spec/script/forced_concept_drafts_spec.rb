@@ -9,9 +9,7 @@ RSpec.describe ForcedConceptDrafts do
   let(:kind)     { ExerciseSection::DesignComparison }
   let(:draft_dir) { ModelComparison::CONCEPT_DRAFT_DIR.join(concept) }
 
-  # Answers the way FakeService would, except that a single-section retry
-  # carries the concept it was asked for, as a provider following the
-  # fixed-concept line would.
+  # A single-section retry carries the concept it was asked for, as a provider following the fixed-concept line would.
   before do
     seen = prompts
     connection = Faraday.new do |f|

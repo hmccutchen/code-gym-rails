@@ -20,8 +20,7 @@ RSpec.describe "Leaving the learning track", type: :system do
   end
 
   it "keeps an Exercise mix edit made just before leaving the track" do
-    # One browser turn puts Leave inside the real debounce, before a driver
-    # round trip can give the mix save time to finish.
+    # One browser turn puts Leave inside the real debounce, before a driver round trip lets the mix save finish.
     page.execute_script(<<~JS)
       const slider = document.querySelector("#weight-challenge");
       slider.value = 0;
@@ -45,8 +44,7 @@ RSpec.describe "Leaving the learning track", type: :system do
     page.evaluate_script("document.activeElement.getAttribute(#{attribute.to_json})")
   end
 
-  # The guide renders only for a track user, so it goes with the track, and
-  # the confirmation takes focus because the button that had it is removed.
+  # The confirmation takes focus because the button that had it is removed.
   it "removes the key guide and moves focus to an announced confirmation" do
     expect(page).to have_css(".key-guide")
 

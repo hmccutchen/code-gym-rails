@@ -1,13 +1,8 @@
 require "rails_helper"
 
-# A wrapped code line used to continue at column 0, and the padding that lines
-# up a column (`kind     = value`) stayed as a wide gap once the block wrapped.
-# These pin the hanging indent, which starts a continuation two columns past
-# the line's own indentation, the alignment padding shown as one space in a
-# block that wraps, and a copy that still holds the original lines.
+# Pins the hanging indent, single-space alignment padding once a block wraps, and a copy that keeps the original lines.
 RSpec.describe "Code block wrapping", type: :system do
-  # Line 1 is too long for a phone but fits the desktop column. Line 2 opens a
-  # string that crosses into line 3 and holds padding of its own after a comma.
+  # Line 1 is too long for a phone; line 2 opens a string that crosses into line 3 and holds its own padding.
   SOURCE = <<~RUBY.chomp.freeze
     def total
       kind     = "a string that is too long for a phone"
@@ -29,8 +24,7 @@ RSpec.describe "Code block wrapping", type: :system do
     )
   end
 
-  # Highlighting happens on the server, so the page must not ask for a
-  # browser highlighter at all. Every such request is counted and refused.
+  # Highlighting happens on the server, so any browser highlighter request is counted and refused.
   def watch_for_highlighter(width:)
     @highlighter_requests = []
     page.driver.with_playwright_page do |pw|
@@ -42,8 +36,7 @@ RSpec.describe "Code block wrapping", type: :system do
     end
   end
 
-  # The Learn page folds its code examples closed, so every example here also
-  # covers a block that was hidden at load and fitted when it opened.
+  # Learn folds its code examples closed, so each example also covers a block fitted only when opened.
   def open_reference(width: 390)
     watch_for_highlighter(width: width)
     visit_as(user)
@@ -53,8 +46,7 @@ RSpec.describe "Code block wrapping", type: :system do
     expect(page).to have_css("pre.snippet code.highlight")
   end
 
-  # Fitting runs from a ResizeObserver, a moment after the block opens or
-  # resizes, so a check on its result retries until the gap matches.
+  # Fitting runs from a ResizeObserver a moment later, so this retries until the gap matches.
   def expect_gap(index, columns, before: "=")
     page.document.synchronize(5) do
       actual = gap_columns(index, before: before)
@@ -62,8 +54,6 @@ RSpec.describe "Code block wrapping", type: :system do
     end
   end
 
-  # How many columns the line shows before the last `before` character in it,
-  # back to the text ahead of the gap.
   def gap_columns(index, before: "=")
     page.evaluate_script(<<~JS)
       (() => {
@@ -104,8 +94,6 @@ RSpec.describe "Code block wrapping", type: :system do
     JS
   end
 
-  # Where the first and the wrapped fragments of one line start, against the
-  # line's own left edge and its padding.
   def fragment_offsets(index)
     page.evaluate_script(<<~JS)
       (() => {
@@ -177,8 +165,7 @@ RSpec.describe "Code block wrapping", type: :system do
     expect(line_texts).to eq(SOURCE.lines.map(&:chomp).map { |line| line.empty? ? "\n" : line })
   end
 
-  # The same observer fits a block that was in a closed disclosure at load,
-  # since opening it changes its width from zero.
+  # Opening a closed disclosure changes the block's width from zero, which the observer must refit.
   it "fits the block again when its width changes" do
     open_reference(width: 1280)
     expect(gap_columns(1)).to eq(5)
@@ -194,8 +181,7 @@ RSpec.describe "Code block wrapping", type: :system do
     ConceptReference.last.update!(code_example: 'kind = ExerciseSection.for_key(section.fetch("kind")).with_rung(KindDifficulty.new.level)')
     open_reference
 
-    # The character before each row break, found by walking the line one
-    # character at a time and noting where its top edge moves down.
+    # Finds each row break by walking the line a character at a time and noting where its top edge moves down.
     before_breaks = page.evaluate_script(<<~JS)
       (() => {
         const line = document.querySelector("pre.snippet .code-line");

@@ -67,9 +67,6 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(body).to include("User.includes(:posts)")
     end
 
-    # The email is the same review. A difficulty note the engineer sees on the
-    # page and not in their inbox is a second rendering that disagrees with the
-    # first.
     it "carries the difficulty note alongside the grade" do
       daily_response.update!(ai_review: daily_response.ai_review.deep_merge(
         "code_review" => { "difficulty" => { "level" => "demanding",

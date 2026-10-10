@@ -19,9 +19,7 @@ RSpec.describe PreviewSeed do
       expect(PreviewSeed.run!).to be_nil
     end
 
-    # The property that makes this strictly safer than the old gate: the email
-    # variable alone is no longer sufficient to seed. Before this change,
-    # PREVIEW_SEED_EMAIL set at the wrong Railway scope would seed production.
+    # PREVIEW_SEED_EMAIL set at the wrong Railway scope once would have seeded production.
     it "does nothing even when PREVIEW_SEED_EMAIL is set, if this is not a preview app" do
       ENV["PREVIEW_SEED_EMAIL"] = "reviewer@example.com"
 
@@ -71,8 +69,7 @@ RSpec.describe PreviewSeed do
       expect(PreviewSeed.run!.id).to eq(first.id)
     end
 
-    # Safety rule 3. This is the test that protects a real account that
-    # happens to share the configured preview address.
+    # Protects a real account that shares the configured preview address.
     it "never overwrites an existing API key" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
       real.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
@@ -114,8 +111,7 @@ RSpec.describe PreviewSeed do
       expect { PreviewSeed.run! }.not_to change { bystander.reload.attributes }
     end
 
-    # Seeding is create-only: a real user who signed up but never added a key
-    # (api_key / provider still nil) must not have the dummy key filled in.
+    # Seeding is create-only, so a real keyless user must not get the dummy key.
     it "does not fill blank attributes on an existing user" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
       set_target
@@ -128,8 +124,7 @@ RSpec.describe PreviewSeed do
     end
   end
 
-  # PreviewAutoLogin signs in only a row that passes this, so it is what keeps
-  # an address collision from becoming an account takeover.
+  # PreviewAutoLogin signs in only a row that passes this, so it blocks takeover by address collision.
   describe ".seeded?" do
     it "is true for an account this seeder created" do
       set_target
@@ -156,15 +151,7 @@ RSpec.describe PreviewSeed do
   describe "the seeded content" do
     before { set_target }
 
-    # Pin to noon UTC: this suite runs Rails in UTC while the default reviewer
-    # falls back to User::DEFAULT_TIME_ZONE ("America/New_York"), so bare
-    # Date.current here and Date.current inside seed_days' Time.use_zone can
-    # land on different calendar days for a few hours around UTC midnight.
-    # Freezing to local noon keeps both sides on the same day regardless of
-    # when CI runs. The block form restores the clock even if an example raises,
-    # so a frozen time never leaks into later specs. (The Kiritimati test below
-    # is unaffected either way: it compares against the same frozen instant on
-    # both sides.)
+    # Noon keeps the UTC suite and the reviewer's New York zone on the same calendar day.
     around do |example|
       travel_to(Time.current.change(hour: 12)) { example.run }
     end
@@ -266,10 +253,7 @@ RSpec.describe PreviewSeed do
       expect(user.daily_exercises.pluck(:date)).to include(local_today)
     end
 
-    # The bang finders make a bad fixture abort the deploy loudly rather than
-    # seeding nothing while preDeployCommand reports success. A blank problem_set
-    # fails DailyExercise's presence validation; the non-bang finder would return
-    # an unsaved record and let run! finish, so this discriminates bang from not.
+    # A non-bang finder would let run! finish and preDeployCommand report success while seeding nothing.
     it "raises rather than silently seeding nothing when a fixture is invalid" do
       allow_any_instance_of(PreviewSeed).to receive(:architecture_set).and_return({})
 

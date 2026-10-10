@@ -1,7 +1,4 @@
-# What a trial account is shown about its trial, in the user's zone and
-# against the clock it is given: how long is left, how much of today's cap is
-# used, and when it ended. Whether it is still active also reads the kill
-# switch and the house key, as the gate does.
+# Active also reads the kill switch and house key, as TrialAllowance does.
 class TrialStatus
   attr_reader :used, :cap
 
@@ -22,7 +19,6 @@ class TrialStatus
   # Today counts: a trial ending at the end of today has one day left.
   def days_left = [ (ends_on - @local.to_date).to_i + 1, 0 ].max
 
-  # Nil under the kill switch or with no house key, when the trial ended
-  # without reaching its date.
+  # Nil when the trial ended early, under the kill switch or with no house key.
   def ended_on = @user.trial_ends_at <= @now ? ends_on : nil
 end

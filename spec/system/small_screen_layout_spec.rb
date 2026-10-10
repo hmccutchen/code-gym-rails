@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# Reflow (WCAG 1.4.10) and target size only show up in a real layout: a
-# request spec sees the same markup whether or not a row fits its screen.
+# Reflow (WCAG 1.4.10) and target size only show up in a real layout.
 RSpec.describe "Small screen layout", type: :system do
   def resize(width)
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: width, height: 844) }
@@ -107,8 +106,7 @@ RSpec.describe "Small screen layout", type: :system do
     JS
   end
 
-  # A text field that shares a row with its buttons must wrap the buttons
-  # below it rather than shrink to a sliver beside them.
+  # A field sharing a row with its buttons must wrap them below rather than shrink to a sliver.
   [ [ 390, {} ], [ 320, LARGEST ] ].each do |width, prefs|
     it "keeps the duck's field wide enough to read at #{width}px#{' with the largest text' if prefs.any?}" do
       travel_to(a_weekday) do

@@ -27,8 +27,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     fake_service
   end
 
-  # Job logs name the user by id: an email in a log line is personal data in a
-  # place nobody deletes it from.
+  # An email in a log line is personal data nobody deletes.
   describe "the user named in log lines" do
     let(:logged) { StringIO.new }
 
@@ -90,8 +89,6 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.regenerating_since).to be_nil
   end
 
-  # The dashboard's "a section was left out" line describes the set it sits
-  # beside, and a replaced set dropped nothing.
   it "clears the sections the judge dropped from the day it replaces" do
     exercise = claimed_exercise
     exercise.update!(dropped_sections: [ "pattern" ])
@@ -127,12 +124,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.reload.plan_notes).to eq({})
   end
 
-  # A claim can be released under the worker while its provider call runs:
-  # User#carry_forward clears regenerating_since when it moves a held set to
-  # today, whether from a resume or from a paused dashboard load after
-  # midnight. The claim is the worker's only title to the row, so when it is
-  # gone the generated set is discarded rather than written over a set the
-  # user is looking at, and the draft on it survives.
+  # User#carry_forward can clear the claim mid-call; the job must then discard its set and keep the draft.
   it "abandons the regeneration when its claim was released during the provider call" do
     exercise = claimed_exercise
     draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -152,9 +144,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.reload.last_generation_error).to be_nil
   end
 
-  # The claim is identified by its timestamp, not by being present: a worker
-  # whose claim was released and then re-made by a later click must not
-  # mistake the newer claim for its own and consume that job's turn.
+  # The claim is matched by timestamp, so a newer claim from a later click is not mistaken for this job's.
   it "abandons the regeneration when a newer claim replaced its own, and leaves that claim standing" do
     exercise = claimed_exercise
     original_claim = exercise.regenerating_since
@@ -201,11 +191,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.reload.daily_response).to be_nil
   end
 
-  # DailyExercisesController#regenerate refuses a reviewed set, but that check
-  # runs a worker hop and a provider call before this destroy — a review started
-  # in another tab can land inside that window. Here the whole regeneration is
-  # abandoned instead, since the alternative destroys a review ConceptMastery has
-  # already recorded tier/streak/retention movement from.
+  # A review can land after the controller's check; destroying it would orphan ConceptMastery's movement.
   it "keeps a response reviewed after the click, and the set that review describes" do
     exercise = claimed_exercise
     reviewed = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -236,8 +222,6 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.last_generation_error_date).to eq(Date.current)
   end
 
-  # A running review can still fail, so the kept-set explanation must not assert
-  # that one landed.
   it "distinguishes a review still running from one that landed" do
     exercise = claimed_exercise
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -251,8 +235,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.last_generation_error).not_to include("landed")
   end
 
-  # The review's own writes commit after its provider call returns, so a claimed
-  # row is a review in flight — destroying it discards work the user has paid for.
+  # A claimed response is a review in flight; destroying it discards work the user paid for.
   it "keeps a response whose review is still in flight" do
     exercise = claimed_exercise
     in_flight = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -279,10 +262,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.reload.problem_set).to eq("code_review" => { "question" => "new" })
   end
 
-  # #start_over can delete the row while this job is mid-flight. The locked read
-  # returns nil for a row already gone rather than raising the way a load
-  # followed by #lock! does — a raise here escapes every rescue below and
-  # strands the claim until it goes stale.
+  # A load followed by lock! would raise for a deleted row and strand the claim until it goes stale.
   it "completes cleanly when the response is deleted while the provider call runs" do
     exercise = claimed_exercise
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -322,8 +302,6 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(exercise.reload.dropped_sections).to eq([ "design_comparison" ])
   end
 
-  # The whole point of regenerating in place: a provider failure must not cost
-  # the user the set they already have, nor their one regenerate for the day.
   it "preserves the existing set and the daily allowance when the provider fails" do
     exercise = claimed_exercise
     stub_provider(AiService::Error.new("boom"))
@@ -402,9 +380,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(daily_response.reload.answers).to eq("code_review" => "important work")
   end
 
-  # A nil problem_set fails DailyExercise's presence validation, so exercise.update!
-  # raises inside the transaction after the response has already been destroyed.
-  # Without the transaction the user would lose their answers to a bad payload.
+  # The transaction keeps the destroyed response when the replacement set fails validation.
   it "rolls back the destroyed response when the replacement set is invalid" do
     exercise = claimed_exercise
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -433,8 +409,6 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.last_generation_error_date).to be_nil
   end
 
-  # Without the claim there is nothing to finish, so a stray or duplicated job
-  # must not spend a second provider call replacing a set nobody asked about.
   it "does nothing when no claim is held" do
     exercise = claimed_exercise
     exercise.update!(regenerating_since: nil)
@@ -456,8 +430,6 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(AiService).not_to have_received(:for)
   end
 
-  # Date.current must mean the user's today, not the server's, or a user west of
-  # UTC regenerates a row dated tomorrow.
   it "resolves today in the user's own time zone" do
     user.update!(time_zone: "Hawaii")
     travel_to Time.utc(2026, 8, 7, 5, 0, 0) do

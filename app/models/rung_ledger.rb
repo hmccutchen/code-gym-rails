@@ -1,24 +1,8 @@
-# Which rung a user currently holds for each concept, read from stored
-# evidence: the most recent answered, reviewed, un-eased section pitched at
-# each rung, held when both ratings were favourable — the co-favourable rule
-# ConceptMastery.record_review! applies, on the same terms: a concept tagged
-# on several sections of one day is judged by its least favourable section,
-# and a review that stored no rating is no signal rather than a bad one. The
-# concept's standing is the highest held rung, which covers the rungs below
-# it; a later poor attempt at a rung releases it, so this describes now. An
-# attempt at any rung above that one which did not hold means the concept is
-# developing toward the next rung up.
-#
-# Pure over the response objects it is given, newest first: nothing here
-# queries, and nothing compares a date to today, so time alone changes no
-# answer. Sections from before rungs were stamped carry no rung and are not
-# attempts; neither is an eased one, since the problem was easier than the
-# rung says.
+# Pure over responses given newest first, and never compares to today, so time alone changes no answer.
 class RungLedger
   RESPONSE_COLUMNS = %i[id daily_exercise_id date answers concept_tags section_ratings ai_review].freeze
 
-  # Only the columns the verdicts read; the exercise rows come whole, since
-  # their problem_set is where the rungs live.
+  # Exercises load whole because their problem_set holds the rungs.
   def self.for(user)
     new(user.daily_responses.submitted.select(*RESPONSE_COLUMNS).preload(:daily_exercise).order(date: :desc))
   end
@@ -33,9 +17,7 @@ class RungLedger
     KindDifficulty::LEVELS.reverse.find { |rung| @verdicts[[ concept, bucket, rung ]] }
   end
 
-  # The rung just above the held one, or the lowest when none is held, once
-  # any rung above has been attempted; otherwise nil. Every verdict recorded
-  # above the held rung did not hold, or that rung would be the held one.
+  # Every verdict above the held rung failed to hold, or that rung would be the held one.
   def developing_toward(concept, bucket)
     held_rung = held(concept, bucket)
     above = held_rung ? KindDifficulty::LEVELS.drop(KindDifficulty::LEVELS.index(held_rung) + 1) : KindDifficulty::LEVELS
@@ -44,8 +26,7 @@ class RungLedger
 
   private
 
-  # First sighting wins: responses arrive newest first, so the verdict kept
-  # for a (concept, bucket, rung) is the most recent day that attempted it.
+  # First sighting wins, because responses arrive newest first.
   def record(response)
     attempts(response).each do |key, sections|
       next if @verdicts.key?(key)

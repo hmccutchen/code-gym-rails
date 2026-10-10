@@ -1,6 +1,4 @@
-# The one way a controller turns a provider error into words for the person
-# who hit it: classified, then written in their zone. Nothing here reads the
-# error's message.
+# Nothing here reads the error's message, which can carry provider text.
 module ProviderFailureRendering
   extend ActiveSupport::Concern
 

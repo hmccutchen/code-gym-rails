@@ -24,8 +24,7 @@ RSpec.describe DaySize do
       expect(decision.reason).to eq(:setting)
     end
 
-    # The model validates the count only when it changes, so a row saved under
-    # a wider range can still hold a count outside the current one.
+    # The model validates the count only when it changes, so an old row can sit outside the current range.
     it "clamps a stored setting outside the current range" do
       expect(size(setting: ExerciseSection::MAX_SECTIONS + 1).count).to eq(ExerciseSection::MAX_SECTIONS)
       expect(size(setting: SectionCount::FLOOR - 1).count).to eq(SectionCount::FLOOR)
@@ -53,8 +52,6 @@ RSpec.describe DaySize do
       expect(decision.reason).to eq(:completion)
     end
 
-    # Completion alone would have given the same day, so the gate decided
-    # nothing and the brake did not lower it.
     it "names completion when the two agree" do
       expect(size(completion: 3, gate: gate(3)).reason).to eq(:completion)
       expect(size(completion: 2, gate: gate(2, :brake)).reason).to eq(:completion)
@@ -74,8 +71,7 @@ RSpec.describe DaySize do
   end
 
   describe "#brake?" do
-    # The coverage exception stays off for every day the too-hard results are
-    # still in the window, even when completion alone would also give the floor.
+    # The coverage exception stays off while too-hard results remain in the window.
     it "follows the gate's reason, not which bound decided" do
       expect(size(completion: 2, gate: gate(2, :brake)).brake?).to be(true)
       expect(size(completion: 4, gate: gate(3, :grew)).brake?).to be(false)

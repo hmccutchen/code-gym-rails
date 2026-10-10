@@ -1,8 +1,7 @@
 require "rails_helper"
 
 RSpec.describe PreviewMail do
-  # apply! mutates global job configuration, so restore it or the rest of the
-  # suite inherits an inline mail adapter.
+  # apply! mutates global job configuration, so restore it or the suite inherits an inline mail adapter.
   around do |example|
     original = ActionMailer::MailDeliveryJob.queue_adapter
     example.run

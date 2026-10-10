@@ -1,26 +1,13 @@
-# The kinds of section a daily problem set can hold. Each kind is a named class
-# rather than a bare string so the facets that vary per kind — which vocabulary
-# its concept is validated against, whether its review can carry improved_code,
-# whether it can occupy the rolled third slot — live in one place instead of
-# being re-derived by a conditional at each call site.
-#
-# Deliberately closed, like the concept vocabularies these select: adding a kind
-# means adding a subclass here, not persisting a new string.
+# Closed: adding a kind means adding a subclass here, not persisting a new string.
 class ExerciseSection
-  # Bounds on the model-generated `answer_scaffold`. Enough labels to decompose
-  # an answer, short enough to read as a label rather than a paragraph — and,
-  # more to the point, bounded at all, since this is provider output rendered
-  # straight into the form.
+  # Bounded because this provider output is rendered straight into the form.
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80
 
-  # The most sections one day holds. Its own fact rather than the slot count:
-  # a second fixed kind adds a slot without making a day longer.
+  # Its own fact rather than the slot count: a second fixed kind adds a slot without making a day longer.
   MAX_SECTIONS = 4
 
-  # Enumeration order, matching the order these keys have always been listed in
-  # (strong params, concept tagging, scenario collection) so anything deriving a
-  # Hash or Array from it keeps the ordering it already had.
+  # Enumeration order; anything deriving a Hash or Array from it keeps the order it already had.
   def self.all
     [ CodeReview, DesignComparison, Pattern, Challenge, Architecture, SecurityReview, ParsonsProblem,
       PlanReview, AmbiguityHunt, PseudocodeToCode ]
@@ -39,23 +26,17 @@ class ExerciseSection
     all.select(&:fixed?)
   end
 
-  # Precedence order, NOT enumeration order: a problem_set holding more than one
-  # third key (a provider returning both) resolves the way it always has —
-  # architecture first, then security_review, then challenge, then
-  # parsons_problem.
+  # Precedence order, not enumeration order, for a problem_set holding more than one third key.
   def self.thirds
     [ Architecture, SecurityReview, Challenge, ParsonsProblem ]
   end
 
-  # Precedence order for the fourth slot, mirroring .thirds: if a provider
-  # somehow returned more than one fourth-shaped key, plan_review wins, then
-  # ambiguity_hunt, then pseudocode_to_code.
+  # Precedence order for a problem_set holding more than one fourth key.
   def self.fourths
     [ PlanReview, AmbiguityHunt, PseudocodeToCode ]
   end
 
-  # A provider can emit a key holding null or a bare string alongside the real
-  # section; only a Hash is a section anything downstream can render.
+  # A provider can emit a key holding null or a bare string beside the real section.
   def self.present?(problem_set, key)
     problem_set[key].is_a?(Hash)
   end
@@ -69,29 +50,17 @@ class ExerciseSection
     kinds.map(&:key).find { |key| present?(problem_set, key) }
   end
 
-  # The keys a problem set presents, in slot order: each slot's resolved kind,
-  # kept only when the payload holds it, and never more than MAX_SECTIONS.
-  # There are more slots than a day holds, so a payload with an extra shape in
-  # every slot would otherwise present one section too many; the fixed slots
-  # come first, so the cut always falls on an optional one. Ingest prunes
-  # unplanned slots before it gets here (see ProblemSetIngest), so on a
-  # delivered set the cut never removes a requested section.
-  # DailyExercise#active_section_keys reads this for a stored row; ingest
-  # reads it for a payload that is not a row yet.
+  # Capped at MAX_SECTIONS with fixed slots first, so the cut always falls on an optional slot.
   def self.resolved_keys(problem_set)
     slots.values.filter_map { |kinds| resolved_key(problem_set, kinds) }.first(MAX_SECTIONS)
   end
 
-  # Whether the payload holds every fixed section and each carries `concept`.
-  # A fixed section that is missing, dropped or tagged with something else
-  # makes it false, so a placement the model ignored is never reported as
-  # delivered.
+  # False when a fixed section is missing or tagged otherwise, so an ignored placement never reads as delivered.
   def self.fixed_sections_share?(problem_set, concept)
     concept.present? && fixed.all? { |kind| present?(problem_set, kind.key) && problem_set[kind.key]["concept"] == concept }
   end
 
-  # The day's shape, in slot order. Every slot but a fixed kind's may be nil,
-  # meaning the day does not include it.
+  # Every slot but a fixed kind's may be nil, meaning the day does not include it.
   def self.slots
     fixed.to_h { |kind| [ kind.key.to_sym, [ kind ] ] }
       .merge(pattern: [ Pattern ], third: thirds, fourth: fourths)
@@ -101,29 +70,22 @@ class ExerciseSection
     slots.find { |_slot, kinds| kinds.include?(kind) }&.first
   end
 
-  # Every field any kind keeps as answer key: data the grader reads and
-  # nothing before submission may show, log or send to a model.
+  # Data the grader reads that nothing before submission may show, log or send to a model.
   def self.all_answer_key_fields
     all.flat_map(&:answer_key_fields).uniq
   end
 
-  # Which kinds a user can bias or exclude. A slot holding one candidate has no
-  # choice to bias — its roll returns that kind at any weight — so a control
-  # there would be one that provably does nothing.
+  # A slot holding one candidate is left out: a weight there could change nothing.
   def self.rotatable
     slots.values.select { |kinds| kinds.size > 1 }.flatten
   end
 
-  # .resolved_keys answers the same question from a payload; this one works
-  # from DailyPlan's rolled symbols, before the provider is contacted.
+  # Works from DailyPlan's rolled symbols, before the provider is contacted.
   def self.for_plan(third:, fourth:, pattern: :pattern)
     slot_kinds(third: third, fourth: fourth, pattern: pattern).values.compact
   end
 
-  # The same resolution keyed by slot, for callers that need to know which slot
-  # a kind came from. #for_plan drops omitted slots, which shifts every later
-  # kind left — so reading a slot out of it by position names the wrong kind on
-  # any day that omits one.
+  # Keyed by slot: #for_plan drops omitted slots, so reading it by position names the wrong kind.
   def self.slot_kinds(third:, fourth:, pattern: :pattern)
     chosen = fixed.to_h { |kind| [ kind.key.to_sym, kind.key.to_sym ] }
       .merge(pattern: pattern, third: third, fourth: fourth)
@@ -131,8 +93,7 @@ class ExerciseSection
     slots.to_h { |slot, eligible| [ slot, slot_kind(chosen.fetch(slot), eligible) ] }
   end
 
-  # nil means "not today"; an ineligible symbol is a bug in the plan, and a set
-  # silently missing a section is worse than a failed generation the user can retry.
+  # Raises on an ineligible symbol: a silently missing section is worse than a failed generation.
   def self.slot_kind(rolled, eligible)
     return nil if rolled.nil?
 
@@ -141,17 +102,12 @@ class ExerciseSection
   end
   private_class_method :slot_kind
 
-  # nil for anything outside the closed set. Callers decide what an unrecognized
-  # section means; a provider can put arbitrary keys in a jsonb payload, so this
-  # never raises.
+  # Never raises: a provider can put arbitrary keys in a jsonb payload.
   def self.find(key)
     all.find { |section| section.key == key.to_s }
   end
 
-  # #find, for callers that only want to read a facet and have no interesting
-  # answer for an unrecognized key. The base class carries every default, so
-  # this keeps the fallback in one place instead of making each caller restate
-  # it (`ExerciseSection.find(k)&.improved_code_label || "Improved code"`).
+  # The base class carries every default, so callers need no `find(k)&.facet || default` fallback.
   def self.for(key)
     find(key) || self
   end
@@ -173,79 +129,45 @@ class ExerciseSection
       false
     end
 
-    # Names which vocabulary this kind's concept is validated against. AiService
-    # owns the constants themselves — this only says which one applies, so the
-    # vocabularies stay closed Ruby constants in one place.
+    # AiService owns the constants; this only names which one applies.
     def vocabulary_key
       :concepts
     end
 
-    # Groups of concepts this kind may never be assigned at generation, named
-    # the same way vocabulary_key names a vocabulary: the kind says which
-    # groups, the resolver owns the constants.
-    #
-    # Generation-time only. A concept excluded here is still perfectly valid if
-    # it arrives on this kind anyway — ingest validates against the full
-    # vocabulary and normalizes it as usual, because rewriting a concept the
-    # provider actually tagged would destroy history over a preference about
-    # what to ask for.
+    # Generation-time only: ingest still accepts an excluded concept, since rewriting a real tag destroys history.
     def excluded_vocabulary_keys
       []
     end
 
-    # The last say over what generation may offer this kind, handed the
-    # vocabulary left after excluded_vocabulary_keys. `rung` is the level the
-    # section is pitched at, or nil when the caller does not know it, in which
-    # case a kind that narrows by level returns its strictest list.
+    # A nil rung means the caller does not know it; a kind that narrows by level then returns its strictest list.
     def narrow_vocabulary(vocabulary, rung: nil)
       vocabulary
     end
 
-    # Fields of this kind's section that are answer key rather than exercise
-    # content. See ExerciseSection.all_answer_key_fields.
+    # See ExerciseSection.all_answer_key_fields.
     def answer_key_fields
       []
     end
 
-    # Fields holding code in the day's language, which ingest re-indents
-    # through CodeFormat. Parsons blocks are left out on purpose: each block's
-    # indentation is part of the arrangement being asked for.
+    # Parsons blocks are left out on purpose: each block's indentation is part of the arrangement.
     def code_fields
       []
     end
 
-    # What the server decides about one resolved section's presentation that
-    # the provider must not, applied after .reject_unusable! accepts it. Most
-    # kinds have nothing to arrange.
+    # Applied after .reject_unusable! accepts the section. Most kinds have nothing to arrange.
     def arrange!(section)
     end
 
-    # The provider boundary's check on one resolved section of this kind:
-    # raises AiService::InvalidResponseError when the section cannot be used,
-    # and may bound its fields in place. Ingest then leaves that section out
-    # of the set rather than refusing the day. Most kinds have nothing to
-    # refuse.
+    # Raises AiService::InvalidResponseError for an unusable section; ingest then leaves out only that section.
     def reject_unusable!(section)
     end
 
-    # This kind's entry in the generation schema — the JSON object the provider
-    # is told to return for it, under this kind's own key. `label` names the
-    # day's language for the code-bearing fields; AiService still owns
-    # LANGUAGE_CONFIG, so a kind knows where the language name goes, never how
-    # it was resolved.
-    #
-    # Formatted to sit at one level of nesting inside the schema object: first
-    # line unindented, fields at 4, closing brace at 2. The assembler
-    # interpolates it directly (see AiService#exercise_schema_for), so this
-    # indentation is part of the contract, not incidental.
+    # Indentation is part of the contract: first line unindented, fields at 4, closing brace at 2.
     def schema_fragment(label:)
       raise NotImplementedError, "#{self} must implement .schema_fragment"
     end
 
-    # This kind's block in the review prompt's day context: what was asked, the
-    # material it was asked about, and what the engineer said. Abstract rather
-    # than defaulted — a kind that returns nothing here produces a review
-    # missing a section's context with no signal that anything went wrong.
+    # Abstract: a kind returning nothing would produce a review missing its context with no signal.
     def review_context(section:, answer:, rating:)
       raise NotImplementedError, "#{self} must implement .review_context"
     end
@@ -255,31 +177,12 @@ class ExerciseSection
       "Their self-rating: #{rating.presence || '(none given)'}"
     end
 
-    # What the reviewer needs beyond AiService::RATING_RUBRIC to grade this
-    # kind: its main point and essential pieces, which the rubric's levels are
-    # read against, and what its improved_code must hold. The rubric itself is
-    # never restated here.
+    # The kind's main point and essential pieces; never restate AiService::RATING_RUBRIC here.
     def grading_note(section:, answer:)
       ""
     end
 
-    # The generation prompt's instruction block for this kind — how to write
-    # it, and which vocabulary its concept comes from. Every kind states its
-    # own vocabulary and none speaks for another, which is what keeps the
-    # instruction a reader sees for one section independent of what rolled
-    # into another (see issue #81, fixed by that rule).
-    #
-    # Every kind is handed the same context and reads only the part it needs:
-    # `vocabulary` (this kind's own, resolved by the caller from
-    # .vocabulary_key), `label`, `mode` (the rolled content mode — only
-    # code_review has one today), `artifact`/`test_framework` (the day's
-    # language config, which only a code_review mode reads), `source` (the
-    # RealSource excerpt a code_review is grounded in today, or nil), and
-    # `rung` (the level this section is pitched at).
-    # Uniform, so the assembler never has to know which kind it is holding; a
-    # kind that reads none of the optional values absorbs them with `**`
-    # rather than naming them. Widening this context stays a one-line change
-    # here and at the single call site, and touches no other kind.
+    # Every kind gets the same context and states only its own vocabulary (#81); absorb unread values with `**`.
     def generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil)
       raise NotImplementedError, "#{self} must implement .generation_guidance"
     end
@@ -288,8 +191,7 @@ class ExerciseSection
       true
     end
 
-    # The rating this kind computes for itself, replacing the grader's, or nil
-    # when the grader chooses one under AiService::RATING_RUBRIC.
+    # nil when the grader chooses the rating under AiService::RATING_RUBRIC.
     def fixed_rating(section:, answer:)
       nil
     end
@@ -298,18 +200,9 @@ class ExerciseSection
       false
     end
 
-    # ── What the judge measures against ─────────────────────────────────────
-    # judge_task, discovery?, and prose_fields are read only by the judge that
-    # checks each drafted section on the weekday batch (AiService#judge_section),
-    # never by the draft prompt or by grading. judge_task is the one-sentence
-    # yardstick it measures a structural giveaway against; discovery? marks a
-    # kind whose task is to find something hidden, so naming where it is
-    # defeats the task (the rest legitimately name the concept); prose_fields
-    # bounds which fields the judge may rewrite to everything but the artifact
-    # (snippet, options, blocks, and the like).
+    # ── Read only by the judge (AiService#judge_section), never by the draft prompt or grading ──
 
-    # Abstract rather than defaulted: a new kind with no stated task should
-    # fail loudly rather than ship with a task the judge silently never checks.
+    # Abstract: a new kind with no stated task must fail loudly rather than ship unjudged.
     def judge_task
       raise NotImplementedError, "#{name} must state its task"
     end
@@ -323,52 +216,36 @@ class ExerciseSection
       %w[title scenario question teaching_note]
     end
 
-    # How many regenerations a rejected section of this kind gets before it is
-    # dropped. A fixed kind gets one more, since every day is built around it.
+    # A fixed kind gets one more retry, since every day is built around it.
     def judge_retries
       fixed? ? 2 : 1
     end
 
-    # Extra instructions for judging this kind, added to the judge prompt when
-    # present.
     def judge_guidance
       nil
     end
 
-    # Whether an edit the judge makes to this kind is judged once more before
-    # it ships. True where the editable prose holds what decides the answer,
-    # so a rewrite could change which answer is right.
+    # True where the editable prose decides the answer, so a rewrite could change which answer is right.
     def rejudge_edits?
       false
     end
 
-    # The answers a judge must choose between when it solves this kind blind,
-    # or nil for a kind the judge does not solve. A solve is an answer
-    # candidate, so a kind with one keeps it, and the judge's free text, out
-    # of every log.
+    # nil when the judge does not solve this kind. A solve is an answer candidate, so it stays out of every log.
     def judge_solve_options
       nil
     end
 
-    # Whether the judge's blind solve agrees with the section's answer key.
     # Only called for a kind with .judge_solve_options.
     def solve_matches_key?(section, solve)
       raise NotImplementedError, "#{self} has judge_solve_options and must compare a solve with its key"
     end
 
-    # Whether grading this kind needs the engineer's answer translated into
-    # code first (AiService#translate_before_grading). A declared per-kind fact
-    # rather than a name comparison in the review path, like every other facet
-    # here — and false for every kind whose answer is graded as written.
+    # A declared per-kind fact rather than a name comparison in the review path.
     def translated_before_grading?
       false
     end
 
-    # What the review's improved_code actually IS for this kind, and whether it
-    # is prose rather than source. Both default to corrected source, which is
-    # what every code-bearing kind carries — a kind whose "improvement" is
-    # written English says so here, so the review view and the review email
-    # don't each have to special-case it.
+    # Defaults to corrected source; a kind whose improvement is prose overrides these.
     def improved_code_label
       "Improved code"
     end
@@ -377,58 +254,36 @@ class ExerciseSection
       false
     end
 
-    # ── How this kind renders ────────────────────────────────────────────────
-    # Structural facts only. The user-facing strings (section name, textarea
-    # placeholder) live in config/locales/en.yml under `sections.<key>`, which
-    # is where this app already keeps user-facing copy — unlike the prompt
-    # text above, which is provider-facing and has no other home.
+    # ── How this kind renders: user-facing strings live in config/locales/en.yml under sections.<key> ──
 
-    # The partial rendering the part of this section no shared wrapper can:
-    # the snippet, the plan excerpt, the option list, the block ladder.
     def body_partial
       "responses/bodies/#{key}"
     end
 
-    # Whether the section label appends the day's title ("4 — Plan Review:
-    # Backfill the ledger"). False for the two kinds whose problem_set carries
-    # no title of its own.
+    # False for kinds whose problem_set carries no title of its own.
     def titled_label?
       true
     end
 
-    # The answer input this kind offers while unsubmitted. Every kind but one
-    # takes a plain textarea; parsons_problem's answer is an ordering, so it
-    # brings its own control.
     def answer_partial
       "responses/answers/textarea"
     end
 
-    # Extra class on that textarea — challenge is answered in code, so it gets
-    # the monospace treatment.
     def answer_class
       "answer"
     end
 
-    # Whether a concept's reference may open on its own on first exposure,
-    # before the section is answered. False for a kind whose reference would
-    # name and illustrate what the grade asks the engineer to supply.
+    # False for a kind whose reference would name what the grade asks the engineer to supply.
     def reference_opens_before_answer?
       true
     end
 
-    # Whether this kind's problem_set may carry a Mermaid `diagram` of the
-    # structure its scenario describes. False by default: a diagram is only
-    # safe pre-answer where it restates something already on screen, which is
-    # not true of a kind whose whole task is finding what is hidden in a
-    # snippet (security_review) or arranging the structure itself
-    # (parsons_problem).
+    # False by default: a diagram is safe pre-answer only where it restates what is already on screen.
     def diagrammable?
       false
     end
 
-    # Whether this kind's answer is scaffolded, and with what labels when the
-    # day's problem carries none. nil for kinds that take a single unstructured
-    # answer — those are never pre-filled and never have labels stripped.
+    # nil for kinds that are never pre-filled and never have labels stripped.
     def default_scaffold
       nil
     end
@@ -437,10 +292,7 @@ class ExerciseSection
       default_scaffold.present?
     end
 
-    # The labels actually in play for one day's problem. The generator tailors
-    # `answer_scaffold` to the question it just wrote; DEFAULT_SCAFFOLD covers
-    # rows generated before that field existed and any provider that omits it,
-    # so a scaffolded kind always has labels and an unscaffolded one never does.
+    # DEFAULT_SCAFFOLD covers rows and providers without answer_scaffold.
     def scaffold_labels(section_data)
       return [] unless scaffolded?
 
@@ -448,10 +300,7 @@ class ExerciseSection
         .presence || default_scaffold
     end
 
-    # Bounded and sanitized because this is model-generated text rendered into a
-    # textarea and a data attribute: labels are stripped, blanks and non-strings
-    # dropped, each truncated, and the list capped. Anything left unusable falls
-    # back to DEFAULT_SCAFFOLD via scaffold_labels.
+    # Model-generated text rendered into a textarea and a data attribute, so it is bounded and sanitized.
     def normalize_scaffold(raw)
       return [] unless raw.is_a?(Array)
 
@@ -460,9 +309,7 @@ class ExerciseSection
          .first(MAX_SCAFFOLD_LABELS)
     end
 
-    # Starting value for a fresh textarea: each label followed by room to write
-    # under it. The blank lines are what make the scaffold feel like a form to
-    # fill rather than a paragraph to edit.
+    # The blank lines make the scaffold read as a form to fill.
     def scaffold_template(section_data = nil)
       labels = scaffold_labels(section_data)
       return nil if labels.empty?
@@ -478,19 +325,12 @@ class ExerciseSection
       value if answered?(value, section_data)
     end
 
-    # What the page posted, as the answer to store, or nil when the kind
-    # cannot read it — which drops the section from the payload rather than
-    # storing something unreadable over the draft. Only a kind whose control
-    # sends something other than the stored form overrides this.
+    # nil drops the section from the payload rather than storing something unreadable over the draft.
     def decode_answer(value, exercise: nil, key: nil, section_data: nil)
       value
     end
 
-    # The answer with this day's scaffold labels removed, so "how much did the
-    # user actually write" never counts the scaffolding we gave them. Matching
-    # whole stripped lines (not substrings) is what makes partial edits degrade
-    # gracefully: an untouched label is removed, an edited one becomes the
-    # user's own text and counts.
+    # Matches whole stripped lines, so an edited label becomes the user's own text and counts.
     def substantive_answer(value, section_data = nil)
       text   = value.to_s
       labels = scaffold_labels(section_data)

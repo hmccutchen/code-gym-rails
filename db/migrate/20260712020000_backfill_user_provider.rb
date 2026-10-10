@@ -1,10 +1,6 @@
-# One-off data migration: existing users already saved an encrypted API key
-# under the old Anthropic-only validation, but we derive `provider` the same
-# way ApiKeysController does going forward, in case any non-Anthropic-shaped
-# key ever slipped through.
+# One-off: derives provider for users who saved a key under the old Anthropic-only validation.
 class BackfillUserProvider < ActiveRecord::Migration[8.0]
-  # Its own model, because User no longer reads the api_key column this
-  # migration ran against.
+  # Its own model, because User no longer reads the api_key column this migration ran against.
   class LegacyUser < ActiveRecord::Base
     self.table_name = "users"
     encrypts :api_key
@@ -35,7 +31,6 @@ class BackfillUserProvider < ActiveRecord::Migration[8.0]
   end
 
   def down
-    # no-op — reverting the provider column (added in a separate migration)
-    # is sufficient; there's no prior state to restore.
+    # Deliberately empty: removing the provider column, in its own migration, restores the prior state.
   end
 end

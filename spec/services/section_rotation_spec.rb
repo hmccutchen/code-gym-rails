@@ -47,10 +47,7 @@ RSpec.describe SectionRotation do
     expect(described_class::MANDATORY_SLOT_COUNT).to eq(2)
   end
 
-  # The regime this is designed for: every optional kind competing for one
-  # slot, all of them maximally stale, so the tie-break does the work. The pool
-  # is derived from the roster rather than counted, so adding an eighth kind
-  # lengthens this run instead of leaving the new kind silently uncovered.
+  # The pool derives from the roster, so a new kind lengthens this run instead of going uncovered.
   it "drains the whole pool in pool-size days rather than repeating" do
     pool_size = (ExerciseSection.slots.values.flatten - ExerciseSection.fixed).size
     seen = []
@@ -70,19 +67,13 @@ RSpec.describe SectionRotation do
     KindPreferences.new(weights: weights, excluded: excluded)
   end
 
-  # Every third kind seen in the newest entry, so all four sit at staleness 1
-  # and nothing is starved. Equal staleness is what leaves the multiplier as the
-  # only thing separating them.
+  # Equal staleness leaves the multiplier as the only thing separating the thirds.
   def all_thirds_fresh
     history(%w[code_review architecture security_review challenge parsons_problem])
   end
 
   describe "user weights" do
-    # Equal staleness gives four equal weights, so the roll's boundaries sit at
-    # .25/.50/.75. Weighting challenge x4 makes the total 7 and moves its band to
-    # .2857...8571 — so the SAME roll that used to land on security_review now
-    # lands on challenge. Asserting both at one rand value pins the arithmetic,
-    # not merely the direction.
+    # Challenge x4 moves its band to .2857-.8571, so the same roll lands on challenge instead.
     it "shifts the roll's boundaries by the stated multiplier" do
       allow(WeightedRoll).to receive(:rand).and_return(0.30)
 
@@ -103,10 +94,7 @@ RSpec.describe SectionRotation do
       expect(chosen).to eq(:parsons_problem)
     end
 
-    # The guarantee the whole feature is built around. Stubbing the roll to
-    # raise proves the starvation branch returned before any weight was read —
-    # structural, where asserting "it still shows up sometimes" would only be
-    # statistical.
+    # A raising roll proves the starvation branch returned before any weight was read.
     it "cannot starve a kind, however low its weight" do
       recent = history(*Array.new(12, %w[code_review pattern architecture security_review parsons_problem]))
       allow(WeightedRoll).to receive(:pick).and_raise("the weighted roll must not be reached")
@@ -137,11 +125,7 @@ RSpec.describe SectionRotation do
       expect(with[:third]).to eq(without[:third])
     end
 
-    # KindPreferences.none is the kwarg's own default, so calling #for with and
-    # without it can never diverge — pinned literal values are what makes an
-    # untouched user's unweighted behaviour an assertion instead of a tautology.
-    # Pattern and the fourths were seen a day after the thirds, so the third
-    # slot is the stalest and takes the one optional spot.
+    # Pinned values make the untouched-user case an assertion; the third slot is stalest here.
     it "matches the unweighted rotation when nothing is stated" do
       allow(WeightedRoll).to receive(:rand).and_return(0.42)
       recent = history(%w[code_review design_comparison pattern plan_review ambiguity_hunt pseudocode_to_code],
@@ -153,10 +137,7 @@ RSpec.describe SectionRotation do
   end
 
   describe "excluded kinds" do
-    # Exclusion is applied before the starvation check, which is the whole
-    # difference between it and a low weight: a starved kind is taken outright,
-    # so anything that could not remove a kind from the pool entirely would be
-    # overridden here.
+    # Exclusion runs before the starvation check, which takes a starved kind outright.
     it "keeps an excluded kind out even when it is starved" do
       recent = history(*Array.new(12, %w[code_review pattern architecture security_review parsons_problem]))
 
@@ -165,10 +146,7 @@ RSpec.describe SectionRotation do
       expect(chosen).not_to eq(:challenge)
     end
 
-    # slot_staleness is a max over the pool, so an excluded kind left in it would
-    # pull its slot into a scarce spot on the strength of a kind that can never
-    # fill it. Here architecture is the only stale third; excluding it hands the
-    # slot to the fourth track.
+    # slot_staleness is a max over the pool, so an excluded kind would still pull its slot forward.
     it "stops an excluded kind pulling its slot into a short day" do
       recent = history(*Array.new(12, %w[code_review pattern challenge security_review parsons_problem plan_review]))
 
@@ -180,10 +158,7 @@ RSpec.describe SectionRotation do
       expect(excluded[:fourth]).to be_present
     end
 
-    # User validation refuses this, so it can only arrive from a hand-edited
-    # row. A slot with an empty pool would break slot ranking outright, and a
-    # day that silently loses a section is worse than one ignoring an impossible
-    # preference.
+    # Only a hand-edited row reaches this; an empty slot pool would break slot ranking.
     it "ignores an exclusion that would empty a slot" do
       excluded = ExerciseSection.thirds.map(&:key)
 

@@ -1,7 +1,5 @@
 require "rails_helper"
 
-# A concept reference row is shared, so a failed write-up is noted per user in
-# the cache, where the status endpoint reads it and the page stops polling.
 # The test store is :null_store; these examples swap in a real one.
 RSpec.describe "Learn write-up failures", type: :request do
   include ActiveSupport::Testing::TimeHelpers
@@ -51,8 +49,7 @@ RSpec.describe "Learn write-up failures", type: :request do
     end
   end
 
-  # An unusable reply raises after the call, so the error carries no provider
-  # stamp of its own.
+  # An unusable reply raises after the call, so the error carries no provider stamp of its own.
   it "names the job's provider for a reply it could not use, after a switch" do
     unusable = { "status" => "completed", "outputs" => [ { "type" => "text", "text" => "not json" } ],
                  "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "not json" } ] } ],

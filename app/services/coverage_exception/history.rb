@@ -1,12 +1,7 @@
-# What CoverageException reads about past days. last_seen maps a kind key to
-# the last date it was delivered; coverage_dates are the days a coverage
-# addition was planned, whether or not its section survived the judge;
-# first_date is the oldest exercise read, from which a kind never delivered
-# counts as unseen.
+# coverage_dates count planned additions even when the judge dropped the section.
 class CoverageException
   History = Data.define(:last_seen, :coverage_dates, :first_date) do
-    # Read first, over the cap's window only: on a day the cap holds, the
-    # gaps are never needed and their problem sets are never loaded.
+    # Read first and over the cap's window only, so a capped day never loads problem sets.
     def self.recent_coverage_dates(user, today: Date.current)
       user.daily_exercises.where(date: CoverageException.cap_window_start(today)...today)
           .where("plan_notes ? 'coverage'").pluck(:date)

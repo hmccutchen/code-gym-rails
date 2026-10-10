@@ -1,15 +1,6 @@
 require "optparse"
 
-# Replays realistic tester-days against one Gemini key, with the production
-# prompts and sizes, until the provider answers 429, and reports how many
-# requests that took and which limit was hit. Billed to the key it is given;
-# writes no ApiUsage rows and no exercise, response or reference. Nothing in
-# app/ loads this, and it never runs in CI.
-#
-# One tester-day is a judged two-section day plus the calls a person makes
-# on it: the draft, one judge call per fixed section, the review's grading
-# fan-out with its difficulty check, a first-exposure concept reference, and
-# a few thinking-partner turns.
+# Billed to the key it is given; writes no ApiUsage rows and no exercise, response or reference.
 class GeminiCapacityProbe
   DUCK_TURNS = 3
   DUCK_MESSAGES = [
@@ -19,21 +10,14 @@ class GeminiCapacityProbe
   ].freeze
   SAMPLE_ANSWER = "The loop fetches related records one row at a time; load them together before the loop instead.".freeze
 
-  # Pacing keeps the per-minute limit out of the way so the daily limit is the
-  # one that trips: the wait before a step is the pace times the requests on
-  # either side of it, so a fan-out that sends three calls together is given
-  # three paces before and after. At 15 seconds no rolling minute holds more
-  # than five requests.
+  # At 15 seconds per request no rolling minute holds more than five, so the daily limit trips first.
   DEFAULT_PACE_SECONDS = 15
-  # The probe's connection has no retry middleware, so the longest a request
-  # can stay on the wire is one connect and one read. A step waits that long
-  # for its stragglers, so a late reply is never counted against the next one.
+  # No retry middleware, so one connect and one read is the longest a straggler can take.
   DRAIN_SECONDS = AiService.single_attempt_call_seconds(AiService::READ_TIMEOUT)
   OUTPUT_DIR = "tmp/gemini_probe".freeze
   FIXTURE_CAPTURE = "gemini_429_capture.json".freeze
 
-  # `sent` is false only for a step that put nothing on the wire; an attempt
-  # that ended without a reply was still sent and still counts.
+  # An attempt that ended without a reply was still sent and still counts.
   Record = Data.define(:day, :step, :sent, :status, :ms, :input_tokens, :output_tokens, :thought_tokens, :cached_tokens,
                        :quota_id, :quota_value, :retry_delay, :retry_after, :error) do
     def rate_limited? = status == 429
@@ -41,10 +25,7 @@ class GeminiCapacityProbe
     def tokens = input_tokens.to_i + output_tokens.to_i + thought_tokens.to_i
   end
 
-  # Every HTTP attempt as the provider answered it, shared by every service
-  # thread of a step. A step reads its attempts only once none is still on
-  # the wire: the review's difficulty thread can outlive review_sections by
-  # its grace period, and its reply belongs to the review, not the next step.
+  # Read only once nothing is on the wire: the review's difficulty thread can outlive review_sections.
   class AttemptLog
     def initialize
       @attempts  = []
@@ -67,12 +48,7 @@ class GeminiCapacityProbe
     end
   end
 
-  # Records every HTTP attempt as the provider answered it, so the report
-  # counts requests the way the quota does. The response body is kept only
-  # for a non-2xx reply, where it names the quota; a successful reply is
-  # reduced to its usage block. An attempt that ends without a reply, such as
-  # a timeout or a reset, is recorded too, since the provider may have
-  # counted it.
+  # Records attempts that got no reply too, since the provider may have counted them against the quota.
   class Recorder < Faraday::Middleware
     def initialize(app, log)
       super(app)
@@ -124,8 +100,7 @@ class GeminiCapacityProbe
     @user.daily_section_count = SectionCount::FLOOR
   end
 
-  # In the user's zone, as generation runs: the day, and so the language of
-  # a mixed account, is theirs rather than the server's.
+  # In the user's zone, as generation runs, so the day and a mixed account's language are theirs.
   def run
     Time.use_zone(@user.effective_time_zone) do
       @output_dir.mkpath
@@ -205,11 +180,7 @@ class GeminiCapacityProbe
     kind.respond_to?(:encode_answer) ? kind.encode_answer("a", SAMPLE_ANSWER) : SAMPLE_ANSWER
   end
 
-  # One step of a tester-day: paced, recorded per HTTP attempt, and never
-  # fatal except on a 429, which is what the probe is looking for, or a
-  # refused key, which no later request can get past. A reply the app could
-  # not use still counted against the quota, so it is recorded and the day
-  # goes on.
+  # Fatal only on a 429 or a refused key; an unusable reply still counted against the quota, so the day goes on.
   def step(day, label, requests: 1)
     @sleeper.call(@pace * [ @last_step_attempts, requests, 1 ].max) if @pace.positive? && @calls_made.positive?
     @calls_made += 1
@@ -231,8 +202,7 @@ class GeminiCapacityProbe
 
   def stopped? = @stop_reason.present?
 
-  # The review fan-out answers no error of its own, so a 429 or a refused key
-  # inside it is read off the attempts rather than raised.
+  # The review fan-out raises nothing of its own, so a 429 or refused key there is read off the attempts.
   def record_attempts(day, label, error)
     fresh = @attempts.drain(timeout: DRAIN_SECONDS)
     @last_step_attempts = fresh.size
@@ -280,8 +250,7 @@ class GeminiCapacityProbe
     Array(body.dig("error", "details")).select { |detail| detail.is_a?(Hash) && detail["@type"].to_s.end_with?(type) }
   end
 
-  # The daily violation wins over a per-minute one listed beside it, as in
-  # GeminiService#quota_id_from, since the daily one is what the run measures.
+  # The daily violation wins over a per-minute one, as in GeminiService#quota_id_from.
   def quota_violation(body)
     violations = error_details(body, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }.select { |v| v.is_a?(Hash) }
     violations.find { |v| v["quotaId"].to_s.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || violations.first || {}
@@ -291,10 +260,7 @@ class GeminiCapacityProbe
     error_details(body, "RetryInfo").filter_map { |detail| detail["retryDelay"] }.first
   end
 
-  # The full body and response headers of a refused reply, for reading and
-  # for replacing spec/fixtures/provider_errors, one file per attempt.
-  # Request headers are never captured, and a rejected key's body is left
-  # out, since Google's API_KEY_INVALID reply can echo the key.
+  # Never captures request headers or a rejected key's body: Google's API_KEY_INVALID reply can echo the key.
   def capture(attempt, record)
     stamp = Time.current.utc.strftime("%Y%m%dT%H%M%S")
     path  = @output_dir.join("#{stamp}-#{format('%03d', @captured += 1)}-#{record.status}.json")
@@ -351,8 +317,7 @@ class GeminiCapacityProbe
     hit.quota_value.to_i / self.class.calls_per_day
   end
 
-  # Days whose last step got an answer, so the figure never counts a day the
-  # 429 cut short.
+  # Only days whose last step got an answer, so a day the 429 cut short never counts.
   def tokens_per_completed_day
     completed = @records.group_by(&:day).select { |_, rows| rows.size >= self.class.calls_per_day && rows.none?(&:rate_limited?) }
     completed.transform_values { |rows| rows.sum(&:tokens) }

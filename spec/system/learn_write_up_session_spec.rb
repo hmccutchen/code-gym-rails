@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# fetch follows the login redirect a JSON endpoint gives once the session has
-# expired, so the reply arrives as a 200 the page must not start polling on.
+# fetch follows the expired session's login redirect, so the reply is a 200 the page must not start polling on.
 RSpec.describe "Learn write-up after the session expired", type: :system, with_csrf: true do
   it "says the session expired instead of polling the login page" do
     user = create_fake_provider_user

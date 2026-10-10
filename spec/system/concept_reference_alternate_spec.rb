@@ -1,13 +1,8 @@
 require "rails_helper"
 
-# The control is inline JavaScript talking to a JSON endpoint, so request specs
-# execute none of it. These cover the parts that only exist in the browser: the
-# fetch round trip, the cap shared across every copy of one reference on the
-# page, and the fact that nothing survives a reload.
+# The control is inline JavaScript, so request specs execute none of it.
 RSpec.describe "Concept reference alternate framings", type: :system, with_csrf: true do
-  # The inline script reads the CSRF meta tag before every fetch, and
-  # allow_forgery_protection off (config/environments/test.rb) blanks it.
-  # See spec/support/csrf_helper.rb.
+  # with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 
   def cache_reference
     ConceptReference.create!(
@@ -24,9 +19,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     expect(page).to have_content(/Code Review/i, wait: 10)
 
     box = first(".concept-alternates")
-    # The first-exposure auto-expand may already have opened this one; only
-    # click the summary when it hasn't.
-    # The nearest one: the section that holds the reference is a <details> too.
+    # The nearest <details>, since the section holding it is one too; first-exposure may already have opened it.
     details = box.find(:xpath, "ancestor::details[1]")
     details.find(":scope > summary").click unless details["open"]
     box
@@ -53,8 +46,6 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     end
   end
 
-  # Both of these are what the live region and the focus move exist for, and
-  # neither is observable outside a browser.
   it "announces each framing and keeps focus in the page when the control goes" do
     user = create_fake_provider_user
     cache_reference
@@ -71,15 +62,12 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
       expect(status).to have_text("that was the last one", wait: 10)
       expect(box).to have_no_css(".explain-concept-differently")
 
-      # The button holding focus was just removed; focus must have moved to the
-      # framing rather than falling back to the body.
+      # The focused button was removed; focus must move to the framing, not fall back to the body.
       expect(page.evaluate_script("document.activeElement.className")).to eq("alternate-item")
     end
   end
 
-  # An expired session redirects to the HTML login form, and fetch follows that
-  # transparently — 200, res.ok true, body a page. Parsing has to fail closed:
-  # an earlier version fell back to {} and appended an undefined framing.
+  # An expired session's login page arrives as a 200; parsing must fail closed rather than append an undefined framing.
   it "refuses an OK response that isn't the JSON this endpoint returns" do
     user = create_fake_provider_user
     cache_reference
@@ -143,9 +131,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     travel_to(a_weekday) do
       box = open_reference(user)
 
-      # A real 422 from the endpoint, rather than a stubbed provider: rspec-mocks
-      # stubs set here don't reach the server thread the driver's requests are
-      # handled on. Overstating the framings already shown trips the cap guard.
+      # A real 422 from the cap guard: rspec-mocks stubs don't reach the server thread handling the driver's requests.
       page.execute_script(<<~JS)
         const realFetch = window.fetch;
         window.fetch = (url, options) => {

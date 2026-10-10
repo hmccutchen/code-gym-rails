@@ -16,8 +16,7 @@ class LearningTrackDismissalsController < ApplicationController
 
   private
 
-  # Removed bundle members arrive after Apply, when the proposal has changed.
-  # Validate their current targets rather than membership in that proposal.
+  # Removed bundle members arrive after Apply changed the proposal, so validate current targets, not membership.
   def record_cutoffs(kinds, through)
     return :not_found unless current_user.on_learning_track?
     return :invalid unless valid_kinds?(kinds)

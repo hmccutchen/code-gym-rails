@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# The selected rating is drawn with a filled button. aria-pressed has to follow
-# the same state, or a screen reader hears three identical buttons.
+# aria-pressed must follow the filled state, or a screen reader hears three identical buttons.
 RSpec.describe "Rating buttons", type: :system do
   let(:user) { create_fake_provider_user }
 

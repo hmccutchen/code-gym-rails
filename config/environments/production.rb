@@ -19,9 +19,6 @@ Rails.application.configure do
   # Cache assets for far-future expiry since they are all digest stamped.
   config.public_file_server.headers = { "cache-control" => "public, max-age=#{1.year.to_i}" }
 
-  # Enable serving of images, stylesheets, and JavaScripts from an asset server.
-  # config.asset_host = "http://assets.example.com"
-
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
@@ -30,9 +27,6 @@ Rails.application.configure do
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
   config.force_ssl = true
-
-  # Skip http-to-https redirect for the default health check endpoint.
-  # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
   # Log to STDOUT with the current request id as a default log tag.
   config.log_tags = [ :request_id ]
@@ -50,38 +44,23 @@ Rails.application.configure do
   # Replace the default in-process memory cache store with a durable alternative.
   config.cache_store = :solid_cache_store
 
-  # Replace the default in-process and non-durable queuing backend for Active Job.
-  # Solid Queue runs against the primary database (no connects_to override):
-  # Railway provides a single postgres, and the solid_* tables live there.
+  # Solid Queue uses the primary database: Railway provides one postgres, which holds the solid_* tables.
   config.active_job.queue_adapter = :solid_queue
 
-  # Raise delivery errors so failed sends surface as failed/retried Solid Queue jobs
-  # (UserMailer.login_code is sent via deliver_later) instead of failing silently.
+  # Raise so a failed send becomes a failed, retried Solid Queue job instead of vanishing.
   config.action_mailer.raise_delivery_errors = true
 
-  # Defensive: no mailer template generates a link any more. AppHost's live
-  # consumer is the ActionCable allowed-origins check just below, but mailer
-  # views render outside the request cycle, so config.force_ssl has no effect
-  # here -- protocol is forced to https explicitly, kept in case that changes.
+  # Mailer views render outside the request cycle, where force_ssl has no effect, so https is set here.
   app_host = AppHost.resolve
   config.action_mailer.default_url_options = { host: app_host, protocol: "https" }
 
-  # Allow the app's own origin to open ActionCable WebSocket connections.
-  # Nothing subscribes today -- this layout loads no Turbo or Stimulus, and the
-  # dashboard learns a generation finished by polling /dashboard/status -- so
-  # this is the standing allowance for the mounted cable, not the transport any
-  # current feature runs on. Derived from the same resolved host as the mailer
-  # config above. Browser Origin headers always include the scheme, so only the
-  # full "https://host" form is ever matched.
+  # Browser Origin headers include the scheme, so only the full https:// form matches.
   config.action_cable.allowed_request_origins = [ "https://#{app_host}" ]
 
-  # Deliver via Resend's HTTP API (see docs/deploy/railway-smtp-setup.md).
-  # Railway blocks outbound SMTP on plans below Pro, so smtp_settings would
-  # time out at TCP connect -- the API key is set in config/initializers/resend.rb.
+  # Resend's HTTP API, because Railway blocks outbound SMTP below Pro (docs/deploy/railway-smtp-setup.md).
   config.action_mailer.delivery_method = :resend
 
-  # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
-  # the I18n.default_locale when a translation cannot be found).
+  # Fall back to I18n.default_locale when a translation is missing.
   config.i18n.fallbacks = true
 
   # Do not dump schema after migrations.
@@ -89,13 +68,4 @@ Rails.application.configure do
 
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
-
-  # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
-  # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end

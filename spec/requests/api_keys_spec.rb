@@ -53,8 +53,6 @@ RSpec.describe "ApiKeys", type: :request do
       end
     end
 
-    # Both start with "sk-", so a pattern loose enough to catch every OpenAI
-    # key could claim an Anthropic one.
     it "never mistakes an Anthropic key for an OpenAI key" do
       expect(OpenaiService.key_pattern).not_to match("sk-ant-api03-Ab8RN6J5yPUsY9SwLxAS2DYq")
     end
@@ -221,18 +219,12 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response.body).to include(KindPreferences::MULTIPLIERS.to_json)
     end
 
-    # The copy is load-bearing: the two controls mean different things, and a
-    # slider at its minimum provably cannot mean "never" while the starvation
-    # guarantee stands.
     it "says excluding is a different action from a low weight" do
       login_as(user)
 
       get setup_path
 
       expect(response.body).to include("stronger, different action")
-      # Excluding narrows a slot's pool, which also makes that slot fill less
-      # often on short days. Saying only "never appears again" would leave that
-      # to be discovered.
       expect(response.body).to include("come up less often on shorter days")
     end
 

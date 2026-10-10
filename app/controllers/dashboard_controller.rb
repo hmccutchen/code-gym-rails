@@ -1,25 +1,14 @@
 class DashboardController < ApplicationController
-  # The submit → review chain leaves this URL and redirects back to it, so the
-  # entry Back returns to is an older response for the same address: this page
-  # with the answer form on it. Without no-store the browser replays that first
-  # response body — an empty form for a day that has since been submitted and
-  # reviewed, offering a Submit button that would re-post it. Chrome does this
-  # for history navigations even under Rails' default must-revalidate.
+  # no-store, or Back after submit → review replays the cached empty form with a Submit button that re-posts it.
   before_action :no_store, only: :show
 
   def show
     return redirect_to(welcome_path) if current_user.first_run?
 
-    # Rendered in every state below, weekends and pauses included: it is the one
-    # thing this page always has to offer. #status deliberately does not ask —
-    # the poller reads generation progress, and a pick is not that.
+    # Rendered in every state; #status does not ask, since a pick is not generation progress.
     @featured = ConceptReference.featured
 
-    # A paused user's unfinished set follows them forward each day until it is
-    # submitted; the same move the resume makes, so it is one rule. Re-read
-    # after the move rather than trusting its return: a second first-load of
-    # the day can lose the race and move nothing, and today's set is still
-    # there to show.
+    # Re-read after the move: a second first-load of the day can lose the race and move nothing.
     @exercise = current_user.daily_exercises.for_date.first
     if @exercise.nil?
       current_user.carry_held_set_forward!
@@ -41,8 +30,6 @@ class DashboardController < ApplicationController
 
     return unless @exercise.nil?
 
-    # Like a pause, an ended trial stops this trigger; unlike one, there is no
-    # button back in, only a key of the user's own.
     if current_user.trial_ended?
       @trial_ended = true
       return
@@ -50,23 +37,15 @@ class DashboardController < ApplicationController
     return unless current_user.provider_ready?
 
     if flash[:generating]
-      # Set by DailyExercisesController#generate right after a manual weekend
-      # trigger or a "Try again" retry — an explicit fresh trigger always
-      # takes priority over a stale failure recorded earlier today.
+      # A fresh manual trigger outranks a failure recorded earlier today.
       @generating = true
     elsif current_user.last_generation_error_date == Date.current
-      # An earlier attempt today failed and nothing has retried since — show
-      # the failure instead of silently auto-enqueuing another attempt.
       @generation_failed = true
     elsif Date.current.on_weekend?
-      # Ahead of the pause check: a weekend is empty whether or not the user
-      # paused, so naming the pause as the reason would send them to resume a
-      # setting that wouldn't produce a set today either way.
+      # Ahead of the pause check: a weekend is empty either way, so naming the pause would mislead.
       @weekend_no_exercise = true
     elsif current_user.paused_generation_at?
-      # Opening the dashboard is not a request for a set — pausing has to stop
-      # this trigger too, or the cron skip it performs buys the user nothing.
-      # The button the paused state renders is the way back in.
+      # Opening the dashboard is not a request for a set; the paused state renders the button back in.
       @generation_paused = true
     else
       GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
@@ -74,10 +53,7 @@ class DashboardController < ApplicationController
     end
   end
 
-  # GET /dashboard/status — polled by dashboard/_generating's inline script
-  # while an async generation job is in flight, so the page can detect
-  # completion (or failure) without a live Turbo/ActionCable connection
-  # (this app loads no Turbo/Stimulus JS).
+  # GET /dashboard/status — polled by dashboard/_generating, since this app loads no Turbo or Stimulus JS.
   def status
     exercise = current_user.daily_exercises.for_date.first
 

@@ -6,31 +6,24 @@ class User < ApplicationRecord
   has_many :push_subscriptions, dependent: :destroy
   belongs_to :invite_code, optional: true
 
-  # One key per provider, encrypted at rest as a whole. provider names the
-  # one in use. Requires RAILS_MASTER_KEY / credentials to be set (standard
-  # Rails setup).
+  # One key per provider, encrypted as a whole; needs RAILS_MASTER_KEY or credentials.
   serialize :api_keys, coder: JSON
   encrypts :api_keys
 
-  # Old code keeps serving while the pre-deploy migration runs, so the column
-  # stays until a later migration drops it.
+  # Kept while old code serves through the pre-deploy migration; a later migration drops it.
   self.ignored_columns += [ "api_key" ]
 
   LANGUAGES = %w[ruby_rails javascript mixed].freeze
   SKILL_LEVELS = KindDifficulty::LEVELS
 
-  # Stored values from before skill levels took the difficulty levels' names.
-  # Read through #skill_level until a migration rewrites them; writing them
-  # in the same deploy would fail the old code's validation while it still
-  # serves.
+  # Read through #skill_level; rewriting rows in the same deploy would fail the old code's validation.
   LEGACY_SKILL_LEVELS = {
     "beginner" => "junior", "developing" => "junior", "solid" => "senior", "strong" => "principal_engineer"
   }.freeze
 
   DEFAULT_TIME_ZONE = "America/New_York".freeze
 
-  # nil is Automatic: DaySize sizes the day from recent completion and the
-  # competency gate.
+  # nil is Automatic: DaySize sizes the day from completion and the competency gate.
   DAILY_SECTION_COUNTS = (SectionCount::FLOOR..ExerciseSection::MAX_SECTIONS)
   # What Setup posts for Automatic, since a radio has no nil value.
   AUTOMATIC_SECTION_COUNT = "automatic".freeze
@@ -38,9 +31,7 @@ class User < ApplicationRecord
   validates :email, presence: true, uniqueness: { case_sensitive: false },
                     format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :name,  presence: true
-  # Clamped rather than refused: the name goes into the generation prompt, so
-  # it needs a bound, but sign-up creates the row from a typed name and a
-  # refusal there would turn a long name into a failed login.
+  # Clamped, not refused: sign-up creates the row from a typed name, so a refusal would fail the login.
   before_validation :clean_name, if: :name_changed?
   validates :skill_level, inclusion: { in: SKILL_LEVELS }
   validates :provider, inclusion: { in: ->(_) { AiProvider.keys } }, allow_nil: true
@@ -49,12 +40,7 @@ class User < ApplicationRecord
   validates :language, inclusion: { in: LANGUAGES }
   validates :learning_track, inclusion: { in: LearningTrack::VALUES }, allow_nil: true
   validate :time_zone_must_be_loadable
-  # Only on change, because these read a registry that moves. Unconditional,
-  # a kind retired from ExerciseSection would make every user still naming it
-  # unsaveable — and `generate_login_code!` writes through `update!`, so the
-  # first thing that would break is logging in, recoverable only by a data
-  # migration. A stale stored value is already harmless on the read side:
-  # KindPreferences ignores a key it does not recognize.
+  # Only on change: a kind retired from the registry would otherwise make every user naming it unsaveable, logins included.
   validate :section_kind_weights_name_rotatable_kinds,   if: :section_kind_weights_changed?
   validate :excluded_section_kinds_name_rotatable_kinds, if: :excluded_section_kinds_changed?
   validate :every_slot_keeps_a_kind,                     if: :excluded_section_kinds_changed?
@@ -62,23 +48,17 @@ class User < ApplicationRecord
   validate :locked_section_kinds_name_section_kinds,     if: :locked_section_kinds_changed?
   validate :locks_have_levels, if: -> { section_kind_levels_changed? || locked_section_kinds_changed? }
   validate :display_preferences_name_known_options, if: :display_preferences_changed?
-  # Checked only on change so a later range change cannot make a stored row
-  # unsavable; SectionCount clamps the stored count on read.
+  # Only on change, so a later range change can't make a stored row unsavable; DaySize clamps on read.
   validates :daily_section_count, numericality: { only_integer: true, in: DAILY_SECTION_COUNTS }, allow_nil: true,
                                   if: :daily_section_count_changed?
 
   normalizes :display_preferences, with: ->(values) { DisplayPreferences.sparse(values) }
-  # nil rather than {} when no key is stored, so where.not(api_keys: nil)
-  # finds exactly the accounts that can call a provider.
+  # nil, not {}, so where.not(api_keys: nil) finds exactly the accounts that can call a provider.
   normalizes :api_keys, with: ->(keys) { keys.presence }
 
   before_save { email.downcase! }
 
-  # Bumped only when the preference columns themselves change. A whole-row
-  # timestamp would move on every save — a rename, a time zone, a login code —
-  # and refuse a mix save that nothing had actually raced. Weights, exclusions,
-  # levels and locks share one version on purpose: the Exercise mix is one save
-  # boundary, so a stale tab is refused whichever half it touched.
+  # Only on preference changes, so unrelated saves can't refuse a mix save; the whole mix shares one version.
   before_save :bump_section_kind_preferences_version, if: :section_kind_preferences_changed?
   before_save :record_track_level_changes, if: -> { on_learning_track? && section_kind_levels_changed? }
   before_save :finish_learning_track, if: :on_learning_track?
@@ -88,19 +68,13 @@ class User < ApplicationRecord
 
   enum :reminder_level, { none: 0, ready: 1, ready_and_nudges: 2 }, prefix: :reminders
 
-  # "Is this user enrolled at all", which is a transport question, not an
-  # intent one — `reminder_level` carries intent, and the job reads that enum
-  # directly. Kept as a derived predicate so the layout's re-subscribe script,
-  # the Account page's on/off gate, and #update's enrolment precondition can
-  # all ask the simple question without knowing about levels.
+  # Transport, not intent: reminder_level carries intent, which the job reads directly.
   def push_reminders_enabled? = !reminders_none?
 
   LOGIN_CODE_EXPIRY = 15.minutes
   LOGIN_CODE_MAX_ATTEMPTS = 5
 
-  # The one phrasing of the window, so the flash and the email cannot drift
-  # from the constant they describe. ActiveSupport::Duration#inspect is the
-  # humanized form ("15 minutes"), not a debug dump.
+  # Duration#inspect gives the humanized form ("15 minutes"), not a debug dump.
   def self.login_code_expiry_in_words
     LOGIN_CODE_EXPIRY.inspect
   end
@@ -116,19 +90,7 @@ class User < ApplicationRecord
     raw_code
   end
 
-  # Wrong guesses count against LOGIN_CODE_MAX_ATTEMPTS; hitting it
-  # invalidates the code, forcing a fresh request rather than leaving a
-  # guessable one live.
-  #
-  # Serialized under a row lock, the same way #anonymize! is. Read, compare and
-  # invalidate are one decision, and unserialized they are three statements a
-  # second request can interleave with: every request that reads the digest
-  # before the first invalidation commits redeems the same code. Measured, not
-  # reasoned — with the lock removed, eight parallel posts of one correct code
-  # authenticate five times (see spec/models/login_code_concurrency_spec.rb).
-  # Those same interleaved reads each spend a guess against a live digest,
-  # which is why the lock matters more here than it would for a 256-bit token.
-  # It spans one BCrypt compare, which a login endpoint can afford.
+  # Under a row lock: unlocked, parallel posts of one code each redeem it (spec/models/login_code_concurrency_spec.rb).
   def self.authenticate_login_code(email:, code:)
     user = active.find_by(email: email.to_s.strip.downcase)
     return nil unless user
@@ -156,33 +118,19 @@ class User < ApplicationRecord
     )
   end
 
-  # ── Account deletion ──────────────────────────────────────────────────────
-  # Self-service deletion anonymizes in place rather than destroying: the
-  # user's exercises, responses (answers, ai_review, concept_tags) and API
-  # usage stay linked by user_id for aggregate stats, but nothing on the row
-  # identifies a person any more. Never call destroy here — the association
-  # `dependent: :destroy` would take that history with it.
+  # Deletion anonymizes in place; never destroy, since dependent: :destroy would take the history with it.
   def anonymized?
     anonymized_at.present?
   end
 
-  # The one home for "today's recorded generation failure no longer describes
-  # anything". Both callers had this byte-identical — ResponsesController after
-  # a review succeeds, and #carry_forward once a recovered set occupies today —
-  # and the guard is part of the rule, not the caller's: an error from an
-  # earlier day is history, not a stale banner. Scoped to the same day because
-  # DashboardController#show only reports it when it matches today.
+  # Same-day only: an error from an earlier day is history, and the dashboard reports only today's.
   def clear_stale_generation_error!
     return unless last_generation_error_date == Date.current
 
     clear_generation_failure!
   end
 
-  # ── Generation failures ───────────────────────────────────────────────────
-  # A provider failure is stored as its kind and time, and written into words
-  # only when read (#generation_failure_message), in the reader's zone and
-  # against the clock. A message that is not a provider failure (a reviewed
-  # set kept, a draft the app could not use) is stored as text, as before.
+  # Provider failures store kind and time and become words only when read (#generation_failure_message).
   NO_GENERATION_FAILURE = { last_generation_failure: nil, last_generation_failure_provider: nil,
                             last_generation_failed_at: nil, last_generation_retry_after: nil }.freeze
 
@@ -203,8 +151,7 @@ class User < ApplicationRecord
 
   def generation_failed_today? = last_generation_error_date == Date.current
 
-  # Names the provider the failed call went to, which the user may have
-  # switched away from since, and the wait it asked for.
+  # Names the provider the failed call went to, which the user may have switched away from since.
   def generation_failure_message(surface:, now: Time.current)
     return last_generation_error if last_generation_failure.blank?
 
@@ -214,48 +161,12 @@ class User < ApplicationRecord
                             variant: ProviderFailureText.variant_for(self)).full
   end
 
-  # Suppresses every generation the user didn't ask for — the cron batch and
-  # the dashboard's auto-trigger. An explicit /generate or /regenerate click
-  # still runs while paused.
+  # Suppresses only unrequested generation; explicit /generate and /regenerate still run while paused.
   def paused_generation_at?
     paused_generation_at.present?
   end
 
-  # Lifts the pause and brings the set it stranded forward. Clearing the flag
-  # alone would only unblock the next cycle: every "today's exercise" lookup is
-  # `for_date`, so a set generated the morning of the pause is unreachable the
-  # next day — the dashboard won't render it and ResponsesController#create
-  # 404s — while still reading as a skip to SectionCount and as a break to
-  # #current_streak. Re-dating it to today makes it an ordinary today exercise
-  # and drops it out of both windows at once, since #recent_exercise_history
-  # excludes today and #current_streak exempts it.
-  #
-  # Returns the exercise it moved, or nil when there was nothing to move.
-  #
-  # Accepted: the set then counts toward the resume day's completion window and
-  # streak rather than the day it was generated.
-  #
-  # `with_lock` for the same reason as #anonymize!: it reloads under a row lock,
-  # so a double-tapped call serializes and the second one sees the pause
-  # already cleared, finds no held set, and no-ops.
-  #
-  # That FOR UPDATE also settles the race against a generation running for this
-  # user, though indirectly: daily_exercises has a foreign key to users, so
-  # inserting today's exercise needs a FOR KEY SHARE lock on this same row,
-  # which FOR UPDATE conflicts with. A generator therefore cannot commit
-  # between the `exists?` check and the move — it either committed before the
-  # lock (and `exists?` sees it, so nothing moves) or blocks until after
-  # (and loses its own set to the unique index, which
-  # GenerateDailyExercisesJob already treats as "generated concurrently").
-  # Resume wins, which is the right way round: the held set carries the user's
-  # own draft answers, a fresh one would not.
-  #
-  # Runs in the user's own zone rather than trusting the caller's, unlike the
-  # read-only #recent_exercise_history and #current_streak: this one *writes* a
-  # date that has to be the user's today, and it also compares against the
-  # pause's local date, so a caller with a different ambient zone would not
-  # merely read oddly — it would either no-op silently or file the set under a
-  # day that is not the user's.
+  # Runs in the user's zone because it writes a date that must be the user's today; the row lock also beats a racing generation.
   def resume_generation!
     Time.use_zone(effective_time_zone) do
       with_lock do
@@ -266,21 +177,7 @@ class User < ApplicationRecord
     end
   end
 
-  # The same recovery the resume performs, without lifting the pause: the
-  # dashboard calls it whenever a paused user opens a day with no set, so a
-  # set left unfinished when the pause began keeps following the user forward
-  # until they submit it, instead of vanishing at midnight and only
-  # reappearing on resume. Once it is submitted, #held_exercise finds nothing
-  # and the paused day stays empty, which is what the pause is for. Returns
-  # the set moved, or nil when there was nothing to move.
-  #
-  # The unlocked read first is a cost guard, not the decision: most loads have
-  # nothing to move (#held_exercise answers nil at once for an unpaused user),
-  # and taking the row lock on each of them would briefly block a resume or an
-  # anonymize for no reason. The locked check inside #recover_held_set is the
-  # one that holds. A held row that cannot be saved is logged and left where
-  # it is: this runs on every paused dashboard load, and a raise here would
-  # turn each into a 500 with no button to escape by.
+  # The unlocked read is only a cost guard; an unsavable held row is logged, since a raise would 500 every paused dashboard load.
   def carry_held_set_forward!
     Time.use_zone(effective_time_zone) do
       return nil if held_exercise.nil?
@@ -292,20 +189,12 @@ class User < ApplicationRecord
     nil
   end
 
-  # Idempotent under concurrency: `with_lock` takes a row lock and reloads
-  # before the check, so two in-flight calls (double-click, retry from another
-  # tab) serialize — the second sees `anonymized?` already true, returns false,
-  # and never overwrites the original `anonymized_at`. Returns true only on the
-  # call that actually anonymized the row.
+  # with_lock makes it idempotent: a second call sees anonymized? and never overwrites anonymized_at.
   def anonymize!
     with_lock do
       return false if anonymized?
 
-      # Reminders have to stop at the device, not just in the UI: a home-screen
-      # install keeps its browser-side subscription after the account is gone,
-      # so the endpoints are what actually silence it. `active` already keeps
-      # SendPushReminderJob away from this row; destroying them means a
-      # deleted account cannot be reached even if that guard is ever missed.
+      # A home-screen install keeps its subscription after deletion, so the endpoints must go too.
       push_subscriptions.destroy_all
       clear_legacy_api_key
 
@@ -330,38 +219,23 @@ class User < ApplicationRecord
     api_key.present?
   end
 
-  # Own key, or a trial that can still pay for a call: what every page that
-  # needs a provider reads, and what the dashboard's on-demand generation
-  # reads. The nightly batch keeps reading stored keys, so a trial account is
-  # generated only when it opens the dashboard.
+  # The nightly batch reads stored keys only, so a trial account generates only when it opens the dashboard.
   def provider_ready? = api_key_present? || trial_active?
 
-  # ── Trial ──────────────────────────────────────────────────────────────────
-  # A trial_ends_at is the fact; there is no flag.
+  # A present trial_ends_at is the trial; there is no flag.
   def trial? = trial_ends_at.present?
 
-  # Deleting an account leaves its trial dates in place, and jobs queued
-  # before the deletion still load the row, so an anonymized account must
-  # never reach the house key.
+  # Jobs queued before deletion still load the row, so an anonymized account must never reach the house key.
   def trial_active?(now: Time.current)
     trial? && !anonymized? && trial_ends_at > now && TrialMode.enabled? && HouseKeys.for(provider).present?
   end
 
-  # The trial is what pays. A trial account that pasted a key of its own is
-  # an own-key account on every page, whatever its dates say, because
-  # ProviderCredential hands the service that key first.
+  # A trial account with its own key is an own-key account, since ProviderCredential hands over that key first.
   def on_trial? = trial? && !api_key_present?
 
   def trial_ended? = on_trial? && !trial_active?
 
-  # Starts a trial on the provider the person chose, taking one seat on the
-  # code. Under the row lock, so two submissions cannot start it twice, and
-  # the seat is taken only once the account is known to be eligible. Returns
-  # false for a missing, expired or full code, a provider no trial can start
-  # on, an account that has had a trial, or one with a key of its own, which
-  # a trial would never be used over. The trial runs from now, when the seat
-  # is taken, rather than from consent, which on the signed-out page comes
-  # before the emailed code and can fall on the day before.
+  # Under the row lock so it can't start twice; the trial runs from when the seat is taken, not from consent.
   def start_trial!(invite:, provider:, consented_at:, now: Time.current)
     with_lock do
       return false if api_key_present? || trial? || invite.nil?
@@ -393,10 +267,7 @@ class User < ApplicationRecord
     LEGACY_SKILL_LEVELS.fetch(stored, stored)
   end
 
-  # Accounts that existed when the track shipped were backfilled to "none", so
-  # nil means an account created since. The exercise check covers the preview
-  # app's seeded account, which is created after migrations run but arrives
-  # with exercises.
+  # Pre-track accounts were backfilled to "none"; the exercise check excludes the preview app's seeded account.
   def first_run?
     persisted? && learning_track.nil? && !daily_exercises.exists?
   end
@@ -404,16 +275,13 @@ class User < ApplicationRecord
   def learning_track_change_allowed?(value)
     case value
     when LearningTrack::ON then first_run?
-    # A repeat leave is accepted: Setup's Leave control can outlive a track
-    # that a mix save already ended.
+    # A repeat leave is accepted: Setup's Leave control can outlive a track a mix save already ended.
     when LearningTrack::OFF then first_run? || on_learning_track? || learning_track == LearningTrack::OFF
     else false
     end
   end
 
-  # ── Recent performance for prompt context ─────────────────────────────────
-  # Last N sessions by count, not a calendar window — matches the "last 10
-  # sessions" contract embedded verbatim in AiService's generation prompt.
+  # Last N sessions by count, matching the "last 10 sessions" contract in the generation prompt.
   def recent_performance(limit: 10)
     recent_daily_responses(limit).map do |r|
       problem_set = r.daily_exercise&.problem_set || {}
@@ -434,11 +302,7 @@ class User < ApplicationRecord
     end
   end
 
-  # Recent exercises and whether each was answered, newest first, before
-  # `before`: today is left out by default, since it has had no chance to be
-  # answered; the dashboard's forecast of tomorrow passes tomorrow to count a
-  # submitted today. SectionCount/SectionRotation are pure and take this as an
-  # argument rather than touching the database themselves.
+  # Excludes today by default, since it has had no chance to be answered; the forecast passes tomorrow.
   def recent_exercise_history(limit:, before: Date.current)
     daily_exercises
       .includes(:daily_response)
@@ -456,44 +320,7 @@ class User < ApplicationRecord
       end
   end
 
-  # Concepts still needing reinforcement, resolved on each concept's single
-  # most-recent answered occurrence — not cumulative history, so a concept
-  # mastered weeks ago never resurfaces because of an old bad day. Mastery requires
-  # both signals to explicitly agree the user is solid; an absent signal
-  # never counts toward mastery (uncertain data defaults to reinforcement).
-  # Total absence of both signals is out of scope, same as an unrated
-  # concept today.
-  #
-  # Every entry carries its bucket, and a concept is resolved per (concept,
-  # bucket) pair: RAILS_CONCEPTS and JS_CONCEPTS share a few names (e.g.
-  # over_mocking), so for a mixed-language user the same name is two concepts
-  # with two histories, and one must never stand in for the other (#190).
-  # Consumers that ask "is this concept already claimed" match on the pair.
-  #
-  # `bucket:`/`exclude_buckets:` scope the result by ConceptBucket — added for
-  # the fourth slot's independent reinforcement track, which must never mix
-  # with the three-slot vocabulary. Both default to a no-op filter, so a
-  # caller that passes neither sees the behavior from before either keyword
-  # existed; DailyPlan passes one on each track. Marking a pair resolved
-  # happens before either filter runs, which is safe now that the marker is
-  # the pair: a filtered-out most-recent occurrence implies every older
-  # occurrence of that same pair would be filtered too.
-  #
-  # The vocabulary-membership filter DOES apply to language buckets, and so
-  # runs BEFORE the dedup marker rather than after it: an occurrence naming a
-  # concept that has left its own bucket's vocabulary is not an occurrence of a
-  # live concept at all, and must not consume the dedup slot that an older
-  # occurrence in a bucket where the name is still valid would fill.
-  #
-  # Drilled concepts (ConceptDrills) lead the list, since callers truncate it
-  # to what today can host and order is priority. A drilled concept the
-  # history would also list appears once, in the drilled position; a drilled
-  # concept in the paused tier waits out its cooldown like any other.
-  # `hostable:` answers whether today's sections can carry a drilled concept
-  # (given the concept and its bucket), because a drill persists until
-  # mastered — unlike a history entry, which ages out — so one no section
-  # could tag would otherwise claim a slot every day. nil leaves the bucket
-  # filters above as the only restriction.
+  # Resolved per (concept, bucket) on the latest answered occurrence; drills lead, since callers truncate and order is priority.
   def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], hostable: nil)
     result   = drilled_reinforcement(bucket, exclude_buckets, hostable)
     resolved = result.to_h { |h| [ [ h[:concept], h[:bucket] ], true ] }
@@ -524,11 +351,7 @@ class User < ApplicationRecord
     result
   end
 
-  # Never-seen drills first, then least recently seen, so a group drilled past
-  # today's capacity rotates through its concepts rather than repeating the
-  # same first few — the same order SectionRotation and RealSource.pick use.
-  # Read from the exposure index rather than stored, since which drill was
-  # offered is never recorded, like every other offer.
+  # Never-seen first, then least recently seen, so a large drilled group rotates instead of repeating its first few.
   def drilled_reinforcement(bucket, exclude_buckets, hostable)
     buckets = bucket ? [ bucket ] : ConceptBucket.slice_for(language) - exclude_buckets
     rows    = concept_masteries.drilling.in_buckets(buckets).where.not(tier: :paused)
@@ -545,23 +368,12 @@ class User < ApplicationRecord
   end
   private :drill_order
 
-  # Mastered concepts whose scheduled re-check has come due, across the
-  # buckets given, in one query. Bucket-scoped by the caller: an architecture
-  # concept has no valid home outside the architecture third, and a
-  # ruby_rails concept must not surface on a JavaScript day. Unordered and
-  # unlimited, because DailyPlan ranks by overdue ratio, which a date order or
-  # a cap would cut across (issue #93); the user's slice bounds the size.
+  # Unordered and uncapped, because DailyPlan ranks by overdue ratio, which a date order or cap would cut across (#93).
   def concepts_due_for_retention_check_in(buckets)
     concept_masteries.in_buckets(buckets).due_for_retention_check.to_a
   end
 
-  # Due concepts that have crossed the "meaningfully overdue" threshold: overdue
-  # by RETENTION_OVERDUE_THRESHOLD_MULTIPLIER × the concept's OWN current
-  # retention_interval_days, on top of its due date. Used only to decide whether
-  # to reserve a reinforcement slot for retention — a merely-due check is not
-  # enough on its own (see AiService#generate_exercise). retention_interval_days
-  # is nullable (cleared whenever a check fails), so null-interval rows are
-  # excluded explicitly rather than risking a null comparison silently matching.
+  # Excludes null intervals explicitly, since retention_interval_days clears whenever a check fails.
   def concepts_overdue_for_retention_check(bucket:)
     concept_masteries
       .in_bucket(bucket)
@@ -573,10 +385,7 @@ class User < ApplicationRecord
       )
   end
 
-  # Single-query, memoized index of every submitted response's concept exposures,
-  # keyed [concept, bucket] => the distinct dates the concept appeared (in query
-  # order, not sorted — callers only ever count them). Built once per User
-  # instance so a page rendering many responses (history) never queries per section.
+  # Memoized per instance so pages rendering many responses never query per section.
   def concept_exposure_index
     @concept_exposure_index ||= begin
       index = Hash.new { |hash, key| hash[key] = [] }
@@ -586,8 +395,7 @@ class User < ApplicationRecord
         (tags || {}).each do |section, concept|
           next if concept.blank? || concept == "other"
           bucket = ConceptBucket.for(section, language)
-          # Union, not append: a concept tagged on multiple sections the same
-          # day is one exposure, not one per section (matches ConceptMastery#record_review!).
+          # Union: several sections tagging a concept on one day count as one exposure, matching ConceptMastery.
           index[[ concept, bucket ]] |= [ date ]
         end
       end
@@ -599,12 +407,7 @@ class User < ApplicationRecord
     concept_exposure_index.fetch([ concept, bucket ], []).count { |d| d <= on_or_before }
   end
 
-  # ── Language preference ────────────────────────────────────────────────────
-  # Resolves the day's actual generation language. Pinned preferences return
-  # themselves. "mixed" alternates by flipping the most recent PRIOR
-  # exercise's language (excluding today's own row, so calling this multiple
-  # times for the same day — e.g. on regenerate — stays consistent as long as
-  # callers pass the result through rather than recomputing mid-day).
+  # "mixed" flips the latest prior exercise's language, excluding today's row so regeneration stays consistent.
   def language_for_today
     return language unless language == "mixed"
 
@@ -614,13 +417,7 @@ class User < ApplicationRecord
     last.language == "ruby_rails" ? "javascript" : "ruby_rails"
   end
 
-  # ── Daily streak ───────────────────────────────────────────────────────────
-  # Consecutive weekdays with a submitted response, derived on read by walking
-  # back from today (in the caller's zone — controllers and jobs wrap calls in
-  # Time.use_zone). Weekends never break the chain, and neither does today
-  # while it is still unsubmitted; only a past weekday whose exercise went
-  # unsubmitted resets it. A weekday with no exercise at all (pre-signup,
-  # failed generation) neither counts nor breaks.
+  # Walks back from today in the caller's zone; only a past weekday with an unsubmitted exercise breaks the streak.
   def current_streak
     submitted = daily_responses.where.not(submitted_at: nil).pluck(:date).to_set
     return 0 if submitted.empty?
@@ -631,9 +428,7 @@ class User < ApplicationRecord
     day = Date.current
     while day >= earliest
       if day.on_weekend?
-        # Neither breaks the streak nor counts toward it — the empty branch is
-        # what skips the day, so collapsing it into the elsif would end streaks
-        # every Saturday.
+        # Weekends neither break nor count; folding this empty branch into the elsif would end streaks every Saturday.
       elsif submitted.include?(day)
         streak += 1
       elsif exercised.include?(day) && day != Date.current
@@ -644,9 +439,7 @@ class User < ApplicationRecord
     streak
   end
 
-  # ── Timezone ────────────────────────────────────────────────────────────────
-  # Resolved zone for computing this user's "today". Blank until the browser
-  # detects it or the user sets it manually, so fall back to the team default.
+  # Blank until the browser detects it or the user sets it, so fall back to the team default.
   def effective_time_zone
     time_zone.presence || DEFAULT_TIME_ZONE
   end
@@ -660,47 +453,18 @@ class User < ApplicationRecord
     self.name = UserText.clean(name, limit: UserText::MAX_NAME_LENGTH).strip
   end
 
-  # Moves the held set onto today. The draft moves with its exercise: a response
-  # is only ever created against today's exercise, so leaving it behind would
-  # let #create build a second one for the same exercise while `has_one`
-  # returned the stale row. Both regeneration columns clear, for the same reason:
-  # they describe the row's *day*, not the set. `regenerated_at` would hide the
-  # Generate-new-set button behind something false ("You've already generated
-  # a new set today"), and `regenerating_since` is worse than cosmetic — a
-  # RegenerateExerciseJob stranded from the pause day gates only on
-  # `exercise&.regenerating_since` after resolving `for_date`, so a leftover
-  # claim would let it replace the carried-forward problem_set and destroy the
-  # very draft response this went to the trouble of moving.
-  #
-  # Clearing a same-day generation error is part of establishing today's
-  # exercise, not an extra: /generate is not pause-gated, so a paused user can
-  # click it, have the job fail with no exercise for today to suppress the
-  # report (see GenerateDailyExercisesJob#persist_failure), and then resume —
-  # leaving DashboardController#show's `last_generation_error_date` check
-  # rendering "Couldn't generate a new set" above the perfectly good set this
-  # just recovered, the exact banner persist_failure exists to avoid.
-  #
-  # A SAVEPOINT so a failed move rolls back only itself, leaving the
-  # pause-clearing UPDATE committed — otherwise a user who hit this would be
-  # both 500ing and still paused. Both rescues are defence in depth rather than
-  # the mechanism: #resume_generation!'s row lock already serializes generation
-  # against this. Both classes are caught because `date` uniqueness is enforced
-  # twice — the model validation raises RecordInvalid before the index ever
-  # raises RecordNotUnique — and RecordInvalid is re-raised unless it is that
-  # validation, so an unrelated invalid record still surfaces.
-  # Locks the exercise, then its response, and writes in that order: the same
-  # order RegenerateExerciseJob takes, so the two serialize but cannot
-  # deadlock.
-  # #held_exercise read the response outside these locks, and a submit can
-  # commit in between, so the response is re-read under its lock and a
-  # submitted one ends the move — a finished session keeps its day.
+  # Clears both regeneration columns: a stranded RegenerateExerciseJob would otherwise replace the moved set and draft.
   def carry_forward(held)
+    # SAVEPOINT so a failed move rolls back alone and the pause still lifts.
     transaction(requires_new: true) do
+      # Exercise, then response: RegenerateExerciseJob's lock order, so the two can't deadlock.
       held.lock!
       response = held.daily_response&.lock!
+      # Re-checked under the lock, since a submit can commit after #held_exercise read it.
       next nil if response&.submitted?
 
       held.update!(date: Date.current, regenerated_at: nil, regenerating_since: nil)
+      # The draft moves too, or #create would build a second response for the moved exercise.
       response&.update!(date: Date.current)
       clear_stale_generation_error!
       held
@@ -720,12 +484,7 @@ class User < ApplicationRecord
     carry_forward(held)
   end
 
-
-  # The set the pause stranded: the newest unsubmitted exercise dated on or
-  # after the pause and before today. Scoped to the pause rather than to "any
-  # unsubmitted exercise" because a day abandoned before pausing was abandoned,
-  # not held. The range excludes today so a set already dated today is a no-op
-  # instead of a collision with itself.
+  # Scoped to the pause, since a day abandoned before pausing was abandoned, not held; excludes today to avoid self-collision.
   def held_exercise
     return nil unless paused_generation_at?
 
@@ -738,25 +497,13 @@ class User < ApplicationRecord
       .first
   end
 
-  # concept_tags is persisted provider output, so it keeps the name a section
-  # was tagged with even after that concept leaves the vocabulary. Reinforcing
-  # one the generator can no longer tag wastes an entry AND a retention slot,
-  # since DailyPlan sizes retention as whatever the day's non-fourth sections
-  # can host minus the reinforcement entries that claim them.
-  #
-  # A nil bucket passes, because vocabulary_for raises on nil and there is no
-  # vocabulary to check against. Reaching it needs both a nil language and a
-  # missing exercise row, which the NOT NULL foreign key on
-  # daily_responses.daily_exercise_id makes unreachable — this keeps an
-  # unreachable state from raising during generation rather than describing a
-  # case that happens.
+  # Reinforcing a concept that left the vocabulary wastes an entry and a retention slot; nil bucket is unreachable.
   def still_in_vocabulary?(concept, bucket)
     return true if bucket.nil?
     ConceptBucket.vocabulary_for(bucket).include?(concept)
   end
 
-  # Shared by #recent_performance and #concepts_needing_reinforcement so
-  # neither issues its own duplicate "last N sessions" query.
+  # Shared so neither caller issues its own "last N sessions" query.
   def recent_daily_responses(limit)
     daily_responses.includes(:daily_exercise).order(date: :desc).limit(limit)
   end
@@ -770,8 +517,7 @@ class User < ApplicationRecord
     self.section_kind_preferences_version += 1
   end
 
-  # Without a cutoff, results that justified a move could immediately propose
-  # its opposite. Use the user's day even when the caller runs in another zone.
+  # Without a cutoff, the evidence for a move could immediately propose its opposite; dates use the user's day.
   def record_track_level_changes
     return if learning_track_changed?
 
@@ -836,8 +582,7 @@ class User < ApplicationRecord
     end
   end
 
-  # Not expressible as a database CHECK: Postgres CHECK constraints cannot run
-  # subqueries. KindDifficulty#locked? makes a lock that slips past this inert.
+  # A CHECK constraint can't run subqueries; KindDifficulty#locked? makes a lock that slips past this inert.
   def locks_have_levels
     return unless locked_section_kinds.is_a?(Array) && section_kind_levels.is_a?(Hash)
 
@@ -846,16 +591,12 @@ class User < ApplicationRecord
     end
   end
 
-  # The ignored api_key column still holds the key copied into api_keys until
-  # a later migration drops it, so deleting an account has to clear it too.
-  # Remove this with the column.
+  # The ignored api_key column still holds the copied key; remove this with the column.
   def clear_legacy_api_key
     self.class.where(id: id).update_all(api_key: nil)
   end
 
-  # A review written before review_provider existed, or by old code while the
-  # migration ran, is labelled with the user's provider. Recording it before
-  # the provider changes keeps those reviews naming the one that wrote them.
+  # Labels old reviews before the provider changes, so they keep naming the provider that wrote them.
   def record_provider_on_unlabelled_reviews
     daily_responses.where(review_provider: nil).where.not(ai_review: [ nil, {} ])
                    .update_all(review_provider: provider_in_database)
@@ -871,9 +612,7 @@ class User < ApplicationRecord
     end
   end
 
-  # An account with no key at all may still name a provider: an anonymized
-  # account keeps its provider after its keys are cleared, and a trial
-  # account names the provider it chose while its keys stay nil.
+  # Anonymized and trial accounts can name a provider while holding no keys.
   def provider_has_a_stored_key
     return unless api_keys.is_a?(Hash) && provider.present?
 
@@ -884,8 +623,7 @@ class User < ApplicationRecord
     DisplayPreferences.problems_with(display_preferences).each { |problem| errors.add(:display_preferences, problem) }
   end
 
-  # Derived from the slot roster rather than naming third and fourth, so a
-  # future multi-kind slot is covered without an edit here.
+  # Derived from the slot roster, so a future multi-kind slot needs no edit here.
   def every_slot_keeps_a_kind
     return unless excluded_section_kinds.is_a?(Array)
 

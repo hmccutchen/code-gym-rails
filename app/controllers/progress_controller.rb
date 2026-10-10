@@ -1,7 +1,4 @@
-# GET /progress — which rung each concept is currently held at, in the
-# buckets and groups the Learn tab uses for the same concepts. Read-only: every
-# standing comes from RungLedger over stored responses and from the user's
-# current section preferences; nothing here writes.
+# GET /progress — read-only: standings come from RungLedger and the user's current section preferences.
 class ProgressController < ApplicationController
   include LearnScope
 
@@ -21,9 +18,7 @@ class ProgressController < ApplicationController
 
   private
 
-  # A held rung; developing toward the next rung once a higher one has been
-  # attempted; :not_yet; or :not_offered when every kind that could show the
-  # concept is excluded — the user's own choice, never a gap.
+  # :not_offered when every host kind is excluded, which is the user's choice rather than a gap.
   def standing_for(concept, bucket, ledger, hosts, preferences)
     toward = ledger.developing_toward(concept, bucket)
     return :"#{ProgressHelper::DEVELOPING}#{toward}" if toward

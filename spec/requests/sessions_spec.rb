@@ -2,9 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Sessions", type: :request do
   describe "POST /login" do
-    # Regression guard: this drives User#generate_login_code! (BCrypt) under
-    # bundler, which 500'd in production when the bcrypt gem was missing from
-    # the Gemfile.
+    # Drives BCrypt under bundler, which 500'd in production when bcrypt was missing from the Gemfile.
     it "creates a first-time user and enqueues the login code email" do
       expect {
         post login_path, params: { email: "new@example.com", name: "New Dev" }
@@ -15,8 +13,6 @@ RSpec.describe "Sessions", type: :request do
       expect(flash[:notice]).to match(/check your email/i)
     end
 
-    # Every requester gets a code now, with no client-supplied hint deciding
-    # who is worth mailing one to.
     it "mails a code regardless of any touch_device hint in the params" do
       expect {
         post login_path, params: { email: "new@example.com", touch_device: "" }
@@ -95,8 +91,6 @@ RSpec.describe "Sessions", type: :request do
       expect(response.body).to include("6-digit code")
     end
 
-    # The page carries no JavaScript at all now: polling is gone with the
-    # link it waited on, and the device sniffing went with the gating.
     it "carries no polling or device-detection script" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
 
@@ -161,8 +155,7 @@ RSpec.describe "Sessions", type: :request do
       expect(user.reload.login_code_digest).to be_nil
     end
 
-    # The code field takes focus when the page loads, so a screen reader
-    # starts there and never reaches the flash above it on its own.
+    # The code field takes focus on load, so a screen reader never reaches the flash above it.
     it "describes the code field by the error after a wrong code, and marks it invalid" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       follow_redirect!
@@ -184,8 +177,6 @@ RSpec.describe "Sessions", type: :request do
       expect(field["aria-invalid"]).to be_nil
     end
 
-    # The page also offers "request a new code", whose errors say nothing
-    # about the code the person has not entered yet.
     it "keeps an error from requesting a new code off the pending code field" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       follow_redirect!
@@ -233,8 +224,7 @@ RSpec.describe "Sessions", type: :request do
       expect(session.id.public_id).not_to eq(pre_logout_session_id)
     end
 
-    # The rotation discards the whole session, so return_to has to be read out
-    # before reset_session or a successful login silently loses it.
+    # The rotation discards the session, so return_to must be read before reset_session.
     it "still points the user at the page they were bounced from" do
       user = User.create!(email: "dev@example.com", name: "Dev")
 
@@ -266,10 +256,7 @@ RSpec.describe "Sessions", type: :request do
       response.body[/name="authenticity_token" value="([^"]+)"/, 1]
     end
 
-    # Logging in rotates the session, and the CSRF token with it, so the code
-    # form — rendered under the pre-login session — is stale the moment it
-    # succeeds. Re-submitting it (a double-tap on mobile) must not tell an
-    # already-logged-in user their session expired.
+    # Login rotates the CSRF token, so a double-tapped code form must not tell a logged-in user the session expired.
     it "sends an already-logged-in user home instead of claiming the session expired" do
       get login_path
       perform_enqueued_jobs do
@@ -298,16 +285,10 @@ RSpec.describe "Sessions", type: :request do
       expect(flash[:alert]).to eq("Your session expired — please try again.")
     end
 
-    # Logout is a sessions action too, but silently returning someone to the
-    # dashboard when they asked to sign out would hide a failure they care
-    # about — and leave them still logged in with nothing said.
     it "still warns on a stale logout instead of silently returning to the dashboard" do
       user = create_user_with_key(email: "out@example.com")
 
-      # login_as posts with no authenticity_token at all, which real forgery
-      # protection (on for this describe block) rejects outright — so getting
-      # logged in here has to go through the same token-carrying flow as the
-      # test above rather than the shared helper.
+      # login_as posts no authenticity_token, which real forgery protection rejects, so log in through the form.
       get login_path
       perform_enqueued_jobs do
         post login_path, params: { email: user.email, authenticity_token: authenticity_token }
@@ -375,11 +356,7 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
-  # A production lockout: the pending-login state used to replace the email
-  # form rather than sit above it, so any way of reaching verify outside this
-  # browser's cookie jar — a mail client's in-app browser, an expired or
-  # already-consumed link — left the login page with no way to request a new
-  # one. Clearing cookies was the only recovery.
+  # The email form must stay reachable while a login is pending, or the only recovery is clearing cookies.
   describe "recovering from a pending login that never completes" do
     include ActiveJob::TestHelper
 
@@ -395,9 +372,7 @@ RSpec.describe "Sessions", type: :request do
       expect(email_form_present?).to be(true)
     end
 
-    # The code is bound to the session that requested it, so a second browser
-    # holding the same address gets nowhere — and must still be able to ask
-    # for its own code rather than being stranded.
+    # The code is bound to the requesting session, so another browser must still be able to ask for its own.
     it "keeps the form reachable in a browser that did not request the code" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       user = User.find_by(email: "dev@example.com")
@@ -430,13 +405,7 @@ RSpec.describe "Sessions", type: :request do
       end
     end
 
-    # The database is the enforcer here, not the session stamp:
-    # User.authenticate_login_code already filters on login_code_sent_at
-    # within LOGIN_CODE_EXPIRY, and both clocks start from the same #create. So
-    # this guards the outcome rather than the mechanism — it would still pass
-    # with pending_login_email's expiry removed from #verify_code, where that
-    # check is redundancy behind one authority rather than the thing keeping
-    # an expired code out.
+    # User.authenticate_login_code enforces the expiry, so this passes even without the session stamp's check.
     it "refuses a login code once the code's window has passed" do
       perform_enqueued_jobs do
         post login_path, params: { email: "dev@example.com", name: "Dev" }

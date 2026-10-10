@@ -10,8 +10,7 @@ RSpec.describe ModelComparison do
   let(:judge_output_tokens) { [] }
   let(:comparison) { described_class.new(api_key: "sk-ant-runner", out: out) }
 
-  # Answers every request the way FakeService would, in Anthropic's response
-  # shape, so each mode's real prompt building and parsing runs end to end.
+  # Answers in Anthropic's response shape so each mode's real prompt building and parsing runs end to end.
   before do
     requests = posted
     replies  = judge_replies
@@ -87,8 +86,7 @@ RSpec.describe ModelComparison do
     expect(out.string.scan("JSON::ParserError: unexpected token").size).to eq(2)
   end
 
-  # Each DailyPlan.for rolls the day's shape afresh, so without a shared plan
-  # the two candidates would be answering different requests.
+  # Each DailyPlan.for rolls afresh, so without a shared plan the candidates would get different requests.
   it "sends both generation candidates the same prompt" do
     comparison.generate(user.id)
 
@@ -278,8 +276,7 @@ RSpec.describe ModelComparison do
         .and include("complete answers rated solid or better:").and include("cache write")
     end
 
-    # FakeService grades every answer "solid", so no fixture can come out in
-    # order; the run must say so rather than pass it.
+    # FakeService grades everything "solid", so no fixture can come out in order.
     it "reports a fixture whose ratings do not fall in rank order" do
       comparison.review_calibration
 
@@ -368,9 +365,7 @@ RSpec.describe ModelComparison do
       expect(out.string).to include("$")
     end
 
-    # The activation gate checks single replies against the output cap and the
-    # read timeout, which a run's totals cannot show: [100, 1400] and
-    # [750, 750] total the same.
+    # Run totals cannot show single replies against the cap: [100, 1400] and [750, 750] total the same.
     it "prints each call's output tokens and names the largest reply and slowest call against their limits" do
       store_reviews(%w[code_review pattern])
       judge_output_tokens.push(100, 1400, 750, 750)
@@ -378,8 +373,7 @@ RSpec.describe ModelComparison do
       comparison.review_prose(user.id)
 
       sonnet_block, haiku_block = out.string.split(/^=== review_prose: /).drop(1)
-      # ai_review is jsonb, which does not keep key order, so labels are read
-      # back from the output rather than assumed.
+      # ai_review is jsonb, which does not keep key order, so labels are read back from the output.
       calls = sonnet_block.scan(/^(\S+ \w+): keep \d+ms · (\d+) out$/)
       expect(calls.map(&:last)).to eq(%w[100 1400])
       expect(sonnet_block).to include("largest reply: 1400 out (#{calls.last.first}) of the #{AiService::REVIEW_JUDGE_MAX_TOKENS} cap")

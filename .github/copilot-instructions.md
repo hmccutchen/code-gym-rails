@@ -139,7 +139,9 @@ validation.
 
 **Does a comment restate the line beneath it?** Cut it. **Does it state a WHY
 the code cannot?** Keep it — a hidden constraint, a workaround, an invariant a
-future reader would otherwise break.
+future reader would otherwise break. Every comment is one line, which
+`CodeGym/SingleLineComment` enforces; longer reasoning goes in CLAUDE.md, a doc
+or the PR description.
 
 Some comments read as obvious but carry something real and must survive: a
 non-RESTful route, a partial's required locals, an abstract method's contract,

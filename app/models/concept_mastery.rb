@@ -3,15 +3,7 @@ class ConceptMastery < ApplicationRecord
 
   enum :tier, { standard: 0, reduced: 1, paused: 2 }, prefix: true
 
-  # The one place selection says "rows of this bucket that its vocabulary still
-  # holds." Both halves belong together: a row survives a concept being renamed
-  # or dropped from a vocabulary, and such a row can never resolve — the
-  # generator is only offered vocabulary concepts, ingest normalizes anything
-  # else to "other", and .record_review! skips "other" — so it would stay due
-  # and keep claiming a slot forever (issue #97).
-  #
-  # Filtering on `language:` alone is exactly that bug. Every selection query
-  # goes through here so a new one cannot reintroduce it by omission.
+  # Every selection query goes through here: filtering on `language:` alone keeps dead-concept rows due (#97).
   scope :in_bucket, ->(bucket) { where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket)) }
   scope :in_buckets, ->(buckets) { buckets.map { |bucket| in_bucket(bucket) }.reduce(none, :or) }
   scope :drilling, -> { where.not(drilled_at: nil) }
@@ -20,44 +12,17 @@ class ConceptMastery < ApplicationRecord
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
 
-  # Once a concept is mastered it would otherwise never resurface. These schedule
-  # a re-check at expanding intervals: 7 days ≈ 5 weekday sessions (long enough to
-  # forget, short enough to catch decay), doubling per successful check, capped at
-  # 60 days because two months is the outer edge where a re-check still measures
-  # RETENTION. Past it, a correct answer is indistinguishable from having
-  # relearned the concept elsewhere and a wrong one from never having held it, so
-  # the check stops telling us the thing it exists to ask.
-  #
-  # The cap is about what the check can still measure, not about how often
-  # ordinary rotation happens to resurface a concept. It was once justified that
-  # second way — "each vocabulary is only 13-16 concepts" — which stopped being
-  # true as the vocabularies grew and was never the right argument anyway: an
-  # architecture day draws no language concept at all, security_review draws a
-  # restricted subset, and a schema-review code_review draws only the
-  # data-modeling group, so real coverage of any one concept is far thinner than
-  # counting sections per weekday suggests. Nothing here should be derived from a
-  # vocabulary's size (issue #98).
+  # Capped at 60 days, where a re-check stops measuring retention; never derive this from vocabulary size (#98).
   RETENTION_INITIAL_INTERVAL_DAYS = 7
   RETENTION_GROWTH_FACTOR         = 2
   RETENTION_MAX_INTERVAL_DAYS     = 60
-  # How far past its own due date a check must fall before it's "meaningfully
-  # overdue" enough to bump a reinforcement slot: 1 means overdue by 100% of
-  # the concept's own current retention_interval_days (a 7-day check crosses
-  # at 14 days past due, a 28-day check at 56). Sits alongside
-  # RETENTION_GROWTH_FACTOR as an equally tunable knob on the same schedule.
+  # 1 means overdue by 100% of the concept's own retention_interval_days.
   RETENTION_OVERDUE_THRESHOLD_MULTIPLIER = 1
 
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: [ :user_id, :language ] }
 
-  # Called inside ResponsesController#review, in one transaction per successful
-  # batch of sections (a review action may fire this more than once across
-  # retries, each time with a disjoint `sections:` — a section can only ever be
-  # evaluated once, since it's removed from "missing" the moment it succeeds).
-  # `apply_session_countdown:` gates Step A (the once-per-day paused-cooldown
-  # decrement) so a later partial-retry within the same day's review never
-  # re-runs it — the controller passes true only on the first successful batch
-  # for a given response.
+  # Pass apply_session_countdown: true only on a response's first successful batch, so retries never re-run Step A.
   def self.record_review!(response, sections:, apply_session_countdown:)
     user = response.user
 
@@ -117,10 +82,7 @@ class ConceptMastery < ApplicationRecord
   end
   private_class_method :skipped_check_scopes
 
-  # Least-favorable-section-wins: the day's representative AI rating is the
-  # lowest-ranked across the concept's sections; self is favorable only if
-  # every such section is favorable. An unreviewed section means no AI signal
-  # for the day, so we skip (no mastery/streak movement without an AI rating).
+  # Least favorable section wins; no AI rating for the day means no mastery or streak movement.
   def self.evaluate_concept!(user, concept, bucket, response, sections)
     ai_ratings = sections.map { |s| response.ai_rating_for(s) }
     return if ai_ratings.any?(&:nil?)
@@ -151,11 +113,7 @@ class ConceptMastery < ApplicationRecord
     end
 
     unless mastered
-      # A failed check drops the schedule entirely; the concept re-enters normal
-      # reinforcement through concepts_needing_reinforcement's existing rules, so
-      # there is no parallel "retry the check" path to maintain. mastered_at stays
-      # as a historical record that it was once mastered — see retention_schedule_for,
-      # which only ever sets it the first time.
+      # A failed check re-enters normal reinforcement; mastered_at stays as the first-mastery record.
       cm.assign_attributes(next_retention_check_on: nil, retention_interval_days: nil)
     end
 
@@ -163,16 +121,7 @@ class ConceptMastery < ApplicationRecord
     cm.save!
   end
 
-  # The interval only grows when the scheduled check was actually DUE. Without that
-  # guard, mastering the same concept three days running would inflate 7 → 14 → 28
-  # with no real spacing behind it; here the date is simply re-anchored instead.
-  #
-  # `on_date` (response.date, the day the submitted work covers) decides whether
-  # the check was due — that's a question about the work being reviewed, and a
-  # late review shouldn't change the answer. But the NEXT check has to count
-  # forward from today (the day we're actually scheduling it), not from
-  # response.date — otherwise reviewing a 10-day-old submission schedules a
-  # check that's already days in the past and immediately due.
+  # Grow only when the check was due on the work's date; count the next check forward from today, not that date.
   def self.retention_schedule_for(cm, on_date)
     due = cm.next_retention_check_on.present? && cm.next_retention_check_on <= on_date
 
@@ -186,9 +135,7 @@ class ConceptMastery < ApplicationRecord
       end
 
     {
-      # Set only on first mastery — mastered_at is a historical "when was this
-      # concept first mastered" record, not a "most recently" timestamp, so a
-      # later successful retention check must not overwrite it.
+      # First mastery only: a later retention check must not overwrite it.
       mastered_at:             cm.mastered_at || Time.current,
       retention_interval_days: interval,
       next_retention_check_on: Date.current + interval
@@ -196,8 +143,7 @@ class ConceptMastery < ApplicationRecord
   end
   private_class_method :retention_schedule_for
 
-  # Where a pause lets go: an expired cooldown and ConceptDrills.start! both
-  # leave the row here, so a drill cannot invent a second way out.
+  # Shared with ConceptDrills.start!, so a drill cannot invent a second way out of a pause.
   def end_pause
     assign_attributes(tier: :reduced, streak: 0, cooldown_remaining: 0)
   end

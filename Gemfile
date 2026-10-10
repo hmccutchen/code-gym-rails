@@ -29,18 +29,13 @@ gem "pagy", "~> 43.7"
 # Server-side syntax highlighting for code blocks [https://github.com/rouge-ruby/rouge]
 gem "rouge", "~> 5.1"
 
-# Slices RealSource method excerpts out of their files by AST position.
-# Declared, not left to irb's transitive dependency: a production boot never
-# requires it on its own, and a Rails upgrade could drop that path silently.
+# RealSource slices excerpts with Prism; declared because irb's transitive dependency on it could vanish.
 gem "prism", "~> 1.9"
 
-# Re-indents provider-written Ruby at the generation boundary with its Layout
-# cops (CodeFormat::Ruby), so it is needed in production, not only for linting.
+# Needed in production: CodeFormat::Ruby re-indents provider-written Ruby with its Layout cops.
 gem "rubocop", require: false
 
-# VAPID-signed Web Push delivery for the daily reminder (PushDelivery).
-# The reminder is best-effort: the gem is only ever reached from a background
-# job, so a push failure cannot surface on a request.
+# Web Push for the daily reminder (PushDelivery), only ever called from a background job.
 gem "web-push", "~> 3.1"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
@@ -59,9 +54,6 @@ gem "kamal", require: false
 
 # Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]
 gem "thruster", require: false
-
-# Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-# gem "image_processing", "~> 1.2"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
@@ -86,11 +78,7 @@ group :development do
 end
 
 group :test do
-  # Real-browser system specs, driven by Playwright — kept in its own group
-  # (not merged into :development, :test) so neither gem loads outside tests.
-  # capybara-playwright-driver is pinned because its playwright-ruby-client
-  # dependency must stay compatible with the exact playwright-core CLI version
-  # pinned in spec/playwright/package.json — bump the two together.
+  # capybara-playwright-driver's pin must move with playwright-core in spec/playwright/package.json.
   gem "capybara"
   gem "capybara-playwright-driver", "~> 0.5.12"
 end

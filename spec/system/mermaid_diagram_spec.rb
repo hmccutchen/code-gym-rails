@@ -1,35 +1,14 @@
 require "rails_helper"
 
-# The "a failed diagram leaves no trace" guarantee used to be structural: the
-# container was display:none by default and revealed only on a successful
-# render, so no JS path could produce a broken box. Making diagrams collapsible
-# inverted that — the disclosure now renders visible, and the module script has
-# to REMOVE it on failure. That moves the guarantee out of CSS and into
-# JavaScript, where only a real browser can verify it.
-#
-# These assertions read the DOM directly rather than using have_no_css, because
-# .mermaid-diagram:empty is display:none — a Capybara visibility check passes
-# identically whether the element was removed or is merely still empty, which is
-# exactly the distinction these specs exist to draw.
+# Read the DOM directly: .mermaid-diagram:empty is display:none, so have_no_css can't tell removed from empty.
 RSpec.describe "Mermaid diagram failure cleanup", type: :system do
   let(:user)    { create_fake_provider_user }
   let(:weekday) { a_weekday }
 
-  # Passes MermaidSource, so it reaches the browser, and then fails Mermaid's
-  # own parse on the unclosed label.
+  # Passes MermaidSource, so it reaches the browser, then fails Mermaid's own parse on the unclosed label.
   bad_diagram = "flowchart TD\n  A[unclosed --> B"
 
-  # Travelled here rather than around each example body, the way the sibling
-  # specs do it: this spec already enters the page in one place, and that place
-  # is the only one that knows about `weekday`, so dating the record and
-  # rendering against that same date happen together.
-  #
-  # travel_to stubs this process's clock, not the browser's — what matters is
-  # that the SERVER answers the visit as of `weekday`. Without it these examples
-  # pass Monday to Friday, where a_weekday IS today, and fail every weekend,
-  # when a_weekday jumps forward to the next Monday while the server still
-  # answers as the real day and renders its "no exercises on weekends" empty
-  # state instead of the set.
+  # travel_to makes the server answer as of `weekday`; without it these fail every weekend.
   def start_dashboard(problem_set)
     travel_to(weekday) do
       DailyExercise.create!(user: user, date: weekday.to_date, language: "ruby_rails",
@@ -38,8 +17,7 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     end
   end
 
-  # The module script imports Mermaid from a CDN, so cleanup lands after an
-  # unpredictable delay; poll rather than sleep on a guessed duration.
+  # Mermaid loads from a CDN, so cleanup lands after an unpredictable delay; poll rather than sleep.
   def wait_until(timeout: 15)
     deadline = Time.current + timeout
     loop do
@@ -62,8 +40,6 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     start_dashboard(ps)
     expect(page).to have_content(/Code Review/i, wait: 10)
 
-    # Gone entirely — not a still-empty box, and not a clickable triangle with
-    # nothing behind it.
     wait_until { count(STRUCTURE_SUMMARIES).zero? }
     expect(count(EMPTY_DIAGRAMS)).to eq(0)
   end
@@ -79,11 +55,7 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     expect(count(EMPTY_DIAGRAMS)).to eq(0)
   end
 
-  # The regression this guards already happened once during development:
-  # cleanup that walks up to the nearest <details> unconditionally deletes
-  # architecture's "Reference — tradeoffs" box, destroying content the diagram
-  # never owned. collapsible: false is what makes removing only the div the
-  # correct blast radius.
+  # Cleanup that removes the nearest <details> unconditionally would delete a reference box the diagram doesn't own.
   it "takes out only its own div when a failed diagram sits in a box it does not own" do
     ps = FakeService::EXERCISE_PROBLEM_SET.deep_dup.except("challenge")
     ps["architecture"] = {

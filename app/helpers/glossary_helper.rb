@@ -1,27 +1,9 @@
-# Wraps each curated Glossary::TERMS match's first case-insensitive,
-# word-boundary occurrence in `text` with a <span class="gloss-term"
-# data-definition="..."> that the tooltip CSS/JS (in the layout) reads.
-# Scans against the full curated glossary — not an AI-selected subset — via
-# Glossary::TERM_PATTERN, a single alternation regex compiled once at load
-# rather than looping per term on every render. Operates on the raw,
-# un-escaped `text` — never on already-escaped HTML, since escaping entities
-# can shift word-boundary positions — and escapes every resulting fragment
-# (plain text and span attributes) individually before assembling the final
-# string. The result is marked .html_safe only after that escaping, so
-# nothing in `text` can ever break out of the surrounding markup.
-#
-# Each span also carries tabindex="0", role="button", and an aria-label of
-# "term: definition" so the tooltip is reachable and announced for keyboard
-# and screen-reader users, not just mouse/touch — the layout's CSS shows the
-# tooltip on :focus-visible in addition to :hover/.gloss-open, and its JS
-# toggles .gloss-open on Enter/Space in addition to click/tap.
+# Works on raw text and escapes each fragment before marking the result html_safe, so `text` can't break the markup.
 module GlossaryHelper
   def glossary_wrap(text)
     return text if text.blank?
 
-    # Strip any ActiveSupport::SafeBuffer wrapper unconditionally: html_escape
-    # is a no-op on already-html_safe input, which would silently skip every
-    # escape call below if `text` ever arrived pre-marked safe.
+    # html_escape is a no-op on html_safe input, so a SafeBuffer would silently skip every escape below.
     text = text.to_str
 
     matches = []

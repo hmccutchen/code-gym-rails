@@ -29,10 +29,7 @@ class ApiKeysController < ApplicationController
 
   private
 
-  # The password field is always blank when this page renders (existing keys
-  # are never echoed back), so a blank submission means the user only touched
-  # the language dropdown or the provider choice -- not that they're clearing
-  # their key.
+  # Existing keys are never echoed back, so a blank key field means only the other preferences changed.
   def preferences_update
     unless current_user.api_key_present?
       flash.now[:alert] = t("flash.application.api_key_needed")

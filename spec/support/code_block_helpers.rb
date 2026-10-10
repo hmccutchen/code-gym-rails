@@ -1,5 +1,4 @@
-# CodeHighlight renders each source line as its own .code-line, with no
-# newline between them, so a block's text reads back by joining its lines.
+# CodeHighlight puts each line in its own .code-line with no newline, so join the lines to read the text.
 module CodeBlockHelpers
   def code_block_text(code)
     code.css(".code-line").map { |line| line.text == "\n" ? "" : line.text }.join("\n")

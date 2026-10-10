@@ -1,41 +1,21 @@
-# Given a problem statement, the engineer writes pseudocode; one call at review
-# time then translates it into real code FAITHFULLY, preserving whatever the
-# plan got wrong, and the grading call reads that code. Unscaffolded
-# deliberately — a labelled scaffold would hand over the decomposition, and
-# choosing the decomposition is the exercise.
+# Unscaffolded on purpose: a labelled scaffold would hand over the decomposition, which is the exercise.
 class ExerciseSection::PseudocodeToCode < ExerciseSection
-  # What the round-1 critique may return, bounded because it is provider text
-  # rendered into the page. Three is enough to redirect a plan without
-  # rewriting it for them.
+  # Bounded because critique points are provider text rendered into the page.
   MAX_CRITIQUE_POINTS = 3
 
   MAX_CRITIQUE_POINT_LENGTH = 300
 
-  # problem_statement is the whole task: rendered, persisted, and interpolated
-  # into both round prompts. Bounded on ingest by .reject_unusable!.
+  # Bounded on ingest by .reject_unusable!, since it is rendered and interpolated into both round prompts.
   MAX_PROBLEM_STATEMENT_LENGTH = 2_000
 
-  # A pseudocode plan for a 15-25 line problem. Generous enough not to clip a
-  # verbose planner, bounded because it is user text going into a prompt. Lives
-  # on the kind rather than on either caller, because both of this kind's
-  # provider calls read it from two different entry points — the critique
-  # endpoint validates a request param against it, and
-  # AiService#translate_before_grading checks the submitted answer, which
-  # ResponsesController#create bounds only by UserText::MAX_ANSWER_LENGTH,
-  # which is wider than this kind allows.
+  # On the kind because both provider calls check it, and ResponsesController only bounds answers by the wider MAX_ANSWER_LENGTH.
   MAX_PSEUDOCODE_LENGTH = 6_000
 
   def self.vocabulary_key
     :pseudocode_to_code
   end
 
-  # problem_statement is the entire task for a pseudocode_to_code day: it is the
-  # only thing telling the engineer what to plan, it is interpolated into both
-  # round prompts, and it reaches glossary_wrap in the view — where a non-string
-  # raises. A section with nothing to plan is not a section, so this rejects
-  # rather than repairs, the same call AmbiguityHunt.reject_unusable! makes and
-  # for the same reason. Bounded too, since it is provider text going into a
-  # prompt.
+  # Rejects rather than repairs: the statement is the whole task, and a non-string raises in glossary_wrap.
   def self.reject_unusable!(section)
     statement = section["problem_statement"].is_a?(String) ? section["problem_statement"].strip : ""
     if statement.empty?
@@ -54,15 +34,12 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     nil
   end
 
-  # The only kind that answers true: its grade is about the code its plan
-  # produced, so the translation has to exist before the review's day context
-  # is assembled. See AiService#translate_before_grading.
+  # Its grade is about the translated code, so translation must finish before the day context is built.
   def self.translated_before_grading?
     true
   end
 
-  # A diagram of the structure would hand over the decomposition this section
-  # asks the engineer to produce.
+  # A diagram would hand over the decomposition this section asks the engineer to produce.
   def self.diagrammable?
     false
   end
@@ -71,24 +48,12 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     "responses/answers/pseudocode_to_code"
   end
 
-  # Pseudocode is written as code-shaped text, so it reads wrong in the prose
-  # face. "answer code-answer" is what actually applies the monospace treatment
-  # (see Challenge) — returning the bare "answer" here duplicated the base
-  # default and did nothing.
+  # "code-answer" is what applies the monospace treatment (see Challenge).
   def self.answer_class
     "answer code-answer"
   end
 
-  # The one statement of what counts as a genuine gap. Two consumers read this
-  # method and neither restates it: the round-1 critique prompt
-  # (AiService#critique_pseudocode) and this kind's own .grading_note. A second
-  # wording of this rule is the drift the design set out to prevent, and a spec
-  # asserts both call sites contain exactly this string.
-  #
-  # It lives on the kind rather than beside AiService's #<group>_guidance
-  # methods because those state a rule about a CONCEPT GROUP once for every
-  # section, while this states a rule about one kind at two call sites — and
-  # because ExerciseSection deliberately does not depend on AiService.
+  # The one wording of the gap rule; critique_pseudocode and .grading_note both read it, and a spec checks both.
   def self.gap_standard
     "Only flag a gap if implementing the pseudocode literally as written would produce behavior " \
       "that's actually wrong or that fails to handle something the problem statement requires. " \
@@ -97,8 +62,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
       "be less granular than code — evaluate the REASONING, not the verbosity."
   end
 
-  # Same normalize-and-bound shape as ExerciseSection.normalize_scaffold, and
-  # for the same reason: provider text going into the page.
+  # Bounded like normalize_scaffold, because it is provider text going into the page.
   def self.normalize_critique(raw)
     return [] unless raw.is_a?(Array)
 
@@ -129,8 +93,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     SCHEMA
   end
 
-  # `section["rounds"]` is merged in by the caller from the response's
-  # pseudocode_rounds column — the exercise's own problem_set never holds it.
+  # section["rounds"] is merged in by the caller from pseudocode_rounds; problem_set never holds it.
   def self.review_context(section:, answer:, rating:)
     rounds = section["rounds"].is_a?(Hash) ? section["rounds"] : {}
 
@@ -144,9 +107,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     CONTEXT
   end
 
-  # Absence is stated rather than left blank: a reviewer given no critique line
-  # cannot tell whether the engineer declined one or the field went missing, and
-  # .grading_note turns on exactly that difference.
+  # States absence explicitly, since .grading_note depends on whether a critique was declined or is missing.
   def self.critique_lines(rounds)
     return "No critique was requested, so there was no revision round." if rounds["critiqued_at"].blank?
 
@@ -158,20 +119,7 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   end
   private_class_method :critique_lines
 
-  # Translation runs at review time against the submitted answer, so the two
-  # normally match and the first branch is what a new day takes. The second is
-  # for rows from when translating was a button the engineer pressed before
-  # submitting and could keep editing after: saying so is what keeps
-  # .grading_note's "any flaw in the code is a flaw in the plan" rule honest,
-  # since otherwise a draft's flaws get attributed to a plan that no longer
-  # contains them, and improved_code gets written against the wrong approach.
-  # This is the only reader of translated_from, which is why it is stored
-  # separately from the answer at all.
-  #
-  # The code is fenced even though a provider wrote it: the translator is
-  # asked to carry the plan over literally, so whatever the engineer typed
-  # into a string or a comment arrives here intact. Unfenced, it is the
-  # pseudocode's instructions again with the fence taken off.
+  # The second branch covers old rows translated from a draft; the code stays fenced because it carries the plan's text intact.
   def self.translation_lines(rounds, answer)
     code = rounds["generated_code"].presence
     return "They never translated their plan into code." if code.nil?

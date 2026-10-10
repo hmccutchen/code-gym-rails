@@ -23,10 +23,7 @@ RSpec.describe FakeService do
     it "answers with every ExerciseSection kind, and delivers sections with valid, non-'other' concepts" do
       problem_set = described_class.new(user.api_key).generate_exercise(user, language: "ruby_rails")
 
-      # Derived from the registry rather than restated: this example's whole
-      # claim is "every kind", and a hardcoded list quietly stops meaning that
-      # the moment a kind is added. Ingest then prunes the slots the day's
-      # plan left empty, since every kind at once is more than a day holds.
+      # Derived from the registry so "every kind" stays true when a kind is added.
       expect(described_class::EXERCISE_PROBLEM_SET.keys).to match_array(ExerciseSection.keys)
       expect(ExerciseSection.resolved_keys(problem_set)).to include(*ExerciseSection.fixed.map(&:key))
       problem_set.each_value do |section|
@@ -35,10 +32,7 @@ RSpec.describe FakeService do
       end
     end
 
-    # The behavioural half of the faithfulness check: the canned plan omits the
-    # empty-input case, and the canned translation omits it too. A fixture that
-    # "helpfully" added a guard would let the faithfulness specs pass while
-    # proving nothing.
+    # A canned translation that added the guard would let the faithfulness specs pass while proving nothing.
     it "returns a translation that preserves the gap its own critique names" do
       expect(described_class::PSEUDOCODE_CRITIQUE["gaps"].join).to match(/empty/i)
       expect(described_class::PSEUDOCODE_TRANSLATION).not_to match(/empty\?|nil\?|blank\?|\.any\?/)
@@ -96,10 +90,7 @@ RSpec.describe FakeService do
       end
     end
 
-    # The fake's own raise cannot protect this: it runs inside
-    # AiService#safe_difficulty_assessment, which swallows everything so a note
-    # never costs a review. So a broken section scan would show up as reviews
-    # that quietly carry no difficulty — this spec is what makes it loud.
+    # AiService#safe_difficulty_assessment swallows every error, so only this spec makes a broken scan loud.
     it "returns a difficulty for every section it was asked about" do
       user_exercise = DailyExercise.create!(
         user: user, date: Date.current, language: "ruby_rails", generated_at: Time.current,

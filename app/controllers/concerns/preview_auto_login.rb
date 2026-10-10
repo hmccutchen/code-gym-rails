@@ -1,43 +1,22 @@
-# Transparent login for a Railway PR app: opening the deployment URL lands the
-# reviewer on the dashboard rather than a login form they have no mailbox for.
-#
-# The gate is checked at class-definition time, not per request: unless
-# PREVIEW_APP is set at boot, the callback is never added to the chain, so a
-# non-preview deployment has no path that could run this — not one that declines
-# at request time. What that safety rests on is PREVIEW_APP being reserved for
-# pull-request deployments: railway.toml exports it only from
-# [environments.pr.deploy], and nothing in the app sets it. It is still an
-# ordinary environment variable, so setting it by hand on a production service
-# would enable this — that variable is the thing to keep un-set, and the reason
-# PreviewEnvironment documents it as such.
+# Preview-only auto-login, registered at class definition only when PREVIEW_APP is set; never set it on production.
 module PreviewAutoLogin
   extend ActiveSupport::Concern
 
-  # Survives reset_session, which both SessionsController#destroy and
-  # AccountsController#destroy call — a session key would be discarded by the
-  # very action that needs to set it. Using a cookie also keeps every line of
-  # preview-only logic inside this module instead of editing the shared logout
-  # path.
+  # A cookie survives the reset_session that both logout actions call; a session key would be discarded.
   SIGNED_OUT_COOKIE = :preview_signed_out
 
-  # Extracted so the behavior is testable without the registration decision:
-  # specs exercise Behavior directly, while the `included do` block below owns
-  # the decision about whether the callback ever enters the chain.
+  # Specs exercise Behavior directly; the `included do` block owns whether the callback enters the chain.
   module Behavior
     private
 
     def preview_auto_login
       return if current_user
       return if cookies[SIGNED_OUT_COOKIE].present?
-      # Code login must behave exactly as it does everywhere else, and
-      # staying out of this controller is what keeps that flow exercisable here.
+      # Staying out of SessionsController keeps code login exercisable in a preview app.
       return if controller_name == "sessions"
 
       user = User.active.find_by(email: PreviewSeed.target_email)
-      # Seeding may have failed, the account may have been deleted through the
-      # Account page, or the row may be a real user PreviewSeed refused to touch.
-      # A convenience must neither become a 500 nor sign anyone into an account
-      # this seeder did not create.
+      # Never sign into an account the seeder did not create, and never 500 when seeding failed or the row is gone.
       return unless PreviewSeed.seeded?(user)
 
       session[:user_id] = user.id
@@ -48,10 +27,7 @@ module PreviewAutoLogin
                             (controller_name == "sessions" || controller_name == "accounts")
       return unless destroying_session
 
-      # No expires: a browser-session cookie. Quitting the browser (not just
-      # closing the tab) drops it, so auto-login comes back on the next visit
-      # — acceptable in a throwaway preview app, not something to carry into
-      # a real deployment.
+      # A browser-session cookie: quitting the browser brings auto-login back, acceptable only in a throwaway preview.
       cookies[SIGNED_OUT_COOKIE] = { value: "1", httponly: true }
     end
   end

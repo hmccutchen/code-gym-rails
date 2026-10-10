@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# Every code block on a page goes through CodeHighlight on the server. Code is
-# provider output, so markup inside it must reach the page as text on every
-# surface that shows it.
+# Code is provider output, so markup inside it must reach every surface as text.
 RSpec.describe "Server-highlighted code blocks", type: :request do
   PAYLOAD = %(x = "</code><script>alert('x')</script><a href="y" onclick='z'>w</a>").freeze
 

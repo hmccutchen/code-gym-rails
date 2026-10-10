@@ -1,10 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true do
-  # allow_forgery_protection off (config/environments/test.rb) also blanks
-  # csrf_meta_tags — the dashboard's inline submit script reads that meta tag
-  # and throws on a real browser exercising the real fetch/CSRF path, so this
-  # spec needs :with_csrf (spec/support/csrf_helper.rb) turned on.
+  # with_csrf: the submit script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 
   it "enables Submit only once every section is rated, then submits and shows the submitted state" do
     user = create_fake_provider_user
@@ -12,21 +9,15 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
 
     travel_to(weekday) do
       visit_with_todays_set(user)
-      # Regex, not a literal string: this label renders inside
-      # `.section-label` (CSS `text-transform: uppercase`), and the
-      # Playwright driver matches on rendered text — see
-      # dashboard_generation_spec.rb for the full explanation.
+      # Regex: `.section-label` is uppercased by CSS and Playwright matches the rendered text.
       expect(page).to have_content(/Code Review/i, wait: 10)
 
       expect(page).to have_button("Submit answers", disabled: true)
 
-      # Answer every section the page actually holds (the count varies with
-      # the day's plan), so "one left unrated" is the only thing blocking.
+      # Answer every section the page holds, since the count varies with the plan.
       fields = rating_row_fields
       fields.each { |field| fill_in_answer(field, "A substantive answer for #{field} that clears the length floor.") }
 
-      # Rate every section but the last: with one answered section left
-      # unrated, the gate must still be blocked.
       fields[0..-2].each { |field| rate_section(field) }
       expect(page).to have_button("Submit answers", disabled: true)
       expect(page).to have_selector("#progress-label", exact_text: "✓ All answered")
@@ -36,9 +27,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_button("Submit answers", disabled: false)
       click_button "Submit answers"
 
-      # A successful submit chains into the review, which lands back on the
-      # dashboard's submitted state. review_request_spec covers the chain
-      # itself; this one only needs the gated click to have gone through.
+      # review_request_spec covers the chained review; this only needs the gated click to have gone through.
       expect(page).to have_content("Review ready!", wait: 10)
       expect(user.daily_responses.sole).to be_submitted
     end
@@ -288,8 +277,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     JS
   end
 
-  # A design comparison's stored answer is written by its own pick and reason
-  # controls, so it is answered through them, as a person would.
+  # A design comparison's answer is written by its pick and reason controls, so answer through them.
   def fill_in_answer(field, text)
     comparison = first(%([data-comparison-answer="#{field}"]), minimum: 0)
     return find(%(textarea[data-field="#{field}"])).fill_in(with: text) unless comparison

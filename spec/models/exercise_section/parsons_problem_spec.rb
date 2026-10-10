@@ -44,11 +44,7 @@ RSpec.describe ExerciseSection::ParsonsProblem do
       expect(decode("order:2,0,1")).to be_nil
     end
 
-    # RegenerateExerciseJob writes the replacement problem_set onto the same
-    # row, so the exercise id and the section key are both unchanged. Were the
-    # blocks out of the signature, a token sequence learned from the set that
-    # was replaced would still decode here, and submitting it would arrange a
-    # puzzle nobody had read.
+    # Regeneration keeps the row and key, so only the blocks in the signature stop a stale token decoding.
     it "refuses a token from the set a regeneration replaced, same row and same block count" do
       replaced = token(0, data: { "blocks" => %w[x y z] })
 
@@ -56,9 +52,7 @@ RSpec.describe ExerciseSection::ParsonsProblem do
       expect(decode("order:#{replaced},#{token(1)},#{token(2)}")).to be_nil
     end
 
-    # Blocks are provider output and nothing rejects a separator inside one,
-    # so a digest over the blocks joined on one would read these two puzzles
-    # as the same and carry every token across a regeneration between them.
+    # Blocks are provider output and may contain a separator, so a joined digest would collide.
     it "tells apart two block lists a separator alone cannot" do
       expect(token(0, data: { "blocks" => [ "a\u0000b", "c" ] }))
         .not_to eq(token(0, data: { "blocks" => [ "a", "b\u0000c" ] }))

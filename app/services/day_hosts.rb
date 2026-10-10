@@ -1,8 +1,4 @@
-# Which kinds can tag a concept on one day: the kind must record the concept
-# under the concept's own bucket, and the generation prompt must be allowed to
-# offer it there. Read with no rung, the strictest list, because the plan
-# never reads difficulty targets. Pure; DailyPlan and CoverageException both
-# ask it.
+# Reads vocabularies with no rung, the strictest list, because the plan never reads difficulty targets.
 class DayHosts
   def initialize(language, mode:)
     @language     = language

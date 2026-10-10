@@ -1,8 +1,4 @@
-# Per-user limits on the endpoints that bill one provider call, for a trial
-# account on a house key (see ApplicationController#own_key?). Each endpoint
-# already caps one section or one page; these bound a script or a stuck client
-# across all of them. The scope is fixed rather than the controller's, so every
-# endpoint that declares it shares one hourly and one daily count.
+# A fixed scope rather than the controller's, so every endpoint that declares these shares one hourly and daily count.
 module ProviderCallLimits
   extend ActiveSupport::Concern
 

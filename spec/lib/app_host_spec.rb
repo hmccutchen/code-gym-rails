@@ -3,8 +3,6 @@ require Rails.root.join("lib/boot/app_host")
 
 RSpec.describe AppHost do
   describe ".resolve" do
-    # Production sets APP_HOST deliberately to its custom domain. An injected
-    # value must never win over it.
     it "prefers APP_HOST over the Railway-injected domain" do
       host = described_class.resolve(
         "APP_HOST" => "https://coding-gym.pro",
@@ -14,10 +12,7 @@ RSpec.describe AppHost do
       expect(host).to eq("coding-gym.pro")
     end
 
-    # The bug this exists to fix: Railway injects a bare host, and
-    # URI.parse("web-….up.railway.app").host is nil, which left every preview
-    # app with default_url_options[:host] = nil and a broken ActionCable
-    # origin check.
+    # Railway injects a bare host, and URI.parse(bare).host is nil.
     it "resolves a bare host that carries no scheme" do
       expect(described_class.resolve("RAILWAY_PUBLIC_DOMAIN" => "web-code-gym-rails-pr-117.up.railway.app"))
         .to eq("web-code-gym-rails-pr-117.up.railway.app")
@@ -45,12 +40,7 @@ RSpec.describe AppHost do
   end
 
   describe "on a preview deployment" do
-    # A PR environment inherits its base environment's variables, so it arrives
-    # carrying production's APP_HOST. Verified live on PR #118's environment:
-    # APP_HOST=https://coding-gym.pro alongside
-    # RAILWAY_PUBLIC_DOMAIN=web-code-gym-rails-pr-118.up.railway.app. Honoring
-    # APP_HOST there would point the preview app's default_url_options and
-    # ActionCable origin check at production's host instead of its own.
+    # A PR environment inherits production's APP_HOST, which would point the preview app at production's host.
     it "prefers the injected Railway domain over an inherited APP_HOST" do
       host = described_class.resolve(
         "PREVIEW_APP" => "1",
@@ -76,17 +66,14 @@ RSpec.describe AppHost do
       expect(host).to eq("coding-gym.pro")
     end
 
-    # The variable name is owned by PreviewEnvironment; AppHost reads ENV
-    # directly only because it runs before autoloading is available.
+    # AppHost reads ENV directly only because it runs before autoloading is available.
     it "reads the same variable PreviewEnvironment gates on" do
       expect(described_class::PREVIEW_VAR).to eq(PreviewEnvironment::VAR)
     end
   end
 
   describe "a value that parses to an empty host" do
-    # URI.parse("https://").host is "" rather than nil, so without an explicit
-    # blank check this would be treated as resolved — skipping the next source
-    # AND the fallback, and yielding the blank host this class rules out.
+    # URI.parse("https://").host is "", so without a blank check this would resolve to a blank host.
     it "falls through to the next source rather than resolving blank" do
       expect(described_class.resolve("APP_HOST" => "https://", "RAILWAY_PUBLIC_DOMAIN" => "pr.up.railway.app"))
         .to eq("pr.up.railway.app")

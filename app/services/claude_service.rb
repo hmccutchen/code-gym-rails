@@ -7,17 +7,10 @@ class ClaudeService < AiService
   def self.provider_key = "anthropic"
   def self.key_pattern = /\Ask-ant-/
 
-  # Still gated by REVIEW_PROSE_JUDGE, which a deployment sets only once the
-  # activation gate in CLAUDE.md's "Review prose judge" has been met.
+  # Still gated by REVIEW_PROSE_JUDGE; see CLAUDE.md, "Review prose judge".
   def self.judges_review_prose? = true
 
-  # Keyed by the ApiUsage purpose string, so usage rows and routes name calls
-  # the same way. script/compare_models.rb is how a candidate route gets read
-  # before it is added here. CLAUDE.md's "Per-purpose model routing" holds what
-  # to check before moving a purpose — the provider facts behind those checks
-  # move, so they live in one place rather than two.
-  # Effort is stated even where it is the model's default, so a change to that
-  # default cannot move a route silently.
+  # Keyed by ApiUsage purpose; effort is stated even at the default. See CLAUDE.md, "Per-purpose model routing".
   DEFAULT_ROUTE = { model: "claude-sonnet-5-5", effort: "high" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" },
@@ -25,35 +18,16 @@ class ClaudeService < AiService
     "judge_review"      => { model: "claude-sonnet-5-5", effort: "high" }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
-  # How each model turns thinking off for a capped call. Sonnet 5.5 rejects
-  # "disabled" with a 400 and takes "between_tools", which is valid only at
-  # effort high or below. Opus 5.5 has no thinking-off setting, so it has no
-  # entry and a capped call routed to it raises before sending.
+  # Sonnet 5.5 rejects "disabled" with a 400; Opus 5.5 has no off setting, so a capped call routed to it raises.
   THINKING_OFF = {
     "claude-sonnet-5-5" => { type: "between_tools" },
     "claude-haiku-4-5"  => { type: "disabled" }
   }.freeze
 
-  # Output ceiling, not a target — Anthropic bills generated tokens, so a
-  # headroom-heavy cap costs nothing on the common case. It has to clear the
-  # largest response we ask for: a full-day review, each section carrying
-  # prose arrays plus a structural `improved_code` block. The original 2500
-  # predated those fields and silently truncated reviews mid-string, which
-  # surfaced as a JSON parse error. claude-sonnet-5-5 and claude-opus-5-5 both
-  # think by default and max_tokens caps thinking + response text together, so
-  # this also has to clear whatever the model spends on unrequested thinking.
+  # Must clear a full-day review plus default thinking, which max_tokens caps too; 2500 once truncated reviews mid-string.
   MAX_TOKENS = 16_000
 
-  # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
-  # every retry decision through `retry_if` — faraday-retry treats a method on
-  # its `methods` list as retryable outright and never consults `retry_if`, and
-  # POST (which every call here uses) has to be on one list or the other or no
-  # retry ever fires. 429 is Anthropic's rate limit; 500/502/503/504 are
-  # transient provider-side failures; 529 is Anthropic's own "overloaded"
-  # status. Retry-After / RateLimit-Reset response headers are honored
-  # automatically by faraday-retry when present, taking precedence over the
-  # computed backoff. Exposed as a constant so specs can build an equivalent
-  # test connection instead of duplicating these values.
+  # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
   RETRY_OPTIONS = {
     max:                 AiService::RETRY_MAX,
     interval:            0.5,
@@ -76,13 +50,7 @@ class ClaudeService < AiService
       messages:   history.map { |turn| { role: turn[:role], content: turn[:content] } } +
                   [ { role: "user", content: prompt } ]
     }
-    # A caller-supplied max_tokens is, by construction, tighter than MAX_TOKENS
-    # (sized generously specifically to leave room for unrequested thinking —
-    # see the comment above). Sharing a tight budget with thinking risks the
-    # model spending it all before emitting any reply text, which surfaces as
-    # a truncated/empty response and a 503 for an otherwise-valid request.
-    # Turning thinking off avoids having to guess a split that reserves enough
-    # tokens for both; THINKING_OFF says how each model does that.
+    # A tight caller cap shared with thinking can be spent before any reply text, so thinking goes off.
     body[:thinking] = thinking_off_for(route[:model]) if max_tokens
     output_config = { effort: route[:effort], format: json_format(response_schema) }.compact
     body[:output_config] = output_config if output_config.any?
@@ -96,9 +64,7 @@ class ClaudeService < AiService
 
     parsed = parse_provider_envelope(resp.body, provider: "Claude")
     usage  = parsed["usage"] || {}
-    # Current Sonnet models think by default (unlike claude-sonnet-4-5), so the
-    # text block is no longer reliably content[0] — a leading thinking block
-    # pushes it back, and dig(0, "text") silently returns nil.
+    # A leading thinking block means the text block is not reliably content[0].
     text_block = (parsed["content"] || []).find { |block| block["type"] == "text" }
 
     {
@@ -110,8 +76,7 @@ class ClaudeService < AiService
       cache_read_tokens:  usage["cache_read_input_tokens"].to_i,
       cache_write_tokens: usage["cache_creation_input_tokens"].to_i,
       truncated:     parsed["stop_reason"] == "max_tokens",
-      # Reported as data, like truncation, so call_and_log records the billed
-      # usage before it raises: a refused request still charges its input.
+      # Reported as data so call_and_log records usage first: a refused request still charges its input.
       refusal:       refusal_category(parsed),
       http_status:   resp.status
     }
@@ -120,18 +85,11 @@ class ClaudeService < AiService
     raise error_class, "Network error calling Claude: #{e.message}"
   end
 
-  # Anthropic's out-of-credit replies, per platform.claude.com/docs/en/api/errors
-  # and /rate-limits: a 402 billing_error, a 400 whose message begins "You have
-  # reached your specified ... API usage limits" (a spend limit the account
-  # set) or names the credit balance, and a 429 whose details carry
-  # enforced_spend_limit_reached (the tier's monthly cap, sent with no
-  # retry-after). None is a rate limit, so none is retried as one.
+  # Out-of-credit replies (402, 400 spend-limit message, 429 enforced_spend_limit_reached) are never retried as rate limits.
   SPEND_LIMIT_MESSAGE = /\A(You have reached your specified|Your credit balance)/
   ENFORCED_SPEND_LIMIT = "enforced_spend_limit_reached".freeze
 
-  # Which limit a 429 hit, from the rate-limit headers: the first family whose
-  # remaining count reads zero. 529 is Anthropic's own "overloaded" status,
-  # with the same transient semantics as a 429.
+  # The first rate-limit header family whose remaining count reads zero names the limit a 429 hit.
   RATE_LIMIT_FAMILIES = %w[requests input-tokens output-tokens tokens].freeze
 
   def raise_for_status(resp)
@@ -170,8 +128,7 @@ class ClaudeService < AiService
 
   def routed_model(purpose) = route_for(purpose)[:model]
 
-  # Structured outputs rather than a prefilled "{": every model this service
-  # routes to rejects an assistant prefill with a 400.
+  # Structured outputs rather than a prefilled "{": every model routed here rejects an assistant prefill with a 400.
   def json_format(schema)
     { type: "json_schema", schema: schema } if schema
   end

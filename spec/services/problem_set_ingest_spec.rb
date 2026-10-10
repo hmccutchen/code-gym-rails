@@ -1,20 +1,8 @@
 require "rails_helper"
 
-# ProblemSetIngest's own tests. The front door is .call; the examples below
-# reach individual steps through the `step` helper, which is legitimate here
-# and only here.
-#
-# NO TEST OUTSIDE THIS FILE MAY TOUCH A STEP. Steps are internal seams — the
-# module's tests may use them, callers and their tests may not. The moment a
-# spec elsewhere wants "just the scaffold normalizer", the answer is to assert
-# through .call, not to make a step reachable.
-#
-# Ingest writes nothing, so nothing here needs the database.
+# No test outside this file may touch a step; callers and their specs assert through .call.
 RSpec.describe ProblemSetIngest do
-  # Runs the whole pipeline and hands back the mutated set, so a step-focused
-  # example still goes through the real interface. The steps are ordered and
-  # independent — no step undoes another's work — so asserting one field after
-  # a full run says the same thing as calling that step alone used to.
+  # The steps are ordered and none undoes another, so one field after a full run tests that step.
   def step(problem_set, language: "ruby_rails")
     described_class.call(problem_set, language: language, expected_keys: problem_set.keys).problem_set
   rescue AiService::InvalidResponseError
@@ -26,8 +14,7 @@ RSpec.describe ProblemSetIngest do
   end
 
   describe "grounding a code_review in real source" do
-    # A pool entry whose scenario and id need no file read, so this file stays
-    # database- and disk-free.
+    # Needs no file read, so this file stays database- and disk-free.
     let(:excerpt) { RealSource::APPLICATION_CODE.first }
 
     def grounded(problem_set, source:)
@@ -56,9 +43,7 @@ RSpec.describe ProblemSetIngest do
       expect(set["code_review"]).not_to have_key("source")
     end
 
-    # The trace is server-owned: a provider that emits a `source` key on a toy
-    # day must not be able to mark an excerpt as seen for a set that never
-    # showed it.
+    # A provider-emitted `source` must not mark an excerpt seen for a set that never showed it.
     it "strips a provider-supplied source on a toy day" do
       set = grounded({ "code_review" => { "concept" => "memoization", "source" => excerpt.id } }, source: nil)
 
@@ -66,8 +51,7 @@ RSpec.describe ProblemSetIngest do
     end
 
     describe "the current schema" do
-      # A double rather than a pool entry, since a real Migration reads
-      # db/schema.rb and this file stays disk-free.
+      # A double, since a real Migration reads db/schema.rb and this file stays disk-free.
       let(:migration) do
         instance_double(RealSource::Migration, scenario: "Modelled on Code Gym's own migration",
                                                id: "db/migrate/1_create_things.rb",
@@ -95,8 +79,7 @@ RSpec.describe ProblemSetIngest do
         expect(set["code_review"]).not_to have_key("current_schema")
       end
 
-      # The duck and the difficulty assessment read it from whichever section
-      # they are handed, so no other section may carry a provider's version.
+      # The duck and difficulty assessment read it from any section, so only the stamp may carry it.
       it "strips a provider-supplied one from every other section, leaving the stamp alone" do
         set = grounded({ "code_review" => { "concept" => "wrong_cardinality" },
                          "pattern" => { "concept" => "memoization", "current_schema" => "invented" } },
@@ -123,9 +106,7 @@ RSpec.describe ProblemSetIngest do
       expect(result.suggested_concepts).to be_empty
     end
 
-    # The guarantee that replaces the old ordering comment: a set refused
-    # because nothing usable is left cannot leave a vocabulary suggestion
-    # behind, because nothing is written and the caller never receives a Result.
+    # A rejected set writes nothing and returns no Result, so it cannot leave a vocabulary suggestion.
     it "reports nothing at all when the set is rejected" do
       set = { "ambiguity_hunt" => { "concept" => "invented_concept", "planted_ambiguities" => [] } }
 
@@ -155,8 +136,7 @@ RSpec.describe ProblemSetIngest do
         expect(result.unusable_sections.map(&:key)).to eq(%w[ambiguity_hunt pseudocode_to_code])
       end
 
-      # An unrequested hunt the provider threw in must not take a requested,
-      # usable section down with it.
+      # An unrequested hunt must not take a requested, usable section down with it.
       it "keeps a usable lower-precedence shape when the one above it is refused" do
         pseudo = { "code_review" => { "concept" => "n_plus_one" },
                    "ambiguity_hunt" => { "concept" => "missing_success_criteria", "planted_ambiguities" => [] },
@@ -231,9 +211,7 @@ RSpec.describe ProblemSetIngest do
       expect(ExerciseSection::Pattern).to have_received(:narrow_vocabulary).with(AiService::RAILS_CONCEPTS, rung: nil)
     end
 
-    # Parsons grades by positional diff against one correct sequence, and
-    # neither the data-modeling nor the meta-skill concepts are sequential —
-    # see ExerciseSection::ParsonsProblem.excluded_vocabulary_keys.
+    # Parsons grades by position; see ExerciseSection::ParsonsProblem.excluded_vocabulary_keys.
     it "withholds every data-modeling concept from parsons_problem" do
       vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
 
@@ -248,9 +226,6 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-    # The exclusion is exactly those seven groups and nothing else: parsons
-    # ends up with the same list every other language-bucket kind gets, minus
-    # them.
     it "changes nothing about parsons beyond the exclusion" do
       excluded = AiService::DATA_MODELING_CONCEPTS + AiService::DOMAIN_MODELING_CONCEPTS +
                  AiService::META_SKILL_CONCEPTS +
@@ -282,10 +257,7 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-    # The three kinds that draw the day's full language vocabulary are the only
-    # hosts these concepts can ever have: every other kind draws a disjoint
-    # vocabulary of its own, so it is excluded without anyone writing an
-    # exclusion (see the design doc, question 2).
+    # Every other kind draws a disjoint vocabulary, so these three are the only possible hosts.
     it "offers the meta-skill concepts to code_review, pattern, and challenge" do
       %w[ruby_rails javascript].each do |language|
         %w[pattern challenge].each do |key|
@@ -349,9 +321,7 @@ RSpec.describe ProblemSetIngest do
       expect(vocabulary).to include(*AiService::OO_DESIGN_CONCEPTS)
     end
 
-    # The premise of the test-file idiom in #oo_design_violation_guidance: all
-    # three principles can land on a day whose code_review must also exhibit a
-    # test smell. If selection ever narrows here, that clause is what to revisit.
+    # #oo_design_violation_guidance's test-file idiom assumes this; revisit it if selection narrows.
     it "offers every OO design principle to a test-file code_review" do
       vocabulary = described_class.selectable_vocabulary_for("code_review", "ruby_rails", mode: :test_file)
 
@@ -364,10 +334,7 @@ RSpec.describe ProblemSetIngest do
       expect(vocabulary).not_to include(*AiService::OO_DESIGN_CONCEPTS)
     end
 
-    # A wrong unit, an incomplete cache key and a missing tiebreak are each one
-    # wrong VALUE, which no permutation of blocks expresses. allocation_rounding
-    # is the arguable exception — see the comment on ParsonsProblem — and is
-    # excluded with the group rather than special-cased.
+    # Each is one wrong value no block order expresses; see the comment on ParsonsProblem.
     it "withholds silent-correctness concepts from parsons_problem, whose grade is an ordering" do
       vocabulary = described_class.selectable_vocabulary_for("parsons_problem", "ruby_rails")
 
@@ -401,9 +368,7 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-    # A positional diff cannot measure whether a name matches the domain's own
-    # word, and every permutation of the same blocks performs the same writes
-    # — see the comment on ParsonsProblem.
+    # A positional diff cannot measure naming or write paths; see the comment on ParsonsProblem.
     it "withholds domain-modeling concepts from parsons_problem" do
       %w[ruby_rails javascript].each do |language|
         expect(described_class.selectable_vocabulary_for("parsons_problem", language))
@@ -449,9 +414,7 @@ RSpec.describe ProblemSetIngest do
       expect(described_class.vocabulary_for("ambiguity_hunt", "ruby_rails")).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
     end
 
-    # The asymmetry that matters: generation declines to ASK parsons for a
-    # data-modeling concept, but if one arrives anyway it is a real tag and is
-    # kept. Rewriting it to "other" would destroy history over a preference.
+    # Generation declines to ask for this, but an arriving tag is real; rewriting it would destroy history.
     it "still accepts a data-modeling concept tagged on parsons_problem" do
       expect(described_class.vocabulary_for("parsons_problem", "ruby_rails")).to include("missing_index")
 
@@ -466,9 +429,7 @@ RSpec.describe ProblemSetIngest do
       expect(described_class.vocabulary_for("made_up_section", "ruby_rails")).to eq(AiService::RAILS_CONCEPTS)
     end
 
-    # Ingest validates a persisted set and does not know which mode produced
-    # it, so it passes no mode and gets the full list. The narrowing exists to
-    # steer generation, not to reject a concept after the fact.
+    # Ingest does not know which mode produced a set; the narrowing steers generation only.
     it "returns the full language vocabulary for code_review with no mode" do
       expect(described_class.vocabulary_for("code_review", "ruby_rails"))
         .to eq(AiService::RAILS_CONCEPTS)
@@ -487,9 +448,7 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-    # pattern keeps the full vocabulary: it is the only section that can host
-    # a data-modeling concept on a non-schema day, which keeps a due retention
-    # check reachable.
+    # Pattern keeps a due data-modeling retention check reachable on a non-schema day.
     it "leaves pattern unnarrowed on every mode" do
       %i[application_code test_file schema_review].each do |mode|
         expect(described_class.selectable_vocabulary_for("pattern", "ruby_rails", mode: mode))
@@ -554,8 +513,7 @@ RSpec.describe ProblemSetIngest do
         expect(set["ambiguity_hunt"]["planted_ambiguities"]).to eq(exactly_enough)
       end
 
-      # A refused hunt costs only itself, so each case leaves a code review
-      # standing beside it and reads the refusal off the Result.
+      # A refused hunt costs only itself, so each case keeps a code review beside it.
       def refusal_of(hunt)
         ingest({ "code_review" => { "concept" => "n_plus_one" } }.merge(hunt)).unusable_sections.map(&:reason)
       end
@@ -573,10 +531,7 @@ RSpec.describe ProblemSetIngest do
         expect(refusal_of(planted([ "   ", nil, 42, "" ]))).to contain_exactly(/no usable planted_ambiguities/)
       end
 
-      # The prompt asks for an exact count, but nothing downstream reads it: the
-      # review prompt lists the ambiguities rather than counting them. Rejecting
-      # a short list would discard the day's other three sections over the
-      # likeliest deviation an LLM makes on a counted list.
+      # Nothing downstream reads the count, so a short list must not cost the day its other sections.
       it "keeps a gradable list that came back short of the asked-for count" do
         set = planted(exactly_enough.first(2) + [ "  ", nil ])
         step(set)
@@ -600,9 +555,7 @@ RSpec.describe ProblemSetIngest do
         expect { step(set) }.not_to raise_error
       end
 
-      # plan_review wins the fourth slot when both shapes come back, so the
-      # ambiguity hunt's answer key is never read — discarding the day's other
-      # three sections over it would be strictly worse than ignoring it.
+      # A hunt that lost the fourth slot has an answer key nothing reads.
       it "ignores an unusable list on an ambiguity_hunt that lost the fourth slot to plan_review" do
         set = {
           "plan_review"    => { "plan_excerpt" => "a plan" },
@@ -666,7 +619,6 @@ RSpec.describe ProblemSetIngest do
         expect(ExerciseSection::AmbiguityHunt).not_to have_received(:reject_unusable!)
       end
     end
-
 
     describe "concepts" do
       it "keeps on-list concepts and maps off-list ones to 'other'" do
@@ -751,7 +703,6 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-
     describe "concepts in the fourth-slot vocabularies" do
       it "keeps a valid plan_review concept and buckets suggestions under plan_review" do
         set = { "plan_review" => { "concept" => "scope_creep" } }
@@ -765,9 +716,7 @@ RSpec.describe ProblemSetIngest do
         expect(result["plan_review"]["concept"]).to eq("other")
       end
 
-      # Reached through .call, so the answer-key check runs first: an
-      # ambiguity_hunt fixture needs a usable planted list or the set is
-      # rejected before its concept is ever looked at.
+      # Through .call, an ambiguity_hunt needs a usable planted list or its concept is never checked.
       it "keeps a valid ambiguity_hunt concept regardless of the day's language" do
         set = { "ambiguity_hunt" => { "concept" => "missing_success_criteria",
                                       "planted_ambiguities" => [ "a gap" ] } }
@@ -775,7 +724,6 @@ RSpec.describe ProblemSetIngest do
         expect(result["ambiguity_hunt"]["concept"]).to eq("missing_success_criteria")
       end
     end
-
 
     describe "answer scaffolds" do
       it "keeps a usable scaffold on a scaffolded section" do
@@ -793,8 +741,7 @@ RSpec.describe ProblemSetIngest do
         expect(labels.map(&:length)).to all(be <= ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH)
       end
 
-      # Dropped rather than repaired: the reader then takes the same fallback path
-      # every pre-scaffold row already takes.
+      # Dropped so the reader takes the same fallback every pre-scaffold row takes.
       it "drops an unusable scaffold instead of persisting it" do
         [ "not an array", [], [ "", nil ], [ 42, true ], 42 ].each do |bad|
           set = { "pattern" => { "question" => "q", "answer_scaffold" => bad } }
@@ -815,7 +762,6 @@ RSpec.describe ProblemSetIngest do
       end
     end
 
-
     describe "diagrams" do
       it "keeps a usable diagram on a diagrammable section" do
         set = { "code_review" => { "diagram" => "  flowchart TD\n  A[Job] --> B[(DB)]  " } }
@@ -824,9 +770,7 @@ RSpec.describe ProblemSetIngest do
           .to eq("flowchart TD\n  A[Job] --> B[(DB)]")
       end
 
-      # Dropped rather than truncated: a half a diagram is broken Mermaid, which
-      # the renderer rejects anyway — dropping says the same thing without the
-      # CDN round trip.
+      # Half a diagram is broken Mermaid, which the renderer rejects anyway.
       it "drops an unusable diagram instead of persisting it" do
         [ "", "   ", nil, 42, [ "flowchart TD" ], "flowchart TD\n#{'x' * MermaidSource::MAX_LENGTH}",
           "sequenceDiagram\n  A->>B: hi", "flowchart TD\n  A --> B\n  classDef hot fill:#f00" ].each do |bad|
@@ -914,8 +858,7 @@ RSpec.describe ProblemSetIngest do
       described_class.call(extra, language: "ruby_rails", expected_keys: %w[code_review pattern])
     end
 
-    # Section names are provider-controlled JSON keys, so a newline in one
-    # would forge a second log line if they were interpolated raw.
+    # Section names are provider-controlled, so a raw newline would forge a log line.
     it "escapes a section name rather than letting it forge a log line" do
       forged = full_set.merge("challenge\nFATAL -- : owned" => { "concept" => "caching" })
 
@@ -1016,8 +959,7 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["code_review"]).not_to have_key("eased")
   end
 
-  # An unrequested section can still win a slot by list precedence, so a
-  # provider-written stamp on it would reach the page as if the server wrote it.
+  # An unrequested section can win a slot, so a provider stamp on it would read as the server's.
   it "strips provider-written stamps from a section the day never asked for" do
     set = problem_set.merge("architecture" => { "question" => "q", "concept" => "sync_vs_async",
                                                 "pitched_at" => "principal_engineer", "eased" => true })
@@ -1029,8 +971,7 @@ RSpec.describe ProblemSetIngest, "pitched rung stamps" do
     expect(result["architecture"]).not_to have_key("eased")
   end
 
-  # Only the judge path may say a section was shipped after being rejected,
-  # and only a grounded code_review carries a real excerpt's trace.
+  # Only the judge path may mark a section anchored, and only a grounded code_review carries a source.
   it "strips a provider-written anchor marker and a stray source trace" do
     set = problem_set.deep_dup
     set["pattern"].merge!("anchored" => true, "source" => "forged-trace")
@@ -1148,8 +1089,7 @@ RSpec.describe ProblemSetIngest, "with the second fixed kind" do
   end
 
   describe "a payload with a shape in every slot" do
-    # Every kind at once resolves to one section per slot, which is one more
-    # than a day holds.
+    # Every kind at once resolves to one more section than a day holds.
     let(:every_kind) { FakeService::EXERCISE_PROBLEM_SET.deep_dup }
 
     it "drops the slots the plan left empty, so no requested section is cut" do

@@ -1,10 +1,6 @@
-# Moves each user's single key into a map keyed by provider, so a user can
-# keep a key for every provider and switch between them. users.api_key stays
-# until a later migration drops it, because old code keeps serving while this
-# pre-deploy migration runs.
+# users.api_key stays for now: old code keeps serving while this pre-deploy migration runs.
 class AddApiKeysToUsers < ActiveRecord::Migration[8.1]
-  # Its own model, so this migration keeps working after User stops reading
-  # api_key. Encryption does not depend on the class name.
+  # Its own model, so this keeps working after User stops reading api_key; encryption ignores the class name.
   class LegacyUser < ActiveRecord::Base
     self.table_name = "users"
     encrypts :api_key

@@ -18,6 +18,10 @@ hidden constraint, a workaround, an invariant a future reader would otherwise
 break. Never restate *what* the code does. A comment that would go stale the
 next time the line changes shouldn't be written. One that already has gone
 stale is worse than either kind — fix it or delete it, don't leave it.
+Every comment is one line; `CodeGym/SingleLineComment` fails RuboCop on two or
+more consecutive comment lines and on `=begin` blocks. Reasoning that needs
+more room belongs in this file, a doc under `docs/`, or the PR description,
+with the comment pointing there.
 
 **Some comments must survive a cleanup.** The rule above cuts restatement, not
 explanation, and a few categories read as obvious while carrying something the
@@ -107,9 +111,11 @@ treats as authoritative when "well-tested standard" would otherwise be left to
 interpretation.
 
 **Style baseline: `rubocop-rails-omakase`.** `.rubocop.yml` inherits it whole
-and overrides nothing. Where omakase has an opinion, that opinion wins — don't
-argue formatting in review. Two things it deliberately does *not* cover, so
-neither is machine-checkable here: `Metrics` and `Naming` are disabled outright
+and adds one house cop, `CodeGym/SingleLineComment`
+(`lib/rubocop/cop/code_gym/`), which limits every comment to one line. Where
+omakase has an opinion, that opinion wins — don't argue formatting in review.
+Two things it deliberately does *not* cover, so neither is machine-checkable
+here: `Metrics` and `Naming` are disabled outright
 (no method-length, class-length, ABC, or complexity cop runs, and no naming cop
 at all), and `Lint` is off except for three re-enabled cops.
 `Lint/UselessAssignment` is not among them, so dead locals left behind by an
@@ -3009,9 +3015,24 @@ A system spec that needs today's set calls `visit_with_todays_set(user)`,
 which generates it before the first page load; visiting first would wait out
 the dashboard's 3-second "generating" poll. `dashboard_generation_spec.rb` is
 the one spec that goes through that poll on purpose.
-Running them locally requires a one-time Playwright CLI install — see the
-comment block at the top of `spec/support/system_test_helper.rb` for the
-exact commands. The npm manifests live in `spec/playwright/`, not the repo
+Running them locally requires a one-time install of the pinned Playwright CLI
+and a Chromium build, the same commands CI runs:
+
+```bash
+npm --prefix spec/playwright ci
+./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
+```
+
+`npm ci` rather than `npm install`, so setup never rewrites the lockfile. The
+CLI version must match what playwright-ruby-client expects, so bump it
+together with the gem:
+
+```bash
+npm --prefix spec/playwright install --save-exact \
+  "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
+```
+
+The npm manifests live in `spec/playwright/`, not the repo
 root, so Nixpacks doesn't add a Node phase to the Railway production build.
 CI runs system specs in a separate `system_test` job that installs the same
 CLI (cached on `spec/playwright/package-lock.json`), while the `test` job runs

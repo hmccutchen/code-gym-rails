@@ -26,8 +26,7 @@ RSpec.describe SectionCount do
     expect(described_class.for(history(2, 2, 2, 2, 2))).to eq(3)
   end
 
-  # Without the stretch this is an absorbing state: 2-of-2 forever reads as a
-  # mean of 2 and the day can never grow back.
+  # Without the stretch, 2-of-2 forever reads as a mean of 2 and the day never grows back.
   it "grows back after a full short day" do
     expect(described_class.for(history(3, 3, 3, 3, 3))).to eq(4)
   end
@@ -51,7 +50,6 @@ RSpec.describe SectionCount do
   it "counts scattered skips in full, unlike a consecutive run" do
     expect(described_class.for(history(nil, 4, nil, 4, nil, 4))).to eq(3)
   end
-
 
   describe "with dropped sections" do
     it "lets a drop stand in for a delivered section left unanswered" do

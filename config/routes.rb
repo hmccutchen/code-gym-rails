@@ -1,30 +1,14 @@
 Rails.application.routes.draw do
-  # Railway healthcheck target (railway.toml healthcheckPath). Returns 200 once the
-  # app has booted; served by Rails' built-in health controller, no auth required.
+  # Railway's healthcheck target (railway.toml healthcheckPath).
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Web app manifest. Linked from the layout, this is what lets an iOS
-  # home-screen launch open standalone instead of inside Safari's chrome.
-  # Rails' own PwaController does not inherit ApplicationController, so it is
-  # reachable logged out — which it must be, since the manifest is fetched
-  # before any session exists.
-  # format: false, not just a default: the route would otherwise compile to
-  # /manifest.json(.:format), and a request-supplied format beats the default —
-  # /manifest.json.html then reaches the controller as HTML and raises
-  # MissingTemplate, a 500 on an unauthenticated path any crawler can hit.
+  # format: false, or /manifest.json.html reaches the controller as HTML and 500s on MissingTemplate.
   get "manifest.json" => "rails/pwa#manifest", as: :pwa_manifest, defaults: { format: :json }, format: false
 
-  # The service worker that receives a push and shows the notification. Served
-  # from the root path deliberately: a worker's default scope is the directory
-  # it is served from, and only a root-scoped one covers the whole app. Same
-  # format: false reasoning as the manifest above — /service-worker.js.html
-  # would otherwise reach the controller as HTML and raise MissingTemplate.
+  # Served from the root so the worker's scope covers the whole app; format: false as for the manifest.
   get "service-worker.js" => "rails/pwa#service_worker", as: :pwa_service_worker, defaults: { format: :js }, format: false
 
-  # Not used by anything live today — the dashboard's generation-completion
-  # signal is a polled JSON endpoint instead (this app loads no Turbo/
-  # Stimulus JS, so a broadcast here would have no subscriber). Left mounted
-  # rather than removed, as that's a separate, unrelated cleanup.
+  # Unused: the dashboard polls for generation status because the layout loads no Turbo/Stimulus.
   mount ActionCable.server => "/cable"
 
   # Auth (emailed 6-digit code)
@@ -37,8 +21,7 @@ Rails.application.routes.draw do
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
 
-  # Start a trial on a house key with an invite code: signed out with an
-  # email, or signed in on an account with no key.
+  # Trial on a house key: signed out with an email, or signed in on an account with no key.
   get  "trial/start", to: "trials#new", as: :new_trial
   post "trial/start", to: "trials#start", as: :start_trial
   get  "trial", to: "trials#show"
@@ -47,14 +30,11 @@ Rails.application.routes.draw do
   get "welcome", to: "welcome#show"
 
   # Account page: log out or permanently delete (anonymize) the account.
-  # Singular resource — a user has exactly one.
   resource :account, only: [ :show, :destroy ] do
     patch :toggle_generation, on: :member
   end
 
-  # Enrolment in the daily push reminder. Singular, and not nested under the
-  # account: a user's answer to "do you want reminders" is one thing however
-  # many browser endpoints happen to back it.
+  # Not nested under account: one reminder choice, however many browser endpoints back it.
   resource :push_subscription, only: [ :create, :update, :destroy ]
 
   # Core app
@@ -63,9 +43,7 @@ Rails.application.routes.draw do
   # Past sessions, newest first
   get "history", to: "history#index"
 
-  # The concept library: every concept in the user's vocabularies, whether or
-  # not they have met one. Not nested under anything — a concept's guide
-  # belongs to the vocabulary, not to a user or to a day.
+  # The concept library: every concept in the user's vocabularies, met or not.
   get  "learn", to: "learn#index"
   # Which rung each concept is held at, grouped as Learn groups them.
   get  "progress", to: "progress#index"
@@ -75,9 +53,7 @@ Rails.application.routes.draw do
   get  "learn/lessons/:lesson", to: "learn_lessons#show", as: :learn_lesson
   get  "learn/:bucket/:concept", to: "learn#show", as: :learn_concept
   post "learn/:bucket/:concept/prepare", to: "learn#prepare_concept", as: :prepare_learn_concept
-  # Polled while a guide is being written, the way the dashboard polls for a
-  # finished generation: this app loads no Turbo/ActionCable, so a page learns
-  # that background work finished by checking in.
+  # Polled while a guide is being written; this app loads no Turbo/ActionCable to push completion.
   get  "learn/:bucket/:concept/status", to: "learn#status", as: :learn_concept_status
   # Drills: a concept or a whole display group the user asked to practise.
   post   "learn/:bucket/:concept/drill",      to: "concept_drills#create",        as: :learn_concept_drill
@@ -94,17 +70,13 @@ Rails.application.routes.draw do
   # Manually re-run today's exercise generation (capped at once/day in the controller)
   post "regenerate", to: "daily_exercises#regenerate"
 
-  # Manually trigger on-demand generation when the automatic weekday trigger
-  # in DashboardController#show intentionally didn't fire (weekends).
+  # Manual generation for days the dashboard's weekday auto-trigger skips (weekends).
   post "generate", to: "daily_exercises#generate"
 
-  # Polled by the dashboard while an async generation job is in flight (see
-  # dashboard/_generating.html.erb) — this app has no live Turbo/ActionCable
-  # connection to push completion, so the page checks in instead.
+  # Polled by dashboard/_generating while a generation job runs; nothing pushes completion.
   get "dashboard/status", to: "dashboard#status", as: :dashboard_status
 
-  # Submit/update today's answers. Rating rides along in #create's payload; there
-  # is no per-day show page — /history renders every submitted day, today included.
+  # No per-day show page: /history renders every submitted day, today included.
   resources :responses, only: [ :create ] do
     member do
       post :review       # trigger the inline AI review
@@ -114,23 +86,15 @@ Rails.application.routes.draw do
       delete :start_over # clear today's answers and ratings so the same set can be re-attempted
     end
     collection do
-      # Pre-submission Socratic thinking partner. No :id — fully unpersisted,
-      # nothing to look up by id.
+      # Pre-submission thinking partner; unpersisted, so no :id.
       post :duck_thread
 
-      # The pseudocode_to_code critique round. No :id for the same reason
-      # duck_thread has none: it runs before submission, against today's
-      # response, which may not exist yet on the first call.
+      # No :id: it runs before submission, when today's response may not exist yet.
       post :pseudocode_critique
     end
   end
 
-  # A second framing of one cached concept reference, on demand from inside the
-  # reference's own disclosure. Nothing is created — the framing lives in the
-  # tab that asked for it, like the duck thread — so this is a verb on the
-  # reference, not a nested resource. It still takes an :id, which duck_thread
-  # does not: the reference's text must be read from the server's row rather
-  # than accepted from the client.
+  # Takes an :id so the reference's text is read from the server's row, never from the client.
   resources :concept_references, only: [] do
     member do
       post :explain_differently

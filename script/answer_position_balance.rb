@@ -1,6 +1,4 @@
-# Counts where the better piece of every stored design comparison was shown,
-# to check that ProblemSetIngest's roll stays near even. Read-only, and it
-# prints totals only: never which position any one exercise or user got.
+# Read-only, and prints totals only, never which position any one exercise or user got.
 class AnswerPositionBalance
   KIND = ExerciseSection::DesignComparison
 

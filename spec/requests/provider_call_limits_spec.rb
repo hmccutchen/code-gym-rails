@@ -1,10 +1,6 @@
 require "rails_helper"
 
-# The test environment uses :null_store, whose #increment returns nil, so no
-# limit trips in the rest of the suite. These examples swap in a real store.
-# Requests here are refused by each action's own checks after the limit has
-# counted them, so no provider is called. The limits guard a trial's house
-# key, so the account is a trial unless an example says otherwise.
+# :null_store never trips limits, so these swap in a real store; the limits guard a trial's house key.
 RSpec.describe "Per-user request limits", type: :request do
   let(:user) { create_trial_user }
 
@@ -34,9 +30,7 @@ RSpec.describe "Per-user request limits", type: :request do
       expect(response).to have_http_status(:too_many_requests)
     end
 
-    # One request to each action, then a critique that is over the limit only
-    # if that request counted. Each is refused by its own checks after the
-    # limit has counted it, so no provider is called.
+    # Each request is refused by its own checks after the limit counts it, so no provider is called.
     {
       "duck_thread" => -> { post duck_thread_responses_path, params: {}, as: :json },
       "follow_ups" => -> { post follow_ups_response_path(0), params: {}, as: :json },

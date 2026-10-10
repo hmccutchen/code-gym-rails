@@ -1,13 +1,8 @@
 require "rails_helper"
 
-# The duck thread is entirely inline JavaScript talking to a JSON endpoint, so
-# request specs execute none of it. These cover the parts that only exist in
-# the browser: the toggle, the fetch round trip, the in-memory (never
-# persisted) thread, the client-side turn cap, and Clear.
+# The duck thread is inline JavaScript, so request specs execute none of it.
 RSpec.describe "Duck thread", type: :system, with_csrf: true do
-  # The inline script reads the CSRF meta tag before every fetch, and
-  # allow_forgery_protection off (config/environments/test.rb) blanks it.
-  # See spec/support/csrf_helper.rb.
+  # with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 
   def open_duck(user)
     visit_with_todays_set(user)
@@ -89,10 +84,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       duck = open_duck(user)
 
-      # Hold the response open so Clear can run mid-flight, then release it
-      # with a canned payload. Resolving in-page (rather than letting the real
-      # request through) keeps this deterministic: no network is involved, so
-      # the app's continuation runs on the very next microtask.
+      # Resolve in-page with a canned payload so Clear runs mid-flight deterministically, with no network involved.
       page.execute_script(<<~JS)
         window.__release = null;
         window.fetch = () => new Promise((resolve) => {
@@ -111,10 +103,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
       page.execute_script("window.__release();")
 
-      # Give the resolved reply every chance to land before asserting it
-      # didn't: a bare negative matcher would pass instantly, before the
-      # continuation had run at all, and would keep passing with the guard
-      # removed.
+      # A bare negative matcher would pass before the continuation ran, and keep passing with the guard removed.
       sleep 1
 
       expect(page.evaluate_script("document.querySelectorAll('.duck-turn').length")).to eq(0)
@@ -129,9 +118,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       duck = open_duck(user)
-      # A real 422 from the endpoint (over the message length bound), rather
-      # than a stubbed provider — rspec-mocks stubs set here don't reach the
-      # server thread the driver's requests are handled on.
+      # A real 422 from the endpoint: rspec-mocks stubs don't reach the server thread handling the driver's requests.
       ask(duck, "x" * (ResponsesController::MAX_DUCK_MESSAGE_LENGTH + 1))
 
       expect(duck).to have_content(/too long/i, wait: 10)
@@ -141,8 +128,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
-  # A user reaches for Explain precisely because they don't know what to type,
-  # so the empty input box is the normal case, not an edge case.
+  # Someone reaches for Explain because they don't know what to type, so an empty box is the normal case.
   it "sends the pre-written explanation request with an empty input box" do
     user = create_fake_provider_user
 
@@ -158,8 +144,6 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
-  # A button that looks live and silently swallows the click is worse than one
-  # that is plainly unavailable.
   it "disables Explain at the cap rather than letting it fail silently" do
     user = create_fake_provider_user
 
@@ -175,10 +159,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck.find(".duck-send")).to be_disabled
       expect(duck.find(".duck-input")).to be_disabled
 
-      # Deliberately not clicked: Playwright's click auto-waits for the element
-      # to become actionable and would time out on a disabled button rather
-      # than reporting the no-op this asserts. "Visibly unavailable" is the
-      # whole property — the click itself is covered in manual verification.
+      # Not clicked: Playwright would wait for a disabled button to become actionable and time out.
 
       # Clear restores it along with the rest of the controls.
       duck.find(".duck-clear").click
@@ -199,8 +180,7 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers"
 
-      # Submitting chains into the review, which lands back on the dashboard's
-      # submitted state — where the duck thread must no longer be offered.
+      # Submitting chains into the review and lands on the submitted dashboard, where the duck must not be offered.
       expect(page).to have_content("Review ready!", wait: 10)
 
       expect(page).to have_content("✓ Submitted")

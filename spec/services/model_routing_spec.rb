@@ -5,8 +5,7 @@ RSpec.describe "per-purpose model routing" do
     File.read(Rails.root.join("app/services/ai_service.rb")).scan(/purpose: "(\w+)"/).flatten.uniq
   end
 
-  # The model a call reports is the one it routed to, so a usage row names the
-  # model whose prices apply to it.
+  # A usage row must name the model whose prices apply to it.
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
     it "reports the model #{service_class} routed each purpose to" do
       purposes = service_class::MODEL_FOR_PURPOSE.keys + [ "an_unlisted_purpose" ]
@@ -45,9 +44,7 @@ RSpec.describe "per-purpose model routing" do
     bodies.sole
   end
 
-
-  # An unlisted purpose falls back to the default route, so a misspelled key
-  # would silently route nothing. This is what makes that fallback safe.
+  # An unlisted purpose falls back silently, so a misspelled key would route nothing.
   [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
     it "routes only purposes #{service_class} actually logs" do
       expect(service_class::MODEL_FOR_PURPOSE.keys - purposes_in_use).to be_empty
@@ -65,9 +62,7 @@ RSpec.describe "per-purpose model routing" do
     end
   end
 
-  # Everything above drives #call directly, so none of it would notice
-  # call_and_log dropping the purpose on the way down — the real generation
-  # call would quietly fall back to the default model.
+  # The examples above call #call directly and would miss call_and_log dropping the purpose.
   it "routes the generation call made through call_and_log, not only a direct #call" do
     user     = User.create!(email: "routing@example.com", name: "Routing")
     bodies   = []
@@ -100,8 +95,7 @@ RSpec.describe "per-purpose model routing" do
       expect(body["output_config"]).to eq("effort" => "medium")
     end
 
-    # The comparisons were run on 2026-10-09 (CLAUDE.md, "Per-purpose model
-    # routing"); reading them kept all three on the default route.
+    # See CLAUDE.md, "Per-purpose model routing", for the 2026-10-09 comparisons behind this.
     it "keeps review, duck and pseudocode translation on the default model" do
       %w[review_response duck_thread pseudocode_translate].each do |purpose|
         expect(ClaudeService::MODEL_FOR_PURPOSE).not_to have_key(purpose)

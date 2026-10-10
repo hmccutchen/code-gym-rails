@@ -1,12 +1,4 @@
-# The judge's reply, held to its closed vocabulary at the boundary the way
-# ProblemSetIngest holds a problem set: a status outside three, an issue type
-# or principle outside the lists, a rewritten field outside the kind's prose
-# fields, or blank evidence or reason is invalid output, not a judgment. Pure;
-# specs need no database.
-#
-# A kind with judge_solve_options also gets the judge's blind solve, under
-# SOLVE_FIELD, on every status. The solve is an answer candidate, so no
-# message raised here quotes it.
+# Boundary for the judge's reply, like ProblemSetIngest; no error message quotes the blind solve, an answer candidate.
 class JudgeVerdict
   Invalid = Class.new(StandardError)
 
@@ -31,11 +23,7 @@ class JudgeVerdict
     new(status: status.to_sym, solve: parse_solve(raw, kind), **attributes)
   end
 
-  # The reply shape the provider is held to, one alternative per status, so a
-  # prose reply cannot be generated at all. Built from the same closed lists
-  # .parse checks, which stays the boundary: a schema cannot bound a string or
-  # require a non-empty list, so a blank string or an edit with no issues
-  # still has to be refused there.
+  # The schema can't bound strings or require non-empty lists, so .parse stays the boundary.
   def self.schema_for(kind)
     VerdictSchema.one_per_status(STATUSES) { |status| shape_for(status, kind).merge(solve_shape(kind)) }
   end

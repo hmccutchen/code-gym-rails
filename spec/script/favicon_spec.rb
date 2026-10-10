@@ -1,8 +1,7 @@
 require "spec_helper"
 require "zlib"
 
-# script/generate_icons.py needs Pillow, which CI does not install, so this
-# checks the favicon it wrote rather than running it.
+# script/generate_icons.py needs Pillow, which CI lacks, so this checks the favicon it wrote.
 RSpec.describe "public/favicon.ico" do
   let(:bytes_per_pixel) { 4 }
 

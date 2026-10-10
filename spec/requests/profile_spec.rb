@@ -88,8 +88,7 @@ RSpec.describe "Profile", type: :request do
       expect(user.excluded_section_kinds).to eq([ "parsons_problem" ])
     end
 
-    # Active Record's cast is too forgiving for a request boundary — the same
-    # reasoning as BOOLEAN_VALUES above it.
+    # Active Record's cast is too forgiving for a request boundary, as with BOOLEAN_VALUES above.
     it "rejects a weight sent as a string" do
       login_as(user)
 
@@ -117,9 +116,7 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.excluded_section_kinds).to eq([])
     end
 
-    # A wrong-shaped value used to read as blank, get dropped by strong
-    # parameters, and come back 200 having applied nothing — a success status
-    # for a write that did not happen.
+    # A wrong-shaped value used to be dropped by strong params and return 200 having applied nothing.
     it "rejects a present-but-wrong-shaped preference rather than reporting success" do
       login_as(user)
       user.update!(section_kind_weights: { "challenge" => 4.0 }, excluded_section_kinds: [ "parsons_problem" ])
@@ -152,9 +149,6 @@ RSpec.describe "Profile", type: :request do
         expect(user.reload.section_kind_weights).to eq("challenge" => 2.0)
       end
 
-      # The two-tab clobber this exists to stop: tab B posts the version it read
-      # before tab A saved, so its write is refused rather than silently
-      # replacing A's.
       it "refuses a save posting a version that has moved on, and writes nothing" do
         login_as(user)
         stale = version
@@ -172,9 +166,7 @@ RSpec.describe "Profile", type: :request do
         expect(response.parsed_body.dig("current", "section_kind_preferences_version")).to eq(version)
       end
 
-      # The specific bug a whole-row updated_at would reintroduce: an unrelated
-      # field shares the row, so a coarse stamp would move and refuse a mix save
-      # that nothing had raced.
+      # A whole-row updated_at would refuse a mix save after an unrelated field changed.
       it "does not treat an unrelated field's save as a conflict" do
         login_as(user)
         held = version
@@ -209,8 +201,7 @@ RSpec.describe "Profile", type: :request do
         expect(response.parsed_body.keys).to contain_exactly("name", "time_zone", "daily_section_count")
       end
 
-      # Deliberate coupling: weights and difficulty share one version, so a
-      # stale tab is refused whichever half it touched.
+      # Weights and difficulty share one version, so a stale tab is refused whichever half it touched.
       it "refuses a lock save from a tab that missed another tab's weight save" do
         login_as(user)
         stale = version
@@ -236,8 +227,7 @@ RSpec.describe "Profile", type: :request do
       end
     end
 
-    # Writes replace rather than merge, so returning a slider to its default is
-    # expressed by the key being absent — one representation of default, not two.
+    # Writes replace rather than merge, so a default is represented only by the key being absent.
     it "replaces the stored preferences rather than merging into them" do
       login_as(user)
       user.update!(section_kind_weights: { "challenge" => 0.25, "architecture" => 2.0 })
@@ -248,9 +238,6 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.section_kind_weights).to eq("architecture" => 2.0)
     end
 
-    # Every slider back to Default, or the last exclusion unchecked — the full
-    # reset a user actually performs, distinct from the smaller-replaces-larger
-    # case above.
     it "clears previously-stored preferences on a full reset" do
       login_as(user)
       user.update!(section_kind_weights: { "challenge" => 0.25 }, excluded_section_kinds: [ "parsons_problem" ])
@@ -262,9 +249,7 @@ RSpec.describe "Profile", type: :request do
       expect(user.excluded_section_kinds).to eq([])
     end
 
-    # permit(excluded_section_kinds: []) silently drops a non-scalar entry
-    # rather than raising, so without this guard the malformed payload below
-    # would arrive as [] and clear the user's existing exclusions with a 200.
+    # permit(excluded_section_kinds: []) drops a non-scalar entry, which would clear exclusions with a 200.
     it "rejects an exclusion list containing a non-string entry" do
       login_as(user)
       user.update!(excluded_section_kinds: [ "parsons_problem" ])
@@ -407,9 +392,7 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.daily_section_count).to be_nil
     end
 
-    # Active Record's integer cast turns "" and null into nil, which here
-    # means Automatic, "abc" into 0 and "2.5" into 2, so each would otherwise
-    # save a choice the request never made.
+    # The integer cast turns "" and null into nil (Automatic), "abc" into 0 and "2.5" into 2.
     it "refuses anything else and changes nothing" do
       user.update!(daily_section_count: 3)
       login_as(user)

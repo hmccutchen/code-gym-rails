@@ -1,28 +1,6 @@
 require "rails_helper"
 
-# Pins what every section kind renders, in all three places a section appears:
-# the dashboard answer form, the dashboard's submitted (read-only) state, and a
-# history entry.
-#
-# This guards the refactor that replaces the two elsif chains in
-# dashboard/_exercise and responses/_answered_sections with one loop over
-# DailyExercise#active_section_keys, rendering each kind through a shared
-# wrapper. There is no byte-level equivalent of the prompt snapshots for views,
-# so this stands in for one: every field each kind puts on the page is asserted
-# by a marker string distinctive enough that the assertion can only pass if that
-# exact field reached that exact render.
-#
-# Every kind is covered across all three renders, enumerated from
-# ExerciseSection.thirds/.fourths rather than sampled — a kind quietly dropping
-# out of one of the three renders is the specific failure this exists to catch.
-# (This read DailyPlan's third/fourth weight tables when it was written; those
-# were replaced by SectionRotation's staleness weighting, and the registry is
-# now the authority.)
-#
-# Recorded against unmodified views. Anything asserted here is current
-# behaviour, not desired behaviour: the numbering in SLOT_LABELS is hardcoded
-# per kind today, and the refactor deliberately changes it to derive from the
-# loop index (see the commit that does so).
+# Pins every field each kind renders in the answer form, the submitted state and history; kinds come from the registry.
 RSpec.describe "section rendering", type: :request do
   let(:user) { create_user_with_key }
 
@@ -76,8 +54,6 @@ RSpec.describe "section rendering", type: :request do
     }
   }.freeze
 
-  # The label each kind renders today, slot number included. The numbers are
-  # hardcoded per kind at the time of recording.
   SLOT_LABELS = {
     "code_review"     => "1 — Code Review",
     "pattern"         => "2 — Pattern of the Month: PAT-TITLE",
@@ -90,9 +66,7 @@ RSpec.describe "section rendering", type: :request do
     "pseudocode_to_code" => "4 — Pseudocode to Code: P2C-TITLE"
   }.freeze
 
-  # Body content unique to each kind — the part no shared wrapper can render.
-  # Read from the page's text, since a highlighted snippet puts each token in
-  # a span of its own.
+  # Read from the page's text, since a highlighted snippet puts each token in its own span.
   BODY_MARKERS = {
     "code_review"     => [ "CR-SNIPPET" ],
     "pattern"         => [ "PAT-WHY" ],
@@ -107,11 +81,7 @@ RSpec.describe "section rendering", type: :request do
 
   ANSWER_KEY_MARKERS = %w[AH-SECRET-ONE AH-SECRET-TWO].freeze
 
-  # parsons_problem stores a positional order, not prose, and its read-only
-  # render replays the blocks in that order rather than echoing the answer —
-  # so it is the one kind whose submitted state cannot be asserted by looking
-  # for the stored string. "order:0,2,1" against three blocks puts the first
-  # block right and the other two wrong, exercising both rendered states.
+  # The read-only render replays blocks in the stored order, so assert on the blocks, not the answer string.
   PARSONS_ANSWER = "order:0,2,1".freeze
 
   def page_text
@@ -218,8 +188,7 @@ RSpec.describe "section rendering", type: :request do
           end
         end
 
-        # The ambiguity hunt's planted list is grading data. It must not reach
-        # any rendered page, in any state — see ExerciseSection.all_answer_key_fields.
+        # The planted list is grading data and must not reach any render; see ExerciseSection.all_answer_key_fields.
         it "never renders the answer key, in any of the three renders" do
           [ -> { exercise and get root_path },
             -> { submit!(exercise) and get root_path },

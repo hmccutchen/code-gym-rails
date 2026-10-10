@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# Folding is native <details>, so only a real browser shows that a folded
-# section keeps gating submit, that its status line follows the live form,
-# and that editing a rated, folded section reopens it.
+# Folding is native <details>, so only a real browser shows the gate, status line and reopen-on-edit.
 RSpec.describe "Section folding", type: :system do
   it "folds on a tap, keeps the submit gate, and reopens a rated section on edit" do
     user = create_fake_provider_user

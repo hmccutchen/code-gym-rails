@@ -1,13 +1,4 @@
-# When a failed call's limit lifts, so a sentence can name the time in the
-# user's zone and say when it has already passed. Pure over the values it is
-# given; nothing here reads the clock.
-#
-# A daily limit's boundary is the provider's own fact (Gemini's quota day ends
-# at midnight Pacific), so each provider class answers `daily_quota_reset_at`
-# and an unknown provider gets the base class's day from the failure; a longer
-# wait the provider asked for wins over it. A short limit lifts after the wait
-# the provider asked for, or a minute. A trial allowance resets when the gate
-# that refused the call said it would.
+# Pure: never reads the clock; each provider class owns its daily_quota_reset_at.
 class ResetClock
   SHORT_WAIT = 1.minute
 

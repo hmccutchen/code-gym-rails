@@ -4,8 +4,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
   let(:user)    { create_fake_provider_user }
   let(:weekday) { a_weekday }
 
-  # FakeService always loses parsons_problem to architecture in DailyPlan's
-  # precedence order, so relying on generation would never produce this section.
+  # FakeService always loses parsons_problem to architecture in DailyPlan's precedence, so seed it directly.
   def seed_parsons_exercise
     DailyExercise.create!(
       user: user,
@@ -27,11 +26,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
 
   SORTABLE_URL = "**cdn.jsdelivr.net**sortable**"
 
-  # Both branches of the fallback are decided by whether one CDN request
-  # succeeds, so intercepting that request is what makes either branch testable
-  # at all — otherwise the outcome is whatever the CI runner's network allows,
-  # and the failure branch is never exercised. The stub only needs `create`:
-  # the partial destructures the default export and calls nothing else on it.
+  # Intercepting the CDN request makes both fallback branches testable regardless of the runner's network.
   def stub_sortable_cdn(outcome)
     page.driver.with_playwright_page do |pw|
       pw.route(SORTABLE_URL, ->(route, _request) {
@@ -54,8 +49,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
     expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]", wait: 10)
   end
 
-  # The page shows an opaque token per block, so these read the arrangement
-  # back through the same mapping the server decodes a submission with.
+  # The page shows opaque tokens, so read the arrangement back through the server's own decoding.
   def block_positions
     exercise = user.daily_exercises.sole
     ExerciseSection::ParsonsProblem.token_ids(
@@ -176,9 +170,6 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
-  # The page's tokens stop decoding once the problem is regenerated under it.
-  # The server refuses that save with 409, and the only recovery is a reload,
-  # which brings back blocks the page can save again.
   it "reloads when a save is refused because the problem changed under the page" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
@@ -193,9 +184,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
-  # The reload wipes the banner the refused save set, so without carrying the
-  # message the page would come back changed and silent, with the engineer's
-  # last move gone and nothing saying why.
+  # The reload wipes the banner, so without carrying the message the engineer's lost move goes unexplained.
   it "explains the refusal on the page the reload lands on" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
@@ -209,9 +198,6 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
-  # The message is for the page the reload lands on and nowhere else. A reader
-  # who navigates away instead of reloading, or whose reload never happens,
-  # must not meet the explanation again on a page it says nothing about.
   it "does not follow the reader to another page" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)

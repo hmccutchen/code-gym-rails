@@ -1,7 +1,4 @@
-# Language-independent by nature: an architecture concept transcends any one
-# stack, so it draws from ARCHITECTURE_CONCEPTS rather than the day's language
-# vocabulary. Its review carries no improved_code — the model is asked to return
-# an empty string there, since a design decision has no single corrected form.
+# Its review carries no improved_code: a design decision has no single corrected form.
 class ExerciseSection::Architecture < ExerciseSection
   # Fallback only — see ExerciseSection::Pattern::DEFAULT_SCAFFOLD.
   DEFAULT_SCAFFOLD = [
@@ -57,10 +54,7 @@ class ExerciseSection::Architecture < ExerciseSection
     SCHEMA
   end
 
-  # The options are what the grading note asks the reviewer to weigh, so they
-  # have to be here — without them "did they consider the alternatives?" is
-  # unanswerable. Omitted when blank, since a provider can return a question
-  # with no option list.
+  # The options must be here for the grader to weigh alternatives; omitted when blank.
   def self.review_context(section:, answer:, rating:)
     [
       "Architecture decision (#{section["title"]}): #{section["question"]}",

@@ -1,10 +1,6 @@
 require "rails_helper"
 
-# Background saves used to swallow every failure: the fetch promise was never
-# consumed, so a rejected write left the control showing a state the server had
-# refused. A request spec cannot see that — it exercises the endpoint, not the
-# page's handling of the answer — so these drive a real browser and assert what
-# the engineer is actually told.
+# A request spec can't see how the page handles a refused save, so these assert what the engineer is told in a browser.
 RSpec.describe "Save status", type: :system do
   let(:user) { create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
@@ -12,10 +8,7 @@ RSpec.describe "Save status", type: :system do
     page.execute_script("window.fetch = () => Promise.reject(new Error('offline'))")
   end
 
-  # Unreachable by clicking, which is the point: the last un-excluded kind in a
-  # group has its checkbox disabled. Stripping that attribute reproduces a tab
-  # whose DOM predates another tab's exclusions — the one case that can post a
-  # slot-emptying set and earn a real 422.
+  # Re-enabling the disabled checkbox reproduces a stale tab, the one case that can post a slot-emptying set.
   def exclude_every_fourth_kind
     ExerciseSection.fourths.each do |kind|
       page.execute_script("document.querySelector('#exclude-#{kind.key}').disabled = false")
@@ -53,9 +46,7 @@ RSpec.describe "Save status", type: :system do
     end
   end
 
-  # The banner is set and the page then reloads over it, so the only reader is
-  # the page that replaces this one. Without the hand-off an engineer watches
-  # their edit vanish and is told nothing about why.
+  # The page reloads over the banner, so only the replacement page can show the explanation.
   it "shows a carried explanation on the page the reload lands on" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
@@ -68,8 +59,6 @@ RSpec.describe "Save status", type: :system do
     end
   end
 
-  # Read once: a second reload is a page the message was never about, and the
-  # engineer has already been told.
   it "shows a carried explanation only once" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
@@ -85,9 +74,7 @@ RSpec.describe "Save status", type: :system do
     end
   end
 
-  # A caller that carries a message and then never reloads would otherwise
-  # leave it for whatever page renders this partial next, which could be a
-  # different page days later and about nothing the reader did.
+  # A carried message that is never reloaded must not surface days later on an unrelated page.
   it "keeps a carried explanation off a page it was not about" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
@@ -133,10 +120,7 @@ RSpec.describe "Save status", type: :system do
     expect(user.reload.excluded_section_kinds).not_to match_array(ExerciseSection.fourths.map(&:key))
   end
 
-  # fetch follows redirects, so a save made after the session ended arrives as
-  # the login page: 200, and `ok` true. Taken at face value that reads as a
-  # successful write of something the server never stored — the failure this
-  # file exists to stop, wearing a success.
+  # fetch follows the redirect to the login page, a 200 that would otherwise read as a successful save.
   it "reports a save made after the session ended" do
     visit_as(user)
     visit setup_path
@@ -148,9 +132,7 @@ RSpec.describe "Save status", type: :system do
     expect(page).to have_css("#save-status", text: /signed out/i, wait: 5)
   end
 
-  # One banner, but a failure belongs to the control that earned it: these
-  # three PATCH the same path, so an unkeyed status would let the time zone's
-  # success speak for the exercise mix.
+  # These three controls PATCH the same path, so an unkeyed status would let one control's success hide another's warning.
   it "keeps one control's warning when a different control saves" do
     visit_as(user)
     visit setup_path
@@ -161,8 +143,7 @@ RSpec.describe "Save status", type: :system do
 
     find("#tz-select").select("Pacific")
 
-    # Waits on the write rather than the DOM: the fetch resolves independently
-    # of Capybara, and the point is that this save really did succeed.
+    # Waits on the write, not the DOM: the fetch resolves independently of Capybara.
     deadline = Time.current + 5
     sleep 0.1 until user.reload.time_zone == "America/Los_Angeles" || Time.current > deadline
 

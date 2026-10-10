@@ -1,17 +1,11 @@
 module GenerationFailureHelper
-  # A provider failure is a whole sentence group that names the set itself;
-  # any other stored message (a kept reviewed set, an unusable draft) is a
-  # clause written to follow the "Couldn't generate a new set" prefix.
+  # A provider failure is a whole sentence; any other stored message is a clause following the "Couldn't generate" prefix.
   def regeneration_failure_line(user)
     message = user.generation_failure_message(surface: :regeneration)
     user.last_generation_failure.present? ? message : t("dashboard.exercise.regeneration_failed", error: message)
   end
 
-  # The newest stored review failure, as the sentence its kind earns today,
-  # naming the provider that was tried. Rows written before kinds were stored
-  # carry a code instead and read as the nearest kind, and rows with no
-  # provider can only have come from the current one. Beside sections that
-  # were reviewed, it speaks of the others.
+  # Rows from before review failure kinds were stored carry one of these codes.
   LEGACY_REVIEW_CODES = { "rate_limit" => "short_rate_limit", "authentication" => "bad_key" }.freeze
 
   def review_failure_sentence(response)

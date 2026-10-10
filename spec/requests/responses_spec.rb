@@ -149,10 +149,7 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "POST /responses (parsons_problem answer)" do
-    # The refusal used to read as a save: 200, the section quietly dropped from
-    # the payload. It answers 409 now, which is what the page needs to know it
-    # must reload before another save can land. The guarantee this example was
-    # written for is unchanged and still asserted — the stored order stands.
+    # The refusal answers 409 so the page knows to reload; the stored order must still stand.
     it "keeps a saved order out of reach of a posted positional one" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
@@ -173,10 +170,7 @@ RSpec.describe "Responses", type: :request do
       expect(saved.answers["parsons_problem"]).to eq("order:2,0,4,1,3")
     end
 
-    # A refused encoding stored nothing, so reporting it as saved loses the
-    # rearrangement behind a reported success. Nothing is written at all, which
-    # is what makes the reload safe: the draft the page comes back with is the
-    # last one that did land.
+    # Writing nothing is what makes the reload safe: the page returns with the last draft that landed.
     it "refuses a stale encoding outright rather than reporting a save that dropped it" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] },
@@ -192,10 +186,7 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
     end
 
-    # A page loaded before block tokens shipped posts positions and has no
-    # handler for the 409, so it cannot reload itself. The message it shows is
-    # the only recovery it has, and announcing a reload would describe
-    # something that never happens on exactly the page that needs it.
+    # A page from before block tokens has no 409 handler, so its message must ask the user to refresh.
     it "asks a page that cannot reload itself to refresh rather than announcing one" do
       create_exercise("parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] })
 
@@ -208,11 +199,7 @@ RSpec.describe "Responses", type: :request do
       expect(response.parsed_body["errors"].first).not_to match(/reloading/i)
     end
 
-    # The check and the save have to see one problem set. RegenerateExerciseJob
-    # takes the exercise lock before it writes, so reading problem_set before
-    # that lock let a replacement commit in between: the tokens validated
-    # against the old blocks and the arrangement was then stored against the
-    # new ones, reported as a successful save.
+    # RegenerateExerciseJob writes under the exercise lock, so problem_set must be read inside that lock.
     it "re-reads the problem set under the lock, so a regeneration cannot land between the check and the save" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] }
@@ -274,8 +261,7 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  # The point of re-dating on resume: at its original date the held set is
-  # unreachable here — #create looks it up with `for_date` and 404s.
+  # At its original date the held set is unreachable: #create looks it up with `for_date` and 404s.
   describe "POST /responses after resuming from a pause" do
     include ActiveSupport::Testing::TimeHelpers
 
@@ -371,10 +357,7 @@ RSpec.describe "Responses", type: :request do
       expect(resp.completeness).to be <= 100
     end
 
-    # A payload can hold more third- or fourth-shaped keys than the page ever
-    # renders — FakeService returns every registered kind, and a provider can throw in an
-    # alternate. Tagging what was never shown puts a concept the engineer
-    # never saw into the history that shapes tomorrow's set.
+    # Tagging a section the page never showed would put an unseen concept into tomorrow's history.
     it "omits a section the exercise holds but never presented" do
       create_exercise(
         "code_review"  => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
@@ -567,8 +550,6 @@ RSpec.describe "Responses", type: :request do
 
       post email_review_response_path(daily_response)
 
-      # set_response scopes to current_user.daily_responses -> RecordNotFound,
-      # which test env's show_exceptions = :rescuable renders as a 404.
       expect(response).to have_http_status(:not_found)
     end
 
@@ -880,8 +861,7 @@ RSpec.describe "Responses", type: :request do
       expect(response.body).not_to include(ERB::Util.html_escape("so the review didn't run"))
     end
 
-    # The review waits for its slowest section, so a reset counted from the
-    # end of the review can land a day late across Gemini's midnight.
+    # The review waits for its slowest section, so a reset timed from the end can land a day late.
     it "keeps the time each section failed, not the time the review finished" do
       daily_response = create_submitted_response
       failed_at = Time.utc(2026, 10, 7, 6, 59, 30)
@@ -995,9 +975,7 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  # A review closes the day to regeneration, and every path that clears this
-  # message runs through regeneration — so a message left standing would tell
-  # the user to retry something the reviewed-set guard now refuses.
+  # Every path that clears this message runs through regeneration, which a review closes off.
   describe "POST /responses/:id/review and a stale generation failure" do
     def submitted_response
       exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
@@ -1344,8 +1322,6 @@ RSpec.describe "Responses", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       expect(fake).not_to have_received(:explain_differently)
       expect(r.reload.review_alternates["code_review"]).to eq([ "one", "two" ])
-      # Same error-body shape as follow_ups' cap and every other section error —
-      # {"status", "error"} — not a hand-rolled one-off render.
       expect(JSON.parse(response.body)).to eq("status" => "error",
         "error" => "You've already asked for 2 alternate explanations here.")
     end
@@ -1384,11 +1360,7 @@ RSpec.describe "Responses", type: :request do
       r.update!(review_alternates: { "code_review" => [ "one" ] })
       fake = instance_double(ClaudeService)
       allow(AiService).to receive(:for).and_return(fake)
-      # The size-then-append cap check is race-able: the initial size (1, still
-      # under the cap of 2) is read before this slow provider call. Simulate a
-      # concurrent second request appending its own alternate while this one is
-      # still waiting — the re-check inside with_lock must catch that the cap
-      # was reached in the meantime, rather than overwriting it with a stale array.
+      # Simulates a concurrent append during the provider call; the in-lock re-check must catch the cap.
       allow(fake).to receive(:explain_differently) do
         r.update!(review_alternates: { "code_review" => [ "one", "concurrent" ] })
         "A different framing"
@@ -1464,9 +1436,7 @@ RSpec.describe "Responses", type: :request do
 
     it "reports remaining from the count taken inside the lock, not the pre-provider-call count" do
       r = reviewed_response_for(user)
-      # A concurrent request lands between the advisory pre-check and the lock,
-      # so the in-lock count (2) is one higher than the count read before the
-      # provider call (1). remaining must reflect the fresher number.
+      # A concurrent request raises the in-lock count above the pre-check, and remaining must use the fresher one.
       ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "already asked")
       fake = instance_double(ClaudeService)
       allow(AiService).to receive(:for).and_return(fake)
@@ -1530,11 +1500,7 @@ RSpec.describe "Responses", type: :request do
       2.times { |i| ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "q#{i}") }
       fake = instance_double(ClaudeService)
       allow(AiService).to receive(:for).and_return(fake)
-      # The count-then-create cap check is race-able: the initial count (2, still
-      # under the cap of 3) is read before this slow provider call. Simulate a
-      # concurrent second request completing its own turn pair while this one is
-      # still waiting — the re-check inside with_lock must catch that the cap
-      # was reached in the meantime, rather than blindly writing a 4th user turn.
+      # Simulates a concurrent turn pair during the provider call; the in-lock re-check must catch the cap.
       allow(fake).to receive(:answer_follow_up) do
         ReviewFollowUp.create!(daily_response: r, section: "code_review", role: :user, content: "concurrent")
         "An answer"
@@ -1592,12 +1558,7 @@ RSpec.describe "Responses", type: :request do
       expect(resp.reload.ai_review["security_review"]["rating"]).to eq("solid")
 
       get history_path
-      # "Injection risk" is security_review["title"] — the only place in this
-      # page that string can come from is the section's own render, via
-      # responses/_section's label. (A weaker assertion on "Security review" would also pass off
-      # history/index.html.erb's independent section.humanize pill, which
-      # renders for any rated section regardless of whether the answer
-      # partial rendered anything.)
+      # The title comes only from the section's own render; "Security review" would also match history's pill.
       expect(response.body).to include("Injection risk")
     end
   end
@@ -1733,8 +1694,6 @@ RSpec.describe "Responses", type: :request do
     let(:scaffold) { [ "Which cache, and why:", "How you'd invalidate it:" ] }
     let(:template) { ExerciseSection::Architecture.scaffold_template("answer_scaffold" => scaffold) }
 
-    # The dashboard form renders all three sections, so these need a full set
-    # rather than the single section the POST paths above can get away with.
     def full_set(third = "architecture", scaffold: nil)
       third_data = { "title" => "t", "question" => "q" }
       third_data["answer_scaffold"] = scaffold if scaffold
@@ -1755,9 +1714,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     describe "POST /responses normalization" do
-      # Rating a section triggers an autosave that posts every textarea's raw
-      # value, so an untouched scaffold reaches the server whether the user
-      # typed or not. It must not be stored as if it were an answer.
+      # Rating triggers an autosave of every textarea's raw value, so an untouched scaffold reaches the server.
       it "stores a blank answer when only the scaffold comes back" do
         exercise = create_exercise(full_set("architecture", scaffold: scaffold))
         saved = post_answers(exercise, "architecture" => template)
@@ -1789,9 +1746,7 @@ RSpec.describe "Responses", type: :request do
 
         get root_path
 
-        # Asserted on the textarea's contents, not the page: the labels also
-        # appear in data-scaffold-labels, so a page-wide match would pass even
-        # if the pre-fill never happened.
+        # The labels also appear in data-scaffold-labels, so a page-wide match would pass without the pre-fill.
         expect(textarea_body("architecture")).to eq(ERB::Util.html_escape(template))
 
         labels_attr = response.body[/<textarea[^>]*data-field="architecture"[^>]*>/][/data-scaffold-labels="([^"]*)"/, 1]
@@ -1873,8 +1828,7 @@ RSpec.describe "Responses", type: :request do
 end
 
 RSpec.describe ResponsesController, "duck thread byte allowance" do
-  # A reply the cap allows must fit its own per-turn allowance, whatever the
-  # cap is set to; a flat number outgrew the cap once.
+  # A flat reply allowance once outgrew the cap, so the allowance must fit whatever the cap is.
   it "gives a full-length reply room" do
     allowance = described_class::DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE
 

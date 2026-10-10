@@ -27,8 +27,7 @@ RSpec.describe SharedConcept do
     expect(pick([ entry("n_plus_one", tier: "reduced"), entry("memoization") ], kinds: fixed)).to be_nil
   end
 
-  # Architecture cannot tag a Ruby concept, so the fixed sections are the
-  # other entry's only hosts; counting free sections alone would have paired.
+  # Architecture cannot tag a Ruby concept, so counting free sections alone would have paired.
   it "takes nothing when another entry would lose its only host" do
     list = [ entry("n_plus_one", tier: "reduced"), entry("transaction_safety") ]
 

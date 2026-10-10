@@ -1,8 +1,4 @@
-# GET /trial/start, POST /trial/start — a trial for someone signed out: their
-# email, an invite code and a provider. The emailed login code proves the
-# address, and the trial takes its seat once it is entered.
-#
-# GET /trial, POST /trial — the same for a signed-in account with no key.
+# GET/POST /trial/start for a signed-out visitor; GET/POST /trial for a signed-in account with no key.
 class TrialsController < ApplicationController
   include LoginCodeRequests
 
@@ -44,10 +40,7 @@ class TrialsController < ApplicationController
     refuse_start(t("sessions.email_not_accepted"))
   end
 
-  # GET /trial — the form, or the trial's standing for an account on one. A
-  # first-run account answers the experience question first, as on Setup;
-  # an account with a key of its own has nothing to see here. The first-run
-  # hop keeps the flash, since a trial refused at sign-in lands here first.
+  # GET /trial — the first-run hop keeps the flash, since a trial refused at sign-in lands here first.
   def show
     return redirect_to new_trial_path unless logged_in?
     return redirect_to(welcome_path).tap { flash.keep } if current_user.first_run?

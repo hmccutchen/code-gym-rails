@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# The Display controls on Setup: each choice applies to the page at once,
-# saves, and is still there after a reload. The request specs cover what the
-# layout renders from a stored choice; these cover the browser's side.
+# Request specs cover what the layout renders from a stored choice; these cover applying and saving in the browser.
 RSpec.describe "Display preferences", type: :system, with_csrf: true do
   let(:user) { create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
@@ -147,8 +145,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
 
     choose_display("theme", "light")
     expect(page).to have_css("nav .brand-mark")
-    # currentSrc reads empty while the new source loads, so wait for the plain
-    # logo itself rather than for the outlined one to go.
+    # currentSrc reads empty while the new source loads, so wait for the plain logo itself.
     plain_logo = %r{/logo-[0-9a-f]+\.png}
     Timeout.timeout(5) { sleep 0.05 until logo.call.match?(plain_logo) }
     expect(logo.call).to match(plain_logo)

@@ -1,12 +1,8 @@
-# Blocks are always persisted in correct order (.arrange! scrambles only the
-# display order), so a correct submission is always the
-# identity permutation. That is what keeps grading local and deterministic —
-# the AI is never asked to judge correctness for this kind, only to explain it.
+# Blocks persist in correct order, so a correct answer is the identity permutation and grading never asks the AI.
 class ExerciseSection::ParsonsProblem < ExerciseSection
   ANSWER_PREFIX = "order:".freeze
 
-  # Long enough that guessing one of the few block tokens on a page is not
-  # worth trying, short enough to read in a DOM inspector without scrolling.
+  # Long enough that guessing a token isn't worth trying, short enough to read in a DOM inspector.
   TOKEN_LENGTH = 16
 
   class << self
@@ -14,10 +10,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
-    # The provider returns "blocks" already in correct order, so the scramble
-    # is rolled once at ingest and persisted, and refreshes and the history
-    # view then show the same arrangement. Never the identity permutation,
-    # which would ship an already-solved problem.
+    # Rolled once at ingest and persisted so every view shows the same scramble; never the identity, which is pre-solved.
     def arrange!(section)
       return unless section["blocks"].is_a?(Array)
 
@@ -27,10 +20,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       section["display_order"] = order
     end
 
-    # Correctness is decided here, never by the model: whatever the grader
-    # returned is replaced. nil when the stored section has no blocks, since
-    # there is nothing to grade against and the score would read as a
-    # spurious perfect one.
+    # Replaces whatever the grader returned; nil without blocks, which would otherwise read as a perfect score.
     def fixed_rating(section:, answer:)
       blocks = Array(section["blocks"])
       return if blocks.empty?
@@ -38,16 +28,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       grade(submitted_order(answer, blocks.size), blocks.size)[:rating]
     end
 
-    # The page cannot show a block's position in the correct order, or sorting
-    # by that attribute would solve the puzzle. It shows an opaque token
-    # instead, signed per exercise, section and problem so one day's tokens say
-    # nothing about another's.
-    #
-    # The problem is in the signature because the exercise id is not enough:
-    # RegenerateExerciseJob writes the new problem_set onto the same row, so
-    # without it today's replacement puzzle would reuse today's tokens, and a
-    # token sequence learned from the set it replaced would submit the correct
-    # order for blocks nobody had read.
+    # Opaque so sorting by it can't solve the puzzle; signs the problem too, since regeneration reuses the exercise row.
     def block_token(block_id, exercise:, key:, section_data:)
       OpenSSL::HMAC.hexdigest(
         "SHA256", Rails.application.secret_key_base,
@@ -55,25 +36,14 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       ).first(TOKEN_LENGTH)
     end
 
-    # The blocks are stored in their correct order, so this changes whenever
-    # the puzzle does — including a regeneration that happens to keep the
-    # block count. Serialized as JSON rather than joined on a separator:
-    # blocks are provider output and nothing rejects a separator inside one,
-    # so a join would give ["a\0b", "c"] and ["a", "b\0c"] the same digest
-    # and carry every token across a regeneration between them.
+    # JSON, not a join: provider blocks can contain any separator, so a join lets two puzzles share a digest.
     def problem_digest(section_data)
       OpenSSL::Digest::SHA256.hexdigest(
         Array(section_data&.dig("blocks")).map(&:to_s).to_json
       ).first(TOKEN_LENGTH)
     end
 
-    # Tokens back to the stored positional order. An order this page's tokens
-    # cannot account for is refused rather than stored: taking it at its word
-    # would accept the positional form the tokens exist to withhold, and
-    # "order:0,1,2" counted off the blocks on screen is the whole answer. A
-    # refusal drops the section from the payload, which the caller reads as a
-    # page out of date; the draft already stored is untouched either way,
-    # since nothing a refusal returns ever reaches the record.
+    # Refuses an order these tokens can't account for; accepting "order:0,1,2" would hand over the answer the tokens hide.
     def decode_answer(value, exercise: nil, key: nil, section_data: nil)
       count = Array(section_data&.dig("blocks")).size
       text  = value.to_s
@@ -86,11 +56,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       ANSWER_PREFIX + ids.join(",")
     end
 
-    # The draft field is re-encoded in tokens for the same reason the blocks
-    # are: rendering the stored "order:2,0,1" beside the token list pairs each
-    # visible position with its real id, which is the whole mapping. A draft
-    # that is not a complete permutation renders blank, since the page is
-    # showing the scramble rather than the learner's work.
+    # Rendering the stored positional order beside the tokens would reveal the token-to-id mapping.
     def token_answer(answer:, exercise:, key:, section_data:)
       ids = submitted_order(answer, Array(section_data&.dig("blocks")).size)
       return "" if ids.empty?
@@ -111,71 +77,12 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       true
     end
 
-    # Parsons is a SEQUENCING format: 5-8 blocks reordered into one correct
-    # sequence, graded by positional diff against a known-correct order.
-    #
-    # The data-modeling concepts are not sequential — "these columns are in the
-    # wrong order" is not what wrong_cardinality or missing_index means. The
-    # meta-skill concepts fail the same way from the other direction: they are
-    # about reading and interrogating something, and there is nothing to read
-    # in a pile of blocks whose only question is what order they go in. The
-    # code smells fail on scale rather than on sequence: each names a shape
-    # visible across a class or a call graph, and 5-8 blocks is neither — a
-    # god_object cannot be shown, let alone recognized, in a list short enough
-    # to reorder. A Parsons problem tagged from any of the three degenerates
-    # into nonsense or quietly becomes about something else, and a nonsense
-    # exercise costs more trust than a missed retention check does — a due
-    # concept from any of them still has other hosts (see
-    # AiService#annotate_retention_concept).
-    #
-    # The OO design principles fail on the same axis as the code smells and
-    # for a sharper reason: this format's entire grade is a positional diff,
-    # and none of open_closed, dependency_inversion, or
-    # composition_over_inheritance has an ordering that is right or wrong. An
-    # extension seam, an injected collaborator, and a composed object are
-    # structural judgments a permutation score cannot measure at all.
-    #
-    # The module-design concepts fail on that same axis. A shallow module, a
-    # pass-through method, and a temporally decomposed flow are all judgments
-    # about what an interface hides, and a permutation score measures where
-    # lines sit rather than what a boundary costs — temporal_decomposition
-    # especially, whose whole point is that a correct execution order is not
-    # evidence of a correct module boundary.
-    #
-    # unsafe_migration is the arguable exception: backfill-then-constrain has a
-    # genuinely correct step order, which is exactly this format's shape. It is
-    # excluded anyway, because the case for it is really evidence that
-    # unsafe_migration sits on a different axis from the other four —
-    # operational rather than structural — and the fix for that is to stop
-    # grouping it with them, not to special-case one consumer. Revisit here if
-    # that regrouping ever happens.
-    # The silent-correctness concepts fail on the same axis: a wrong unit, an
-    # incomplete cache key, and a missing secondary sort are each one wrong
-    # VALUE, and no permutation of blocks expresses any of them.
-    # allocation_rounding is that group's arguable exception, for the same
-    # reason unsafe_migration is this list's — validate, floor-divide, then
-    # distribute the remainder is a genuinely correct step order, which is this
-    # format's shape. It is excluded anyway, and for the same reason: the case
-    # for it is evidence that it sits on a different axis from the other three
-    # (algorithmic rather than invariant-spotting), and the fix is to regroup
-    # if that ever matters, not to special-case one consumer.
-    #
-    # The domain-modeling concepts fail on the axis the OO and module-design
-    # groups do. A positional diff measures where lines sit; it cannot measure
-    # whether a name matches the word the domain uses, and a
-    # ubiquitous_language section needs the domain's own wording established
-    # around the code before the collision is visible at all — there is no
-    # room for that in a pile of blocks. aggregate_boundaries fails more
-    # sharply still: its defect is a write path reaching past the object that
-    # owns a set of rows, and every permutation of the same blocks performs
-    # the same writes.
+    # A positional diff can't grade concepts with no right or wrong order; they have other hosts (annotate_retention_concept).
     def excluded_vocabulary_keys
       [ :data_modeling, :domain_modeling, :meta_skill, :code_smell, :oo_design, :module_design,
         :silent_correctness ]
     end
 
-    # The answer is an ordering, not prose: a draggable, keyboard-reorderable
-    # block ladder writing into a hidden field.
     def answer_partial
       "responses/answers/parsons_problem"
     end
@@ -185,8 +92,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       submitted_order(value, blocks.size).any?
     end
 
-    # Incomplete/corrupt attempts still need the existing strict grade and
-    # lenient replay; they do not count as completed work.
+    # Incomplete attempts still need strict grading and lenient replay, though they don't count as completed work.
     def answer_for(value, _section_data = nil)
       value.presence
     end
@@ -211,9 +117,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       SCHEMA
     end
 
-    # Returns [] for a blank, prefix-missing, or malformed answer so grading
-    # degrades to "everything misplaced" rather than raising on a skipped or
-    # corrupted submission.
+    # Returns [] for a malformed answer so grading reads it as all misplaced instead of raising.
     def parse_order(answer)
       text = answer.to_s
       return [] unless text.start_with?(ANSWER_PREFIX)
@@ -221,11 +125,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       text.delete_prefix(ANSWER_PREFIX).split(",").filter_map { |s| Integer(s, exception: false) }
     end
 
-    # answers["parsons_problem"] is a free-form permitted param, so a saved
-    # order can hold duplicate, negative, or out-of-range ids. Anything short of
-    # a complete permutation is rejected outright — a partially valid order
-    # would drop blocks from the page and then be persisted back by the next
-    # autosave.
+    # Saved orders are free-form params; a partial order would drop blocks and get persisted back by the next autosave.
     def normalize_order(ids, block_count)
       return [] unless ids.size == block_count && ids.uniq.size == block_count
       return [] unless ids.all? { |id| valid_id?(id, block_count) }
@@ -237,30 +137,18 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       id.is_a?(Integer) && id >= 0 && id < block_count
     end
 
-    # The one way to read a stored answer as an ordering. Parsing alone is not
-    # enough anywhere it matters: "order:0,1,2,3,4,999" parses into a list
-    # whose first block_count entries are the identity permutation, so every
-    # consumer that indexes positionally would call a malformed answer a
-    # perfect one.
+    # Use this, not parse_order: "order:0,1,2,3,4,999" parses to a list whose prefix is the perfect identity order.
     def submitted_order(answer, block_count)
       normalize_order(parse_order(answer), block_count)
     end
 
-    # The arrangement to render on the dashboard: the learner's own saved order
-    # if it survives normalization, else the generated scramble, else the
-    # stored (correct) order.
     def initial_order(answer:, display_order:, block_count:)
       [ parse_order(answer), Array(display_order) ]
         .filter_map { |ids| normalize_order(ids, block_count).presence }
         .first || (0...block_count).to_a
     end
 
-    # A mismatch count of exactly 1 is impossible for a permutation — the
-    # smallest non-zero mismatch is a pair swap — so the table has no `when 1`.
-    #
-    # Normalizes first so nothing short of a complete permutation can score:
-    # padding to block_count silently drops trailing ids, which would grade
-    # a valid prefix plus garbage as an exact match.
+    # Normalizes first so a valid prefix plus garbage can't grade as exact; no `when 1`, since one lone misplaced block is impossible.
     def grade(submitted_ids, block_count)
       submitted_ids = normalize_order(submitted_ids, block_count)
       padded        = Array.new(block_count) { |i| submitted_ids[i] }
@@ -276,9 +164,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       { mismatches: mismatches, rating: rating }
     end
 
-    # No answer line: the submitted ordering is scored in Ruby against the
-    # stored blocks (see .grade) and handed to the reviewer already graded, so
-    # the raw "order:2,1" string would tell it nothing it can read as prose.
+    # No answer line: the order is already graded in Ruby, and "order:2,1" means nothing to the reviewer as prose.
     def review_context(section:, answer:, rating:)
       <<~CONTEXT.chomp
         Parsons Problem (#{section["title"]}): #{section["question"]}
@@ -286,11 +172,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       CONTEXT
     end
 
-    # A provider can return a parsons_problem object with no "blocks" — that
-    # still resolves as the third section (resolution only checks for a Hash),
-    # but there is nothing to score against, so the prompt must not claim a
-    # verified count. Grading is skipped entirely in that case rather than
-    # reporting the grader's degenerate "0 out of place".
+    # A section can resolve with no blocks; then skip grading instead of claiming a verified "0 out of place".
     def grading_note(section:, answer:)
       blocks = Array(section["blocks"])
 
@@ -313,10 +195,7 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       PARSONS
     end
 
-    # The ground truth the review prompt hands the model, so it explains a
-    # known result rather than judging one. Normalizes and pads the same way
-    # .grade does, so the description can never contradict the score it
-    # accompanies.
+    # Normalizes and pads like .grade, so the description the reviewer gets can't contradict the score.
     def describe_mismatches(blocks, submitted_ids)
       return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
 

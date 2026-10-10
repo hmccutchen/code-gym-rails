@@ -1,13 +1,5 @@
-# The concept both fixed sections take on one day. Pure: reinforcement
-# entries, the day's due checks, a DayHosts and the day's kinds.
 class SharedConcept
-  # A reduced-tier concept has stalled across several reviews, so every fixed
-  # section takes it, each from its own side. Paused concepts never reach the
-  # reinforcement list. The pairing only ever fills hosts nothing else
-  # needed: it is made only when every other reinforcement entry and due
-  # check can still take a distinct remaining kind able to tag it, so a
-  # concept whose only hosts are the fixed sections is never displaced.
-  # Returns the entry, or nil.
+  # Pairs only when every other reinforcement entry and due check still gets a distinct kind, so nothing is displaced.
   def self.pick(reinforcement, due_checks, hosts, kinds:)
     remaining = kinds.reject(&:fourth?) - ExerciseSection.fixed
     checks    = due_checks.map { |cm| [ cm.concept, cm.language ] }

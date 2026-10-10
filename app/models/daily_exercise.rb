@@ -2,16 +2,10 @@ class DailyExercise < ApplicationRecord
   belongs_to :user
   has_one    :daily_response, dependent: :destroy
 
-  # Concrete, generatable languages only -- excludes "mixed", which is a
-  # per-user meta-preference (see User::LANGUAGES) that User#language_for_today
-  # always resolves down to one of these before a DailyExercise is created or
-  # regenerated. Persisting "mixed" here would let an invalid value flow back
-  # into AiService#generate_unjudged_exercise via RegenerateExerciseJob.
+  # Excludes "mixed": a stored "mixed" would flow back into generation through RegenerateExerciseJob.
   LANGUAGES = %w[ruby_rails javascript].freeze
 
-  # A regeneration claim expires so a worker that dies mid-job can't strand the
-  # user on a spinner forever. Must exceed AiService::GENERATION_READ_TIMEOUT
-  # plus job pickup, or a healthy long-running job looks abandoned.
+  # Must exceed AiService::GENERATION_READ_TIMEOUT plus job pickup, or a healthy job looks abandoned.
   REGENERATION_STALE_AFTER = 6.minutes
 
   validates :date, :problem_set, :generated_at, presence: true
@@ -20,8 +14,7 @@ class DailyExercise < ApplicationRecord
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
 
-  # The latest planned size recorded before `date`. A row generated before
-  # plans recorded a size is skipped rather than read as one.
+  # A row from before plans recorded a size is skipped rather than read as one.
   def self.planned_size_before(date)
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
   end
@@ -35,21 +28,15 @@ class DailyExercise < ApplicationRecord
   def plan_review        = problem_set["plan_review"]&.with_indifferent_access
   def ambiguity_hunt     = problem_set["ambiguity_hunt"]&.with_indifferent_access
 
-  # plan_notes records what the plan meant to do; these say whether the
-  # delivered set still shows it, so a dropped section or an ignored
-  # placement never produces a false claim on the dashboard.
-  # Why the plan added a section ("gap" or "due_check"), or nil when it added
-  # none or the added section is no longer on the page.
+  # nil when the plan added nothing or the added section is gone, so the dashboard never makes a false claim.
   def coverage_shown
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end
 
-  # The count the plan sized the day with, before any coverage addition; nil
-  # on a row from before plans recorded it.
+  # Before any coverage addition; nil on a row from before plans recorded it.
   def planned_size = plan_notes["size"]
 
-  # The planned size plus the one section a coverage addition brings
-  # (CoverageException adds at most one), nil when no size was recorded.
+  # CoverageException adds at most one section.
   def planned_size_with_coverage
     planned_size && planned_size + (plan_notes["coverage"] ? 1 : 0)
   end
@@ -64,47 +51,17 @@ class DailyExercise < ApplicationRecord
     regenerating_since.present? && regenerating_since > REGENERATION_STALE_AFTER.ago
   end
 
-  # Which third-section shape this exercise's problem_set actually holds.
-  # Replaces the ad hoc `arch ? "architecture" :
-  # "challenge"` pattern that build_review_prompt used before a third shape
-  # (security_review) existed.
-  #
-  # Checked on the value's shape, not `problem_set.key?(key)`. A provider can
-  # emit a third key holding null or a bare string alongside the real section;
-  # resolving to it would hand build_review_prompt a section whose `["title"]`
-  # raises. The earlier `key?` form of this method did exactly that, and the
-  # per-key readers it replaced (`problem_set["architecture"]&.with_indifferent_access`)
-  # raised outright on a non-Hash value rather than falling through.
+  # Checked on the value's shape: a provider can emit a third key holding null or a string beside the real one.
   def third_key
     ExerciseSection.resolved_key(problem_set, ExerciseSection.thirds) || "challenge"
   end
 
-  # Which fourth-slot shape this exercise's problem_set holds, resolved the
-  # same shape-checked way as third_key. Unlike third_key, there is no
-  # fallback kind: an exercise generated before this slot existed has neither
-  # key at all, and nil is the correct answer for it — every fourth-slot
-  # caller (views, prompt building) treats a nil fourth_key as "nothing to
-  # render/prompt here" rather than needing a default kind to fall back to.
+  # No fallback kind: an exercise from before the fourth slot existed correctly answers nil.
   def fourth_key
     ExerciseSection.resolved_fourth_key(problem_set)
   end
 
-  # The sections this exercise actually presents: each slot's resolved key
-  # (ExerciseSection.resolved_keys), keeping only those the payload holds. This
-  # reads the payload, not the plan — the plan is gone by the time anything
-  # asks — so a section the provider added unasked for still counts here if it
-  # resolves (ProblemSetIngest logs that case; see warn_unrequested_sections!).
-  # A planned day holds 2 to ExerciseSection::MAX_SECTIONS of them, and one
-  # that lost sections can hold fewer: any kind can be dropped, fixed ones
-  # included, so a day can arrive with a single section. A day with none is
-  # never written (AiService::AllSectionsRejectedError, or ingest refusing a
-  # set with nothing usable left).
-  #
-  # NOT `problem_set.keys`. A payload can hold more than one third- or
-  # fourth-shaped key — FakeService answers with every kind deliberately, and a real
-  # provider can return an extra alternate — but only the resolved one is ever
-  # rendered, answerable, or rateable. Every "N of M sections" denominator
-  # derives from this, so a count can never exceed what is on screen.
+  # The single authority for section counts; never problem_set.keys, which can hold unrendered alternates.
   def active_section_keys
     ExerciseSection.resolved_keys(problem_set)
   end

@@ -1,5 +1,3 @@
-# The smallest successful reply each provider's #call can parse, for specs that
-# drive the real request against a Faraday test adapter.
 module ProviderSuccessBodies
   def provider_success_body(service_class, text: "ok")
     body =

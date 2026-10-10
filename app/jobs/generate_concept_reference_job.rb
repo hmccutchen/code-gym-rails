@@ -1,26 +1,14 @@
 class GenerateConceptReferenceJob < ApplicationJob
   queue_as :default
 
-  # The cache is shared across users and refresh modes. Discard overlaps so an
-  # incomplete result cannot immediately trigger another queued, billed attempt.
+  # Discards overlaps so an incomplete result can't trigger another billed attempt on the shared row.
   limits_concurrency key: ->(args) { "#{args.fetch(:language)}/#{args.fetch(:concept)}" },
                      to: 1, on_conflict: :discard,
                      duration: AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
-  # Best-effort: any failure is logged and swallowed, so a missing reference
-  # renders as nothing and is retried the next time anyone submits the concept.
-  #
-  # `refresh` is what the Learn tab passes to rewrite a row missing its guide or
-  # its ladder. It defaults to false so the first-exposure caller in
-  # ResponsesController keeps its original contract: any existing row is a
-  # no-op there, whatever it does or doesn't carry.
-  #
-  # A row is rewritten WHOLE, reference text included, because every part has
-  # to come from one response to be consistent by construction. That is why
-  # only a deliberate click asks for it.
+  # refresh rewrites the whole row so its parts come from one response; only a deliberate Learn click passes it.
   def perform(concept:, language:, user_id:, refresh: false)
-    # "other" is the off-vocabulary catch-all from ProblemSetIngest#normalize_concepts!,
-    # not a real concept worth a reference.
+    # "other" is ProblemSetIngest's off-vocabulary catch-all, not a real concept.
     return if concept == "other"
 
     # Another job may have generated it in the enqueue/run gap.
@@ -35,8 +23,7 @@ class GenerateConceptReferenceJob < ApplicationJob
                    .index_with { |field| reference[field] }
 
     if existing
-      # Keep the write guard even with queue concurrency control: an expired
-      # permit or a direct perform_now caller can bypass that control.
+      # An expired permit or a direct perform_now bypasses queue concurrency control, so keep the lock.
       existing.with_lock do
         next if existing.fully_written?
 
@@ -49,21 +36,12 @@ class GenerateConceptReferenceJob < ApplicationJob
     ConceptReferenceFailures.clear(user_id: user_id, concept: concept, language: language)
     Rails.logger.info("Generated concept reference for #{concept}/#{language}")
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
-    # Uniqueness is enforced twice here, the same as User#resume_generation!'s
-    # date race: the model validation's SELECT can see the other job's
-    # already-committed row and raise RecordInvalid before the database
-    # constraint ever gets a chance to raise RecordNotUnique. With 74-118 jobs
-    # racing over 3 worker threads, the validation losing that race is the
-    # common case, not the rare one, so both exceptions mean the same thing —
-    # a concurrent job won.
+    # The validation can see a concurrent job's committed row before the index does, so both errors mean it won.
     raise if e.is_a?(ActiveRecord::RecordInvalid) && e.record.errors[:concept].blank?
 
     Rails.logger.info("Skipped duplicate concept reference for #{concept}/#{language}")
   rescue AiService::Error => e
-    # The row is shared, so the failure is noted for the user who asked, not
-    # on the row, and the concept page reads it to stop polling. An error
-    # raised after the call (an unusable reply) carries no provider stamp, so
-    # the provider this job called is named instead.
+    # Noted per user because the row is shared; an error raised after the call has no provider stamp of its own.
     e.provider ||= user&.provider
     ConceptReferenceFailures.record(user_id: user_id, concept: concept, language: language, error: e)
     Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language} (#{ProviderFailure.classify(e)}): #{e.message}")

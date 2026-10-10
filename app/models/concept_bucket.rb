@@ -1,23 +1,4 @@
-# The vocabulary bucket a concept's history is recorded under. Architecture,
-# plan_review, ambiguity_hunt, and pseudocode_to_code concepts are each
-# language-independent — they transcend any one stack, so they're tracked in
-# their own bucket rather than under the day's generation language; every other
-# section buckets under that language. Each of the four special buckets is
-# entirely disjoint vocabulary (see AiService::ARCHITECTURE_CONCEPTS/
-# PLAN_REVIEW_CONCEPTS/AMBIGUITY_HUNT_CONCEPTS/PSEUDOCODE_TO_CODE_CONCEPTS), so
-# each gets its own bucket rather than being merged into one shared
-# "meta-skills" bucket — the same granularity ConceptMastery already uses
-# everywhere else.
-#
-# Accepts one section or several: a concept tagged on multiple sections the
-# same day belongs to a special bucket if any of them is that special
-# section (see ConceptMastery.record_review!). Only one special section can
-# ever appear in a given day's `sections` list in practice (a section only
-# occupies one slot), but the lookup is written to tolerate more than one
-# without preferring one arbitrarily — first match by key order wins.
-#
-# A nil language passes through as a nil bucket — callers reading history for
-# a response whose exercise is missing get no bucket rather than an exception.
+# Language-independent kinds record under their own bucket; a nil language passes through as a nil bucket.
 class ConceptBucket
   ARCHITECTURE       = "architecture".freeze
   PLAN_REVIEW        = "plan_review".freeze
@@ -31,19 +12,13 @@ class ConceptBucket
     PSEUDOCODE_TO_CODE => PSEUDOCODE_TO_CODE
   }.freeze
 
-  # The buckets every user holds, whatever language they are assigned. Derived
-  # from the map above so a fifth special bucket joins it without an edit.
   LANGUAGE_INDEPENDENT = SPECIAL_BUCKETS.values.freeze
 
-  # The programming-language buckets a user's language setting covers. Reads
-  # the setting, never User#language_for_today: a library and its coverage must
-  # not change with tomorrow's roll, so "mixed" means both.
+  # Reads the setting, never User#language_for_today, so a library does not change with tomorrow's roll.
   def self.language_buckets_for(language)
     language == "mixed" ? DailyExercise::LANGUAGES : [ language ]
   end
 
-  # Every bucket a user with this language can see: their language's buckets
-  # plus the language-independent ones. The Learn tab and drills both read it.
   def self.slice_for(language)
     language_buckets_for(language) + LANGUAGE_INDEPENDENT
   end
@@ -56,22 +31,7 @@ class ConceptBucket
     language
   end
 
-  # The closed vocabulary a bucket's concepts are drawn from — the counterpart
-  # to .for, which says which bucket a section records under.
-  #
-  # Selection queries need this because a mastery row outlives its vocabulary:
-  # a concept renamed or dropped leaves a row that matches `language: bucket`
-  # forever, and it can never resolve (the generator is only offered vocabulary
-  # concepts, ingest normalizes anything else to "other", and
-  # ConceptMastery.record_review! skips "other"). Filtering on membership is
-  # what keeps such a row from claiming a slot it can never use.
-  #
-  # Every NON-NIL bucket .for can return is a LANGUAGE_CONFIG key — .for also
-  # passes a nil language through as a nil bucket (see above), which no
-  # retention caller does, since those resolve their bucket from
-  # hostable_buckets or FOURTH_BUCKET_FOR. So a miss here is a bucket that
-  # escaped that mapping: fetch raises rather than yielding an empty list,
-  # which a caller would read as "nothing is due" instead of as a bug.
+  # Raises on a miss rather than returning [], which a caller would read as "nothing is due".
   def self.vocabulary_for(bucket)
     AiService::LANGUAGE_CONFIG.fetch(bucket).fetch(:concepts)
   end

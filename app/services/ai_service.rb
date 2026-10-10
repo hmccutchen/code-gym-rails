@@ -1,14 +1,10 @@
 require "json"
 
 class AiService
-  # http_status is set when the provider answered with a non-success status,
-  # so a fallback can say which. quota_id names the limit a 429 hit, in the
-  # provider's own vocabulary, and retry_after is the wait it asked for in
-  # seconds; both are read by ProviderFailure and the usage row, never shown.
+  # http_status, quota_id (the limit a 429 hit) and retry_after feed ProviderFailure and the usage row; never shown.
   class Error < StandardError
     attr_reader :http_status, :quota_id, :retry_after
-    # Stamped by call_and_log with the provider whose call raised, so a stored
-    # failure names the provider that was tried even after the user switches.
+    # Set by call_and_log, so a stored failure names the provider tried even after the user switches.
     attr_accessor :provider
 
     def initialize(message = nil, http_status: nil, quota_id: nil, retry_after: nil)
@@ -19,219 +15,90 @@ class AiService
     end
   end
 
-  # Bad/revoked API key (HTTP 401/403, or Gemini's 400 API_KEY_INVALID) —
-  # user-actionable: they need to fix their key in Settings. Never worth
-  # retrying.
+  # Bad or revoked key (401/403, or Gemini's 400 API_KEY_INVALID); never worth retrying.
   class AuthenticationError < Error; end
 
-  # Transient rate limiting (HTTP 429) that survived Faraday's own retries.
-  # User-actionable in the sense of "try again shortly", but not a bug.
+  # A 429 that survived Faraday's own retries.
   class RateLimitError < Error; end
 
-  # The account behind the key is out of credit or over a spend limit. Not a
-  # rate limit: waiting does not clear it, and OpenAI reports it as a 429 all
-  # the same, so the providers tell the two apart before raising.
+  # Out of credit or over a spend limit; providers separate it from a 429 rate limit, since waiting won't clear it.
   class BillingError < Error; end
 
-  # The account is on a trial that has ended, or trials are switched off, and
-  # it stored no key of its own. Raised before anything is sent.
+  # An ended or switched-off trial on an account with no key of its own; raised before anything is sent.
   class TrialEndedError < Error; end
 
-  # A trial account has used its calls for today, or every trial together has
-  # used the house key's guard. Raised before anything is sent; retry_after is
-  # the wait until the count resets.
+  # A trial's daily cap or the house key's guard is used up; retry_after is the wait until the count resets.
   class TrialAllowanceError < Error; end
 
-  # The request never got an HTTP answer and did not time out: a refused
-  # connection, a reset, a DNS failure.
+  # No HTTP answer and no timeout: a refused connection, a reset or a DNS failure.
   class NetworkError < Error; end
 
-  # The read budget ran out before the provider answered. Separated from a
-  # generic Error so callers can report it in the user's terms: the raw
-  # Faraday message ("Net::ReadTimeout with #<TCPSocket:(closed)>") is a
-  # socket-level detail that used to reach the dashboard verbatim.
+  # Kept apart so callers can explain it in the user's terms instead of showing Faraday's socket message.
   class TimeoutError < Error; end
 
-  # Malformed JSON or a payload with the wrong shape (e.g. an Array where a
-  # Hash was expected). Not user-actionable — almost always a real bug in
-  # our prompt/schema or a provider-side change.
+  # Malformed JSON or the wrong shape; usually a bug in our prompt or schema, not something the user can fix.
   class InvalidResponseError < Error; end
 
-  # The provider stopped generating because it hit its output token cap, so
-  # the JSON body is syntactically incomplete. Detected explicitly because
-  # otherwise it surfaces as a generic parse error ("unexpected end of
-  # input"), which points at the wrong cause — the payload isn't malformed,
-  # it's unfinished.
+  # Hit the output token cap; named so the unfinished JSON doesn't read as a generic parse error.
   class TruncatedResponseError < InvalidResponseError; end
 
-  # The provider's safety classifier declined the request: a 200 with no
-  # text and a refusal in its place (Claude's stop_reason "refusal", OpenAI's
-  # refusal content or content filter). Named so it does not surface as an
-  # empty-response parse error pointing at the prompt.
+  # A safety refusal: a 200 with no text, named so it isn't misread as an empty-response parse error.
   class RefusalError < Error; end
 
-  # A call routed to a model that cannot take its shape, such as a capped call
-  # on a model with no way to turn thinking off. A configuration mistake, not
-  # a provider failure, but an Error all the same so callers' existing rescues
-  # show the engineer a try-again message rather than an error page.
+  # A configuration mistake, such as a capped call to a model that can't turn thinking off; an Error so rescues catch it.
   class UnsupportedRouteError < Error; end
 
-  # The judge rejected every section of a drafted day, retries included. No
-  # empty day is written; the job records this like any other failed
-  # generation, so its message is what the dashboard shows.
+  # Every section rejected, retries included; no empty day is written, and the dashboard shows this message.
   class AllSectionsRejectedError < Error
     def initialize(message = "Every section of today's draft failed its quality check, so no set was saved. Try generating again.")
       super
     end
   end
 
-  # Faraday sets no timeout by default, so without one a call made from a
-  # request thread would tie up a Puma thread indefinitely and outlive
-  # ResponsesController#review's claim on the row, letting a second review
-  # start while the first is still in flight. READ_TIMEOUT is the budget for
-  # every call that doesn't pass a larger one. The ceiling that matters is the
-  # longest #review request: a pre-grading translation on this budget, then a
-  # grade on REVIEW_READ_TIMEOUT, each allowed every retry attempt, then one prose-judge attempt on
-  # REVIEW_JUDGE_READ_TIMEOUT. That chain has to stay under DailyResponse::REVIEW_CLAIM_STALE_AFTER, which
-  # ai_service_spec asserts so the two cannot drift apart.
+  # The longest #review chain must stay under DailyResponse::REVIEW_CLAIM_STALE_AFTER; ai_service_spec asserts it.
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 45
 
-  # Generation asks for the single largest response we ever request — one
-  # non-streaming call carrying every section, including the full reference
-  # blocks — from a model that thinks before it answers, so the socket stays
-  # silent until the whole thing is built. READ_TIMEOUT is far too short for
-  # that, and imposing it here made generation fail on Net::ReadTimeout once
-  # ClaudeService::MAX_TOKENS grew.
-  #
-  # Two budgets, because generation runs from two places with different costs
-  # for waiting:
-  #   - GENERATION_READ_TIMEOUT: GenerateDailyExercisesJob, the morning batch
-  #     and every on-demand dashboard trigger. Runs on the worker and holds no
-  #     Puma thread and no review claim, so it can wait as long as the
-  #     provider needs; the dashboard's poller waits with it.
-  #   - SYNC_GENERATION_READ_TIMEOUT: currently uncalled. It sized the read
-  #     budget for a generation that blocks a Puma thread with a user waiting
-  #     on the response — enough room to finish and no more. Its only caller
-  #     was DailyExercisesController#regenerate, which now claims the row and
-  #     enqueues RegenerateExerciseJob instead. Retained so any future
-  #     synchronous caller inherits a bound rather than GENERATION_READ_TIMEOUT.
-  #   - RETRY_READ_TIMEOUT: the judged path's single-section regeneration.
-  #     Same call shape, a fraction of the output — GENERATION_READ_TIMEOUT is
-  #     sized for a whole day, up to ExerciseSection::MAX_SECTIONS sections with their reference
-  #     blocks, and a retry asks for one. Bounding it is what keeps the judged
-  #     path's worst case near one draft rather than several: the retries fan
-  #     out, so the day now waits for the slowest one, not their sum. Set to
-  #     SYNC_GENERATION_READ_TIMEOUT rather than a second number of its own,
-  #     since that value was already sized for a whole day's generation with
-  #     someone waiting on it — comfortably more than one section needs.
+  # Generation runs on the worker and can wait; SYNC_ is uncalled but bounds future sync callers and one-section retries.
   GENERATION_READ_TIMEOUT      = 300
   SYNC_GENERATION_READ_TIMEOUT = 90
   RETRY_READ_TIMEOUT           = SYNC_GENERATION_READ_TIMEOUT
 
-  # #generate_concept_reference asks for the reference, guide and difficulty
-  # ladder together, with extended thinking left on (no max_tokens is passed).
-  # READ_TIMEOUT is sized for calls with short replies, so it under-times this
-  # call the same way GENERATION_READ_TIMEOUT exists because READ_TIMEOUT
-  # under-timed generation.
-  # SYNC_GENERATION_READ_TIMEOUT was the reference point for magnitude: another
-  # blocking, thinking-on call, so this one was sized the same order.
-  #
-  # Re-measured on 2026-10-09 with script/calibrate_concept_references.rb on
-  # the current routes. 30 sequential claude-sonnet-5-5 calls ran 18.8-34.4
-  # seconds, median 25.7, and 6 concurrent ones 23.7-36.8, median 26.5; none
-  # timed out and none came within 50 seconds of this value. So Claude has
-  # well over twice the room it needs, which is what the 2026-09-19 run on
-  # claude-sonnet-5 also found.
-  #
-  # Gemini's tail is still the open question. 16 gemini-3.5-flash calls
-  # completed in 12.7-21.6 seconds, median 17.0, but the key's per-minute
-  # quota refused the remaining 14 sequential calls and all 6 concurrent ones.
-  # In the 2026-09-19 run, completed calls took up to 70 seconds and one hit
-  # the 90-second timeout. No run since has let such a call finish, so how
-  # long it needs is still unmeasured. The value stays until a Gemini run
-  # under the harness's --timeout produces that number: a value raised
-  # without it would be sized by guess again. No ordering against
-  # REVIEW_READ_TIMEOUT is claimed; a longer visible reply is not evidence it
-  # takes longer to produce.
-  #
-  # The second thing this buys: RETRY_TIMEOUT_GUARD only marks a timeout final
-  # (rather than retryable) when the call is tagged `long_running`, and that
-  # tag is set once the call exceeds READ_TIMEOUT. At READ_TIMEOUT this call
-  # was still "short" to the guard, so faraday-retry could retry a genuine
-  # timeout twice — up to three billed calls — before GenerateConceptReferenceJob
-  # swallows the resulting TimeoutError. A larger, dedicated timeout here means
-  # a call that actually needs this long is recognized as long_running instead
-  # of retried into duplicate spend.
+  # Above READ_TIMEOUT so the call counts as long_running and a timeout isn't retried into duplicate spend.
   CONCEPT_REFERENCE_READ_TIMEOUT = SYNC_GENERATION_READ_TIMEOUT
 
-  # #grade_section grades one section with extended thinking left on, and a
-  # section that returns an improved_code rewrite runs well past READ_TIMEOUT:
-  # on full-length answers the slowest grades measured took about 80 seconds.
-  # Sized with room above that.
-  #
-  # Exceeding READ_TIMEOUT also makes the call long_running to
-  # RETRY_TIMEOUT_GUARD, so a timeout is final. At READ_TIMEOUT faraday-retry
-  # retried a timed-out grade twice more, billing the section up to three
-  # times for a grade the provider had usually already produced.
+  # Slowest measured grades took about 80s; above READ_TIMEOUT also makes a timeout final instead of retried and rebilled.
   REVIEW_READ_TIMEOUT = 120
 
-  # The review prose judge's one attempt. Short because the engineer is
-  # waiting on it, and it is added to the review claim's budget as a single
-  # attempt: the judge never retries.
+  # One attempt only, added to the review claim's budget; the judge never retries.
   REVIEW_JUDGE_READ_TIMEOUT = 30
 
-  # Every provider configures the same retry policy (see each subclass's
-  # RETRY_OPTIONS), so how many attempts and how long the backoff
-  # can grow are base-class facts, not per-provider ones — a caller computing a
-  # timeout budget from these reads one number, not two duplicated literals.
+  # Every provider's RETRY_OPTIONS share this policy, so timeout budgets read one number.
   RETRY_MAX          = 2
   RETRY_MAX_INTERVAL = 8
 
-  # The worst case a caller can wait on one provider call at a given read
-  # timeout: that timeout spent on each attempt faraday-retry allows, plus the
-  # capped backoff between them. What a poller has to outlast before it can
-  # honestly call a job failed. A class method rather than one constant per
-  # timeout because a poller must derive its wait from the SAME timeout the
-  # call it's waiting on actually uses — learn/show.html.erb calls this with
-  # CONCEPT_REFERENCE_READ_TIMEOUT rather than READ_TIMEOUT, or it would
-  # under-wait a call sized for the larger budget.
+  # A poller must pass the same read timeout the call it waits on uses, or it under-waits.
   def self.call_budget_seconds(read_timeout)
     (read_timeout * (RETRY_MAX + 1)) + (RETRY_MAX * RETRY_MAX_INTERVAL)
   end
 
-  # call_budget_seconds plus an open timeout per attempt. Every attempt counts
-  # even for a call whose read timeout is final: a 429 or 5xx still retries,
-  # and it can arrive just before the read timeout each time.
+  # Counts every attempt even when the read timeout is final, since a 429 or 5xx still retries.
   def self.worst_case_call_seconds(read_timeout)
     call_budget_seconds(read_timeout) + ((RETRY_MAX + 1) * OPEN_TIMEOUT)
   end
 
-  # A call made with single_attempt: one open timeout and one read timeout,
-  # no retries, no backoff.
   def self.single_attempt_call_seconds(read_timeout)
     OPEN_TIMEOUT + read_timeout
   end
 
-  # How long a judged generation can run before it lands or fails: the draft,
-  # then the judge fan-out, then one retry fan-out and one re-judge fan-out
-  # for each retry the most-retried kind gets, each waiting on its slowest
-  # thread, and one more judge call when a kind re-judges its edits. Only the
-  # version that ships is edited and re-judged, so that happens once a chain.
+  # Only the version that ships is edited and re-judged, so the re-judge call is counted once.
   JUDGED_GENERATION_BUDGET = worst_case_call_seconds(GENERATION_READ_TIMEOUT) +
                              worst_case_call_seconds(READ_TIMEOUT) +
                              (ExerciseSection.all.map(&:judge_retries).max *
                                (worst_case_call_seconds(RETRY_READ_TIMEOUT) + worst_case_call_seconds(READ_TIMEOUT))) +
                              (ExerciseSection.all.any?(&:rejudge_edits?) ? worst_case_call_seconds(READ_TIMEOUT) : 0)
 
-  # Passed to faraday-retry as `retry_if`. A read timeout on a generation is
-  # taken as final: the provider has almost certainly finished, and billed, the
-  # work we stopped waiting for, so retrying buys a duplicate charge for the
-  # entire problem set rather than a better outcome. Short calls keep retrying.
-  # On a single_attempt request, every retry is refused, including status
-  # retries (429/5xx arrive as Faraday::RetriableResponse, not a timeout).
-  # Every retry decision, status or timeout, is made here (both connections
-  # set methods: []), so a single-attempt request refuses all of them.
+  # Timeouts on long_running calls are final: the provider has likely finished and billed the work, so a retry pays twice.
   RETRY_TIMEOUT_GUARD = lambda do |env, exception|
     return false if env.request.context.to_h[:single_attempt]
     return true unless exception.is_a?(Faraday::TimeoutError)
@@ -239,82 +106,23 @@ class AiService
     !env.request.context.to_h[:long_running]
   end
 
-  # Cost and length control for #duck_response. 400 tokens fits every shape the
-  # system prompt asks for, including the longest: a mixed message that earns
-  # a plain-language explanation with an analogy AND a guiding question. That
-  # shape overran the 250 this sat at (a real question about RSpec stubbing
-  # and whether a test exercised its error path), and 150 before that. It
-  # remains a budget, not an enforcement mechanism: a short fix fits in 400
-  # tokens too, so DUCK_SYSTEM_PROMPT's rules are still the only thing
-  # actually asking the model not to give answers. A reply that still overruns
-  # is shown cut short rather than discarded, since prose that stops a
-  # sentence early is worth more than a 503 — see #duck_response.
-  #
-  # Deliberately one ceiling for every duck reply rather than a higher one for
-  # explain-requests. The server cannot know which kind a message is until the
-  # model has answered it, so branching would mean trusting a client-declared
-  # flag that any client could set on every request — a per-type ceiling that
-  # does not hold is worse than one honest number.
-  # Deliberately distinct from ClaudeService::MAX_TOKENS, which is sized for
-  # full review generation.
+  # A budget, not an enforcement mechanism; one ceiling for every reply, since a client-declared reply type can't be trusted.
   DUCK_RESPONSE_MAX_TOKENS = 400
 
-  # Cost and length control for #explain_concept_differently. Sized the way
-  # DUCK_RESPONSE_MAX_TOKENS is — a budget, not an enforcement mechanism —
-  # rather than sized from a bounded reply the way
-  # DIFFICULTY_ASSESSMENT_MAX_TOKENS is, because a reframing is free prose and
-  # has no largest valid reply to derive from. 500 is the two short paragraphs the prompt asks for with room
-  # for a worked scenario, which is one of the three approaches it offers.
-  #
-  # Passing it at all is the second thing this buys: ClaudeService leaves
-  # extended thinking on unless a max_tokens is given, and a reframing of an
-  # explanation the model itself wrote does not need a thinking budget.
-  # #explain_differently passes none and is left alone deliberately — changing
-  # an existing billed path is not this change's business.
+  # Free prose has no largest valid reply to derive a cap from; passing any max_tokens also turns extended thinking off.
   CONCEPT_ALTERNATE_MAX_TOKENS = 500
 
-  # The message the "Explain this simply" button sends on the user's behalf.
-  # Server-owned so its wording lives beside the prompt it is tuned against: it
-  # names the exercise rather than the answer, so it reads as a kind-1 request
-  # under DUCK_SYSTEM_PROMPT without the prompt having to recognize it
-  # specially. It reaches the endpoint as an ordinary message and counts
-  # against the same turn cap as one.
+  # Server-owned so its wording sits beside the prompt it is tuned against; it counts against the turn cap like any message.
   DUCK_EXPLAIN_REQUEST = "Explain what this exercise is asking, in plain language."
 
-  # Derived from what the critique schema actually permits rather than guessed:
-  # MAX_CRITIQUE_POINTS points of up to MAX_CRITIQUE_POINT_LENGTH characters is
-  # the largest VALID response, and a flat 300 sat below it — so a maximal
-  # three-point critique truncated mid-JSON and surfaced as a parse failure on a
-  # response the provider had produced correctly. Three characters per token is
-  # deliberately conservative for prose, and the constant covers the JSON
-  # envelope on top. Still far below full generation; round 1 returns no code,
-  # which is what keeps it cheap.
+  # Derived from the largest valid critique, since a flat cap truncated maximal replies mid-JSON.
   PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS = 100
   PSEUDOCODE_CRITIQUE_MAX_TOKENS =
     (ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINTS *
       ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
     PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
 
-  # Sized from the largest valid response (one entry per section the day can
-  # hold, each a level name plus a reason of at most
-  # DailyResponse::MAX_DIFFICULTY_REASON_LENGTH characters), then doubled,
-  # because the model can write past the length it was asked for. Both margins
-  # are chosen, not measured. In #168 all four four-section calls truncated
-  # under the old cap. The only direct measurement was a two-section reply
-  # (319 output tokens, about 160 per section); four sections at that rate
-  # would be about 640, which was not measured. A cap that is too tight loses
-  # the whole note without any error, while a loose one costs nothing unless
-  # the tokens are actually generated, so both margins err on the loose side.
-  #
-  # Passing any max_tokens at all is half the point: ClaudeService disables
-  # extended thinking whenever a caller supplies one, and a reply of one
-  # sentence per section has nothing to think about. Without it the assessment
-  # runs with thinking on and ClaudeService::MAX_TOKENS to spend, billed to the
-  # engineer's own key for a note that renders in two lines. GeminiService
-  # pairs the same cap with its own least-thinking setting, but Gemini 3 Flash
-  # has no off switch and only reaches "minimal" (see
-  # GeminiService::MINIMAL_THINKING_LEVEL), so a Gemini call still spends a
-  # little before it answers, and that spend counts against this same cap.
+  # Both margins are chosen, not measured; a tight cap loses the note silently, and any max_tokens turns thinking off.
   DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
   DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN = 2.5
   DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM = 2
@@ -324,38 +132,20 @@ class AiService
       DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM) +
       DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS).ceil
 
-  # How long the review may keep waiting for the difficulty note once every
-  # section has been graded. The note is optional context; the grades are what
-  # the engineer paid for, so the assessment gets to run alongside them for
-  # free and then has this long to finish before the request leaves without it.
-  # Without the bound, one hung provider connection could hold a synchronous
-  # request for the full retry budget to deliver a sentence.
+  # Bounds how long one hung provider connection can hold the review request for an optional note.
   DIFFICULTY_ASSESSMENT_GRACE_SECONDS = 5
 
-  # Provider output rendered into the page, so bounded at the boundary like
-  # every other such field.
+  # Provider output rendered into the page, so bounded at the boundary.
   MAX_GENERATED_CODE_LENGTH = 8_000
 
-  # The one statement of what "differently" means, shared by the two prompts
-  # that re-explain something after a first attempt did not land — one
-  # re-teaches a concept, the other reframes a point of feedback. A method
-  # rather than a constant because those two name their subject differently and
-  # always have; the rule is everything after that noun, and it is this
-  # method's whole reason to exist that the rule cannot be edited in one prompt
-  # without the other. Shaped like ExerciseSection::PseudocodeToCode.gap_standard,
-  # which solves the same one-rule-two-consumers problem.
+  # One rule shared by two prompts so it cannot be edited in one without the other.
   def self.explain_differently_standard(subject)
     "Explain the SAME #{subject} again using a genuinely different approach — a\n" \
       "different analogy, a different level of abstraction, or a concrete worked\n" \
       "scenario instead of a principle. Do not repeat the original wording."
   end
 
-  # The one statement of how the app's generated prose should read, shared by
-  # the prompts that explain, reframe, answer follow-ups on, or grade an
-  # engineer's work. CLAUDE.md's Writing style section carries the same list
-  # for commits and comments, minus the second-person item, and a spec fails
-  # when the two drift apart. Defined above DUCK_SYSTEM_PROMPT because that
-  # constant interpolates it at load time.
+  # CLAUDE.md's Writing style list mirrors this (a spec checks); defined above DUCK_SYSTEM_PROMPT, which interpolates it.
   PLAIN_LANGUAGE_STANDARD = <<~STANDARD.chomp.freeze
     Write prose for the engineer this way:
 
@@ -379,12 +169,7 @@ class AiService
     Calibration: too informal ("This is a total game-changer!") and too formal/overwrought ("The interface undergoes a paradigmatic transformation") are both wrong; aim for the plain middle ("This changes how the interface works").
   STANDARD
 
-  # The one definition of what each review rating means, stated once in the
-  # review's shared day context. A rating describes how the answer meets the
-  # level its section was pitched at, so "solid" means the same at junior and
-  # senior. Each kind's grading note names its own main point and essential
-  # pieces; none restates these levels. RubricCheck reads the essential_gaps
-  # the grader returns against them.
+  # A rating means the same at every pitched level; each kind's grading note must not restate these levels.
   RATING_RUBRIC = <<~RUBRIC.chomp.freeze
     How to choose "rating": rate the answer against the level its section was pitched at, which the grading instruction states on its "Pitched at" line, so a rating means the same thing at every level. Base it on the gaps you list in "missed". A gap is essential when, left as the engineer wrote it, the code or decision would behave wrongly or a requirement the problem states would go unmet. Missing syntax, polish or wording, or a step any engineer at this level would take for granted, is not essential and does not lower the rating. Judge what is essential against the problem as written: a problem simpler than its level's description is graded on what it actually asks. Each section's grading note says what its main point and its essential pieces are.
     - "beginner": missed the main point of the section.
@@ -394,14 +179,7 @@ class AiService
     The rating must agree with "missed": when "missed" names an essential gap, the rating is not "solid" or "strong". When a section's grading note says its rating is already fixed, that note wins.
   RUBRIC
 
-  # Stamped into every review this prompt grades (ai_review[section]["rubric"]).
-  # A review without it was graded with no rubric, so its rating answers a
-  # different question; an evidence reader that compares ratings to a bar
-  # reads only stamped reviews. A stamp rather than a date because grading
-  # knows which prompt it ran, and a date misfiles a review retried after a
-  # deploy. Raise it when RATING_RUBRIC changes what a rating means. Raising
-  # it also restarts every Automatic account's earned size at two, since the
-  # competency gate reads only reviews stamped with the current version.
+  # Raise when RATING_RUBRIC changes what a rating means; that restarts every Automatic account's earned size at two.
   RUBRIC_VERSION = 1
 
   PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT = <<~PROMPT.chomp
@@ -424,11 +202,7 @@ class AiService
     "gaps" must be empty when "gaps_found" is false, and non-empty when it is true.
   PROMPT
 
-  # The single most important constraint in this feature. If the translation
-  # drifts into helpfulness the exercise silently becomes free help, which is
-  # the same failure teaching_note and improved_code gating exist to prevent.
-  # Stated as a list of prohibitions rather than as the adjective "faithful",
-  # because the adjective is exactly what a model interprets generously.
+  # Stated as prohibitions because a model reads the adjective "faithful" generously, and drift turns this into free help.
   PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT = <<~PROMPT.chomp
     You translate an engineer's pseudocode into real code. You are a
     TRANSCRIBER, not a reviewer and not an assistant. You do not improve
@@ -483,24 +257,10 @@ class AiService
     #{PLAIN_LANGUAGE_STANDARD}
   PROMPT
 
-  # Sized for the worst case an edit can return, which is five prose fields
-  # and not three: ExerciseSection::Pattern carries five, the base default is
-  # four, and only code_review is three. Across the stored judge fixtures the
-  # largest pattern section's five prose fields run 496 characters, and this
-  # text tokenizes near 2.9 characters per token — so a full rewrite of them
-  # is under 200 tokens, one issue per field with its quoted evidence adds a
-  # couple of hundred more, and the JSON structure the rest. The cap keeps
-  # several times that headroom on purpose: what it bounds is a model
-  # overrunning the length it was asked for, not a correctly sized reply.
-  # Passing it turns thinking off, as for every capped purpose, unless the
-  # provider's route for the judge adds room to reason on top of it.
+  # Sized for five prose fields (Pattern's count); the headroom bounds a model overrunning, and the cap turns thinking off.
   JUDGE_MAX_TOKENS = 1_200
 
-  # One line per rejection principle, rendered into the prompt in
-  # JudgeVerdict::PRINCIPLES' own order and fetched by name — so a principle
-  # added to that constant fails loudly here rather than reaching the judge
-  # unexplained, and the prompt can never enumerate a principle the boundary
-  # would reject.
+  # Fetched by name in JudgeVerdict::PRINCIPLES' order, so a new principle fails loudly here instead of reaching the judge.
   JUDGE_PRINCIPLE_GUIDANCE = {
     "scope_mismatch" => "answering correctly does not require the tagged concept, or the question asks for something the concept does not cover.",
     "unstated_prerequisite" => "solving depends on important knowledge that is neither the tagged concept nor supplied by the problem, and a brief clarifying phrase could not reasonably supply it.",
@@ -542,26 +302,13 @@ class AiService
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
-  # The largest reply script/compare_models.rb measured on the production
-  # route, across the eight fixtures and four stored reviews of the
-  # 2026-10-10 run against the corrected prompt. The cap below is justified
-  # by its headroom over this, so the number lives here rather than in the
-  # prose that reasons about it, and ai_service_spec asserts the headroom the
-  # reasoning claims. The slack left is small enough that a later run
-  # measuring past REVIEW_JUDGE_MAX_TOKENS / 4 makes the cap a decision
-  # rather than a passing check.
+  # ai_service_spec asserts REVIEW_JUDGE_MAX_TOKENS' headroom over this; a run past a quarter of it needs a decision.
   REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 371
 
-  # Review output has no length bound, so a much longer review could still
-  # hit this and fall back unedited as `truncated`; nothing measured has come
-  # close. The slowest measured call took 3.1 seconds of
-  # REVIEW_JUDGE_READ_TIMEOUT. Passing this turns thinking off.
+  # Review output is unbounded, so a long review can still fall back as `truncated`; passing this turns thinking off.
   REVIEW_JUDGE_MAX_TOKENS = 1_500
 
-  # Hedging and a next step naming several topics were listed as problems
-  # until the 2026-10-09 comparison: told to fix them, the judge firmed up a
-  # vague claim and cut a next step to one topic, which changes what the
-  # review says. The rules in the prompt below now forbid both.
+  # Hedging and multi-topic next steps are not listed here: fixing them changed what reviews said (2026-10-09 comparison).
   REVIEW_PROSE_ISSUE_GUIDANCE = {
     "plain_language_violation" => "jargon or buzzwords where a plainer word works, filler such as \"basically\" or \"at the end of the day\", or a miss explained in a more complicated way than it needs.",
     "verbosity" => "the same point made twice, the rating restated in prose, or filler."
@@ -591,193 +338,51 @@ class AiService
     Work through this internally, then reply with only the JSON verdict, with no text before or after it.
   PROMPT
 
-  # Fixed concept vocabularies, one per generation language. Embedded in the
-  # generation prompt; anything a provider returns outside the active list is
-  # normalized to "other" so per-user concept history stays aggregatable.
-  # Kept closed rather than AI-extensible so history stays clean.
-  #
-  # Security concepts are deliberately selective: the mastery-tier system
-  # (Standard/Reduced/Paused, easing/reinforcing over time) only pays off for
-  # concepts with real depth — room to be approached multiple ways, room to
-  # get harder or easier. Two proposed security items were cut for lacking
-  # that depth: `secure_secrets_handling` is essentially one rule ("don't
-  # hardcode credentials") with no harder version to graduate toward, and
-  # `dependency_vulnerability_management` is a process/tooling habit (running
-  # an audit tool, reviewing a Dependabot PR) that no code snippet can test —
-  # the wrong shape for this app's format entirely.
+  # Closed vocabularies: anything a provider returns outside the active list is normalized to "other".
 
-  # Data-modeling concepts, folded into BOTH language vocabularies rather than
-  # given a bucket of their own. A bucket is not possible here: ConceptBucket
-  # dispatches on section key, and this content mode's key is still
-  # "code_review". Per-language mastery tracking is the accepted cost, and is
-  # arguably correct — indexing and migration-safety concerns differ enough
-  # between an ActiveRecord/Postgres context and a Prisma one to track apart.
-  #
-  # One shared list rather than two, unlike RAILS_SECURITY_CONCEPTS /
-  # JS_SECURITY_CONCEPTS, whose contents genuinely differ. These do not: the
-  # Prisma artifact is relational, so every entry means the same thing in both
-  # languages. Two identical lists would only be somewhere to drift.
-  #
-  # `unsafe_migration` is operational rather than structural, and belongs
-  # anyway: the artifact under review IS a migration, so its safety is in
-  # frame by construction. It passes the same depth filter as the rest — a
-  # lock is the easy version, backfill-then-constrain across deploys the
-  # harder one, knowing when the safe path isn't worth its complexity the
-  # hardest.
+  # In both language vocabularies because ConceptBucket dispatches on section key, and this mode's key is still code_review.
   DATA_MODELING_CONCEPTS = %w[
     missing_index wrong_cardinality missing_constraint
     denormalization_tradeoffs unsafe_migration
   ].freeze
 
-  # Reasoning skills rather than technical topics — how to approach a problem,
-  # not a thing to know about it. They sit in both language vocabularies rather
-  # than a bucket of their own because ConceptBucket dispatches on section key,
-  # never on concept: a bucket would require a section kind, and this is
-  # deliberately not one. The cost is per-language mastery. The gain is that
-  # these are absent from LANGUAGE_AGNOSTIC_VOCABULARIES, so their concept
-  # reference shows real Rails or JavaScript code — the better illustration for
-  # a concept about reading code than pseudocode would be.
+  # Outside LANGUAGE_AGNOSTIC_VOCABULARIES so references show real code; their own bucket would need a section kind.
   META_SKILL_CONCEPTS = %w[
     reading_for_intent spotting_unstated_assumptions separating_symptom_from_cause
   ].freeze
 
-  # Named smells rather than the remedies the language vocabularies already
-  # carry (service_objects, query_objects, state_lifting name the cure). Shared
-  # across both languages because each means the same thing in a Rails class
-  # and a React component.
+  # Named smells, not remedies; shared across languages because each means the same in a Rails class and a React component.
   CODE_SMELL_CONCEPTS = %w[
     god_object primitive_obsession shotgun_surgery feature_envy
   ].freeze
 
-  # The rule underneath the smell: the code smells name a shape to recognize
-  # and the language vocabularies name a remedy, but nothing named the design
-  # principle either one appeals to. Evaluative rather than situational — "does
-  # this violate open/closed?" is askable of almost any snippet, which is what
-  # makes three principles a better fit here than the GoF catalog, whose 22
-  # patterns would nearly double both vocabularies and starve the mastery loop.
-  #
-  # Five candidates were cut rather than shipped as twins. single_responsibility
-  # is god_object named from the rule side and generates the same section;
-  # program_to_interface is dependency_inversion with a less findable violation;
-  # encapsulate_what_varies is open_closed with a blurrier one. Neither
-  # liskov_substitution nor interface_segregation survives the relevance filter
-  # in duck-typed Ruby and hooks-based React, and completing SOLID is not a
-  # reason to carry a concept this app's sections cannot host well.
-  #
-  # Shared across both languages because each means the same thing in a Rails
-  # class and a React component, and deliberately outside
-  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code.
+  # Kept small on purpose: candidates that would generate the same section as an existing concept were cut.
   OO_DESIGN_CONCEPTS = %w[
     open_closed dependency_inversion composition_over_inheritance
   ].freeze
 
-  # The cost of an interface rather than a defect in what it computes: the code
-  # smells name a shape, the design principles name a rule, and the language
-  # vocabularies name a remedy, but nothing named what a module's interface
-  # charges every caller who uses it. Diagnostic rather than situational —
-  # "does this module hide more than it asks you to learn?" is askable of
-  # almost any snippet, which is the same filter that made the design
-  # principles a better fit here than a pattern catalog.
-  #
-  # Two candidates were cut rather than shipped as twins. information_leakage
-  # is shotgun_surgery named from the cause side and generates the same
-  # section, and coupling_cohesion already carries the architecture-level
-  # version; special_general_mixture's findable violation is the same
-  # conditional an open_closed section shows.
-  #
-  # Shared across both languages because each means the same thing in a Rails
-  # class and a React component, and deliberately outside
-  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code.
+  # What an interface costs its callers; candidates that duplicated shotgun_surgery or open_closed were cut.
   MODULE_DESIGN_CONCEPTS = %w[
     shallow_module pass_through_method temporal_decomposition
   ].freeze
 
-  # Defects that survive every check the engineer normally makes: the code
-  # runs, nothing raises, no type or schema validator fires, and the output is
-  # wrong anyway. That is the group's identity, and it is what separates these
-  # from every other group here — the code smells name a shape, the design
-  # principles a rule, the module-design concepts an interface's cost, and the
-  # language vocabularies a remedy, but nothing named a broken invariant that
-  # looks like a working result.
-  #
-  # Shared across both languages rather than split, like the three groups
-  # above: integer division truncates in Ruby and JavaScript alike, an
-  # ingestion boundary is stack-neutral, and `ORDER BY created_at` with no
-  # tiebreak is the same defect as a comparator over a non-total order. Two
-  # identical lists would only be somewhere to drift. Deliberately outside
-  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code — a
-  # rounding split that loses a unit is only convincing when you can run it.
-  #
-  # These are remedies to reach for (largest-remainder distribution, semantic
-  # validation at the boundary, a complete key, a total order), so they stay
-  # off ANTI_SHAPE_CONCEPTS: the defect is the violation, the concept is the
-  # discipline.
-  #
-  # Three neighbours the names sit close to, recorded because a reader will ask.
-  # cache_key_completeness is NOT `caching`: that one names a topic (should
-  # this be cached, for how long), this names one correctness defect with a
-  # specific failure — unrelated requests receiving each other's data.
-  # semantic_input_validation is NOT `validations`, which is the absent or
-  # malformed field; this is the field that arrives well-formed and means the
-  # wrong thing, which is why no type or schema check catches it. Both share a
-  # vocabulary line with their neighbour on every Rails day, so the guidance
-  # method draws each boundary for the generator too. And
-  # deterministic_ordering is NOT PSEUDOCODE_TO_CODE_CONCEPTS' ambiguous_ordering,
-  # which is a plan that fails to specify an order; this is code whose order is
-  # underdetermined at runtime. Those vocabularies are disjoint, so the
-  # adjacency costs nothing mechanically — the same relationship idempotency
-  # and idempotency_at_scale already have.
+  # Code that runs cleanly and is still wrong; these are remedies to reach for, so they stay off ANTI_SHAPE_CONCEPTS.
   SILENT_CORRECTNESS_CONCEPTS = %w[
     allocation_rounding semantic_input_validation cache_key_completeness
     deterministic_ordering
   ].freeze
 
-  # The two words a model can get wrong before any of it runs: what a thing is
-  # CALLED, and which things must change TOGETHER. That is the group's
-  # identity, and it is what separates these from the five groups above — the
-  # code smells name a shape, the design principles a rule, the module-design
-  # concepts an interface's cost, the silent-correctness concepts a broken
-  # invariant, and the language vocabularies a remedy, but nothing named the
-  # model's own vocabulary or its consistency boundaries.
-  #
-  # Shared across both languages rather than split, like the four groups above:
-  # a table named for a word the business does not use is the same defect as a
-  # store slice named for one, and an aggregate boundary is drawn the same way
-  # whether the writes are ActiveRecord or a reducer. Deliberately outside
-  # LANGUAGE_AGNOSTIC_VOCABULARIES so a concept reference shows real code — a
-  # naming collision is only convincing when you can see both classes.
-  #
-  # These are disciplines to reach for (name it as the domain names it, make
-  # one object the entry point for a set of writes), so they stay off
-  # ANTI_SHAPE_CONCEPTS, and off TRADEOFF_CONCEPTS because neither has two
-  # defensible sides — their reference gets the failure-mode-then-fix contrast.
-  #
-  # Four neighbours the names sit close to, recorded because a reader will ask.
-  # ubiquitous_language is NOT reading_for_intent: that one is code whose
-  # behavior diverges from its evident purpose, this is code that does exactly
-  # what it says under a word the domain does not use. It is not
-  # primitive_obsession either — a missing type, not a wrong word.
-  # aggregate_boundaries is NOT transaction_safety, which is the mechanics of
-  # wrapping writes; this is WHICH writes belong in one, and which object is
-  # the only legal way in. Nor is it data_ownership, which asks which service
-  # owns data rather than which object.
+  # What a thing is called and which writes change together; disciplines, so off ANTI_SHAPE_CONCEPTS and TRADEOFF_CONCEPTS.
   DOMAIN_MODELING_CONCEPTS = %w[
     ubiquitous_language aggregate_boundaries
   ].freeze
 
-  # The architecture-level causes of complexity, kept as their own constant
-  # because ANTI_SHAPE_CONCEPTS below has to name them and ARCHITECTURE_CONCEPTS
-  # is defined further down.
+  # Its own constant because ANTI_SHAPE_CONCEPTS names it before ARCHITECTURE_CONCEPTS is defined.
   COMPLEXITY_CAUSE_CONCEPTS = %w[
     cognitive_load unknown_unknowns
   ].freeze
 
-  # The groups that name something to find rather than something to choose.
-  # Every lens written for a remedy is wrong for these — see the senior_lens
-  # framing in #build_concept_reference_prompt, whose output is generated once
-  # and cached forever, so a wrong framing never self-corrects. Membership
-  # rather than "every group with a guidance method": the design principles
-  # have one too, and a principle IS something to reach for.
+  # Things to find, not choose; references are cached forever, so a remedy framing applied here would never self-correct.
   ANTI_SHAPE_CONCEPTS = (CODE_SMELL_CONCEPTS + MODULE_DESIGN_CONCEPTS + COMPLEXITY_CAUSE_CONCEPTS).freeze
 
   RAILS_CONCEPTS = (%w[
@@ -799,35 +404,16 @@ class AiService
   ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
     MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS + DOMAIN_MODELING_CONCEPTS).freeze
 
-  # The exact subset security_review draws from — never the full language
-  # vocabulary. Each concept gets reinforced through two reasoning modes on
-  # different days: "is this correct" (code_review) and "is this exploitable"
-  # (security_review). A restricted list is what makes that interleaving
-  # deliberate rather than incidental — without it, security_review could
-  # surface an unrelated concept like memoization under adversarial framing.
+  # security_review draws only from these, so each concept is practiced as both "is this correct" and "is this exploitable".
   RAILS_SECURITY_CONCEPTS = %w[mass_assignment_protection sql_injection_prevention].freeze
   JS_SECURITY_CONCEPTS    = %w[xss_prevention insecure_client_storage].freeze
 
-  # Subset of JS_CONCEPTS that reflects real TypeScript usage rather than a
-  # separate language mode: no new generation language, no schema change.
-  # When one of these is the section's tagged concept, build_exercise_prompt
-  # instructs real TS syntax/annotations for that section only — every other
-  # JS_CONCEPTS entry stays plain JS, matching actual day-to-day variety.
+  # TypeScript syntax is asked for only in a section tagged with one of these; other JS concepts stay plain JS.
   TYPESCRIPT_FLAVORED_CONCEPTS = %w[
     generics type_guards_narrowing union_intersection_types mapped_conditional_types
   ].freeze
 
-  # Language-INDEPENDENT architecture/design-reasoning vocabulary. Unlike
-  # RAILS_CONCEPTS/JS_CONCEPTS this is NOT tied to the user's language: these
-  # concepts transcend any one stack. Used only by the architecture third
-  # section and its concept references (pseudo-language "architecture").
-  #
-  # COMPLEXITY_CAUSE_CONCEPTS are causes of complexity rather than decisions,
-  # and they sit here rather than in the language vocabularies
-  # because what they cost is only visible across a whole design.
-  # change_amplification was cut with them: it is coupling_cohesion's symptom
-  # at this altitude, and shotgun_surgery already carries the code-level
-  # version in both language vocabularies.
+  # Language-independent; used only by the architecture section and its concept references.
   ARCHITECTURE_CONCEPTS = (%w[
     sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
     caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
@@ -835,29 +421,7 @@ class AiService
     idempotency_at_scale observability_tradeoffs
   ] + COMPLEXITY_CAUSE_CONCEPTS).freeze
 
-  # The concepts whose Learn-tab worked example contrasts two legitimate
-  # options rather than a failure mode against its fix — see
-  # #worked_example_description. The test for membership is whether the concept
-  # has two defensible sides: at-most-once against at-least-once, fail-open
-  # against fail-closed. Not which existing group it sits nearest, and
-  # deliberately NOT the ANTI_SHAPE_CONCEPTS axis, which answers a different
-  # question (a shape to find against a remedy to reach for) — n_plus_one is a
-  # remedy and still contrasts as a defect.
-  #
-  # Written out rather than derived as "ARCHITECTURE_CONCEPTS minus today's
-  # exceptions". A derivation would hand the tradeoff framing to every
-  # architecture concept added later without anyone deciding it has two sides,
-  # and a reference is generated once and cached forever, so a concept framed
-  # wrong stays wrong. The list is deliberately mixed-vocabulary for the same
-  # reason the shape follows the concept: COMPLEXITY_CAUSE_CONCEPTS sit inside
-  # ARCHITECTURE_CONCEPTS and name things to catch rather than choose between,
-  # so they are absent here, while denormalization_tradeoffs arrives from both
-  # language vocabularies and is a real decision. That one is planted as a flaw
-  # on a schema-review day and taught as a tradeoff here without contradiction:
-  # grading one instance and explaining the concept are different jobs.
-  #
-  # A spec holds every architecture concept to a deliberate classification, so
-  # growing that vocabulary fails until someone chooses a side for the new one.
+  # Written out, not derived, so a new architecture concept needs a decision before it gets this framing; a spec enforces it.
   TRADEOFF_CONCEPTS = %w[
     sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
     caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
@@ -866,45 +430,25 @@ class AiService
     denormalization_tradeoffs
   ].freeze
 
-  # Vocabulary for the plan_review fourth-slot kind. Entirely disjoint from
-  # RAILS_CONCEPTS/JS_CONCEPTS/ARCHITECTURE_CONCEPTS — a plan_review concept
-  # can never appear in code_review/pattern/third, and vice versa. All four
-  # pass the same depth filter used to trim the security vocabulary: each has
-  # room to be approached multiple ways and to get harder or easier.
+  # Disjoint from every other vocabulary, so a plan_review concept never appears in another section kind.
   PLAN_REVIEW_CONCEPTS = %w[
     unjustified_constant contradicts_existing_pattern scope_creep silent_behavior_change
   ].freeze
 
-  # Vocabulary for the ambiguity_hunt fourth-slot kind. Same disjointness rule
-  # as PLAN_REVIEW_CONCEPTS.
+  # Same disjointness rule as PLAN_REVIEW_CONCEPTS.
   AMBIGUITY_HUNT_CONCEPTS = %w[
     undefined_scope_boundary unspecified_edge_cases missing_success_criteria
     unstated_data_implications undefined_permissions_model
   ].freeze
 
-  # What a plan can get wrong before any syntax exists: these name defects in a
-  # decomposition, not in a language. Deliberately disjoint from every language
-  # vocabulary and from the other two fourth-slot ones, which is what lets this
-  # kind carry a ConceptBucket of its own (see DailyPlan::FOURTH_BUCKET_FOR).
-  #
-  # ambiguous_ordering is a plan that never says what the order should be, not
-  # SILENT_CORRECTNESS_CONCEPTS' deterministic_ordering, which is code whose
-  # order is underdetermined at runtime. The names are close; the buckets are
-  # disjoint and the sections they generate share nothing.
+  # Disjoint from every other vocabulary, which lets this kind have its own ConceptBucket (DailyPlan::FOURTH_BUCKET_FOR).
   PSEUDOCODE_TO_CODE_CONCEPTS = %w[
     missing_base_case unhandled_empty_input off_by_one_boundary ambiguous_ordering
     unstated_mutation conflated_responsibilities missing_termination_condition
     undefined_failure_path
   ].freeze
 
-  # Curated, real, job-adjacent scenario flavors for the "scenario" field's
-  # business-domain framing — prompt-level grounding only, to keep generated
-  # scenarios feeling like real engineering work rather than generic SaaS
-  # examples. Never concept-tagged, never fed into ProblemSetIngest.vocabulary_for or
-  # any mastery-loop bucket. `legacy_graphql_maintenance` is scenario dressing
-  # only, for occasional legacy-app relevance — see build_exercise_prompt's
-  # explicit low-frequency instruction. It must never appear as a "concept"
-  # value.
+  # Scenario dressing only, never concept-tagged; legacy_graphql_maintenance must never appear as a "concept" value.
   SCENARIO_DOMAINS = %w[
     background_job_processing api_versioning_and_deprecation
     activerecord_query_construction component_state_management
@@ -912,9 +456,7 @@ class AiService
     multi_tenant_data_isolation legacy_graphql_maintenance
   ].freeze
 
-  # Everyday SETTINGS, used the same way SCENARIO_DOMAINS is. Each names
-  # something people use outside work, so a concept can be met without first
-  # having to learn what an invoice run or a tenant is.
+  # Settings from outside work, so a concept can be met without first learning what an invoice run or a tenant is.
   EVERYDAY_SCENARIO_DOMAINS = %w[
     shared_grocery_list recipe_box_and_meal_planner gym_workout_log
     library_book_checkout pet_adoption_listings household_chore_rota
@@ -922,19 +464,12 @@ class AiService
     personal_savings_goals
   ].freeze
 
-  # Legacy GraphQL is scenario dressing at a stated rarity on a job-adjacent
-  # day. An everyday day leaves it out, since a legacy layer is exactly the
-  # industry context that pool avoids.
+  # Job-adjacent days only: a legacy layer is the industry context the everyday pool avoids.
   LEGACY_GRAPHQL_SCENARIO_GUIDANCE =
     "Use a legacy GraphQL maintenance scenario (e.g. \"a legacy GraphQL layer needs a fix\") only rarely — " \
     "at most roughly 1 in every 8-10 sessions — purely as scenario framing, never as the tagged concept.".freeze
 
-  # What the scenario bullet says under each flavor: which pool, how the pool
-  # is introduced, one example of adapting a setting to the day's stack, and
-  # any rule the flavor needs stated. Keyed by every flavor DailyPlan can
-  # roll from SCENARIO_FLAVOR_WEIGHTS; a spec holds these keys equal to its
-  # keys, so a flavor cannot be rolled that has no pool or listed that is
-  # never rolled. Data rather than a branch, so a new flavor is an entry.
+  # A spec holds these keys equal to DailyPlan's SCENARIO_FLAVOR_WEIGHTS keys, so every rolled flavor has a pool.
   SCENARIO_POOLS = {
     general: {
       domains:    SCENARIO_DOMAINS,
@@ -954,10 +489,7 @@ class AiService
     }
   }.freeze
 
-  # Single source of truth per concrete generation language ("mixed" is a
-  # user-level meta-preference that always resolves to one of these before it
-  # reaches AiService — see User#language_for_today). Adding a language means
-  # adding one entry here, not hunting down every ternary in this file.
+  # One entry per concrete language; "mixed" resolves to one of these before reaching AiService (User#language_for_today).
   LANGUAGE_CONFIG = {
     "ruby_rails" => {
       label:             "Ruby/Rails",
@@ -1004,73 +536,41 @@ class AiService
     }
   }.freeze
 
-  # Vocabularies with no code of their own to reference — a concept from any
-  # of these has nothing language-specific to show, so their concept
-  # reference asks for illustrative pseudocode instead of real source.
+  # These have no language-specific code, so their concept references use pseudocode.
   LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS,
                                      AMBIGUITY_HUNT_CONCEPTS, PSEUDOCODE_TO_CODE_CONCEPTS ].freeze
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
-  # The Learn tab's longer, plainer-language guide. A SECOND constant rather
-  # than three more entries in CONCEPT_REFERENCE_FIELDS above: that one is read
-  # by #explain_concept_differently to build "the reference they have already
-  # read", and widening it would silently change an existing prompt.
-  #
-  # Deliberately absent from #generate_concept_reference's required-field
-  # check. A provider that writes a good reference and flubs the guide leaves a
-  # row the inline dropdown renders exactly as before; the Learn tab treats it
-  # as ungenerated and regenerates it when someone opens it.
-  # guide_worked_example is the one guide field allowed past the two-paragraph
-  # cap, since a contrastive pair cannot fit in it. A stated bound rather than
-  # "longer": an unbounded field drifts into the essay this guide exists not to
-  # be.
+  # guide_worked_example's stated bound, since a contrastive pair can't fit the two-paragraph cap.
   WORKED_EXAMPLE_BOUND = "At most the two fragments plus four sentences of prose.".freeze
 
+  # Separate from CONCEPT_REFERENCE_FIELDS (read by #explain_concept_differently) and outside the required-field check.
   CONCEPT_GUIDE_FIELDS = %w[guide_plain_language guide_worked_example guide_pitfalls].freeze
 
-  # Prompt-only content that grounds a difficulty target (see KindDifficulty).
-  # Outside the required-field check for the reason the guide is: a provider that
-  # flubs the ladder still leaves a usable reference.
+  # Outside the required-field check, so a flubbed ladder still leaves a usable reference.
   LADDER_FIELD_FOR      = KindDifficulty::LEVELS.index_with { |level| "ladder_#{level}" }.freeze
   CONCEPT_LADDER_FIELDS = LADDER_FIELD_FOR.values.freeze
 
-  # An honest one-or-two-sentence rung runs 100-200 characters. Many rungs share
-  # one generation prompt, so this is tighter than MAX_CONCEPT_GUIDE_LENGTH.
+  # Many rungs share one generation prompt, so this is tighter than MAX_CONCEPT_GUIDE_LENGTH.
   MAX_LADDER_RUNG_LENGTH = 300
 
-  # Ceiling on the difficulty block's characters. A spec renders the worst case
-  # from the live vocabularies, so this fails when a vocabulary grows past it
-  # rather than letting the prompt grow unnoticed.
+  # A spec renders the worst case from the live vocabularies, so growing one past this fails.
   MAX_LADDER_GUIDANCE_CHARS = 48_000
 
-  # Bounds provider prose rendered straight into a page, the same reason
-  # ExerciseSection::MAX_SCAFFOLD_LABEL_LENGTH bounds a scaffold label. Not
-  # derived from a schema — the prompt asks for at most two short paragraphs per
-  # field, and this is several times that, so it catches a runaway response
-  # without truncating an honest one.
+  # Catches a runaway response: several times the two short paragraphs per field the prompt asks for.
   MAX_CONCEPT_GUIDE_LENGTH = 4_000
 
-  # The one statement of what a concept reference is FOR, shared by the prompt
-  # that writes one and the prompt that reframes it. Stated once because a
-  # reframing that drifts into solving the day's problem is the only real
-  # failure mode this surface has, and two copies of the rule can disagree.
-  # It is not what actually holds that line, though —
-  # #explain_concept_differently is handed no exercise and no answer, so it
-  # cannot reach today's problem whatever the prompt says.
+  # Shared by the prompts that write and reframe a reference; the reframing call's narrow signature is what holds it.
   CONCEPT_REFERENCE_SCOPE = <<~SCOPE.chomp
     This is a stable explanation an engineer returns to across repeat exposure —
     not tied to any single problem.
   SCOPE
 
-  # A recognition guide is rendered as three parts, all required: a guide with
-  # a part missing has nothing worth showing, so the call fails and a later
-  # backfill retries rather than caching half of one forever.
+  # All three required, so a partial guide fails and a later backfill retries instead of caching half of one.
   RECOGNITION_GUIDE_FIELDS = %w[questions contrast misfires].freeze
 
-  # The one line this surface must hold. Stated in the prompt, but what holds it
-  # is #generate_recognition_guide's signature: it is handed no exercise, no
-  # response and no history, so it cannot reach a particular problem.
+  # #generate_recognition_guide gets no exercise, response or history; that signature, not this text, holds the line.
   RECOGNITION_GUIDE_SCOPE = <<~SCOPE.chomp
     This teaches a PROCESS for recognizing the category, never an ANSWER.
     - Good: "ask whether this interface hides what it should, or makes every caller repeat the same decision."
@@ -1079,14 +579,10 @@ class AiService
     It is a lens the reader carries into any problem, not a hint about one.
   SCOPE
 
-  # Max bytes of raw provider output logged server-side when a provider
-  # response can't be used (invalid JSON, non-success HTTP status). Keeps
-  # exception messages — which surface in flash alerts and error trackers —
-  # free of large/undesired provider content.
+  # Keeps exception messages, which reach flash alerts and error trackers, free of large provider output.
   RAW_SNIPPET_LIMIT = 500
 
-  # True when the key is a house key paid for by the deployment rather than
-  # the user: the usage row records it, and the trial gates run before a call.
+  # A house key is paid for by the deployment: usage rows record it, and trial gates run before each call.
   attr_writer :house_key
 
   def house_key? = @house_key == true
@@ -1107,9 +603,7 @@ class AiService
     provider.new(credential.key).tap { |service| service.house_key = credential.house }
   end
 
-  # The calendar day a provider counts requests in, for the house-key guard.
-  # Gemini's day is Pacific; the base assumes UTC for a provider that states
-  # no boundary.
+  # The day a provider counts requests in, for the house-key guard; UTC unless a provider states otherwise.
   def self.quota_day_zone = "UTC"
 
   def self.quota_day(now)
@@ -1119,15 +613,10 @@ class AiService
 
   def self.available? = true
   def self.key_pattern = nil
-  # Named by every registered provider; nil only on a bare subclass, such as a
-  # spec's double, whose usage rows then carry no provider.
+  # nil only on a bare subclass such as a spec double, whose usage rows then carry no provider.
   def self.provider_key = nil
 
-  # Whether this provider can hold the prose judge's reply to a schema. The
-  # base answers false; a provider that can opts in. Whether the judge runs at
-  # all is the separate ReviewProseJudge switch, off in code and turned on per
-  # deployment only once the activation gate in CLAUDE.md's "Review prose
-  # judge" has been met for the prompt and route in question.
+  # The base answers false; the separate ReviewProseJudge switch decides whether the judge runs at all.
   def self.judges_review_prose? = false
 
   # plan_notes is what DailyPlan::Result#notes recorded, written onto the row.
@@ -1141,21 +630,12 @@ class AiService
                       :prompt_options, :suggested_concepts, :unusable_sections)
   private_constant :Draft
 
-  # ── Generate a personalized daily exercise set ────────────────────────────
-  # The day's plan (third section, reinforcement, retention checks) is decided by
-  # DailyPlan before any provider is contacted; this method only renders it into
-  # a prompt, sends it, and records what came back.
-  #
-  # `blocking:` says a request thread is waiting on this call, which buys a
-  # tighter read budget (see SYNC_GENERATION_READ_TIMEOUT). Callers state their
-  # constraint; the timeout policy stays here.
+  # `blocking:` means a request thread is waiting; the timeout policy for that stays here (SYNC_GENERATION_READ_TIMEOUT).
   def generate_exercise(user, language: user.language_for_today, blocking: false)
     generate_unjudged_exercise(user, language: language, blocking: blocking).problem_set
   end
 
-  # The single-stage path with what it left out: a planned section ingest
-  # refused is dropped, as the judged path drops one it cannot repair, and
-  # its key is recorded the same way.
+  # Drops a planned section ingest refused and records its key, as the judged path does.
   def generate_unjudged_exercise(user, language: user.language_for_today, blocking: false)
     draft   = draft_exercise(user, language: language, blocking: blocking)
     planned = draft.kinds.map(&:key)
@@ -1166,10 +646,7 @@ class AiService
                   plan_notes: draft.plan.notes)
   end
 
-  # ── Draft, judge, retry, drop — the weekday batch's path ─────────────────
-  # Drafts here, then hands the draft to JudgedGeneration, which owns the
-  # judge, retry and drop rules. Every provider instance it uses is a fresh one
-  # built from this key, as every other fan-out here builds its own.
+  # JudgedGeneration owns the judge, retry and drop rules; each provider instance it uses is built fresh from this key.
   def generate_judged_exercise(user, language: user.language_for_today)
     draft = draft_exercise(user, language: language, blocking: false)
     JudgedGeneration.call(
@@ -1179,25 +656,9 @@ class AiService
     ).with(plan_notes: draft.plan.notes)
   end
 
-  # ── Review a submitted response, one thread per still-missing section ────
-  # Each thread gets its own service instance (and therefore its own Faraday
-  # connection) — no shared mutable state crosses a thread boundary. A
-  # section's failure is caught and tagged rather than raised, so one bad
-  # section can never keep the other threads' results from being usable by
-  # the caller.
-  #
-  # No pooled DB connection is held for the duration of a thread — only the
-  # provider HTTP call happens here, and that can run up to REVIEW_READ_TIMEOUT
-  # seconds. The one bit of real DB work (ApiUsage.create! inside #log_usage)
-  # checks out a connection for itself, after the provider call returns, so
-  # a multi-section review never pins (section count) pooled connections for
-  # the length of an HTTP round trip — with Puma's thread count and
-  # database.yml's pool sized 1:1, that used to leave zero spare connections
-  # for any concurrent request.
+  # Each thread has its own service and holds no DB connection during the HTTP call; a failed section is tagged, not raised.
   def review_sections(user, exercise, daily_response, sections:)
-    # Started first so it overlaps everything below rather than following it:
-    # the assessment is an extra provider call, but not extra waiting. It reads
-    # the problems alone, so the translation step below writes nothing it needs.
+    # Started first so the extra provider call overlaps the grading instead of adding to the wait.
     difficulty = thread_in_caller_zone { safe_difficulty_assessment(user, exercise, sections) }
 
     translate_before_grading(user, exercise, daily_response, sections)
@@ -1224,9 +685,7 @@ class AiService
 
     reference = parse_json_object(result[:text], subject: "concept reference")
 
-    # Caching keys off (concept, language), so an unusable field would
-    # persist a broken reference forever and block regeneration.
-    # Rejecting the response preserves any existing reference for a later retry.
+    # Cached by (concept, language) forever, so reject an unusable field and keep any existing reference for a retry.
     missing = CONCEPT_REFERENCE_FIELDS.reject { |field| reference[field].is_a?(String) && reference[field].strip.present? }
     if missing.any?
       raise InvalidResponseError, "Concept reference missing required field(s): #{missing.join(', ')}"
@@ -1237,9 +696,7 @@ class AiService
     reference
   end
 
-  # ── Generate the one-time cached recognition guide for a group ───────────
-  # Same narrow shape as #generate_concept_reference: no exercise, no response,
-  # no history. See RECOGNITION_GUIDE_SCOPE for why that matters here.
+  # Handed no exercise, response or history; see RECOGNITION_GUIDE_SCOPE.
   def generate_recognition_guide(user, group_key)
     result = call_and_log(
       user, purpose: "generate_recognition_guide",
@@ -1257,23 +714,9 @@ class AiService
     guide.slice(*RECOGNITION_GUIDE_FIELDS)
   end
 
-  # ── Reframe one cached concept reference a different way ─────────────────
-  # For the engineer the reference itself did not land for. Returns plain prose
-  # rather than JSON, like #explain_differently and for the same reason.
-  #
-  # The signature is the guarantee: no exercise, no daily_response, no section —
-  # the same narrow shape #generate_concept_reference and #assess_difficulty
-  # take. This is the one reframing surface reachable BEFORE a day is submitted,
-  # so "must not hint at today's answer" cannot rest on a prompt line here. It
-  # rests on today's problem never being passed in.
-  #
-  # `prior_alternates` is the framings the client has already been shown, sent
-  # back on every request. Nothing about this call is persisted — same as
-  # #duck_response, and see ConceptReferencesController for why.
+  # Reachable before submission, so it gets no exercise or answer; nothing is persisted (see ConceptReferencesController).
   def explain_concept_differently(user, reference, prior_alternates: [])
-    # reference.language is the ConceptBucket, not a generation language, so
-    # this resolves architecture/plan_review/ambiguity_hunt/pseudocode_to_code
-    # alongside the two programming languages.
+    # reference.language is a ConceptBucket, so this also resolves the language-independent buckets.
     coach = config_for(reference.language)[:coach]
 
     already_read = CONCEPT_REFERENCE_FIELDS
@@ -1302,9 +745,7 @@ class AiService
     text_or_raise(result, subject: "alternate concept explanation")
   end
 
-  # ── Reframe one section's feedback a different way ───────────────────────
-  # Returns a plain string, not JSON: there is no structure to parse, and routing
-  # it through parse_json_object would add a failure mode for no benefit.
+  # Plain string, not JSON: there is nothing to parse, and parse_json_object would only add a failure mode.
   def explain_differently(user, exercise, daily_response, section:, prior_alternates: [])
     coach   = config_for(exercise.language)[:coach]
     review  = daily_response.ai_review&.dig(section) || {}
@@ -1332,10 +773,7 @@ class AiService
     text_or_raise(result, subject: "alternate explanation")
   end
 
-  # ── Answer one follow-up question about a completed review ────────────────
-  # `thread` is an ordered array of { role:, content: } hashes — the prior turns
-  # for this section, passed to the provider as real turns. Returns plain prose,
-  # like #explain_differently.
+  # `thread` holds the prior { role:, content: } turns for this section, sent to the provider as real turns.
   def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
     coach  = config_for(exercise.language)[:coach]
     review = daily_response.ai_review&.dig(section) || {}
@@ -1347,13 +785,7 @@ class AiService
 
     result = call_and_log(
       user, purpose: "review_follow_up",
-      # Everything stable across the thread lives in `system` EXCEPT the
-      # engineer's own answer, which stays in the user turn deliberately: it is
-      # the one piece of free-form text they authored, and this method exists
-      # because a role boundary that a user can write across is not a boundary.
-      # Re-sending it each round costs nothing a cache would have saved, since
-      # this call passes no `cache_system` (see CLAUDE.md's "Conversational
-      # calls send real turns").
+      # The engineer's own answer stays in the user turn, since a role boundary the user can write across is no boundary.
       system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
 
@@ -1381,21 +813,12 @@ class AiService
     text_or_raise(result, subject: "follow-up answer")
   end
 
-  # ── Rubber-duck Socratic thinking-partner turn, pre-submission only ───────
-  # Fully unpersisted: no `daily_response` argument, no draft-answer context,
-  # no read of any stored state. `thread` is the client's own in-memory
-  # conversation so far, sent back on every request — passed to the provider as
-  # real turns, never written anywhere.
+  # Fully unpersisted: `thread` is the client's in-memory conversation, sent back each request and never stored.
   def duck_response(user, exercise, section:, message:, thread: [])
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS, allow_truncated: true,
       system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
-      # A first turn pays a write premium only a later turn recovers, so this
-      # is a bet that threads continue — not a free win. CLAUDE.md's
-      # "Conversational calls send real turns" holds the measured prompt sizes,
-      # the provider's threshold and prices, and the share of single-turn
-      # threads the bet can absorb; they are external facts that move, so they
-      # live in one place rather than three.
+      # A bet that threads continue past one turn; CLAUDE.md's "Conversational calls send real turns" holds the numbers.
       cache_system: true,
       history: UserText.tag_history(thread),
       prompt: <<~PROMPT
@@ -1410,14 +833,7 @@ class AiService
     result[:truncated] ? "#{text}…" : text
   end
 
-  # ── The pseudocode_to_code rounds ────────────────────────────────────────
-  # Round 1 runs pre-submission, from the engineer's own request. Round 2 runs
-  # at review time (see #translate_before_grading), so neither this group nor
-  # #translate_pseudocode is pre-submission-only any more.
-  #
-  # Round 1: one text-only critique. `gaps_found` is returned as a typed boolean
-  # rather than letting an empty list carry the meaning — an empty list is also
-  # what a malformed response normalizes to, so the list can never be the signal.
+  # `gaps_found` is a typed boolean because a malformed response also normalizes to an empty list.
   def critique_pseudocode(user, exercise, section:, pseudocode:)
     result = call_and_log(
       user, purpose: "pseudocode_critique", max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS,
@@ -1446,16 +862,9 @@ class AiService
       prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
     )
 
-    # Normalized before it is measured, so the bound below, the page and the
-    # grading fence all count one representation. NFC can lengthen a string —
-    # U+0958 decomposes into two characters — so code measured raw here could
-    # still cross UserText.tagged's cap downstream and be clipped there, which
-    # is the one outcome the bound exists to prevent.
+    # Normalized before measuring, since NFC can lengthen a string past UserText.tagged's cap downstream.
     code = UserText.normalize(text_or_raise(result, subject: "pseudocode translation"))
-    # Rejected, never truncated. Cutting source mid-token or mid-delimiter
-    # produces code that is no longer what their plan says — which the page
-    # then captions as "your plan implemented literally" and the review grades
-    # them on. Raising keeps the round unspent and retryable instead.
+    # Rejected, never truncated: cut code no longer matches the plan it is graded as; raising keeps the round retryable.
     if code.length > MAX_GENERATED_CODE_LENGTH
       raise InvalidResponseError,
             "Pseudocode translation came back too long to be usable (#{code.length} characters)"
@@ -1464,18 +873,7 @@ class AiService
     code
   end
 
-  # ── Judge one drafted section ────────────────────────────────────────────
-  # Handed the section as delivered, its concept, rung and lock state, and the
-  # kind's task — never another section, the engineer's history, or the
-  # author's rationale. The answer key never leaves the server (see
-  # without_answer_key), so an ambiguity hunt is judged on its request alone,
-  # and neither do the server's own stamps (see ProblemSetIngest::SERVER_STAMPS):
-  # they say what the day intended, which is the one thing a judge that judges
-  # the section as written must not be told. The rung and lock state reach it
-  # as stated arguments instead, since a level is what it measures against.
-  #
-  # A kind the judge solves blind gets its reply parsed without logging it on
-  # failure: the solve is an answer candidate.
+  # Answer key and server stamps are stripped, since they say what the day intended; rung and lock arrive as arguments.
   def judge_section(user, kind, section, rung:, locked:)
     visible = section.except(*ExerciseSection.all_answer_key_fields, *ProblemSetIngest::SERVER_STAMPS)
     result  = call_and_log(
@@ -1488,10 +886,7 @@ class AiService
     JudgeVerdict.parse(raw, kind: kind)
   end
 
-  # Handed the review alone, as the page renders it, plus the section's kind
-  # and the coaching language: never the answer, the problem or the grading
-  # note, so the judge has nothing to regrade from. The signature is the
-  # guarantee, like #assess_difficulty's.
+  # Never handed the answer, problem or grading note, so the judge has nothing to regrade from.
   def judge_review_prose(user, kind, review, coach:)
     projection = ReviewProseVerdict.project(review)
     result = call_and_log(
@@ -1505,8 +900,7 @@ class AiService
     ReviewProseVerdict.parse(raw, projection: projection)
   end
 
-  # Maps an error to the code a fan-out records for it. A class method so
-  # JudgedGeneration names failures the same way this class does.
+  # A class method so JudgedGeneration names failures the same way this class does.
   def self.error_code_for(error)
     case error
     when AuthenticationError  then "authentication"
@@ -1519,9 +913,7 @@ class AiService
     end
   end
 
-  # The failure a usage row records for a call that returned nothing usable.
-  # Closed list in ApiUsage::FAILURES; a refusal or truncation is recorded on
-  # the row its tokens were billed to, since the provider charged for them.
+  # Codes come from ApiUsage::FAILURES; a refusal or truncation is recorded on the row its billed tokens went to.
   def self.failure_code_for(error)
     case error
     when RateLimitError         then "rate_limit"
@@ -1536,11 +928,7 @@ class AiService
     end
   end
 
-  # The reason either judge records when it falls back: one table for both, so
-  # their fallback rates can be compared. A code, never the message, which can
-  # carry provider text. A timeout is the judges' commonest failure, so it is
-  # named here rather than in error_code_for, where the review fan-out reads
-  # it as "other".
+  # One table for both judges so fallback rates compare; a code, never the message, which can carry provider text.
   def self.judge_fallback_reason(error)
     case error
     when JudgeVerdict::Invalid, ReviewProseVerdict::Invalid then "invalid_output"
@@ -1559,8 +947,7 @@ class AiService
 
   protected
 
-  # The two provider calls JudgedGeneration makes, handed over as bound methods
-  # so neither has to join this class's public API.
+  # Bound methods, so neither call has to join this class's public API.
   def judged_generation_provider
     JudgedGeneration::Provider.new(judge_section: method(:judge_section), retry_section: method(:retry_section))
   end
@@ -1594,20 +981,12 @@ class AiService
     PROMPT
   end
 
-  # Stands in for the blank line above the section, so a kind with no
-  # guidance renders the prompt it always has.
+  # Stands in for the blank line above the section, so a kind with no guidance renders its usual prompt.
   def judge_guidance_block(kind)
     kind.judge_guidance ? "\n#{kind.judge_guidance}\n" : ""
   end
 
-  # Everything stage 1 decided, kept so the judged path can re-render the same
-  # guidance for one section and describe the draft after sections are dropped.
-  #
-  # History is fetched once and carried on the Draft to both the prompt and the
-  # diagnostics log — two separate calls to #recent_performance would double the
-  # query and risk the logged "requested" history silently diverging from what
-  # the prompt actually contained if anything changed for this user during the
-  # provider call.
+  # History is fetched once so the logged "requested" history can't diverge from what the prompt contained.
   def draft_exercise(user, language:, blocking:)
     plan       = DailyPlan.for(user, language: language)
     log_set_size(user, plan.size)
@@ -1655,20 +1034,15 @@ class AiService
       difficulty: difficulty, ladders: ladders }
   end
 
-  # Over every kind, not today's: the rendered set is resolved by slot
-  # precedence over what the provider returned, so a section the day did
-  # not ask for can still be the one shown, and #rung_for is total.
+  # Over every kind: slot precedence can show a section the day didn't ask for.
   def pitched_rungs(difficulty, skill_level)
     ExerciseSection.all.to_h { |kind| [ kind.key, difficulty.rung_for(kind, skill_level: skill_level) ] }
   end
 
-  # The tail both paths share. `set` is what will be delivered; `draft` still
-  # holds every drafted section, so a dropped key can still be named with the
-  # concept it was carrying.
+  # `draft` still holds every drafted section, so a dropped key can be named with its concept.
   def finish_generation(user, language, draft, set, dropped_concepts: {}, judge: nil, unhosted: [])
     plan = draft.plan
-    # After ingest, never during: ingest writes nothing and raises on an
-    # unusable set, so a rejected response cannot have left a suggestion behind.
+    # After ingest, which raises on an unusable set, so a rejected response cannot leave a suggestion behind.
     record_suggested_concepts(draft.suggested_concepts)
 
     fourth_dropped, language_dropped = dropped_concepts
@@ -1686,10 +1060,7 @@ class AiService
                                judge: judge, unhosted: unhosted)
   end
 
-  # One kind, one concept, through the same builder and the same ingest as the
-  # draft — narrower, not different, which is why it asks for a narrower read
-  # budget too (see RETRY_READ_TIMEOUT). Raises on failure; JudgedGeneration
-  # decides what a failed retry means.
+  # Raises on failure; JudgedGeneration decides what a failed retry means.
   def retry_section(user, language, draft, kind, concept)
     result = call_and_log(
       user, purpose: "retry_section", read_timeout: RETRY_READ_TIMEOUT,
@@ -1706,11 +1077,7 @@ class AiService
     ).problem_set[kind.key]
   end
 
-  # Guide and ladder fields are optional (see CONCEPT_GUIDE_FIELDS and
-  # CONCEPT_LADDER_FIELDS). Guide text is rendered into the Learn tab and rungs
-  # into a generation prompt, so both get boundary treatment: only a String
-  # survives, stripped and within its bound. Anything else normalizes to nil
-  # rather than raising — an unusable optional field is still a usable reference.
+  # Optional fields are rendered into pages and prompts, so anything but a bounded String becomes nil instead of raising.
   def normalize_optional_reference_fields!(reference)
     CONCEPT_GUIDE_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_CONCEPT_GUIDE_LENGTH) }
     CONCEPT_LADDER_FIELDS.each { |field| reference[field] = usable_optional_text(reference[field], MAX_LADDER_RUNG_LENGTH) }
@@ -1723,37 +1090,18 @@ class AiService
     text.blank? || text.length > max_length ? nil : text
   end
 
-  # A provider that cannot represent a real turn array renders the conversation
-  # into the prompt instead (see GeminiService#call). The wording lives here,
-  # with every other prompt string this class owns, so the subclass decides
-  # only whether to fold — not what the fold says.
+  # The fold's wording lives here with the other prompt text; a subclass decides only whether to fold (GeminiService#call).
   def flatten_history(history, prompt)
     return prompt if history.empty?
 
     "Conversation so far:\n#{render_thread(history)}\n\n#{prompt}"
   end
 
-  # Used by #flatten_history to render a prior `{ role:, content: }`
-  # conversation as "You: .../Them: ..." lines, for a provider that cannot
-  # take history as real turns (see GeminiService#call).
   def render_thread(thread)
     thread.map { |turn| "#{turn[:role] == "assistant" ? "You" : "Them"}: #{turn[:content]}" }.join("\n")
   end
 
-  # Plain-text summary of whichever fields a given section actually has
-  # (code_review/pattern/challenge/architecture/security_review/
-  # parsons_problem/plan_review/ambiguity_hunt/pseudocode_to_code all carry a
-  # different subset)
-  # — enough context for a Socratic prompt without needing per-section-kind
-  # branching. `planted_ambiguities` is deliberately excluded: it's the
-  # answer key for ambiguity_hunt and must never reach a pre-submission prompt.
-  #
-  # This is the single authority for "the section as the engineer sees it", and
-  # it now has two callers: the duck, and #build_difficulty_prompt, which needs
-  # exactly the same view for the opposite reason — the difficulty of a problem
-  # is the difficulty of what was actually shown. Widening this to a field the
-  # engineer cannot see widens both, so add such a field to the caller that
-  # needs it rather than here.
+  # The one view of a section as the engineer sees it, for the duck and the difficulty prompt; never add answer-key fields.
   def duck_section_context(exercise, section)
     data = exercise.problem_set.dig(section.to_s) || {}
 
@@ -1775,30 +1123,20 @@ class AiService
     ].compact.join("\n")
   end
 
-  # A Parsons question is only "arrange these blocks", so without the blocks
-  # the model cannot say anything section-specific. But blocks are persisted
-  # already-solved (see ExerciseSection::ParsonsProblem.arrange!), so their stored order IS
-  # the answer the duck prompt forbids revealing. Positions are therefore only
-  # ever quoted from a genuine persisted scramble; with no trustworthy
-  # scramble to quote, the blocks go over unordered rather than in the stored
-  # order, which would both leak the solution and misdescribe the screen.
+  # Stored blocks are already solved, so positions come only from a persisted scramble; otherwise blocks go unordered.
   def duck_parsons_blocks(data)
     blocks = data["blocks"]
     return unless blocks.is_a?(Array) && blocks.any?
 
     order = scrambled_display_order(data["display_order"], blocks.size)
-    # to_s before sorting: a provider can return non-strings, and Array#sort on
-    # mixed types raises rather than degrading.
+    # to_s first: a provider can return non-strings, and sorting mixed types raises.
     return "Blocks (order withheld):\n#{blocks.map(&:to_s).sort.map { |b| "- #{b}" }.join("\n")}" unless order
 
     lines = order.map.with_index { |block_index, position| "#{position + 1}. #{blocks[block_index]}" }
     "Blocks, in the learner's current on-screen order (NOT the correct order):\n#{lines.join("\n")}"
   end
 
-  # nil unless display_order is a complete permutation that actually differs
-  # from the stored order. The identity permutation is rejected rather than
-  # trusted: it means no scramble was ever persisted, and echoing it back
-  # would present the solved arrangement as the learner's own.
+  # The identity permutation means no scramble was persisted; echoing it would present the solution as the learner's order.
   def scrambled_display_order(display_order, block_count)
     order = ExerciseSection::ParsonsProblem.normalize_order(Array(display_order), block_count)
     return if order.empty? || order == (0...block_count).to_a
@@ -1835,9 +1173,7 @@ class AiService
     PROMPT
   end
 
-  # Counts and flags only: no pseudocode, no critique text. The counterpart line
-  # is ResponsesController#log_pseudocode_review_diagnostics, correlated by
-  # user id + date the way the difficulty diagnostics pair already correlates.
+  # Counts and flags only; pairs with ResponsesController#log_pseudocode_review_diagnostics by user id and date.
   def log_pseudocode_critique(user, gaps_found, gaps)
     Rails.logger.info(
       "[pseudocode] user=#{user.id} date=#{Date.current} phase=critique " \
@@ -1845,13 +1181,7 @@ class AiService
     )
   end
 
-  # The prior-framings block both reframing prompts open with. One rule — do
-  # not reprise what you already said — stated once, since the two callers
-  # differ only in what is being reframed.
-  #
-  # Each framing is fenced because it reaches the service from the page rather
-  # than from storage: the page sends back the framings it holds, so a forged
-  # one is a request away.
+  # Each framing is fenced because the page sends them back, so a forged one is a request away.
   def prior_framings(prior_alternates)
     return "No alternate framing has been given yet." if prior_alternates.empty?
 
@@ -1859,12 +1189,7 @@ class AiService
       prior_alternates.map.with_index(1) { |a, i| "#{i}. #{UserText.tagged(a, blank: '')}" }.join("\n")
   end
 
-  # A blank provider response is a provider bug, not a valid answer — persisting
-  # it downstream fails a presence validation with an error class that escapes
-  # the controller's `rescue AiService::Error`, so the user gets a raw 500
-  # instead of the clean "couldn't generate that" message every other failure
-  # gets. Raising here routes it through the same handling as any other bad
-  # provider response.
+  # A blank response would fail a validation outside `rescue AiService::Error` and give the user a raw 500.
   def text_or_raise(result, subject:)
     text = result[:text].to_s.strip
     raise InvalidResponseError, "Provider returned an empty #{subject}" if text.blank?
@@ -1873,82 +1198,32 @@ class AiService
 
   def error_code_for(error) = self.class.error_code_for(error)
 
-  # Looks up the fixed per-language config, failing loudly on anything
-  # outside RAILS_CONCEPTS/JS_CONCEPTS's languages (e.g. "mixed", or a typo)
-  # instead of silently degrading to Ruby/Rails behavior.
+  # Fails loudly on "mixed" or a typo instead of silently falling back to Ruby/Rails.
   def config_for(language)
     LANGUAGE_CONFIG.fetch(language) do
       raise Error, "Unsupported generation language: #{language.inspect}"
     end
   end
 
-  # A due retention concept's `language` bucket names which vocabulary it was
-  # validated against, but not which section(s) that vocabulary is legal in
-  # today — without this the model has no way to know an architecture-vocabulary
-  # concept can't go in code_review, guesses wrong, and ingest rewrites a
-  # correctly-honored check into a false "miss".
-  #
-  # code_review's legal concepts now depend on the day's content mode as well:
-  # a schema-review day hosts only data-modeling concepts, and every other day
-  # hosts only the rest. pattern and the language-vocabulary thirds are
-  # unscoped, which is what keeps a due data-modeling concept reachable on a
-  # non-schema day.
+  # Names the sections that can host the concept today; otherwise the model guesses and ingest records a false miss.
   def annotate_retention_concept(cm, kinds, language, code_review_mode, rungs)
     hosts = kinds.filter_map do |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
       kind.key if can_host?(cm, kind.key, language, mode: mode, rung: rungs[kind])
     end
 
-    # nil, not "concept ()": with every line derived, a day can present no
-    # section able to carry this concept, and listing it anyway would tell the
-    # model to "work it into one of those" over an empty set. The caller drops
-    # it from the prompt instead. The old unconditional `pattern` line made
-    # this unreachable; deriving it is what put the case back on the table.
+    # nil when no section today can host the concept; the caller drops it from the prompt.
     return nil if hosts.empty?
 
     "#{cm.concept} (#{hosts.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')})"
   end
 
-  # Every slot answered by the same authority that decides what the generation
-  # prompt may offer that section, so an annotation can never name a host whose
-  # own vocabulary line in the same prompt withholds the concept.
-  #
-  # All three derive, deliberately. Two of them used to be restated by hand —
-  # an unconditional `pattern` and a `code_review` line that re-derived the
-  # schema-review rule from DATA_MODELING_CONCEPTS — and the third had already
-  # drifted that way before, answering "yes" for a data-modeling concept on a
-  # parsons_problem third. A restatement here cannot be kept honest by tests
-  # that only cover today's kinds: it goes wrong the day a kind gains an
-  # exclusion, which is exactly what adding a second concept group did.
-  #
-  # `mode` is passed only for code_review, the one kind whose selectable
-  # vocabulary depends on it; the third slot is never code_review. `rung` is
-  # the level the section is pitched at, which a kind may narrow by.
-  #
-  # `language` is the day's actual generation language, deliberately not
-  # `cm.language`: for an architecture-bucket concept the two diverge
-  # (cm.language is the pseudo-language "architecture"), and LANGUAGE_CONFIG
-  # happens to carry an "architecture" entry of its own for concept-reference
-  # generation — passing cm.language through would resolve non-architecture
-  # kinds against that entry's vocabulary instead of the day's real one,
-  # falsely reporting code_review/pattern as hosts for an architecture
-  # concept.
+  # Use the day's language, not cm.language: LANGUAGE_CONFIG's "architecture" entry would report false hosts.
   def can_host?(cm, section_key, language, mode: nil, rung: nil)
     ProblemSetIngest.selectable_vocabulary_for(section_key, language, mode: mode, rung: rung).include?(cm.concept)
   end
 
-  # Delivery is advisory, so the only way to know whether retention checks actually
-  # land is to record both halves. Logged after ingest so it reflects
-  # the concepts actually persisted, not whatever the provider first returned.
-  # `tagged` makes a miss diagnosable rather than merely countable: it shows what
-  # the model picked instead.
-  #
-  # Takes a ConceptBucket rather than a language because the fourth slot's
-  # track is bucket-scoped and language-independent; for the three-slot track
-  # the bucket IS the day's language (see ConceptBucket.for).
-  #
-  # `honored` is computed over the delivered set, so a due check the judge
-  # dropped reads as offered and not honored; `dropped` is what names it.
+  # Logged after ingest, over the delivered set, so a check the judge dropped reads as offered and not honored.
   def log_retention(user, bucket, due_checks, problem_set, code_review_mode, dropped: {})
     return if due_checks.empty?
 
@@ -1966,10 +1241,7 @@ class AiService
     )
   end
 
-  # Logged when the plan is decided, before the provider is contacted, so an
-  # attempt that later fails still leaves its size and evidence behind. The
-  # transition compares planned counts, since a coverage addition makes the
-  # delivered count larger than the size that was planned.
+  # Logged before the provider is contacted, so an attempt that later fails still leaves its size behind.
   def log_set_size(user, size)
     Rails.logger.info("[set_size] user=#{user.id} date=#{Date.current} #{size.diagnostics.to_json}")
 
@@ -1985,8 +1257,7 @@ class AiService
     Rails.logger.info("[coverage] user=#{user.id} kind=#{coverage.kind.key} reason=#{coverage.reason}")
   end
 
-  # The pairing is advisory, so whether the model placed it is read from the
-  # delivered set.
+  # The pairing is advisory, so whether the model placed it is read from the delivered set.
   def log_shared_concept(user, concept, problem_set)
     return if concept.nil?
 
@@ -1996,9 +1267,7 @@ class AiService
     )
   end
 
-  # Checks the plan did not offer would otherwise stay due with no trace, the
-  # way an architecture or fourth-bucket check did on every day without its
-  # kind.
+  # Otherwise checks the plan did not offer would stay due with no trace.
   def log_waiting_retention(user, waiting)
     return if waiting.empty?
 
@@ -2006,14 +1275,7 @@ class AiService
     Rails.logger.info("[retention] user=#{user.id} date=#{Date.current} waiting=#{entries.join(',')}")
   end
 
-  # Nearly all difficulty adaptation in this app is advisory — the prompt asks
-  # the model to ease off reduced-tier concepts or raise the bar after a run
-  # of "too easy" ratings, but nothing verifies the returned problem set
-  # actually reflects that. This pairs what was requested against what was
-  # delivered so a week of production entries can answer whether the loop is
-  # working before changing any generation logic on a hunch. Read alongside
-  # ResponsesController#log_review_diagnostics (correlated by user_id + date).
-  # Safe to remove once that question is settled.
+  # Difficulty adaptation is advisory; this pairs requested with delivered to check it, alongside log_review_diagnostics.
   def log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds:, difficulty:, ladders:,
                                  judge: nil, unhosted: [])
     requested = {
@@ -2049,21 +1311,12 @@ class AiService
     Rails.logger.info("[difficulty_diagnostics] #{payload.to_json}")
   end
 
-  # The tier is the system's reading of the evidence and `drilled` the
-  # engineer's own request, so a drilled entry shows both rather than folding
-  # one into the other — a log line can then tell them apart too.
+  # Shows the tier and `drilled` side by side so a log line can tell the system's reading from the engineer's request.
   def annotate_reinforcement(entry)
     "#{entry[:concept]} (#{[ entry[:tier], ("drilled" if entry[:drilled]) ].compact.join(', ')})"
   end
 
-  # Which concepts the prompt was told to ease in each section: reduced-tier
-  # reinforcement, unless the kind is locked, which the locked line exempts
-  # from the `(reduced)` rule. There are exactly two lists — the fourth slot
-  # reads its own — so each is computed once and every kind maps onto one.
-  # This is the one easing the server decides; the prompt's "too hard" and
-  # "too easy" rating adjustments also move an unlocked section, but the
-  # model judges when they apply, so they cannot be recorded here. Only a
-  # lock makes a rung exact.
+  # The one easing the server decides; locked kinds are exempt, and the model's rating adjustments can't be recorded here.
   def eased_concepts_for(plan, difficulty)
     reduced_main   = reduced_concepts(plan.reinforcement)
     reduced_fourth = reduced_concepts(plan.fourth_reinforcement)
@@ -2077,9 +1330,7 @@ class AiService
     entries.select { |h| h[:tier] == "reduced" }.map { |h| h[:concept] }
   end
 
-  # Coverage says whether material was available; chosen_grounded says whether
-  # the model picked a concept it had a rung for. Whether the problem was
-  # actually pitched at the rung is deliberately not measured here.
+  # Measures whether a rung was available and chosen; whether the problem was pitched at it is deliberately not measured.
   def kind_difficulty_diagnostics(kinds, difficulty, ladders, language, mode, problem_set)
     targeted = kinds & difficulty.targeted_kinds
     return {} if targeted.empty?
@@ -2096,32 +1347,14 @@ class AiService
     { kind_difficulty: per_kind, kind_difficulty_chars: kind_difficulty_guidance(kinds, difficulty, ladders).length }
   end
 
-  # Log storage is not one of the places a kind's answer key is allowed to
-  # reach (see ExerciseSection.all_answer_key_fields). Every other consumer of
-  # a problem_set renders a closed enumeration of named fields; this is the
-  # only one that serializes the whole thing, so the exclusion lives here
-  # rather than in a rule the next whole-payload logger would have to
-  # remember. Returns a copy — the caller's problem_set is what gets persisted.
+  # The only whole-payload serializer, so the answer-key exclusion lives here; returns a copy, since the caller persists it.
   def without_answer_key(problem_set)
     problem_set.transform_values do |section|
       section.is_a?(Hash) ? section.except(*ExerciseSection.all_answer_key_fields) : section
     end
   end
 
-  # Subclasses must implement: makes the provider-specific HTTP call and
-  # returns a normalized Hash { text:, input_tokens:, output_tokens: }.
-  # `read_timeout` overrides the connection's default read budget for this
-  # call only (see AiService::GENERATION_READ_TIMEOUT). `max_tokens`, when
-  # given, overrides the provider's own default output ceiling for this call
-  # only (see AiService::DUCK_RESPONSE_MAX_TOKENS). `history` carries the prior
-  # turns of a conversation; `prompt` is always the new final user turn, so an
-  # empty `history` is the single-shot case every non-conversational caller uses.
-  # `purpose` is the ApiUsage purpose; each provider looks it up in its own
-  # MODEL_FOR_PURPOSE, falling back to its DEFAULT_ROUTE. `response_schema`,
-  # when given, is a JSON Schema the provider should hold the reply to; a
-  # provider that cannot enforce one ignores it, and the caller's own parse is
-  # still the boundary either way. `single_attempt` makes this request once,
-  # with no transport retry of any kind.
+  # Abstract: returns { text:, input_tokens:, output_tokens: }; `history` is prior turns and `prompt` the new user turn.
   def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     raise NotImplementedError, "#{self.class} must implement #call"
   end
@@ -2144,12 +1377,7 @@ class AiService
     PROMPT
   end
 
-  # JSON schema every provider is asked to return for a problem set. Each kind
-  # owns the fragment describing itself (ExerciseSection.schema_fragment); this
-  # joins the fragments for whichever kinds today's set holds (two to four).
-  # The code-bearing fields' label switches with `language` so instructions
-  # never assume Ruby idioms when generating JS — the structure itself never
-  # changes across languages.
+  # Each kind owns its schema fragment; this joins the fragments for today's kinds.
   def exercise_schema_for(language = "ruby_rails", third: :challenge, fourth: :plan_review, pattern: :pattern, only: nil)
     label = config_for(language)[:label]
 
@@ -2164,10 +1392,7 @@ class AiService
     SCHEMA
   end
 
-  # history defaults to a fresh query so every existing caller (direct specs
-  # included) keeps working unchanged; #generate_exercise passes its own
-  # already-fetched value instead so the prompt and the diagnostics log
-  # never see two different snapshots of the same user's history.
+  # #generate_exercise passes its own history so the prompt and diagnostics log see the same snapshot.
   def build_exercise_prompt(user, language = "ruby_rails", third: :challenge, pattern: :pattern,
                             reinforcement: nil, due_checks: [],
                             established: [], history: user.recent_performance,
@@ -2194,30 +1419,15 @@ class AiService
       }.join("\n")
     end
 
-    # Direct callers only; #generate_exercise always passes the plan's list,
-    # which is where the per-section hosting test for drills lives.
+    # Direct callers only; #generate_exercise passes the plan's list, which applies the per-section hosting test for drills.
     reinforcement_list = reinforcement || user.concepts_needing_reinforcement(exclude_buckets: DailyPlan::FOURTH_BUCKETS)
     reinforcement_text = reinforcement_list.any? ?
       reinforcement_list.map { |h| annotate_reinforcement(h) }.join(", ") : "none"
 
-    # Both slots resolved once, through the same call the schema assembles
-    # from, so guidance, hosting, and schema can never disagree about which
-    # kind a slot holds — and a symbol rolled into a slot it can't occupy fails
-    # here rather than reaching a kind that has no guidance to give.
-    #
-    # `only`, when given, is a single-section retry: guidance and schema both
-    # shrink to that one kind, while every other block (difficulty, retention,
-    # reinforcement, flavor, mode, source) still renders as it does for a full day.
+    # Resolved once through the schema's call, so guidance, hosting and schema agree; `only` narrows to one retried kind.
     kinds = only ? [ only ] : ExerciseSection.for_plan(third: third, fourth: fourth, pattern: pattern)
 
-    # Advisory, like every other concept instruction here — the model may ignore it.
-    # If real-world hit rate turns out low, the fix is to escalate THIS wording
-    # toward the directive phrasing used for reinforcement above ("reintroduce
-    # every concept listed"). It is not a reason to revisit the schedule, the data
-    # model, or the decision not to track delivery.
-    # filter_map, not map: a due concept no section can host today annotates as
-    # nil and is dropped, so the block disappears entirely rather than listing
-    # a concept the prompt cannot ask for.
+    # filter_map: a due concept no section can host annotates as nil and is dropped from the prompt.
     rungs = kinds.index_with { |kind| difficulty.rung_for(kind, skill_level: user.skill_level) }
     annotated_due_checks = due_checks.filter_map { |cm| annotate_retention_concept(cm, kinds, language, code_review_mode, rungs) }
 
@@ -2234,8 +1444,7 @@ class AiService
         ""
       end
 
-    # Unlike retention_block, this never forces a selection — it only shapes a
-    # section if the model was already going to pick one of these on its own.
+    # Unlike retention_block, this never forces a selection.
     established_block =
       if established.any?
         <<~EST.chomp
@@ -2289,10 +1498,7 @@ class AiService
         ""
       end
 
-    # A retry's fixed concept folds onto the end of the Drilled-concepts bullet
-    # rather than its own heredoc line — an empty interpolation on its own line
-    # still renders a blank line, which the byte-for-byte prompt snapshots would
-    # catch on every day that isn't a retry.
+    # Folded onto the drilled-concepts bullet: an empty interpolation on its own line would break the prompt snapshots.
     fixed_concept_line = fixed_concept ?
       "\n- This section's concept must be exactly `#{fixed_concept}`: it replaces a section that was rejected on wording alone, and the day's plan already placed this concept here." :
       ""
@@ -2302,12 +1508,7 @@ class AiService
     label  = config[:label]
     focus  = user.focus_areas.any? ? user.focus_areas.join(", ") : "general #{label} patterns"
 
-    # Each chosen kind gives its own guidance line, keyed off the same `kinds`
-    # the schema and retention hosting derive from — so guidance can never
-    # disagree with what the schema actually asks for. code_review is the only
-    # kind whose guidance depends on the day's content mode. The real-source
-    # excerpt is handed to every kind unconditionally: only code_review reads
-    # it and the rest absorb it, which is what the uniform context is for.
+    # Keyed off the same `kinds` as the schema, so guidance can't disagree with what the schema asks for.
     sections_guidance = kinds.map { |kind|
       mode = code_review_mode if kind == ExerciseSection::CodeReview
       generation_guidance_for(kind, language, mode: mode, source: code_review_source, rung: rungs[kind])
@@ -2365,9 +1566,7 @@ class AiService
     PROMPT
   end
 
-  # Folded onto the end of the drilled-concepts bullet, like a retry's fixed
-  # concept, so a day without one renders the prompt byte for byte as before.
-  # A retry asks for one section, so it never carries the pairing.
+  # Folded onto the drilled-concepts bullet so a day without a pairing renders the prompt byte for byte as before.
   def shared_concept_guidance(concept)
     return "" if concept.nil?
 
@@ -2375,12 +1574,7 @@ class AiService
     "\n- The #{sections} sections share `#{concept}` as their concept today. It is one concept needing reinforcement, looked at from different sides: each section tests it in its own way and its own scenario, following its own rules above."
   end
 
-  # One bullet, whichever pool today rolled. The general flavor renders the
-  # line exactly as it read before flavors existed; legacy_graphql_maintenance
-  # is dropped from every listed pool because its clause, where the pool
-  # carries one, states it separately.
-  # SCENARIO_POOLS.fetch, so an unknown flavor fails here rather than
-  # rendering an empty list the model would fill with generic SaaS.
+  # SCENARIO_POOLS.fetch, so an unknown flavor fails here instead of rendering an empty list.
   def scenario_flavor_guidance(flavor)
     pool    = SCENARIO_POOLS.fetch(flavor)
     flavors = (pool[:domains] - %w[legacy_graphql_maintenance]).map { |d| d.tr("_", " ") }.join(", ")
@@ -2393,19 +1587,7 @@ class AiService
     ].compact.join(" ")
   end
 
-  # Data-modeling concepts sit in both language vocabularies, so pattern — and
-  # any rotating third except parsons_problem, which excludes them — can draw
-  # one on any day. That reachability is the point (a due retention check must
-  # have somewhere to land when code_review isn't in schema-review mode). What
-  # it must not do is turn those sections into a second schema review: only a
-  # schema-review code_review presents an artifact. Stated once, for every
-  # section, rather than repeated into each kind's guidance, since it is a rule
-  # about the concept and not about any one kind.
-  #
-  # The sentence defers to each section's own vocabulary list rather than
-  # claiming every section: a kind that excludes the group would otherwise read
-  # this as license to tag it anyway, and ingest validates against the full
-  # vocabulary, so nothing downstream would catch it.
+  # Defers to each section's own vocabulary because ingest validates against the full one and would not catch a misuse.
   def data_modeling_idiom_guidance
     "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section whose own " \
       "vocabulary list above includes them. " \
@@ -2416,13 +1598,7 @@ class AiService
       "same, such as with and without an index, and asks which one the stated access pattern should use."
   end
 
-  # The meta-skill concepts name a way of reasoning, which makes them the one
-  # group that can quietly cost a section its grade: code_review and challenge
-  # are graded on the planted issue or stated requirement their grading notes
-  # name, and there is nothing to put in "missed" if the question had no wrong
-  # answer to begin with. So the concept is confined to framing here, once for
-  # every section, rather than restated into each kind's guidance — like
-  # data_modeling_idiom_guidance, it is a rule about the concept, not the kind.
+  # Confined to framing because code_review and challenge need a planted issue to grade "missed" against.
   def meta_skill_framing_guidance
     "- The meta-skill concepts (#{META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
       "about a problem, not a topic to write about. A section tagged with one must still " \
@@ -2451,14 +1627,7 @@ class AiService
       "restructure it, so writing the better shape IS the answer rather than describing it."
   end
 
-  # A principle is a rule, not a thing to find, which makes this the group most
-  # likely to produce a section with no wrong answer in it: code_review and
-  # challenge are graded on the planted issue or stated requirement their
-  # grading notes name, so nothing goes in "missed" if nothing was missable. So
-  # the requirement here is the same one meta_skill_framing_guidance enforces —
-  # the concept frames the question, it never replaces the findable issue.
-  # Stated once for every section, like the other group rules, because it
-  # is a rule about the concept and not about any one kind.
+  # The principle frames the question and never replaces the findable issue, as with meta_skill_framing_guidance.
   def oo_design_violation_guidance
     "- The OO design-principle concepts (#{OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
       "topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that " \
@@ -2479,13 +1648,7 @@ class AiService
       "it, so writing the corrected design IS the answer rather than describing it."
   end
 
-  # Depth is a property of an interface, not a defect in a result, which makes
-  # this the group most able to produce a section with nothing missable in it —
-  # the same failure oo_design_violation_guidance and meta_skill_framing_guidance
-  # each guard against, since code_review and challenge are graded on a
-  # planted issue or stated requirement and nothing else goes in "missed".
-  # Stated once for every section, like the other four group rules, because it
-  # is a rule about the concept and not about any one kind.
+  # Interface depth can leave nothing missable, so like the other group rules this keeps a findable issue in the section.
   def module_design_depth_guidance
     "- The module-design concepts (#{MODULE_DESIGN_CONCEPTS.join(', ')}) name what a module's interface costs " \
       "every caller, not a bug in what it computes. A section tagged with one must contain exactly one specific, " \
@@ -2503,13 +1666,7 @@ class AiService
       "the answer rather than describing it."
   end
 
-  # The one group whose failure mode is the opposite of the other four's. They
-  # risk a section with nothing missable in it; this one risks a section whose
-  # defect is too visible — code that raises, or an obviously broken line — at
-  # which point the concept is no longer what it names. So the rule here is
-  # that the planted code must LOOK like it works. Stated once for every
-  # section, like the other group rules, because it is a rule about the concept
-  # and not about any one kind.
+  # Opposite risk to the other groups: the planted code must look like it works, or the concept is no longer what it names.
   def silent_correctness_guidance
     "- The silent-correctness concepts (#{SILENT_CORRECTNESS_CONCEPTS.join(', ')}) name a broken invariant that " \
       "looks like a working result. A section tagged with one must show code that runs clean — no exception, no " \
@@ -2535,13 +1692,7 @@ class AiService
       "ordering IS the answer."
   end
 
-  # Both concepts are judgments about the MODEL rather than about a result, so
-  # this group shares the failure mode the design principles and module-design
-  # concepts have: a section with nothing missable in it. code_review and
-  # challenge are graded on a planted issue or stated requirement, so such a
-  # section leaves nothing to put in "missed". Stated once for every section,
-  # like the other five group rules, because it is a rule about the concept
-  # and not about any one kind.
+  # Judgments about the model can leave nothing missable, so like the other group rules this keeps a findable issue.
   def domain_modeling_guidance
     "- The domain-modeling concepts (#{DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
       "which things must change together, not a defect in what the code computes. A section tagged with one must " \
@@ -2565,12 +1716,7 @@ class AiService
       "it IS the answer rather than describing it."
   end
 
-  # { level => { concept => rung } } for today's targeted kinds, in the day's
-  # mode. Merging by concept name is safe because a day's buckets never share a
-  # concept name (spec/models/concept_reference_spec.rb holds that). One query
-  # for every targeted kind's bucket/vocabulary, partitioned by level in
-  # memory afterward — the same shape LadderCoverage.for uses — rather than a
-  # round trip per kind.
+  # Merging by concept name is safe because a day's buckets never share one (concept_reference_spec holds that).
   def ladders_for(kinds, difficulty, language, code_review_mode)
     targeted = kinds & difficulty.targeted_kinds
     return {} if targeted.empty?
@@ -2596,10 +1742,7 @@ class AiService
     end
   end
 
-  # Appended last, so it is the final instruction before the schema. Grouped by
-  # level so a concept shared by same-level sections is listed once. Empty when
-  # nothing on today's plan is targeted, which keeps every other prompt
-  # byte-identical.
+  # Empty when nothing on today's plan is targeted, which keeps every other prompt byte-identical.
   def kind_difficulty_guidance(kinds, difficulty, ladders)
     targeted = kinds & difficulty.targeted_kinds
     return "" if targeted.empty?
@@ -2635,8 +1778,7 @@ class AiService
       "these sections, eased or raised from the section's level rather than from the profile's skill level."
   end
 
-  # Names each rule it overrides. An easing rule added to the prompt later must
-  # be added here on purpose; nothing covers it by implication.
+  # An easing rule added to the prompt later must be added here on purpose; nothing covers it by implication.
   def locked_difficulty_line(kinds)
     return if kinds.empty?
 
@@ -2646,25 +1788,12 @@ class AiService
       "write it at its level, not easier."
   end
 
-  # The answer_scaffold rule's scope, from the registry rather than a written
-  # list: a scaffolding kind the rule leaves out is asked for the field but
-  # never told the bound, and normalize_scaffold then truncates its labels
-  # mid-word (issue #164).
+  # From the registry, since a scaffolding kind left out of a written list gets its labels truncated mid-word (issue #164).
   def scaffolded_kinds_clause
     ExerciseSection.all.select(&:scaffolded?).map(&:key).to_sentence(last_word_connector: " and ")
   end
 
-  # A kind's generation instructions. The vocabulary comes from
-  # ProblemSetIngest.selectable_vocabulary_for, which is always a subset of
-  # what ingest validates against — so the guidance can never name a concept
-  # the normalizer would then rewrite away, and never has to name one the
-  # kind's own format cannot express.
-  #
-  # Every kind gets the same context and reads what it needs (see
-  # ExerciseSection.generation_guidance). No branch on which kind this is:
-  # one lived here for code_review's mode arguments, which put per-kind
-  # knowledge back into the shared assembler that .generation_guidance exists
-  # to keep it out of.
+  # No branch on kind; each kind reads what it needs from the shared context (ExerciseSection.generation_guidance).
   def generation_guidance_for(kind, language, mode: nil, source: nil, rung: nil)
     config = config_for(language)
 
@@ -2683,10 +1812,7 @@ class AiService
     keys    = exercise.active_section_keys
     ratings = daily_response.section_ratings
 
-    # "rounds" is merged in for every key, not just the one kind that reads it:
-    # handing each kind a uniform context and letting it read only its own part
-    # is the same contract .generation_guidance uses, and it keeps the branch on
-    # which kind this is out of the shared assembler.
+    # "rounds" goes to every key so the assembler needn't branch on which kind reads it.
     sections = keys.map do |key|
       ExerciseSection.for(key).review_context(
         section: (exercise.problem_set[key] || {}).merge("rounds" => daily_response.pseudocode_round(key)),
@@ -2738,9 +1864,7 @@ class AiService
     PROMPT
   end
 
-  # The rung only, never `eased`; the rubric grades an eased problem on what
-  # it actually asks. A section generated before stamps existed falls back to
-  # the rung generation would pick for it today.
+  # The rung only, never `eased`: the rubric grades an eased problem on what it actually asks.
   def pitch_line(exercise, daily_response, section)
     stamped = exercise.problem_set.dig(section, "pitched_at")
     rung = KindDifficulty::LEVELS.include?(stamped) ? stamped : current_rung(daily_response.user, section)
@@ -2765,42 +1889,18 @@ class AiService
     )
   end
 
-  # Time.zone is per thread, so a bare Thread.new runs in the default zone and
-  # its ApiUsage row lands on a different date from the rows its caller writes
-  # whenever the two zones straddle midnight. Carrying the caller's zone, rather
-  # than rereading the user's, keeps every row of one fan-out on the date the
-  # caller's own unthreaded calls use.
+  # Time.zone is per thread, so carry the caller's zone or a fan-out's ApiUsage rows can land on another date.
   def thread_in_caller_zone(&work)
     zone = Time.zone
     Thread.new { Time.use_zone(zone, &work) }
   end
 
-  # The grades are what the engineer paid for, so the note never gets to hold
-  # them up: once grading is done the assessment has DIFFICULTY_ASSESSMENT_GRACE_SECONDS
-  # to finish, and the review goes out without it otherwise. #join returns the
-  # thread when it finished and nil when it timed out, so this reads as "take it
-  # if it is ready".
-  #
-  # A thread abandoned here keeps running and may still write its ApiUsage row
-  # after the request has ended — deliberate. The provider call really happened
-  # and really cost money, so recording it is honest accounting, and #log_usage
-  # swallows its own database errors, so a late write cannot fail anything. Killing the
-  # thread instead would save nothing: the provider bills from the moment the
-  # request is sent.
+  # An abandoned thread may still write its ApiUsage row later, which is honest accounting for a call already billed.
   def awaited_difficulty(thread)
     thread.join(DIFFICULTY_ASSESSMENT_GRACE_SECONDS) ? thread.value : {}
   end
 
-  # #assess_difficulty is display-only: a failure in it must never cost the
-  # engineer the review they have already paid for. That contract cannot be
-  # kept inside the method alone, because `self.class.new` builds this thread's
-  # Faraday connection and can fail before the method is even entered — and
-  # Thread#value re-raises whatever escapes, straight past
-  # ResponsesController#review's rescues, which would 500 on a request whose
-  # grades had already succeeded and leave the review claim held. So the guard
-  # lives here, around the whole thread body, and is StandardError-wide on
-  # purpose rather than AiService::Error-wide.
-
+  # StandardError-wide around the whole thread: Thread#value would re-raise past #review's rescues and 500 a graded review.
   def safe_difficulty_assessment(user, exercise, sections)
     fresh_service.send(:assess_difficulty, user, exercise, sections: sections)
   rescue StandardError => e
@@ -2808,21 +1908,7 @@ class AiService
     {}
   end
 
-  # Translate the engineer's pseudocode into code before grading reads it —
-  # faithfully, gaps and all (see #translate_pseudocode). Sequential, and ahead
-  # of the fan-out rather than inside the section's own thread, because
-  # #build_review_day_context reads the stored translation ONCE for every
-  # grading thread: a translation written later than this line would be graded
-  # against a day context that never mentions it. The cost is one sequential
-  # call before grading (and grading's optional prose judge) on a day carrying
-  # such a kind, which ai_service_spec holds against the review claim window.
-  #
-  # Failure is swallowed as widely as the difficulty note's, and for the same
-  # reason: the grades are what the engineer paid for, and .review_context
-  # already states an absent translation rather than assuming one. A section
-  # nobody answered has nothing to translate, and one already translated is
-  # left alone, so retrying a partial review never pays for the same
-  # translation twice.
+  # Runs before the fan-out because #build_review_day_context reads the stored translation once for every grading thread.
   def translate_before_grading(user, exercise, daily_response, sections)
     sections.each do |section|
       next unless ExerciseSection.for(section).translated_before_grading?
@@ -2838,15 +1924,7 @@ class AiService
     end
   end
 
-  # The bound the critique endpoint applies to its own param, applied here too:
-  # this reads a submitted answer, and the general answer cap
-  # (UserText::MAX_ANSWER_LENGTH, 12_000) is twice this kind's translation
-  # bound, so a plan can be stored in full and still be too long to translate.
-  # Skipped rather than truncated, for the reason
-  # #translate_pseudocode refuses to truncate its output — code translated from
-  # a clipped plan is not translated from their plan, and the page would caption
-  # it as though it were. The grade is unaffected: it reads the answer itself,
-  # which every kind sends to the same provider under the general cap alone.
+  # Skipped rather than truncated: code from a clipped plan would be captioned as the engineer's plan.
   def translatable_length?(pseudocode)
     return true if pseudocode.length <= ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
 
@@ -2857,30 +1935,14 @@ class AiService
     false
   end
 
-  # Failures that say "the machine could not run this right now" rather than
-  # "this code is wrong". A grading thread that hits one used to propagate
-  # through Thread#value, past ResponsesController#review's rescues, and 500 a
-  # request whose OTHER sections had already graded — discarding results the
-  # engineer was billed for and leaving the review claim held until it went
-  # stale. Tagged like a provider error instead, so the sections that succeeded
-  # still save and the claim is released.
-  #
-  # Deliberately not a blanket StandardError: on the grading path that would
-  # turn a NoMethodError into "couldn't be reviewed, try again" and hide a real
-  # bug behind a retry button. The difficulty note can afford that breadth
-  # because it is display-only; a grade cannot.
-  #
-  # ConnectionTimeoutError is a subclass of ConnectionNotEstablished, so naming
-  # the parent covers the pool exhaustion this is mostly here for.
+  # Tagged like provider errors so other sections still save; not StandardError, which would hide real bugs behind a retry.
   INFRASTRUCTURE_ERRORS = [
     ActiveRecord::ConnectionNotEstablished,
     Timeout::Error,
     IOError
   ].freeze
 
-  # Only onto a section that actually graded: a failed section has no review
-  # hash to carry an assessment, and a section the day never asked about must
-  # not acquire one.
+  # Only onto sections that graded; a section the day never asked about must not acquire one.
   def merge_difficulty!(results, difficulty)
     results.each do |section, result|
       next unless result[:ok] && difficulty[section]
@@ -2896,8 +1958,7 @@ class AiService
       system: context, prompt: service.send(:build_review_section_prompt, exercise, daily_response, section),
       cache_system: true, read_timeout: REVIEW_READ_TIMEOUT
     )
-    # graded_prose and the rubric stamp are server-owned: only the prose
-    # judge's edit writes the first, and only this line the second.
+    # graded_prose and the rubric stamp are server-owned: only the prose judge writes one, and only this line the other.
     review = service.send(:parse_json_object, result[:text], subject: "#{section} review", log_raw: false)
                     .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => RUBRIC_VERSION)
     review = service.send(:rated, user, exercise, daily_response, section, review)
@@ -2909,9 +1970,7 @@ class AiService
                  quota_id: e.try(:quota_id), retry_after: e.try(:retry_after), failed_at: Time.current } ]
   end
 
-  # A kind that computes its own rating replaces the grader's, and the
-  # grader's essential_gaps then describe a rating nobody kept. Every other
-  # rating is checked against the rubric.
+  # A computed rating replaces the grader's, whose essential_gaps then describe a rating nobody kept, so it is not checked.
   def rated(user, exercise, daily_response, section, review)
     fixed = ExerciseSection.for(section).fixed_rating(
       section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section)
@@ -2922,8 +1981,6 @@ class AiService
   end
 
   # Runs before the prose judge, whose merges would renumber "missed".
-  # Positions it cannot read are dropped rather than stored. The log carries
-  # counts and vocabulary words only.
   def checked_against_rubric(user, section, review)
     check  = RubricCheck.new(review)
     rating = ConceptMastery::AI_RATING_RANK.key?(review["rating"]) ? review["rating"] : "invalid"
@@ -2933,8 +1990,7 @@ class AiService
     check.essential_gaps ? review.merge("essential_gaps" => check.essential_gaps) : review.except("essential_gaps")
   end
 
-  # The positions index the grader's "missed", so when the prose judge
-  # rewrote that list they move into graded_prose beside the one they number.
+  # The positions index the grader's "missed", so they move into graded_prose when the judge rewrote that list.
   def gaps_beside_their_prose(review)
     original = review[ReviewProseVerdict::ORIGINAL_KEY]
     return review unless original.is_a?(Hash) && review.key?("essential_gaps") && original["missed"] != review["missed"]
@@ -2942,10 +1998,7 @@ class AiService
     review.except("essential_gaps").merge(ReviewProseVerdict::ORIGINAL_KEY => original.merge("essential_gaps" => review["essential_gaps"]))
   end
 
-  # Its own rescue, so a judge failure returns the grade the provider already
-  # gave instead of reaching grade_section's, which marks the section failed.
-  # StandardError, because Thread#value re-raises anything grade_section's
-  # narrower rescue misses, and that would cost the whole day's review.
+  # StandardError, because Thread#value re-raises anything grade_section's narrower rescue misses, costing the whole review.
   def judged_review(user, exercise, section, review)
     return review unless ReviewProseJudge.enabled? && self.class.judges_review_prose?
 
@@ -2965,19 +2018,7 @@ class AiService
                       "merges=#{verdict.merges.to_json} ms=#{ms}")
   end
 
-  # Rate how hard each problem is, from its content alone.
-  # Handed no daily_response, and none of the engineer's history — deliberately.
-  # This must rate the problem, not the person, and above all it must not
-  # become a second readout of their ConceptMastery tier, which the mastery
-  # design keeps invisible to them precisely so it cannot shape engagement. A
-  # prompt sentence asking the model to ignore the answer would be a weaker
-  # guarantee than not having the answer, so the signature is the guarantee:
-  # widening it is what a reviewer should push back on. `user` is here only to
-  # bill the call.
-  #
-  # Failure is swallowed rather than raised. The rating is context for reading
-  # a review; it is never worth costing the engineer the review itself, which
-  # they paid for with their own API key.
+  # Handed no daily_response or history so it can't become a readout of the mastery tier; resist widening this signature.
   def assess_difficulty(user, exercise, sections:)
     result = call_and_log(
       user, purpose: "assess_difficulty", max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS,
@@ -2986,9 +2027,7 @@ class AiService
     )
 
     assessed = parse_json_object(result[:text], subject: "difficulty assessment")
-    # Repairs rather than raises: a bad assessment costs a note, and discarding
-    # a review the engineer already paid for over one would be the worse
-    # failure. DailyResponse owns the rule, and applies it again on read.
+    # Repairs rather than raises, so a bad assessment costs only the note; DailyResponse applies the rule again on read.
     sections.to_h { |section| [ section, DailyResponse.usable_difficulty(assessed[section]) ] }.compact
   end
 
@@ -3023,17 +2062,7 @@ class AiService
     PROMPT
   end
 
-  # Descriptions are prompt text and live here; the level names come from
-  # DailyResponse, so the scale offered and the scale storable cannot drift
-  # apart. Keyed by level rather than positional: this was three descriptions
-  # destructured off the constant in order, which would have silently relabelled
-  # every rung the moment a level was added or reordered. #fetch over [] so a
-  # level with no guidance cannot interpolate nil into the prompt — but note
-  # that the KeyError is NOT the safety net: this runs inside
-  # #safe_difficulty_assessment, which swallows it and drops the note. The spec
-  # "has guidance for exactly the levels it can offer" is what actually catches
-  # a missing rung, and a second spec pins the ordered vocabulary, which is what
-  # lets #build_difficulty_prompt call .first "the easiest".
+  # Keyed by level from DailyResponse so labels can't shift; a spec, not the KeyError, catches a missing level.
   DIFFICULTY_GUIDANCE = {
     "straightforward" => "one thing to notice; a competent engineer finds it on a first read.",
     "moderate"        => "a couple of reasoning steps, or one detail that is easy to skim past.",
@@ -3047,15 +2076,9 @@ class AiService
   end
 
   def build_concept_reference_prompt(concept, config)
-    # A concept with no code of its own to show is illustrated in pseudocode;
-    # every other concept gets real source in the day's language.
     medium = LANGUAGE_AGNOSTIC_VOCABULARIES.include?(config[:concepts]) ? nil : config[:label]
 
-    # A shape you find is never a technique to choose, so the remedy lens the
-    # other concepts get would have the provider explain when to reach for a
-    # god object, a shallow module, or an unknown unknown. The design
-    # principles deliberately stay on the remedy lens: open_closed IS
-    # something to reach for.
+    # Shapes to find are never techniques to choose, so they skip the remedy lens; design principles keep it.
     senior_lens_desc =
       if ANTI_SHAPE_CONCEPTS.include?(concept)
         "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"
@@ -3102,9 +2125,7 @@ class AiService
     PROMPT
   end
 
-  # The lesson's keys come from ConceptLesson, which also holds the reply to
-  # them. A choice between two defensible options has no wrong side, so its
-  # habits are the options and each catch is what that option costs.
+  # A tradeoff concept's habits are its options, and each catch is what that option costs.
   def concept_lesson_instruction(concept)
     habits =
       if TRADEOFF_CONCEPTS.include?(concept)
@@ -3159,8 +2180,7 @@ class AiService
     PROMPT
   end
 
-  # Derived from TRADEOFF_CONCEPTS rather than keyed to a group, so the framing
-  # follows the concepts wherever they are grouped.
+  # Derived from TRADEOFF_CONCEPTS, so the framing follows the concepts wherever they are grouped.
   def recognition_tradeoff_line(concepts)
     choices = concepts & TRADEOFF_CONCEPTS
     return if choices.empty?
@@ -3169,19 +2189,14 @@ class AiService
       "For those, the lens recognizes that a choice is being made and which property of the context decides it, never which side is right."
   end
 
-  # `medium` is nil for a concept with no code of its own — see
-  # LANGUAGE_AGNOSTIC_VOCABULARIES.
+  # `medium` is nil for a concept with no code of its own (see LANGUAGE_AGNOSTIC_VOCABULARIES).
   def code_example_description(medium)
     return "illustrative pseudocode or a short language-agnostic snippet, ~15 lines" if medium.nil?
 
     "annotated #{medium} code, ~15 lines"
   end
 
-  # A pair of the SAME scenario, so the difference is visible structurally
-  # rather than held in the reader's head across two unrelated examples. The
-  # tradeoff branch withholds the word "corrected" on purpose: both options are
-  # legitimate, and a flaw/fix frame would sell a real decision as having one
-  # right answer.
+  # The tradeoff branch withholds "corrected": both options are legitimate, and a flaw/fix frame implies one right answer.
   def worked_example_description(concept, medium)
     opening = "two short #{medium || 'pseudocode'} fragments of the SAME scenario, " \
               "keeping the same names and shape so the difference reads structurally"
@@ -3198,10 +2213,7 @@ class AiService
     end
   end
 
-  # Both callers persist the result into a jsonb column and then index into it
-  # by key, so a non-Hash payload has to fail here rather than downstream: an
-  # array saved to ai_review is still truthy, which flips DailyResponse#reviewed?
-  # and leaves the user an empty review they can't regenerate.
+  # A non-Hash must fail here: an array saved to ai_review is truthy, flips #reviewed? and strands an empty review.
   def parse_json_object(text, subject:, log_raw: true)
     parsed = parse_json_response(text, subject: subject, log_raw: log_raw)
     return parsed if parsed.is_a?(Hash)
@@ -3209,11 +2221,7 @@ class AiService
     raise InvalidResponseError, "Provider returned #{parsed.class} instead of a JSON object for the #{subject}"
   end
 
-  # log_raw: false is for replies that must stay out of application logs: an
-  # engineer's review text or pseudocode critique, which can quote their
-  # answer, a blind solve, and a drafted problem set, whose
-  # answer keys the stripping steps have not yet seen. Nothing is logged, and
-  # the message never quotes the reply (a parser message can).
+  # log_raw: false keeps replies that may quote an answer or hold an answer key out of logs; the message never quotes them.
   def parse_json_response(text, subject: "response", log_raw: true)
     # Strip any accidental markdown fences
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
@@ -3225,10 +2233,7 @@ class AiService
     raise InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
   end
 
-  # The HTTP envelope of a successful call, as opposed to the model's reply
-  # inside it. Callers rescue AiService::Error, so a body that is not a JSON
-  # object (a proxy's HTML page, a cut-off response, a bare array) has to
-  # arrive as one.
+  # Callers rescue AiService::Error, so a non-object body (an HTML page, a cut-off reply) must arrive as one.
   def parse_provider_envelope(body, provider:)
     parsed = JSON.parse(body.to_s)
     return parsed if parsed.is_a?(Hash)
@@ -3238,11 +2243,7 @@ class AiService
     unreadable_envelope!(body, provider)
   end
 
-  # A body that starts like JSON (an object, an array or a quoted string) is
-  # most likely a reply cut off in transit, and a reply can carry an answer
-  # the logs must not (a judge's blind solve, an engineer's review), so only
-  # its size is logged. Anything else, such as a proxy's HTML page, is logged
-  # as a snippet for diagnosis.
+  # A body that starts like JSON may carry an answer the logs must not, so only its size is logged.
   def unreadable_envelope!(body, provider)
     text = body.to_s
     if text.lstrip.start_with?("{", "[", '"')
@@ -3253,13 +2254,7 @@ class AiService
     raise InvalidResponseError, "#{provider} returned an unreadable response"
   end
 
-  # Extracts a provider's own explanation for a failed HTTP response, when
-  # one is available, so users see actionable detail (e.g. "credit balance
-  # too low") instead of a bare status code. Falls back to `fallback`
-  # whenever the body isn't parseable JSON or lacks the expected shape (5xx
-  # HTML error pages, empty bodies, unrecognized formats). Every provider
-  # nests its error detail the same way:
-  # {"error": {"type": "...", "message": "..."}}.
+  # Every provider nests error detail as {"error": {"message": ...}}; anything else falls back to `fallback`.
   def extract_provider_message(body, fallback:)
     parsed  = JSON.parse(body.to_s)
     message = parsed.is_a?(Hash) ? parsed.dig("error", "message") : nil
@@ -3268,8 +2263,7 @@ class AiService
     fallback
   end
 
-  # A provider's authentication error body can echo the key or fragments of
-  # it, so the body is neither logged nor shown; the status says enough.
+  # The body can echo the key, so it is neither logged nor shown; the status says enough.
   def raise_if_key_rejected(company, status)
     return unless [ 401, 403 ].include?(status)
 
@@ -3278,26 +2272,16 @@ class AiService
                                   http_status: status)
   end
 
-  # Logs a truncated snippet of raw provider output server-side instead of
-  # embedding it in an exception message — exception messages surface in
-  # flash alerts and error trackers, where large/undesired content would
-  # leak to users and bloat logs.
+  # Logged instead of put in an exception message, which reaches flash alerts and error trackers.
   def log_raw_snippet(label, content)
     text = content.to_s
-    # .scrub guards against byteslice cutting a multi-byte UTF-8 character in
-    # half at the truncation boundary, which would otherwise leave an invalid
-    # byte sequence in the log line.
+    # .scrub repairs a multi-byte character byteslice may cut in half.
     snippet = text.byteslice(0, RAW_SNIPPET_LIMIT).scrub
     snippet += "... (truncated, #{text.bytesize} bytes total)" if text.bytesize > RAW_SNIPPET_LIMIT
     Rails.logger.error("#{label}: #{snippet}")
   end
 
-  # Never allowed to break generation — a bug here is a lost analytics
-  # signal, not a reason to fail the request.
-  #
-  # Rescued per suggestion, not around the loop: a single malformed or
-  # transiently failing name would otherwise discard every suggestion behind
-  # it, which is how one bad concept costs a whole day's analytics.
+  # Rescued per suggestion, so one bad name can't discard the rest; a failure here never breaks generation.
   def record_suggested_concepts(suggestions)
     suggestions.each { |suggestion| record_suggested_concept(suggestion) }
   end
@@ -3308,15 +2292,12 @@ class AiService
     Rails.logger.warn("SuggestedConcept recording failed: #{e.message}")
   end
 
-  # Rescues database failures only, the pool checkout included. Anything else
-  # here is a bug, and swallowing it would silently empty the table that cost
-  # questions are answered from.
-  # A service for another thread of the same call, carrying the same key and
-  # the same credential kind.
+  # Carries the same key and credential kind into another thread of the same call.
   def fresh_service
     self.class.new(@api_key).tap { |service| service.house_key = house_key? }
   end
 
+  # Rescues database errors only; swallowing anything else would silently empty the table cost questions rely on.
   def log_usage(user, result, purpose:)
     ActiveRecord::Base.connection_pool.with_connection do
       ApiUsage.create!(
@@ -3343,31 +2324,7 @@ class AiService
     )
   end
 
-  # Every provider entry point funnels through here so usage is recorded on
-  # exactly one path. A truncated response is still a billed response, often
-  # a long one, so the usage row has to be written before the failure
-  # propagates, or cost tracking under-counts the calls that failed.
-  #
-  # Providers report truncation as data (`truncated:`) rather than raising it
-  # themselves: recognizing a stop reason is provider-specific, but deciding
-  # that it's fatal is shared policy, and belongs with the rest of the
-  # response handling here.
-  #
-  # #log_usage checks out its own connection after the provider call and
-  # rescues a failed checkout or write, so a busy pool never discards a result
-  # the provider already billed. A failure, refusal or truncation still raises below.
-  #
-  # `allow_truncated:` hands a cut-off reply back with its `truncated` flag
-  # instead of raising. Only a prose caller may ask for it: a JSON body that
-  # stops early is unusable, but prose that stops a sentence early still is.
-  # A refusal always raises, after the usage row is written: the provider
-  # billed the input even though it returned no text.
-  #
-  # A call that fails before a reply arrives writes a row too, with zero
-  # tokens and the failure's code, status and quota id: one row per call,
-  # whatever faraday-retry did inside it. The write goes through #log_usage,
-  # which never raises, so recording a failure cannot change which error the
-  # caller sees.
+  # The one path every provider call takes, so usage rows are written before any failure, truncation or refusal raises.
   def call_and_log(user, purpose:, system:, prompt:, cache_system: false,
                    read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], response_schema: nil, allow_truncated: false, single_attempt: false)
     TrialAllowance.check!(user, provider: self.class) if house_key?
@@ -3399,8 +2356,7 @@ class AiService
       http_status: error.http_status, failure: self.class.failure_code_for(error), quota_id: error.quota_id }
   end
 
-  # A reply that arrived but is unusable is still billed, so its row keeps the
-  # tokens and names why it was not used.
+  # An unusable reply is still billed, so its row keeps the tokens and names why it was not used.
   def reply_failure_code(result, allow_truncated)
     return "provider_error" if result[:error]
     return "refusal" if result[:refusal]
@@ -3409,13 +2365,10 @@ class AiService
     nil
   end
 
-  # The model a purpose routes to on this provider, for a failure row that
-  # never reached a reply. Providers override; the base knows no routes.
+  # Providers override; the base knows no routes.
   def routed_model(_purpose) = nil
 
-  # A provider error body as a Hash, or {} when it is not a JSON object. Read
-  # for a quota id or an error code, never logged: an error body can carry the
-  # key or fragments of it.
+  # Read for a quota id or error code, never logged: an error body can carry the key.
   def parse_error_body(body)
     parsed = JSON.parse(body.to_s)
     parsed.is_a?(Hash) ? parsed : {}
@@ -3423,15 +2376,13 @@ class AiService
     {}
   end
 
-  # The provider's error object, or an empty one when the body is not JSON,
-  # carries no "error" or carries a null one, so the status alone decides.
+  # Empty when the body is not JSON or has no "error", so the status alone decides.
   def error_envelope(body)
     error = parse_error_body(body)["error"]
     error.is_a?(Hash) ? error : {}
   end
 
-  # When a daily request limit hit at failed_at lifts. A provider whose quota
-  # day has a known boundary overrides this; the base gives a day.
+  # A provider whose quota day has a known boundary overrides this; the base gives a day.
   def self.daily_quota_reset_at(failed_at)
     failed_at + 1.day
   end

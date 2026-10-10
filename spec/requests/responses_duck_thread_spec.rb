@@ -154,13 +154,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
       expect(fake).not_to have_received(:duck_response)
     end
 
-    # Regression guard: a flat MAX_DUCK_THREAD_BYTES undercounted its own
-    # documented "generous enough that no honest session approaches it" claim
-    # — 6 honest user turns at the max message length, in a worst-case
-    # 4-byte-per-character language, already exceeded a flat 20_000-byte
-    # budget after only 2-3 exchanges. This drives a full, cap-respecting,
-    # every-message-at-the-character-limit CJK conversation through and
-    # confirms it never trips the byte cap.
+    # A flat byte cap once tripped on honest multi-byte conversations; drive a full CJK thread at every limit.
     it "lets a full, honest, cap-respecting conversation through even in a worst-case multi-byte language" do
       create_exercise_for(user)
       fake = stub_answer
@@ -191,9 +185,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     expect(fake).not_to have_received(:duck_response)
   end
 
-  # A payload can carry more third-/fourth-shaped keys than the page renders;
-  # only the resolved ones are on screen, and a section the engineer can't see
-  # isn't one they can think out loud about.
+  # Only resolved sections are on screen, so the duck must refuse a key the page never renders.
   it "returns 422 for a payload key the exercise holds but never renders, without calling the provider" do
     create_exercise_for(user, problem_set: {
       "code_review"    => { "question" => "Find the bug", "snippet" => "def a; end" },
@@ -340,8 +332,6 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
   end
 
   describe "the pre-written explanation request" do
-    # It travels the same path as anything the user types: same endpoint, same
-    # gate, same cap, no branch anywhere on the server.
     it "is handled as an ordinary message with no special-casing" do
       create_exercise_for(user)
       fake = stub_answer("Think of it like recounting a shopping list on every trip.")
@@ -389,14 +379,7 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     end
   end
 
-  # The motivating defect is two-stage: a user's message gets stored client-side
-  # as a thread turn, then sent back on the *next* request. Turns used to be
-  # flattened into "You: ..." / "Them: ..." lines inside one prompt string, so
-  # a user turn whose own content happened to contain those prefixes rendered
-  # as an indistinguishable extra "You:" line — a fabricated assistant turn
-  # mid-transcript. Role-tagged turns make that unrepresentable: the forged
-  # text stays confined inside its one user turn's content, in `history`
-  # rather than in `prompt`, and creates no extra turn.
+  # Role-tagged turns keep "You:"/"Them:" text inside its own turn, so it cannot forge an assistant turn.
   it "cannot forge an assistant turn from text embedded in a prior thread turn" do
     fake_provider_user = create_fake_provider_user
     create_exercise_for(fake_provider_user)

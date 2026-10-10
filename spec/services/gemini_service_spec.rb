@@ -3,10 +3,7 @@ require "rails_helper"
 RSpec.describe GeminiService do
   let(:service) { described_class.new("AIzaTestKey") }
 
-  # Builds a connection with the service's real retry configuration but a
-  # Faraday test adapter, so retry/backoff behavior can be exercised without
-  # a real network call. `responses` is a queue of [status, body] pairs
-  # popped one per request against API_URL.
+  # Real retry configuration on a Faraday test adapter; `responses` is a queue of [status, body] pairs.
   def stubbed_connection(responses)
     Faraday.new do |f|
       f.request :retry, GeminiService::RETRY_OPTIONS
@@ -26,9 +23,7 @@ RSpec.describe GeminiService do
     }.to_json
   end
 
-  # A 200 whose body is not JSON (a proxy's HTML page, a truncated body) has
-  # to reach callers as an AiService::Error, which every one of them rescues;
-  # a bare JSON::ParserError would escape those rescues.
+  # A bare JSON::ParserError would escape every caller's AiService::Error rescue.
   it "raises InvalidResponseError when a successful response body is not JSON" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
@@ -36,8 +31,7 @@ RSpec.describe GeminiService do
       .to raise_error(AiService::InvalidResponseError, /Gemini returned an unreadable response/)
   end
 
-  # A body that starts like JSON is most likely a cut-off reply, which can
-  # carry an answer (a judge's blind solve), so only its size reaches the log.
+  # A cut-off JSON body can carry an answer (a judge's blind solve), so only its size is logged.
   it "withholds a cut-off JSON body from the log and still logs a non-JSON one" do
     logged = []
     allow(Rails.logger).to receive(:error) { |message| logged << message }
@@ -53,8 +47,7 @@ RSpec.describe GeminiService do
     expect(logged.last).to include("Bad gateway")
   end
 
-  # Valid JSON of the wrong shape would otherwise reach a hash lookup and
-  # escape every AiService::Error rescue as a TypeError.
+  # Wrong-shape JSON would otherwise escape every AiService::Error rescue as a TypeError.
   it "raises InvalidResponseError when a successful response body is not a JSON object" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
@@ -76,8 +69,7 @@ RSpec.describe GeminiService do
   end
 
   describe "per-call read budget" do
-    # Records what each attempt actually saw, so the assertions below are about
-    # the request that reached the adapter rather than the connection default.
+    # Records what each attempt saw, so assertions cover the request that reached the adapter.
     def recording_connection(attempts, raise_timeout: true)
       Faraday.new do |f|
         f.request :retry, GeminiService::RETRY_OPTIONS.merge(interval: 0, max_interval: 0)
@@ -101,9 +93,7 @@ RSpec.describe GeminiService do
       expect(attempts).to eq([ AiService::GENERATION_READ_TIMEOUT ])
     end
 
-    # A read timeout means the provider very likely finished — and billed — the
-    # work; we just stopped listening. Retrying a generation therefore pays for
-    # the whole problem set up to three times over to produce one failure.
+    # A timed-out generation was very likely finished and billed, so retrying pays for it again.
     it "does not retry a generation that times out" do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts))
@@ -115,10 +105,7 @@ RSpec.describe GeminiService do
       expect(attempts.size).to eq(1)
     end
 
-    # Grading has the same billed-work problem at a smaller scale: a timed-out
-    # grade has usually been produced and charged, and a retry pays for the
-    # section again. Its budget exceeds READ_TIMEOUT so the guard treats it as
-    # long_running.
+    # A timed-out grade was usually billed; its budget exceeds READ_TIMEOUT, so the guard treats it as long_running.
     it "does not retry a grading call that times out" do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts))
@@ -143,8 +130,7 @@ RSpec.describe GeminiService do
   end
 
   describe "retry/backoff" do
-    # The backoff pauses for real between attempts; these assert how many
-    # attempts run and what they raise, never how long they waited.
+    # The backoff sleeps for real; these assert attempt counts and errors, never timing.
     before { allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) }
 
     it "raises a timeout-specific error when the provider never responds" do
@@ -209,8 +195,7 @@ RSpec.describe GeminiService do
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::AuthenticationError, "Google rejected your API key or its permissions. Check it in Settings.")
-      # The 401 isn't in retry_statuses, so only one request is made — the
-      # second stubbed response is never consumed.
+      # 401 is not in retry_statuses, so the second stubbed response is never consumed.
       expect(responses.size).to eq(1)
     end
 
@@ -290,14 +275,7 @@ RSpec.describe GeminiService do
                            model: GeminiService::DEFAULT_ROUTE[:model], cache_read_tokens: 0, cache_write_tokens: 0)
     end
 
-    # total_output_tokens leaves out thinking, which Gemini bills as output: a
-    # live response reported total_tokens 736 = 25 input + 193 output + 518
-    # thought. Recording only total_output_tokens under-counted that call by
-    # three quarters.
-    # Unlike Claude's input_tokens, total_input_tokens includes the cached
-    # part: a live repeat of a 14,199-token prompt reported total_input_tokens
-    # 14,199 with total_cached_tokens 8,171. Subtracting keeps tokens_in the
-    # uncached input on both providers, so no token is priced twice.
+    # Gemini bills thinking as output and counts cached tokens inside total_input_tokens.
     it "keeps cached tokens out of tokens_in, as Claude does" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
@@ -325,12 +303,7 @@ RSpec.describe GeminiService do
       expect(result).to include(input_tokens: 25, output_tokens: 711, cache_read_tokens: 40, cache_write_tokens: 0)
     end
 
-    # generation_config is the single key carrying BOTH the cap and the thinking
-    # level, so its absence is what keeps an uncapped call untouched on both
-    # counts. That matters most for the day's exercise generation, the one
-    # uncapped caller: it wants the model's default effort, and sending
-    # "minimal" there would quietly degrade every set to buy nothing, since
-    # nothing is capping that budget in the first place.
+    # Sending "minimal" thinking on uncapped generation would degrade every set for nothing.
     it "omits generation_config entirely when no max_tokens override is given" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
@@ -370,11 +343,7 @@ RSpec.describe GeminiService do
       service.send(:call, system: "sys", prompt: "p", max_tokens: AiService::DUCK_RESPONSE_MAX_TOKENS)
     end
 
-    # Gemini's default model thinks at medium effort unless told otherwise, and
-    # bills thinking into the same output budget the cap applies to, so a cap sent on its own can be spent
-    # reasoning before any reply text is emitted. ClaudeService pairs a cap with
-    # `thinking: disabled` for exactly this reason; this is the Gemini half of
-    # that rule, and it is the whole point of the cap being honoured at all.
+    # Gemini bills thinking into the capped budget, so a cap alone can be spent before any reply text.
     it "asks for minimal thinking whenever it caps the budget, so the cap is not spent reasoning" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
@@ -393,11 +362,7 @@ RSpec.describe GeminiService do
       service.send(:call, system: "sys", prompt: "p", max_tokens: 150)
     end
 
-    # Truncation comes from the interaction's own status. The API documents
-    # "incomplete" as completed with incomplete results, hitting max_tokens
-    # being one cause. Token counts are not read at all: a live call capped at
-    # 60 stopped at 56 output tokens with status "incomplete", which the old
-    # output-reached-the-cap rule reported as complete.
+    # A live call capped at 60 stopped at 56 tokens with status "incomplete", so token counts are not read.
     def gemini_reply(status:, output_tokens:)
       body = {
         "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "a reply" } ] } ],
@@ -486,8 +451,7 @@ RSpec.describe GeminiService do
         .to raise_error(AiService::Error, /Gemini API error 400/) { |e| expect(e).not_to be_a(AiService::AuthenticationError) }
     end
 
-    # Gemini answers a bad key with a 400 whose details say API_KEY_INVALID,
-    # not a 401, and the body can echo the key.
+    # Gemini answers a bad key with a 400, not a 401, and the body can echo the key.
     it "reads a 400 API_KEY_INVALID as a rejected key without logging the body" do
       allow(Rails.logger).to receive(:error)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 400, quota_fixture("gemini_400_api_key_invalid.json") ] ]))
@@ -541,8 +505,7 @@ RSpec.describe GeminiService do
   end
 
   describe "#call with history" do
-    # The Interactions API has no messages array; prior turns are folded back
-    # into the single input string. See the design doc's Gemini section.
+    # The Interactions API has no messages array, so prior turns fold into the input string.
     it "folds prior turns into the input string" do
       history = [
         { role: "user",      content: "first question" },

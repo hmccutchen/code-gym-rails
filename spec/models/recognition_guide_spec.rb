@@ -6,8 +6,7 @@ RSpec.describe RecognitionGuide do
       .to match_array(ConceptGroup::NAMED.map(&:first) + ConceptBucket::LANGUAGE_INDEPENDENT)
   end
 
-  # key_for reads a group key and a bucket key through one list, so a named
-  # group sharing a name with a bucket would answer for both.
+  # key_for reads group and bucket keys through one list, so a shared name would answer for both.
   it "has no group key that is also a bucket's" do
     expect(ConceptGroup::NAMED.map(&:first) & AiService::LANGUAGE_CONFIG.keys).to be_empty
   end

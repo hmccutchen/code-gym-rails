@@ -1,6 +1,4 @@
-# Restricted to the day's language security_concepts subset, never the full
-# vocabulary — that restriction is what makes the interleaving with code_review
-# deliberate rather than incidental.
+# Restricted to the language's security subset, which is what makes interleaving with code_review deliberate.
 class ExerciseSection::SecurityReview < ExerciseSection
   def self.vocabulary_key
     :security_concepts

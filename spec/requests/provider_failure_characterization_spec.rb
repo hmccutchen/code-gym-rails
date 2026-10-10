@@ -1,15 +1,6 @@
 require "rails_helper"
 
-# What each provider-calling path shows when Gemini fails, stubbed at the HTTP
-# level through GeminiService's real retry configuration, so the request count
-# and the text that reaches the page are the real ones. The bodies live in
-# spec/fixtures/provider_errors and follow Google's documented error shape;
-# the Interactions API's real 429 is unconfirmed until the capacity probe
-# records one, and the fixtures are replaced with what it captures.
-#
-# One example per failure class per path. Every sentence comes from the
-# provider_failures locale table through ProviderFailureText; nothing here
-# repeats provider text, a status code, socket detail or a key.
+# Stubbed at the HTTP level through GeminiService's real retry config; the fixtures follow Google's error shape.
 RSpec.describe "Provider failures as users see them", type: :request do
   include ActiveSupport::Testing::TimeHelpers
 
@@ -35,9 +26,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
     "timeout"         => "timeout"
   }.freeze
 
-  # Each class's sentence on each surface, for a Gemini key at 10am Eastern on
-  # Tuesday: the daily limit then resets at 3am Eastern on Wednesday, and
-  # the per-minute fixture asks for a 20-second wait.
+  # A Gemini key at 10am Eastern Tuesday: the daily limit resets 3am Wednesday; the per-minute fixture asks 20s.
   def expected(kind, outcome, saved: nil, wait: "a minute")
     reset = { "daily_limit" => "The limit resets at 3:00 am your time, Wednesday.",
               "short_rate_limit" => "Try again in about #{wait}." }[kind]
@@ -65,8 +54,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
 
   before { allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) }
 
-  # Returns a counter of requests made. Every GeminiService instance, including
-  # the per-thread copies grade_section builds, gets this connection.
+  # Every GeminiService instance, including grade_section's per-thread copies, gets this connection.
   def stub_gemini(failure)
     requests = 0
     conn = Faraday.new do |f|
@@ -96,8 +84,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
   end
 
   describe "generation" do
-    # A daily 429 arrives with a Retry-After past faraday-retry's ceiling, so it
-    # is tried once; the per-minute 429 and the outage are tried three times.
+    # A daily 429's Retry-After exceeds faraday-retry's ceiling, so it is tried once.
     { "daily-quota 429" => 1, "per-minute 429" => 3, "invalid key 400" => 1, "revoked key 403" => 1, "outage 503" => 3, "timeout" => 1 }
       .each do |failure, request_count|
       it "on-demand generation under a #{failure} stores the kind and shows its sentence with a Try again button" do

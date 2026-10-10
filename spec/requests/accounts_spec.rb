@@ -16,9 +16,7 @@ RSpec.describe "Accounts", type: :request do
       expect(response.body).to include(setup_path)
     end
 
-    # `AccountsController` skips `require_api_key` on purpose: without that
-    # skip a keyless user is bounced to /setup and — with the nav log-out
-    # button gone — has no way to log out at all.
+    # Without that skip a keyless user is bounced to /setup and cannot log out.
     it "renders for a user who has not added an API key yet" do
       user = User.create!(email: "keyless@example.com", name: "Keyless")
       login_as(user)
@@ -167,9 +165,7 @@ RSpec.describe "Accounts", type: :request do
       end
     end
 
-    # The buttons post the state they want. Read as a flip, a double-tapped
-    # Resume would re-read an already-unpaused user and take the pause branch,
-    # leaving generation paused by two clicks of a button labelled "Resume".
+    # Read as a flip, a double-tapped Resume would pause generation again.
     it "stays resumed when Resume is double-tapped" do
       user = create_user_with_key(email: "doubletap@example.com", name: "Double")
       user.update!(paused_generation_at: Time.current)
@@ -180,9 +176,7 @@ RSpec.describe "Accounts", type: :request do
       expect(user.reload.paused_generation_at).to be_nil
     end
 
-    # Asserts the timestamp is untouched, not merely still set: it is the floor
-    # #held_exercise searches from, so re-stamping it walks that floor past the
-    # set the pause stranded.
+    # The pause timestamp is #held_exercise's floor, so re-stamping it would strand the held set.
     it "stays paused when Pause is double-tapped, without restamping the pause" do
       user = create_user_with_key(email: "doubletap2@example.com", name: "Double Two")
       paused_at = 2.days.ago.change(usec: 0)
