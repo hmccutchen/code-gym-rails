@@ -9,7 +9,7 @@ RSpec.describe "proportionality judge fixtures" do
   fixtures = paths.to_h { |path| [ File.basename(path, ".json"), JSON.parse(File.read(path)) ] }
 
   excluded_words = /\b(concurren\w*|race|races|racing|lock\w*|mutex\w*|threads?|atomic\w*|transactions?)\b/
-  excluded_concepts = AiService::META_SKILL_CONCEPTS + AiService::SILENT_CORRECTNESS_CONCEPTS +
+  excluded_concepts = ConceptVocabulary::META_SKILL_CONCEPTS + ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS +
                       %w[concurrency transaction_safety idempotency]
 
   def self.text_of(fixture)
@@ -75,11 +75,11 @@ RSpec.describe "proportionality judge fixtures" do
 
   # The concept joins no vocabulary, hosting list or prompt until the judge comparison has been read.
   it "is in no vocabulary and no design comparison hosting list" do
-    AiService::LANGUAGE_CONFIG.each_value { |config| expect(config[:concepts]).not_to include(concept) }
+    ConceptVocabulary.languages.each { |language| expect(ConceptVocabulary.for_language(language)).not_to include(concept) }
     expect(kind.hosted_concepts).not_to include(concept)
     %w[ruby_rails javascript].each do |language|
       ExerciseSection.all.each do |each_kind|
-        expect(ProblemSetIngest.selectable_vocabulary_for(each_kind.key, language, rung: "principal_engineer"))
+        expect(ConceptVocabulary.selectable_for_section(each_kind.key, language, rung: "principal_engineer"))
           .not_to include(concept)
       end
     end

@@ -5,7 +5,7 @@ RSpec.describe ConceptReferenceCalibration do
   let(:out) { StringIO.new }
   let(:seen) { [] }
   let(:api_key) { "sk-ant-calibration-runner" }
-  let(:js_concept) { AiService::JS_CONCEPTS.first }
+  let(:js_concept) { ConceptVocabulary::JS_CONCEPTS.first }
 
   def calibration(provider: "claude", **options)
     described_class.new(provider: provider, api_key: provider == "claude" ? api_key : "AIzaCalibration", out: out, **options)
@@ -52,8 +52,8 @@ RSpec.describe ConceptReferenceCalibration do
     it "covers every bucket a user can hold with a tradeoff concept where the bucket has one" do
       sample = described_class.default_sample
 
-      expect(sample.map(&:first).uniq).to match_array(AiService::LANGUAGE_CONFIG.keys)
-      expect(sample.map(&:last) & AiService::TRADEOFF_CONCEPTS).not_to be_empty
+      expect(sample.map(&:first).uniq).to match_array(ConceptVocabulary.languages)
+      expect(sample.map(&:last) & ConceptVocabulary::TRADEOFF_CONCEPTS).not_to be_empty
       expect(sample).to eq(described_class.default_sample)
     end
   end

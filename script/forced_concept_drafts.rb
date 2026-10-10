@@ -18,17 +18,17 @@ class ForcedConceptDrafts
 
   def with_concept
     concept = @concept
-    vocabulary = ProblemSetIngest.method(:vocabulary_for)
+    vocabulary = ConceptVocabulary.method(:for_section)
     hosted     = KIND.method(:hosted_concepts)
 
-    ProblemSetIngest.define_singleton_method(:vocabulary_for) do |key, language|
+    ConceptVocabulary.define_singleton_method(:for_section) do |key, language|
       list = vocabulary.call(key, language)
       key == KIND.key ? list + [ concept ] : list
     end
     KIND.define_singleton_method(:hosted_concepts) { hosted.call + [ concept ] }
     yield
   ensure
-    ProblemSetIngest.define_singleton_method(:vocabulary_for, vocabulary)
+    ConceptVocabulary.define_singleton_method(:for_section, vocabulary)
     KIND.define_singleton_method(:hosted_concepts, hosted)
   end
 

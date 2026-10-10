@@ -40,8 +40,8 @@ RSpec.describe Glossary do
   end
 
   # Users search for the words the app shows them; "concurrency" once had no glossary hit at all.
-  it "resolves every AiService concept vocabulary entry, in its literal or space-normalized form" do
-    concepts = AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS
+  it "resolves every ConceptVocabulary entry, in its literal or space-normalized form" do
+    concepts = ConceptVocabulary::RAILS_CONCEPTS + ConceptVocabulary::JS_CONCEPTS + ConceptVocabulary::ARCHITECTURE_CONCEPTS
     missing = concepts.uniq.reject do |concept|
       Glossary.lookup(concept) || Glossary.lookup(concept.tr("_", " "))
     end

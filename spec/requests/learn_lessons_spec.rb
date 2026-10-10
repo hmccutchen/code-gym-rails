@@ -15,7 +15,7 @@ RSpec.describe "Learn lessons", type: :request do
       links = group.css("li.learn-entry a").map { |link| link["href"] }
 
       expect(links).to include(learn_lesson_path(lesson: lesson))
-      AiService::META_SKILL_CONCEPTS.each do |sibling|
+      ConceptVocabulary::META_SKILL_CONCEPTS.each do |sibling|
         expect(links).to include(learn_concept_path(bucket: "ruby_rails", concept: sibling))
       end
     end
@@ -75,8 +75,8 @@ RSpec.describe "Learn lessons", type: :request do
 
   describe "staying out of generation, mastery and drills" do
     it "is in no vocabulary, so no section, mastery row or retention check can carry it" do
-      AiService::LANGUAGE_CONFIG.each_value do |config|
-        expect(config[:concepts]).not_to include(lesson)
+      ConceptVocabulary.languages.each do |language|
+        expect(ConceptVocabulary.for_language(language)).not_to include(lesson)
       end
     end
 

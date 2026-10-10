@@ -16,60 +16,6 @@ class ProblemSetIngest
     problem_set.deep_dup.slice(*expected_keys)
   end
 
-  # Never narrowed: a concept the provider tagged is history, and rewriting it to "other" would destroy the record.
-  def self.vocabulary_for(section_key, language)
-    case ExerciseSection.find(section_key)&.vocabulary_key
-    when :architecture      then AiService::ARCHITECTURE_CONCEPTS
-    when :security_concepts then language_config(language)[:security_concepts]
-    when :plan_review       then AiService::PLAN_REVIEW_CONCEPTS
-    when :ambiguity_hunt    then AiService::AMBIGUITY_HUNT_CONCEPTS
-    when :pseudocode_to_code then AiService::PSEUDOCODE_TO_CODE_CONCEPTS
-    else                         language_config(language)[:concepts]
-    end
-  end
-
-  def self.selectable_vocabulary_for(section_key, language, mode: nil, rung: nil)
-    vocabulary =
-      if mode && section_key == ExerciseSection::CodeReview.key
-        code_review_vocabulary(language, mode)
-      else
-        vocabulary_for(section_key, language)
-      end
-
-    excluded = excluded_concepts_for(section_key)
-    remaining = excluded.empty? ? vocabulary : vocabulary - excluded
-    ExerciseSection.for(section_key).narrow_vocabulary(remaining, rung: rung) & remaining
-  end
-
-  def self.code_review_vocabulary(language, mode)
-    full = language_config(language)[:concepts]
-    mode == :schema_review ? AiService::DATA_MODELING_CONCEPTS : full - AiService::DATA_MODELING_CONCEPTS
-  end
-  private_class_method :code_review_vocabulary
-
-  def self.excluded_concepts_for(section_key)
-    ExerciseSection.for(section_key).excluded_vocabulary_keys.flat_map do |key|
-      case key
-      when :data_modeling then AiService::DATA_MODELING_CONCEPTS
-      when :domain_modeling then AiService::DOMAIN_MODELING_CONCEPTS
-      when :meta_skill    then AiService::META_SKILL_CONCEPTS
-      when :code_smell    then AiService::CODE_SMELL_CONCEPTS
-      when :oo_design     then AiService::OO_DESIGN_CONCEPTS
-      when :module_design then AiService::MODULE_DESIGN_CONCEPTS
-      when :silent_correctness then AiService::SILENT_CORRECTNESS_CONCEPTS
-      else                     []
-      end
-    end
-  end
-  private_class_method :excluded_concepts_for
-
-  def self.language_config(language)
-    AiService::LANGUAGE_CONFIG.fetch(language) do
-      raise AiService::Error, "Unsupported generation language: #{language.inspect}"
-    end
-  end
-  private_class_method :language_config
-
   def initialize(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
     @problem_set        = problem_set
     @language           = language
@@ -174,7 +120,7 @@ class ProblemSetIngest
 
   def usable_concept(key)
     concept = @problem_set.dig(key, "concept")
-    concept if self.class.vocabulary_for(key, @language).include?(concept)
+    concept if ConceptVocabulary.for_section(key, @language).include?(concept)
   end
 
   def slot_kinds_for(key)
@@ -197,7 +143,7 @@ class ProblemSetIngest
       next unless section.is_a?(Hash) && section.key?("concept")
 
       original = section["concept"]
-      next if self.class.vocabulary_for(section_key, @language).include?(original)
+      next if ConceptVocabulary.for_section(section_key, @language).include?(original)
 
       section["concept"] = "other"
       @suggested_concepts << Suggestion.new(bucket: ConceptBucket.for(section_key, @language), name: original)

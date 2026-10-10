@@ -317,7 +317,7 @@ RSpec.describe ModelComparison do
         expect(ExerciseSection.keys).to include(fixture["kind"]), path
         expect(KindDifficulty::LEVELS).to include(fixture.dig("section", "pitched_at")), path
         expect(fixture["answers"].keys).to match_array(ModelComparison::CALIBRATION_EXPECTED.keys), path
-        expect(ProblemSetIngest.vocabulary_for(fixture["kind"], fixture["language"])).to include(fixture.dig("section", "concept")), path
+        expect(ConceptVocabulary.for_section(fixture["kind"], fixture["language"])).to include(fixture.dig("section", "concept")), path
       end
     end
   end

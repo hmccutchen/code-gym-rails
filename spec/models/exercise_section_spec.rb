@@ -758,7 +758,7 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".generation_guidance" do
-    RAILS_VOCAB = AiService::RAILS_CONCEPTS.freeze
+    RAILS_VOCAB = ConceptVocabulary::RAILS_CONCEPTS.freeze
 
     def guidance(kind, vocabulary:, label: "Ruby/Rails", mode: nil, artifact: nil, test_framework: nil, source: nil)
       kind.generation_guidance(vocabulary: vocabulary, label: label, mode: mode,
@@ -783,7 +783,7 @@ RSpec.describe ExerciseSection do
       end
 
       # Production subtracts data-modeling concepts for these modes; without that, `unsafe_migration` collides below.
-      let(:non_schema_vocabulary) { RAILS_VOCAB - AiService::DATA_MODELING_CONCEPTS }
+      let(:non_schema_vocabulary) { RAILS_VOCAB - ConceptVocabulary::DATA_MODELING_CONCEPTS }
 
       it "asks for application code by default" do
         text = guidance(described_class, vocabulary: non_schema_vocabulary, mode: :application_code)
@@ -801,13 +801,13 @@ RSpec.describe ExerciseSection do
 
       it "is handed exactly the vocabulary ingest resolves for these modes" do
         %i[application_code test_file].each do |mode|
-          expect(ProblemSetIngest.selectable_vocabulary_for("code_review", "ruby_rails", mode: mode))
+          expect(ConceptVocabulary.selectable_for_section("code_review", "ruby_rails", mode: mode))
             .to eq(non_schema_vocabulary)
         end
       end
 
       it "asks for the language's schema artifact on a schema-review day" do
-        text = guidance(described_class, vocabulary: AiService::DATA_MODELING_CONCEPTS,
+        text = guidance(described_class, vocabulary: ConceptVocabulary::DATA_MODELING_CONCEPTS,
                                           label: "Ruby/Rails", mode: :schema_review,
                                           artifact: "a Rails migration")
         expect(text).to include("a Rails migration, ~10-15 lines, containing one planted data-modeling flaw")
@@ -829,7 +829,7 @@ RSpec.describe ExerciseSection do
       ExerciseSection.all.each do |kind|
         next if [ ExerciseSection::CodeReview, ExerciseSection::Pattern ].include?(kind)
 
-        text = guidance(kind, vocabulary: ProblemSetIngest.vocabulary_for(kind.key, "ruby_rails"))
+        text = guidance(kind, vocabulary: ConceptVocabulary.for_section(kind.key, "ruby_rails"))
         expect(text).not_to include("code_review and pattern concepts"), "#{kind.key} still speaks for code_review"
         expect(text).not_to include("each section's concept"), "#{kind.key} still speaks for every section"
       end
@@ -837,25 +837,25 @@ RSpec.describe ExerciseSection do
 
     describe ExerciseSection::Architecture do
       it "names the architecture vocabulary for its own section" do
-        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::ARCHITECTURE_CONCEPTS)
         expect(text).to include("SEPARATE vocabulary", "service_boundaries")
       end
 
       it "demands a short scenario and drops the old team-size/budget/timeline list" do
-        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::ARCHITECTURE_CONCEPTS)
         expect(text).to include("~50 words maximum")
         expect(text).to include("Do NOT stack scale figures")
       end
 
       it "says the diagram shows the structure under decision, not how to decide" do
-        text = guidance(described_class, vocabulary: AiService::ARCHITECTURE_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::ARCHITECTURE_CONCEPTS)
         expect(text).to include("not a flowchart of how to decide")
       end
     end
 
     describe ExerciseSection::SecurityReview do
       it "frames the section adversarially and restricts the vocabulary to security concepts" do
-        text = guidance(described_class, vocabulary: AiService::RAILS_SECURITY_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::RAILS_SECURITY_CONCEPTS)
         expect(text).to include("SECURITY REVIEW", "exploitable vulnerability")
         expect(text).to include("these are the ONLY concepts security_review may use")
         expect(text).to include("mass_assignment_protection")
@@ -863,12 +863,12 @@ RSpec.describe ExerciseSection do
       end
 
       it "names the day's language for the snippet's realism bar" do
-        text = guidance(described_class, vocabulary: AiService::JS_SECURITY_CONCEPTS, label: "JavaScript/React")
+        text = guidance(described_class, vocabulary: ConceptVocabulary::JS_SECURITY_CONCEPTS, label: "JavaScript/React")
         expect(text).to include("realistic JavaScript/React code")
       end
 
       it "says nothing about code_review and pattern's vocabulary" do
-        text = guidance(described_class, vocabulary: AiService::RAILS_SECURITY_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::RAILS_SECURITY_CONCEPTS)
         expect(text).not_to include("Choose the code_review and pattern concepts")
         expect(text).not_to include("Choose each section's concept")
       end
@@ -903,13 +903,13 @@ RSpec.describe ExerciseSection do
 
     describe ExerciseSection::PlanReview do
       it "asks for 2-3 planted flaws spanning levels, never three of a kind" do
-        text = guidance(described_class, vocabulary: AiService::PLAN_REVIEW_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::PLAN_REVIEW_CONCEPTS)
         expect(text).to include("2-3 planted flaws that span levels")
         expect(text).to include("never three of the same category")
       end
 
       it "restricts the concept to the plan_review vocabulary" do
-        text = guidance(described_class, vocabulary: AiService::PLAN_REVIEW_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::PLAN_REVIEW_CONCEPTS)
         expect(text).to include("scope_creep")
         expect(text).not_to include("memoization")
       end
@@ -917,18 +917,18 @@ RSpec.describe ExerciseSection do
 
     describe ExerciseSection::AmbiguityHunt do
       it "asks for exactly PLANTED_COUNT planted ambiguities" do
-        text = guidance(described_class, vocabulary: AiService::AMBIGUITY_HUNT_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS)
         expect(text).to include("EXACTLY #{ExerciseSection::AmbiguityHunt::PLANTED_COUNT} deliberately planted ambiguities")
       end
 
       it "forbids leaking the planted list into any field the engineer reads" do
-        text = guidance(described_class, vocabulary: AiService::AMBIGUITY_HUNT_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS)
         expect(text).to include("HIDDEN test data")
         expect(text).to include('Never restate, hint at, or echo any of it inside "request", "question", or "teaching_note"')
       end
 
       it "restricts the concept to the ambiguity_hunt vocabulary" do
-        text = guidance(described_class, vocabulary: AiService::AMBIGUITY_HUNT_CONCEPTS)
+        text = guidance(described_class, vocabulary: ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS)
         expect(text).to include("undefined_scope_boundary")
         expect(text).not_to include("memoization")
       end

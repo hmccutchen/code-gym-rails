@@ -16,16 +16,6 @@ It raises `AiService::InvalidResponseError` when the set cannot be used. A calle
 
 This only drops unexpected keys from a draft that has already been ingested. It works on a deep copy, so the draft the logs read stays intact.
 
-## `.vocabulary_for` and `.selectable_vocabulary_for`
-
-Validation and generation use separate lookups. `parsons_problem` narrows its vocabulary without a mode, so a nil mode cannot tell the two uses apart.
-
-`.selectable_vocabulary_for` always returns a subset of `.vocabulary_for`, so nothing it offers is rejected at ingest. Ask it, not `.vocabulary_for`, what may be requested.
-
-## `.excluded_concepts_for`
-
-`ExerciseSection.for` returns the base class for an unknown key, and the base class excludes nothing, so a provider-invented key excludes nothing rather than raising.
-
 ## `#reject_missing_sections!`
 
 A set missing an intended section is refused, because a short set would under-report `sections_total` and shrink tomorrow's set. Extra sections are fine.
