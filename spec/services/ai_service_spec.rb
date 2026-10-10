@@ -6586,6 +6586,14 @@ RSpec.describe AiService, "#judge_review_prose" do
                           response_schema: ReviewProseVerdict.schema, system: AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)
   end
 
+  # The cap is justified by its headroom over what the comparison script
+  # measured, so the justification fails here rather than going quietly false
+  # if either number moves.
+  it "keeps the measured headroom its cap is justified by" do
+    expect(AiService::REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS * 4)
+      .to be <= AiService::REVIEW_JUDGE_MAX_TOKENS
+  end
+
   it "shows the projection and never the rating, code, answer or problem" do
     prompt = captured_call[:prompt]
     expect(prompt).to include("One query per row.").and include("code_review").and include("Rails")

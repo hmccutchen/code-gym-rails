@@ -537,11 +537,17 @@ class AiService
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
-  # The 1,500 floor governs: the local sample was only 4 section reviews
-  # (largest projection 243 characters). Review output has no length bound, so
-  # a long review can hit this cap and fall back unedited as `truncated`.
-  # Re-check the value against the review_prose script's measured output
-  # tokens before the switch is turned on. Passing it turns thinking off.
+  # The largest reply script/compare_models.rb measured on the production
+  # route, across the eight fixtures and four stored reviews of the
+  # 2026-10-09 run. The cap below is justified by its headroom over this, so
+  # the number lives here rather than in the prose that reasons about it, and
+  # ai_service_spec asserts the headroom the reasoning claims.
+  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 347
+
+  # Review output has no length bound, so a much longer review could still
+  # hit this and fall back unedited as `truncated`; nothing measured has come
+  # close. The slowest measured call took 3.1 seconds of
+  # REVIEW_JUDGE_READ_TIMEOUT. Passing this turns thinking off.
   REVIEW_JUDGE_MAX_TOKENS = 1_500
 
   REVIEW_PROSE_ISSUE_GUIDANCE = {
@@ -1105,7 +1111,9 @@ class AiService
 
   # Whether this provider can hold the prose judge's reply to a schema. The
   # base answers false; a provider that can opts in. Turning the judge on is
-  # the separate ReviewProseJudge switch, which waits on measurement.
+  # the separate ReviewProseJudge switch, which stays off until the activation
+  # gate in CLAUDE.md's "Review prose judge" is met: the comparison runs are
+  # done, and a person has still to read the rewrites beside their sources.
   def self.judges_review_prose? = false
 
   # plan_notes is what DailyPlan::Result#notes recorded, written onto the row.

@@ -596,14 +596,69 @@ concept-specific difficulty descriptions for future generation, not a new set.
   show. Haiku 4.5 is the comparison candidate at half the price;
   `script/compare_models.rb judge` runs one stored day's draft through both,
   and `judge_fixtures` runs both over the fixture set with its expected
-  verdicts. The route stays on Sonnet until those are read, and moving it is
-  editing one entry.
+  verdicts. Both were run on 2026-10-09, and **the route stays on Sonnet**,
+  which is now a measurement rather than a default.
 
-  Review stays on `claude-sonnet-5-5` pending a comparison with `claude-opus-5-5`,
-  and `duck_thread` and `pseudocode_translate` pending one with
-  `claude-haiku-4-5`. `script/compare_models.rb` runs a stored day through both
+  Over the 23 judge fixtures, Sonnet returned valid output 23 times to
+  Haiku's 21 — Haiku's two failures were `TruncatedResponseError` at the
+  1,200-token cap, so it did not fit the budget the route gives it. Sonnet
+  detected 5 of the 9 planted problems against Haiku's 1, falsely rejected 1
+  of the 14 sound fixtures against Haiku's 4, kept 5 of the 6 keep-expected
+  fixtures unedited against Haiku's 4, and solved 9 of 9 blind against
+  Haiku's 7 of 8 with 1 mismatch. The false-rejection count is the number
+  that decides it: a judge that rejects a sound section costs a retry and
+  then a dropped section, and Haiku rejects four times as many. Sonnet was
+  also *faster* over the set, 69.0s against 91.2s, so the $0.19 against
+  $0.08 buys latency as well as accuracy. Sonnet's per-principle detection
+  was reasoning_failure 2/3, scope_mismatch 1/1, underdetermined 2/3,
+  unstated_prerequisite **0/2** — that last one is the gap worth knowing
+  about, since the Ruby `Thread` incident this stage exists for is an
+  unstated prerequisite.
+
+  A live three-section day told the same story. Sonnet edited the code
+  review and the security review for leakage and kept the design comparison
+  with a matching blind solve; Haiku **rejected** that design comparison as
+  a `scope_mismatch` while solving it correctly. A rejection the judge's own
+  solve contradicts is the shape of failure that costs a section, and it is
+  more reason to leave
+  `JudgedGeneration::REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` false.
+
+  Review stays on `claude-sonnet-5-5`, and `duck_thread` and
+  `pseudocode_translate` stay there too. All three comparisons were run on
+  2026-10-09 and none of them argues for a move.
+  `script/compare_models.rb` runs a stored day through both
   models of a pair and prints the results with tokens and time for a person to
-  judge. Two constraints apply before routing any of them, both noted beside
+  judge.
+
+  **Review against `claude-opus-5-5`:** the two agreed on all three of a
+  stored day's ratings (beginner, beginner, solid). Opus took roughly twice
+  as long on every section (16.5s against 7.1s, 24.4s against 9.3s, 13.3s
+  against 8.4s) and wrote far more output at twice Sonnet's list price per
+  token, so the run cost about four times as much for the same grades. Review is a request the engineer waits on, so paying four
+  times as much to wait twice as long for the same answer is the wrong
+  trade.
+
+  **The duck against `claude-haiku-4-5`:** Sonnet answered in 2.4s on
+  **54 input tokens**, Haiku in 1.6s on **806**. That gap is the caching bet
+  below, measured: Sonnet read the cached prefix and Haiku could not, since
+  the duck's prompt sits under Haiku's 4,096-token cache minimum. Moving the
+  route would end the caching and eat most of the headline saving. Both
+  answers were usable; Sonnet's gave a concrete analogy and stayed inside
+  what was on screen.
+
+  **Pseudocode translate against `claude-haiku-4-5`:** this is the one
+  arguable move, and it is still a no. Both produced a correct, equivalent
+  `merge_ranges` at near-identical speed (1.6s each, 576 against 426 input
+  tokens), but **Haiku's omitted the `.dup` and so mutated the caller's
+  input arrays** where Sonnet's did not. The page captions this output as
+  the engineer's plan implemented literally, and the engineer is graded on
+  it, so a silent aliasing bug in the demonstration is worse than its cost.
+  One sample is thin evidence; re-run it before moving the route on this.
+  No production response had a `pseudocode_to_code` answer to replay, so the
+  input was a local section built from `FakeService`'s canned problem set;
+  only the two models' output is real.
+
+  Two constraints apply before routing any of them, both noted beside
   the table. `#call` turns thinking off whenever a caller passes `max_tokens`,
   using the routed model's entry in `ClaudeService::THINKING_OFF` (`between_tools`
   on Sonnet 5.5, `disabled` on Haiku 4.5). Opus 5.5 has no thinking-off setting
@@ -2085,10 +2140,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   through the production review route and reports whether each fixture's
   three ratings fall in rank order, how many complete answers reach solid,
   and the run's cost including cache writes. At introduction it ran 5/5 in
-  order and 15/15 at the expected rating on Claude, about $0.21. The fixtures are deliberately
+  order and 15/15 at the expected rating on Claude, about $0.21. Re-run on
+  2026-10-09 with the design comparison fixture included: **6/6 in order,
+  20/20 at the expected rating, 20/20 agreeing with the essential gaps it
+  listed, and 6/6 complete answers at solid or better**, on
+  `claude-sonnet-5-5` for $0.2613 (10,713 in, 24,426 cache write, 0 cache
+  read, 17,878 out). The fixtures are deliberately
   clear-cut: they show the levels separate, not where a borderline answer
-  lands. The design comparison fixture, added later, also carries two extra
-  answers with their own expected ratings and has not been run yet.
+  lands. That includes the design comparison fixture's two extra answers,
+  which had not been run before: a matching pick with a vague reason graded
+  `beginner` and the other pick with a sound reason graded `developing`,
+  both as the kind's grading note asks.
 - **Review prose judge**: an optional second pass over each graded review,
   for readability only. `AiService#judge_review_prose` reads the review as the
   page renders it (`ReviewProseVerdict.project`) and may reword its prose
@@ -2126,10 +2188,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   returns the grade unchanged and logs `[review_judge_fallback]` with a fixed
   reason code from `AiService.judge_fallback_reason`, the table the section
   judge also reads, never the error message, which can carry provider text. The call is billed as `judge_review`, which is in
-  `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). That
-  cap came from a local sample of only four reviews, so it must be re-checked
-  against the output tokens the comparison script measures before the switch
-  goes on.
+  `ApiUsage::PURPOSES`, and capped by `REVIEW_JUDGE_MAX_TOKENS` (1,500). The
+  cap was re-checked against the comparison script on 2026-10-09; the run
+  record at the end of this bullet has the measured figures.
 
   **One attempt, and a 12-minute claim.** The call passes `single_attempt:
   true`, which refuses every retry, status retries included, and runs on
@@ -2161,6 +2222,32 @@ concept-specific difficulty descriptions for future generation, not a new set.
   against `REVIEW_JUDGE_MAX_TOKENS` at the same time, and the slowest
   measured calls against `REVIEW_JUDGE_READ_TIMEOUT` (30 seconds): the call
   has one attempt, so a timeout is billed and then falls back.
+
+  **Both modes ran on 2026-10-09; the switch is still the user's call.** On
+  `claude-sonnet-5-5`, `review_prose_fixtures` hit the expected status on
+  8 of 8 with 0 invalid replies, producing 6 edits and 1 merge; `review_prose`
+  over 4 stored reviews kept every one unedited, which is what stored
+  reviews that are already plain should do, so the fixtures carry the
+  signal. Haiku is not a candidate here: it hit 6 of 8 and returned 2
+  invalid replies, both refused by the cite-every-entry rule, and in one
+  case added a claim that was not in the source.
+
+  The two budget checks pass with room. The largest reply was **347 output
+  tokens of the 1,500-token `REVIEW_JUDGE_MAX_TOKENS`**, and the slowest
+  call **3,099 ms of the 30,000 ms `REVIEW_JUDGE_READ_TIMEOUT`**, so the cap
+  that came from a four-review sample is not tight.
+
+  Every Sonnet rewrite was read beside its source; no negation, condition or
+  identifier changed. Two did change a claim, which is what the gate asks
+  about: `string_fields` sharpened "essentially a performance thing" to
+  "slows the page down", stating more than the source did, and
+  `verbose_jargon` compressed a four-topic next step to "Study ActiveRecord
+  preloading", dropping three topics. Both change what the engineer is told
+  to do next, so **the gate is not met and the switch stays off.** Turning it
+  on needs the prompt or the boundary changed so those two shapes stop
+  happening, and both modes read again. Accepting them instead would be a
+  change to the gate itself, which is a decision to state here rather than a
+  box this run ticked.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
