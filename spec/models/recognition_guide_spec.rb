@@ -8,7 +8,7 @@ RSpec.describe RecognitionGuide do
 
   # key_for reads group and bucket keys through one list, so a shared name would answer for both.
   it "has no group key that is also a bucket's" do
-    expect(ConceptGroup::NAMED.map(&:first) & AiService::LANGUAGE_CONFIG.keys).to be_empty
+    expect(ConceptGroup::NAMED.map(&:first) & ConceptVocabulary.languages).to be_empty
   end
 
   it "states a subject for every group" do
@@ -43,11 +43,11 @@ RSpec.describe RecognitionGuide do
 
   describe ".concepts_for" do
     it "reads a named group's concepts from ConceptGroup" do
-      expect(described_class.concepts_for("meta_skill")).to eq(AiService::META_SKILL_CONCEPTS)
+      expect(described_class.concepts_for("meta_skill")).to eq(ConceptVocabulary::META_SKILL_CONCEPTS)
     end
 
     it "reads a bucket's concepts from its vocabulary" do
-      expect(described_class.concepts_for("architecture")).to eq(AiService::ARCHITECTURE_CONCEPTS)
+      expect(described_class.concepts_for("architecture")).to eq(ConceptVocabulary::ARCHITECTURE_CONCEPTS)
     end
   end
 

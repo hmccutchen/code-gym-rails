@@ -16,7 +16,7 @@ class ConceptHosts
     languages.flat_map do |language|
       bucket = ConceptBucket.for(kind.key, language)
       DailyPlan::CODE_REVIEW_MODE_WEIGHTS.keys.product(rungs)
-        .flat_map { |mode, rung| ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: rung) }
+        .flat_map { |mode, rung| ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung) }
         .map { |concept| [ concept, bucket ] }
     end.uniq
   end

@@ -1712,7 +1712,7 @@ RSpec.describe User, "#concepts_needing_reinforcement with drills", type: :model
 
     drilled = user.concepts_needing_reinforcement.select { |h| h[:drilled] }.map { |h| h[:concept] }
     expect(drilled.last(2)).to eq(%w[memoization n_plus_one])
-    expect(drilled.first(3)).to match_array(AiService::MODULE_DESIGN_CONCEPTS)
+    expect(drilled.first(3)).to match_array(ConceptVocabulary::MODULE_DESIGN_CONCEPTS)
   end
 
   it "holds a drilled concept back while it is paused" do

@@ -29,16 +29,16 @@ RSpec.describe ConceptGroup do
     end
 
     it "returns one flat core group for a language-independent bucket" do
-      grouped = described_class.grouped(AiService::PLAN_REVIEW_CONCEPTS)
+      grouped = described_class.grouped(ConceptVocabulary::PLAN_REVIEW_CONCEPTS)
 
       expect(grouped.size).to eq(1)
       expect(grouped.first.first).to eq(described_class::CORE)
-      expect(grouped.first.last).to match_array(AiService::PLAN_REVIEW_CONCEPTS)
+      expect(grouped.first.last).to match_array(ConceptVocabulary::PLAN_REVIEW_CONCEPTS)
     end
 
     it "preserves the vocabulary's own order inside a group" do
-      expect(described_class.grouped(AiService::CODE_SMELL_CONCEPTS).first.last)
-        .to eq(AiService::CODE_SMELL_CONCEPTS)
+      expect(described_class.grouped(ConceptVocabulary::CODE_SMELL_CONCEPTS).first.last)
+        .to eq(ConceptVocabulary::CODE_SMELL_CONCEPTS)
     end
   end
 
@@ -60,10 +60,10 @@ RSpec.describe ConceptGroup do
         vocabulary = ConceptBucket.vocabulary_for(language)
         registered = described_class::NAMED.map(&:last)
 
-        unregistered = AiService.constants.grep(/_CONCEPTS\z/).reject do |name|
+        unregistered = ConceptVocabulary.constants.grep(/_CONCEPTS\z/).reject do |name|
           next true if NON_GROUPING_SUBSETS.include?(name)
 
-          concepts = AiService.const_get(name)
+          concepts = ConceptVocabulary.const_get(name)
           next true unless concepts.is_a?(Array) && concepts.any?
           next true unless concepts.size < vocabulary.size && concepts.all? { |c| vocabulary.include?(c) }
 

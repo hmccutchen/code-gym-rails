@@ -3,8 +3,8 @@ class SuggestedConcept < ApplicationRecord
 
   belongs_to :reviewed_by, class_name: "User", optional: true
 
-  # "architecture" is valid because it's a LANGUAGE_CONFIG key, though not a language.
-  validates :language, inclusion: { in: AiService::LANGUAGE_CONFIG.keys }
+  # "architecture" is valid because it's a ConceptVocabulary language key, though not a language.
+  validates :language, inclusion: { in: ConceptVocabulary.languages }
   validates :normalized_name, :display_name, presence: true
   validates :status, inclusion: { in: STATUSES }
 

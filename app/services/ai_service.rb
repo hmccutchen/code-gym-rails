@@ -298,98 +298,6 @@ class AiService
     Work through this internally, then reply with only the JSON verdict, with no text before or after it.
   PROMPT
 
-  DATA_MODELING_CONCEPTS = %w[
-    missing_index wrong_cardinality missing_constraint
-    denormalization_tradeoffs unsafe_migration
-  ].freeze
-
-  META_SKILL_CONCEPTS = %w[
-    reading_for_intent spotting_unstated_assumptions separating_symptom_from_cause
-  ].freeze
-
-  CODE_SMELL_CONCEPTS = %w[
-    god_object primitive_obsession shotgun_surgery feature_envy
-  ].freeze
-
-  OO_DESIGN_CONCEPTS = %w[
-    open_closed dependency_inversion composition_over_inheritance
-  ].freeze
-
-  MODULE_DESIGN_CONCEPTS = %w[
-    shallow_module pass_through_method temporal_decomposition
-  ].freeze
-
-  SILENT_CORRECTNESS_CONCEPTS = %w[
-    allocation_rounding semantic_input_validation cache_key_completeness
-    deterministic_ordering
-  ].freeze
-
-  DOMAIN_MODELING_CONCEPTS = %w[
-    ubiquitous_language aggregate_boundaries
-  ].freeze
-
-  COMPLEXITY_CAUSE_CONCEPTS = %w[
-    cognitive_load unknown_unknowns
-  ].freeze
-
-  ANTI_SHAPE_CONCEPTS = (CODE_SMELL_CONCEPTS + MODULE_DESIGN_CONCEPTS + COMPLEXITY_CAUSE_CONCEPTS).freeze
-
-  RAILS_CONCEPTS = (%w[
-    n_plus_one transaction_safety memoization service_objects scope_chaining
-    idempotency authorization background_jobs caching validations
-    callbacks_vs_service query_objects policy_objects indexing concurrency
-    error_handling mass_assignment_protection sql_injection_prevention
-    over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
-    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS + DOMAIN_MODELING_CONCEPTS).freeze
-
-  JS_CONCEPTS = (%w[
-    callback_hell promise_chaining closures prototype_chain event_loop_blocking
-    this_binding array_mutation_pitfalls debouncing_throttling closures_in_loops
-    memory_leaks_listeners hooks_dependencies component_re_renders state_lifting
-    controlled_vs_uncontrolled xss_prevention insecure_client_storage
-    generics type_guards_narrowing union_intersection_types mapped_conditional_types
-    over_mocking testing_implementation_not_behavior
-  ] + DATA_MODELING_CONCEPTS + META_SKILL_CONCEPTS + CODE_SMELL_CONCEPTS + OO_DESIGN_CONCEPTS +
-    MODULE_DESIGN_CONCEPTS + SILENT_CORRECTNESS_CONCEPTS + DOMAIN_MODELING_CONCEPTS).freeze
-
-  RAILS_SECURITY_CONCEPTS = %w[mass_assignment_protection sql_injection_prevention].freeze
-  JS_SECURITY_CONCEPTS    = %w[xss_prevention insecure_client_storage].freeze
-
-  TYPESCRIPT_FLAVORED_CONCEPTS = %w[
-    generics type_guards_narrowing union_intersection_types mapped_conditional_types
-  ].freeze
-
-  ARCHITECTURE_CONCEPTS = (%w[
-    sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
-    caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
-    api_versioning event_driven_vs_request_response data_ownership
-    idempotency_at_scale observability_tradeoffs
-  ] + COMPLEXITY_CAUSE_CONCEPTS).freeze
-
-  TRADEOFF_CONCEPTS = %w[
-    sync_vs_async service_boundaries coupling_cohesion data_consistency_tradeoffs
-    caching_strategy build_vs_buy scaling_bottlenecks failure_mode_design
-    api_versioning event_driven_vs_request_response data_ownership
-    idempotency_at_scale observability_tradeoffs
-    denormalization_tradeoffs
-  ].freeze
-
-  PLAN_REVIEW_CONCEPTS = %w[
-    unjustified_constant contradicts_existing_pattern scope_creep silent_behavior_change
-  ].freeze
-
-  AMBIGUITY_HUNT_CONCEPTS = %w[
-    undefined_scope_boundary unspecified_edge_cases missing_success_criteria
-    unstated_data_implications undefined_permissions_model
-  ].freeze
-
-  PSEUDOCODE_TO_CODE_CONCEPTS = %w[
-    missing_base_case unhandled_empty_input off_by_one_boundary ambiguous_ordering
-    unstated_mutation conflated_responsibilities missing_termination_condition
-    undefined_failure_path
-  ].freeze
-
   SCENARIO_DOMAINS = %w[
     background_job_processing api_versioning_and_deprecation
     activerecord_query_construction component_state_management
@@ -427,11 +335,9 @@ class AiService
     }
   }.freeze
 
-  LANGUAGE_CONFIG = {
+  LANGUAGE_PROMPTS = {
     "ruby_rails" => {
       label:             "Ruby/Rails",
-      concepts:          RAILS_CONCEPTS,
-      security_concepts: RAILS_SECURITY_CONCEPTS,
       coach:             "Rails",
       test_framework:    "an RSpec-style",
       schema_artifact:   "a Rails migration",
@@ -439,8 +345,6 @@ class AiService
     },
     "javascript" => {
       label:             "JavaScript/React",
-      concepts:          JS_CONCEPTS,
-      security_concepts: JS_SECURITY_CONCEPTS,
       coach:             "JavaScript/React",
       test_framework:    "a Jest/Vitest-style",
       schema_artifact:   "a Prisma schema change, with the migration it generates",
@@ -448,32 +352,25 @@ class AiService
     },
     "architecture" => {
       label:    "language-agnostic",
-      concepts: ARCHITECTURE_CONCEPTS,
       coach:    "software architecture",
       focus:    "system-design tradeoffs: service boundaries, consistency, failure modes, scale, coupling."
     },
     "plan_review" => {
       label:    "language-agnostic",
-      concepts: PLAN_REVIEW_CONCEPTS,
       coach:    "engineering plan review",
       focus:    "spotting flaws in a written implementation plan before it's built: unjustified complexity, scope creep, and unflagged behavior changes."
     },
     "ambiguity_hunt" => {
       label:    "language-agnostic",
-      concepts: AMBIGUITY_HUNT_CONCEPTS,
       coach:    "requirements analysis",
       focus:    "interrogating an underspecified feature request: missing scope boundaries, unhandled edge cases, and unstated success criteria."
     },
     "pseudocode_to_code" => {
       label:    "language-agnostic",
-      concepts: PSEUDOCODE_TO_CODE_CONCEPTS,
       coach:    "algorithm design",
       focus:    "turning an informal plan into something that actually works: base cases, empty input, boundaries, ordering, and the failure paths a plan leaves undefined."
     }
   }.freeze
-
-  LANGUAGE_AGNOSTIC_VOCABULARIES = [ ARCHITECTURE_CONCEPTS, PLAN_REVIEW_CONCEPTS,
-                                     AMBIGUITY_HUNT_CONCEPTS, PSEUDOCODE_TO_CODE_CONCEPTS ].freeze
 
   CONCEPT_REFERENCE_FIELDS = %w[tagline explanation code_example senior_lens].freeze
 
@@ -593,7 +490,7 @@ class AiService
     result = call_and_log(
       user, purpose: "generate_concept_reference",
       system: "You are a senior #{config[:coach]} engineer writing a concise, durable reference for one concept. Return ONLY valid JSON.",
-      prompt: build_concept_reference_prompt(concept, config),
+      prompt: build_concept_reference_prompt(concept, language),
       read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT
     )
 
@@ -880,6 +777,7 @@ class AiService
   end
 
   def draft_exercise(user, language:, blocking:)
+    require_supported_language!(language)
     plan       = DailyPlan.for(user, language: language)
     log_set_size(user, plan.size)
     history    = user.recent_performance
@@ -1076,8 +974,10 @@ class AiService
 
   def error_code_for(error) = self.class.error_code_for(error)
 
+  def require_supported_language!(language) = config_for(language)
+
   def config_for(language)
-    LANGUAGE_CONFIG.fetch(language) do
+    LANGUAGE_PROMPTS.fetch(language) do
       raise Error, "Unsupported generation language: #{language.inspect}"
     end
   end
@@ -1094,7 +994,7 @@ class AiService
   end
 
   def can_host?(cm, section_key, language, mode: nil, rung: nil)
-    ProblemSetIngest.selectable_vocabulary_for(section_key, language, mode: mode, rung: rung).include?(cm.concept)
+    ConceptVocabulary.selectable_for_section(section_key, language, mode: mode, rung: rung).include?(cm.concept)
   end
 
   def log_retention(user, bucket, due_checks, problem_set, code_review_mode, dropped: {})
@@ -1202,7 +1102,7 @@ class AiService
     return {} if targeted.empty?
 
     per_kind = targeted.to_h do |kind|
-      vocabulary = ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: difficulty.level_for(kind))
+      vocabulary = ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: difficulty.level_for(kind))
       grounded   = vocabulary & ladders.fetch(difficulty.level_for(kind), {}).keys
       chosen     = problem_set.dig(kind.key, "concept")
       [ kind.key, { level: difficulty.level_for(kind), locked: difficulty.locked?(kind),
@@ -1352,7 +1252,7 @@ class AiService
 
     ts_guidance =
       if language == "javascript"
-        "- If a section's tagged concept is one of #{TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
+        "- If a section's tagged concept is one of #{ConceptVocabulary::TYPESCRIPT_FLAVORED_CONCEPTS.join(", ")}, write that section's code using real TypeScript syntax and type annotations. Every other section stays plain JavaScript — do not switch the whole set to TypeScript just because one section calls for it.\n"
       else
         ""
       end
@@ -1443,7 +1343,7 @@ class AiService
   end
 
   def data_modeling_idiom_guidance
-    "- The data-modeling concepts (#{DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section whose own " \
+    "- The data-modeling concepts (#{ConceptVocabulary::DATA_MODELING_CONCEPTS.join(', ')}) may be tagged on any section whose own " \
       "vocabulary list above includes them. " \
       "Only a schema-review code_review presents a schema artifact to review — anywhere else, express the " \
       "concept in that section's own idiom: a pattern question about wrong_cardinality asks how the " \
@@ -1453,7 +1353,7 @@ class AiService
   end
 
   def meta_skill_framing_guidance
-    "- The meta-skill concepts (#{META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
+    "- The meta-skill concepts (#{ConceptVocabulary::META_SKILL_CONCEPTS.join(', ')}) name HOW to reason " \
       "about a problem, not a topic to write about. A section tagged with one must still " \
       "contain exactly one specific, findable issue and be gradeable against it — the " \
       "concept shapes only how the question is framed, never whether there is a right " \
@@ -1468,7 +1368,7 @@ class AiService
   end
 
   def code_smell_naming_guidance
-    "- The code-smell concepts (#{CODE_SMELL_CONCEPTS.join(', ')}) name a shape to recognize, not a single " \
+    "- The code-smell concepts (#{ConceptVocabulary::CODE_SMELL_CONCEPTS.join(', ')}) name a shape to recognize, not a single " \
       "broken line. When one is a section's tagged concept, the code must exhibit it at a scale where it is " \
       "visible — a class doing four jobs, a change that would touch six call sites — and the answer is naming " \
       "and locating the smell and saying what it costs, never patching one line. Express it in the host " \
@@ -1481,7 +1381,7 @@ class AiService
   end
 
   def oo_design_violation_guidance
-    "- The OO design-principle concepts (#{OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
+    "- The OO design-principle concepts (#{ConceptVocabulary::OO_DESIGN_CONCEPTS.join(', ')}) name a rule the code breaks, not a " \
       "topic to discuss. A section tagged with one must contain exactly one specific, findable violation of that " \
       "rule and be gradeable against it, and the answer is naming the violation and saying which future change it " \
       "makes hard, rather than a rewrite of the class. Express it in the host section's own idiom: a code_review " \
@@ -1501,7 +1401,7 @@ class AiService
   end
 
   def module_design_depth_guidance
-    "- The module-design concepts (#{MODULE_DESIGN_CONCEPTS.join(', ')}) name what a module's interface costs " \
+    "- The module-design concepts (#{ConceptVocabulary::MODULE_DESIGN_CONCEPTS.join(', ')}) name what a module's interface costs " \
       "every caller, not a bug in what it computes. A section tagged with one must contain exactly one specific, " \
       "findable instance of that shape and be gradeable against it, and the answer is naming the instance and " \
       "saying which future change its interface makes expensive, rather than a rewrite of the module. Express it " \
@@ -1518,7 +1418,7 @@ class AiService
   end
 
   def silent_correctness_guidance
-    "- The silent-correctness concepts (#{SILENT_CORRECTNESS_CONCEPTS.join(', ')}) name a broken invariant that " \
+    "- The silent-correctness concepts (#{ConceptVocabulary::SILENT_CORRECTNESS_CONCEPTS.join(', ')}) name a broken invariant that " \
       "looks like a working result. A section tagged with one must show code that runs clean — no exception, no " \
       "type or schema error, nothing a passing test would catch — and still produce a wrong answer, and the " \
       "engineer's job is to say which invariant it breaks and on what input. Calibrate to one specific defect at " \
@@ -1543,7 +1443,7 @@ class AiService
   end
 
   def domain_modeling_guidance
-    "- The domain-modeling concepts (#{DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
+    "- The domain-modeling concepts (#{ConceptVocabulary::DOMAIN_MODELING_CONCEPTS.join(', ')}) name what the model calls things and " \
       "which things must change together, not a defect in what the code computes. A section tagged with one must " \
       "contain exactly one specific, findable instance and be gradeable against it, and the answer is naming the " \
       "instance and saying which future change it makes wrong or expensive, rather than a rewrite of the model. " \
@@ -1571,7 +1471,7 @@ class AiService
 
     requests = targeted.map do |kind|
       { level: difficulty.level_for(kind), bucket: ConceptBucket.for(kind.key, language),
-        concepts: ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: code_review_mode,
+        concepts: ConceptVocabulary.selectable_for_section(kind.key, language, mode: code_review_mode,
                                                              rung: difficulty.level_for(kind)) }
     end
     pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
@@ -1642,7 +1542,7 @@ class AiService
     config = config_for(language)
 
     kind.generation_guidance(
-      vocabulary:     ProblemSetIngest.selectable_vocabulary_for(kind.key, language, mode: mode, rung: rung),
+      vocabulary:     ConceptVocabulary.selectable_for_section(kind.key, language, mode: mode, rung: rung),
       label:          config[:label],
       mode:           mode,
       artifact:       config[:schema_artifact],
@@ -1903,11 +1803,12 @@ class AiService
       .join("\n")
   end
 
-  def build_concept_reference_prompt(concept, config)
-    medium = LANGUAGE_AGNOSTIC_VOCABULARIES.include?(config[:concepts]) ? nil : config[:label]
+  def build_concept_reference_prompt(concept, language)
+    config = config_for(language)
+    medium = ConceptVocabulary.language_agnostic?(language) ? nil : config[:label]
 
     senior_lens_desc =
-      if ANTI_SHAPE_CONCEPTS.include?(concept)
+      if ConceptVocabulary::ANTI_SHAPE_CONCEPTS.include?(concept)
         "how to catch it early, what it costs to leave in place, and when the cheaper-looking shape is still worth refusing"
       else
         "when to reach for it / tradeoffs"
@@ -1954,7 +1855,7 @@ class AiService
 
   def concept_lesson_instruction(concept)
     habits =
-      if TRADEOFF_CONCEPTS.include?(concept)
+      if ConceptVocabulary::TRADEOFF_CONCEPTS.include?(concept)
         "habits: one to #{ConceptLesson::MAX_HABITS} options a team can choose between. Each carries \"catch\": what that option costs."
       else
         "habits: one to #{ConceptLesson::MAX_HABITS} small habits or fixes. Each carries \"catch\": the real limit or cost of that habit, which the reader sees directly after it."
@@ -2007,7 +1908,7 @@ class AiService
   end
 
   def recognition_tradeoff_line(concepts)
-    choices = concepts & TRADEOFF_CONCEPTS
+    choices = concepts & ConceptVocabulary::TRADEOFF_CONCEPTS
     return if choices.empty?
 
     "Some of these (#{choices.join(', ')}) are choices between two defensible options rather than defects. " \
@@ -2024,7 +1925,7 @@ class AiService
     opening = "two short #{medium || 'pseudocode'} fragments of the SAME scenario, " \
               "keeping the same names and shape so the difference reads structurally"
 
-    if TRADEOFF_CONCEPTS.include?(concept)
+    if ConceptVocabulary::TRADEOFF_CONCEPTS.include?(concept)
       "string — #{opening}: option A, then option B. NEITHER is the corrected version — both are " \
         "legitimate and the choice is context-dependent. Then say in prose what each option buys, what it " \
         "costs, and which property of the context decides between them. #{WORKED_EXAMPLE_BOUND}"

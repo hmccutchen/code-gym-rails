@@ -428,7 +428,7 @@ class ModelComparison
       review: fixture["review"], expected: fixture["expected"], must_survive: fixture["must_survive"] }
   end
 
-  def coach_for(language) = AiService::LANGUAGE_CONFIG.fetch(language)[:coach]
+  def coach_for(language) = AiService::LANGUAGE_PROMPTS.fetch(language)[:coach]
 
   def run_prose_judge(heading, route, inputs, user)
     usage   = []
