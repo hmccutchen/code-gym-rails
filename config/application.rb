@@ -20,7 +20,7 @@ module CodeGymRails
     config.load_defaults 8.0
 
     # boot is required before autoloading works; rubocop holds RuboCop:: cops that Zeitwerk would name Rubocop::.
-    config.autoload_lib(ignore: %w[assets tasks boot rubocop])
+    config.autoload_lib(ignore: %w[assets tasks boot rubocop comment_check])
 
     config.generators.system_tests = nil
   end

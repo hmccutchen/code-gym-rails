@@ -53,6 +53,9 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+      - name: Check comments in ERB, JavaScript, CSS, YAML and Python
+        run: bin/comment-check
+
   test:
     runs-on: ubuntu-latest
 
