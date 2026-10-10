@@ -105,12 +105,11 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     end
   end
 
-  it "re-fits an already-open panel after the device is rotated" do
+  it "re-fits an already-open panel after the device rotates from landscape to portrait" do
     user = create_fake_provider_user
     landscape_width = 568
 
     travel_to(a_weekday) do
-      # Landscape to portrait: a panel sized for the wider screen is the one that stops fitting.
       page.current_window.resize_to(landscape_width, 320)
       start_dashboard(user, question: "The customer memoization")
       open_panel_and_measure

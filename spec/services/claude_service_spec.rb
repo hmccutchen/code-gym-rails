@@ -20,16 +20,14 @@ RSpec.describe ClaudeService do
     { "content" => [ { "type" => "text", "text" => text } ], "usage" => { "input_tokens" => 1, "output_tokens" => 1 } }.to_json
   end
 
-  # A bare JSON::ParserError would escape every caller's AiService::Error rescue.
-  it "raises InvalidResponseError when a successful response body is not JSON" do
+  it "raises InvalidResponseError rather than a bare JSON::ParserError when a successful response body is not JSON" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
     expect { service.send(:call, system: "sys", prompt: "p") }
       .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
   end
 
-  # A cut-off JSON body can carry an answer (a judge's blind solve), so only its size is logged.
-  it "withholds a cut-off JSON body from the log and still logs a non-JSON one" do
+  it "withholds a cut-off JSON body, which can carry a blind solve, from the log and still logs a non-JSON one" do
     logged = []
     allow(Rails.logger).to receive(:error) { |message| logged << message }
 
@@ -44,8 +42,7 @@ RSpec.describe ClaudeService do
     expect(logged.last).to include("Bad gateway")
   end
 
-  # Wrong-shape JSON would otherwise escape every AiService::Error rescue as a TypeError.
-  it "raises InvalidResponseError when a successful response body is not a JSON object" do
+  it "raises InvalidResponseError rather than a TypeError when a successful response body is not a JSON object" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
     expect { service.send(:call, system: "sys", prompt: "p") }
@@ -67,7 +64,6 @@ RSpec.describe ClaudeService do
   end
 
   describe "per-call read budget" do
-    # Records what each attempt saw, so assertions cover the request that reached the adapter.
     def recording_connection(attempts, raise_timeout: true)
       Faraday.new do |f|
         f.request :retry, ClaudeService::RETRY_OPTIONS.merge(interval: 0, max_interval: 0)
@@ -91,8 +87,7 @@ RSpec.describe ClaudeService do
       expect(attempts).to eq([ AiService::GENERATION_READ_TIMEOUT ])
     end
 
-    # A timed-out generation was very likely finished and billed, so retrying pays for it again.
-    it "does not retry a generation that times out" do
+    it "does not retry a generation that times out, since it was very likely finished and billed" do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
@@ -103,8 +98,7 @@ RSpec.describe ClaudeService do
       expect(attempts.size).to eq(1)
     end
 
-    # A timed-out grade was usually billed; its budget exceeds READ_TIMEOUT, so the guard treats it as long_running.
-    it "does not retry a grading call that times out" do
+    it "does not retry a grading call that times out, since it was usually billed and runs past READ_TIMEOUT" do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
@@ -282,8 +276,7 @@ RSpec.describe ClaudeService do
                            http_status: 200)
     end
 
-    # input_tokens excludes cached tokens, and reads and writes are billed at different rates.
-    it "reports cache reads and writes separately from input tokens" do
+    it "reports cache reads and writes separately from input tokens, since each is billed at its own rate" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
           "content" => [ { "type" => "text", "text" => "hello" } ],
@@ -324,8 +317,7 @@ RSpec.describe ClaudeService do
       service.send(:call, system: "sys", prompt: "prompt text")
     end
 
-    # A three-section review overran the old 2500-token budget and came back truncated.
-    it "keeps an output budget large enough for a full three-section review" do
+    it "keeps an output budget large enough for a full three-section review, which overran the old 2,500 tokens" do
       expect(ClaudeService::MAX_TOKENS).to be >= 8_000
     end
 
@@ -342,7 +334,6 @@ RSpec.describe ClaudeService do
       service.send(:call, system: "sys", prompt: "prompt text")
     end
 
-    # max_tokens caps thinking and reply together; the thinking-off setting is a per-model fact.
     describe "thinking-off for a capped call" do
       def capped_body(model)
         body = nil
@@ -365,7 +356,6 @@ RSpec.describe ClaudeService do
         expect(capped_body("claude-haiku-4-5")["thinking"]).to eq("type" => "disabled")
       end
 
-      # An AiService::Error, so the controllers' rescue shows a try-again message instead of an error page.
       it "refuses a capped call on a model with no thinking-off setting, before sending, as an AiService error" do
         posts = 0
         conn = Faraday.new { |f| f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { posts += 1; [ 200, {}, success_body ] } } }
@@ -388,12 +378,10 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      # Reported as data: AiService#call_and_log records the billed usage before the failure propagates.
       expect(service.send(:call, system: "sys", prompt: "prompt text")[:truncated]).to be(true)
     end
 
-    # Left unnamed, a refusal surfaces as an empty-response parse error that hides the safety classifier.
-    it "reports a refusal and its category as data, with the billed usage, rather than raising" do
+    it "reports a refusal and its category as data, with the billed usage, rather than as an empty-response error" do
       body = {
         "content"      => [],
         "stop_reason"  => "refusal",
@@ -403,7 +391,6 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      # Reported as data so AiService#call_and_log records the billed usage before it raises.
       result = service.send(:call, system: "sys", prompt: "prompt text")
 
       expect(result[:refusal]).to eq("cyber")

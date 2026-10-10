@@ -1,9 +1,7 @@
 require "rails_helper"
 
-# The duck thread is inline JavaScript, so request specs execute none of it.
+# with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Duck thread", type: :system, with_csrf: true do
-  # with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
-
   def open_duck(user)
     visit_with_todays_set(user)
     expect(page).to have_content(/Code Review/i, wait: 10)
@@ -31,11 +29,9 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       expect(duck).to have_content(FakeService::DUCK_RESPONSE_TEXT, wait: 10)
       expect(duck).to have_selector(".duck-turn.duck-user", text: "I don't see what's slow here")
 
-      # Never persisted: the conversation exists only in this tab.
       expect(DailyResponse.count).to eq(0)
       expect(page).to have_css(".duck-turn.duck-assistant")
 
-      # The input clears and stays usable below the cap.
       expect(duck.find(".duck-input").value).to eq("")
 
       (ResponsesController::MAX_DUCK_TURNS_PER_SECTION - 1).times do |i|
@@ -122,14 +118,12 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       ask(duck, "x" * (ResponsesController::MAX_DUCK_MESSAGE_LENGTH + 1))
 
       expect(duck).to have_content(/too long/i, wait: 10)
-      # Recoverable: the input comes back so the user can retry.
       expect(duck.find(".duck-send")).not_to be_disabled
       expect(duck).to have_no_css(".duck-turn")
     end
   end
 
-  # Someone reaches for Explain because they don't know what to type, so an empty box is the normal case.
-  it "sends the pre-written explanation request with an empty input box" do
+  it "sends the pre-written explanation request with an empty input box, the usual state for someone stuck" do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
@@ -155,13 +149,11 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
         expect(duck).to have_css(".duck-turn.duck-user", count: i + 1, wait: 10)
       end
 
+      # Not clicked: Playwright would wait for a disabled button to become actionable and time out.
       expect(duck.find(".duck-explain")).to be_disabled
       expect(duck.find(".duck-send")).to be_disabled
       expect(duck.find(".duck-input")).to be_disabled
 
-      # Not clicked: Playwright would wait for a disabled button to become actionable and time out.
-
-      # Clear restores it along with the rest of the controls.
       duck.find(".duck-clear").click
       expect(duck.find(".duck-explain")).not_to be_disabled
     end
@@ -180,7 +172,6 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
       rate_all_sections
       click_button "Submit answers"
 
-      # Submitting chains into the review and lands on the submitted dashboard, where the duck must not be offered.
       expect(page).to have_content("Review ready!", wait: 10)
 
       expect(page).to have_content("✓ Submitted")

@@ -1,13 +1,11 @@
 class GenerateDailyExercisesJob < ApplicationJob
   queue_as :default
 
-  # Each dashboard load with no set enqueues a full billed run, so overlaps are discarded; the batch is unlimited.
   limits_concurrency key: ->(args = {}) { args[:user_id] },
                      group: ->(args = {}) { self.class.name if args[:user_id] },
                      to: 1, on_conflict: :discard,
                      duration: AiService::JUDGED_GENERATION_BUDGET.seconds
 
-  # Cron passes no args and runs hourly; on-demand passes user_id:, judged on weekdays like the batch.
   def perform(user_id: nil)
     if user_id
       # No hour gate here; active skips a user anonymized after the job was enqueued.
@@ -15,7 +13,6 @@ class GenerateDailyExercisesJob < ApplicationJob
         Time.use_zone(user.effective_time_zone) { generate_now(user) }
       end
     else
-      # Paused users are skipped; while paused only an explicit /generate reaches the on-demand path.
       User.active.where.not(api_keys: nil).where(paused_generation_at: nil).find_each do |user|
         Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
       end
@@ -24,7 +21,6 @@ class GenerateDailyExercisesJob < ApplicationJob
 
   private
 
-  # exists? forks rather than bails: the first tick generates and sends :ready, later ticks may nudge.
   def generate_if_due(user)
     return unless Date.current.on_weekday?
     return unless Time.current.hour >= 8
@@ -64,7 +60,6 @@ class GenerateDailyExercisesJob < ApplicationJob
     generate_for(user, judge: Date.current.on_weekday?)
   end
 
-  # The dashboard polls GET /dashboard/status for the outcome; no page loads Turbo, so a broadcast has no subscriber.
   def generate_for(user, judge: false)
     language = user.language_for_today
     service  = AiService.for(user)
@@ -85,7 +80,6 @@ class GenerateDailyExercisesJob < ApplicationJob
 
     Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
   rescue AiService::AllSectionsRejectedError => e
-    # An app decision, not a provider failure: its message is the explanation.
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
     persist_failure(user) { user.record_generation_message!(e.message) }
   rescue AiService::Error => e
@@ -93,7 +87,6 @@ class GenerateDailyExercisesJob < ApplicationJob
     persist_failure(user) { user.record_generation_failure!(e) }
     # Don't re-raise — one failure shouldn't block other users in the batch
   rescue ActiveRecord::RecordNotUnique
-    # A concurrent generation for this user and date won the unique index.
     Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?

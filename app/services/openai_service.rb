@@ -9,21 +9,17 @@ class OpenaiService < AiService
   # The legacy branch cannot claim an Anthropic key's "sk-ant-" prefix.
   def self.key_pattern = /\Ask-(proj-|svcacct-|[A-Za-z0-9]{20})/
 
-  # Keyed by ApiUsage purpose; effort is stated even at the default. Capped routes on models without "none" need an allowance.
   DEFAULT_ROUTE = { model: "gpt-6-sol", effort: "none" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "gpt-6.1-sol", effort: "high" },
-    # OpenAI's suggested reasoning reserve; low is Astra's lowest effort, chosen for the judge's 45-second timeout.
     "judge_section"     => { model: "gpt-6-astra", effort: "low", reasoning_allowance: 25_000 }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
-  # max_output_tokens caps reasoning too; models without "none" have no entry and need a reasoning_allowance when capped.
   REASONING_OFF = {
     "gpt-6-sol"  => "none",
     "gpt-6-luna" => "none"
   }.freeze
 
-  # JSON mode needs an input message mentioning JSON, and instructions do not count (#253).
   JSON_MODE_REQUEST = "Reply with a JSON object.".freeze
 
   # `methods: []` routes every retry decision through retry_if; an exhausted-quota 429 is retried too, as statuses match.
@@ -67,14 +63,12 @@ class OpenaiService < AiService
       store:        false,
       reasoning:    { effort: effort_for(route, capped: max_tokens.present?) }
     }
-    # The cap grows by the allowance so reasoning has room on top of the reply the caller sized for.
     body[:max_output_tokens] = max_tokens + route.fetch(:reasoning_allowance, 0) if max_tokens
     # JSON mode, since strict schemas forbid VerdictSchema's root anyOf and optional fields; .parse still holds the shape.
     body[:text] = { format: { type: "json_object" } } if response_schema
     body
   end
 
-  # A 429 insufficient_quota (or a 402) means no credit, which waiting never clears; it is not a rate limit.
   INSUFFICIENT_QUOTA = "insufficient_quota".freeze
   RATE_LIMIT_FAMILIES = %w[requests tokens].freeze
 
@@ -126,9 +120,7 @@ class OpenaiService < AiService
     cache_write_tokens = usage.dig("input_tokens_details", "cache_write_tokens").to_i
 
     {
-      # OpenAI includes both cache reads and writes in input_tokens.
       input_tokens:  usage["input_tokens"].to_i - cached_tokens - cache_write_tokens,
-      # Reasoning tokens are already inside output_tokens.
       output_tokens: usage["output_tokens"],
       model:         route[:model],
       cache_read_tokens:  cached_tokens,

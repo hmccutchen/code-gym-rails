@@ -42,7 +42,6 @@ class ApplicationController < ActionController::Base
     current_user.present?
   end
 
-  # The per-user limits guard a trial's house key; an account with its own key is never limited.
   def own_key?
     current_user.api_key_present?
   end
@@ -54,7 +53,6 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  # An ended trial still reaches every page; each provider call then fails with the trial-ended sentence.
   def require_provider
     return unless logged_in?
     return if current_user.provider_ready? || current_user.trial?

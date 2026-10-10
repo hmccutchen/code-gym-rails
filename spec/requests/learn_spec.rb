@@ -72,7 +72,6 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).not_to include(I18n.t("learn.encountered"))
     end
 
-    # An unsubmitted draft must not mark a concept seen.
     it "does not mark a concept from an unsubmitted response" do
       user.update!(language: "ruby_rails")
       exercise = user.daily_exercises.create!(
@@ -577,8 +576,7 @@ RSpec.describe "Learn", type: :request do
         .with(hash_including(concept: "n_plus_one"))
     end
 
-    # Bulk backfill must not rewrite legacy rows; only a concept someone opened may be refreshed.
-    it "does not ask to refresh a guide-less row" do
+    it "does not ask to refresh a guide-less row, since only a concept someone opens may be refreshed" do
       ConceptReference.create!(
         concept: "memoization", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"

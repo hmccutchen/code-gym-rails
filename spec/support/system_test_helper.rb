@@ -1,4 +1,3 @@
-# One-time setup commands: see CLAUDE.md, "Tests".
 PLAYWRIGHT_CLI_PATH = Rails.root.join("spec/playwright/node_modules/.bin/playwright-core")
 
 # Not :playwright, which Rails reserves for its own driver and would silently take over.
@@ -34,7 +33,6 @@ module SystemTimeHelper
   end
 end
 
-# Reads rated fields from the page, since the day's sections vary; the gate lives in DailyResponse#submit_blocker.
 module RatingHelper
   def rating_row_fields
     all(".rating-row[data-rating-for]", visible: :all).map { |row| row["data-rating-for"] }.uniq
@@ -49,7 +47,6 @@ module RatingHelper
   end
 end
 
-# Visiting first would wait out the generating placeholder's 3s status poll.
 module TodaysSetHelper
   def visit_with_todays_set(user)
     perform_enqueued_jobs do

@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/models/concept_mastery.md
 class ConceptMastery < ApplicationRecord
   belongs_to :user
 
@@ -7,7 +8,6 @@ class ConceptMastery < ApplicationRecord
   scope :in_bucket, ->(bucket) { where(language: bucket, concept: ConceptBucket.vocabulary_for(bucket)) }
   scope :in_buckets, ->(buckets) { buckets.map { |bucket| in_bucket(bucket) }.reduce(none, :or) }
   scope :drilling, -> { where.not(drilled_at: nil) }
-  # The one statement of "a retention check is due today".
   scope :due_for_retention_check, -> { where.not(next_retention_check_on: nil).where(next_retention_check_on: ..Date.current) }
 
   AI_RATING_RANK = { "beginner" => 0, "developing" => 1, "solid" => 2, "strong" => 3 }.freeze
@@ -16,7 +16,6 @@ class ConceptMastery < ApplicationRecord
   RETENTION_INITIAL_INTERVAL_DAYS = 7
   RETENTION_GROWTH_FACTOR         = 2
   RETENTION_MAX_INTERVAL_DAYS     = 60
-  # 1 means overdue by 100% of the concept's own retention_interval_days.
   RETENTION_OVERDUE_THRESHOLD_MULTIPLIER = 1
 
   validates :concept, :language, presence: true
@@ -82,7 +81,6 @@ class ConceptMastery < ApplicationRecord
   end
   private_class_method :skipped_check_scopes
 
-  # Least favorable section wins; no AI rating for the day means no mastery or streak movement.
   def self.evaluate_concept!(user, concept, bucket, response, sections)
     ai_ratings = sections.map { |s| response.ai_rating_for(s) }
     return if ai_ratings.any?(&:nil?)
@@ -91,7 +89,7 @@ class ConceptMastery < ApplicationRecord
     self_fav = sections.all? { |s| response.self_rating_favorable?(s) }
 
     cm = user.concept_masteries.find_or_initialize_by(concept: concept, language: bucket)
-    return if cm.tier_paused? # paused concepts only count down (Step A)
+    return if cm.tier_paused?
 
     prev      = cm.last_rating
     mastered  = self_fav && DailyResponse::AI_RATING_FAVORABLE.include?(rep_ai)
@@ -103,7 +101,7 @@ class ConceptMastery < ApplicationRecord
       cm.assign_attributes(**retention_schedule_for(cm, response.date))
     elsif improving || prev.blank?
       cm.streak = 0
-    else # stagnant: same-or-worse than last time
+    else
       cm.streak += 1
       if cm.tier_standard? && cm.streak >= 3
         cm.assign_attributes(tier: :reduced, streak: 0)
@@ -113,7 +111,6 @@ class ConceptMastery < ApplicationRecord
     end
 
     unless mastered
-      # A failed check re-enters normal reinforcement; mastered_at stays as the first-mastery record.
       cm.assign_attributes(next_retention_check_on: nil, retention_interval_days: nil)
     end
 
@@ -135,7 +132,6 @@ class ConceptMastery < ApplicationRecord
       end
 
     {
-      # First mastery only: a later retention check must not overwrite it.
       mastered_at:             cm.mastered_at || Time.current,
       retention_interval_days: interval,
       next_retention_check_on: Date.current + interval
@@ -143,12 +139,10 @@ class ConceptMastery < ApplicationRecord
   end
   private_class_method :retention_schedule_for
 
-  # Shared with ConceptDrills.start!, so a drill cannot invent a second way out of a pause.
   def end_pause
     assign_attributes(tier: :reduced, streak: 0, cooldown_remaining: 0)
   end
 
-  # Where a drill ends: mastery and the user's own stop both come through here.
   def clear_drill
     assign_attributes(drilled_at: nil, drill_group: nil)
   end

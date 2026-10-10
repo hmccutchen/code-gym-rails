@@ -31,7 +31,6 @@ RSpec.describe ConceptBookSources do
     expect(described_class::SOURCES.keys - TRACKED_CONCEPTS).to be_empty
   end
 
-  # Array-valued so a second book is a line, not a migration.
   it "holds an array of sources for every concept, never a bare source" do
     expect(described_class::SOURCES.values).to all(be_an(Array))
     expect(described_class::SOURCES.values).to all(be_present)
@@ -68,7 +67,6 @@ RSpec.describe ConceptBookSources do
     expect(described_class.for("aggregate_boundaries")).to be_present
   end
 
-  # A generated citation is a hallucinated one, and a ConceptReference row is cached forever.
   it "never reaches a provider prompt" do
     double_class = Class.new(AiService) do
       private def build_connection = nil

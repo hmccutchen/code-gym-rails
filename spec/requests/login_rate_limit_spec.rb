@@ -19,7 +19,6 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
-    # The earlier requests left a code pending, so the page still shows the code field.
     it "keeps the refused request's message off the pending code field" do
       5.times do
         post login_path, params: { email: "dev@example.com", name: "Dev" }
@@ -33,7 +32,6 @@ RSpec.describe "Login rate limits", type: :request do
       expect(field["aria-invalid"]).to be_nil
     end
 
-    # Keyed on the address, to cap how many fresh codes one target can be made to generate.
     it "counts requests for one address across separate sessions" do
       5.times { post login_path, params: { email: "dev@example.com", name: "Dev" } }
 
@@ -131,8 +129,7 @@ RSpec.describe "Login rate limits", type: :request do
       expect(response.body).to include('name="email"')
     end
 
-    # Nothing was checked, so the code is not marked invalid.
-    it "describes the code field by the refusal without marking the code invalid" do
+    it "describes the code field by the refusal without marking the code invalid, since nothing was checked" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       11.times { post verify_login_code_path, params: { code: "000000" } }
 

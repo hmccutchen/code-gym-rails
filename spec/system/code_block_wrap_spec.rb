@@ -1,6 +1,5 @@
 require "rails_helper"
 
-# Pins the hanging indent, single-space alignment padding once a block wraps, and a copy that keeps the original lines.
 RSpec.describe "Code block wrapping", type: :system do
   # Line 1 is too long for a phone; line 2 opens a string that crosses into line 3 and holds its own padding.
   SOURCE = <<~RUBY.chomp.freeze
@@ -165,8 +164,7 @@ RSpec.describe "Code block wrapping", type: :system do
     expect(line_texts).to eq(SOURCE.lines.map(&:chomp).map { |line| line.empty? ? "\n" : line })
   end
 
-  # Opening a closed disclosure changes the block's width from zero, which the observer must refit.
-  it "fits the block again when its width changes" do
+  it "fits the block again when opening its disclosure changes its width from zero" do
     open_reference(width: 1280)
     expect(gap_columns(1)).to eq(5)
 

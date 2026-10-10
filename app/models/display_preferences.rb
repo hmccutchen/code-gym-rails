@@ -15,7 +15,6 @@ class DisplayPreferences
   DARK_THEME_COLOR  = "#1a1a2e"
   LIGHT_THEME_COLOR = "#ffffff"
 
-  # Where the light palette applies, as the media attribute of its <link>.
   LIGHT_PALETTE_MEDIA = { "light" => "all", "device" => "(prefers-color-scheme: light)" }.freeze
   LIGHT_PALETTE_OFF   = "not all"
 

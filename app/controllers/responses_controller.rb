@@ -2,25 +2,20 @@ class ResponsesController < ApplicationController
   include ProviderCallLimits
   include ProviderFailureRendering
 
-  # Ahead of the other checks, so a request they refuse still counts.
   limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
   before_action :set_response, only: [ :review, :email_review, :explain_differently, :follow_ups, :start_over ]
   before_action :require_reviewed_section!, only: [ :explain_differently, :follow_ups ]
 
-  # Double MAX_FOLLOW_UPS_PER_SECTION: a duck thread is a real back-and-forth; the view partial reads it from here.
   MAX_DUCK_TURNS_PER_SECTION = 6
 
-  # The client-held thread is attacker-sized and the turn cap counts only user roles; these bound what is forwarded.
   MAX_DUCK_MESSAGE_LENGTH = 2_000
   MAX_DUCK_THREAD_ENTRIES = MAX_DUCK_TURNS_PER_SECTION * 2
 
-  # Derived from the caps, not flat: a flat byte limit rejected honest multi-byte threads and outgrew a raised token cap.
   DUCK_REPLY_BYTES_PER_TOKEN = 4
   DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE = AiService::DUCK_RESPONSE_MAX_TOKENS * DUCK_REPLY_BYTES_PER_TOKEN
   MAX_DUCK_THREAD_BYTES = MAX_DUCK_TURNS_PER_SECTION *
     (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)
 
-  # POST /responses — save answers (auto-save friendly, idempotent)
   def create
     exercise = current_user.daily_exercises.for_date.first
     return head :not_found unless exercise
@@ -32,7 +27,7 @@ class ResponsesController < ApplicationController
     render_save_result(outcome != :failed)
   end
 
-  # POST /responses/:id/review — every exit lands on root_path, so the page never changes based on how the review went.
+  # POST /responses/:id/review
   def review
     return redirect_to root_path, alert: t("flash.responses.not_submitted") unless @response.submitted?
 
@@ -43,7 +38,6 @@ class ResponsesController < ApplicationController
       return redirect_to root_path, alert: t("flash.responses.review_already_running")
     end
 
-    # Recompute after reload: another request may have finished the last section between the first check and the claim.
     missing = @response.section_keys - Array(@response.ai_review&.keys)
     if missing.empty?
       release_review_claim!
@@ -56,7 +50,6 @@ class ResponsesController < ApplicationController
     failures  = results.reject { |_, r| r[:ok] }
 
     ActiveRecord::Base.transaction do
-      # Lock before writing: #start_over or RegenerateExerciseJob can destroy the row during the provider call.
       @response.lock!
 
       if successes.any?
@@ -88,7 +81,7 @@ class ResponsesController < ApplicationController
     redirect_to root_path, alert: provider_failure_text(e, :review).full
   end
 
-  # DELETE /responses/:id/start_over — blocked once reviewed or while reviewing, since ConceptMastery writes can't be undone.
+  # DELETE /responses/:id/start_over
   def start_over
     return redirect_to root_path, alert: t("flash.responses.start_over_after_review") if @response.reviewed?
     return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
@@ -98,7 +91,6 @@ class ResponsesController < ApplicationController
     redirect_to root_path, notice: t("flash.responses.answers_cleared")
   end
 
-  # POST /responses/:id/email_review — the button renders only on the submitted dashboard, so both exits go there.
   def email_review
     return redirect_to root_path, alert: t("flash.responses.no_review_to_email") unless @response.fully_reviewed?
 
@@ -106,7 +98,7 @@ class ResponsesController < ApplicationController
     redirect_to root_path, notice: t("flash.responses.review_emailed", email: current_user.email)
   end
 
-  # POST /responses/:id/explain_differently — synchronous; the caller posts via fetch and appends in place.
+  # POST /responses/:id/explain_differently
   def explain_differently
     existing = Array(@response.review_alternates[@section])
     if existing.size >= DailyResponse::MAX_ALTERNATES_PER_SECTION
@@ -118,7 +110,6 @@ class ResponsesController < ApplicationController
       section: @section, prior_alternates: existing
     )
 
-    # The count check above is advisory; this re-check under the row lock is what keeps concurrent requests under the cap.
     capped = false
     remaining = nil
     @response.with_lock do
@@ -141,7 +132,6 @@ class ResponsesController < ApplicationController
     render_provider_failure(e, :alternate)
   end
 
-  # POST /responses/:id/follow_ups — both turns are written in one transaction, so no question is left without an answer.
   def follow_ups
     question = UserText.clean(params[:question], limit: UserText::MAX_QUESTION_LENGTH).strip
     return render_section_error(t("errors.responses.question_blank")) if question.blank?
@@ -158,7 +148,6 @@ class ResponsesController < ApplicationController
       section: @section, question: question, thread: thread
     )
 
-    # The count check above is advisory; this re-check under the row lock is what keeps concurrent requests under the cap.
     capped = false
     remaining = nil
     @response.with_lock do
@@ -175,21 +164,18 @@ class ResponsesController < ApplicationController
     if capped
       render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
     else
-      # Return the cleaned question so the transcript never claims an answer to text the provider never saw.
       render json: { status: "ok", question: question, answer: answer, remaining: remaining }
     end
   rescue AiService::Error => e
     render_provider_failure(e, :follow_up)
   end
 
-  # POST /responses/duck_thread — unpersisted: the client sends its whole thread and nothing is written.
+  # POST /responses/duck_thread
   def duck_thread
     exercise = current_user.daily_exercises.for_date.first
-    # A JSON body because the client calls res.json() before checking res.ok.
     return render json: { status: "error", error: t("errors.no_exercise_today") }, status: :not_found unless exercise
 
     section = params[:section].to_s
-    # active_section_keys, not payload keys: a section the engineer can't see is not one to think out loud about.
     return render_section_error(t("errors.section_not_in_exercise")) unless exercise.active_section_keys.include?(section)
 
     existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
@@ -209,7 +195,6 @@ class ResponsesController < ApplicationController
     unless well_formed_thread?(thread)
       return render_section_error(t("errors.responses.conversation_out_of_step"))
     end
-    # Soft cap: the thread lives in the browser, acceptable because each user pays with their own key.
     if thread.count { |turn| turn[:role] == "user" } >= MAX_DUCK_TURNS_PER_SECTION
       return render_section_error(t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION))
     end
@@ -223,7 +208,7 @@ class ResponsesController < ApplicationController
     render_provider_failure(e, :duck)
   end
 
-  # POST /responses/pseudocode_critique — round 1: one text-only critique of the engineer's plan.
+  # POST /responses/pseudocode_critique
   def pseudocode_critique
     return unless (context = load_pseudocode_context)
 
@@ -248,7 +233,6 @@ class ResponsesController < ApplicationController
 
   private
 
-  # Unreadable Parsons tokens mean the set was replaced, so the whole post is refused with a 409 rather than half-saved.
   def stale_answer_sections(exercise)
     submitted = response_params[:answers]&.slice(*exercise.active_section_keys)
     return [] if submitted.blank?
@@ -256,7 +240,6 @@ class ResponsesController < ApplicationController
     submitted.keys.map(&:to_s) - DailyResponse.normalize_answers(submitted, exercise).keys.map(&:to_s)
   end
 
-  # Lock the exercise then the response, RegenerateExerciseJob's order, so the two serialize instead of deadlocking.
   def save_answers_under_lock(exercise)
     ActiveRecord::Base.transaction do
       exercise.lock!
@@ -322,9 +305,7 @@ class ResponsesController < ApplicationController
     end
   end
 
-  # Roles are normalized and limited to user/assistant (the cap matches "user" exactly); blank turns would 400 at the provider.
   def duck_thread_param
-    # first(...+1) bounds the mapping while leaving an over-limit thread detectably over the limit.
     Array(params[:thread]).first(MAX_DUCK_THREAD_ENTRIES + 1).filter_map { |turn|
       next unless turn.is_a?(Hash) || turn.respond_to?(:permit)
 
@@ -338,7 +319,6 @@ class ResponsesController < ApplicationController
     }
   end
 
-  # Turns must alternate and end on an assistant reply; the script always produces that, so anything else is hand-crafted.
   def well_formed_thread?(thread)
     return true if thread.empty?
 
@@ -348,7 +328,6 @@ class ResponsesController < ApplicationController
       }
   end
 
-  # The section comes from the registry, never params; renders its own error and returns nil, so callers guard on it.
   def load_pseudocode_context
     exercise = current_user.daily_exercises.for_date.first
     unless exercise
@@ -375,7 +354,6 @@ class ResponsesController < ApplicationController
     value
   end
 
-  # Persisted, because the round's row lock needs a real row; reached only after the request has validated.
   def open_response_for(exercise)
     row = persisted_response_for(exercise)
     return pseudocode_error(t("errors.responses.pseudocode.after_submit")) if row.submitted?
@@ -383,7 +361,6 @@ class ResponsesController < ApplicationController
     row
   end
 
-  # Rescue both errors (validation and index both guard uniqueness) inside a SAVEPOINT, since #create wraps a transaction.
   def persisted_response_for(exercise)
     ActiveRecord::Base.transaction(requires_new: true) do
       current_user.daily_responses.find_or_create_by!(daily_exercise: exercise, date: Date.current)
@@ -392,7 +369,6 @@ class ResponsesController < ApplicationController
     current_user.daily_responses.find_by!(date: Date.current)
   end
 
-  # Claim before the provider call so a cap on a paid call bounds the spend; the claim expires like #review's.
   def claim_pseudocode_round!(row, section, phase, done)
     claimed = false
 
@@ -406,12 +382,10 @@ class ResponsesController < ApplicationController
     claimed
   end
 
-  # Writing the result also releases the claim, so the two can never disagree.
   def write_pseudocode_round!(row, section, phase, attrs)
     row.with_lock { row.merge_pseudocode_round!(section, attrs.merge("#{phase}_claimed_at" => nil)) }
   end
 
-  # A handled provider failure hands the round back so the engineer can retry without waiting out the stale window.
   def release_pseudocode_claim!(row, section, phase)
     return if row.nil?
 
@@ -422,13 +396,11 @@ class ResponsesController < ApplicationController
     t(row.critiqued?(section) ? "errors.responses.pseudocode.already_checked" : "errors.responses.pseudocode.check_running")
   end
 
-  # Callers need a falsy value to mean "already handled"; render_section_error returns a truthy one.
   def pseudocode_error(message)
     render_section_error(message)
     nil
   end
 
-  # The review renders below the day's problems and answers, so anchor to it; a day with no review stays at the top.
   def review_anchor
     root_path(anchor: "ai-review")
   end
@@ -437,7 +409,6 @@ class ResponsesController < ApplicationController
     @response = current_user.daily_responses.find(params[:id])
   end
 
-  # Validate the section against the problem_set, or a crafted param writes arbitrary keys into the jsonb columns.
   def require_reviewed_section!
     @section = params[:section].to_s
     return render_section_error(t("errors.section_not_in_exercise")) unless @response.daily_exercise.problem_set.key?(@section)
@@ -448,7 +419,6 @@ class ResponsesController < ApplicationController
     render json: { status: "error", error: message }, status: :unprocessable_content
   end
 
-  # A single UPDATE ... WHERE claims atomically, so a second click backs off instead of making a second provider call.
   def claim_review!
     claimed = DailyResponse.where(id: @response.id)
                            .where("reviewing_since IS NULL OR reviewing_since < ?", DailyResponse::REVIEW_CLAIM_STALE_AFTER.ago)
@@ -461,17 +431,14 @@ class ResponsesController < ApplicationController
     @response.update_column(:reviewing_since, nil)
   end
 
-  # A reviewed day can't be regenerated, so an earlier regeneration error would otherwise ask for an impossible retry.
   def clear_stale_generation_error!
     current_user.clear_stale_generation_error!
   end
 
-  # Pairs AI and self ratings per section to read beside AiService#log_difficulty_diagnostics; remove once settled.
   def log_review_diagnostics(response, sections)
     payload = {
       event: "review",
       user_id: response.user_id,
-      # daily_exercise.date, because response.date can fall a day after the generation event it correlates with.
       date: response.daily_exercise.date.to_s,
       sections: sections.index_with { |section|
         { ai_rating: response.ai_rating_for(section), self_rating: response.self_rating_for(section) }
@@ -482,7 +449,6 @@ class ResponsesController < ApplicationController
     log_pseudocode_review_diagnostics(response, sections)
   end
 
-  # Counterpart to AiService#log_pseudocode_critique; counts and flags only, never pseudocode or critique text.
   def log_pseudocode_review_diagnostics(response, sections)
     section = ExerciseSection::PseudocodeToCode.key
     return unless sections.include?(section)
@@ -498,14 +464,12 @@ class ResponsesController < ApplicationController
     )
   end
 
-  # The prose judge may have merged the stored missed points; it keeps the grader's originals under graded_prose.
   def graded_missed(review)
     return nil unless review.is_a?(Hash)
 
     review.dig(ReviewProseVerdict::ORIGINAL_KEY, "missed") || review["missed"]
   end
 
-  # A fan-out usually fails every section the same way; otherwise the commonest kind is the one worth explaining.
   def review_failure_text(failures, surface)
     kind    = failures.values.map { |f| f[:failure] }.tally.max_by { |_, count| count }.first
     example = failures.values.find { |f| f[:failure] == kind }
@@ -514,7 +478,6 @@ class ResponsesController < ApplicationController
                             retry_after: example[:retry_after], variant: ProviderFailureText.variant_for(current_user))
   end
 
-  # Store the kind, never the error text; use the section's own time, since the review waits for its slowest sibling.
   def stored_review_failure(result)
     { "kind" => result[:failure], "provider" => result[:provider], "quota_id" => result[:quota_id],
       "retry_after" => result[:retry_after], "at" => (result[:failed_at] || Time.current).iso8601 }.compact
@@ -528,14 +491,12 @@ class ResponsesController < ApplicationController
     )
   end
 
-  # active_section_keys, never ExerciseSection.keys, so an unseen section neither pollutes history nor bills a reference.
   def exercise_concept_tags(exercise)
     exercise.active_section_keys
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
   end
 
-  # The exists? check only skips obvious no-ops; the job re-checks, so a racing duplicate enqueue is harmless.
   def enqueue_concept_references(exercise)
     enqueued = []
     exercise_concept_tags(exercise).each do |section, concept|

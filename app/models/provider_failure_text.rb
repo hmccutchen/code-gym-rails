@@ -17,12 +17,10 @@ class ProviderFailureText
     @reset_at    = ResetClock.reset_at(@kind, provider: provider, failed_at: @failed_at, retry_after: retry_after)
   end
 
-  # What happened, what is kept, when it lifts, what to do.
   def full
     [ title, saved, reset, next_step ].compact.join(" ")
   end
 
-  # The one line a status area has room for.
   def brief
     [ title, reset || next_step ].compact.join(" ")
   end

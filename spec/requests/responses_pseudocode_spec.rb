@@ -1,6 +1,5 @@
 require "rails_helper"
 
-# Each round is a provider call on the user's key, so most guards stop unrequested or uncounted calls.
 RSpec.describe "Pseudocode rounds", type: :request do
   let(:user) { create_fake_provider_user }
 
@@ -51,8 +50,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(JSON.parse(response.body)["error"]).to match(/already/i)
     end
 
-    # A critique that found nothing is still spent, so the cap keys on critiqued_at, not the critique list.
-    it "refuses a second critique even when the first found no gaps" do
+    it "refuses a second critique even when the first found no gaps, since the cap keys on critiqued_at" do
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode)
         .and_return({ gaps_found: false, gaps: [] })
 
@@ -64,7 +62,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    # A provider hiccup must not silently spend the engineer's one critique.
     it "leaves the cap unconsumed when the provider response is malformed" do
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode)
         .and_raise(AiService::InvalidResponseError, "claimed gaps but returned none usable")
@@ -87,7 +84,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
         .to eq([ "pseudocode_to_code" ])
     end
 
-    # A check made only after the call would still bill both of two concurrent requests.
     it "claims the round before calling the provider, so a concurrent request never calls at all" do
       calls = 0
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode) do
@@ -113,8 +109,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    # A crashed request must not lock the round forever — same window #review uses.
-    it "lets a stale claim be reclaimed" do
+    it "lets a stale claim be reclaimed after the same window #review uses" do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             pseudocode_rounds: { "pseudocode_to_code" => {
                               "critique_claimed_at" => (DailyResponse::REVIEW_CLAIM_STALE_AFTER.ago - 1.minute).iso8601
@@ -135,7 +130,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(JSON.parse(response.body)["error"]).to match(/already running/i)
     end
 
-    # Uniqueness is a validation and an index, so the two race orderings raise different classes.
     it "reuses today's response when the autosave already created it" do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "pseudocode_to_code" => "sort then walk" })
@@ -192,7 +186,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
-  # The client path uses textContent; this covers the server-rendered half a reload shows.
   describe "rendering stored round output" do
     it "escapes generated code and critique text rather than emitting markup" do
       DailyResponse.create!(
@@ -214,7 +207,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
-  # A clean critique followed by a harsh review is logged as a boolean so the mismatch is measurable.
   describe "review diagnostics" do
     def submitted_response(rounds:, review:)
       DailyResponse.create!(
@@ -273,7 +265,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(line).to include("critiqued=true", "gaps=1", "missed=2", "disagreement=false")
     end
 
-    # The metric compares critique gaps with the grader's findings, so prose-judge merges must not move it.
     it "counts the grader's missed points, not the prose judge's merged ones" do
       response_row = submitted_response(
         rounds: { "gaps_found" => false, "critique" => [], "critiqued_at" => Time.current.iso8601,
@@ -295,7 +286,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
-  # The review translates the submitted pseudocode before grading and skips translation in two cases.
   describe "translation at review time" do
     def submit_and_review(answer: "sort the ranges then walk them", rounds: {})
       row = DailyResponse.create!(
@@ -316,7 +306,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(round["translated_at"]).to be_present
     end
 
-    # The shared grading context is built after the translation is stored, so the prompt carries the code.
     it "grades the section against the code it just generated" do
       prompts = []
       allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, **kwargs|
@@ -340,8 +329,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(row.pseudocode_round("pseudocode_to_code")["translated_at"]).to be_nil
     end
 
-    # Partial reviews retry section by section, so a paid translation is never bought again.
-    it "leaves an existing translation alone" do
+    it "leaves an existing translation alone, so a partial review's retry never pays for it again" do
       expect_any_instance_of(FakeService).not_to receive(:translate_pseudocode)
 
       row = submit_and_review(rounds: { "generated_code" => "def already; end",
@@ -386,7 +374,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(round["generated_code"]).to include("def merge_ranges")
     end
 
-    # A failed translation costs the engineer the code, never the review.
     it "still reviews every section when the translation fails" do
       allow_any_instance_of(FakeService).to receive(:translate_pseudocode)
         .and_raise(AiService::Error, "provider down")

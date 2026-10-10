@@ -1,7 +1,7 @@
 require_relative "solve_agreement"
 require_relative "forced_concept_drafts"
 
-# Writes no ApiUsage rows, which would charge a teammate's history for a comparison they never ran.
+# Design notes: docs/code-notes/script/model_comparison.md
 class ModelComparison
   CANDIDATES = {
     "generate"  => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-opus-5-5", effort: "medium" } ],
@@ -10,43 +10,36 @@ class ModelComparison
     "translate" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
     "judge"     => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
     "review_prose" => [ { model: "claude-sonnet-5-5", effort: "high" }, { model: "claude-haiku-4-5" } ],
-    # The production grading route, so the run measures the rubric as deployed.
     "review_calibration" => [ ClaudeService::MODEL_FOR_PURPOSE.fetch("review_response", ClaudeService::DEFAULT_ROUTE) ]
   }.freeze
 
   REVIEW_FIELDS = %w[rating missed next_step].freeze
 
-  # Expected statuses: "reject", "keep_or_edit", or "keep", which an edit does not satisfy.
   SOUND_EXPECTATIONS = %w[keep keep_or_edit].freeze
   VERDICT_FIELDS = %w[status issues principle evidence reason].freeze
 
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
   REVIEW_PROSE_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_judge")
   REVIEW_CALIBRATION_FIXTURE_DIR = Rails.root.join("spec/fixtures/review_calibration")
-  # Forced-concept drafts carry their answer key, so they go to files instead of pasteable terminal output.
   CONCEPT_DRAFT_DIR = Rails.root.join("tmp/judge_concept")
 
-  # extra_answers in a fixture are graded and matched but take no part in the rank-order check.
   CALIBRATION_EXPECTED = {
     "complete" => %w[solid strong],
     "partial"  => %w[developing],
     "miss"     => %w[beginner]
   }.freeze
 
-  # List prices per million tokens, for comparing candidates; nothing billed reads these.
   LIST_PRICE_PER_MILLION = {
     "claude-opus-5-5"   => { input: 4.0, output: 20.0 },
     "claude-sonnet-5-5" => { input: 2.0, output: 10.0 },
     "claude-haiku-4-5"  => { input: 1.0, output: 5.0 }
   }.freeze
 
-  # Priced separately because Claude's input_tokens excludes cache reads and writes.
   CACHE_WRITE_PRICE_FACTOR = 1.25
   CACHE_READ_PRICE_FACTOR  = 0.1
 
   Run = Data.define(:route, :output, :seconds, :tokens_in, :tokens_out, :cache_read, :cache_write)
 
-  # Kept whole, failures included, so a model's summary counts every input and its waiting time.
   ProseResult = Data.define(:label, :outcome, :verdict, :error, :ms, :tokens_in, :tokens_out, :expected)
 
   def initialize(api_key:, out: $stdout)
@@ -94,7 +87,6 @@ class ModelComparison
     end
   end
 
-  # A section's error stands in its place, so one bad section never loses the rest of a candidate's output.
   def judge(user_id)
     user       = User.find(user_id)
     language   = user.language_for_today
@@ -111,7 +103,6 @@ class ModelComparison
     runs.each { |run| SolveAgreement.new(draft_solve_rows(run, draft, difficulty, user), out: @out).print(run.route[:model]) }
   end
 
-  # No user_id: the fixtures carry their own rung and lock, and the fixture user is never persisted.
   def judge_fixtures
     fixtures = Dir[FIXTURE_DIR.join("*.json")].sort.map { |path| load_fixture(path) }
     user     = User.new(skill_level: "senior")
@@ -119,7 +110,6 @@ class ModelComparison
     CANDIDATES.fetch("judge").each { |route| print_fixture_table(route, fixtures, user) }
   end
 
-  # A review the live judge already edited is measured from the grader's original under graded_prose.
   def review_prose(user_id, limit: 5)
     raise ArgumentError, "limit must be a positive integer" unless limit.is_a?(Integer) && limit.positive?
 
@@ -138,11 +128,9 @@ class ModelComparison
     end
   end
 
-  # Drafts are saved with their key under CONCEPT_DRAFT_DIR; the terminal shows only file, verdict and match.
   def judge_concept(user_id, concept, per_rung: 2)
     user   = User.find(user_id)
     forced = ForcedConceptDrafts.new(concept)
-    # Planned on the user's own day, as GenerateDailyExercisesJob plans them.
     drafts = Time.use_zone(user.effective_time_zone) do
       forced.with_concept { draft_concept_sections(forced, user, concept, per_rung) }
     end
@@ -150,7 +138,6 @@ class ModelComparison
     CANDIDATES.fetch("judge").each { |route| print_concept_judgments(route, user, concept, drafts) }
   end
 
-  # A fixture passes when its three ratings fall in rank order.
   def review_calibration
     user     = User.new(skill_level: "junior")
     fixtures = Dir[REVIEW_CALIBRATION_FIXTURE_DIR.join("*.json")].sort.map { |path| load_fixture(path) }
@@ -197,7 +184,6 @@ class ModelComparison
     @out.puts
   end
 
-  # Locked, as the drafts were, so the judge measures against exactly the rung they were written to.
   def concept_judgment(service, user, draft)
     row = draft.slice(:name, :rung)
     return row.merge(status: :error, detail: draft[:error], matched: nil) if draft[:error]
@@ -236,7 +222,6 @@ class ModelComparison
     end.to_h
   end
 
-  # Reports match or mismatch, never the piece the judge picked, so the output never names the answer.
   def judge_drafted_section(service, user, kind, section, difficulty)
     verdict = service.judge_section(
       user, kind, section,
@@ -339,7 +324,6 @@ class ModelComparison
     (input * price[:input] + tokens_out * price[:output]) / 1_000_000.0
   end
 
-  # A provider failure is an error row, so one timeout neither ends the run nor counts as invalid output.
   def fixture_row(service, user, fixture)
     kind    = ExerciseSection.for(fixture["kind"])
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -370,7 +354,6 @@ class ModelComparison
       rung: fixture["rung"], concept: fixture.dig("section", "concept"), expects_solve: fixture.key?("expected_better") }
   end
 
-  # A "keep" fixture the judge rewrote is edited, since rewriting a deliberately sound section is not keeping it.
   def classify_fixture(fixture, verdict)
     case fixture["expected"]
     when "reject"
@@ -412,7 +395,6 @@ class ModelComparison
     lock = Mutex.new
 
     Class.new(ClaudeService) do
-      # Measures the grader alone, whatever the deployment's switch says.
       def self.judges_review_prose? = false
 
       define_method(:route_for) { |_purpose| route }
@@ -460,7 +442,6 @@ class ModelComparison
     results
   end
 
-  # Time and tokens are measured on failure too, so a model that keeps timing out cannot look fast.
   def judge_prose_input(service, usage, user, input)
     seen    = usage.size
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -480,7 +461,6 @@ class ModelComparison
     [ :error, nil, "#{e.class}: #{e.message}" ]
   end
 
-  # Prints review text by design: a person reads it in a terminal; it never reaches application logs.
   def print_prose_result(result, input)
     @out.puts "#{result.label}: #{result.outcome}#{" (expected #{result.expected})" if result.expected} " \
               "#{result.ms}ms · #{result.tokens_out} out"
@@ -489,7 +469,6 @@ class ModelComparison
     lines.each { |line| @out.puts "  #{line}" }
   end
 
-  # Each rewritten entry beside the originals it cites, so a reader can check the claim survived.
   def rewrite_lines(verdict, projection)
     return [ "keep" ] unless verdict.edit?
 
@@ -521,7 +500,6 @@ class ModelComparison
     @out.puts "matched expected status: #{expected.count { |result| result.outcome.to_s == result.expected }}/#{expected.size}" if expected.any?
   end
 
-  # The activation gate checks single replies against the cap and timeout, which totals hide.
   def print_prose_extremes(results)
     return if results.empty?
 
@@ -537,7 +515,6 @@ class ModelComparison
     end.join(", ")
   end
 
-  # Each answer is [label, expected ratings, run]; the first three are the quality ladder, in order.
   def calibration_row(route, user, fixture)
     answers = CALIBRATION_EXPECTED.map { |quality, expected| [ quality, expected, fixture.dig("answers", quality) ] } +
               Array(fixture["extra_answers"]).map { |extra| extra.values_at("label", "expected", "answer") }
@@ -593,7 +570,6 @@ class ModelComparison
     review.is_a?(Hash) ? review.slice(*REVIEW_FIELDS) : review
   end
 
-  # The whole review grade_section produced, or its failure as a line to print.
   def graded_review(service, response, exercise, section)
     coach   = service.send(:config_for, exercise.language)[:coach]
     context = service.send(:build_review_day_context, coach, exercise, response)
@@ -602,7 +578,6 @@ class ModelComparison
     result[:ok] ? result[:review] : "#{result[:error_code]}: #{result[:message]}"
   end
 
-  # A real review translates pseudocode first; this one writes nothing, so an untranslated plan is graded as written.
   def review_heading(response, section)
     return section unless ExerciseSection.for(section).translated_before_grading? && !response.translated?(section)
 

@@ -95,7 +95,6 @@ RSpec.describe "per-purpose model routing" do
       expect(body["output_config"]).to eq("effort" => "medium")
     end
 
-    # See CLAUDE.md, "Per-purpose model routing", for the 2026-10-09 comparisons behind this.
     it "keeps review, duck and pseudocode translation on the default model" do
       %w[review_response duck_thread pseudocode_translate].each do |purpose|
         expect(ClaudeService::MODEL_FOR_PURPOSE).not_to have_key(purpose)

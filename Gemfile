@@ -1,32 +1,20 @@
 source "https://rubygems.org"
 
-# Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.4"
-# The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
-# Use postgresql as the database for Active Record
 gem "pg", "~> 1.7"
-# Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
-# Use JavaScript with ESM import maps [https://github.com/rails/importmap-rails]
 gem "importmap-rails"
-# Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]
 gem "turbo-rails"
-# Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]
 gem "stimulus-rails"
-# Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
-# Login codes are digested with BCrypt (User#generate_login_code!)
 gem "bcrypt", "~> 3.1.7"
 
-# Email delivery via Resend's HTTP API (Railway blocks outbound SMTP below Pro)
 gem "resend"
 
-# Offset pagination for the History page (HistoryController)
 gem "pagy", "~> 43.7"
 
-# Server-side syntax highlighting for code blocks [https://github.com/rouge-ruby/rouge]
 gem "rouge", "~> 5.1"
 
 # RealSource slices excerpts with Prism; declared because irb's transitive dependency on it could vanish.
@@ -35,13 +23,10 @@ gem "prism", "~> 1.9"
 # Needed in production: CodeFormat::Ruby re-indents provider-written Ruby with its Layout cops.
 gem "rubocop", require: false
 
-# Web Push for the daily reminder (PushDelivery), only ever called from a background job.
 gem "web-push", "~> 3.1"
 
-# Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
-# Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "solid_cache"
 gem "solid_queue"
 gem "solid_cable"
@@ -49,37 +34,29 @@ gem "solid_cable"
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 
-# Deploy this application anywhere as a Docker container [https://kamal-deploy.org]
 gem "kamal", require: false
 
-# Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]
 gem "thruster", require: false
 
 group :development, :test do
-  # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
 
-  # Testing framework
   gem "rspec-rails", "~> 8.0"
 
-  # Static analysis for security vulnerabilities [https://brakemanscanner.org/]
   gem "brakeman", require: false
 
-  # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
 
-  # Runs specs across several processes locally, one test database each
   gem "parallel_tests"
 end
 
 group :development do
-  # Use console on exceptions pages [https://github.com/rails/web-console]
   gem "web-console"
 end
 
 group :test do
-  # capybara-playwright-driver's pin must move with playwright-core in spec/playwright/package.json.
   gem "capybara"
+  # capybara-playwright-driver's pin must move with playwright-core in spec/playwright/package.json.
   gem "capybara-playwright-driver", "~> 0.5.12"
 end
 

@@ -1,6 +1,5 @@
 require "rails_helper"
 
-# Only a real browser round trip covers the listener that PATCHes /profile; a request spec stays green without it.
 RSpec.describe "Exercise mix", type: :system do
   let(:user) { create_fake_provider_user }
 
@@ -20,7 +19,6 @@ RSpec.describe "Exercise mix", type: :system do
     sleep 0.1 until yield || Time.current > deadline
   end
 
-  # A radio caught by the full-width input rule, or a stray label margin, only shows up in real layout.
   it "keeps each difficulty radio beside its text with the fieldset gap as the only spacing" do
     visit_as(user)
     visit setup_path
@@ -70,8 +68,7 @@ RSpec.describe "Exercise mix", type: :system do
     expect(heights).to all(be >= 24)
   end
 
-  # user.update! makes the same version bump a save in another tab would, without a second window's timing.
-  it "refuses a save from a page whose controls predate another save" do
+  it "refuses a save from a page whose controls predate another save, and re-syncs the controls" do
     visit_as(user)
     visit setup_path
     find("#exercise-mix summary").click
@@ -82,7 +79,6 @@ RSpec.describe "Exercise mix", type: :system do
 
     expect(page).to have_css("#save-status", text: /changed in another tab/i, wait: 5)
     expect(user.reload.section_kind_weights).to eq({})
-    # Re-synced rather than left showing a change the server rejected.
     expect(find("#exclude-parsons_problem")).to be_checked
   end
 

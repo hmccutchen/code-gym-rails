@@ -5,7 +5,6 @@ class DashboardController < ApplicationController
   def show
     return redirect_to(welcome_path) if current_user.first_run?
 
-    # Rendered in every state; #status does not ask, since a pick is not generation progress.
     @featured = ConceptReference.featured
 
     # Re-read after the move: a second first-load of the day can lose the race and move nothing.
@@ -45,7 +44,6 @@ class DashboardController < ApplicationController
       # Ahead of the pause check: a weekend is empty either way, so naming the pause would mislead.
       @weekend_no_exercise = true
     elsif current_user.paused_generation_at?
-      # Opening the dashboard is not a request for a set; the paused state renders the button back in.
       @generation_paused = true
     else
       GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
@@ -53,7 +51,7 @@ class DashboardController < ApplicationController
     end
   end
 
-  # GET /dashboard/status — polled by dashboard/_generating, since this app loads no Turbo or Stimulus JS.
+  # GET /dashboard/status — polled by dashboard/_generating.
   def status
     exercise = current_user.daily_exercises.for_date.first
 

@@ -10,14 +10,12 @@ class SessionsController < ApplicationController
 
   limit_login_code_requests only: :create
 
-  # Every limit needs a distinct `name:`, or Rails keys them into one shared bucket per controller.
   rate_limit to: 10, within: User::LOGIN_CODE_EXPIRY,
              with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
              store: RATE_LIMIT_STORE,
              name:  "code_attempts",
              only:  :verify_code
 
-  # Caps guesses per address against rotating IPs; hourly, because anyone can trigger this lockout for any address.
   rate_limit to: 10, within: 1.hour,
              by:    -> { pending_login_email || request.remote_ip },
              with:  -> { rate_limited(t("sessions.rate_limited.code_attempts")) },
@@ -55,7 +53,6 @@ class SessionsController < ApplicationController
       redirect_to destination || root_path, notice: t("sessions.welcome_back", name: user.name)
     else
       @code_rejected = true
-      # With no pending state the page renders no code field, so the message can't tell everyone to retry.
       flash.now[:alert] =
         email.present? ? t("sessions.code_rejected_retry") : t("sessions.code_rejected_request_new")
       render :new, status: :unprocessable_content
@@ -79,13 +76,11 @@ class SessionsController < ApplicationController
 
   def login_code_requests_limited(message) = rate_limited(message)
 
-  # A bare 429 would strand the user; this keeps them on the page that can request a new code.
   def rate_limited(message)
     flash.now[:alert] = message
     render :new, status: :too_many_requests
   end
 
-  # Single authority for "is a login pending in this browser"; a stamped state expires with its code.
   def pending_login_email
     return nil if pending_login_expired?
 

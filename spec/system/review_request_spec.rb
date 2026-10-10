@@ -1,8 +1,7 @@
 require "rails_helper"
 
+# with_csrf: submit and the chained review read the CSRF meta tag, which test config blanks (see csrf_helper.rb).
 RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
-  # with_csrf: submit and the chained review read the CSRF meta tag, which test config blanks (see csrf_helper.rb).
-
   it "reviews and shows the result on the dashboard from the submit click alone" do
     user = create_fake_provider_user
     weekday = a_weekday

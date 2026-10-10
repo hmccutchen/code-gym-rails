@@ -1,9 +1,9 @@
+# Design notes: docs/code-notes/app/controllers/profile_controller.md
 class ProfileController < ApplicationController
   include ExerciseMixLadders
 
   skip_before_action :require_provider
 
-  # PATCH /profile — inline profile autosave (JSON)
   def update
     return render_invalid_daily_section_count if invalid_daily_section_count?
     return render_invalid_weight    if invalid_section_kind_weights?
@@ -28,7 +28,6 @@ class ProfileController < ApplicationController
 
   private
 
-  # Integer casting is too forgiving here ("" -> Automatic, "2.5" -> 2), so only exact listed values are accepted.
   DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
 
@@ -90,7 +89,6 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # Same reasoning as the weights guard: a wrong-shaped value must fail, not be dropped and reported a success.
   def invalid_section_kind_levels?
     user_params = params.require(:user)
     return false unless user_params.key?(:section_kind_levels)
@@ -111,7 +109,6 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # Same reasoning as the weights guard: a wrong-shaped value must fail, not be dropped and reported a success.
   def invalid_display_preferences?
     user_params = params.require(:user)
     return false unless user_params.key?(:display_preferences)
@@ -127,7 +124,6 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # Same reasoning as the weights guard: a wrong-shaped value must fail, not be dropped and reported a success.
   def invalid_skill_level?
     user_params = params.require(:user)
 
@@ -158,7 +154,6 @@ class ProfileController < ApplicationController
     outcome
   end
 
-  # A track choice saves only its own keys, so a lock, weight or target sent with it is refused.
   TRACK_CHOICE_KEYS = {
     LearningTrack::ON  => %w[learning_track section_kind_levels skill_level section_kind_preferences_version],
     LearningTrack::OFF => %w[learning_track]
@@ -195,7 +190,6 @@ class ProfileController < ApplicationController
     }, status: :conflict
   end
 
-  # The version is included only when preferences were touched, so every other caller's body is unchanged.
   def saved_body
     body = { name: current_user.name, time_zone: current_user.time_zone,
              daily_section_count: current_user.daily_section_count }

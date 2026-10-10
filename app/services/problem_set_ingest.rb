@@ -1,28 +1,20 @@
-# The generation boundary. Writes nothing to the database, so a rejected set structurally leaves no row behind.
 class ProblemSetIngest
-  # Unforgeable and hidden from the judge; current_schema is server-owned too but left off because the judge must read it.
   SERVER_STAMPS = %w[pitched_at eased source anchored].freeze
 
-  # `bucket` is the vocabulary bucket the concept would have belonged to, which SuggestedConcept records under.
   Suggestion = Data.define(:bucket, :name)
 
-  # `concept` is nil when off-vocabulary, so a retry is only asked for a concept the plan could have placed.
   Unusable = Data.define(:key, :concept, :reason)
 
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections)
 
-  # Raises AiService::InvalidResponseError when the set cannot be used; a caller passing no rungs gets no stamps.
   def self.call(problem_set, language:, expected_keys:, code_review_source: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
     new(problem_set, language: language, expected_keys: expected_keys, code_review_source: code_review_source,
         pitched_at: pitched_at, eased_for: eased_for, fixed_concepts: fixed_concepts).call
   end
 
-  # Only drops unexpected keys from an already-ingested draft; the deep dup keeps the draft the logs read intact.
   def self.prune_to_expected_keys(problem_set, expected_keys:)
     problem_set.deep_dup.slice(*expected_keys)
   end
-
-  # Validation and generation use separate lookups: parsons_problem narrows without a mode, so nil cannot tell them apart.
 
   # Never narrowed: a concept the provider tagged is history, and rewriting it to "other" would destroy the record.
   def self.vocabulary_for(section_key, language)
@@ -36,7 +28,6 @@ class ProblemSetIngest
     end
   end
 
-  # Always a subset of .vocabulary_for, so nothing offered here is rejected at ingest; ask it what may be requested.
   def self.selectable_vocabulary_for(section_key, language, mode: nil, rung: nil)
     vocabulary =
       if mode && section_key == ExerciseSection::CodeReview.key
@@ -56,7 +47,6 @@ class ProblemSetIngest
   end
   private_class_method :code_review_vocabulary
 
-  # ExerciseSection.for carries the empty default, so a provider-invented key excludes nothing rather than raising.
   def self.excluded_concepts_for(section_key)
     ExerciseSection.for(section_key).excluded_vocabulary_keys.flat_map do |key|
       case key
@@ -73,7 +63,6 @@ class ProblemSetIngest
   end
   private_class_method :excluded_concepts_for
 
-  # Read from AiService rather than copied, so the vocabularies cannot drift.
   def self.language_config(language)
     AiService::LANGUAGE_CONFIG.fetch(language) do
       raise AiService::Error, "Unsupported generation language: #{language.inspect}"
@@ -115,7 +104,6 @@ class ProblemSetIngest
 
   private
 
-  # Before the boundary checks, so bounds such as piece length apply to the code as the engineer sees it.
   def format_code!
     fields = @problem_set.flat_map do |key, section|
       next [] unless section.is_a?(Hash)
@@ -126,7 +114,6 @@ class ProblemSetIngest
     fields.zip(formatted).each { |(section, field), code| section[field] = code }
   end
 
-  # A short set would under-report sections_total and shrink tomorrow's set; extra sections are fine.
   def reject_missing_sections!
     missing = @expected_keys.reject { |key| ExerciseSection.present?(@problem_set, key) }
     return if missing.empty?
@@ -152,7 +139,6 @@ class ProblemSetIngest
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
 
-  # Drops slots the plan left empty first, so the MAX_SECTIONS cap in resolved_keys never cuts a requested section.
   def prune_unplanned_slots!
     return if resolved_slot_count <= ExerciseSection::MAX_SECTIONS
 
@@ -166,7 +152,6 @@ class ProblemSetIngest
     ExerciseSection.slots.values.count { |kinds| ExerciseSection.resolved_key(@problem_set, kinds) }
   end
 
-  # A refused section is removed alone; the next shape in its slot then resolves and is checked in turn.
   def reject_unusable_sections!
     pending = ExerciseSection.resolved_keys(@problem_set)
     while (key = pending.shift)
@@ -207,7 +192,6 @@ class ProblemSetIngest
     end
   end
 
-  # Keeps concept history aggregatable; off-list tags are only collected as suggestions and stored as "other".
   def normalize_concepts!
     @problem_set.each do |section_key, section|
       next unless section.is_a?(Hash) && section.key?("concept")
@@ -220,7 +204,6 @@ class ProblemSetIngest
     end
   end
 
-  # An unusable scaffold is dropped, not repaired, so scaffold_labels falls back to the kind's default.
   def normalize_answer_scaffolds!
     @problem_set.each do |section_key, section_data|
       kind = ExerciseSection.find(section_key)
@@ -236,7 +219,6 @@ class ProblemSetIngest
     end
   end
 
-  # Rendered into an HTML data attribute, so held to MermaidSource; unusable diagrams are deleted, not repaired.
   def normalize_diagrams!
     @problem_set.each do |section_key, section_data|
       next unless section_data.is_a?(Hash)
@@ -252,14 +234,12 @@ class ProblemSetIngest
     allowed && MermaidSource.usable?(diagram) ? holder["diagram"] = diagram.strip : holder.delete("diagram")
   end
 
-  # Several readers treat current_schema as the real table, so no provider copy survives; ground_code_review! stamps it.
   def strip_current_schemas!
     @problem_set.each_value do |section_data|
       section_data.delete("current_schema") if section_data.is_a?(Hash)
     end
   end
 
-  # Stamped regardless of provider output, so the page never says something untrue about deployed code.
   def ground_code_review!
     return if @code_review_source.nil?
     return unless ExerciseSection.present?(@problem_set, "code_review")

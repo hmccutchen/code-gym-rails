@@ -1,9 +1,7 @@
-# At two sections SectionRotation's starvation guarantee has no slot to act on, so a kind could wait forever.
 class CoverageException
   # The cap below binds once several kinds are stale; this only sets how soon the first addition comes.
   GAP_WEEKDAYS = 20
 
-  # Calendar weekdays: weekends never count, and a paused stretch counts as the weekdays it spans.
   CAP_WEEKDAYS = 4
 
   # Longer than SectionRotation::LOOKBACK, where capped staleness ties every slot.
@@ -11,7 +9,6 @@ class CoverageException
 
   OPTIONAL_KINDS = ExerciseSection.all.reject(&:fixed?).freeze
 
-  # check names the retention check a due_check addition was made for, so the plan can tell whether it landed.
   Addition = Data.define(:kind, :reason, :check) do
     def initialize(kind:, reason:, check: nil) = super
   end
@@ -56,7 +53,6 @@ class CoverageException
     coverage_dates.any? { |date| date >= cap_window_start(today) && date < today }
   end
 
-  # A kind never delivered counts from the oldest exercise read; a user with no exercises has no gap.
   def self.gap(kind, history, today)
     from = history.last_seen[kind.key] || history.first_date&.prev_day
     return 0 if from.nil?

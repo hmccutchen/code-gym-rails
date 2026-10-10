@@ -14,7 +14,6 @@ class DailyExercise < ApplicationRecord
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
 
-  # A row from before plans recorded a size is skipped rather than read as one.
   def self.planned_size_before(date)
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
   end
@@ -28,15 +27,12 @@ class DailyExercise < ApplicationRecord
   def plan_review        = problem_set["plan_review"]&.with_indifferent_access
   def ambiguity_hunt     = problem_set["ambiguity_hunt"]&.with_indifferent_access
 
-  # nil when the plan added nothing or the added section is gone, so the dashboard never makes a false claim.
   def coverage_shown
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end
 
-  # Before any coverage addition; nil on a row from before plans recorded it.
   def planned_size = plan_notes["size"]
 
-  # CoverageException adds at most one section.
   def planned_size_with_coverage
     planned_size && planned_size + (plan_notes["coverage"] ? 1 : 0)
   end

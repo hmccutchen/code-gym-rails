@@ -116,7 +116,6 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.excluded_section_kinds).to eq([])
     end
 
-    # A wrong-shaped value used to be dropped by strong params and return 200 having applied nothing.
     it "rejects a present-but-wrong-shaped preference rather than reporting success" do
       login_as(user)
       user.update!(section_kind_weights: { "challenge" => 4.0 }, excluded_section_kinds: [ "parsons_problem" ])
@@ -201,7 +200,6 @@ RSpec.describe "Profile", type: :request do
         expect(response.parsed_body.keys).to contain_exactly("name", "time_zone", "daily_section_count")
       end
 
-      # Weights and difficulty share one version, so a stale tab is refused whichever half it touched.
       it "refuses a lock save from a tab that missed another tab's weight save" do
         login_as(user)
         stale = version
@@ -392,7 +390,6 @@ RSpec.describe "Profile", type: :request do
       expect(user.reload.daily_section_count).to be_nil
     end
 
-    # The integer cast turns "" and null into nil (Automatic), "abc" into 0 and "2.5" into 2.
     it "refuses anything else and changes nothing" do
       user.update!(daily_section_count: 3)
       login_as(user)

@@ -1,9 +1,7 @@
-# .arrange! rolls which piece is A, so the correct position exists only in the answer key.
+# Design notes: docs/code-notes/app/models/exercise_section/design_comparison.md
 class ExerciseSection::DesignComparison < ExerciseSection
-  # Blank lines not counted; stops a runaway reply, while unequal lengths are the judge's parity check.
   MAX_PIECE_LINES = 24
 
-  # About one sentence naming a fact: a pick and a word is not an answer.
   MIN_REASON_LENGTH = 40
 
   PICK_PREFIX = "pick:".freeze
@@ -17,13 +15,10 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
   CANONICAL_PIECES = %w[better_piece other_piece].freeze
   ANSWER_KEY_FIELD = "answer_key".freeze
-  # The fields the provider writes; `better` is the server's.
   PROVIDER_KEY_FIELDS = %w[deciding_fact principle why_other_fails].freeze
 
-  # Deferred until a comparison run shows pieces that behave the same under every stated condition (2026-10-01).
   DEFERRED_CONCEPTS = %w[missing_constraint unsafe_migration wrong_cardinality].freeze
 
-  # Leaves out concepts whose worse piece would be incorrect, which turns the task back into a code review.
   HOSTED_CONCEPTS = %w[
     n_plus_one memoization service_objects query_objects policy_objects
     over_mocking testing_implementation_not_behavior
@@ -69,7 +64,6 @@ class ExerciseSection::DesignComparison < ExerciseSection
       "responses/answers/design_comparison"
     end
 
-    # Its reference explains the principle that decides the pick, which is what the grade asks for.
     def reference_opens_before_answer?
       false
     end
@@ -97,7 +91,6 @@ class ExerciseSection::DesignComparison < ExerciseSection
       PIECES
     end
 
-    # The scenario and question the judge may reword are where the deciding fact lives.
     def rejudge_edits?
       true
     end
@@ -106,13 +99,11 @@ class ExerciseSection::DesignComparison < ExerciseSection
       section.dig(ANSWER_KEY_FIELD, "better") == solve
     end
 
-    # TRADEOFF_CONCEPTS only at principal_engineer; no rung gets the strictest list.
     def narrow_vocabulary(vocabulary, rung: nil)
       hosts = vocabulary & hosted_concepts
       rung == "principal_engineer" ? hosts : hosts - AiService::TRADEOFF_CONCEPTS
     end
 
-    # An allowlist, so a concept added to a vocabulary later is not offered until someone decides it fits.
     def hosted_concepts
       AiService::CODE_SMELL_CONCEPTS + AiService::OO_DESIGN_CONCEPTS + AiService::MODULE_DESIGN_CONCEPTS +
         AiService::DOMAIN_MODELING_CONCEPTS + (AiService::DATA_MODELING_CONCEPTS - DEFERRED_CONCEPTS) +

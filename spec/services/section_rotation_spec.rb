@@ -137,7 +137,6 @@ RSpec.describe SectionRotation do
   end
 
   describe "excluded kinds" do
-    # Exclusion runs before the starvation check, which takes a starved kind outright.
     it "keeps an excluded kind out even when it is starved" do
       recent = history(*Array.new(12, %w[code_review pattern architecture security_review parsons_problem]))
 
@@ -146,7 +145,6 @@ RSpec.describe SectionRotation do
       expect(chosen).not_to eq(:challenge)
     end
 
-    # slot_staleness is a max over the pool, so an excluded kind would still pull its slot forward.
     it "stops an excluded kind pulling its slot into a short day" do
       recent = history(*Array.new(12, %w[code_review pattern challenge security_review parsons_problem plan_review]))
 
@@ -158,7 +156,6 @@ RSpec.describe SectionRotation do
       expect(excluded[:fourth]).to be_present
     end
 
-    # Only a hand-edited row reaches this; an empty slot pool would break slot ranking.
     it "ignores an exclusion that would empty a slot" do
       excluded = ExerciseSection.thirds.map(&:key)
 

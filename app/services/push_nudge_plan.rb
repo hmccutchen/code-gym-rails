@@ -21,7 +21,6 @@ class PushNudgePlan
   end
   private_class_method :quiet?
 
-  # Shown in the Account opt-in label, so the stated window always comes from the constant.
   def self.window_description
     format = ->(hour) { Time.zone.parse("#{hour}:00").strftime("%-l%P") }
 

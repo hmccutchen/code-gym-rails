@@ -1,8 +1,7 @@
 require "rails_helper"
 
+# with_csrf: the submit script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true do
-  # with_csrf: the submit script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
-
   it "enables Submit only once every section is rated, then submits and shows the submitted state" do
     user = create_fake_provider_user
     weekday = a_weekday

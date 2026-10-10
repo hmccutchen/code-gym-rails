@@ -1,19 +1,15 @@
 # Production boot never loads prism, so without this the first real-source pick raises NameError; a spec pins it.
 require "prism"
 
-# Curated for exercise quality, not secrecy; safeguards are one planted flaw in an altered copy and a scenario saying so.
+# Design notes: docs/code-notes/app/models/real_source.md
 class RealSource
-  # Code Gym is Ruby, so a javascript day has nothing here to ground in.
   LANGUAGE = "ruby_rails".freeze
 
-  # One weight for both modes; grow the pool, not this, to space excerpts out.
   WEIGHTS = { real: 0.35, toy: 0.65 }.freeze
 
-  # A spec holds every entry inside these bounds.
   MIN_LINES = 5
   MAX_LINES = 40
 
-  # Reads off local disk, so the text is exactly what is deployed.
   class Excerpt
     attr_reader :path
 
@@ -37,7 +33,6 @@ class RealSource
       raise NotImplementedError, "#{self.class} must implement #instruction"
     end
 
-    # A renamed method or deleted file is skipped by .pick instead of failing every user's generation.
     def resolvable?
       !text.nil?
     end
@@ -46,7 +41,6 @@ class RealSource
       text&.lines&.size
     end
 
-    # Nil for a kind whose snippet is not written against a table.
     def current_schema
       nil
     end
@@ -71,7 +65,6 @@ class RealSource
       found
     end
 
-    # Without this, general flavor and freshness rules would rename real source or move it into a fictional domain.
     def setting_rule
       "The business-domain settings suggested for each section do not apply to this one: its setting is " \
       "Code Gym itself, a learning app for engineers, so its comments, names, and any other prose describe " \
@@ -107,7 +100,6 @@ class RealSource
       node && lines_spanning(source, node)
     end
 
-    # Says the copy is altered, or an engineer can read the exercise as a bug report against deployed code.
     def scenario
       "Code Gym's own source — `#{path}`, `##{method}` — altered for this exercise. " \
       "The deployed method is fine; find what this copy gets wrong."
@@ -134,7 +126,6 @@ class RealSource
     end
   end
 
-  # Reference for a new migration, never mutated; no modified copy, because the current schema beside it would show the fix.
   class Migration < Excerpt
     SCHEMA_PATH = "db/schema.rb".freeze
 
@@ -155,7 +146,6 @@ class RealSource
       super && !current_schema.nil?
     end
 
-    # Nil, and so unresolvable, when a touched table or the schema file is gone.
     def current_schema
       tables = touched_tables
       schema_path = Rails.root.join(SCHEMA_PATH)
@@ -238,7 +228,6 @@ class RealSource
     Method.new("app/controllers/daily_exercises_controller.rb", "claim_regeneration!")
   ].freeze
 
-  # Chosen for structure to get wrong; a bare one-line add_column has no room for a flaw.
   SCHEMA_REVIEW = [
     Migration.new("db/migrate/20260905120000_create_push_subscriptions.rb"),
     Migration.new("db/migrate/20260908120000_add_reminder_level_to_users.rb"),
@@ -250,7 +239,6 @@ class RealSource
     Migration.new("db/migrate/20260728000004_add_retention_schedule_to_concept_masteries.rb")
   ].freeze
 
-  # test_file has no pool by construction, which is what keeps it untouched.
   POOLS = { application_code: APPLICATION_CODE, schema_review: SCHEMA_REVIEW }.freeze
 
   def self.pool(mode)
@@ -261,7 +249,6 @@ class RealSource
     POOLS.values.flatten
   end
 
-  # Never-seen first in list order, then oldest seen, so the worst-case wait is bounded by the pool size.
   def self.pick(mode, last_seen:)
     candidates  = pool(mode).select { |excerpt| usable?(excerpt) }
     never, seen = candidates.partition { |excerpt| !last_seen.key?(excerpt.id) }
@@ -269,7 +256,6 @@ class RealSource
     never.first || seen.min_by { |excerpt| [ last_seen.fetch(excerpt.id), candidates.index(excerpt) ] }
   end
 
-  # code_review_mode is never persisted, so the stamped source id is the only record of what was grounded.
   def self.last_seen_for(user)
     user.daily_exercises
         .where("problem_set -> 'code_review' ->> 'source' IS NOT NULL")

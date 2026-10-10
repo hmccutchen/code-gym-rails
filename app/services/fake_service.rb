@@ -3,10 +3,8 @@ class FakeService < AiService
   def self.provider_key = "fake"
   def self.available? = Rails.env.local?
 
-  # So specs can drive the judged review path; the fake always keeps.
   def self.judges_review_prose? = true
 
-  # Every kind at once, so slot precedence (DailyExercise#third_key/#fourth_key) decides what renders, not DailyPlan.
   EXERCISE_PROBLEM_SET = {
     "code_review" => {
       "question" => "This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?",
@@ -336,14 +334,12 @@ class FakeService < AiService
     { text: text, input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0 }
   end
 
-  # A blind-solve kind needs its solve, or every judged design comparison falls back as invalid output.
   def judge_verdict(prompt)
     kind = ExerciseSection.find(prompt[/^Section kind: (\w+)$/, 1])
     solve = kind&.judge_solve_options&.last
     { "status" => "keep", "better" => solve }.compact
   end
 
-  # Keyed by the sections asked about, with levels rotating by position so a day doesn't repeat one word.
   def difficulty_assessment(prompt)
     # Intersected with the registry so a snippet's own "## Heading" line can't shift the levels.
     sections = prompt.scan(/^## (\w+)$/).flatten & ExerciseSection.keys

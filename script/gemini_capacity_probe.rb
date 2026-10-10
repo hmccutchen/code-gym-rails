@@ -1,6 +1,6 @@
 require "optparse"
 
-# Billed to the key it is given; writes no ApiUsage rows and no exercise, response or reference.
+# Design notes: docs/code-notes/script/gemini_capacity_probe.md
 class GeminiCapacityProbe
   DUCK_TURNS = 3
   DUCK_MESSAGES = [
@@ -10,14 +10,12 @@ class GeminiCapacityProbe
   ].freeze
   SAMPLE_ANSWER = "The loop fetches related records one row at a time; load them together before the loop instead.".freeze
 
-  # At 15 seconds per request no rolling minute holds more than five, so the daily limit trips first.
   DEFAULT_PACE_SECONDS = 15
   # No retry middleware, so one connect and one read is the longest a straggler can take.
   DRAIN_SECONDS = AiService.single_attempt_call_seconds(AiService::READ_TIMEOUT)
   OUTPUT_DIR = "tmp/gemini_probe".freeze
   FIXTURE_CAPTURE = "gemini_429_capture.json".freeze
 
-  # An attempt that ended without a reply was still sent and still counts.
   Record = Data.define(:day, :step, :sent, :status, :ms, :input_tokens, :output_tokens, :thought_tokens, :cached_tokens,
                        :quota_id, :quota_value, :retry_delay, :retry_after, :error) do
     def rate_limited? = status == 429
@@ -96,11 +94,9 @@ class GeminiCapacityProbe
     @captured   = 0
     @calls_made = 0
     @last_step_attempts = 0
-    # In memory only: a two-section plan without touching the stored setting.
     @user.daily_section_count = SectionCount::FLOOR
   end
 
-  # In the user's zone, as generation runs, so the day and a mixed account's language are theirs.
   def run
     Time.use_zone(@user.effective_time_zone) do
       @output_dir.mkpath
@@ -120,7 +116,6 @@ class GeminiCapacityProbe
 
   def language = @user.language_for_today
 
-  # Returns false once a 429 has ended the run.
   def tester_day(day)
     @out.puts "--- tester-day #{day}"
     draft = step(day, "draft") { service.send(:draft_exercise, @user, language: language, blocking: false) }
@@ -180,7 +175,6 @@ class GeminiCapacityProbe
     kind.respond_to?(:encode_answer) ? kind.encode_answer("a", SAMPLE_ANSWER) : SAMPLE_ANSWER
   end
 
-  # Fatal only on a 429 or a refused key; an unusable reply still counted against the quota, so the day goes on.
   def step(day, label, requests: 1)
     @sleeper.call(@pace * [ @last_step_attempts, requests, 1 ].max) if @pace.positive? && @calls_made.positive?
     @calls_made += 1
@@ -202,7 +196,6 @@ class GeminiCapacityProbe
 
   def stopped? = @stop_reason.present?
 
-  # The review fan-out raises nothing of its own, so a 429 or refused key there is read off the attempts.
   def record_attempts(day, label, error)
     fresh = @attempts.drain(timeout: DRAIN_SECONDS)
     @last_step_attempts = fresh.size
@@ -250,7 +243,6 @@ class GeminiCapacityProbe
     Array(body.dig("error", "details")).select { |detail| detail.is_a?(Hash) && detail["@type"].to_s.end_with?(type) }
   end
 
-  # The daily violation wins over a per-minute one, as in GeminiService#quota_id_from.
   def quota_violation(body)
     violations = error_details(body, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }.select { |v| v.is_a?(Hash) }
     violations.find { |v| v["quotaId"].to_s.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || violations.first || {}
@@ -317,7 +309,6 @@ class GeminiCapacityProbe
     hit.quota_value.to_i / self.class.calls_per_day
   end
 
-  # Only days whose last step got an answer, so a day the 429 cut short never counts.
   def tokens_per_completed_day
     completed = @records.group_by(&:day).select { |_, rows| rows.size >= self.class.calls_per_day && rows.none?(&:rate_limited?) }
     completed.transform_values { |rows| rows.sum(&:tokens) }

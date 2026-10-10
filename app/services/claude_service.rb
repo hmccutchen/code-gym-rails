@@ -1,16 +1,15 @@
 require "faraday"
 require "faraday/retry"
 
+# Design notes: docs/code-notes/app/services/claude_service.md
 class ClaudeService < AiService
   API_URL = "https://api.anthropic.com/v1/messages"
 
   def self.provider_key = "anthropic"
   def self.key_pattern = /\Ask-ant-/
 
-  # Still gated by REVIEW_PROSE_JUDGE; see CLAUDE.md, "Review prose judge".
   def self.judges_review_prose? = true
 
-  # Keyed by ApiUsage purpose; effort is stated even at the default. See CLAUDE.md, "Per-purpose model routing".
   DEFAULT_ROUTE = { model: "claude-sonnet-5-5", effort: "high" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "claude-opus-5-5", effort: "medium" },
@@ -50,7 +49,6 @@ class ClaudeService < AiService
       messages:   history.map { |turn| { role: turn[:role], content: turn[:content] } } +
                   [ { role: "user", content: prompt } ]
     }
-    # A tight caller cap shared with thinking can be spent before any reply text, so thinking goes off.
     body[:thinking] = thinking_off_for(route[:model]) if max_tokens
     output_config = { effort: route[:effort], format: json_format(response_schema) }.compact
     body[:output_config] = output_config if output_config.any?
@@ -72,11 +70,9 @@ class ClaudeService < AiService
       input_tokens:  usage["input_tokens"],
       output_tokens: usage["output_tokens"],
       model:         route[:model],
-      # input_tokens excludes both, and each is billed at its own rate.
       cache_read_tokens:  usage["cache_read_input_tokens"].to_i,
       cache_write_tokens: usage["cache_creation_input_tokens"].to_i,
       truncated:     parsed["stop_reason"] == "max_tokens",
-      # Reported as data so call_and_log records usage first: a refused request still charges its input.
       refusal:       refusal_category(parsed),
       http_status:   resp.status
     }
@@ -85,11 +81,9 @@ class ClaudeService < AiService
     raise error_class, "Network error calling Claude: #{e.message}"
   end
 
-  # Out-of-credit replies (402, 400 spend-limit message, 429 enforced_spend_limit_reached) are never retried as rate limits.
   SPEND_LIMIT_MESSAGE = /\A(You have reached your specified|Your credit balance)/
   ENFORCED_SPEND_LIMIT = "enforced_spend_limit_reached".freeze
 
-  # The first rate-limit header family whose remaining count reads zero names the limit a 429 hit.
   RATE_LIMIT_FAMILIES = %w[requests input-tokens output-tokens tokens].freeze
 
   def raise_for_status(resp)
@@ -128,7 +122,6 @@ class ClaudeService < AiService
 
   def routed_model(purpose) = route_for(purpose)[:model]
 
-  # Structured outputs rather than a prefilled "{": every model routed here rejects an assistant prefill with a 400.
   def json_format(schema)
     { type: "json_schema", schema: schema } if schema
   end

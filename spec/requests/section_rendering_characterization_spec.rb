@@ -92,7 +92,6 @@ RSpec.describe "section rendering", type: :request do
     key == "parsons_problem" ? PARSONS_ANSWER : "ANSWER-#{key.upcase}"
   end
 
-  # What proves the stored answer reached a read-only render, per kind.
   def submitted_answer_markers(key)
     return [ "parsons-correct", "parsons-misplaced" ] if key == "parsons_problem"
 

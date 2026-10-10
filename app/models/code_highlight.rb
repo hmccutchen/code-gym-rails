@@ -1,4 +1,3 @@
-# The one place code becomes HTML: Rouge escapes every token, and only that output is marked safe.
 module CodeHighlight
   # Process memory, not Rails.cache: Solid Cache would make every block on a page its own database query.
   CACHE = ActiveSupport::Cache::MemoryStore.new(size: 16.megabytes)

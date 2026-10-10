@@ -18,7 +18,6 @@ RSpec.describe OpenaiService do
     end
   end
 
-  # Records each posted body and answers with `reply`.
   def recording_connection(bodies, reply)
     Faraday.new do |f|
       f.adapter :test do |stub|
@@ -109,8 +108,7 @@ RSpec.describe OpenaiService do
       .to raise_error(AiService::InvalidResponseError, /OpenAI returned an unreadable response/)
   end
 
-  # A cut-off JSON body can carry an answer (a judge's blind solve), so only its size is logged.
-  it "withholds a cut-off JSON body from the log and still logs a non-JSON one" do
+  it "withholds a cut-off JSON body, which can carry a blind solve, from the log and still logs a non-JSON one" do
     logged = []
     allow(Rails.logger).to receive(:error) { |message| logged << message }
 
@@ -123,8 +121,7 @@ RSpec.describe OpenaiService do
     expect(logged.last).to include("Bad gateway")
   end
 
-  # Wrong-shape JSON would otherwise escape every AiService::Error rescue as a TypeError.
-  it "raises InvalidResponseError when a successful response body is not a JSON object" do
+  it "raises InvalidResponseError rather than a TypeError when a successful response body is not a JSON object" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
     expect { service.send(:call, system: "sys", prompt: "p") }

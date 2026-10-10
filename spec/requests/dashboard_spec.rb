@@ -86,7 +86,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include("Answer at least one section to finish up.")
   end
 
-  # Every site that reloads on a 409 must hand the sentence to the reloaded page; a browser spec cannot reach both.
   it "hands the refusal's sentence to the reload at every stale save site" do
     create_response(create_exercise, submitted: false)
 
@@ -394,7 +393,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     it "leaves a term not present in the curated glossary as plain text" do
-      # base_problem_set's "Service Objects" title would itself match a glossary entry.
       create_exercise(problem_set: {
         "code_review" => { "question" => "Find the bug in this frobnicator widget.", "snippet" => "def a; end" },
         "pattern"     => { "title" => "Untitled Pattern", "why" => "Because", "question" => "When?" },
@@ -415,7 +413,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       )
     end
 
-    # A term inside a summary would nest a control in the control that folds the section.
     it "leaves a section's title unwrapped, in the form and once submitted, while its body text is still wrapped" do
       ps = base_problem_set
       ps["pattern"]["why"] = "Service objects keep controllers thin."
@@ -441,7 +438,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       expect { get root_path }.not_to raise_error
       expect(response).to have_http_status(:ok)
-      # The stale per-section field is ignored entirely — the curated definition wins, not the old one.
       expect(response.body).not_to include("stale AI-generated definition")
     end
   end
@@ -509,7 +505,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      # The field itself, seeded with the current name.
       expect(response.body).to include('id="nav-name-input"')
       expect(response.body).to include('value="Editable"')
       expect(response.body).to include('fetch("' + profile_path + '", {')
@@ -526,8 +521,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to match(%r{<a class="brand" href="/"><img alt="Code Gym" class="brand-mark"[^>]*src="/assets/logo-outlined-[0-9a-f]+\.png" />})
     end
 
-    # The logo stays its own element so CSS can hide it or the wordmark; its alt text names the brand.
-    it "keeps the brand's logo separately addressable from the wordmark" do
+    it "keeps the brand's logo separately addressable from the wordmark, so CSS can hide either" do
       login_as(user)
 
       get root_path
@@ -541,7 +535,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       create_exercise
       get root_path
 
-      # Tied to the selector so deleting the break-out declaration cannot leave this green.
       expect(response.body).to match(/@media \(max-width: 600px\) \{\s*\.section \{[^}]*margin-inline: -1\.5rem;/)
     end
   end
@@ -552,7 +545,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     context "on a weekday" do
-      let(:anchor_date) { Date.new(2026, 7, 13) } # Monday
+      let(:anchor_date) { Date.new(2026, 7, 13) }
 
       it "auto-enqueues generation and shows the generating state" do
         expect {
@@ -563,8 +556,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).to include('class="spinner"')
       end
 
-      # dashboard/_generating's poll reloads into the dashboard-content wrapper, so the placeholder keeps that id.
-      it "wraps the placeholder in the dashboard-content id" do
+      it "wraps the placeholder in the dashboard-content id, which the generating poll reloads into" do
         get root_path
 
         expect(response.body).to match(%r{<div id="dashboard-content">.*Generating your personalized exercise set.*</div>}m)
@@ -576,8 +568,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).to include(dashboard_status_path)
       end
 
-      # A screen reader reads in-place hint updates only from inside a live region.
-      it "announces the generating hint's updates" do
+      it "announces the generating hint's updates from inside a live region" do
         get root_path
 
         expect(response.body).to include('id="generating-hint" aria-live="polite"')
@@ -585,7 +576,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     context "on a weekend" do
-      let(:anchor_date) { Date.new(2026, 7, 18) } # Saturday
+      let(:anchor_date) { Date.new(2026, 7, 18) }
 
       it "does not auto-enqueue generation and shows the weekend message instead" do
         expect {
@@ -604,7 +595,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     context "when the user has paused automatic generation" do
-      let(:anchor_date) { Date.new(2026, 7, 13) } # Monday
+      let(:anchor_date) { Date.new(2026, 7, 13) }
 
       before { user.update!(paused_generation_at: Time.current) }
 
@@ -661,7 +652,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       end
 
       context "on a weekend" do
-        let(:anchor_date) { Date.new(2026, 7, 18) } # Saturday
+        let(:anchor_date) { Date.new(2026, 7, 18) }
 
         it "gives the weekend message, since the pause isn't why the day is empty" do
           expect {
@@ -677,7 +668,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   describe "generation failure recovery" do
     around do |example|
-      travel_to(Date.new(2026, 7, 13)) { example.run } # Monday
+      travel_to(Date.new(2026, 7, 13)) { example.run }
     end
 
     it "shows the failure message instead of the exercise when today's generation failed" do
@@ -797,8 +788,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include(%(data-url="#{explain_differently_concept_reference_path(reference)}"))
     end
 
-    # This partial renders inside #gym-form, so a default-type button would submit the day.
-    it "renders that control as a non-submitting button" do
+    it "renders that control as a non-submitting button, since it sits inside #gym-form" do
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
@@ -888,12 +878,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("10x traffic")            # scenario
-      expect(response.body).to include("Shard Postgres")         # an option
-      expect(response.body).to include("cost vs latency")        # a tradeoff
-      expect(response.body).to include("name=\"response[answers][architecture]\"")   # prose textarea
-      expect(response.body).to include("Reference — Scaling bottlenecks: how it works")  # arch-bucket dropdown
-      expect(response.body).not_to include("# Your implementation")  # not the challenge textarea
+      expect(response.body).to include("10x traffic")
+      expect(response.body).to include("Shard Postgres")
+      expect(response.body).to include("cost vs latency")
+      expect(response.body).to include("name=\"response[answers][architecture]\"")
+      expect(response.body).to include("Reference — Scaling bottlenecks: how it works")
+      expect(response.body).not_to include("# Your implementation")
     end
 
     it "auto-expands the architecture section's dropdown on first exposure, but not once submitted" do
@@ -947,7 +937,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
 
     it "renders the plan_review concept-reference dropdown from the plan_review bucket, not the exercise's language" do
-      # plan_review is its own ConceptBucket, so the reference is cached under language "plan_review".
       create_exercise(problem_set: base_problem_set.merge(
         "plan_review" => {
           "title" => "Cache plan", "question" => "What's wrong?",
@@ -982,7 +971,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  # Forces ai_review onto an unsubmitted response to prove the form would never show a difficulty note.
   describe "the difficulty note before an answer exists" do
     it "renders nowhere on the answer form, even for a response that somehow carries one" do
       exercise = create_exercise
@@ -1047,8 +1035,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(rendered_block_ids(response.body)).to eq([ 2, 0, 1 ])
     end
 
-    # Pairing the saved order with the tokens would reveal the mapping the tokens hide.
-    it "re-encodes a saved draft order as tokens rather than positions" do
+    it "re-encodes a saved draft order as tokens rather than positions, which would reveal the token mapping" do
       exercise = create_exercise(problem_set: {
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
         "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
@@ -1073,7 +1060,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(rendered_block_ids(response.body)).to eq([ 1, 2, 0 ])
     end
 
-    # Every move records the order, so the button is only needed for a single block.
     { 1 => true, 2 => false, 3 => false }.each do |count, shown|
       it "#{shown ? "shows" : "hides"} the Use this order button for #{count} block#{"s" unless count == 1}" do
         create_exercise(problem_set: {
@@ -1193,7 +1179,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     end
   end
 
-  describe "streak display" do    # A Wednesday, so the streak days are plain weekdays.
+  describe "streak display" do
     let(:wednesday) { Time.utc(2026, 7, 22, 12) }
 
     def submit_on(date)
@@ -1214,9 +1200,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       end
     end
 
-    it "omits the streak entirely at zero" do
+    it "omits the streak entirely at zero, after a missed weekday" do
       travel_to(wednesday) do
-        submit_on(Date.current - 2) # Mon submitted, Tue's exercise missed
+        submit_on(Date.current - 2)
         DailyExercise.create!(user: user, date: Date.current - 1,
                               problem_set: base_problem_set, generated_at: Time.current)
 
@@ -1253,8 +1239,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("STALE-SET-MARKER")
     end
 
-    # The row exists throughout, so an exists?-only check would report the regeneration finished at once.
-    it "reports pending rather than ready" do
+    it "reports pending rather than ready, though the row exists throughout" do
       claimed_exercise
 
       get dashboard_status_path
@@ -1271,7 +1256,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(JSON.parse(response.body)["status"]).to eq("ready")
     end
 
-    # A dead worker's claim must not trap the user on a spinner forever.
     it "falls through to the normal dashboard when the claim is stale" do
       problem_set = {
         "code_review" => { "question" => "STALE-SET-MARKER", "snippet" => "def a; end" },
@@ -1322,9 +1306,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   describe "the generation poller" do
     include ActiveSupport::Testing::TimeHelpers
 
-    # A judged weekday generation runs past GENERATION_READ_TIMEOUT, so a fixed poll count told users to refresh too early.
     it "keeps polling for longer than a generation is allowed to take" do
-      # A weekday with no exercise yet is the state that renders the spinner.
       travel_to Time.utc(2026, 8, 7, 12, 0, 0) do
         get root_path
 
@@ -1384,7 +1366,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   describe "structure diagrams" do
-    # Diagrams show before answering, unlike improved_code: they explain what is being asked.
     it "renders a collapsed disclosure and the mermaid module on an unsubmitted set" do
       ps = base_problem_set
       ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
@@ -1400,7 +1381,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("mermaid@11.17.2")
       expect(response.body).to match(/securityLevel:\s*["']strict["']/)
 
-      # data-owns-details tells a failed render's cleanup it may remove the <details> this partial created.
       expect(response.body).to include('data-owns-details="1"')
     end
 
@@ -1419,8 +1399,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
 
-    # Rows stored before ingest checked diagrams still render through MermaidSource.
-    it "renders no disclosure or script for a stored diagram MermaidSource refuses" do
+    it "renders no disclosure or script for a stored diagram MermaidSource refuses, as rows from before ingest checks can hold" do
       ps = base_problem_set
       ps["code_review"]["diagram"] = "sequenceDiagram\n  A->>B: hi"
       ps["pattern"]["diagram"]     = "%%{init: {'theme': 'base'}}%%\nflowchart TD\n  A --> B"
@@ -1444,7 +1423,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).not_to include("mermaid@11.17.2")
     end
 
-    # The submitted day renders a different partial, so every diagrammable section needs asserting here too.
     it "still shows every section's diagram, each collapsed, on a submitted day, where the questions are still on screen" do
       ps = base_problem_set
       ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
@@ -1462,7 +1440,6 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
 
-    # Only this example mixes collapsible and non-collapsible diagrams on one page.
     it "renders collapsible code_review/pattern diagrams alongside architecture's non-collapsible one on the same page" do
       ps = base_problem_set.except("challenge")
       ps["code_review"]["diagram"] = "flowchart TD\n  A[Job] --> B[(DB)]"
@@ -1572,7 +1549,6 @@ RSpec.describe "Dashboard while paused with an unfinished set", type: :request d
     end
   end
 
-  # A carry-forward that lost the race moves nothing, and that must still render today's set.
   it "renders today's set when the carry-forward lost a race to another request" do
     travel_to(wednesday) do
       held = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, problem_set: problem_set)
@@ -1635,7 +1611,6 @@ RSpec.describe "Dashboard lines about what the plan did", type: :request do
     expect(response.body).not_to include(CGI.escapeHTML(due_check_line))
   end
 
-  # A due check can pick a kind seen last week, so "haven't seen in a while" would be false.
   it "shows the due-check line, not the gap line, for a section added to host a check" do
     exercise_with({ "code_review" => code_review, "design_comparison" => comparison, "plan_review" => plan_review },
                   plan_notes: { "coverage" => "plan_review", "coverage_reason" => "due_check" })
@@ -1757,8 +1732,7 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
-  # The count comes from tomorrow's size, not from the floor.
-  it "names tomorrow's count in the smaller line" do
+  it "names tomorrow's count, not the floor, in the smaller line" do
     stub_gate(3, :brake)
     day(Date.current, planned: 4)
 
@@ -1767,7 +1741,6 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).to include(CGI.escapeHTML(I18n.t("dashboard.size_change.smaller", count: 3)))
   end
 
-  # A larger Automatic day after leaving a fixed setting reflects the switch, not the user's answers.
   it "says nothing when today's size came from a fixed setting" do
     stub_gate(3, :grew)
     day(Date.current, planned: 2, notes: { "size_reason" => "setting" })
@@ -1777,8 +1750,7 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
-  # Today showed three sections, two planned and one added for coverage.
-  it "does not promise a larger set of the size today already showed" do
+  it "does not promise a larger set of the size today already showed with a coverage section" do
     stub_gate(3, :grew)
     day(Date.current, planned: 2, notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
 
@@ -1787,7 +1759,6 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
-  # Ingest keeps an unrequested extra section under the cap, so a day planned at two can show three.
   it "does not promise a larger set of the size today showed through an extra section" do
     stub_gate(3, :grew)
     today = day(Date.current, planned: 2)
@@ -1829,7 +1800,6 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
-  # Without today, two days are too few for the completion rule, which then gives the largest day.
   it "counts today's submission toward tomorrow's completion" do
     stub_gate(ExerciseSection::MAX_SECTIONS, :held)
     both = { "code_review" => "a" * 20, "design_comparison" => "b" * 20 }

@@ -84,7 +84,6 @@ RSpec.describe ConceptReference do
       expect(ConceptReference.featured(sunday + 1)).not_to eq(this_week)
     end
 
-    # The date asked about is the picker's only input, so a Saturday visit picks for the week begun Monday.
     it "picks on a weekend for the week it belongs to" do
       featurable("idempotency_at_scale")
       saturday = Date.new(2026, 9, 12)
@@ -92,7 +91,6 @@ RSpec.describe ConceptReference do
       expect(ConceptReference.featured(saturday)&.featured_on).to eq(Date.new(2026, 9, 7))
     end
 
-    # Rows featured while the pick was daily carry any weekday; a Monday stamp is that week's pick.
     it "takes a daily pick stamped on this week's Monday as the week's concept" do
       featurable("caching_strategy")
       monday_pick = featurable("idempotency_at_scale", featured_on: Date.new(2026, 9, 7))
@@ -144,11 +142,9 @@ RSpec.describe ConceptReference do
       end
     end
 
-    # A week resolved in each viewer's zone would let teammates stamp different concepts across Sunday midnight.
-    it "resolves the week in the team's zone, not the viewer's" do
+    it "resolves the week in the team's zone, not the viewer's, while UTC Monday is still Sunday for the team" do
       reference = featurable("idempotency_at_scale")
 
-      # 03:00 UTC Monday the 14th is still Sunday in America/New_York, so the team's week began on the 7th.
       travel_to Time.utc(2026, 9, 14, 3, 0, 0) do
         Time.use_zone("Asia/Tokyo") { ConceptReference.featured }
       end
@@ -290,8 +286,7 @@ RSpec.describe ConceptReference do
       end
     end
 
-    # The prompt merges rungs by concept name, which is safe only while no name lives in two buckets a day holds.
-    it "keeps every language-independent vocabulary disjoint from the others" do
+    it "keeps every language-independent vocabulary disjoint from the others, since the prompt merges rungs by concept name" do
       independent = ConceptBucket::LANGUAGE_INDEPENDENT
 
       DailyExercise::LANGUAGES.each do |language|

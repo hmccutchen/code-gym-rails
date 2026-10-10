@@ -1,9 +1,7 @@
 require "rails_helper"
 
-# The critique round is inline JavaScript, so request specs execute none of it.
+# Request specs can't run this inline JavaScript; with_csrf because it reads the CSRF meta tag test config blanks.
 RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
-  # with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
-
   # Created up front: plan_review wins the fourth slot by precedence, so a generated day never shows this section.
   def create_exercise_for(user)
     DailyExercise.create!(

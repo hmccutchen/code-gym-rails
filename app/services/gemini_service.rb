@@ -1,25 +1,23 @@
 require "faraday"
 require "faraday/retry"
 
+# Design notes: docs/code-notes/app/services/gemini_service.md
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
   def self.provider_key = "gemini"
 
-  # Google's daily quotas reset at midnight Pacific, whatever the user's zone.
   def self.quota_day_zone = "America/Los_Angeles"
 
   def self.daily_quota_reset_at(failed_at) = quota_day(failed_at).end
   def self.key_pattern = /\A(AIza|AQ\.)/
 
-  # Generation and its retry name the default route explicitly so route coverage can pin both usage labels.
   DEFAULT_ROUTE = { model: "gemini-3.5-flash" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => DEFAULT_ROUTE,
     "retry_section"     => DEFAULT_ROUTE
   }.freeze
 
-  # Thinking shares the output cap and Gemini 3 Flash cannot turn it off; minimal is the least, so caps keep headroom.
   MINIMAL_THINKING_LEVEL = "minimal".freeze
 
   # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
@@ -65,14 +63,11 @@ class GeminiService < AiService
 
     {
       text:          text_parts.join,
-      # total_input_tokens includes cached tokens; subtract them so a cached token is never priced twice.
       input_tokens:  usage["total_input_tokens"].to_i - cached_tokens,
-      # Thinking is billed as output but reported apart from it.
       output_tokens: output_tokens.to_i + usage["total_thought_tokens"].to_i,
       model:         body[:model],
       cache_read_tokens:  cached_tokens,
       cache_write_tokens: 0,
-      # The status decides truncation: a live call capped at 60 stopped at 56 output tokens as "incomplete".
       truncated: parsed["status"] == "incomplete",
       http_status: resp.status
     }
@@ -120,7 +115,6 @@ class GeminiService < AiService
     ids.find { |id| id.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || ids.first
   end
 
-  # RetryInfo's delay is a duration string such as "39s"; the header is whole seconds.
   def retry_delay_from(resp, error)
     delay = error_details(error, "RetryInfo").filter_map { |detail| detail["retryDelay"] }.first.to_s
     return delay.to_f.ceil if delay.match?(/\A\d+(\.\d+)?s\z/)
@@ -130,7 +124,6 @@ class GeminiService < AiService
 
   def routed_model(purpose) = MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model]
 
-  # The schema bounds shape, not string length, so the caller's parse stays the boundary.
   def json_format(schema)
     { type: "text", mime_type: "application/json", schema: schema }
   end

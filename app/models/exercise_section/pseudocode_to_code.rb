@@ -1,14 +1,11 @@
-# Unscaffolded on purpose: a labelled scaffold would hand over the decomposition, which is the exercise.
+# Design notes: docs/code-notes/app/models/exercise_section/pseudocode_to_code.md
 class ExerciseSection::PseudocodeToCode < ExerciseSection
-  # Bounded because critique points are provider text rendered into the page.
   MAX_CRITIQUE_POINTS = 3
 
   MAX_CRITIQUE_POINT_LENGTH = 300
 
-  # Bounded on ingest by .reject_unusable!, since it is rendered and interpolated into both round prompts.
   MAX_PROBLEM_STATEMENT_LENGTH = 2_000
 
-  # On the kind because both provider calls check it, and ResponsesController only bounds answers by the wider MAX_ANSWER_LENGTH.
   MAX_PSEUDOCODE_LENGTH = 6_000
 
   def self.vocabulary_key
@@ -34,12 +31,10 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     nil
   end
 
-  # Its grade is about the translated code, so translation must finish before the day context is built.
   def self.translated_before_grading?
     true
   end
 
-  # A diagram would hand over the decomposition this section asks the engineer to produce.
   def self.diagrammable?
     false
   end
@@ -48,7 +43,6 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     "responses/answers/pseudocode_to_code"
   end
 
-  # "code-answer" is what applies the monospace treatment (see Challenge).
   def self.answer_class
     "answer code-answer"
   end
@@ -62,7 +56,6 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
       "be less granular than code — evaluate the REASONING, not the verbosity."
   end
 
-  # Bounded like normalize_scaffold, because it is provider text going into the page.
   def self.normalize_critique(raw)
     return [] unless raw.is_a?(Array)
 
@@ -119,7 +112,6 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
   end
   private_class_method :critique_lines
 
-  # The second branch covers old rows translated from a draft; the code stays fenced because it carries the plan's text intact.
   def self.translation_lines(rounds, answer)
     code = rounds["generated_code"].presence
     return "They never translated their plan into code." if code.nil?

@@ -1,8 +1,7 @@
-# Blocks persist in correct order, so a correct answer is the identity permutation and grading never asks the AI.
+# Design notes: docs/code-notes/app/models/exercise_section/parsons_problem.md
 class ExerciseSection::ParsonsProblem < ExerciseSection
   ANSWER_PREFIX = "order:".freeze
 
-  # Long enough that guessing a token isn't worth trying, short enough to read in a DOM inspector.
   TOKEN_LENGTH = 16
 
   class << self
@@ -10,7 +9,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       false
     end
 
-    # Rolled once at ingest and persisted so every view shows the same scramble; never the identity, which is pre-solved.
     def arrange!(section)
       return unless section["blocks"].is_a?(Array)
 
@@ -20,7 +18,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       section["display_order"] = order
     end
 
-    # Replaces whatever the grader returned; nil without blocks, which would otherwise read as a perfect score.
     def fixed_rating(section:, answer:)
       blocks = Array(section["blocks"])
       return if blocks.empty?
@@ -28,7 +25,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       grade(submitted_order(answer, blocks.size), blocks.size)[:rating]
     end
 
-    # Opaque so sorting by it can't solve the puzzle; signs the problem too, since regeneration reuses the exercise row.
     def block_token(block_id, exercise:, key:, section_data:)
       OpenSSL::HMAC.hexdigest(
         "SHA256", Rails.application.secret_key_base,
@@ -56,7 +52,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       ANSWER_PREFIX + ids.join(",")
     end
 
-    # Rendering the stored positional order beside the tokens would reveal the token-to-id mapping.
     def token_answer(answer:, exercise:, key:, section_data:)
       ids = submitted_order(answer, Array(section_data&.dig("blocks")).size)
       return "" if ids.empty?
@@ -77,7 +72,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       true
     end
 
-    # A positional diff can't grade concepts with no right or wrong order; they have other hosts (annotate_retention_concept).
     def excluded_vocabulary_keys
       [ :data_modeling, :domain_modeling, :meta_skill, :code_smell, :oo_design, :module_design,
         :silent_correctness ]
@@ -92,7 +86,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       submitted_order(value, blocks.size).any?
     end
 
-    # Incomplete attempts still need strict grading and lenient replay, though they don't count as completed work.
     def answer_for(value, _section_data = nil)
       value.presence
     end
@@ -117,7 +110,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       SCHEMA
     end
 
-    # Returns [] for a malformed answer so grading reads it as all misplaced instead of raising.
     def parse_order(answer)
       text = answer.to_s
       return [] unless text.start_with?(ANSWER_PREFIX)
@@ -125,7 +117,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       text.delete_prefix(ANSWER_PREFIX).split(",").filter_map { |s| Integer(s, exception: false) }
     end
 
-    # Saved orders are free-form params; a partial order would drop blocks and get persisted back by the next autosave.
     def normalize_order(ids, block_count)
       return [] unless ids.size == block_count && ids.uniq.size == block_count
       return [] unless ids.all? { |id| valid_id?(id, block_count) }
@@ -164,7 +155,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       { mismatches: mismatches, rating: rating }
     end
 
-    # No answer line: the order is already graded in Ruby, and "order:2,1" means nothing to the reviewer as prose.
     def review_context(section:, answer:, rating:)
       <<~CONTEXT.chomp
         Parsons Problem (#{section["title"]}): #{section["question"]}
@@ -172,7 +162,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       CONTEXT
     end
 
-    # A section can resolve with no blocks; then skip grading instead of claiming a verified "0 out of place".
     def grading_note(section:, answer:)
       blocks = Array(section["blocks"])
 
@@ -195,7 +184,6 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       PARSONS
     end
 
-    # Normalizes and pads like .grade, so the description the reviewer gets can't contradict the score.
     def describe_mismatches(blocks, submitted_ids)
       return "cannot verify — the exercise's blocks are unavailable" if blocks.empty?
 

@@ -86,8 +86,7 @@ RSpec.describe ModelComparison do
     expect(out.string.scan("JSON::ParserError: unexpected token").size).to eq(2)
   end
 
-  # Each DailyPlan.for rolls afresh, so without a shared plan the candidates would get different requests.
-  it "sends both generation candidates the same prompt" do
+  it "sends both generation candidates the same prompt from one shared plan" do
     comparison.generate(user.id)
 
     expect(posted.map { |body| body["messages"] }.uniq.size).to eq(1)
@@ -197,7 +196,6 @@ RSpec.describe ModelComparison do
     expect(out.string).to include("valid: #{fixture_count - 1}/#{fixture_count}")
   end
 
-  # A solve is a verdict field only for the kind the judge solves blind.
   def keep_verdict(kind, solve: "b")
     JudgeVerdict.new(status: :keep, solve: (solve if kind.judge_solve_options))
   end
@@ -276,8 +274,7 @@ RSpec.describe ModelComparison do
         .and include("complete answers rated solid or better:").and include("cache write")
     end
 
-    # FakeService grades everything "solid", so no fixture can come out in order.
-    it "reports a fixture whose ratings do not fall in rank order" do
+    it "reports a fixture out of rank order when FakeService grades every answer solid" do
       comparison.review_calibration
 
       expect(out.string).to include("OUT OF ORDER").and include("in order: 0/#{fixtures.size}")
@@ -288,8 +285,7 @@ RSpec.describe ModelComparison do
         .to eq([ ClaudeService::MODEL_FOR_PURPOSE.fetch("review_response", ClaudeService::DEFAULT_ROUTE) ])
     end
 
-    # FakeService grades every answer "solid", which no extra case here expects.
-    it "prints each extra answer beside its own expected ratings" do
+    it "prints each extra answer beside its own expected ratings, flagging FakeService's solid as a mismatch" do
       comparison.review_calibration
 
       expect(out.string).to match(%r{^  vague_correct_pick solid +expected beginner/developing +MISMATCH})

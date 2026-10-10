@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/jobs/regenerate_exercise_job.md
 class RegenerateExerciseJob < ApplicationJob
   queue_as :default
 
@@ -24,7 +25,7 @@ class RegenerateExerciseJob < ApplicationJob
       exercise.lock!
       if exercise.regenerating_since != claim
         kept_for = :superseded
-        raise ActiveRecord::Rollback # before touching the response: nothing here depends on it
+        raise ActiveRecord::Rollback
       end
       # Not #lock!, which raises if #start_over deleted the row; #reviewing? also counts, as #review holds no lock mid-call.
       existing = DailyResponse.lock.find_by(daily_exercise_id: exercise.id)
@@ -54,25 +55,21 @@ class RegenerateExerciseJob < ApplicationJob
     release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end
 
-  # A running review can still fail, so it gets its own message rather than claiming a review landed.
   KEPT_SET_MESSAGES = {
     reviewed:  "your review landed first, and replacing a reviewed set would discard it — today's reviewed set was kept.",
     reviewing: "a review was running for today's set, so it was kept rather than replaced mid-review."
   }.freeze
 
-  # No error banner or release: the dashboard's set is intact and the claim is no longer ours.
   def keep_superseded_set(user)
     Rails.logger.info("Regeneration claim for user #{user.id} on #{Date.current} was released or retaken under the call; discarded the regenerated one")
   end
 
-  # Releases the claim and leaves regenerated_at nil, so the day's one regeneration stays available.
   def keep_reviewed_set(user, exercise, kept_for, claim)
     Rails.logger.info("Kept today's set (#{kept_for}) for user #{user.id} on #{Date.current}; discarded the regenerated one")
     release_own_claim(exercise, claim)
     user.record_generation_message!(KEPT_SET_MESSAGES.fetch(kept_for))
   end
 
-  # Where-guarded so a newer claim made after ours was cleared is left for its own worker.
   def release_own_claim(exercise, claim)
     DailyExercise.where(id: exercise.id, regenerating_since: claim).update_all(regenerating_since: nil)
   end

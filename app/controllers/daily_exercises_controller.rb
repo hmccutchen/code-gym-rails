@@ -11,11 +11,9 @@ class DailyExercisesController < ApplicationController
       return redirect_to root_path, alert: trial_ended_text(:generation)
     end
 
-    # Carry the held set forward first, or this would bill a generation the unique index then discards.
     current_user.carry_held_set_forward!
     return redirect_to root_path if current_user.daily_exercises.for_date.exists?
 
-    # Clear today's earlier failure so /dashboard/status doesn't report "failed" while this retry runs.
     current_user.clear_generation_failure!
     GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
     redirect_to root_path, flash: { generating: true }
@@ -61,7 +59,6 @@ class DailyExercisesController < ApplicationController
                             zone: current_user.effective_time_zone).full
   end
 
-  # A single UPDATE ... WHERE claims atomically and enforces the once-per-day gate; an expired claim can be retaken.
   def claim_regeneration!(exercise)
     current_user.daily_exercises
                 .where(id: exercise.id, regenerated_at: nil)

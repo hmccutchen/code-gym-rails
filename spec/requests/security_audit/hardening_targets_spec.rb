@@ -42,8 +42,7 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(user.daily_responses.first&.answers.to_h.fetch("code_review", "").length).to be < 100_000
     end
 
-    # The server cap clips silently, so the input must declare the same bound to make it visible while typing.
-    it "declares the same cap on the answer input (finding A1)" do
+    it "declares the same cap on the answer input, so the server's silent clip is visible while typing (finding A1)" do
       get root_path
 
       expect(response.body).to include(%(maxlength="#{UserText::MAX_ANSWER_LENGTH}"))

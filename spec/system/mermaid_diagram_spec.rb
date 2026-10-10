@@ -70,7 +70,6 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
     expect(page).to have_content(/Datastore/i, wait: 10)
 
     wait_until { count(EMPTY_DIAGRAMS).zero? }
-    # The box that merely contained the diagram, and its content, must survive.
     expect(page).to have_css("details.ref", text: /Reference/i)
     expect(count(%q{document.body.innerHTML.includes("Sharding complicates joins")})).to be(true)
   end

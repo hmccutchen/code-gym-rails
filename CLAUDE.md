@@ -683,8 +683,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   input was a local section built from `FakeService`'s canned problem set;
   only the two models' output is real.
 
-  Two constraints apply before routing any of them, both noted beside
-  the table. `#call` turns thinking off whenever a caller passes `max_tokens`,
+  Two constraints apply before routing any of them, and this paragraph is
+  where they are stated. `#call` turns thinking off whenever a caller passes `max_tokens`,
   using the routed model's entry in `ClaudeService::THINKING_OFF` (`between_tools`
   on Sonnet 5.5, `disabled` on Haiku 4.5). Opus 5.5 has no thinking-off setting
   and no entry, so a capped purpose cannot move to Opus: the call raises before sending. And Haiku 4.5 caches only a
@@ -1390,8 +1390,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   making a day longer, and `DailyPlan.share_hosts` already keeps a host for
   evidence when drills outnumber the hosts. A fourth-bucket drill counts
   against the same cap while occupying only the fourth: the cap bounds how
-  many gaps are worked at once, not how many hosts they take. The reasoning
-  sits beside the constant, a spec pins the value, and
+  many gaps are worked at once, not how many hosts they take. This paragraph
+  is the reasoning, a spec pins the value, and
   `ConceptDrills#can_start?` / `#can_start_group?` are the one statement of
   what it allows, read by the start methods and by the pages that offer the
   button.
@@ -2349,8 +2349,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the largest reply used a fraction of `REVIEW_JUDGE_MAX_TOKENS` and the
   slowest call a tenth of `REVIEW_JUDGE_READ_TIMEOUT`.
   `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS` moves to what this run measured;
-  that constant and its comment are where the number and its remaining
-  headroom are stated, so they are not restated here to go stale.
+  that constant and its section in `docs/code-notes/app/services/ai_service.md`
+  are where the number and its remaining headroom are stated, so they are not
+  restated here to go stale.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a

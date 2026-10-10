@@ -1,14 +1,12 @@
 class GenerateConceptReferenceJob < ApplicationJob
   queue_as :default
 
-  # Discards overlaps so an incomplete result can't trigger another billed attempt on the shared row.
   limits_concurrency key: ->(args) { "#{args.fetch(:language)}/#{args.fetch(:concept)}" },
                      to: 1, on_conflict: :discard,
                      duration: AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
   # refresh rewrites the whole row so its parts come from one response; only a deliberate Learn click passes it.
   def perform(concept:, language:, user_id:, refresh: false)
-    # "other" is ProblemSetIngest's off-vocabulary catch-all, not a real concept.
     return if concept == "other"
 
     # Another job may have generated it in the enqueue/run gap.

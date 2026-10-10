@@ -128,10 +128,9 @@ RSpec.describe DailyResponse, type: :model do
                                        })
       response = DailyResponse.new(daily_exercise: exercise,
                                    answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "", "plan_review" => "" })
-      expect(response.completeness).to eq(25) # 1 of 4
+      expect(response.completeness).to eq(25)
     end
 
-    # FakeService always sends more third/fourth keys than the page renders; counting them reported 50%.
     it "computes completeness against the sections presented, not every payload key" do
       exercise = DailyExercise.create!(user: User.create!(email: "eight-key@example.com", name: "Eight"),
                                        date: Date.current, generated_at: Time.current,
@@ -197,7 +196,6 @@ RSpec.describe DailyResponse, type: :model do
       end
     end
 
-    # A regenerated day can leave an answer behind; counting it pushes completeness past 100%.
     it "ignores an answer for a section the exercise no longer presents" do
       daily_response = user.daily_responses.create!(
         daily_exercise: exercise,
@@ -503,8 +501,7 @@ RSpec.describe DailyResponse, type: :model do
       expect(unreviewed.difficulty_for("code_review")).to be_nil
     end
 
-    # ai_review is schemaless jsonb, so a row bypassing the writer must not put an unbounded reason on the page.
-    it "bounds the reason on read, not only on write" do
+    it "bounds the reason on read, not only on write, for rows that bypass the writer" do
       response = user.daily_responses.create!(
         daily_exercise: exercise, date: Date.current, answers: {},
         ai_review: {
@@ -520,7 +517,6 @@ RSpec.describe DailyResponse, type: :model do
       expect(response.difficulty_for("challenge")["reason"]).to eq("padded")
     end
 
-    # The note renders beside the AI grade badge and must not be mistaken for it.
     it "shares no word with the AI grade or self-rating vocabularies" do
       overlap = DailyResponse::DIFFICULTY_LEVELS &
                 (DailyResponse::AI_RATING_FAVORABLE + DailyResponse::AI_RATING_UNFAVORABLE +
@@ -598,7 +594,6 @@ RSpec.describe DailyResponse, type: :model do
     it "is always false for the architecture section, even on a repeat exposure" do
       first  = submit(concept: "service_boundaries", date: Date.current - 3)
       second = submit(concept: "service_boundaries", date: Date.current - 1)
-      # Passes "architecture" directly so the exclusion is shown unconditional, not an accident of the fixtures.
       expect(first.improved_code_visible?("architecture")).to be(false)
       expect(second.improved_code_visible?("architecture")).to be(false)
     end
@@ -611,7 +606,6 @@ RSpec.describe DailyResponse, type: :model do
           answers: { "security_review" => "x" * 20 },
           concept_tags: { "security_review" => "xss_prevention" })
 
-        # No prior exposure yet — gated closed, same rule code_review/pattern follow.
         expect(response.improved_code_visible?("security_review")).to be false
       end
     end

@@ -1,9 +1,7 @@
 require "rails_helper"
 
-# The control is inline JavaScript, so request specs execute none of it.
+# with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Concept reference alternate framings", type: :system, with_csrf: true do
-  # with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
-
   def cache_reference
     ConceptReference.create!(
       concept: "n_plus_one", language: "ruby_rails",
@@ -35,7 +33,6 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
       box.find(".explain-concept-differently").click
       expect(box).to have_content(FakeService::CONCEPT_ALTERNATE_TEXT, wait: 10)
 
-      # Nothing is written anywhere — not a response, and not the shared row.
       expect(DailyResponse.count).to eq(0)
       expect(ConceptReference.find_by(concept: "n_plus_one").explanation)
         .to eq("The association loads once per iteration.")
@@ -67,8 +64,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
     end
   end
 
-  # An expired session's login page arrives as a 200; parsing must fail closed rather than append an undefined framing.
-  it "refuses an OK response that isn't the JSON this endpoint returns" do
+  it "refuses an OK response that isn't this endpoint's JSON, such as an expired session's login page" do
     user = create_fake_provider_user
     cache_reference
 
@@ -87,7 +83,6 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
       expect(box).to have_content(/session expired/i, wait: 10)
       expect(box).to have_no_css(".alternate-item")
-      # Recoverable, and the control is still there to recover with.
       expect(box.find(".explain-concept-differently")).not_to be_disabled
     end
   end

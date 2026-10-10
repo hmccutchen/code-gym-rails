@@ -1,4 +1,3 @@
-# #create is JSON because only script can call it; #destroy is a form post so opting out never depends on that script.
 class PushSubscriptionsController < ApplicationController
   # Account is reachable without a key, and the layout's re-subscribe script would otherwise 302 to /setup on every launch.
   skip_before_action :require_provider
@@ -14,7 +13,6 @@ class PushSubscriptionsController < ApplicationController
     notify.windows.com
   ].freeze
 
-  # POST /push_subscription
   def create
     return head :not_found unless WebPushCredentials.configured?
     return head :unprocessable_content unless valid_subscription?
@@ -43,7 +41,6 @@ class PushSubscriptionsController < ApplicationController
     redirect_to account_path, notice: t("flash.push_subscriptions.settings_saved")
   end
 
-  # DELETE /push_subscription — drops endpoints too, or tomorrow's job would push to a browser that asked it to stop.
   def destroy
     User.transaction do
       current_user.push_subscriptions.destroy_all
@@ -55,7 +52,6 @@ class PushSubscriptionsController < ApplicationController
 
   private
 
-  # Validated where it enters, so PushDelivery can assume an endpoint it can sign for.
   def valid_subscription?
     params[:p256dh].present? && params[:auth].present? && allowed_endpoint?
   end

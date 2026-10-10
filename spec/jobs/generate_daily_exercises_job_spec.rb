@@ -20,7 +20,6 @@ RSpec.describe GenerateDailyExercisesJob do
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
 
-  # An email in a log line is personal data nobody deletes.
   describe "the user named in log lines" do
     let(:logged) { StringIO.new }
 
@@ -89,7 +88,6 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(DailyExercise.exists?(user: user, date: Date.current)).to be false
   end
 
-  # The failure is stored as kind and time; the sentence is written when the dashboard reads it.
   it "records a rejected key as bad_key and renders a Setup-pointing sentence" do
     stub_provider_failure(AiService::AuthenticationError, "invalid x-api-key")
 

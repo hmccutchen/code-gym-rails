@@ -1,4 +1,3 @@
-# Writes only the drill columns, plus ending a pause through the same exit an expired cooldown takes.
 class ConceptDrills
   # Counted in drills, a group as one; stated rather than derived. See CLAUDE.md, "Drills".
   MAX_CONCURRENT = 2
@@ -7,7 +6,6 @@ class ConceptDrills
 
   Entry = Data.define(:bucket, :group, :concepts)
 
-  # Only the current slice: a drill stranded by a language change or rename neither counts nor can be stopped.
   def self.for(user)
     new(user.concept_masteries.drilling.in_buckets(ConceptBucket.slice_for(user.language)).order(:drilled_at, :id).to_a)
   end
@@ -81,14 +79,12 @@ class ConceptDrills
     @rows.any? { |cm| cm.concept == concept && cm.language == bucket }
   end
 
-  # Read by start! and by the pages that offer the button, so the two cannot disagree.
   def can_start?(concept, bucket)
     return false if drilling?(concept, bucket)
 
     !full? || joinable_group(concept, bucket).present?
   end
 
-  # The group's own lone members fold into it, so they don't count against the cap.
   def can_start_group?(group, bucket)
     return false if group_drilling?(group, bucket)
 
@@ -97,7 +93,6 @@ class ConceptDrills
     count - absorbed < MAX_CONCURRENT
   end
 
-  # The drilled group this concept would join, if its group is drilled here.
   def joinable_group(concept, bucket)
     group = ConceptGroup.for(concept)
     group if group_drilling?(group, bucket)

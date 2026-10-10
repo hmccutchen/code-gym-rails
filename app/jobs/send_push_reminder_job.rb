@@ -1,4 +1,3 @@
-# Enqueued only from GenerateDailyExercisesJob's cron branch, which already owns "8am on a weekday".
 class SendPushReminderJob < ApplicationJob
   queue_as :default
 
@@ -85,7 +84,6 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
-  # active_section_keys is the authority for a day's section count; never count problem_set.keys.
   def section_count(exercise) = exercise.active_section_keys.size
   def answered_count(response) = response ? response.answered_sections.size : 0
 

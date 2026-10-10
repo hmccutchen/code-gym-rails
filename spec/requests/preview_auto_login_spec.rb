@@ -1,6 +1,5 @@
 require "rails_helper"
 
-# Outside a preview the callback is absent from the chain, and the suite boots without PREVIEW_APP.
 RSpec.describe "Preview auto-login", type: :request do
   # Only a row PreviewSeed.seeded? recognizes gets signed in, so sign-in examples need a seeded row.
   def seeded_user(email = PreviewSeed::DEFAULT_EMAIL)
@@ -98,13 +97,11 @@ RSpec.describe "Preview auto-login", type: :request do
       ENV.delete(PreviewSeed::EMAIL_VAR)
     end
 
-    # A preview convenience must never turn a missing row into a 500.
-    it "declines silently when the seeded user does not exist" do
+    it "declines silently, never with a 500, when the seeded user does not exist" do
       expect { controller.send(:preview_auto_login) }.not_to raise_error
       expect(session).to be_empty
     end
 
-    # PreviewSeed leaves a real account at this address untouched, so auto-login must decline on it.
     it "declines for a real account that happens to sit at the configured address" do
       User.create!(email: PreviewSeed::DEFAULT_EMAIL, name: "Real Person",
                    provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
@@ -139,7 +136,6 @@ RSpec.describe "Preview auto-login", type: :request do
       expect(session[:user_id]).to be_nil
     end
 
-    # Signing in mid-login would change real code login, which must stay testable on preview apps.
     it "declines inside SessionsController so code login still works" do
       seeded_user
       allow(controller).to receive(:controller_name).and_return("sessions")

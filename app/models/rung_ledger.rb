@@ -12,7 +12,6 @@ class RungLedger
     responses.each { |response| record(response) }
   end
 
-  # The highest rung held for the concept in this bucket, or nil.
   def held(concept, bucket)
     KindDifficulty::LEVELS.reverse.find { |rung| @verdicts[[ concept, bucket, rung ]] }
   end

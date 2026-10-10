@@ -13,7 +13,6 @@ RSpec.describe "History", type: :request do
       },
       generated_at: Time.current
     )
-    # If a rating is provided and section_ratings is not explicitly set, use the rating for all sections
     final_section_ratings = if section_ratings.present?
       section_ratings
     elsif rating.present? || legacy_rating.present?
@@ -226,7 +225,6 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # The .mermaid-diagram CSS rule is global, so assert on the container and the script instead.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
       expect(response.body).not_to include("mermaid@11.17.2")
     end
@@ -296,8 +294,8 @@ RSpec.describe "History", type: :request do
       other = create_user_with_key(email: "other@example.com", name: "Other")
       old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")
       newer = create_session_for(user, date: 1.day.ago.to_date)
-      create_session_for(user, date: Date.current, submitted: false)   # draft — excluded
-      create_session_for(other, date: 2.days.ago.to_date)              # other user — excluded
+      create_session_for(user, date: Date.current, submitted: false)
+      create_session_for(other, date: 2.days.ago.to_date)
 
       login_as(user)
       get history_path
@@ -351,7 +349,6 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include('<details class="ref" open>')
     end
 
-    # The script keys framings by reference id so the cap holds across every copy on the page.
     it "gives every copy of one reference the same reference id to share a cap by" do
       reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                            tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
@@ -399,7 +396,6 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # Two entries, no open problems block, exactly one open review — the first.
       expect(response.body.scan(/<details class="answers" open>/).size).to eq(0)
       expect(response.body.scan(/<details class="answers">/).size).to eq(2)
       expect(response.body.scan(/<details class="review" open>/).size).to eq(1)
@@ -420,7 +416,6 @@ RSpec.describe "History", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("only-section")
-      # The malformed row must not take the rest of the page down with it.
       expect(response.body).to include("q-#{intact.date}")
     end
 
@@ -465,7 +460,6 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # The challenge has no starter_code, so the code_review snippet and improved_code are the only blocks.
       blocks = Nokogiri::HTML(response.body).css("code.highlight")
       expect(blocks.size).to eq(2)
       improved = blocks.find { |block| code_block_text(block) == "User.includes(:posts)" }
@@ -525,7 +519,6 @@ RSpec.describe "History", type: :request do
 
     it "highlights a reviewed session with no improved_code in any section and still emits the script" do
       session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
-      # Update to ensure NO improved_code in any section
       session.update!(ai_review: { "code_review" => { "rating" => "solid", "correct" => "Good job" } })
 
       login_as(user)

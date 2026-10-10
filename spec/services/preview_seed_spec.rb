@@ -69,8 +69,7 @@ RSpec.describe PreviewSeed do
       expect(PreviewSeed.run!.id).to eq(first.id)
     end
 
-    # Protects a real account that shares the configured preview address.
-    it "never overwrites an existing API key" do
+    it "never overwrites the API key of a real account at the preview address" do
       real = User.create!(email: "reviewer@example.com", name: "Real Person")
       real.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-a-real-key" })
       set_target
@@ -204,7 +203,6 @@ RSpec.describe PreviewSeed do
       expect(ConceptReference.find_by(concept: "n_plus_one", language: "ruby_rails")).to be_present
     end
 
-    # Safety rule 2, at the row level.
     it "is idempotent — a second run creates nothing new" do
       PreviewSeed.run!
 

@@ -1,11 +1,10 @@
-# Writes no ApiUsage rows, which would charge a teammate's history for a calibration they never ran.
+# Design notes: docs/code-notes/script/concept_reference_calibration.md
 class ConceptReferenceCalibration
   PROVIDERS = {
     "claude" => { service: ClaudeService, key: "ANTHROPIC_API_KEY" },
     "gemini" => { service: GeminiService, key: "GEMINI_API_KEY" }
   }.freeze
   PURPOSE = "generate_concept_reference".freeze
-  # Every bucket a user can hold: both languages, since "mixed" means both.
   BUCKETS = (ConceptBucket.language_buckets_for("mixed") + ConceptBucket::LANGUAGE_INDEPENDENT).freeze
   CONCEPTS_PER_BUCKET = 2
 
@@ -80,7 +79,6 @@ class ConceptReferenceCalibration
 
   private
 
-  # At or under READ_TIMEOUT, RETRY_TIMEOUT_GUARD would retry a timeout into extra billed attempts.
   def validate_options!(timeout, repeats, concurrency)
     unless timeout > AiService::READ_TIMEOUT
       raise ArgumentError, "timeout must exceed AiService::READ_TIMEOUT (#{AiService::READ_TIMEOUT}s), " \
@@ -99,12 +97,10 @@ class ConceptReferenceCalibration
     end
   end
 
-  # Repeats the whole list so a concept's repeats spread out in time instead of landing seconds apart.
   def sequential_phase(sample)
     (sample * @repeats).map { |bucket, concept| measure(bucket, concept, :sequential) }
   end
 
-  # Mirrors the Learn backfill's one job per concept: calls share the provider's rate limit and this CPU.
   def concurrent_phase(sample)
     return [] if @concurrency.zero?
 

@@ -38,7 +38,6 @@ RSpec.describe ConceptMastery, type: :model do
   end
 
   it "steps Reduced → Paused after 2 more stagnant attempts, with a 2-session cooldown" do
-    # 4 attempts to reach reduced, then 2 more stagnant
     6.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (6 - i)) }
     cm = user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")
     expect(cm.tier).to eq("paused")
@@ -56,7 +55,7 @@ RSpec.describe ConceptMastery, type: :model do
   end
 
   it "resets to Standard on full mastery from any tier" do
-    4.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (5 - i)) } # → reduced
+    4.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (5 - i)) }
     cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong", date: Date.current)
     expect(cm.tier).to eq("standard")
     expect(cm.streak).to eq(0)

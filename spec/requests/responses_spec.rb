@@ -149,8 +149,7 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "POST /responses (parsons_problem answer)" do
-    # The refusal answers 409 so the page knows to reload; the stored order must still stand.
-    it "keeps a saved order out of reach of a posted positional one" do
+    it "keeps a saved order out of reach of a posted positional one, answering 409 so the page reloads" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
       )
@@ -170,8 +169,7 @@ RSpec.describe "Responses", type: :request do
       expect(saved.answers["parsons_problem"]).to eq("order:2,0,4,1,3")
     end
 
-    # Writing nothing is what makes the reload safe: the page returns with the last draft that landed.
-    it "refuses a stale encoding outright rather than reporting a save that dropped it" do
+    it "refuses a stale encoding outright and writes nothing, so the reload returns the last draft that landed" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] },
         "code_review" => { "title" => "T", "question" => "Q", "code" => "x" }
@@ -186,8 +184,7 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
     end
 
-    # A page from before block tokens has no 409 handler, so its message must ask the user to refresh.
-    it "asks a page that cannot reload itself to refresh rather than announcing one" do
+    it "asks a page from before block tokens, which cannot reload itself, to refresh rather than announcing one" do
       create_exercise("parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] })
 
       post responses_path,
@@ -199,7 +196,6 @@ RSpec.describe "Responses", type: :request do
       expect(response.parsed_body["errors"].first).not_to match(/reloading/i)
     end
 
-    # RegenerateExerciseJob writes under the exercise lock, so problem_set must be read inside that lock.
     it "re-reads the problem set under the lock, so a regeneration cannot land between the check and the save" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] }
@@ -261,7 +257,6 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  # At its original date the held set is unreachable: #create looks it up with `for_date` and 404s.
   describe "POST /responses after resuming from a pause" do
     include ActiveSupport::Testing::TimeHelpers
 
@@ -357,8 +352,7 @@ RSpec.describe "Responses", type: :request do
       expect(resp.completeness).to be <= 100
     end
 
-    # Tagging a section the page never showed would put an unseen concept into tomorrow's history.
-    it "omits a section the exercise holds but never presented" do
+    it "omits a section the exercise holds but never presented, keeping an unseen concept out of tomorrow's history" do
       create_exercise(
         "code_review"  => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
         "pattern"      => { "title" => "t", "why" => "w", "question" => "q", "concept" => "memoization" },
@@ -861,8 +855,7 @@ RSpec.describe "Responses", type: :request do
       expect(response.body).not_to include(ERB::Util.html_escape("so the review didn't run"))
     end
 
-    # The review waits for its slowest section, so a reset timed from the end can land a day late.
-    it "keeps the time each section failed, not the time the review finished" do
+    it "keeps the time each section failed, not the time the review finished, which can be a day later" do
       daily_response = create_submitted_response
       failed_at = Time.utc(2026, 10, 7, 6, 59, 30)
       fake_service = instance_double(ClaudeService)
@@ -975,7 +968,6 @@ RSpec.describe "Responses", type: :request do
     end
   end
 
-  # Every path that clears this message runs through regeneration, which a review closes off.
   describe "POST /responses/:id/review and a stale generation failure" do
     def submitted_response
       exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
@@ -989,7 +981,7 @@ RSpec.describe "Responses", type: :request do
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
     end
 
-    it "clears today's regeneration failure once a section is reviewed" do
+    it "clears today's regeneration failure once a section is reviewed, since a review closes off regeneration" do
       resp = submitted_response
       user.update!(last_generation_error_date: Date.current, last_generation_error: "boom")
       stub_review({ ok: true, review: { "rating" => "solid" } })
@@ -1714,8 +1706,7 @@ RSpec.describe "Responses", type: :request do
     end
 
     describe "POST /responses normalization" do
-      # Rating triggers an autosave of every textarea's raw value, so an untouched scaffold reaches the server.
-      it "stores a blank answer when only the scaffold comes back" do
+      it "stores a blank answer when only the scaffold comes back, as rating autosaves an untouched textarea" do
         exercise = create_exercise(full_set("architecture", scaffold: scaffold))
         saved = post_answers(exercise, "architecture" => template)
 
@@ -1828,8 +1819,7 @@ RSpec.describe "Responses", type: :request do
 end
 
 RSpec.describe ResponsesController, "duck thread byte allowance" do
-  # A flat reply allowance once outgrew the cap, so the allowance must fit whatever the cap is.
-  it "gives a full-length reply room" do
+  it "gives a full-length reply room whatever the cap is" do
     allowance = described_class::DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE
 
     expect(allowance).to be >= AiService::DUCK_RESPONSE_MAX_TOKENS * described_class::DUCK_REPLY_BYTES_PER_TOKEN

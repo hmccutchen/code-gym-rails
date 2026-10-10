@@ -27,8 +27,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     fake_service
   end
 
-  # An email in a log line is personal data nobody deletes.
-  describe "the user named in log lines" do
+  describe "the user named in log lines, by id since an email in a log is personal data nobody deletes" do
     let(:logged) { StringIO.new }
 
     before { allow(Rails).to receive(:logger).and_return(ActiveSupport::Logger.new(logged)) }
@@ -380,7 +379,6 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(daily_response.reload.answers).to eq("code_review" => "important work")
   end
 
-  # The transaction keeps the destroyed response when the replacement set fails validation.
   it "rolls back the destroyed response when the replacement set is invalid" do
     exercise = claimed_exercise
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,

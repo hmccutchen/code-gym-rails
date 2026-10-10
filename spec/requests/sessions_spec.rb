@@ -155,8 +155,7 @@ RSpec.describe "Sessions", type: :request do
       expect(user.reload.login_code_digest).to be_nil
     end
 
-    # The code field takes focus on load, so a screen reader never reaches the flash above it.
-    it "describes the code field by the error after a wrong code, and marks it invalid" do
+    it "describes the code field by the error after a wrong code, since focus skips the flash, and marks it invalid" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       follow_redirect!
       post verify_login_code_path, params: { code: wrong_code_for(User.find_by!(email: "dev@example.com").generate_login_code!) }
@@ -356,8 +355,7 @@ RSpec.describe "Sessions", type: :request do
     end
   end
 
-  # The email form must stay reachable while a login is pending, or the only recovery is clearing cookies.
-  describe "recovering from a pending login that never completes" do
+  describe "recovering from a pending login that never completes, without clearing cookies" do
     include ActiveJob::TestHelper
 
     def email_form_present?
@@ -372,8 +370,7 @@ RSpec.describe "Sessions", type: :request do
       expect(email_form_present?).to be(true)
     end
 
-    # The code is bound to the requesting session, so another browser must still be able to ask for its own.
-    it "keeps the form reachable in a browser that did not request the code" do
+    it "keeps the form reachable in a browser that did not request the code, so it can ask for its own" do
       post login_path, params: { email: "dev@example.com", name: "Dev" }
       user = User.find_by(email: "dev@example.com")
       code = user.generate_login_code!

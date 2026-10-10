@@ -1,14 +1,11 @@
-# Runs in production's preDeployCommand too, so it is gated on PreviewEnvironment and only creates, never updates.
 class PreviewSeed
   EMAIL_VAR     = "PREVIEW_SEED_EMAIL"
   DUMMY_API_KEY = "sk-ant-preview-not-a-real-key"
 
-  # .invalid is reserved by RFC 2606, so this can never reach a real mailbox.
   DEFAULT_EMAIL = "preview-reviewer@code-gym.invalid".freeze
 
   def self.run! = new.run!
 
-  # An override, not a gate, so a leaked EMAIL_VAR is harmless; PreviewAutoLogin reads this too.
   def self.target_email
     ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
   end

@@ -379,7 +379,6 @@ RSpec.describe "POST /responses/duck_thread", type: :request do
     end
   end
 
-  # Role-tagged turns keep "You:"/"Them:" text inside its own turn, so it cannot forge an assistant turn.
   it "cannot forge an assistant turn from text embedded in a prior thread turn" do
     fake_provider_user = create_fake_provider_user
     create_exercise_for(fake_provider_user)

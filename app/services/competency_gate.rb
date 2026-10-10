@@ -1,4 +1,3 @@
-# A forward fold, so adding a day never changes an earlier answer; thresholds are a starting policy, not validated.
 class CompetencyGate
   Threshold = Data.define(:at_least, :of) do
     def met?(window, &qualifies) = window.size == of && window.count(&qualifies) >= at_least
@@ -106,7 +105,6 @@ class CompetencyGate
     runs[kind] = (runs.fetch(kind, []) + [ entry ]).last(memory)
   end
 
-  # Growth after a brake needs fresh results, so pre-struggle fixed-kind results can't swing the size back up.
   def restart_growth
     @growth_runs.transform_values! { [] }
   end

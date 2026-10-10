@@ -1,4 +1,3 @@
-# Preview-only auto-login, registered at class definition only when PREVIEW_APP is set; never set it on production.
 module PreviewAutoLogin
   extend ActiveSupport::Concern
 
@@ -12,7 +11,6 @@ module PreviewAutoLogin
     def preview_auto_login
       return if current_user
       return if cookies[SIGNED_OUT_COOKIE].present?
-      # Staying out of SessionsController keeps code login exercisable in a preview app.
       return if controller_name == "sessions"
 
       user = User.active.find_by(email: PreviewSeed.target_email)

@@ -1,5 +1,4 @@
 class ConceptReference < ApplicationRecord
-  # Only buckets every user holds: LearnController#show 404s a bucket outside the viewer's own slice.
   FEATURABLE_BUCKETS = ConceptBucket::LANGUAGE_INDEPENDENT
 
   validates :concept, :language, presence: true
@@ -7,13 +6,11 @@ class ConceptReference < ApplicationRecord
 
   scope :featurable, -> { where(language: FEATURABLE_BUCKETS) }
 
-  # Picked lazily on the week's first load and read after; never generates. Nil when no featurable row exists.
   def self.featured(date = team_today)
     week = featured_week_of(date)
     find_by(featured_on: week) || claim_feature(week)
   end
 
-  # Monday, so a weekend visit still shows the concept the working week began with.
   def self.featured_week_of(date)
     date.beginning_of_week(:monday)
   end
@@ -40,7 +37,6 @@ class ConceptReference < ApplicationRecord
     AiService::CONCEPT_GUIDE_FIELDS.all? { |field| public_send(field).present? }
   end
 
-  # Derived from the field list the same way #guide? is.
   def ladder?
     AiService::CONCEPT_LADDER_FIELDS.all? { |field| public_send(field).present? }
   end
@@ -54,7 +50,6 @@ class ConceptReference < ApplicationRecord
     lesson.present?
   end
 
-  # GenerateConceptReferenceJob skips a row on this.
   def fully_written?
     complete? && lesson?
   end

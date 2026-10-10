@@ -1,6 +1,5 @@
 require "rails_helper"
 
-# A request spec can't see how the page handles a refused save, so these assert what the engineer is told in a browser.
 RSpec.describe "Save status", type: :system do
   let(:user) { create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
@@ -46,7 +45,6 @@ RSpec.describe "Save status", type: :system do
     end
   end
 
-  # The page reloads over the banner, so only the replacement page can show the explanation.
   it "shows a carried explanation on the page the reload lands on" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
@@ -74,7 +72,6 @@ RSpec.describe "Save status", type: :system do
     end
   end
 
-  # A carried message that is never reloaded must not surface days later on an unrelated page.
   it "keeps a carried explanation off a page it was not about" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)

@@ -58,8 +58,7 @@ RSpec.describe "PWA", type: :request do
   describe "the layout's install tags" do
     before { get login_path }
 
-    # apple-mobile-web-app-capable, not the manifest, makes iOS before 17.4 launch standalone.
-    it "declares the app installable and standalone-capable" do
+    it "declares the app installable and standalone-capable, including on iOS before 17.4" do
       expect(response.body).to include(%(<link rel="manifest" href="/manifest.json">))
       expect(response.body).to include(%(<meta name="apple-mobile-web-app-capable" content="yes">))
       expect(response.body).to include(%(<meta name="mobile-web-app-capable" content="yes">))
@@ -77,13 +76,11 @@ RSpec.describe "PWA", type: :request do
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
 
-    # A tap leaves a touch screen in :hover, so the global underline would stick on the logo.
-    it "keeps the brand link free of the hover underline" do
+    it "keeps the brand link free of the hover underline, which a tap would leave stuck on a touch screen" do
       expect(response.body).to include("nav .brand:hover { text-decoration: none; }")
     end
   end
 
-  # Asserted against the stylesheet because Playwright cannot emulate display-mode.
   describe "the name editor in standalone mode" do
     let(:standalone_block) do
       Rails.root.join("app/views/layouts/application.html.erb").read[
@@ -101,7 +98,6 @@ RSpec.describe "PWA", type: :request do
     end
   end
 
-  # Playwright cannot emulate display-mode, so assert the stylesheet; pull_to_refresh_spec covers the gesture.
   describe "the pull-to-refresh indicator" do
     let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
     let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }

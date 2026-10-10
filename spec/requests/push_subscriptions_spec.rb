@@ -70,7 +70,6 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    # Accepting any URL would give a logged-in user a blind SSRF: the worker POSTs to whatever is stored.
     [
       [ "an internal host",        "https://10.0.0.5/hook" ],
       [ "localhost",               "https://localhost:5432/hook" ],
@@ -90,7 +89,6 @@ RSpec.describe "Push subscriptions", type: :request do
       end
     end
 
-    # Suffix matching, so per-region and per-tenant subdomains work without listing each one.
     [
       "https://fcm.googleapis.com/fcm/send/abc",
       "https://updates.push.services.mozilla.com/wpush/v2/abc",
@@ -202,7 +200,6 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).to include("Turn on daily reminders")
     end
 
-    # An unconfigured deployment must not offer a control that could only fail.
     it "says nothing about reminders where none is configured" do
       login_as(user)
 
@@ -211,7 +208,6 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).not_to include("Turn on daily reminders")
     end
 
-    # iOS prompts only for a synchronous request inside the click, so the key must be in the page, not fetched.
     it "embeds the VAPID public key rather than leaving the click to fetch it" do
       configure_vapid
       login_as(user)
@@ -232,7 +228,6 @@ RSpec.describe "Push subscriptions", type: :request do
       expect(response.body).to include("if (!response.ok) throw CodeGymServerMessage.error(")
     end
 
-    # The launch re-subscribe is the only repair for an endpoint iOS dropped.
     it "re-subscribes on launch for a user who has reminders on" do
       configure_vapid
       user.update!(reminder_level: :ready)
