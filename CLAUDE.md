@@ -10,24 +10,42 @@ All changes are made on a feature/dev branch, never directly on `main`. Create (
 
 ## Code Style
 
-**Self-documenting.** The code says what it does; names carry the meaning. If a
-block needs a comment to be followed, extract it into a named method instead.
+### Comment rules — never ignored
+
+These rules hold in every file, in every change, with no exceptions for a
+deadline or a "temporary" comment. RuboCop enforces the first three, so CI
+fails when one is broken.
+
+- **Each comment is attached to the code it comments on.** It sits on the line
+  directly above that code, or at the end of the same line. No blank line, no
+  other comment and no end of file between a comment and its code
+  (`CodeGym/AttachedComment`).
+- **Each comment is one line** (`CodeGym/SingleLineComment`).
+- **A file holds at most 5 comments in total**, trailing comments included
+  (`CodeGym/CommentLimit`). Magic comments, shebangs and `rubocop:`
+  directives are tooling and don't count.
+- **Code is self-documenting.** Names carry the meaning. If a block needs a
+  comment to be followed, extract it into a named method instead.
+- **Comments discuss the code in front of them**, never a design, a history,
+  or code somewhere else.
+- **Business decisions live in the documentation:** this file, or a doc under
+  `docs/`. The reasoning behind one file's code lives in
+  `docs/code-notes/`, at the file's own path with `.md` in place of `.rb`
+  (`app/services/ai_service.rb` → `docs/code-notes/app/services/ai_service.md`).
+  A comment may point there in its one line.
 
 **Comments are extremely minimal.** Write one only for a non-obvious *why* — a
 hidden constraint, a workaround, an invariant a future reader would otherwise
 break. Never restate *what* the code does. A comment that would go stale the
 next time the line changes shouldn't be written. One that already has gone
 stale is worse than either kind — fix it or delete it, don't leave it.
-Every comment is one line; `CodeGym/SingleLineComment` fails RuboCop on two or
-more consecutive comment lines and on `=begin` blocks. Reasoning that needs
-more room belongs in this file, a doc under `docs/`, or the PR description,
-with the comment pointing there.
 
-**Some comments must survive a cleanup.** The rule above cuts restatement, not
-explanation, and a few categories read as obvious while carrying something the
-code genuinely doesn't say. Keep: a non-RESTful route (`# GET /login` above
-`SessionsController#new` — the path isn't derivable from the controller and
-action), a partial's required locals, an abstract method's contract, and a
+**Some comments must survive a cleanup**, within the five a file may hold. The
+rule above cuts restatement, not explanation, and a few categories read as
+obvious while carrying something the code genuinely doesn't say. Keep: a
+non-RESTful route (`# GET /login` above `SessionsController#new` — the path
+isn't derivable from the controller and action), a partial's required locals,
+an abstract method's contract, and a
 deliberately empty branch where the emptiness *is* the behavior (see
 `User#current_streak`'s weekend case). The test runs both directions: if
 deleting it would let someone reintroduce a bug, it stays; if it only repeats
@@ -111,9 +129,9 @@ treats as authoritative when "well-tested standard" would otherwise be left to
 interpretation.
 
 **Style baseline: `rubocop-rails-omakase`.** `.rubocop.yml` inherits it whole
-and adds one house cop, `CodeGym/SingleLineComment`
-(`lib/rubocop/cop/code_gym/`), which limits every comment to one line. Where
-omakase has an opinion, that opinion wins — don't argue formatting in review.
+and adds three house cops in `lib/rubocop/cop/code_gym/`, the comment rules
+above (`SingleLineComment`, `AttachedComment`, `CommentLimit`). Where omakase
+has an opinion, that opinion wins — don't argue formatting in review.
 Two things it deliberately does *not* cover, so neither is machine-checkable
 here: `Metrics` and `Naming` are disabled outright
 (no method-length, class-length, ABC, or complexity cop runs, and no naming cop

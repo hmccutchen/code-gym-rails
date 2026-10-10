@@ -139,9 +139,13 @@ validation.
 
 **Does a comment restate the line beneath it?** Cut it. **Does it state a WHY
 the code cannot?** Keep it — a hidden constraint, a workaround, an invariant a
-future reader would otherwise break. Every comment is one line, which
-`CodeGym/SingleLineComment` enforces; longer reasoning goes in CLAUDE.md, a doc
-or the PR description.
+future reader would otherwise break.
+
+The comment rules in CLAUDE.md's Code Style section are never waived: each
+comment is one line, attached to the code directly below it (or trailing it),
+and a file holds at most 5. RuboCop enforces those three. Business decisions
+belong in CLAUDE.md or `docs/` (a file's own notes in `docs/code-notes/`),
+never in a comment.
 
 Some comments read as obvious but carry something real and must survive: a
 non-RESTful route, a partial's required locals, an abstract method's contract,
