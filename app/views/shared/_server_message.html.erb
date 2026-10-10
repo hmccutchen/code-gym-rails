@@ -1,32 +1,21 @@
-<%# The one rule for what a page script shows when a request fails: a
-    sentence the app wrote for a person, or the page's own wording. Never a
-    browser's error text ("Failed to fetch", a JSON parse error), a bare
-    status code, or the body Rails writes for an unhandled exception, whose
-    `status` is a number where the app's own errors carry "error".
-
-    Rendered from the layout ahead of `yield :page_scripts`. The page scripts
-    that use it are inline in the body and run first, so they call it only
-    from handlers that fire after the page has loaded. %>
+<%# Inline page scripts run before this, so they may call it only from handlers that fire after load. %>
 <script>
   window.CodeGymServerMessage = (function () {
     const SIGNED_OUT = <%= t("server_message.signed_out").to_json.html_safe %>;
     const written = new WeakSet();
 
-    // null when the body is not JSON: an HTML error page, the login page a
-    // redirect landed on, or nothing at all.
+    // null for an HTML error page, a redirected login page, or an empty body.
     async function read(response) {
       try { return await response.json(); } catch (_) { return null; }
     }
 
-    // An error whose message a person may read.
     function error(text) {
       const e = new Error(text);
       written.add(e);
       return e;
     }
 
-    // fetch follows redirects, and the only redirect a JSON endpoint gives
-    // is to the login page once the session has expired.
+    // The only redirect a JSON endpoint gives is to the login page after the session expires.
     function failure(response, data, fallback) {
       if (response && response.redirected) return error(SIGNED_OUT);
       const ours = data && data.status === "error" && typeof data.error === "string" && data.error;

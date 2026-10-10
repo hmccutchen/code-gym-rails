@@ -2,15 +2,12 @@
 <h1><%= t("learn.title") %></h1>
 <p class="learn-intro"><%= t("learn.intro") %></p>
 
-<%# Above the filter and the list: opening this tab and reading one thing
-    should take no decision. %>
+<%# Design notes: docs/code-notes/app/views/learn/index.html.md %>
 <% if @featured %>
   <%= render "shared/featured_concept", reference: @featured %>
 <% end %>
 
 <% if @ungenerated.positive? || @ungenerated_guides.positive? %>
-  <%# Quotes the counts and says whose key pays, because it spends the user's
-      own provider key and the rows it writes are shared with the whole team. %>
   <div class="learn-prepare">
     <p>
       <% if @ungenerated.positive? %><%= t("learn.prepare_prompt", count: @ungenerated) %><% end %>
@@ -20,11 +17,7 @@
     <%= button_to t("learn.prepare_button"), prepare_learn_path, class: "btn btn-sm", form: { id: "learn-prepare-form" } %>
   </div>
 
-  <%# #prepare derives what to enqueue from rows that exist, so a reload-and-
-      press-again double-submit would re-enqueue jobs still in flight. Disabling
-      client-side on submit covers the realistic double-click without adding a
-      persisted in-flight marker for a case the job's own re-check already
-      makes mostly harmless. %>
+  <%# #prepare enqueues from missing rows, so a second press would enqueue jobs still in flight again. %>
   <script>
     document.getElementById("learn-prepare-form").addEventListener("submit", (event) => {
       event.target.querySelector('[type="submit"]').disabled = true;
@@ -59,10 +52,7 @@
 
     <% bucket[:groups].each do |group_key, concepts| %>
       <div class="learn-group-block" id="<%= learn_group_anchor(bucket[:key], group_key) %>">
-        <%# A bucket whose concepts all fall in one group renders flat — that is
-            every language-independent bucket, and a heading over the only group
-            would be noise. A group drill sits with the heading, so a bucket
-            with no headings offers none; its core group is the whole bucket. %>
+        <%# A single-group bucket renders flat, so it offers no group drill; its core group is the whole bucket. %>
         <% if bucket[:groups].size > 1 %>
           <div class="learn-group-head">
             <h3 class="learn-group"><%= t("learn.groups.#{group_key}") %></h3>
@@ -92,10 +82,7 @@
               <% if @drills.drilling?(concept, bucket[:key]) %>
                 <span class="learn-drilling"><%= t("learn.drill.marker") %></span>
               <% end %>
-              <%# Row-existence and guide-existence are different facts, stated
-                  once each rather than collapsed into one marker: a row can
-                  exist (pre-guide) without the bulk button's count — driven by
-                  row existence — ever offering to clear it. %>
+              <%# Separate markers: the bulk count reads row existence, so it never counts a row that lacks only a guide. %>
               <% reference = @references[[ concept, bucket[:key] ]] %>
               <% if reference.nil? %>
                 <span class="learn-ungenerated"><%= t("learn.not_generated") %></span>
@@ -134,8 +121,6 @@
         if (visible) shown++;
       });
 
-      // A group or bucket whose every entry is filtered out hides its heading
-      // too, so the page doesn't leave empty sections behind.
       document.querySelectorAll(".learn-group-block").forEach((block) => {
         block.hidden = Array.from(block.querySelectorAll(".learn-entry")).every((e) => e.hidden);
       });

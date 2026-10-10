@@ -1,5 +1,4 @@
-<%# app/views/api_keys/_difficulty_controls.html.erb
-    Required locals: kind (an ExerciseSection class), excluded (Boolean). %>
+<%# Required locals: kind (an ExerciseSection class), excluded (Boolean). %>
 <% difficulty = KindDifficulty.for(current_user) %>
 <% level      = difficulty.level_for(kind) %>
 <fieldset class="mix-difficulty" data-kind="<%= kind.key %>">

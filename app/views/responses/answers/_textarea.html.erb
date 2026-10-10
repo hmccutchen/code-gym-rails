@@ -1,7 +1,4 @@
-<%# The answer area for every kind but parsons_problem: the stored text when
-    submitted, a textarea when not. The scaffold helpers no-op for unscaffolded
-    kinds, so they are called unconditionally.
-    Locals: kind, key, data, exercise, response, submitted. %>
+<%# Every kind but parsons_problem. Locals: kind, key, data, exercise, response, submitted. Scaffold helpers no-op when unscaffolded. %>
 <% if submitted %>
   <div class="answer-display"><%= response.answer_for(key) || t("responses.answered.skipped") %></div>
 <% else %>

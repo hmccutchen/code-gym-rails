@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-# Rasterizes the favicon and home-screen icons from
-# app/assets/images/logo-outlined-square.png. Needs Pillow (pip install pillow);
-# nothing in the app runs this, so the dependency stays out of the Gemfile.
-#
-#   python3 script/generate_icons.py
-#
-# Nearest-neighbor throughout, so the pixel art keeps hard edges instead of
-# blurring. The home-screen icons are composited onto the layout's --bg because
-# iOS fills transparent icon pixels with black.
+# Run: python3 script/generate_icons.py (needs Pillow). Design notes: docs/code-notes/script/generate_icons.md
 import re
 from pathlib import Path
 
@@ -18,16 +10,11 @@ SOURCE = ROOT / "app/assets/images/logo-outlined-square.png"
 LAYOUT = ROOT / "app/views/layouts/application.html.erb"
 PUBLIC = ROOT / "public"
 
-# Share of the icon's width the artwork spans. The barbell's ends sit halfway
-# down the art, clear of the corners iOS rounds off, so it can run nearly edge
-# to edge. The maskable figure is sized so every opaque pixel sits inside the
-# 80% safe-zone circle every platform mask keeps.
 PLAIN_ICON_WIDTH = 0.96
+# Every opaque pixel of the maskable icon stays inside the 80% safe-zone circle all platform masks keep.
 MASKABLE_SAFE_DIAMETER = 0.8
 
-# The barbell makes the art about 1.4x wider than tall, so fitting it whole into
-# a square tab icon leaves the lifter too short to read at 16px. The favicon
-# trims the plates' outer halves down to this width-to-height ratio instead.
+# Width-to-height ratio the favicon trims the plates to, so the lifter stays readable in a square tab icon.
 FAVICON_ASPECT = 1.1
 
 
@@ -74,8 +61,7 @@ def trimmed_to_aspect(art, aspect):
 
 
 def favicon(art):
-    # Transparent, and filled edge to edge: a browser tab has its own
-    # background, and the outline is what keeps the barbell visible on a dark one.
+    # Transparent: a tab has its own background, and the outline keeps the barbell visible on a dark one.
     return centered(trimmed_to_aspect(art, FAVICON_ASPECT), 32, 32, (0, 0, 0, 0))
 
 

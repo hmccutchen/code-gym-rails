@@ -29,9 +29,7 @@
       border-left: none;
       border-right: none;
     }
-    /* The entry already spans the viewport, so the shared .section rule's
-       break-out would overhang it; these cards stay inset and keep the card
-       look they have on desktop. */
+    /* The entry already spans the viewport, so these cards stay inset instead of the shared .section break-out. */
     .history-entry .section {
       margin-inline: 0;
       border-radius: 10px;
@@ -78,11 +76,7 @@
       <% end %>
     </div>
 
-    <%# Same partial the dashboard's submitted state renders — history is the one
-        destination for viewing any day's response, so there is no second
-        rendering to keep in sync. Always collapsed: the review below is what
-        someone opening this page came for, and the problems are a page-long
-        scroll past it. %>
+    <%# Same partial as the dashboard's submitted state; collapsed so the review below is what a visitor sees. %>
     <details class="answers">
       <summary><%= t("history.index.problems_summary") %></summary>
       <%= render "responses/answered_sections", exercise: daily_response.daily_exercise, response: daily_response %>

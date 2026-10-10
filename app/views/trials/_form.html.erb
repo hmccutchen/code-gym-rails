@@ -1,5 +1,4 @@
-<%# Required locals: url (where the form posts), providers (the provider keys a
-    trial can start on), signed_out (whether to ask for a name and email). %>
+<%# Required locals: url (form target), providers (provider keys a trial can start on), signed_out (ask for name and email). %>
 <%= form_with url: url, method: :post do |f| %>
   <% if signed_out %>
     <div class="form-field">

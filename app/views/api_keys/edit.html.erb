@@ -1,3 +1,4 @@
+<%# Design notes: docs/code-notes/app/views/api_keys/edit.html.md %>
 <% page_title t("api_keys.edit.title") %>
 <style>
   .setup-wrap { max-width: 480px; margin: 5rem auto; }
@@ -18,8 +19,6 @@
   .mix-row output { font-size: .8rem; color: var(--muted); }
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
-  /* A tap on the label toggles its box, so the label is the target, and 24px
-     is the WCAG 2.5.8 minimum for it. */
   .mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
   .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
@@ -136,11 +135,6 @@
       <p class="hint"><%= t("exercise_mix.lock_body") %></p>
     </div>
 
-    <%# The complement of the rotating loop below: a slot holding one candidate
-        has nothing to weigh or exclude, but its difficulty can still be set.
-        The fixed kinds share one group because they share a promise, that
-        they are in every set; any other single-kind slot is in some sets
-        only, so it gets a group of its own. %>
     <fieldset class="mix-group">
       <legend><%= t("exercise_mix.fixed_group") %></legend>
       <% ExerciseSection.fixed.each do |kind| %>
@@ -160,9 +154,6 @@
       </fieldset>
     <% end %>
 
-    <%# Derived from the slot roster, like ExerciseSection.rotatable and the
-        User validations: a slot holding one candidate has nothing to bias, and
-        a future multi-kind slot gets its controls without an edit here. %>
     <% ExerciseSection.slots.select { |_, kinds| kinds.size > 1 }.each do |slot, kinds| %>
       <fieldset class="mix-group mix-group-rotating">
         <legend><%= t("exercise_mix.#{slot}_group") %></legend>
@@ -205,19 +196,13 @@
 
   <script>
     (function () {
-      // CodeGymSaveStatus owns the request, the CSRF token, and what happens
-      // when the server refuses — see shared/_save_status.
-      // The key is per control, not per URL: every control here PATCHes the
-      // same path, and a shared key would let one control's success clear another's
-      // warning while the rejected state stayed on screen.
+      // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
       const save = (payload, key) =>
         window.CodeGymSaveStatus.save("PATCH", "<%= profile_path %>", { user: payload }, key);
 
       const tz = document.getElementById("tz-select");
       if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
 
-      // Chained like the skill level below, so a slow older save cannot land
-      // last and store a count the page no longer shows.
       const dailySections = document.getElementById("daily-sections");
       if (dailySections) {
         let sectionSaves = Promise.resolve();
@@ -234,10 +219,6 @@
         });
       }
 
-      // Chained like the Exercise mix's saves: sent in parallel, a slow older
-      // request could land last and store a level the page no longer shows.
-      // The Exercise mix's default options name the stored skill level, so
-      // they change only once the server has it.
       const skill = document.getElementById("skill-level");
       if (skill) {
         let skillSaves = Promise.resolve();
@@ -262,8 +243,7 @@
       const STOPS  = <%= raw KindPreferences::MULTIPLIERS.to_json %>;
       const DEFAULT_STOP = <%= raw KindPreferences::DEFAULT_MULTIPLIER.to_json %>;
       const LABELS = <%= raw t("exercise_mix.stops").to_json %>;
-      // aria-valuetext is what a screen reader reads as the slider's value;
-      // without it the stop word is lost and only the index is announced.
+      // Without aria-valuetext a screen reader announces the slider's index, not the stop word.
       const showStop = (slider, output) => {
         const stopLabel = LABELS[Number(slider.value)];
         output.textContent = stopLabel;
@@ -278,9 +258,6 @@
         const difficultyFor = (kind) => mix.querySelector('.mix-difficulty[data-kind="' + kind + '"]');
         const chosenLevel = (box) => (box.querySelector("input[type=radio]:checked") || { value: "" }).value;
 
-        // A lock is only meaningful with a level, so choosing the default clears
-        // it here rather than posting a lock the server would refuse. Coverage
-        // does not depend on the level, so it can show as soon as one is chosen.
         const syncDifficulty = (box) => {
           const targeted = chosenLevel(box) !== "";
           const lock = box.querySelector(".mix-lock-box");
@@ -307,8 +284,6 @@
             const value = STOPS[Number(slider.value)];
 
             if (box.checked) excluded.push(kind);
-            // Sparse on purpose: a kind left at the default stores no key, so
-            // "untouched" and "set back to default" are one stored state.
             if (value !== DEFAULT_STOP) weights[kind] = value;
           });
 
@@ -335,8 +310,6 @@
           });
         };
 
-        // A group's last remaining kind cannot be excluded. The server
-        // validation is the authority; this only stops the UI offering it.
         const lockLastInGroup = () => {
           mix.querySelectorAll(".mix-group-rotating").forEach((group) => {
             const boxes = Array.from(group.querySelectorAll(".mix-exclude-box"));
@@ -348,14 +321,8 @@
           });
         };
 
-        // The version this tab last saw. Posted with every mix save so a tab
-        // whose controls predate another tab's save is refused rather than
-        // overwriting it, and updated from whatever the server reports back.
         let version = <%= raw current_user.section_kind_preferences_version.to_json %>;
 
-        // Puts the server's state on screen after a refusal, so the engineer
-        // sees what is actually stored instead of re-applying a change against
-        // a version that can never match again.
         const applyServerState = (current) => {
           const weights = current.section_kind_weights || {};
           const excluded = current.excluded_section_kinds || [];
@@ -398,7 +365,6 @@
           return save(payload, "exercise_mix").then((result) => {
             if (!result) return false;
 
-            // A no-op save does not bump the server's version.
             const reported = result.data && result.data.section_kind_preferences_version;
             if (result.ok && typeof reported === "number") version = reported;
             if (result.status === 409 && result.data && result.data.current) {
@@ -414,11 +380,7 @@
           });
         };
 
-        // This tab's own saves are chained rather than issued in parallel. The
-        // debounce only spaces them by 400ms, so a request slower than that is
-        // still in flight when the next one is sent — and that next one would
-        // post the version the first is about to move, and be refused as a
-        // conflict with itself, snapping the user's latest change back.
+        // Chained: a parallel save would post the version the one in flight is about to move, and 409 against itself.
         let inFlight = Promise.resolve();
         // After load: this inline script runs before the layout defines CodeGymSaveStatus.
         document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => pending !== null || queuedSaves > 0));

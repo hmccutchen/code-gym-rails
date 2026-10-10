@@ -20,9 +20,6 @@
     :root {
       --bg: #0f0f1a; --surface: #1a1a2e; --border: #2a2a4a;
       --accent: #7c6af7; --text: #e0e0f0; --muted: #999;
-      /* --accent is too dark to read as text on the surface colors (4.27:1 on
-         --surface), so text takes a lighter shade of the same hue and --accent
-         stays for borders and fills. White on --button-bg is 5.07:1. */
       --accent-text: #988bf9;
       --button-bg: #6a57e8; --button-bg-hover: #5b48d9;
       --focus-ring: #c9c0ff; --focus-ring-width: 2px; --focus-ring-offset: 2px;
@@ -30,13 +27,10 @@
       --code-bg: #0d0d1a; --code-symbol: #a78bfa; --code-builtin: #7dd3fc;
       --pattern-mask: url("/assets/gym-pattern-tile-dark-4382d7e8.png");
       --pattern-tint: rgb(190, 205, 240); --pattern-opacity: .08;
-      /* iOS auto-zooms a focused input below 16px, which shifts the layout and
-         doesn't cleanly restore. max() keeps the floor without overriding a
-         user who has set a larger default. */
+      /* iOS zooms a focused input below 16px; max() keeps that floor without overriding a larger default. */
       --input-font-size: max(1rem, 16px);
     }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
-    /* Below the refresh indicator, outside the content it translates. */
     #background-pattern {
       display: none; position: fixed; inset: 0; z-index: -2; pointer-events: none;
       background-color: var(--pattern-tint); opacity: var(--pattern-opacity);
@@ -51,26 +45,7 @@
     @media (prefers-contrast: more), (forced-colors: active) {
       #background-pattern { display: none; }
     }
-    /* Browser behaviours that read as "web page" rather than "app" once the
-       chrome around them is gone: the rubber-band bounce past the end of a
-       page, and the grey flash on tap. Scoped to the installed app rather than
-       applied everywhere, so a Safari tab keeps its pull-to-refresh and its
-       tap feedback.
-
-       The nav name editor goes with them, for space rather than for feel: the
-       installed app has no browser chrome above the nav, so the row is at its
-       tightest exactly where the brand and the links matter most. The whole
-       .name-editor, not just its input — the status readout it flashes has
-       nothing to report once the field it belongs to is gone. This is the only
-       way to rename yourself in the app, so in the installed app there is no
-       way to; a deliberate trade, and renaming is unchanged in a browser tab.
-       This media query is the app's one standalone-mode test (it is also what
-       the two rules above are scoped by) — a second mechanism could disagree
-       with it. The pull-to-refresh script reads its answer from whether
-       .pull-refresh is displayed, for the same reason; `body` outranks that
-       element's hidden base rule further down, as .nav-links does here. Selected through .nav-links to outrank `nav .name-editor`,
-       which sets a display of its own further down the sheet: a media query
-       adds no specificity, so the later rule would otherwise win. */
+    /* The app's one standalone-mode test; .nav-links in the selector outranks the later nav .name-editor rule. */
     @media (display-mode: standalone) {
       html, body { overscroll-behavior-y: none; }
       body { -webkit-tap-highlight-color: transparent; }
@@ -80,11 +55,6 @@
     a { color: var(--accent-text); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    /* The one focus ring for fields and sliders. Offset, so it sits on the
-       background around the control rather than on the control's own border.
-       A slider's ring goes on its thumb, the part the arrow keys move. The
-       thumb selectors each get a rule of their own because a browser drops a
-       whole selector list when it doesn't know one vendor pseudo-element. */
     input:not([type="checkbox"], [type="radio"], [type="range"]):focus-visible,
     textarea:focus-visible, select:focus-visible,
     .parsons-block:focus-visible, .gloss-term:focus-visible {
@@ -96,57 +66,26 @@
 
     .container { max-width: 800px; margin: 0 auto; padding: 0 1.5rem; }
 
-    /* Positioned, because the collapsed menu below hangs off it. A query
-       container, so the collapse below can measure the nav in its own text
-       size; containment makes nav a stacking context, and the z-index keeps
-       the open menu above the dashboard's sticky progress bar. */
     nav { position: relative; z-index: 20; container-type: inline-size; background: var(--surface); border-bottom: 1px solid var(--border); padding: .75rem 0; margin-bottom: 2rem; }
-    /* Wider than the page column, so on a desktop the brand sits apart from
-       the links instead of crowding them inside the same 800px. */
     nav .inner { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; }
-    /* The brand refuses to shrink or wrap: squeezed against the name editor in
-       a wide browser tab, it otherwise broke into three lines (the bolt, then
-       "Code", then "Gym"). The name editor absorbs the squeeze instead — a
-       truncated name still reads and still edits, a stacked wordmark reads as
-       broken. min-width: 0 all the way down is what lets it: a flex item will
-       not shrink below its content otherwise. */
     nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 2rem; color: var(--accent-text); white-space: nowrap; flex-shrink: 0; }
-    /* A tap leaves a touch screen in :hover, so the global underline would
-       stay on the logo after every trip home. */
     nav .brand:hover { text-decoration: none; }
-    /* The alt text names the link, which is why the wordmark beside it is
-       hidden from screen readers. */
     nav .brand-mark { height: 5rem; width: 7rem; }
     nav .nav-links { display: flex; gap: 1rem; font-size: .9rem; color: var(--muted); align-items: center; min-width: 0; }
     nav .name-editor { display: flex; align-items: center; min-width: 0; }
     nav .nav-toggle { display: none; }
 
-    /* Below this width the row cannot hold the brand and four destinations at
-       once, so the destinations fold behind the button and the brand stays on
-       one line. Measured in em against the nav's own text, so a larger text
-       size moves the fold out with it: 37.5em is 600px at the default size. */
     @container (max-width: 37.5em) {
-      /* 44px in px rather than rem: a button that grew with the text size left
-         no room for the logo beside it on a 320px screen. */
       nav .nav-toggle {
         display: flex; flex-direction: column; justify-content: center; gap: 4px;
         width: 44px; height: 44px; padding: 0 11px; flex-shrink: 0;
         background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
       }
       nav .nav-toggle .bar { height: 2px; background: var(--muted); border-radius: 1px; }
-      /* On the narrowest phones the brand and the button no longer fit side by
-         side. The mark gives up width so the button always stays on screen;
-         the wordmark keeps its size. When the light palette wraps the mark in
-         a picture element, that element is the flex item, so it shrinks and
-         the mark follows it through max-width. */
       nav .inner { gap: .5rem; }
       nav .brand { flex-shrink: 1; min-width: 0; }
       nav .brand > picture { min-width: 0; }
       nav .brand .brand-mark { min-width: 0; max-width: 100%; object-fit: contain; }
-      /* Only .nav-links itself ever carries a display here, never a child: the
-         standalone block above hides the name editor through
-         `nav .nav-links .name-editor`, and any rule of higher specificity in
-         this block would put it back in the installed app. */
       nav .nav-links { display: none; }
       nav .nav-links[data-open] {
         display: flex; flex-direction: column; align-items: stretch; gap: .25rem;
@@ -169,11 +108,6 @@
     .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn-ghost:hover { border-color: var(--accent); color: var(--accent-text); }
     .btn-sm { padding: .3rem .8rem; font-size: .8rem; }
-    /* Loading state for buttons whose click starts a wait. Two consumers:
-       forms tagged data-loading-form (shared script at the bottom of this
-       layout) and the fetch-driven submit/review handlers, which toggle the
-       class themselves. pointer-events guards the gap before `disabled`
-       lands (it is applied a tick late — see the shared script). */
     .btn-loading { opacity: .6; pointer-events: none; }
     .btn-loading::before {
       content: ""; display: inline-block; width: .8em; height: .8em;
@@ -188,11 +122,6 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* The installed app's replacement for the pull-to-refresh a Safari tab has
-       natively. Shown only by the standalone block above; shared/_pull_to_refresh
-       slides [data-pull-content] down and centres this in the gap it opens.
-       z-index -1 keeps it beneath the nav and the content, so it shows only
-       where the content has moved out of the way. */
     .pull-refresh {
       display: none; position: fixed; top: 0; left: 50%; z-index: -1;
       width: 2rem; height: 2rem; margin-left: -1rem;
@@ -208,40 +137,17 @@
     .pull-refresh.is-refreshing .spinner { animation: spin .7s linear infinite; }
     .pull-refresh.is-settling, .pull-settling { transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s ease; }
 
-    /* For anyone whose OS asks for less motion. A spinner stops turning rather
-       than disappearing: each one sits beside text that already says the work
-       is under way, and a still ring beside it keeps the same meaning. Kept
-       after every rule it overrides, since it relies on source order. */
     @media (prefers-reduced-motion: reduce) {
       .spinner, .btn-loading::before, .pull-refresh.is-refreshing .spinner { animation: none; }
       .pull-refresh.is-settling, .pull-settling { transition: none; }
     }
 
-    /* A lone generic `monospace` makes browsers drop the default size to 13px,
-       so inline code would shrink beside 16px prose. Naming it twice is the
-       known way to opt out; the face is unchanged. */
     code, kbd, samp, pre { font-family: monospace, monospace; }
-    /* pre-wrap keeps each line's leading whitespace (indentation) intact, so
-       snippets wrap on phones instead of forcing horizontal scroll;
-       overflow-wrap breaks a token too long for the line. iOS would otherwise
-       enlarge code text on its own in landscape. */
     pre.snippet, .pseudocode-code pre { white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     pre.snippet { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-size: .85rem; margin-bottom: 1.25rem; }
-    /* CodeHighlight renders each line as a .code-line and sets --indent to
-       its leading columns. The first line starts at column 0 and keeps its
-       own spaces; a wrapped continuation starts two columns past that
-       indentation. shared/_code_lines_script marks a block that wraps, and
-       its alignment padding then shows as one space while the rest stays in
-       the text, so a copy keeps the original line. */
     code.highlight .code-line { display: block; padding-left: calc((var(--indent, 0) + 2) * 1ch); text-indent: calc((var(--indent, 0) + 2) * -1ch); }
     code.highlight[data-wraps] .code-align-extra { font-size: 0; }
-    /* Plan-review excerpts are prose, not code — a left-border quote block
-       instead of the monospace snippet treatment, so multi-paragraph text
-       reads as an excerpt from a doc rather than malformed code. */
     .plan-excerpt { background: var(--code-bg); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
-    /* The pseudocode_to_code rounds. Here rather than in a per-page block for
-       the same reason .answer-display is: _answered_sections renders these on
-       the dashboard's submitted state AND on every history entry. */
     .problem-statement { background: var(--code-bg); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: .85rem 1rem; font-size: .9rem; margin-bottom: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
     .pseudocode-rounds { margin-top: .75rem; }
     .pseudocode-controls { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
@@ -251,8 +157,6 @@
     .pseudocode-critique li { margin-bottom: .25rem; }
     .pseudocode-code pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; font-size: .85rem; margin: .6rem 0 .2rem; }
     .pseudocode-caption { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
-    /* Rouge's token classes, colored from the palette, so both themes and
-       Match my device need no second color source. */
     code.highlight { color: var(--text); }
     code.highlight :is(.k, .kd, .kn, .kp, .kr, .kt, .kv, .ow, .nc, .nf, .nn) { color: var(--accent-text); }
     code.highlight :is(.s, .s1, .s2, .sa, .sb, .sc, .sd, .se, .sh, .si, .sr, .sx, .dl) { color: var(--green); }
@@ -289,19 +193,11 @@
     .duck-form { display: flex; gap: .5rem; flex-wrap: wrap; }
     .duck-input { flex: 1 1 12rem; min-width: 0; background: var(--bg); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: .45rem .6rem; font-size: var(--input-font-size); font-family: inherit; }
     .duck-status { display: block; font-size: .75rem; color: var(--muted); margin-top: .4rem; }
-    /* Off screen until focused, so it is the first stop for a keyboard and
-       invisible to everyone else. Fixed, so showing it never shifts the nav. */
     .skip-link { position: fixed; top: .5rem; left: .5rem; z-index: 30; padding: .6rem 1rem; background: var(--surface); color: var(--accent-text); border: 1px solid var(--accent); border-radius: 6px; transform: translateY(-200%); }
     .skip-link:focus { transform: none; }
-    /* Focused only as the skip link's target; a ring around the whole page
-       would read as an error. */
     #main-content:focus { outline: none; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
-    /* Shared submission-rendering styles. Used by responses/_section (and the
-       per-kind partials it renders), responses/_answered_sections, and
-       responses/_submission — all of which render on BOTH the dashboard and the
-       history page, so these cannot live in a per-page <style> block. */
     .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
     .section-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin-bottom: .95rem; }
     details.section > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
@@ -309,9 +205,6 @@
     details.section > summary::before { content: "▼ "; }
     details.section:not([open]) > summary::before { content: "▶ "; }
     details.section:not([open]) > summary { margin-bottom: 0; }
-    /* The most-tapped control on the page, so it gets a 44px target. The
-       negative margins give back exactly what the padding adds, so the label
-       stays where it was and the target grows into the space around it. */
     details.section > summary { padding-block: 12.5px; margin-top: -12.5px; margin-bottom: calc(.95rem - 12.5px); }
     details.section:not([open]) > summary { margin-bottom: -12.5px; }
     .section-label .section-title { font: inherit; letter-spacing: inherit; margin: 0; }
@@ -322,9 +215,7 @@
     .why-box { background: rgba(124,106,247,.08); border-left: 3px solid var(--accent); padding: .6rem .9rem; font-size: .9rem; color: var(--muted); border-radius: 0 6px 6px 0; margin-bottom: 1rem; }
     .arch-options { margin: 0 0 1.25rem 1.25rem; font-size: .95rem; line-height: 1.8; }
 
-    /* Scoped to .section rather than zeroing .container's padding, which would
-       drag the nav and every page heading flush against the screen edge. The
-       -1.5rem tracks .container's padding and must change with it. */
+    /* The -1.5rem tracks .container's padding and must change with it. */
     @media (max-width: 600px) {
       .section {
         margin-inline: -1.5rem;
@@ -360,12 +251,6 @@
     details.ref summary::before { content: "▶ "; }
     details.ref[open] summary::before { content: "▼ "; }
     .ref-body { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-top: .5rem; font-size: .88rem; line-height: 1.7; }
-    /* Hides only the diagram box itself while it's still empty (before render
-       fills it) — the enclosing <details> summary/triangle stays visible and
-       clickable regardless, since that's the point of the disclosure. A
-       genuine failure (bad diagram, blocked/slow CDN) is handled separately:
-       the module script below removes the WHOLE disclosure it owns, not just
-       this div, so a failed diagram never leaves an empty box behind either. */
     .mermaid-diagram:empty { display: none; }
     .mermaid-diagram { margin-top: .9rem; overflow-x: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem; }
     .mermaid-diagram svg { max-width: 100%; height: auto; }
@@ -387,14 +272,6 @@
       white-space: normal; z-index: 10;
       display: none;
     }
-    /* Below this breakpoint .section breaks out of .container
-       (margin-inline: -1.5rem) and sets its own padding, so the panel is
-       measured against the section — not the container — to line up with the
-       text it defines. Every fallback equals the desktop value, so the paths
-       that reveal the panel without running the script (:focus-visible, hover
-       on a hover-capable pointer, or no script at all) stay capped as before.
-       max-width reuses --gloss-width so that it is a no-op once the script has
-       set an explicit width, which the 16rem cap would otherwise clamp. */
     @media (max-width: 600px) {
       .gloss-term::after {
         left: var(--gloss-shift, 0);
@@ -437,8 +314,6 @@
     .learn-list { list-style: none; padding: 0; }
     .learn-group-block { margin-bottom: 1rem; }
     .learn-entry { padding: .35rem 0; display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
-    /* `hidden` alone cannot hide a flex item — .learn-entry's own display beats
-       the UA's [hidden] rule, so the filter needs this to bite. */
     .learn-entry[hidden] { display: none; }
     .learn-seen { font-size: .75rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; }
     .learn-ungenerated { font-size: .75rem; color: var(--muted); }
@@ -457,15 +332,12 @@
     details.progress-group summary::before { content: "▶"; color: var(--accent-text); font-size: .8rem; }
     details.progress-group[open] summary::before { content: "▼"; }
     .progress-group-name { font-weight: 600; min-width: 9rem; }
-    /* Each standing sets --rung once; the bar segments and the held dots read it. */
     .rung-principal_engineer, .rung-developing_principal_engineer { --rung: #7c6af7; }
     .rung-senior, .rung-developing_senior { --rung: #4ade80; }
     .rung-junior, .rung-developing_junior { --rung: #86efac; }
     .rung-not_yet, .rung-not_offered { --rung: transparent; }
     .rung-bar { display: flex; flex: 1 1 8rem; height: .55rem; border-radius: 999px; overflow: hidden; background: var(--border); }
     .rung-bar span { display: block; height: 100%; background: var(--rung); }
-    /* Developing toward a rung is striped in that rung's colour, so the bar
-       reads as the same ladder with the in-between steps marked. */
     .rung-bar span[class^="rung-developing"] { background: repeating-linear-gradient(135deg, var(--rung) 0 3px, transparent 3px 6px); }
     .progress-counts { font-size: .8rem; color: var(--muted); }
     .progress-list { list-style: none; margin: .8rem 0 .2rem; padding: 0; }
@@ -489,10 +361,6 @@
     .learn-recognition summary { cursor: pointer; color: var(--muted); }
     .learn-recognition-label { font-size: .85rem; font-weight: 600; margin: .75rem 0 .25rem; }
 
-    /* shared/_featured_concept renders on BOTH the Learn tab and the dashboard,
-       so like the submission-rendering styles above it cannot live in a
-       per-page <style> block. .featured-compact is the dashboard's wrapper;
-       it dials the same block down rather than giving it a second markup. */
     .featured-concept { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; }
     .featured-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin-bottom: .5rem; }
     .featured-title { font-size: 1.25rem; margin-bottom: .25rem; }
@@ -501,17 +369,14 @@
     .featured-compact { margin-top: 2rem; }
     .featured-compact .featured-concept { padding: .9rem 1rem; margin-bottom: 0; }
     .featured-compact .featured-title { font-size: 1rem; }
-    /* Fixed rather than inline: the dashboard's autosave fires while the
-       engineer is typing far down a long page, and a message rendered at the
-       top would report the failure somewhere they cannot see. */
     .save-status { position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
                    z-index: 50; max-width: min(90vw, 32rem); margin: 0; padding: .7rem 1rem;
                    background: var(--surface); border: 1px solid #a33; border-left: 3px solid #a33;
                    border-radius: 6px; color: var(--text); font-size: .85rem;
                    box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
   </style>
-    <link rel="stylesheet" href="/assets/display-8b30f561.css" />
-    <link rel="stylesheet" href="/assets/display_light-86861e6a.css" media="not all" data-light-palette-media="true" />
+    <link rel="stylesheet" href="/assets/display-ae71633a.css" />
+    <link rel="stylesheet" href="/assets/display_light-aee77cf0.css" media="not all" data-light-palette-media="true" />
 </head>
 <body>
     <div id="background-pattern" aria-hidden="true"></div>
@@ -645,8 +510,6 @@
   .mix-row output { font-size: .8rem; color: var(--muted); }
   .mix-row input[type="range"]:disabled { opacity: .4; }
   .mix-exclude { font-size: .8rem; color: var(--muted); }
-  /* A tap on the label toggles its box, so the label is the target, and 24px
-     is the WCAG 2.5.8 minimum for it. */
   .mix-exclude, .mix-lock, .mix-difficulty label, .daily-sections label { min-height: 24px; }
   .mix-note { border-left: 3px solid var(--accent); padding-left: .6rem; margin: .5rem 0 1rem; }
   .mix-difficulty { grid-column: 1 / -1; border: 0; padding: .35rem 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; font-size: .8rem; }
@@ -1248,8 +1111,7 @@
       return values;
     };
 
-    // The same attributes the layout renders from what is stored, so the page
-    // looks now the way it will after a reload.
+    // Mirrors the attributes the layout renders from stored values; change both together.
     const apply = (values) => {
       Object.entries(values).forEach(([setting, value]) => {
         const attribute = "data-" + setting.replace(/_/g, "-");
@@ -1268,9 +1130,7 @@
       }
     };
 
-    // One save in flight at a time, each sending what is chosen when it goes
-    // out. Every request carries the whole object, so two in parallel could
-    // reach the server out of order and leave the earlier choice stored.
+    // One save at a time: each carries the whole object, so parallel saves could land out of order.
     let inFlight = Promise.resolve();
     let queued = 0;
     // After load: this inline script runs before the layout defines CodeGymSaveStatus.
@@ -1290,19 +1150,13 @@
 
   <script>
     (function () {
-      // CodeGymSaveStatus owns the request, the CSRF token, and what happens
-      // when the server refuses — see shared/_save_status.
-      // The key is per control, not per URL: every control here PATCHes the
-      // same path, and a shared key would let one control's success clear another's
-      // warning while the rejected state stayed on screen.
+      // Key per control: all controls PATCH one path, and a shared key lets one success clear another's warning.
       const save = (payload, key) =>
         window.CodeGymSaveStatus.save("PATCH", "/profile", { user: payload }, key);
 
       const tz = document.getElementById("tz-select");
       if (tz) tz.addEventListener("change", () => save({ time_zone: tz.value }, "time_zone"));
 
-      // Chained like the skill level below, so a slow older save cannot land
-      // last and store a count the page no longer shows.
       const dailySections = document.getElementById("daily-sections");
       if (dailySections) {
         let sectionSaves = Promise.resolve();
@@ -1319,10 +1173,6 @@
         });
       }
 
-      // Chained like the Exercise mix's saves: sent in parallel, a slow older
-      // request could land last and store a level the page no longer shows.
-      // The Exercise mix's default options name the stored skill level, so
-      // they change only once the server has it.
       const skill = document.getElementById("skill-level");
       if (skill) {
         let skillSaves = Promise.resolve();
@@ -1347,8 +1197,7 @@
       const STOPS  = [0.25,0.5,1.0,2.0,4.0];
       const DEFAULT_STOP = 1.0;
       const LABELS = ["Much less","Less","Default","More","Much more"];
-      // aria-valuetext is what a screen reader reads as the slider's value;
-      // without it the stop word is lost and only the index is announced.
+      // Without aria-valuetext a screen reader announces the slider's index, not the stop word.
       const showStop = (slider, output) => {
         const stopLabel = LABELS[Number(slider.value)];
         output.textContent = stopLabel;
@@ -1363,9 +1212,6 @@
         const difficultyFor = (kind) => mix.querySelector('.mix-difficulty[data-kind="' + kind + '"]');
         const chosenLevel = (box) => (box.querySelector("input[type=radio]:checked") || { value: "" }).value;
 
-        // A lock is only meaningful with a level, so choosing the default clears
-        // it here rather than posting a lock the server would refuse. Coverage
-        // does not depend on the level, so it can show as soon as one is chosen.
         const syncDifficulty = (box) => {
           const targeted = chosenLevel(box) !== "";
           const lock = box.querySelector(".mix-lock-box");
@@ -1392,8 +1238,6 @@
             const value = STOPS[Number(slider.value)];
 
             if (box.checked) excluded.push(kind);
-            // Sparse on purpose: a kind left at the default stores no key, so
-            // "untouched" and "set back to default" are one stored state.
             if (value !== DEFAULT_STOP) weights[kind] = value;
           });
 
@@ -1420,8 +1264,6 @@
           });
         };
 
-        // A group's last remaining kind cannot be excluded. The server
-        // validation is the authority; this only stops the UI offering it.
         const lockLastInGroup = () => {
           mix.querySelectorAll(".mix-group-rotating").forEach((group) => {
             const boxes = Array.from(group.querySelectorAll(".mix-exclude-box"));
@@ -1433,14 +1275,8 @@
           });
         };
 
-        // The version this tab last saw. Posted with every mix save so a tab
-        // whose controls predate another tab's save is refused rather than
-        // overwriting it, and updated from whatever the server reports back.
         let version = 0;
 
-        // Puts the server's state on screen after a refusal, so the engineer
-        // sees what is actually stored instead of re-applying a change against
-        // a version that can never match again.
         const applyServerState = (current) => {
           const weights = current.section_kind_weights || {};
           const excluded = current.excluded_section_kinds || [];
@@ -1483,7 +1319,6 @@
           return save(payload, "exercise_mix").then((result) => {
             if (!result) return false;
 
-            // A no-op save does not bump the server's version.
             const reported = result.data && result.data.section_kind_preferences_version;
             if (result.ok && typeof reported === "number") version = reported;
             if (result.status === 409 && result.data && result.data.current) {
@@ -1499,11 +1334,7 @@
           });
         };
 
-        // This tab's own saves are chained rather than issued in parallel. The
-        // debounce only spaces them by 400ms, so a request slower than that is
-        // still in flight when the next one is sent — and that next one would
-        // post the version the first is about to move, and be refused as a
-        // conflict with itself, snapping the user's latest change back.
+        // Chained: a parallel save would post the version the one in flight is about to move, and 409 against itself.
         let inFlight = Promise.resolve();
         // After load: this inline script runs before the layout defines CodeGymSaveStatus.
         document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => pending !== null || queuedSaves > 0));
@@ -1560,9 +1391,6 @@
         const button = form.querySelector('button[type="submit"], input[type="submit"]');
         if (!button) return;
 
-        // button_to (with Rails 8's button_to_generates_button_tag default)
-        // renders a <button>, not an <input> — the two need different
-        // properties for their label, so read/write whichever is present.
         const isButtonTag = button.tagName === "BUTTON";
         const originalLabel = isButtonTag ? button.textContent : button.value;
         const setLabel = (text) => { if (isButtonTag) { button.textContent = text; } else { button.value = text; } };
@@ -1571,8 +1399,7 @@
           const message = form.dataset.confirmMessage;
           if (message && !window.confirm(message)) { event.preventDefault(); return; }
 
-          // Deferred a tick: disabling synchronously inside the submit
-          // handler can cancel the submission in some browsers.
+          // Deferred a tick: disabling synchronously inside the submit handler can cancel the submission.
           setTimeout(() => {
             button.disabled = true;
             button.classList.add("btn-loading");
@@ -1580,9 +1407,6 @@
           }, 0);
         });
 
-        // A bfcache Back-restore would resurrect the page mid-"loading" —
-        // button dead until a manual reload (same hazard the review button
-        // handles). Reset to idle.
         window.addEventListener("pageshow", (event) => {
           if (!event.persisted) return;
           button.disabled = false;
@@ -1622,9 +1446,6 @@
         toggleTerm(term);
       });
 
-      // :focus-visible and :hover reveal the panel through CSS alone, without
-      // ever toggling .gloss-open, so those paths have to be measured too — the
-      // width cap bounds the panel but does not keep it on screen.
       const positionFromEvent = (event) => {
         const term = event.target.closest && event.target.closest(".gloss-term");
         if (term) positionPanel(term);
@@ -1643,21 +1464,18 @@
     const SIGNED_OUT = "Your session expired — reload the page and try again.";
     const written = new WeakSet();
 
-    // null when the body is not JSON: an HTML error page, the login page a
-    // redirect landed on, or nothing at all.
+    // null for an HTML error page, a redirected login page, or an empty body.
     async function read(response) {
       try { return await response.json(); } catch (_) { return null; }
     }
 
-    // An error whose message a person may read.
     function error(text) {
       const e = new Error(text);
       written.add(e);
       return e;
     }
 
-    // fetch follows redirects, and the only redirect a JSON endpoint gives
-    // is to the login page once the session has expired.
+    // The only redirect a JSON endpoint gives is to the login page after the session expires.
     function failure(response, data, fallback) {
       if (response && response.redirected) return error(SIGNED_OUT);
       const ours = data && data.status === "error" && typeof data.error === "string" && data.error;
@@ -1683,20 +1501,10 @@
     const banner = document.getElementById("save-status");
     const announcer = document.getElementById("save-status-announcer");
 
-    // Keyed by control rather than held as one flag: /setup saves three
-    // different things to one URL, and without a key a successful time-zone
-    // save would clear a warning the exercise-mix save had just earned, while
-    // the rejected checkbox sat there still looking saved.
     const failures = new Map();
-    // Guards against two saves of the SAME control finishing out of order,
-    // where a slow failure would otherwise overwrite the result of the newer
-    // save that succeeded after it.
     const issued = new Map();
     let counter = 0;
 
-    // Work the page shows but the server has not stored yet: a request on the
-    // wire, or a delayed save a page registered through watch(). Pull-to-refresh
-    // waits on pending() so a reload cannot drop an edit mid-save.
     let requests = 0;
     const probes = [];
 
@@ -1734,10 +1542,7 @@
       render();
     }
 
-    // Optional-chained for the same reason api_keys/edit's script was: with
-    // forgery protection off, Rails renders no csrf meta tag at all, and a
-    // throw here would stop the save silently — the exact failure this file
-    // exists to surface.
+    // With forgery protection off there is no csrf meta tag, and a throw here would stop the save silently.
     function csrf() {
       return document.querySelector('meta[name="csrf-token"]')?.content ?? "";
     }
@@ -1758,27 +1563,15 @@
         },
         body: JSON.stringify(body)
       }).then(async (response) => {
-        // Resolves with { ok, status, data } so a caller able to act on a
-        // particular refusal can. Callers that cannot simply ignore it —
-        // reporting the failure has already happened by then either way.
         if (!current()) return { ok: false };
 
-        // fetch follows redirects, so a request made after the session expired
-        // arrives here as the login page: 200, and `ok` true, for a save that
-        // stored nothing. Neither endpoint redirects on success, so a redirect
-        // can only mean the write did not happen.
+        // fetch follows redirects, so an expired session arrives as the login page with ok true.
         if (response.redirected) { fail(key, SIGNED_OUT); return { ok: false }; }
         if (response.ok) {
           succeed(key);
           return { ok: true, data: await response.json().catch(() => null) };
         }
 
-        // A failure can answer with an HTML error page rather than JSON, and
-        // parsing that throws — hence the inner catch. Only a message the
-        // server actually wrote is shown; anything else falls back to GENERIC,
-        // which is why the rejection path below ignores its own error. A
-        // dropped connection rejects with a browser string ("Failed to fetch"),
-        // and that is a developer's sentence, not one to hand an engineer.
         const data = await response.json().catch(() => null);
         fail(key, (data && data.errors && data.errors[0]) || GENERIC);
         return { ok: false, status: response.status, data: data };
@@ -1788,24 +1581,13 @@
       }).finally(() => { requests--; });
     }
 
-    // A caller that reloads in answer to a refusal navigates before the banner
-    // it just set can be read, so the message has to reach the page replacing
-    // this one. sessionStorage rather than a query parameter: the reload is a
-    // plain window.location.reload(), and a parameter would survive in the URL
-    // and re-announce itself on every later load of it.
     const CARRIED = "code-gym-save-status-carried";
 
-    // Bound to the path, because the reload is the only page meant to read
-    // this. A caller that sets a message and then never reloads — a refused
-    // navigation, a closed tab — would otherwise leave it for whatever page
-    // this partial renders on next, which could be days later and about
-    // nothing the reader did.
     function carry(key, message) {
       try {
         sessionStorage.setItem(CARRIED, JSON.stringify({ key: key, message: message, path: location.pathname }));
       } catch (error) {
-        // Private browsing can refuse the write. The reload still happens; the
-        // page it lands on simply says nothing, which is where it started.
+        // Private browsing can refuse the write; the reloaded page then just shows no message.
       }
     }
 
@@ -1831,8 +1613,7 @@
     const content = document.querySelector("[data-pull-content]");
     if (!content || getComputedStyle(indicator).display === "none") return;
 
-    // UIScrollView's rubber band: travel approaches MAX_TRAVEL but never
-    // reaches it, so the content keeps giving a little under a longer pull.
+    // UIScrollView's rubber band: travel approaches MAX_TRAVEL but never reaches it.
     const MAX_TRAVEL = 160;
     const THRESHOLD = 64;
     const HOLD = 64;
@@ -1852,8 +1633,6 @@
       return element instanceof Element && element.matches("input, textarea, select, [contenteditable]");
     }
 
-    // Pulling inside an inner area that is scrolled down scrolls that area,
-    // not the page, so it is not a refresh.
     function insideScrolledArea(element) {
       for (let node = element; node instanceof Element; node = node.parentElement) {
         if (node.scrollTop > 0) return true;
@@ -1934,21 +1713,17 @@
       indicator.style.opacity = "";
     }
 
-    // Absent on signed-out pages, which have nothing to save.
     function savesPending() {
       return window.CodeGymSaveStatus?.pending() ?? false;
     }
 
-    // A save still pending at the limit is treated as hung: the pull is
-    // cancelled rather than reloading over it, and can be tried again.
     function reloadWhenSaved(waited = 0) {
       if (!savesPending()) return reload();
       if (waited >= SAVE_WAIT_LIMIT_MS) return reset();
       setTimeout(() => reloadWhenSaved(waited + SAVE_POLL_MS), SAVE_POLL_MS);
     }
 
-    // A second finger, or any touch that cannot start a pull, ends the one
-    // already showing rather than leaving the content pulled down.
+    // A second finger, or a touch that cannot start a pull, ends the pull already showing.
     document.addEventListener("touchstart", (event) => {
       if (refreshing) return;
       if (startY !== null) reset();
@@ -1989,9 +1764,6 @@
 
   <script>
   (() => {
-    // A block with any wrapped line shows its alignment padding as one space,
-    // and gets the rest back when it has room again. A hidden block (a closed
-    // disclosure) measures zero and is fitted when it opens.
     function fitAlignment(code) {
       code.removeAttribute("data-wraps");
 
@@ -2001,15 +1773,14 @@
       code.append(probe);
       const row = probe.getBoundingClientRect().height;
       probe.remove();
+      // A hidden block (a closed disclosure) measures zero; the observer fits it when it opens.
       if (row === 0) return;
 
       const wraps = [...code.children].some((line) => line.getBoundingClientRect().height > row * 1.5);
       code.toggleAttribute("data-wraps", wraps);
     }
 
-    // Watches the <pre>, since an inline <code> reports no size. Fitting
-    // changes a block's height, never its width, so reacting to width alone
-    // cannot loop.
+    // Fitting changes a block's height, never its width, so reacting to width alone cannot loop.
     const widths = new WeakMap();
     const fitOnResize = new ResizeObserver((entries) => {
       entries.forEach(({ target, contentRect }) => {
@@ -2021,6 +1792,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       for (const code of document.querySelectorAll("code.highlight")) {
+        // Observes the <pre>, since an inline <code> reports no size.
         if (code.querySelector(".code-align-extra")) fitOnResize.observe(code.parentElement);
       }
     });

@@ -1,12 +1,4 @@
-<%# The answer area for design_comparison, in both states. The pick and the
-    reason are two controls but one stored answer ("pick:a\n" + reason), so
-    the script below writes them into the hidden field the shared autosave
-    and submit gate read, and sets its data-answer-complete.
-
-    The answer key renders only once this section has been reviewed: before
-    then it is the answer.
-
-    Locals: kind, key, data, exercise, response, submitted. %>
+<%# Locals: kind, key, data, exercise, response, submitted. %>
 <% if submitted %>
   <% pick, reason = kind.parse_answer(response.answer_for(key)) %>
   <div class="answer-display"><% if pick %><strong><%= t("sections.design_comparison.picked", piece: pick.upcase) %></strong>
@@ -36,9 +28,7 @@
     <textarea id="comparison-reason-<%= key %>" class="<%= kind.answer_class %>" data-comparison-reason
               maxlength="<%= ExerciseSection::DesignComparison::MAX_REASON_LENGTH %>"
               placeholder="<%= t("sections.#{key}.placeholder") %>"><%= reason %></textarea>
-    <%# The leading newline is the one HTML drops after the tag, as Rails'
-        text_area emits it: without it a stored "\n" + reason, a reason with no
-        pick, would lose its separator. %>
+    <%# HTML drops the newline after the tag, as with Rails' text_area; without it a reason with no pick loses its "\n". %>
     <textarea name="response[answers][<%= key %>]" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>"
               data-min-reason="<%= ExerciseSection::DesignComparison::MIN_REASON_LENGTH %>" hidden><%= "\n" %><%= response.answers[key] %></textarea>
   </div>
@@ -53,9 +43,7 @@
         const reason = area.querySelector("textarea[data-comparison-reason]");
         const prefix = <%= ExerciseSection::DesignComparison::PICK_PREFIX.to_json.html_safe %>;
 
-        // The same encoding and floor as DesignComparison.encode_answer and
-        // .answered?. A reason with no pick keeps its own line, so a reload
-        // still shows what was typed.
+        // Matches DesignComparison.encode_answer and .answered?; a reason with no pick keeps its line so a reload shows it.
         function compose() {
           const pick = area.querySelector("input[type=radio]:checked")?.value;
           const text = reason.value.trim();

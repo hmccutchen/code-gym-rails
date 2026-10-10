@@ -1,65 +1,15 @@
-# PostgreSQL. Versions 9.3 and up are supported.
-#
-# Install the pg driver:
-#   gem install pg
-# On macOS with Homebrew:
-#   gem install pg -- --with-pg-config=/usr/local/bin/pg_config
-# On Windows:
-#   gem install pg
-#       Choose the win32 build.
-#       Install PostgreSQL and put its /bin directory on your path.
-#
-# Configure Using Gemfile
-# gem "pg"
-#
+# Design notes: docs/code-notes/config/database.md
 default: &default
   adapter: postgresql
   encoding: unicode
-  # For details on connection pooling, see Rails configuration guide
-  # https://guides.rubyonrails.org/configuring.html#database-pooling
   # Sized for the judge fan-out on a Solid Queue worker; see lib/boot/database_pool.rb.
   pool: <%= DatabasePool.size(Rails.env) %>
-
 
 development:
   <<: *default
   database: code_gym_rails_development
 
-  # The specified database role being used to connect to PostgreSQL.
-  # To create additional roles in PostgreSQL see `$ createuser --help`.
-  # When left blank, PostgreSQL will use the default role. This is
-  # the same name as the operating system user running Rails.
-  #username: code_gym_rails
-
-  # The password associated with the PostgreSQL role (username).
-  #password:
-
-  # Connect on a TCP socket. Omitted by default since the client uses a
-  # domain socket that doesn't need configuration. Windows does not have
-  # domain sockets, so uncomment these lines.
-  #host: localhost
-
-  # The TCP port the server listens on. Defaults to 5432.
-  # If your server runs on a different port number, change accordingly.
-  #port: 5432
-
-  # Schema search path. The server defaults to $user,public
-  #schema_search_path: myapp,sharedapp,public
-
-  # Minimum log levels, in increasing order:
-  #   debug5, debug4, debug3, debug2, debug1,
-  #   log, notice, warning, error, fatal, and panic
-  # Defaults to warning.
-  #min_messages: notice
-
-# Warning: The database defined as "test" will be erased and
-# re-generated from your development database when you run "rake".
-# Do not set this db to the same as development or production.
-#
-# parallel_tests gives each process its own database by setting
-# TEST_ENV_NUMBER ("" for the first process, then 2, 3, ...). A url key here
-# outranks DATABASE_URL, so when one is set the suffix goes on the URL too;
-# without TEST_ENV_NUMBER both resolve to the same database as before.
+# parallel_tests sets TEST_ENV_NUMBER; url outranks DATABASE_URL, so the suffix goes on the url too.
 test:
   <<: *default
   database: code_gym_rails_test<%= ENV["TEST_ENV_NUMBER"] %>
@@ -67,31 +17,7 @@ test:
   url: <%= ENV["DATABASE_URL"] %><%= ENV["TEST_ENV_NUMBER"] %>
 <% end %>
 
-# As with config/credentials.yml, you never want to store sensitive information,
-# like your database password, in your source code. If your source code is
-# ever seen by anyone, they now have access to your database.
-#
-# Instead, provide the password or a full connection URL as an environment
-# variable when you boot the app. For example:
-#
-#   DATABASE_URL="postgres://myuser:mypass@localhost/somedatabase"
-#
-# If the connection URL is provided in the special DATABASE_URL environment
-# variable, Rails will automatically merge its configuration values on top of
-# the values provided in this file. Alternatively, you can specify a connection
-# URL environment variable explicitly:
-#
-#   production:
-#     url: <%= ENV["MY_APP_DATABASE_URL"] %>
-#
-# Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
-# for a full overview on how database connection configuration can be specified.
-#
-# Railway provides a single postgres database via DATABASE_URL. Solid Queue,
-# Solid Cache, and Solid Cable all share it (their tables are created by a
-# regular migration), so there must be exactly one database config here:
-# db:migrate iterates every configured database, and any extra logical
-# database would not receive DATABASE_URL and would fail to connect on deploy.
+# Keep exactly one database config: db:migrate runs every one, and an extra would get no DATABASE_URL.
 production:
   <<: *default
   url: <%= ENV["DATABASE_URL"] %>
