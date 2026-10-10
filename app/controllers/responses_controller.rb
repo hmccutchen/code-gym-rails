@@ -48,18 +48,11 @@ class ResponsesController < ApplicationController
     exercise = current_user.daily_exercises.for_date.first
     return head :not_found unless exercise
 
-    @response = persisted_response_for(exercise)
-    newly_submitted = false
-    saved = @response.with_lock do
-      unless @response.submitted?
-        assign_draft_response(exercise)
-        newly_submitted = @response.submitted?
-      end
-      @response.save
-    end
+    outcome = save_answers_under_lock(exercise)
+    return render_stale_answers if outcome == :stale
 
-    enqueue_concept_references(exercise) if saved && newly_submitted
-    render_save_result(saved)
+    enqueue_concept_references(exercise) if outcome == :newly_submitted
+    render_save_result(outcome != :failed)
   end
 
   # POST /responses/:id/review — trigger the inline AI review. Synchronous: the
@@ -332,6 +325,65 @@ class ResponsesController < ApplicationController
 
   private
 
+  # A kind can refuse an answer whose encoding this page no longer speaks —
+  # today only Parsons, whose draft arrives as signed block tokens, and whose
+  # tokens change when the problem is regenerated or the signing secret
+  # rotates. Nothing is written for a refusal, so the alternative to saying so
+  # is a 200 for a save that dropped the section, with the engineer's
+  # rearrangement lost behind a reported success.
+  #
+  # The whole payload goes, not just the refused section: tokens this page
+  # cannot account for mean the problem set was replaced under it, so every
+  # other answer in the same post was written against questions this row no
+  # longer holds. Section keys survive a regeneration, so storing them would
+  # file an answer under a question nobody read — the failure the exercise
+  # lock below exists to prevent, arriving through a different door. The work
+  # already stored is intact, since the refusal never reached the record.
+  #
+  # A page loaded before this shipped posts positional orders and has no
+  # handler for the 409, so it cannot reload itself; flash.responses.stale_answers
+  # asks for a refresh rather than announcing one, which is the recovery both
+  # that page and the current one can actually perform.
+  def stale_answer_sections(exercise)
+    submitted = response_params[:answers]&.slice(*exercise.active_section_keys)
+    return [] if submitted.blank?
+
+    submitted.keys.map(&:to_s) - DailyResponse.normalize_answers(submitted, exercise).keys.map(&:to_s)
+  end
+
+  # Lock the exercise before reading the problem_set the block tokens are
+  # checked against, then the response — RegenerateExerciseJob's order, so the
+  # two serialize rather than deadlock. Checking outside the lock let the job
+  # replace problem_set between the check and the save, which stored an
+  # arrangement against blocks this page never showed and reported it as a
+  # success.
+  def save_answers_under_lock(exercise)
+    ActiveRecord::Base.transaction do
+      exercise.lock!
+      next :stale if stale_answer_sections(exercise).any?
+
+      @response = persisted_response_for(exercise)
+      @response.lock!
+      newly_submitted = false
+      unless @response.submitted?
+        assign_draft_response(exercise)
+        newly_submitted = @response.submitted?
+      end
+      next :failed unless @response.save
+
+      newly_submitted ? :newly_submitted : :saved
+    end
+  end
+
+  def render_stale_answers
+    respond_to do |format|
+      format.json do
+        render json: { status: "stale", errors: [ t("flash.responses.stale_answers") ] }, status: :conflict
+      end
+      format.html { redirect_to root_path, alert: t("flash.responses.stale_answers") }
+    end
+  end
+
   def assign_draft_response(exercise)
     submitted_answers = response_params[:answers]&.slice(*exercise.active_section_keys)
     submitted_answers = DailyResponse.normalize_answers(submitted_answers, exercise) if submitted_answers
@@ -465,8 +517,14 @@ class ResponsesController < ApplicationController
   # The dashboard's debounced autosave makes this race the common case, not the
   # exotic one. Re-found by date alone, which is the uniqueness scope — a
   # regenerated day swaps daily_exercise_id.
+  # A SAVEPOINT, because #create calls this inside its own transaction: an
+  # unrescued unique violation there would abort the whole thing, and the
+  # recovery read below would raise PG::InFailedSqlTransaction instead of
+  # returning the row that won (same reasoning as ConceptReference.claim_feature).
   def persisted_response_for(exercise)
-    current_user.daily_responses.find_or_create_by!(daily_exercise: exercise, date: Date.current)
+    ActiveRecord::Base.transaction(requires_new: true) do
+      current_user.daily_responses.find_or_create_by!(daily_exercise: exercise, date: Date.current)
+    end
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
     current_user.daily_responses.find_by!(date: Date.current)
   end

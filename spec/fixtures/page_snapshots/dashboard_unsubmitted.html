@@ -845,6 +845,11 @@ What would be easy to get wrong or worth testing:
     const ratings = {};
     form.querySelectorAll("button.rating-btn.active").forEach(b => { ratings[b.dataset.ratingFor] = b.dataset.rating; });
 
+    // Carried across the reload a refused save triggers, so it has to be the
+    // sentence for a page that has already come back rather than the server's,
+    // which asks for the refresh this client performs on its own.
+    const STALE_RELOADED = "The set changed, so that last change wasn't saved. This is the current set — your saved work is still there.";
+
     // The client-side half of DailyResponse#submit_blocker, read against the
     // live form so typing into a section re-locks Submit until it is rated.
     function submitBlocker() {
@@ -914,7 +919,20 @@ What would be easy to get wrong or worth testing:
       // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
         saveTimer = null;
-        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, data }) => {
+        window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
+          // A refused encoding (see ResponsesController#stale_answer_sections)
+          // stored nothing, so the page has to come back before another save
+          // can land. Reloading is the whole recovery: the server re-renders
+          // the section in the encoding it now expects. The banner this save
+          // just set would be wiped by that navigation, so the explanation is
+          // carried over to the page that lands — and it is this sentence, not
+          // the server's, because the server's asks for a refresh that has
+          // already happened by the time it would be read.
+          if (!ok && status === 409 && data?.status === "stale") {
+            window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
+            window.location.reload();
+            return;
+          }
           if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
         });
       }, 800);
@@ -997,6 +1015,7 @@ What would be easy to get wrong or worth testing:
       submitButton.textContent = "Submitting…";
 
       let submissionSaved = false;
+      let reloading = false;
       try {
         const res = await fetch(form.action, {
           method: "POST",
@@ -1015,6 +1034,18 @@ What would be easy to get wrong or worth testing:
           requestReview(data.review_url);
           reviewRequested = true;
         } else {
+          // The same refusal the autosave handles, on the path that matters
+          // more: nothing was submitted, so reloading is what lets the next
+          // press reach the server. The form stays inert behind the reload:
+          // restoring it would queue an autosave of the payload just refused.
+          // This path sets no banner of its own, so the carried sentence is
+          // the only thing that tells the reader why the page changed.
+          if (res.status === 409) {
+            window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
+            reloading = true;
+            window.location.reload();
+            return;
+          }
           alert("Couldn't submit your answers — please try again.");
         }
       } catch (error) {
@@ -1025,7 +1056,7 @@ What would be easy to get wrong or worth testing:
           alert("Couldn't submit your answers — please try again.");
         }
       } finally {
-        if (!reviewRequested && !submissionSaved) {
+        if (!reviewRequested && !submissionSaved && !reloading) {
           form.inert = false;
           submitButton.classList.remove("btn-loading");
           submitButton.textContent = "Submit answers";
@@ -1291,7 +1322,39 @@ What would be easy to get wrong or worth testing:
       }).finally(() => { requests--; });
     }
 
-    return { save: save, watch: watch, pending: pending };
+    // A caller that reloads in answer to a refusal navigates before the banner
+    // it just set can be read, so the message has to reach the page replacing
+    // this one. sessionStorage rather than a query parameter: the reload is a
+    // plain window.location.reload(), and a parameter would survive in the URL
+    // and re-announce itself on every later load of it.
+    const CARRIED = "code-gym-save-status-carried";
+
+    // Bound to the path, because the reload is the only page meant to read
+    // this. A caller that sets a message and then never reloads — a refused
+    // navigation, a closed tab — would otherwise leave it for whatever page
+    // this partial renders on next, which could be days later and about
+    // nothing the reader did.
+    function carry(key, message) {
+      try {
+        sessionStorage.setItem(CARRIED, JSON.stringify({ key: key, message: message, path: location.pathname }));
+      } catch (error) {
+        // Private browsing can refuse the write. The reload still happens; the
+        // page it lands on simply says nothing, which is where it started.
+      }
+    }
+
+    try {
+      const carried = sessionStorage.getItem(CARRIED);
+      if (carried) {
+        sessionStorage.removeItem(CARRIED);
+        const parsed = JSON.parse(carried);
+        if (parsed && parsed.message && parsed.path === location.pathname) fail(parsed.key || "carried", parsed.message);
+      }
+    } catch (error) {
+      try { sessionStorage.removeItem(CARRIED); } catch (ignored) {}
+    }
+
+    return { save: save, watch: watch, pending: pending, carry: carry };
   })();
 </script>
 

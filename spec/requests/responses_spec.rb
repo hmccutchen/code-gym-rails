@@ -149,16 +149,126 @@ RSpec.describe "Responses", type: :request do
   end
 
   describe "POST /responses (parsons_problem answer)" do
-    it "round-trips a parsons_problem answer through create and answered_sections" do
+    # The refusal used to read as a save: 200, the section quietly dropped from
+    # the payload. It answers 409 now, which is what the page needs to know it
+    # must reload before another save can land. The guarantee this example was
+    # written for is unchanged and still asserted — the stored order stands.
+    it "keeps a saved order out of reach of a posted positional one" do
       exercise = create_exercise(
         "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
       )
-
-      post responses_path, params: { response: { answers: { "parsons_problem" => "order:2,0,4,1,3" } } },
+      tokens = [ 2, 0, 4, 1, 3 ].map { |id|
+        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem",
+                                                        section_data: exercise.problem_set["parsons_problem"])
+      }
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{tokens.join(',')}" } } },
            as: :json
 
-      expect(response).to have_http_status(:ok)
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:0,1,2,3,4" } } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["status"]).to eq("stale")
       saved = DailyResponse.find_by(user: user, daily_exercise: exercise)
+      expect(saved.answers["parsons_problem"]).to eq("order:2,0,4,1,3")
+    end
+
+    # A refused encoding stored nothing, so reporting it as saved loses the
+    # rearrangement behind a reported success. Nothing is written at all, which
+    # is what makes the reload safe: the draft the page comes back with is the
+    # last one that did land.
+    it "refuses a stale encoding outright rather than reporting a save that dropped it" do
+      exercise = create_exercise(
+        "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] },
+        "code_review" => { "title" => "T", "question" => "Q", "code" => "x" }
+      )
+
+      post responses_path,
+           params: { response: { answers: { "parsons_problem" => "order:0,1,2",
+                                            "code_review" => "A real answer about the query." } } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
+    end
+
+    # A page loaded before block tokens shipped posts positions and has no
+    # handler for the 409, so it cannot reload itself. The message it shows is
+    # the only recovery it has, and announcing a reload would describe
+    # something that never happens on exactly the page that needs it.
+    it "asks a page that cannot reload itself to refresh rather than announcing one" do
+      create_exercise("parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] })
+
+      post responses_path,
+           params: { response: { answers: { "parsons_problem" => "order:0,1,2" } } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["errors"].first).to include("Refresh")
+      expect(response.parsed_body["errors"].first).not_to match(/reloading/i)
+    end
+
+    # The check and the save have to see one problem set. RegenerateExerciseJob
+    # takes the exercise lock before it writes, so reading problem_set before
+    # that lock let a replacement commit in between: the tokens validated
+    # against the old blocks and the arrangement was then stored against the
+    # new ones, reported as a successful save.
+    it "re-reads the problem set under the lock, so a regeneration cannot land between the check and the save" do
+      exercise = create_exercise(
+        "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] }
+      )
+      tokens = [ 0, 1, 2 ].map { |id|
+        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem",
+                                                        section_data: exercise.problem_set["parsons_problem"])
+      }
+      allow_any_instance_of(DailyExercise).to receive(:lock!).and_wrap_original do |original, *args|
+        DailyExercise.where(id: exercise.id).update_all(
+          problem_set: exercise.problem_set.merge(
+            "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[x y z] }
+          )
+        )
+        original.call(*args)
+      end
+
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{tokens.join(',')}" } } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).to be_nil
+    end
+
+    it "refuses a stale submit without submitting, so the day stays open" do
+      exercise = create_exercise(
+        "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c] }
+      )
+      token = ExerciseSection::ParsonsProblem.block_token(
+        0, exercise: exercise, key: "parsons_problem", section_data: exercise.problem_set["parsons_problem"]
+      )
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{token}" } } }, as: :json
+
+      post responses_path,
+           params: { response: { answers: { "parsons_problem" => "order:0,1,2" },
+                                 section_ratings: { "parsons_problem" => "right_level" }, submit: "1" } },
+           as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(DailyResponse.find_by(user: user, daily_exercise: exercise)).not_to be_submitted
+    end
+
+    it "stores the positions a page's block tokens stand for" do
+      exercise = create_exercise(
+        "parsons_problem" => { "title" => "T", "question" => "Q", "blocks" => %w[a b c d e] }
+      )
+      tokens = [ 2, 0, 4, 1, 3 ].map { |id|
+        ExerciseSection::ParsonsProblem.block_token(id, exercise: exercise, key: "parsons_problem",
+                                                        section_data: exercise.problem_set["parsons_problem"])
+      }
+
+      post responses_path, params: { response: { answers: { "parsons_problem" => "order:#{tokens.join(',')}" } } },
+           as: :json
+
+      saved = DailyResponse.find_by(user: user, daily_exercise: exercise)
+      expect(response).to have_http_status(:ok)
       expect(saved.answers["parsons_problem"]).to eq("order:2,0,4,1,3")
       expect(saved.answered_sections).to include("parsons_problem")
     end

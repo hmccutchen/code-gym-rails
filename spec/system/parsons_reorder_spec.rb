@@ -54,12 +54,27 @@ RSpec.describe "Parsons reorder controls", type: :system do
     expect(page).to have_css("ol[data-parsons-blocks][data-parsons-wired]", wait: 10)
   end
 
+  # The page shows an opaque token per block, so these read the arrangement
+  # back through the same mapping the server decodes a submission with.
+  def block_positions
+    exercise = user.daily_exercises.sole
+    ExerciseSection::ParsonsProblem.token_ids(
+      exercise: exercise, key: "parsons_problem",
+      section_data: exercise.problem_set["parsons_problem"]
+    )
+  end
+
   def block_ids
-    all("ol[data-parsons-blocks] .parsons-block").map { |li| li["data-block-id"] }
+    positions = block_positions
+    all("ol[data-parsons-blocks] .parsons-block").map { |li| positions[li["data-block-id"]].to_s }
   end
 
   def hidden_answer
-    find("textarea[data-field='parsons_problem']", visible: :all).value
+    value = find("textarea[data-field='parsons_problem']", visible: :all).value
+    ExerciseSection::ParsonsProblem.decode_answer(
+      value, exercise: user.daily_exercises.sole, key: "parsons_problem",
+      section_data: user.daily_exercises.sole.problem_set["parsons_problem"]
+    )
   end
 
   [ 1, 2, 3 ].each do |count|
@@ -161,6 +176,54 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
+  # The page's tokens stop decoding once the problem is regenerated under it.
+  # The server refuses that save with 409, and the only recovery is a reload,
+  # which brings back blocks the page can save again.
+  it "reloads when a save is refused because the problem changed under the page" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      exercise = user.daily_exercises.sole
+      exercise.problem_set["parsons_problem"]["blocks"] = [ "def replaced(names)", "  names.uniq", "end" ]
+      exercise.save!
+
+      find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
+
+      expect(page).to have_css("ol[data-parsons-blocks] .parsons-block", text: "names.uniq", wait: 10)
+      expect(user.daily_responses.reload).to be_empty
+    end
+  end
+
+  # The reload wipes the banner the refused save set, so without carrying the
+  # message the page would come back changed and silent, with the engineer's
+  # last move gone and nothing saying why.
+  it "explains the refusal on the page the reload lands on" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      exercise = user.daily_exercises.sole
+      exercise.problem_set["parsons_problem"]["blocks"] = [ "def replaced(names)", "  names.uniq", "end" ]
+      exercise.save!
+
+      find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
+
+      expect(page).to have_css("#save-status", text: "that last change wasn't saved", wait: 10)
+    end
+  end
+
+  # The message is for the page the reload lands on and nowhere else. A reader
+  # who navigates away instead of reloading, or whose reload never happens,
+  # must not meet the explanation again on a page it says nothing about.
+  it "does not follow the reader to another page" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      page.execute_script("window.CodeGymSaveStatus.carry('answers', 'Reload to see the current problem.')")
+
+      visit learn_path
+
+      expect(page).to have_css("h1")
+      expect(page).to have_no_css("#save-status", text: "Reload to see the current problem.")
+    end
+  end
+
   it "moves focus between blocks with a bare arrow key" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)
@@ -168,7 +231,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
       find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(:down)
 
       expect(block_ids).to eq([ "2", "0", "1" ])
-      expect(page.evaluate_script("document.activeElement.dataset.blockId")).to eq("0")
+      expect(block_positions[page.evaluate_script("document.activeElement.dataset.blockId")]).to eq(0)
     end
   end
 end

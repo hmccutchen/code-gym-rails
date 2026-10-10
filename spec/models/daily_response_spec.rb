@@ -415,6 +415,15 @@ RSpec.describe DailyResponse, type: :model do
         .to eq("code_review" => "")
     end
 
+    it "drops a section whose kind cannot read what was posted, leaving the draft alone" do
+      exercise = user.daily_exercises.create!(
+        date: Date.current, generated_at: Time.current,
+        problem_set: { "parsons_problem" => { "blocks" => %w[a b c] } }
+      )
+
+      expect(DailyResponse.normalize_answers({ "parsons_problem" => "order:0,1,2" }, exercise)).to eq({})
+    end
+
     it "tolerates a nil exercise by falling back to the kind's default labels" do
       pristine = ExerciseSection::Architecture::DEFAULT_SCAFFOLD.join("\n\n\n")
       expect(DailyResponse.normalize_answers({ "architecture" => pristine }, nil))
