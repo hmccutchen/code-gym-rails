@@ -23,8 +23,7 @@ RSpec.describe ApiUsage, type: :model do
     expect(described_class.failed.count).to eq(1)
   end
 
-  # A job outside the user's zone stamps `date` with the server's day, so the
-  # count reads when the row was written, in the user's zone.
+  # A job outside the user's zone stamps `date` with the server's day, so the count reads write time.
   it "counts one account's calls on its own local day by when they were made" do
     user.update!(time_zone: "America/New_York")
     [ Time.utc(2026, 10, 7, 3, 59), Time.utc(2026, 10, 7, 4), Time.utc(2026, 10, 8, 3, 59), Time.utc(2026, 10, 8, 4) ].each do |at|

@@ -1,12 +1,8 @@
-# The kill switch, TRIALS_DISABLED=1, ends every trial at once, on every call
-# and every page, without touching a row. It also empties the providers a new
-# trial can start on.
+# TRIALS_DISABLED=1 ends every trial at once without touching a row.
 module TrialMode
   def self.enabled? = ENV["TRIALS_DISABLED"] != "1"
 
-  # A trial needs a data notice to consent to and a house key to run on, so
-  # a provider is offered only with both; the test provider counts where it
-  # is available.
+  # A provider needs both a data notice and a house key to be offered.
   def self.providers
     return [] unless enabled?
 

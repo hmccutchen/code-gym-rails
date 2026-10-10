@@ -1,9 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ExerciseSection do
-  # Ingest formats these fields, so a name that matches no field in the
-  # kind's schema would leave its code unformatted without failing anything.
-  it "names only code fields that appear in each kind's schema" do
+  it "names only code fields that appear in each kind's schema, since any other name would go unformatted silently" do
     described_class.all.each do |kind|
       kind.code_fields.each do |field|
         expect(kind.schema_fragment(label: "Ruby")).to include(%("#{field}")), "#{kind.key}: #{field}"
@@ -26,17 +24,13 @@ RSpec.describe ExerciseSection do
       expect(described_class.find(:security_review)).to eq(ExerciseSection::SecurityReview)
     end
 
-    # A provider can put arbitrary keys in a jsonb payload, so callers get nil
-    # to decide on rather than an exception.
-    it "returns nil for a key outside the closed set" do
+    it "returns nil rather than raising for a key outside the closed set, which a provider's payload can carry" do
       expect(described_class.find("bogus")).to be_nil
     end
   end
 
   describe ".thirds" do
-    # Precedence, not enumeration order — DailyExercise#third_key relies on
-    # architecture winning over security_review over challenge.
-    it "lists the third-slot kinds in resolution precedence order" do
+    it "lists the third-slot kinds in the resolution precedence order DailyExercise#third_key relies on" do
       expect(described_class.thirds.map(&:key)).to eq(%w[architecture security_review challenge parsons_problem])
     end
 
@@ -104,15 +98,7 @@ RSpec.describe ExerciseSection do
       end
     end
 
-    # A sequencing format graded by positional diff can express neither
-    # "these columns are modeled wrong" nor "what is this code for" nor
-    # "this class is doing four jobs" — and neither a principle nor a module
-    # boundary has a right or wrong block ORDER — nor does a wrong unit, an
-    # incomplete cache key, or a missing tiebreak, each of which is one wrong
-    # VALUE rather than a misplaced line — nor a name the domain does not use,
-    # nor a write path that every permutation performs identically. See the
-    # comment on ParsonsProblem.
-    it "withholds the seven non-sequential groups from parsons_problem" do
+    it "withholds the seven non-sequential groups from parsons_problem, whose positional diff cannot grade them" do
       expect(ExerciseSection::ParsonsProblem.excluded_vocabulary_keys)
         .to eq([ :data_modeling, :domain_modeling, :meta_skill, :code_smell, :oo_design, :module_design,
                  :silent_correctness ])
@@ -148,9 +134,6 @@ RSpec.describe ExerciseSection do
       expect(described_class.find("pseudocode_to_code").translated_before_grading?).to be(true)
     end
 
-    # The count is load-bearing beyond this facet: each such kind adds a
-    # provider call the review makes in sequence, which the review claim window
-    # has to outlast (see ai_service_spec's request timeout budget).
     it "is false for every other kind, whose answer is graded as written" do
       (described_class.keys - [ "pseudocode_to_code" ]).each do |key|
         expect(described_class.find(key).translated_before_grading?).to be(false)
@@ -179,27 +162,19 @@ RSpec.describe ExerciseSection do
       expect(described_class.for("plan_review")).to eq(ExerciseSection::PlanReview)
     end
 
-    # A provider can put an arbitrary key in a jsonb payload; a view reading a
-    # facet off it wants the default, not a nil to guard.
-    it "falls back to the base class's defaults for an unrecognized key" do
+    it "falls back to the base class's defaults for an unrecognized key, so views never guard a nil" do
       expect(described_class.for("invented_by_a_provider").improved_code_label).to eq("Improved code")
       expect(described_class.for("invented_by_a_provider").improved_code_prose?).to be(false)
     end
   end
 
   describe ".diagrammable?" do
-    # code_review, pattern, and challenge all describe a structure in prose or
-    # in code already on screen, so a diagram of it restates what is visible.
     it "marks the kinds whose scenario carries a structure worth diagramming" do
       expect(described_class.find("code_review").diagrammable?).to be(true)
       expect(described_class.find("pattern").diagrammable?).to be(true)
       expect(described_class.find("challenge").diagrammable?).to be(true)
     end
 
-    # security_review's task is finding one exploitable thing in a snippet, so
-    # a diagram of that snippet's structure narrows the search. A parsons
-    # problem's blocks ARE the structure — diagramming them is the answer.
-    # Architecture already carries a diagram inside its reference block.
     it "excludes the kinds where a diagram would narrow the search or be the answer" do
       expect(described_class.find("security_review").diagrammable?).to be(false)
       expect(described_class.find("parsons_problem").diagrammable?).to be(false)
@@ -254,11 +229,7 @@ RSpec.describe ExerciseSection do
         expect(ExerciseSection::ParsonsProblem.grade([], 5)).to eq(mismatches: 5, rating: "beginner")
       end
 
-      # Anything short of a complete permutation scores as fully mismatched
-      # rather than earning partial credit for the positions that happen to
-      # line up. Padding alone used to award that credit, which made a correct
-      # prefix followed by junk indistinguishable from a correct answer.
-      it "treats a short submission as fully mismatched rather than partially correct" do
+      it "treats a short submission as fully mismatched rather than partially correct, so padding earns no credit" do
         expect(ExerciseSection::ParsonsProblem.grade([ 0, 1 ], 5)).to eq(mismatches: 5, rating: "beginner")
       end
 
@@ -278,10 +249,7 @@ RSpec.describe ExerciseSection do
         expect(ExerciseSection::ParsonsProblem.submitted_order("order:2,0,1", 3)).to eq([ 2, 0, 1 ])
       end
 
-      # The defect this exists to close: parse_order alone returns a list whose
-      # first block_count entries are the identity, so every positional reader
-      # would call this answer perfect.
-      it "rejects a correct permutation with extra ids appended" do
+      it "rejects a correct permutation with extra ids appended, which parse_order alone reads as perfect" do
         expect(ExerciseSection::ParsonsProblem.submitted_order("order:0,1,2,999", 3)).to eq([])
       end
 
@@ -363,9 +331,7 @@ RSpec.describe ExerciseSection do
           .to eq([ "Which cache, and why:", "How you'd invalidate it:" ])
       end
 
-      # Every pre-scaffold row takes this path, so it is the common case, not
-      # an edge case.
-      it "falls back to the kind's default when the problem carries none" do
+      it "falls back to the kind's default when the problem carries none, as every pre-scaffold row does" do
         expect(ExerciseSection::Architecture.scaffold_labels({ "question" => "q" }))
           .to eq(ExerciseSection::Architecture::DEFAULT_SCAFFOLD)
         expect(ExerciseSection::Pattern.scaffold_labels(nil))
@@ -389,9 +355,7 @@ RSpec.describe ExerciseSection do
         expect(ExerciseSection::Pattern.normalize_scaffold([ "  A:  ", "", nil, "B:" ])).to eq([ "A:", "B:" ])
       end
 
-      # Dropped, not coerced: to_s would turn 42 into the label "42" and a Hash
-      # into its inspect output, both of which read as a real scaffold downstream.
-      it "drops non-string elements rather than stringifying them" do
+      it "drops non-string elements rather than stringifying them into text that reads as a real scaffold" do
         expect(ExerciseSection::Pattern.normalize_scaffold([ 42, { "a" => 1 }, [ "B:" ], "A:" ]))
           .to eq([ "A:" ])
       end
@@ -453,9 +417,7 @@ RSpec.describe ExerciseSection do
           .to eq("I would use a registry object")
       end
 
-      # Matching whole lines, not substrings, is what makes an edited label the
-      # user's own text rather than scaffolding to discard.
-      it "keeps a label the user edited, and indentation the user added" do
+      it "keeps a label the user edited, and indentation the user added, by matching whole lines" do
         expect(ExerciseSection::Architecture.substantive_answer("Which option, and why: B\n  indented", data))
           .to eq("Which option, and why: B\n  indented")
       end
@@ -486,9 +448,7 @@ RSpec.describe ExerciseSection do
       end
     end
 
-    # A set silently missing a section is worse than a failed generation the
-    # user can retry, so an ineligible roll raises rather than resolving to nil.
-    it "refuses a kind rolled into a slot it cannot occupy" do
+    it "refuses a kind rolled into a slot it cannot occupy, rather than silently dropping a section" do
       expect { ExerciseSection.for_plan(third: :plan_review, fourth: :plan_review) }
         .to raise_error(ArgumentError, /plan_review is not one of/)
       expect { ExerciseSection.for_plan(third: :challenge, fourth: :challenge) }
@@ -530,9 +490,7 @@ RSpec.describe ExerciseSection do
   end
 
   describe ".slots" do
-    # A kind in two slots would resolve twice and count twice in every
-    # denominator.
-    it "places each kind in exactly one slot" do
+    it "places each kind in exactly one slot, so no kind counts twice in a denominator" do
       expect(described_class.slots.values.flatten).to match_array(described_class.all)
     end
   end
@@ -663,11 +621,7 @@ RSpec.describe ExerciseSection do
       JSON.parse("{#{kind.schema_fragment(label: label)}}").fetch(kind.key)
     end
 
-    # Invariants every kind's fragment has to satisfy, asserted over .all rather
-    # than kind by kind so a ninth kind inherits them without anyone having to
-    # remember. These replace the cross-section counts that used to run against
-    # the assembled schema (`scan('"scenario"').size == 4`), which could only
-    # ever check the four kinds a given day happened to roll.
+    # Asserted over .all so a new kind inherits these invariants without anyone remembering.
     shared_examples "a section kind's schema fragment" do |kind|
       it "is keyed by the kind's own key and parses as JSON" do
         expect(JSON.parse("{#{kind.schema_fragment(label: RUBY_LABEL)}}").keys).to eq([ kind.key ])
@@ -677,15 +631,11 @@ RSpec.describe ExerciseSection do
         expect(parse(kind)).to include("concept", "scenario")
       end
 
-      # A kind with no teaching note says so by leaving it out of the fields
-      # the judge may rewrite.
       it "asks for a teaching_note exactly when the judge may rewrite one" do
         expect(parse(kind).key?("teaching_note")).to eq(kind.prose_fields.include?("teaching_note"))
       end
 
-      # Catches a kind that hardcodes a language instead of interpolating the
-      # label it was handed — invisible on a Rails day, wrong every JS day.
-      it "names only the language it was given" do
+      it "names only the language it was given, never a hardcoded one" do
         expect(parse(kind, label: JS_LABEL).to_s).not_to include(RUBY_LABEL)
         expect(parse(kind, label: RUBY_LABEL).to_s).not_to include(JS_LABEL)
       end
@@ -698,9 +648,7 @@ RSpec.describe ExerciseSection do
         expect(parse(kind).key?("answer_scaffold")).to eq(kind.scaffolded?)
       end
 
-      # The glossary array was removed from the schema; a kind reintroducing one
-      # would put an unrendered field back in every problem set.
-      it "asks for no glossary array" do
+      it "asks for no glossary array, a field no page renders" do
         expect(parse(kind)).not_to have_key("glossary")
       end
     end
@@ -718,13 +666,6 @@ RSpec.describe ExerciseSection do
     end
 
     describe ExerciseSection::CodeReview do
-      # The snippet's language/framing is mode-specific (an RSpec-style test
-      # file, a Prisma schema change, realistic Ruby/Rails code…), so the
-      # fragment defers to the content_instruction line above it in the
-      # prompt rather than restating a label here — restating it is what
-      # made a JS schema-review day describe a Prisma schema as "JavaScript
-      # code" (see #content_instruction). `label:` stays part of the
-      # contract without appearing in this string.
       it "defers the snippet's language description to the guidance instruction" do
         expect(parse(described_class)["snippet"]).to eq("string — ~10-15 lines, matching the code_review snippet instruction above")
         expect(parse(described_class, label: JS_LABEL)["snippet"]).to eq("string — ~10-15 lines, matching the code_review snippet instruction above")
@@ -766,9 +707,7 @@ RSpec.describe ExerciseSection do
         expect(parse(described_class)["question"]).to include("ONE sentence")
       end
 
-      # The one diagram this kind carries lives in its reference, not at the
-      # top level — .diagrammable? is false and the shared example enforces that.
-      it "asks for a Mermaid diagram inside the reference" do
+      it "asks for a Mermaid diagram inside the reference, where this kind's one diagram lives" do
         expect(parse(described_class)["reference"]["diagram"]).to match(/mermaid/i)
       end
 
@@ -826,11 +765,6 @@ RSpec.describe ExerciseSection do
                                 artifact: artifact, test_framework: test_framework, source: source)
     end
 
-    # The contract is uniform on purpose: AiService#generation_guidance_for
-    # hands every kind the same context and never asks which kind it holds. A
-    # kind that narrowed its signature to only what it reads would put that
-    # branch back into the shared assembler — which is the thing "adding a
-    # kind means adding a class, not editing shared code" rules out.
     it "is accepted by every kind with the full context the assembler passes" do
       ExerciseSection.all.each do |kind|
         expect { guidance(kind, vocabulary: RAILS_VOCAB, mode: :application_code,
@@ -848,11 +782,7 @@ RSpec.describe ExerciseSection do
         expect(text).not_to include("pattern concept")
       end
 
-      # These two modes never receive the data-modeling concepts in
-      # production — ProblemSetIngest.vocabulary_for subtracts them — so the
-      # test must hand over the same narrowed list, or the vocabulary line
-      # renders `unsafe_migration` and the assertions below collide with a
-      # substring that has nothing to do with the mode's instruction.
+      # Production subtracts data-modeling concepts for these modes; without that, `unsafe_migration` collides below.
       let(:non_schema_vocabulary) { RAILS_VOCAB - AiService::DATA_MODELING_CONCEPTS }
 
       it "asks for application code by default" do
@@ -869,8 +799,6 @@ RSpec.describe ExerciseSection do
         expect(text).not_to include("migration")
       end
 
-      # The narrowing above is what production does, not a convenience: prove
-      # the two agree, so this block cannot drift from the real resolution.
       it "is handed exactly the vocabulary ingest resolves for these modes" do
         %i[application_code test_file].each do |mode|
           expect(ProblemSetIngest.selectable_vocabulary_for("code_review", "ruby_rails", mode: mode))
@@ -897,7 +825,6 @@ RSpec.describe ExerciseSection do
       end
     end
 
-    # Issue #81: every kind's guidance now speaks only for itself.
     it "has no kind stating another kind's vocabulary" do
       ExerciseSection.all.each do |kind|
         next if [ ExerciseSection::CodeReview, ExerciseSection::Pattern ].include?(kind)
@@ -1045,10 +972,7 @@ RSpec.describe ExerciseSection do
       expect(note).to include("Correct blocks, in order:")
     end
 
-    # The prompt states the mismatch count as verified ground truth the model
-    # is forbidden to re-judge, so an answer that only looks complete must not
-    # be reported as an exact match.
-    it "does not report a parsons answer padded with extra ids as an exact match" do
+    it "does not report a parsons answer padded with extra ids as an exact match, a count the model may not re-judge" do
       note = ExerciseSection::ParsonsProblem.grading_note(
         section: { "blocks" => %w[a b c d e] }, answer: "order:0,1,2,3,4,999"
       )
@@ -1083,8 +1007,6 @@ RSpec.describe ExerciseSection do
       expect(context).not_to include("Their answer:")
     end
 
-    # Both are on screen while the engineer answers, and answers routinely
-    # complete the skeleton, so a reviewer without them misgrades valid code.
     it "carries the challenge's scenario and starter code, which the answer is written against" do
       context = ExerciseSection::Challenge.review_context(
         section: { "question" => "Implement restock", "scenario" => "inventory restocking service",
@@ -1103,8 +1025,6 @@ RSpec.describe ExerciseSection do
       expect(context).not_to include("Scenario:", "Starter code")
     end
 
-    # The grading note asks whether the answer weighed the alternatives, which
-    # is unanswerable unless the alternatives are in the context.
     it "carries the architecture options the grading note asks the reviewer to weigh" do
       context = ExerciseSection::Architecture.review_context(
         section: { "title" => "Queue", "question" => "Which?", "scenario" => "10k jobs/min",
@@ -1144,9 +1064,6 @@ RSpec.describe ExerciseSection do
       expect(context).to include("What's wrong?", "User.all.each", "n+1", "too_hard")
     end
 
-    # A grounded schema_review migration is written against a real table. The
-    # grader has to see that table, or it marks an answer down for not adding
-    # an index the table already has.
     it "carries a grounded migration's current schema, labelled as the real table" do
       context = ExerciseSection::CodeReview.review_context(
         section: { "question" => "What's wrong?", "snippet" => "add_index :things, :user_id",

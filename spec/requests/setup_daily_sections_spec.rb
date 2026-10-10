@@ -21,8 +21,7 @@ RSpec.describe "Setup Daily sections control", type: :request do
     expect(page_html.at_css("#daily-sections input[checked]")["value"]).to eq("3")
   end
 
-  # The hint says the lowest choice is only the fixed sections, which holds
-  # only while the floor equals their number.
+  # The hint holds only while the lowest choice equals the number of fixed sections.
   it "names the fixed sections as everything the lowest choice holds" do
     expect(User::DAILY_SECTION_COUNTS.first).to eq(ExerciseSection.fixed.size)
     login_as(user)
@@ -34,8 +33,6 @@ RSpec.describe "Setup Daily sections control", type: :request do
     expect(hint).not_to include("every day")
   end
 
-  # Finishing more no longer grows the day on its own; the competency gate
-  # also needs favourable reviewed work.
   it "says Automatic grows the day only once reviewed answers go well" do
     login_as(user)
 

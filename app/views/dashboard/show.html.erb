@@ -13,10 +13,7 @@
   .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
   @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
   .progress-label { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
-  /* The bar's height is fixed so the page can keep a focused field clear of
-     it: a browser that scrolls a field to the top edge stops at
-     scroll-padding-top, which reads the same variable. The focus ring's reach
-     is added because the ring sits outside the field. */
+  /* Fixed height, read by scroll-padding-top below so a focused field and its ring stop clear of the bar. */
   :root { --progress-sticky-height: 3.25rem; }
   html:has(.progress-sticky) {
     scroll-padding-top: calc(var(--progress-sticky-height) + var(--focus-ring-width) + var(--focus-ring-offset));
@@ -61,12 +58,7 @@
   <% end %>
 </div>
 
-<%# Below the day's set rather than above it: the workout is what this page is
-    for, and a second call to action over it would compete. On the short states
-    — weekend, paused, generating, failed — there is nothing to scroll past, so
-    it lands in view on exactly the days it has the most to offer. Outside
-    #dashboard-content so the generating state's poller, which replaces that
-    div, cannot take the callout with it. %>
+<%# Outside #dashboard-content, which the generating poller replaces. Placement: docs/code-notes/app/views/dashboard/show.html.md %>
 <% if @featured %>
   <div class="featured-compact">
     <%= render "shared/featured_concept", reference: @featured %>

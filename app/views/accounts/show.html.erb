@@ -42,8 +42,6 @@
     <% end %>
   </div>
 
-  <%# Only where a VAPID keypair is configured — otherwise the control could
-      only ever fail. WebPushCredentials is the one authority for that. %>
   <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
 
   <div class="danger-zone">
@@ -54,10 +52,7 @@
   </div>
 </div>
 
-<%# This app loads no Stimulus/importmap JS (the layout emits no
-    javascript_importmap_tags), so `turbo_confirm` is inert here — an inline
-    script is the working convention, same as the setup page's timezone
-    select and the dashboard's answer autosave. %>
+<%# No importmap JS loads, so turbo_confirm is inert; this inline script asks instead. %>
 <script>
   (function () {
     const form = document.getElementById("delete-account-form");

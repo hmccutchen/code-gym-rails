@@ -1,15 +1,12 @@
 class ApplicationController < ActionController::Base
-  # Registers a prepend_before_action only when PREVIEW_APP is set at boot,
-  # which committed config does only for a Railway pull-request deployment;
-  # everywhere else this include adds no callback at all.
+  # Adds its callback only when PREVIEW_APP is set at boot, which committed config does only for PR deployments.
   include PreviewAutoLogin
 
   before_action :require_login
   before_action :require_provider
   around_action :use_time_zone
 
-  # A stale CSRF token (e.g. a login page left open across a deploy restart)
-  # would otherwise surface as a raw 422. Send the user back to log in fresh.
+  # A stale CSRF token (e.g. a login page left open across a deploy) would otherwise be a raw 422.
   rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_token
 
   helper_method :current_user, :logged_in?
@@ -22,14 +19,7 @@ class ApplicationController < ActionController::Base
     redirect_to login_path, alert: t("flash.application.session_expired")
   end
 
-  # Logging in rotates the session (and its CSRF token), which leaves the login
-  # forms — rendered under the pre-login session — stale the instant they
-  # succeed. A re-submit (a double-tap on mobile) then lands here with the user
-  # already logged in. The request is still blocked; it just isn't worth telling
-  # someone who just authenticated that their session expired and bouncing them
-  # to a login page that only redirects back. Deliberately excludes logout:
-  # silently returning someone to the dashboard when they asked to sign out
-  # would hide a failure they do care about.
+  # A double-tapped login form arrives stale after the session rotates; logout is excluded so a failed sign-out shows.
   def duplicate_login_submit?
     logged_in? && controller_name == "sessions" && %w[create verify_code].include?(action_name)
   end
@@ -38,15 +28,12 @@ class ApplicationController < ActionController::Base
     Time.use_zone(current_user&.effective_time_zone || User::DEFAULT_TIME_ZONE, &block)
   end
 
-  # Page 1 keeps the bare /history URL: the url helper drops a nil param, so the
-  # canonical first page has one address rather than two. Every redirect into
-  # history goes through here so they cannot drift apart.
+  # Page 1 keeps the bare /history URL; every redirect into history goes through here so they can't drift.
   def history_page_path(page)
     history_path(page: (page unless page == 1))
   end
 
-  # Scoped to `active` so an anonymized user's still-open session (another tab,
-  # another device) stops resolving at its very next request.
+  # Scoped to `active` so an anonymized user's open session in another tab stops resolving on its next request.
   def current_user
     @current_user ||= User.active.find_by(id: session[:user_id])
   end
@@ -55,8 +42,6 @@ class ApplicationController < ActionController::Base
     current_user.present?
   end
 
-  # The per-user limits on billed requests guard a trial's house key. An
-  # account with a key of its own pays for its calls, so it is never limited.
   def own_key?
     current_user.api_key_present?
   end
@@ -68,9 +53,6 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  # Own key or a trial. An ended trial still reaches every page, where each
-  # provider call fails with the trial-ended sentence and the dashboard says
-  # so.
   def require_provider
     return unless logged_in?
     return if current_user.provider_ready? || current_user.trial?

@@ -1,7 +1,5 @@
 require "rails_helper"
 
-# Every new account starts at the gate's floor, so a spec about what a longer
-# Automatic day does opens the gate and lets completion decide.
 module DailyPlanGateStubs
   def stub_gate(count, reason = :held)
     allow(CompetencyGate).to receive(:for).and_return(CompetencyGate::Plan.new(count: count, reason: reason, evidence: {}))
@@ -11,30 +9,21 @@ module DailyPlanGateStubs
 end
 
 RSpec.describe DailyPlan do
-  # No spec type is inferred here (spec/services isn't a type RSpec
-  # auto-configures), so the shared AuthHelpers module isn't pulled in by
-  # rails_helper's type-scoped config.include — include it directly instead
-  # of redefining create_fake_provider_user locally.
+  # rails_helper includes AuthHelpers by spec type, and spec/services has no inferred type.
   include AuthHelpers
   include DailyPlanGateStubs
 
   describe "FOURTH_BUCKET_FOR" do
-    # DailyPlan.fourth_track fetches this, so a fourth kind missing an entry
-    # raises at generation rather than silently sharing another kind's history.
     it "gives every fourth-slot kind its own bucket" do
       expect(DailyPlan::FOURTH_BUCKET_FOR.keys.map(&:to_s))
         .to match_array(ExerciseSection.fourths.map(&:key))
       expect(DailyPlan::FOURTH_BUCKET_FOR[:pseudocode_to_code]).to eq(ConceptBucket::PSEUDOCODE_TO_CODE)
-      # Derived from ConceptBucket, so no fourth kind can resolve to nil — which
-      # would mean it was bucketing by the day's language and mixing its history
-      # into the three-slot track.
       expect(DailyPlan::FOURTH_BUCKET_FOR.values).to all(be_present)
       expect(DailyPlan::FOURTH_BUCKET_FOR.values.uniq.size).to eq(DailyPlan::FOURTH_BUCKET_FOR.size)
     end
   end
   let(:user) { User.create!(email: "prompt@example.com", name: "Prompt") }
 
-  # What DailyPlan.for reads once and hands both tracks.
   def due_slice
     user.concepts_due_for_retention_check_in(ConceptBucket.slice_for("mixed"))
   end
@@ -88,14 +77,9 @@ RSpec.describe DailyPlan do
     end
 
     it "prioritizes a threshold-crossed short-interval concept over a merely-due long-interval one" do
-      # "n_plus_one": interval 28, due 20 days ago — due, but not yet overdue by
-      # its own interval (would need 28 days past due to cross the threshold).
       user.concept_masteries.create!(concept: "n_plus_one", language: "ruby_rails", tier: :standard,
                                      mastered_at: 2.months.ago, retention_interval_days: 28,
                                      next_retention_check_on: Date.current - 20)
-      # "memoization": interval 7, due 10 days ago — has crossed its own
-      # threshold (10 > 7). Sorting by raw due-date alone would rank n_plus_one
-      # first (20 days ago < 10 days ago); sorting by overdue-ratio must not.
       user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 10)
@@ -104,19 +88,12 @@ RSpec.describe DailyPlan do
       expect(checks.map(&:concept)).to eq(%w[memoization])
     end
 
-    # The ranking is by overdue ratio against each concept's own interval, not
-    # by date. A date-ordered, capped fetch once dropped the row the ranking
-    # would have put first (issue #93): the concept here is the most overdue
-    # by ratio and the LEAST overdue by date, so any such cap returning would
-    # fail this.
-    it "sees a high-ratio concept whose due date sorts it past a fixed 20-row fetch" do
+    it "sees a high-ratio concept whose due date sorts it past a fixed 20-row fetch (issue #93)" do
       (AiService::RAILS_CONCEPTS - %w[memoization]).first(20).each do |concept|
         user.concept_masteries.create!(concept: concept, language: "ruby_rails", tier: :standard,
                                        mastered_at: 6.months.ago, retention_interval_days: 90,
                                        next_retention_check_on: Date.current - 40)
       end
-      # 5/7 ≈ 0.71 beats every 40/90 ≈ 0.44 above, but its due date is the most
-      # recent of the 21, so it sorts last in the query the cap truncates.
       user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
                                      next_retention_check_on: Date.current - 5)
@@ -154,10 +131,7 @@ RSpec.describe DailyPlan do
                                      next_retention_check_on: Date.current + 5)
     end
 
-    # Same membership rule as the retention queries — stated once, so a concept
-    # dropped from a vocabulary cannot keep showing up in the prompt as an
-    # established concept the generator has no way to use (issue #97).
-    it "excludes a concept no longer in the bucket's vocabulary" do
+    it "excludes a concept no longer in the bucket's vocabulary, which the generator cannot use (issue #97)" do
       established_mastery(concept: "memoization")
       established_mastery(concept: "retired_concept")
 
@@ -166,10 +140,6 @@ RSpec.describe DailyPlan do
       expect(result.map(&:concept)).to eq(%w[memoization])
     end
 
-    # An architecture day spans two buckets, so membership has to be checked per
-    # bucket: a language concept must not qualify by matching the architecture
-    # vocabulary, or vice versa. A flattened "any vocabulary" check would let
-    # this through.
     it "matches each bucket against its own vocabulary, not the union" do
       established_mastery(concept: "service_boundaries", bucket: "ruby_rails")
       established_mastery(concept: "memoization",        bucket: "architecture")
@@ -188,9 +158,6 @@ RSpec.describe DailyPlan do
       expect(result.map(&:concept)).to eq(%w[scope_creep])
     end
 
-    # An architecture day spans two buckets. Each contributes its own
-    # vocabulary condition, but they are OR-ed into one relation rather than
-    # enumerated, so the per-bucket pairing costs no extra round trip.
     it "spans both buckets in a single query" do
       established_mastery(concept: "memoization",        bucket: "ruby_rails")
       established_mastery(concept: "service_boundaries", bucket: "architecture")
@@ -356,9 +323,7 @@ RSpec.describe DailyPlan do
                             concept_tags: { "plan_review" => "scope_creep" },
                             ai_review: { "plan_review" => { "rating" => "developing" } })
 
-      # scope_creep is tagged under the plan_review bucket; pin today's fourth
-      # roll to that bucket so the assertion isn't at the mercy of the other
-      # 50% of rolls landing on ambiguity_hunt instead.
+      # scope_creep is a plan_review concept, so the fourth roll is pinned to plan_review.
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
@@ -376,16 +341,13 @@ RSpec.describe DailyPlan do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
 
       result = DailyPlan.for(user, language: "ruby_rails")
-      expect(result.fourth_due_checks).to eq([]) # not yet meaningfully overdue
+      expect(result.fourth_due_checks).to eq([])
 
       user.concept_masteries.find_by(concept: "scope_creep").update!(next_retention_check_on: Date.current - 10)
       result = DailyPlan.for(user, language: "ruby_rails")
       expect(result.fourth_due_checks.map(&:concept)).to eq(%w[scope_creep])
     end
 
-    # The fourth section's schema permits exactly one concept, so anything past
-    # the first reinforcement entry is a concept the prompt would demand of a
-    # section that structurally cannot host it.
     it "caps fourth-slot reinforcement at the slot's single capacity" do
       allow(user).to receive(:concepts_needing_reinforcement).and_call_original
       allow(user).to receive(:concepts_needing_reinforcement).with(bucket: "plan_review")
@@ -432,8 +394,6 @@ RSpec.describe DailyPlan do
   end
 
   describe "SCENARIO_FLAVOR_WEIGHTS" do
-    # Exact, not merely ordered: an even split is the decision, at every
-    # skill level, and a drift either way is a different decision nobody made.
     it "is exactly half everyday and half job-adjacent" do
       expect(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).to eq(everyday: 0.5, general: 0.5)
     end
@@ -507,16 +467,10 @@ RSpec.describe DailyPlan do
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil)
       code_review_and_third = described_class.for(user, language: "ruby_rails")
 
-      # The two fixed kinds + fourth have two non-fourth hosts (capacity 2); the
-      # fixed kinds + third have three (capacity 3) — pinning capacity's
-      # derivation from the chosen kinds rather than a hardcoded slot count.
       expect(code_review_and_fourth_only.due_checks.size).to eq(2)
       expect(code_review_and_third.due_checks.size).to eq(3)
     end
 
-    # The prompt's mastery instruction demands every listed concept be
-    # reintroduced, so an entry the day has no section left to carry is an
-    # instruction that cannot be honored.
     it "truncates the reinforcement list itself to what the day can host" do
       allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
         [ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" }, { concept: "memoization", bucket: "ruby_rails", tier: "standard" },
@@ -530,8 +484,7 @@ RSpec.describe DailyPlan do
       expect(plan.reinforcement.map { |h| h[:concept] }).to eq(%w[n_plus_one memoization])
     end
 
-    # Pinned to a mode whose code_review can tag a core Ruby concept: on a
-    # schema-review day no fixed section could, and the check would wait.
+    # On a schema-review day no fixed section could tag a core Ruby concept, and the check would wait.
     it "gives a reinforcement entry up when an overdue check takes the slot back" do
       pin_code_review_mode(:application_code)
       allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
@@ -551,8 +504,6 @@ RSpec.describe DailyPlan do
   end
 
   describe "the Daily sections setting" do
-    # Completion and the gate are stubbed to disagree with the choice, so the
-    # count can only come from the setting.
     it "passes a fixed choice through to DaySize, which overrides completion and the gate" do
       user = User.create!(email: "fixed@example.com", name: "Fixed", daily_section_count: 3)
       allow(SectionCount).to receive(:for).and_return(ExerciseSection::MAX_SECTIONS)
@@ -623,7 +574,6 @@ RSpec.describe DailyPlan do
       expect(plan.size.brake?).to be(false)
     end
 
-    # The gate replays every post-rubric day, so it must not run once per track.
     it "runs the gate once per plan" do
       expect(CompetencyGate).to receive(:for).once.and_call_original
 
@@ -672,10 +622,7 @@ RSpec.describe DailyPlan do
       expect(DailyPlan.for(user, language: "ruby_rails").code_review_source).to be_nil
     end
 
-    # Code Gym is Ruby; a javascript day asks for JS/React code or a Prisma
-    # schema, and there is nothing here to ground either in. The roll is
-    # pinned to :real so the example proves the gate, not the dice.
-    it "is nil on a day generating in a language this codebase is not written in" do
+    it "is nil on a javascript day even when the roll lands real" do
       expect(plan(language: "javascript").code_review_source).to be_nil
     end
 
@@ -715,8 +662,6 @@ RSpec.describe DailyPlan do
     end
   end
 
-  # A difficulty target changes prompt text only. Planning must not consult it,
-  # whether the kind is untargeted, targeted, or locked.
   describe "difficulty targets" do
     it "never reads KindDifficulty and plans the same day regardless" do
       allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: :plan_review)
@@ -772,9 +717,6 @@ RSpec.describe DailyPlan, "drilled concepts" do
     expect(described_class.for(user, language: "ruby_rails").reinforcement.map { |h| h[:concept] }).to eq(%w[sync_vs_async])
   end
 
-  # denormalization_tradeoffs, because the design comparison hosts the rest of
-  # the group and DailyPlan, which never reads a rung, offers it the strictest
-  # list, without the tradeoff concepts.
   it "offers a drilled data-modeling concept only when a section today can tag it" do
     ConceptDrills.start!(user, concept: "denormalization_tradeoffs", bucket: "ruby_rails")
     allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: nil, fourth: :plan_review)
@@ -907,8 +849,6 @@ RSpec.describe DailyPlan::Result, "#notes" do
     expect(result(coverage: gap).notes).to eq("coverage" => "pattern", "coverage_reason" => "gap")
   end
 
-  # The planned count, not the delivered one: a coverage addition must not
-  # read as a larger planned size the next day.
   it "records the planned size beside a coverage addition" do
     size = DaySize.for(setting: nil, completion: 2, gate: CompetencyGate::Plan.new(count: 2, reason: :held, evidence: {}))
     gap = CoverageException::Addition.new(kind: ExerciseSection::Pattern, reason: :gap)
@@ -1033,8 +973,7 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
 
   let(:user) { User.create!(email: "plan-waiting@example.com", name: "Plan") }
 
-  # The stubbed rotation fills more than the fixed kinds, which the coverage
-  # exception would otherwise read as a floored day with a check to host.
+  # Otherwise the coverage exception would read the stubbed day as floored with a check to host.
   before do
     open_gate
     pin_code_review_mode(:application_code)
@@ -1088,8 +1027,6 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
     expect(waiting).to eq([ { bucket: "javascript", concept: "closures", reason: :no_host } ])
   end
 
-  # Regeneration keeps the stored exercise's language, so a user who has
-  # since changed theirs still gets that language's due checks offered.
   it "offers the generated language's check when the user's setting has moved to the other language" do
     user.update!(language: "javascript")
     due("memoization", "ruby_rails")
@@ -1148,8 +1085,6 @@ RSpec.describe DailyPlan, "the coverage exception" do
                              "coverage" => "architecture", "coverage_reason" => "due_check")
   end
 
-  # Reinforcement outranks a due check for the one retention slot, so an
-  # added section would carry reinforcement and the check would still wait.
   it "gives the addition up when the check it was added for does not land" do
     allow(user).to receive(:concepts_needing_reinforcement).with(exclude_buckets: anything, hostable: anything).and_return(
       %w[service_objects query_objects policy_objects].map { |c| { concept: c, bucket: "ruby_rails", tier: "standard" } }
@@ -1189,9 +1124,6 @@ RSpec.describe DailyPlan, "the coverage exception" do
     expect(plan.waiting_checks.map { |w| w.slice(:concept, :reason) }).to eq([ { concept: "service_boundaries", reason: :no_host } ])
   end
 
-  # A due check is selected only when a section today can tag it. On a
-  # schema-review day neither fixed section can tag a core Ruby concept, so
-  # the check waits as no_host and the coverage addition brings a kind that can.
   it "leaves a check no fixed section can tag waiting, and adds a kind that can host it" do
     pin_code_review_mode(:schema_review)
     user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,

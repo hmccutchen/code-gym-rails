@@ -1,5 +1,3 @@
-# ENV is read at call time by HouseKeys and TrialMode; these examples stub
-# the variables they read without touching the process environment.
 module EnvHelpers
   def stub_env(values)
     allow(ENV).to receive(:[]).and_call_original unless @env_stubbed

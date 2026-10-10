@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# What the layout renders from a user's display preferences. A user who has
-# chosen nothing keeps the existing display defaults: no attribute on <html>,
-# no display stylesheet, the dark status bar and the outlined logo.
+# A user with no display choices keeps the defaults: no <html> attribute, no stylesheet, dark bar, outlined logo.
 RSpec.describe "Display preferences in the layout", type: :request do
   let(:user) { create_user_with_key }
 

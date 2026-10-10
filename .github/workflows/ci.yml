@@ -53,6 +53,9 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+      - name: Check comments in ERB, JavaScript, CSS, YAML and Python
+        run: bin/comment-check
+
   test:
     runs-on: ubuntu-latest
 
@@ -87,8 +90,7 @@ jobs:
       - name: Prepare test database
         run: bin/rails db:prepare
 
-      # CodeFormat's JavaScript specs run Prettier for real, through the same
-      # package the production build installs.
+      # CodeFormat's JavaScript specs run Prettier for real, from the package production installs.
       - name: Install Prettier
         run: npm --prefix vendor/prettier ci
 
@@ -134,8 +136,7 @@ jobs:
         with:
           node-version: 22
 
-      # Both caches key on the lockfile, so bumping playwright-core invalidates
-      # the CLI and the browser build together and they can never drift apart.
+      # Both caches key on the lockfile so the CLI and browser build can never drift apart.
       - name: Cache Playwright CLI
         id: cache_playwright_cli
         uses: actions/cache@v6
@@ -154,10 +155,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-browser-${{ runner.os }}-${{ hashFiles('spec/playwright/package-lock.json') }}
 
-      # --with-deps also installs system libraries via apt, which live outside
-      # ~/.cache/ms-playwright and so aren't restored by the cache. On a hit we
-      # still need those, but not the browser download — install-deps is the
-      # half that does exactly that.
+      # On a cache hit the apt libraries from --with-deps are still missing; install-deps restores only those.
       - name: Install Playwright browser dependencies
         if: steps.cache_playwright_browser.outputs.cache-hit == 'true'
         run: ./spec/playwright/node_modules/.bin/playwright-core install-deps chromium

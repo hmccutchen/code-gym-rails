@@ -67,8 +67,7 @@ RSpec.describe "The design comparison section", type: :request do
       expect(page.at_css("textarea[data-field='design_comparison']")["data-answer-complete"]).to eq("true")
     end
 
-    # The reference names and illustrates the principle the grade asks for, so
-    # opening it on first exposure would hand over the reason.
+    # The reference illustrates the principle the grade asks for, so opening it would give away the reason.
     it "keeps the concept reference closed on first exposure, where another kind opens it" do
       exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "concept" => "n_plus_one" }))
       %w[open_closed n_plus_one].each do |concept|

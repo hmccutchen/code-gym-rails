@@ -1,9 +1,4 @@
-# A user's display choices as plain values, and what the layout renders for
-# them. Each setting lists its default first. A default is never stored, so a
-# user who has changed nothing stores {}. The background pattern is on by default.
-#
-# Total by construction: a stored value outside OPTIONS reads as the default,
-# so bad data can never reach an attribute on <html>.
+# A stored value outside OPTIONS reads as the default, so bad data never reaches <html>.
 class DisplayPreferences
   OPTIONS = {
     "theme"        => %w[dark light device],
@@ -13,18 +8,13 @@ class DisplayPreferences
     "background_pattern" => %w[on off]
   }.freeze
 
-  # The iOS home-screen app reads these when it launches. "black" is a solid
-  # bar with white text above the page, readable under either theme, so only
-  # an explicit light choice asks for the white bar.
+  # "black" reads under either theme, so only an explicit light choice asks for the white bar.
   STATUS_BAR_STYLES = { "light" => "default" }.freeze
 
-  # The browser's toolbar color. The dark one is always rendered, as the
-  # fallback; the light one goes first and carries the light palette's media,
-  # so a browser picks it exactly where the light palette applies.
+  # The dark color is always rendered as the fallback; the light one carries the light palette's media.
   DARK_THEME_COLOR  = "#1a1a2e"
   LIGHT_THEME_COLOR = "#ffffff"
 
-  # Where the light palette applies, as the media attribute of its <link>.
   LIGHT_PALETTE_MEDIA = { "light" => "all", "device" => "(prefers-color-scheme: light)" }.freeze
   LIGHT_PALETTE_OFF   = "not all"
 
@@ -37,8 +27,7 @@ class DisplayPreferences
     new("theme" => "device")
   end
 
-  # Drops keys set to their default. Unknown keys and values stay, so the
-  # validation that runs after this still sees and refuses them.
+  # Unknown keys and values stay, so the validation that runs after this still refuses them.
   def self.sparse(values)
     return values unless values.is_a?(Hash)
 

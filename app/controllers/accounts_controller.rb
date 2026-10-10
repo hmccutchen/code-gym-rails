@@ -1,16 +1,11 @@
 class AccountsController < ApplicationController
-  # Without this skip, a user who hasn't added an API key is redirected to
-  # /setup before this action runs — and since the nav log-out button now
-  # lives on this page, they would have no way to log out or delete.
+  # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
 
   # GET /account
   def show; end
 
   # DELETE /account
-  # Synchronous and irreversible. Double-submission is safe twice over: once
-  # anonymized, `current_user` returns nil so `require_login` redirects before
-  # this ever runs, and `anonymize!` no-ops regardless.
   def destroy
     current_user.anonymize!
     reset_session
@@ -18,11 +13,6 @@ class AccountsController < ApplicationController
   end
 
   # PATCH /account/toggle_generation
-  # Sets paused_generation_at to nil or now. While paused, nothing generates
-  # unless the user asks for it explicitly (/generate, /regenerate);
-  # submitting and reviewing an existing set are never gated by the pause.
-  # Resuming also brings forward the set the pause stranded, which the notice
-  # names — otherwise an older set would appear on the dashboard unannounced.
   def toggle_generation
     if resume_requested?
       resumed = current_user.resume_generation!
@@ -33,12 +23,7 @@ class AccountsController < ApplicationController
       end
       redirect_to account_path, notice: notice
     else
-      # Only stamp a pause that isn't already running. The timestamp is the
-      # floor #held_exercise searches from, so re-stamping an already-paused
-      # user walks that floor forward past the very set the pause stranded —
-      # a second Pause from a stale Account tab would leave it unreachable for
-      # good, still breaking the streak, with no way back. Pausing twice means
-      # the pause that is already running, not a new one.
+      # Re-stamping would move #held_exercise's floor past the set the first pause stranded, losing it for good.
       current_user.update!(paused_generation_at: Time.current) unless current_user.paused_generation_at?
       redirect_to account_path, notice: t("flash.accounts.generation_paused")
     end
@@ -46,15 +31,7 @@ class AccountsController < ApplicationController
 
   private
 
-  # Each button posts the state it wants rather than asking for a flip, so a
-  # double-tapped Resume stays a resume. Read as a flip, the second request
-  # re-reads a user the first one already unpaused and takes the pause branch —
-  # leaving generation paused by two clicks of a button labelled "Resume". The
-  # row lock inside #resume_generation! cannot help, since the two requests
-  # disagree about the action before either reaches the model.
-  #
-  # Falls back to flipping when no intent is posted, so the endpoint's original
-  # contract still holds for a caller that sends none.
+  # Honor the posted state so a double-tapped Resume stays a resume; with no param posted, flip.
   def resume_requested?
     return params[:paused] == "0" if params.key?(:paused)
 

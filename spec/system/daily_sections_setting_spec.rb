@@ -1,15 +1,10 @@
 require "rails_helper"
 
-# The radios persist through an inline listener that PATCHes /profile — no
-# form submit, no Turbo. A request spec exercises that endpoint directly, so it
-# stays green even if the listener is deleted or sends the wrong value; only a
-# real browser round trip covers the wiring between the two.
+# Only a real browser round trip covers the listener that PATCHes /profile; a request spec stays green without it.
 RSpec.describe "Daily sections setting", type: :system do
   let(:user) { create_fake_provider_user }
 
-  # The click's fetch resolves independently of Capybara, so the assertion has
-  # to wait on the write rather than on the DOM, which already shows the new
-  # choice.
+  # Waits on the write, not the DOM: the fetch resolves independently of Capybara.
   def count_after_save(expected, timeout: 5)
     deadline = Time.current + timeout
     sleep 0.1 while user.reload.daily_section_count != expected && Time.current < deadline

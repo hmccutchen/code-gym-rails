@@ -32,9 +32,7 @@ RSpec.describe DailyResponse, type: :model do
       expect(response.translated?("pseudocode_to_code")).to be(false)
     end
 
-    # critiqued? keys on the timestamp, never on the list: [].present? is false
-    # in Ruby, so a list-based guard would stop capping exactly the "no gaps
-    # found" case — the most common good outcome.
+    # [].present? is false, so a list-based guard would stop capping the common "no gaps found" case.
     it "counts a critique that found nothing as spent" do
       response = response_for("pseudocode_to_code" => {
         "gaps_found" => false, "critique" => [], "critiqued_at" => Time.current.iso8601
@@ -130,12 +128,9 @@ RSpec.describe DailyResponse, type: :model do
                                        })
       response = DailyResponse.new(daily_exercise: exercise,
                                    answers: { "code_review" => "a" * 20, "pattern" => "", "challenge" => "", "plan_review" => "" })
-      expect(response.completeness).to eq(25) # 1 of 4
+      expect(response.completeness).to eq(25)
     end
 
-    # A payload can carry more third-/fourth-shaped keys than the page renders
-    # (FakeService always does). Counting raw keys reported 50% for a fully
-    # answered set.
     it "computes completeness against the sections presented, not every payload key" do
       exercise = DailyExercise.create!(user: User.create!(email: "eight-key@example.com", name: "Eight"),
                                        date: Date.current, generated_at: Time.current,
@@ -181,16 +176,13 @@ RSpec.describe DailyResponse, type: :model do
         expect(response_with(template).answered_sections).to be_empty
       end
 
-      # The labels alone are well past the threshold, so without stripping them
-      # a two-word answer under a label would count as answered.
+      # The labels alone pass the threshold, so unstripped they would count a two-word answer as answered.
       it "measures only what the user typed under the labels" do
         expect(response_with(template + "Redis").answered_sections).to be_empty
         expect(response_with(template + "Redis, because reads dominate").answered_sections)
           .to eq([ "architecture" ])
       end
 
-      # A row generated before answer_scaffold existed still has its kind's
-      # default labels stripped, so it behaves exactly as it does today.
       it "falls back to the kind's default labels when the problem carries no scaffold" do
         legacy = user.daily_exercises.create!(
           date: Date.current - 1, generated_at: Time.current,
@@ -204,9 +196,6 @@ RSpec.describe DailyResponse, type: :model do
       end
     end
 
-    # A regenerated day can leave an answer behind for a section its exercise
-    # no longer presents; counting it would report more answered sections than
-    # the day has and push completeness past 100%.
     it "ignores an answer for a section the exercise no longer presents" do
       daily_response = user.daily_responses.create!(
         daily_exercise: exercise,
@@ -270,8 +259,6 @@ RSpec.describe DailyResponse, type: :model do
       expect(response.submit_blocker).to eq(:unrated)
     end
 
-    # A rating left behind on a section whose answer was later cleared is not
-    # owed, and must not count as paying for a different section either.
     it "ignores a rating on an unanswered section when checking an answered one" do
       response = draft(answers: { "code_review" => "a" * 20, "pattern" => "" },
                        ratings: { "pattern" => "too_easy" })
@@ -381,8 +368,7 @@ RSpec.describe DailyResponse, type: :model do
         .to eq("architecture" => "")
     end
 
-    # A browser submits textarea content with CRLF line endings, so this is the
-    # shape the untouched scaffold actually arrives in — not the LF the server wrote.
+    # Browsers submit textarea content with CRLF, so the untouched scaffold arrives in that shape.
     it "blanks an untouched scaffold submitted with browser line endings" do
       submitted = template.gsub("\n", "\r\n")
 
@@ -484,10 +470,7 @@ RSpec.describe DailyResponse, type: :model do
   end
 
   describe "#difficulty_for" do
-    # The review path has no ProblemSetIngest equivalent, so nothing validates
-    # a review payload on the way in. This reader is the boundary: an
-    # off-vocabulary level is provider drift, and rendering it verbatim would
-    # put an unreviewed word in front of the engineer as if the app chose it.
+    # Nothing validates a review payload on the way in, so this reader is the boundary for provider drift.
     it "returns the stored assessment only when the level is one this app defines" do
       response = user.daily_responses.create!(
         daily_exercise: exercise, date: Date.current, answers: {},
@@ -518,11 +501,7 @@ RSpec.describe DailyResponse, type: :model do
       expect(unreviewed.difficulty_for("code_review")).to be_nil
     end
 
-    # ai_review is schemaless jsonb, so the reader cannot assume a row it
-    # renders came through AiService#assess_difficulty. Both directions apply
-    # the same rule, from the same place — a row bypassing the writer must not
-    # be able to put an unbounded, or non-string, reason on the page.
-    it "bounds the reason on read, not only on write" do
+    it "bounds the reason on read, not only on write, for rows that bypass the writer" do
       response = user.daily_responses.create!(
         daily_exercise: exercise, date: Date.current, answers: {},
         ai_review: {
@@ -538,9 +517,6 @@ RSpec.describe DailyResponse, type: :model do
       expect(response.difficulty_for("challenge")["reason"]).to eq("padded")
     end
 
-    # The difficulty note renders next to the AI grade badge, which is the one
-    # thing it must not be mistaken for. Sharing a word with beginner /
-    # developing / solid / strong would invite exactly that reading.
     it "shares no word with the AI grade or self-rating vocabularies" do
       overlap = DailyResponse::DIFFICULTY_LEVELS &
                 (DailyResponse::AI_RATING_FAVORABLE + DailyResponse::AI_RATING_UNFAVORABLE +
@@ -599,10 +575,7 @@ RSpec.describe DailyResponse, type: :model do
       expect(second.improved_code_visible?("pattern")).to be(true)
     end
 
-    # plan_review is the only kind that both carries improved_code and records
-    # its concepts under a language-independent bucket, so it is the only place
-    # the reader's bucket can disagree with the exposure index's. When it did,
-    # the "Revised plan" this section exists to show could never appear.
+    # plan_review is the only kind where the reader's bucket can disagree with the exposure index's.
     def submit_plan_review(concept:, date:)
       ex = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
         problem_set: { "plan_review" => { "concept" => concept } })
@@ -621,10 +594,6 @@ RSpec.describe DailyResponse, type: :model do
     it "is always false for the architecture section, even on a repeat exposure" do
       first  = submit(concept: "service_boundaries", date: Date.current - 3)
       second = submit(concept: "service_boundaries", date: Date.current - 1)
-      # improved_code_visible? is normally keyed by section+concept; pass
-      # "architecture" directly to prove the exclusion is unconditional, not
-      # incidentally true because these fixtures never tag an architecture
-      # section.
       expect(first.improved_code_visible?("architecture")).to be(false)
       expect(second.improved_code_visible?("architecture")).to be(false)
     end
@@ -637,7 +606,6 @@ RSpec.describe DailyResponse, type: :model do
           answers: { "security_review" => "x" * 20 },
           concept_tags: { "security_review" => "xss_prevention" })
 
-        # No prior exposure yet — gated closed, same rule code_review/pattern follow.
         expect(response.improved_code_visible?("security_review")).to be false
       end
     end
@@ -705,8 +673,6 @@ RSpec.describe DailyResponse, type: :model do
       expect(response_claimed_at(10.seconds.ago)).to be_reviewing
     end
 
-    # A crashed or hung review must not block regeneration (or start-over) for
-    # the rest of the day.
     it "is false once the claim has gone stale" do
       expect(response_claimed_at((DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago)).not_to be_reviewing
     end

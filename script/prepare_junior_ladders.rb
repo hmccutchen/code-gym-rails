@@ -1,4 +1,3 @@
-# Usage: bin/rails runner script/prepare_junior_ladders.rb <operator_user_id> [--run]
 # Without --run, no jobs are queued and no account or reference is written.
 require_relative "junior_ladder_preparation"
 

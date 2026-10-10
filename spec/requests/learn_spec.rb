@@ -72,9 +72,6 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).not_to include(I18n.t("learn.encountered"))
     end
 
-    # The exposure index counts submitted responses only. An unsubmitted draft
-    # must not mark a concept seen, or the marker starts describing today's
-    # in-progress set rather than what the user has actually worked through.
     it "does not mark a concept from an unsubmitted response" do
       user.update!(language: "ruby_rails")
       exercise = user.daily_exercises.create!(
@@ -98,11 +95,7 @@ RSpec.describe "Learn", type: :request do
       expect(response).to redirect_to(login_path)
     end
 
-    # A row that exists but lacks a guide is a different fact from no row at
-    # all — the bulk button's count is row-existence based, so the "not written
-    # yet" marker must mean exactly that, and a guide-less row needs its own
-    # marker or the two disagree once the button's count reaches zero while
-    # guide-less rows remain.
+    # The bulk button counts rows, so "not written yet" must mean no row, distinct from a guide-less row.
     it "marks a concept with no row at all as not written yet, distinct from one with a reference but no guide" do
       user.update!(language: "ruby_rails")
       ConceptReference.create!(
@@ -117,9 +110,7 @@ RSpec.describe "Learn", type: :request do
     end
   end
 
-  # The views resolve headings by key, so a bucket or group added without its
-  # string raises in the template rather than at the point of the change. This
-  # turns that into a failing spec instead.
+  # Views resolve headings by key, so a bucket or group missing its string would raise only in the template.
   describe "recognition guides on GET /learn" do
     before { user.update!(language: "ruby_rails") }
 
@@ -150,8 +141,7 @@ RSpec.describe "Learn", type: :request do
         .to include("Ask architecture questions.")
     end
 
-    # The guide sits under an h2 in a flat bucket and an h3 in a named group, so
-    # any heading inside it would skip a level in one of them.
+    # The guide sits under an h2 or an h3 depending on placement, so a heading inside it would skip a level.
     it "adds no headings, so neither placement skips a heading level" do
       create_guide("architecture")
       create_guide("code_smell")
@@ -239,15 +229,11 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).to include(I18n.t("learn.sources"))
       ConceptBookSources.for("shotgun_surgery").each do |source|
         expect(response.body).to include(source[:title], source[:author])
-        # The pointer is the half a title-and-author assertion cannot see:
-        # without this, deleting its interpolation from the view leaves every
-        # Learn spec green.
+        # Without this, deleting the pointer from the view leaves every Learn spec green.
         expect(response.body).to include(source[:pointer]) if source[:pointer]
       end
     end
 
-    # A citation is static, so it does not wait on a reference the team has
-    # never generated.
     it "lists the sources even with no reference row at all" do
       get learn_concept_path(bucket: "ruby_rails", concept: "shotgun_surgery")
 
@@ -566,8 +552,7 @@ RSpec.describe "Learn", type: :request do
   describe "POST /learn/prepare" do
     before { user.update!(language: "ruby_rails") }
 
-    # Derived from the same authority the controller reads, not a hand-added
-    # sum: a vocabulary that grows must not need this number edited.
+    # Derived from the controller's authority so a growing vocabulary needs no edit here.
     it "enqueues one job per concept with no row at all" do
       expected = (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT)
                    .sum { |bucket| ConceptBucket.vocabulary_for(bucket).size }
@@ -591,10 +576,7 @@ RSpec.describe "Learn", type: :request do
         .with(hash_including(concept: "n_plus_one"))
     end
 
-    # The backfill must never rewrite a legacy row in bulk — that would change
-    # inline reference text for concepts nobody asked about. Only the
-    # per-concept path, on a concept someone opened, may do that.
-    it "does not ask to refresh a guide-less row" do
+    it "does not ask to refresh a guide-less row, since only a concept someone opens may be refreshed" do
       ConceptReference.create!(
         concept: "memoization", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"

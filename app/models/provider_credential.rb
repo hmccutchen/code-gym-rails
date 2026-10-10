@@ -1,11 +1,4 @@
-# Which key a user's provider call carries: their own when they stored one,
-# else the house key for their provider while their trial is active. The
-# house key is read here, at call time, and reaches the provider the way a
-# user's key does, as a constructor argument.
-#
-# An account with neither is handed no key, as before trials existed; a trial
-# that has ended, or whose provider has no house key, raises instead, so the
-# call fails before anything is sent.
+# Own key first, else the house key for an active trial; an ended trial raises so the call fails before sending.
 class ProviderCredential
   Credential = Data.define(:key, :house)
 

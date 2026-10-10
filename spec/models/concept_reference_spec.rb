@@ -84,9 +84,6 @@ RSpec.describe ConceptReference do
       expect(ConceptReference.featured(sunday + 1)).not_to eq(this_week)
     end
 
-    # Weekends are not a case the picker knows about — the date it is asked
-    # about is its only input — so this pins that a first visit on a Saturday
-    # picks for the week that began on Monday.
     it "picks on a weekend for the week it belongs to" do
       featurable("idempotency_at_scale")
       saturday = Date.new(2026, 9, 12)
@@ -94,8 +91,6 @@ RSpec.describe ConceptReference do
       expect(ConceptReference.featured(saturday)&.featured_on).to eq(Date.new(2026, 9, 7))
     end
 
-    # Rows featured while the pick was daily carry any weekday. They count as
-    # recently featured, and one stamped on a Monday is that week's pick.
     it "takes a daily pick stamped on this week's Monday as the week's concept" do
       featurable("caching_strategy")
       monday_pick = featurable("idempotency_at_scale", featured_on: Date.new(2026, 9, 7))
@@ -116,14 +111,7 @@ RSpec.describe ConceptReference do
       expect(reference).not_to be_guide
     end
 
-    # The same-day race, driven through a REAL unique violation rather than a
-    # stubbed exception: only the initial read is faked, to open the window a
-    # concurrent visit would open. The stamp then genuinely collides with the
-    # winner's row, and the recovery read is a genuine query.
-    #
-    # Real threads were tried here first and could not discriminate: the window
-    # between the read and the stamp is microseconds wide, so the test passed
-    # with the unique index dropped, which is worse than no test.
+    # Real threads passed with the unique index dropped, so only the read is faked to force a real collision.
     def losing_the_race
       missed_once = false
 
@@ -144,13 +132,7 @@ RSpec.describe ConceptReference do
       losing_the_race { expect(ConceptReference.featured).to eq(winner) }
     end
 
-    # The SAVEPOINT, which the example above cannot reach: under transactional
-    # specs Rails opens its wrapper NON-joinable, so update!'s own transaction
-    # becomes a savepoint on its own and masks the bug. A caller's ordinary
-    # transaction is joinable, update! joins it, and without requires_new the
-    # collision aborts that transaction — the recovery read then dies of
-    # PG::InFailedSqlTransaction instead of returning the winner. No caller
-    # opens one today; this pins the guard before one does.
+    # Transactional specs open a non-joinable wrapper, which masks a missing requires_new; a caller's does not.
     it "recovers from the collision inside a caller's own transaction" do
       featurable("caching_strategy")
       winner = featurable("idempotency_at_scale", featured_on: this_week)
@@ -160,15 +142,9 @@ RSpec.describe ConceptReference do
       end
     end
 
-    # ApplicationController runs every action inside the viewer's own zone, so a
-    # week resolved there would differ between teammates across Sunday midnight
-    # and each would stamp their own concept. Driven at an instant where the
-    # team zone and the viewer's zone genuinely disagree about the week.
-    it "resolves the week in the team's zone, not the viewer's" do
+    it "resolves the week in the team's zone, not the viewer's, while UTC Monday is still Sunday for the team" do
       reference = featurable("idempotency_at_scale")
 
-      # 03:00 UTC on Monday the 14th is still Sunday the 13th in
-      # America/New_York, so the team's week began on the 7th.
       travel_to Time.utc(2026, 9, 14, 3, 0, 0) do
         Time.use_zone("Asia/Tokyo") { ConceptReference.featured }
       end
@@ -310,9 +286,7 @@ RSpec.describe ConceptReference do
       end
     end
 
-    # The prompt merges rungs by concept name across a day's buckets. That is
-    # only safe while no concept name lives in two buckets a day can hold.
-    it "keeps every language-independent vocabulary disjoint from the others" do
+    it "keeps every language-independent vocabulary disjoint from the others, since the prompt merges rungs by concept name" do
       independent = ConceptBucket::LANGUAGE_INDEPENDENT
 
       DailyExercise::LANGUAGES.each do |language|

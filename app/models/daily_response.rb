@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/models/daily_response.md
 class DailyResponse < ApplicationRecord
   belongs_to :user, inverse_of: :daily_responses
   belongs_to :daily_exercise
@@ -10,47 +11,20 @@ class DailyResponse < ApplicationRecord
   AI_RATING_FAVORABLE   = %w[solid strong].freeze
   AI_RATING_UNFAVORABLE = %w[beginner developing].freeze
 
-  # How hard the PROBLEM was, judged from its content alone — not how well it
-  # was answered, and deliberately not the engineer's ConceptMastery tier,
-  # which is kept invisible to them (see AiService#assess_difficulty, which is
-  # handed no response and no user history at all). Three levels rather than
-  # four, in words that describe a problem rather than a person, because this
-  # renders inches from the AI grade badge and the two must not read as one
-  # axis; a spec holds the two vocabularies disjoint.
   DIFFICULTY_LEVELS = %w[straightforward moderate demanding].freeze
 
-  # The assessment's one-sentence "why" is provider prose rendered into the
-  # page, so it is bounded here rather than trusted. Long enough for the
-  # sentence the prompt asks for, short enough that a runaway one cannot push
-  # the review off the screen.
   MAX_DIFFICULTY_REASON_LENGTH = 200
 
-  # How many alternate framings a single section may accumulate. Enforced in
-  # ResponsesController#explain_differently as well as in the view: the view
-  # stops offering the button at the cap, but only the server bound holds
-  # against a crafted request. Lives here, not on the controller, because it's
-  # a property of the data (how many alternates a response may hold) that the
-  # view partial also needs to read.
   MAX_ALTERNATES_PER_SECTION = 2
 
-  # How many questions a user may ask about one section. Three exchanges is
-  # enough to clear up a misunderstanding without the review becoming an
-  # open-ended chat. Same rationale as MAX_ALTERNATES_PER_SECTION for living here.
   MAX_FOLLOW_UPS_PER_SECTION = 3
 
-  # How many History entries render per page.
   HISTORY_PAGE_SIZE = 10
 
   validates :date, uniqueness: { scope: :user_id }
 
   scope :submitted, -> { where.not(submitted_at: nil) }
 
-  # Ordered field → {list} map for rendering ai_review sections — shared by the
-  # shared/_ai_review partial and ReviewMailer. Each field's heading is
-  # review.fields.<field> in en.yml, read through .ai_review_label.
-  # `list: true` fields hold multiple discrete points and render as a real list;
-  # next_step is deliberately one thing to study, so it stays a single string.
-  # "rating" (badge) and "improved_code" (code block) render separately.
   AI_REVIEW_FIELDS = {
     "correct"          => { list: true  },
     "missed"           => { list: true  },
@@ -58,24 +32,14 @@ class DailyResponse < ApplicationRecord
     "next_step"        => { list: false }
   }.freeze
 
-  # A prompt passes locale: :en so the text sent to the provider never
-  # follows a request's locale.
   def self.ai_review_label(field, locale: I18n.locale)
     I18n.t("review.fields.#{field}", locale: locale)
   end
 
-  # Read at render time, so a request's locale chooses the wording.
   def self.self_rating_labels
     SELF_RATINGS.index_with { |rating| I18n.t("self_ratings.#{rating}") }
   end
 
-  # Reads a review field as a list of discrete points regardless of how it was
-  # stored. Reviews generated before the schema moved to arrays hold a single
-  # string; those render as a one-item list rather than being backfilled, since
-  # ai_review is jsonb and old rows are still perfectly readable. A class method
-  # rather than a helper because the mailer's text template needs it too, and
-  # helpers aren't included in mailer views by default — same reason
-  # AI_REVIEW_FIELDS lives here.
   def self.review_points(value)
     case value
     when Array then value.map { |v| v.to_s.strip }.reject(&:blank?)
@@ -83,10 +47,7 @@ class DailyResponse < ApplicationRecord
     end
   end
 
-  # Same array-tolerance as review_points (a schema drift could return an Array
-  # here too), but without stripping each entry: review_points' per-entry
-  # #strip is right for prose points, but for a code block it deletes the
-  # first line's leading indentation. nil/blank is still "absent" either way.
+  # Entries are not stripped: that would delete the code block's first-line indentation.
   def self.improved_code_text(value)
     case value
     when Array then value.map(&:to_s).join("\n")
@@ -94,43 +55,13 @@ class DailyResponse < ApplicationRecord
     end.then { |text| text.blank? ? nil : text }
   end
 
-  # How long a claimed-but-unfinished review blocks a retry. A crash or hang
-  # mid-review must not lock the user out forever, so after this window a new
-  # request may reclaim the row — which means the window has to outlast the
-  # longest a review can honestly still be running, or a second review starts
-  # billing the same sections while the first is in flight.
-  # Lives here rather than on ResponsesController because regeneration asks the
-  # same question from a controller and a job, and a second statement of the
-  # window could disagree with this one.
-  #
-  # The longest review is a pseudocode_to_code day's: the translation on
-  # AiService::READ_TIMEOUT, then the grade on AiService::REVIEW_READ_TIMEOUT
-  # (see AiService#translate_before_grading), each able to spend every retry
-  # attempt, then one single-attempt prose-judge call, then the difficulty
-  # note's grace period. Provider time alone omits
-  # usage writes, translation persistence, parsing, scheduling, and the final
-  # lock/save. ai_service_spec reserves a non-provider margin before rounding
-  # the combined budget up to the next whole minute. That margin is headroom,
-  # not a deadline on database waits.
-  #
-  # A literal rather than a derivation because AiService's own constants read
-  # DailyResponse while it loads, so computing this from AiService here would
-  # make the two classes' load order matter.
   REVIEW_CLAIM_STALE_AFTER = 12.minutes
 
   def submitted? = submitted_at.present?
   def reviewed?  = ai_review.present?
 
-  # A review with no recorded provider was written while the user's provider
-  # was the current one: switching providers records it first. The backfill
-  # stores "unknown" where usage shows the user ran another provider, which
-  # labels as the generic name.
   def review_provider_label = AiProvider.label(review_provider.presence || user.provider)
 
-  # A review is claimed and still plausibly running — mirrors
-  # DailyExercise#regenerating?. Anything that would destroy this row has to
-  # ask: #review's provider call runs outside a transaction, so a destroy
-  # mid-flight discards a review the user has already paid for.
   def reviewing?
     reviewing_since.present? && reviewing_since > REVIEW_CLAIM_STALE_AFTER.ago
   end
@@ -147,10 +78,7 @@ class DailyResponse < ApplicationRecord
     pseudocode_rounds[section.to_s] || {}
   end
 
-  # Keyed on the timestamp rather than on the critique list, because `[].present?`
-  # is false: a critique that legitimately found no gaps stores an empty list, and
-  # a list-based check would let that engineer request an unlimited number of
-  # further critiques — each one a provider call they pay for with their own key.
+  # Keyed on the timestamp: a critique that found no gaps stores [], which is not present?.
   def critiqued?(section)
     pseudocode_round(section)["critiqued_at"].present?
   end
@@ -159,24 +87,13 @@ class DailyResponse < ApplicationRecord
     pseudocode_round(section)["translated_at"].present?
   end
 
-  # The one writer of a section's rounds, next to the readers above so the key
-  # names live in one class. Nils are dropped rather than stored, which is what
-  # lets a caller clear a claim in the same merge that records its result.
   def merge_pseudocode_round!(section, attrs)
     rounds = pseudocode_rounds.deep_dup
     rounds[section.to_s] = (rounds[section.to_s] || {}).merge(attrs).compact
     update!(pseudocode_rounds: rounds)
   end
 
-  # The translation and the exact text it was made from, which #translated? and
-  # ExerciseSection::PseudocodeToCode.translation_lines then read back.
-  #
-  # Under the row lock, because the merge above is a read-modify-write of one
-  # jsonb column and a critique round can be in flight while the review runs:
-  # submitting no longer waits for it. Without the lock, this writer could read
-  # the rounds, wait behind ResponsesController#write_pseudocode_round!, and
-  # then overwrite the critique it just stored. #with_lock reloads, so the
-  # merge always builds on the newest rounds.
+  # Under the row lock: a critique round can be in flight, and this read-modify-write would overwrite it.
   def record_translation!(section, code:, pseudocode:)
     with_lock do
       merge_pseudocode_round!(section,
@@ -186,10 +103,6 @@ class DailyResponse < ApplicationRecord
     end
   end
 
-  # A round whose provider call was claimed and has not come back. Mirrors
-  # #reviewing? and deliberately reuses REVIEW_CLAIM_STALE_AFTER: both answer
-  # "a paid call was started and may still be running", and two windows that
-  # could disagree is one window too many.
   def pseudocode_claimed?(section, phase)
     claimed_at = pseudocode_round(section)["#{phase}_claimed_at"]
     return false if claimed_at.blank?
@@ -202,17 +115,6 @@ class DailyResponse < ApplicationRecord
   def self_rating_unfavorable?(section) = SELF_RATING_UNFAVORABLE.include?(self_rating_for(section))
   def self_rating_label(section)       = self.class.self_rating_labels[self_rating_for(section)]
 
-  # The one definition of a usable difficulty assessment. The review path has no
-  # ProblemSetIngest to hold provider output to a closed vocabulary, so this
-  # runs on the way in (AiService#assess_difficulty) and again on the way out
-  # (#difficulty_for). Neither direction is redundant: `ai_review` is schemaless
-  # jsonb, so the reader cannot assume every row it renders was written by the
-  # writer. Stating the rule once is what keeps the two from disagreeing about
-  # what is renderable.
-  #
-  # A class method beside .review_points and .improved_code_text — the other
-  # tolerant readers the view and the mailer both share, and for the same
-  # reason: helpers are not included in mailer views by default.
   def self.usable_difficulty(assessment)
     return unless assessment.is_a?(Hash) && DIFFICULTY_LEVELS.include?(assessment["level"])
 
@@ -229,13 +131,6 @@ class DailyResponse < ApplicationRecord
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 
-  # Prose answer keys with substantive content. Non-prose kinds own their
-  # completion rule through ExerciseSection.answered?; every consumer still
-  # asks this response's #answered? rather than testing the representation.
-  #
-  # Length is measured against the answer minus the day's scaffold labels (see
-  # ExerciseSection.substantive_answer), so a scaffolded section isn't counted
-  # as answered for text the user didn't write.
   ANSWER_MIN_LENGTH = 10
 
   def self.substantive_answer(section, value, section_data = nil)
@@ -247,18 +142,6 @@ class DailyResponse < ApplicationRecord
     (ExerciseSection.find(section) || ExerciseSection).answered?(value, section_data)
   end
 
-  # Scaffold-only drafts store as blank so reloading can offer the scaffold
-  # again without storing its labels as the user's work. Other draft text stays
-  # intact; #answered? decides whether it counts.
-  #
-  # UserText runs first, so what is stored, shown and quoted into every later
-  # prompt is the same cleaned, bounded string. Each typed answer input
-  # declares its own cap as a maxlength — this one, or the room a kind's
-  # encoding leaves in front of it — so the limit is visible where the text is
-  # written rather than discovered after a save. It is the cap as typed: a
-  # browser counts the characters it was handed and this cap counts them after
-  # NFC, which can add one, so the attribute makes the bound visible without
-  # promising the tail is never clipped.
   def self.normalize_answers(answers, exercise)
     answers.to_h.each_with_object({}) do |(section, value), normalized|
       cleaned = UserText.clean(value, limit: UserText::MAX_ANSWER_LENGTH)
@@ -283,11 +166,6 @@ class DailyResponse < ApplicationRecord
     (ExerciseSection.find(section) || ExerciseSection).answer_for(answers[section.to_s], section_data(section))
   end
 
-  # The sections this response is measured against — the exercise's own, never
-  # `answers.keys`. A row can hold an answer for a section its exercise no
-  # longer presents (a regenerated day whose third changed), and counting it
-  # would report more answered sections than exist and push #completeness past
-  # 100%.
   def section_keys
     daily_exercise&.active_section_keys || []
   end
@@ -296,19 +174,10 @@ class DailyResponse < ApplicationRecord
     section_keys.select { |section| answered?(section) }
   end
 
-  # The tags that count as evidence of skill. A skipped section is still
-  # reviewed, but a grade on an empty answer measures nothing — exposure
-  # readers keep the full #concept_tags instead, because a skipped section
-  # was still shown (see CLAUDE.md's "Personalization loop" for which is which).
   def answered_concept_tags
     concept_tags.slice(*answered_sections)
   end
 
-  # Why Submit is still disabled, or nil when it isn't. A rating is owed only
-  # for a section that was answered — rating a skipped one would record a
-  # difficulty for a problem never attempted — but a day with nothing answered
-  # owes none, and that must not read as ready to submit. The dashboard's
-  # script restates these two checks against the live form.
   def submit_blocker
     answered = answered_sections
     if answered.empty?
@@ -322,8 +191,6 @@ class DailyResponse < ApplicationRecord
     submit_blocker.nil?
   end
 
-  # Zero-guarded: a payload whose every section key holds a non-Hash presents no
-  # answerable sections, and dividing by it yields NaN, which #round raises on.
   def completeness
     total = section_keys.size
     return 0 if total.zero?
@@ -331,25 +198,13 @@ class DailyResponse < ApplicationRecord
     (answered_sections.size / total.to_f * 100).round
   end
 
-  # improved_code is revealed only from a concept's SECOND exposure onward — the
-  # first time a concept appears, the corrected answer stays hidden (mirrors the
-  # attempt-gated teaching_note). Ungated for blank/"other" (no concept to track).
-  # Whether a section kind carries improved_code at all is the kind's own
-  # property (see ExerciseSection) — the architecture section never does, and
-  # that exclusion lives there rather than in each render template, so both
-  # templates stay in sync automatically.
   def improved_code_visible?(section)
     kind = ExerciseSection.find(section)
     return false if kind && !kind.improved_code?
 
     concept = concept_tags[section.to_s]
     return true if concept.blank? || concept == "other"
-    # Resolved the same way User#concept_exposure_index builds its keys. Reading
-    # the day's language directly was correct until the fourth slot gave
-    # plan_review a bucket of its own, at which point the two sides of this
-    # lookup silently stopped agreeing and plan_review's revised plan — the one
-    # kind that both carries improved_code and buckets independently — could
-    # never become visible.
+    # Must match User#concept_exposure_index's keys, or plan_review's revised plan never becomes visible.
     bucket = ConceptBucket.for(section, daily_exercise.language)
     user.concept_exposure_count(concept, bucket, on_or_before: date) >= 2
   end

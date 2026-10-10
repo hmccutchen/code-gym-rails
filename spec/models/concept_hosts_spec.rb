@@ -15,8 +15,7 @@ RSpec.describe ConceptHosts do
     expect(hosts.kinds_for("wrong_cardinality", "ruby_rails").map(&:key)).to include("code_review")
   end
 
-  # Every rung, so a concept the design comparison takes only at
-  # principal_engineer still counts as one it could ever be offered.
+  # Every rung, so a concept design_comparison takes only at principal_engineer still counts.
   it "hosts a tradeoff concept in design_comparison across every rung" do
     expect(hosts.kinds_for("denormalization_tradeoffs", "ruby_rails").map(&:key)).to include("design_comparison")
   end
@@ -37,8 +36,7 @@ RSpec.describe ConceptHosts do
     expect(hosts.kinds_for("prototype_chain", "javascript")).to eq([])
   end
 
-  # The page words a concept with no unexcluded host as the user's choice, so
-  # every concept must have a host to begin with or that wording lies.
+  # The page words an unhosted concept as the user's choice, which is false unless every concept has a host.
   it "gives every concept in every bucket of the slice at least one host" do
     mixed = described_class.for(User.new(language: "mixed"))
 

@@ -75,8 +75,7 @@ RSpec.describe CodeHighlight do
       expect(result.css("span span")).to be_empty
     end
 
-    # Judge fixtures carry no language, so each snippet goes through every
-    # lexer a page can pick, plain text included.
+    # Judge fixtures carry no language, so each snippet goes through every lexer a page can pick.
     it "highlights every fixture snippet with every lexer, keeping its text" do
       snippets = Dir[Rails.root.join("spec/fixtures/{judge,review_calibration}/*.json")].flat_map do |path|
         fixture = JSON.parse(File.read(path))

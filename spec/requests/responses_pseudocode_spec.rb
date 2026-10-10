@@ -1,17 +1,9 @@
 require "rails_helper"
 
-# The pseudocode_to_code critique round, plus the translation the review now
-# makes on the engineer's behalf. Every one of these is a provider call the
-# user pays for with their own key, so most of the guards here are about not
-# spending a call the engineer didn't ask for — or spending one and not
-# counting it.
 RSpec.describe "Pseudocode rounds", type: :request do
   let(:user) { create_fake_provider_user }
 
-  # Built by hand rather than from FakeService::EXERCISE_PROBLEM_SET, which
-  # holds every kind at once: plan_review wins the fourth slot by precedence
-  # there, so pseudocode_to_code would never be in active_section_keys and every
-  # example below would 422 on the section guard.
+  # FakeService's full set lets plan_review win the fourth slot, so pseudocode_to_code would never be active.
   let!(:exercise) do
     DailyExercise.create!(
       user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
@@ -58,10 +50,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(JSON.parse(response.body)["error"]).to match(/already/i)
     end
 
-    # The [].present? trap: a critique that found nothing is still spent. Keying
-    # the cap on the critique list rather than on critiqued_at would leave the
-    # most common good outcome uncapped.
-    it "refuses a second critique even when the first found no gaps" do
+    it "refuses a second critique even when the first found no gaps, since the cap keys on critiqued_at" do
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode)
         .and_return({ gaps_found: false, gaps: [] })
 
@@ -73,7 +62,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
-    # A provider hiccup must not silently spend the engineer's one critique.
     it "leaves the cap unconsumed when the provider response is malformed" do
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode)
         .and_raise(AiService::InvalidResponseError, "claimed gaps but returned none usable")
@@ -88,8 +76,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(round["critiqued_at"]).to be_present
     end
 
-    # The section is not a parameter any more — it comes from the registry — so a
-    # crafted request cannot aim these endpoints at another kind at all.
     it "ignores a section parameter and only ever touches its own kind" do
       critique(section: "challenge")
 
@@ -98,8 +84,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
         .to eq([ "pseudocode_to_code" ])
     end
 
-    # The cap has to bound the SPEND, not just the write: a check made only after
-    # the call still bills both of two concurrent requests.
     it "claims the round before calling the provider, so a concurrent request never calls at all" do
       calls = 0
       allow_any_instance_of(FakeService).to receive(:critique_pseudocode) do
@@ -125,8 +109,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    # A crashed request must not lock the round forever — same window #review uses.
-    it "lets a stale claim be reclaimed" do
+    it "lets a stale claim be reclaimed after the same window #review uses" do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             pseudocode_rounds: { "pseudocode_to_code" => {
                               "critique_claimed_at" => (DailyResponse::REVIEW_CLAIM_STALE_AFTER.ago - 1.minute).iso8601
@@ -147,10 +130,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(JSON.parse(response.body)["error"]).to match(/already running/i)
     end
 
-    # The row is created before the provider call now (the claim needs something
-    # to lock), so the autosave race moved into persisted_response_for. Either
-    # ordering must end with exactly one row and no error: the uniqueness rule is
-    # a validation AND an index, so the two orderings raise different classes.
     it "reuses today's response when the autosave already created it" do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "pseudocode_to_code" => "sort then walk" })
@@ -163,10 +142,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
 
     it "reuses today's response when it is created after the lookup" do
-      # The association proxy, not the class: the controller calls
-      # current_user.daily_responses.find_or_create_by!, and a class-level stub
-      # never intercepts it — which made an earlier version of this example pass
-      # with the rescue deleted.
+      # The controller uses the association proxy; a class-level stub never intercepts it.
       allow_any_instance_of(ActiveRecord::Associations::CollectionProxy)
         .to receive(:find_or_create_by!).and_raise(ActiveRecord::RecordNotUnique, "dup")
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current)
@@ -210,9 +186,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
-  # Generated code and critique points are provider output rendered into the
-  # page. The client path uses textContent; this covers the server-rendered
-  # half, which is what a reload shows.
   describe "rendering stored round output" do
     it "escapes generated code and critique text rather than emitting markup" do
       DailyResponse.create!(
@@ -234,10 +207,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
-  # The measurement half of the design: a critique that found nothing followed
-  # by a review that found plenty is the incoherence this feature is most
-  # exposed to, so it is logged as a boolean rather than left to be
-  # reconstructed from user reports later.
   describe "review diagnostics" do
     def submitted_response(rounds:, review:)
       DailyResponse.create!(
@@ -296,8 +265,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(line).to include("critiqued=true", "gaps=1", "missed=2", "disagreement=false")
     end
 
-    # The metric compares critique gaps with what the grader found, so it must
-    # not move when the prose judge merges missed points.
     it "counts the grader's missed points, not the prose judge's merged ones" do
       response_row = submitted_response(
         rounds: { "gaps_found" => false, "critique" => [], "critiqued_at" => Time.current.iso8601,
@@ -319,9 +286,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
     end
   end
 
-  # Round 2 is no longer a button: the review translates whatever pseudocode was
-  # submitted, then grades the plan against it. These cover the ordering the
-  # grading call depends on, and the two skips that keep it from paying twice.
   describe "translation at review time" do
     def submit_and_review(answer: "sort the ranges then walk them", rounds: {})
       row = DailyResponse.create!(
@@ -342,9 +306,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(round["translated_at"]).to be_present
     end
 
-    # The whole point of the ordering: the day context every grading thread
-    # shares is assembled AFTER the translation is stored, so the graded prompt
-    # carries the code rather than "They never translated their plan into code."
     it "grades the section against the code it just generated" do
       prompts = []
       allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, **kwargs|
@@ -368,9 +329,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(row.pseudocode_round("pseudocode_to_code")["translated_at"]).to be_nil
     end
 
-    # A partial review is retried section by section, so a translation already
-    # paid for is never bought again.
-    it "leaves an existing translation alone" do
+    it "leaves an existing translation alone, so a partial review's retry never pays for it again" do
       expect_any_instance_of(FakeService).not_to receive(:translate_pseudocode)
 
       row = submit_and_review(rounds: { "generated_code" => "def already; end",
@@ -380,10 +339,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(row.pseudocode_round("pseudocode_to_code")["generated_code"]).to eq("def already; end")
     end
 
-    # #create length-bounds no answer, so this is the only thing between a
-    # pasted novel and the translation prompt. Skipped rather than clipped: code
-    # translated from half a plan is not translated from their plan, and the
-    # page captions it as though it were.
+    # #create bounds no answer length, so this skip is the only guard on the translation prompt.
     it "does not translate a plan past the length bound, but still reviews" do
       over_limit = "x" * (ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH + 1)
       expect_any_instance_of(FakeService).not_to receive(:translate_pseudocode)
@@ -394,10 +350,7 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(row.ai_review.keys).to include("pseudocode_to_code")
     end
 
-    # Submitting no longer waits for the critique, so that write can land while
-    # the review runs. The translation merges one jsonb column, so without the
-    # row lock it would read the rounds, wait behind the critique's writer, and
-    # then overwrite what it stored.
+    # Without the row lock, the translation's jsonb merge would overwrite a critique that landed mid-review.
     it "keeps a critique that lands mid-review instead of overwriting it" do
       row = DailyResponse.create!(
         user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
@@ -421,8 +374,6 @@ RSpec.describe "Pseudocode rounds", type: :request do
       expect(round["generated_code"]).to include("def merge_ranges")
     end
 
-    # The grade is what the engineer paid for. A translation that fails costs
-    # them the code, never the review.
     it "still reviews every section when the translation fails" do
       allow_any_instance_of(FakeService).to receive(:translate_pseudocode)
         .and_raise(AiService::Error, "provider down")

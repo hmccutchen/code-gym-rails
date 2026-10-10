@@ -1,43 +1,16 @@
 require "rails_helper"
 
-# Pins the exact bytes of the generation prompt, for every combination of
-# generation language, third section, and fourth section the app can roll.
-#
-# This exists to guard a refactor that moves each section kind's schema
-# fragment and generation guidance out of AiService's case statements and onto
-# the ExerciseSection subclasses. That move is required to change nothing about
-# what the provider is asked for, and "nothing" includes whitespace: the
-# fragments are squiggly heredocs interpolated into another squiggly heredoc,
-# so their indentation in the assembled prompt is partly incidental and would
-# be easy to normalize by accident.
-#
-# The combinations are enumerated from ExerciseSection's own third/fourth
-# rosters rather than hardcoded, so adding a section kind to either rotation
-# fails here until a snapshot for it exists — a kind that silently drops out
-# of assembly is the specific failure this is meant to catch.
-#
-# NOT covered, deliberately: retention/reinforcement/established blocks are
-# rendered from empty lists. Those need persisted ConceptMastery rows, and the
-# text they produce lives in build_exercise_prompt, which is not moving. The
-# one exception worth knowing about is #annotate_retention_concept, which does
-# branch on the third — it stays in AiService and keeps its own specs.
-#
-# Rebaselining: UPDATE_PROMPT_SNAPSHOTS=1 bundle exec rspec <this file>. Do
-# that only when a prompt change is the intended deliverable. Rebaselining
-# while moving the fragments would pin the new behavior and defeat the point.
+# Rebaseline with UPDATE_PROMPT_SNAPSHOTS=1 only when a prompt change is the intended deliverable.
 RSpec.describe "generation prompt characterization" do
   SNAPSHOT_DIR = Rails.root.join("spec/fixtures/prompt_snapshots").freeze
 
-  # Concrete subclass so the prompt builders can run without a provider
-  # connection — this renders text and makes no HTTP call.
   let(:service) do
     Class.new(AiService) do
       private def build_connection = nil
     end.new("snapshot-key")
   end
 
-  # Unpersisted and fully explicit: every list the prompt interpolates is
-  # passed in, so nothing here reads the database or the clock.
+  # Unpersisted and explicit, so nothing here reads the database or the clock.
   let(:user) do
     User.new(
       email:       "snapshot@example.com",

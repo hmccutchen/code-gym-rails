@@ -1,8 +1,7 @@
 require "rails_helper"
 
 RSpec.describe KindDifficulty do
-  # A stand-in rather than a record, as in kind_preferences_spec: this object is
-  # built from plain values, and a spec that needed the database would hide that.
+  # A stand-in rather than a record: needing the database would hide that this is built from plain values.
   def stated(levels: {}, locked: [])
     Struct.new(:section_kind_levels, :locked_section_kinds).new(levels, locked)
   end
@@ -37,8 +36,7 @@ RSpec.describe KindDifficulty do
       expect(difficulty.locked?(challenge)).to be(true)
     end
 
-    # The read-side half of the lock-needs-a-level invariant. A console write
-    # can leave this state behind; it must never suppress easing.
+    # A console write can leave an orphaned lock; it must never suppress easing.
     it "reads an orphaned lock as unlocked" do
       difficulty = described_class.new(levels: {}, locked: [ "challenge" ])
 
@@ -70,8 +68,7 @@ RSpec.describe KindDifficulty do
   end
 
   describe "LEVELS" do
-    # Skill levels are these levels, so they are held to that rather than kept
-    # apart; the rating scales stay apart from both.
+    # Skill levels are these levels; the rating scales stay apart from both.
     it "shares no value with either rating scale" do
       [ DailyResponse::DIFFICULTY_LEVELS, ConceptMastery::AI_RATING_RANK.keys ].each do |scale|
         expect(described_class::LEVELS & scale).to be_empty

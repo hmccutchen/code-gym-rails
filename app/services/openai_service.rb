@@ -9,42 +9,20 @@ class OpenaiService < AiService
   # The legacy branch cannot claim an Anthropic key's "sk-ant-" prefix.
   def self.key_pattern = /\Ask-(proj-|svcacct-|[A-Za-z0-9]{20})/
 
-  # Keyed by the ApiUsage purpose string, like ClaudeService's. No route has
-  # been compared against another model yet. Effort is stated even where it is
-  # the model's default, so a change to that default cannot move a route
-  # silently. Generation is never capped, so it can take 6.1 Sol, which cannot
-  # turn reasoning off. The judge is capped, and Astra cannot turn reasoning
-  # off either, so its route carries a reasoning allowance (see
-  # #request_body). Everything else runs on 6 Sol with reasoning off.
   DEFAULT_ROUTE = { model: "gpt-6-sol", effort: "none" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => { model: "gpt-6.1-sol", effort: "high" },
-    # 25,000 is OpenAI's suggested starting reserve for reasoning and output.
-    # Low is Astra's lowest effort, chosen because the judge's read timeout is
-    # 45 seconds.
     "judge_section"     => { model: "gpt-6-astra", effort: "low", reasoning_allowance: 25_000 }
   }.then { |routes| routes.merge("retry_section" => routes.fetch("generate_exercise")) }.freeze
 
-  # max_output_tokens caps reasoning and reply together, so a capped call turns
-  # reasoning off or the model can spend the cap before it answers. 6.1 Sol and
-  # Astra have no "none" effort, so they have no entry, and a capped call routed
-  # to either raises before sending unless its route carries a
-  # reasoning_allowance.
   REASONING_OFF = {
     "gpt-6-sol"  => "none",
     "gpt-6-luna" => "none"
   }.freeze
 
-  # OpenAI refuses JSON mode with a 400 unless an input message mentions JSON,
-  # and the system prompt goes in instructions, which it does not count (#253).
   JSON_MODE_REQUEST = "Reply with a JSON object.".freeze
 
-  # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
-  # every retry decision through `retry_if` — faraday-retry treats a method on
-  # its `methods` list as retryable outright and never consults `retry_if`, and
-  # POST (which every call here uses) has to be on one list or the other or no
-  # retry ever fires. A 429 for an exhausted quota is retried too, since its
-  # status does not say which kind it is; that costs two wasted attempts.
+  # `methods: []` routes every retry decision through retry_if; an exhausted-quota 429 is retried too, as statuses match.
   RETRY_OPTIONS = {
     max:                 AiService::RETRY_MAX,
     interval:            0.5,
@@ -62,8 +40,7 @@ class OpenaiService < AiService
     route = route_for(purpose)
     body  = request_body(route, system: system, prompt: prompt, history: history, max_tokens: max_tokens, response_schema: response_schema)
 
-    # A call that reasons within an allowance can spend most of the allowance
-    # before it times out, so its timeout is final rather than retried.
+    # A call reasoning within an allowance can spend most of it before timing out, so its timeout is not retried.
     final_timeout = read_timeout > READ_TIMEOUT || route.key?(:reasoning_allowance)
     resp = @conn.post(API_URL, body.to_json) do |req|
       req.options.timeout = read_timeout
@@ -86,21 +63,12 @@ class OpenaiService < AiService
       store:        false,
       reasoning:    { effort: effort_for(route, capped: max_tokens.present?) }
     }
-    # An allowance lets a capped call reason: the cap grows by it, leaving
-    # room for reasoning on top of the reply the caller sized the cap for.
     body[:max_output_tokens] = max_tokens + route.fetch(:reasoning_allowance, 0) if max_tokens
-    # JSON mode rather than the schema itself: strict schemas need an object at
-    # the root and every property required, and VerdictSchema builds an anyOf
-    # with optional fields. JSON mode guarantees a parseable reply, and each
-    # verdict's .parse still holds the shape.
+    # JSON mode, since strict schemas forbid VerdictSchema's root anyOf and optional fields; .parse still holds the shape.
     body[:text] = { format: { type: "json_object" } } if response_schema
     body
   end
 
-  # OpenAI answers an account with no credit with a 429 whose error code is
-  # insufficient_quota, the same status as a rate limit. It is not one:
-  # waiting never clears it, so it is told apart here and never retried as a
-  # rate limit by anything downstream. A 402 is read the same way.
   INSUFFICIENT_QUOTA = "insufficient_quota".freeze
   RATE_LIMIT_FAMILIES = %w[requests tokens].freeze
 
@@ -152,9 +120,7 @@ class OpenaiService < AiService
     cache_write_tokens = usage.dig("input_tokens_details", "cache_write_tokens").to_i
 
     {
-      # OpenAI includes both cache reads and writes in input_tokens.
       input_tokens:  usage["input_tokens"].to_i - cached_tokens - cache_write_tokens,
-      # Reasoning tokens are already inside output_tokens.
       output_tokens: usage["output_tokens"],
       model:         route[:model],
       cache_read_tokens:  cached_tokens,
@@ -178,8 +144,7 @@ class OpenaiService < AiService
     REASONING_OFF.fetch(model) { raise AiService::UnsupportedRouteError, "#{model} cannot turn reasoning off, so it cannot take a capped call" }
   end
 
-  # A content filter stops a reply as "incomplete", the same status a spent
-  # budget gives, so it is told apart here rather than read as truncation.
+  # A content filter also reports "incomplete", so it is told apart from truncation here.
   def filtered?(parsed)
     parsed.dig("incomplete_details", "reason") == "content_filter"
   end

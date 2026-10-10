@@ -1,6 +1,4 @@
-# Counts accounts for the open-signup question in the security audit. Prints
-# numbers only, never an email or a name, inside a read-only transaction that
-# is rolled back, so nothing it runs can write.
+# Prints numbers only, never an email or name, inside a read-only transaction that is rolled back.
 class AccountCountReport
   def initialize(out: $stdout)
     @out = out

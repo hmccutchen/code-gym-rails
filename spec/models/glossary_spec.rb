@@ -34,19 +34,12 @@ RSpec.describe Glossary do
     expect(Glossary::TERMS.values).to all(be_present)
   end
 
-  # The coverage guard below only tries the underscore_case form, so a term
-  # whose ordinary written spelling is hyphenated needs both keys — TERM_PATTERN
-  # matches literal keys, and generated prose writes "pass-through method".
-  # Same reason "over-mocking"/"over mocking" are both present.
+  # The coverage guard tries only underscore_case, so hyphenated spellings in prose need their own key.
   it "carries the hyphenated spelling of every term written that way in prose" do
     expect(Glossary.lookup("pass-through method")).to be_present
   end
 
-  # Regression guard: a user is most likely to search for exactly the words
-  # this app already shows them — a concept tag, or its underscore_case form.
-  # Catches the class of bug reported in production: "concurrency" (a real
-  # RAILS_CONCEPTS entry) had no glossary hit at all, and several others only
-  # existed under a mismatched singular/plural or punctuation form.
+  # Users search for the words the app shows them; "concurrency" once had no glossary hit at all.
   it "resolves every AiService concept vocabulary entry, in its literal or space-normalized form" do
     concepts = AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS
     missing = concepts.uniq.reject do |concept|

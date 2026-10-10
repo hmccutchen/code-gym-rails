@@ -2,9 +2,7 @@ class CreatePushSubscriptions < ActiveRecord::Migration[8.1]
   def change
     create_table :push_subscriptions do |t|
       t.references :user, null: false, foreign_key: true
-      # The push service's per-install URL. Unique because re-subscribing on
-      # launch must refresh the existing row rather than accumulate a second
-      # one for the same browser.
+      # Unique so re-subscribing on launch refreshes the browser's row instead of adding one.
       t.string :endpoint, null: false
       t.string :p256dh_key, null: false
       t.string :auth_key, null: false

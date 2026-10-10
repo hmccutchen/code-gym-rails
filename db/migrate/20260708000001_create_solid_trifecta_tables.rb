@@ -1,7 +1,4 @@
-# Solid Queue / Solid Cache / Solid Cable share the primary database (Railway
-# provides a single postgres), so their tables are created here as a regular
-# migration instead of living in the separate db/*_schema.rb files, which only
-# get loaded into dedicated databases by db:prepare.
+# Solid tables live in the primary database (Railway has one postgres); db/*_schema.rb loads only into dedicated ones.
 class CreateSolidTrifectaTables < ActiveRecord::Migration[8.0]
   def change
     # -- Solid Queue (from db/queue_schema.rb) --

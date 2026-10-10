@@ -1,19 +1,8 @@
-<%# The answer area for parsons_problem, in both states. Unlike every other
-    kind, the stored answer is a positional order rather than prose, so a
-    submitted section replays the blocks in the order they were arranged —
-    marking each correct or misplaced — instead of echoing "order:0,2,1".
-
-    The hidden textarea stays a sibling of the <ol> inside .section: the script
-    below finds it with list.parentElement.querySelector.
-
-    Locals: kind, key, data, exercise, response, submitted. %>
+<%# Locals: kind, key, data, exercise, response, submitted. Notes: docs/code-notes/app/views/responses/answers/_parsons_problem.html.md %>
 <% language = exercise.language %>
 <% blocks   = Array(data["blocks"]) %>
 <% if submitted %>
-  <%# parse_order, not submitted_order: grading rejects anything short of a
-      complete permutation, but this is a replay of what they arranged, and
-      showing every block as "(skipped)" because one id is corrupt hides work
-      they did do. Strict at the boundary, lenient in the UI. %>
+  <%# parse_order, not submitted_order: one corrupt id must not hide the blocks they did arrange. %>
   <% submitted_ids = ExerciseSection::ParsonsProblem.parse_order(response.answer_for(key)) %>
   <ol class="parsons-list parsons-list-readonly">
     <% Array.new(blocks.size) { |i| submitted_ids[i] }.each_with_index do |block_id, position| %>
@@ -23,10 +12,6 @@
     <% end %>
   </ol>
 <% else %>
-  <%# The learner's own saved arrangement wins over the original scramble, so
-      a reload doesn't undo their work. Each candidate is rejected unless it
-      is a complete permutation of the blocks, so a corrupted answer or a row
-      missing display_order falls back rather than dropping blocks. %>
   <% initial_order = ExerciseSection::ParsonsProblem.initial_order(
        answer: response.answers[key],
        display_order: data["display_order"],
@@ -39,28 +24,18 @@
       </li>
     <% end %>
   </ol>
-  <%# Every move already records the order, and the scramble never starts in the
-      correct order, so the button only matters when there is nothing to move:
-      without it a one-block exercise could never be answered. %>
   <% if blocks.size == 1 %>
     <button type="button" class="btn btn-ghost btn-sm" data-parsons-confirm><%= t("responses.parsons.confirm_button") %></button>
   <% end %>
-  <%# Dragging is pointer-only, so the arrow keys are the sole path for anyone
-      not using a mouse. The hint is clipped until a block takes focus, which
-      keeps it out of the way of the people who will never need it. %>
   <p class="parsons-keyhint"><%= t("responses.parsons.key_hint") %></p>
   <p class="parsons-status" aria-live="polite"></p>
+  <%# Keep this a sibling of the <ol>: the script finds it through list.parentElement. %>
   <textarea name="response[answers][<%= key %>]" class="<%= kind.answer_class %>" data-field="<%= key %>" data-answer-complete="<%= response.answered?(key) %>" style="display:none"><%= ExerciseSection::ParsonsProblem.token_answer(answer: response.answers[key], exercise: exercise, key: key, section_data: data) %></textarea>
 <% end %>
 <% unless submitted || @parsons_script_emitted %>
   <% @parsons_script_emitted = true %>
   <% content_for :page_scripts do %>
     <script>
-    // Drag (SortableJS, imported below) is the primary way to reorder. The
-    // up/down buttons are a recovery path, injected only when that import
-    // fails or never resolves. Neither path syncs the hidden field on wire-up
-    // — only on a move or explicit confirmation — so the section reads as
-    // unanswered until the learner does something, matching every other section.
     (() => {
       const MOVED     = <%= t("responses.parsons.moved").to_json.html_safe %>;
       const RECORDED  = <%= t("responses.parsons.recorded").to_json.html_safe %>;
@@ -89,8 +64,6 @@
         announce(list, li);
       }
 
-      // Without this a keyboard or screen-reader user gets no confirmation that
-      // a move landed — the visual reflow is the only feedback drag users need.
       function announce(list, li) {
         const status = list.parentElement.querySelector(".parsons-status");
         if (!status) return;
@@ -147,25 +120,17 @@
           syncHiddenField(list);
           list.parentElement.querySelector(".parsons-status").textContent = RECORDED;
         });
-        // A CDN that hangs rather than errors never rejects the import below,
-        // so its catch never runs. Without this the section would stay
-        // unanswerable for as long as the request is stalled.
+        // A hung CDN never rejects the import below, so its catch alone would leave this unanswerable.
         setTimeout(() => { if (!list.dataset.sortableDone) addControls(list); }, 3000);
       });
     })();
     </script>
     <script type="module">
-      // Version pinned exactly, same posture as the Mermaid import in
-      // shared/_mermaid_diagram — a blocked CDN falls back to the injected
-      // up/down buttons above.
       try {
         const { default: Sortable } = await import("https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js");
         document.querySelectorAll("ol[data-parsons-blocks]:not([data-sortable-done])").forEach(list => {
           list.dataset.sortableDone = "1";
-          // delayOnTouchOnly: a touch drag needs a brief hold, so an ordinary
-          // swipe still scrolls the page instead of picking up a block. With
-          // the arrows gone this is the only input on a phone. Mouse dragging
-          // is unaffected.
+          // delayOnTouchOnly: a touch drag needs a brief hold so an ordinary swipe still scrolls the page.
           Sortable.create(list, {
             animation: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 150,
             delay: 150,

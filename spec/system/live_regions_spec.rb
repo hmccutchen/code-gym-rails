@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# Content that arrives after a request has to reach a screen reader. Each
-# example checks the words land inside a live region, which is what makes a
-# screen reader read them without the person having to go looking.
+# Content arriving after a request must land in a live region, or a screen reader never reads it.
 RSpec.describe "Live regions", type: :system, with_csrf: true do
   let(:user) { create_fake_provider_user }
 

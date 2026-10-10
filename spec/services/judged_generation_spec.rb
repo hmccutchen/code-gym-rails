@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# Specced against plain callables rather than a provider subclass: the pipeline
-# reaches a provider only through JudgedGeneration::Provider, so these examples
-# pin that interface as well as the keep, retry, drop and fallback rules.
+# Plain callables, since the pipeline reaches a provider only through JudgedGeneration::Provider.
 RSpec.describe JudgedGeneration do
   let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :unusable_sections, keyword_init: true) }
   let(:plan_type) { Struct.new(:due_checks, :fourth_due_checks, :reinforcement, :fourth_reinforcement, keyword_init: true) }
@@ -232,8 +230,7 @@ RSpec.describe JudgedGeneration do
 
     expect(retry_calls.map { |call| call[3] }).to eq(%w[pattern pattern])
     expect(judged.outcomes["pattern"]).to include(status: :keep, retries: 2, dropped: false)
-    # One entry per judged retry, so the rejected first attempt never reads as
-    # describing the section that shipped.
+    # One entry per judged retry, so the rejected first attempt never describes the section that shipped.
     expect(judged.outcomes["pattern"]).to include(retry_principle: [ "underdetermined", nil ],
                                                   retry_evidence: [ "quoted", nil ], retry_reason: [ "because", nil ])
   end
@@ -248,8 +245,7 @@ RSpec.describe JudgedGeneration do
     expect(judged.outcomes["pattern"]).to include(retries: 2, dropped: true, retry_principle: %w[scope_mismatch underdetermined])
   end
 
-  # The diagnostics log serializes these hashes, so their keys and order are
-  # part of what the log line says.
+  # The diagnostics log serializes these hashes, so key order is part of the log line.
   describe "the outcome a rejection leaves" do
     def outcome_for(*pattern_verdicts)
       verdicts["pattern"] = pattern_verdicts
@@ -339,8 +335,7 @@ RSpec.describe JudgedGeneration do
       expect(logged.grep(/judge_solve_mismatch/)).to be_empty
     end
 
-    # A refused verdict's message quotes the value it refused, which for this
-    # kind can be the solve, so the log carries the reason code alone.
+    # A refused verdict's message can quote this kind's solve, so the log carries the reason code alone.
     it "logs a refused verdict by reason code only" do
       verdicts["design_comparison"] = [ JudgeVerdict::Invalid.new('unknown principle "SECRET: b is better"') ]
 

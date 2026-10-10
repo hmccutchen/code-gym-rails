@@ -1,13 +1,4 @@
-<%# Reference dropdown for a section's concept, rendered near the section's
-    question whenever a cached ConceptReference exists. Collapsed by default;
-    callers may pass `open: true` for a concept's first-ever exposure while
-    answering — see ConceptReferencesHelper#first_exposure?. `reference` is a
-    ConceptReference.
-
-    The "try a different explanation" control lives INSIDE the disclosure, so
-    <details> hides it whenever the dropdown is collapsed without any script
-    doing so. What it produces is never persisted — see
-    ConceptReferencesController#explain_differently. %>
+<%# Locals: reference (a ConceptReference); optional open: true on first exposure (ConceptReferencesHelper#first_exposure?). %>
 <% open = local_assigns.fetch(:open, false) %>
 <details class="ref"<%= " open".html_safe if open %>>
   <summary><%= t("concept_reference.summary", concept: reference.concept.humanize) %></summary>
@@ -16,11 +7,10 @@
     <p style="margin-bottom:.75rem"><%= reference.explanation %></p>
     <pre class="snippet"><%= highlighted_code(reference.code_example, reference.language) %></pre>
     <p>🔭 <%= reference.senior_lens %></p>
+    <%# Inside the disclosure so a collapsed <details> hides it with no script. %>
     <div class="concept-alternates" data-reference-id="<%= reference.id %>"
          data-url="<%= explain_differently_concept_reference_path(reference) %>">
-      <%# type="button" is load-bearing, not stylistic: on the dashboard this
-          partial renders inside #gym-form, so a default-type button here would
-          submit the day's answers and chain into the review. %>
+      <%# type="button": on the dashboard this renders inside #gym-form, where a default button would submit the day. %>
       <button type="button" class="btn btn-ghost btn-sm explain-concept-differently"><%= t("concept_reference.explain_differently") %></button>
       <span class="alternate-status" aria-live="polite"></span>
     </div>

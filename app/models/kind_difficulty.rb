@@ -1,10 +1,4 @@
-# A user's stated difficulty target and lock per section kind, as plain values —
-# the shape KindPreferences gives SectionRotation, so prompt specs need no
-# database.
-#
-# Total by construction: a level outside LEVELS reads as unset, and a lock on a
-# kind with no valid level reads as unlocked. A lock orphaned by a console write
-# can therefore never suppress easing the user did not validly choose.
+# Invalid levels read as unset and orphaned locks as unlocked, so a console write can't suppress easing.
 class KindDifficulty
   LEVELS = %w[junior senior principal_engineer].freeze
 
@@ -37,11 +31,7 @@ class KindDifficulty
     !level_for(kind).nil?
   end
 
-  # The rung a kind is pitched at today: its target, else the skill level,
-  # which shares this scale (User::SKILL_LEVELS). A skill level outside it reads as the lowest rung rather than
-  # raising, the same total-by-construction contract as #level_for: an
-  # orphaned console write must understate evidence, never abort generation
-  # after the provider call was billed.
+  # An out-of-scale skill level reads as the lowest rung instead of aborting generation after a billed call.
   def rung_for(kind, skill_level:)
     level_for(kind) || (LEVELS.include?(skill_level) ? skill_level : LEVELS.first)
   end

@@ -3,14 +3,12 @@ class SuggestedConcept < ApplicationRecord
 
   belongs_to :reviewed_by, class_name: "User", optional: true
 
-  # "architecture" is a valid bucket here because it's a LANGUAGE_CONFIG key
-  # (not a real language) — keep that in mind if LANGUAGE_CONFIG is ever refactored.
+  # "architecture" is valid because it's a LANGUAGE_CONFIG key, though not a language.
   validates :language, inclusion: { in: AiService::LANGUAGE_CONFIG.keys }
   validates :normalized_name, :display_name, presence: true
   validates :status, inclusion: { in: STATUSES }
 
-  # The only write entry point for an off-vocabulary suggestion. Skips a
-  # literal "other" — that's AiService's own catch-all, not a real suggestion.
+  # The only write entry point; skips "other", AiService's own catch-all.
   def self.record!(language:, name:)
     normalized = name.to_s.strip.downcase.squeeze(" ")
     return nil if normalized.blank? || normalized == "other"
@@ -37,8 +35,7 @@ class SuggestedConcept < ApplicationRecord
 
     concept
   rescue ActiveRecord::RecordNotUnique
-    # A concurrent generation raced us to create the same row. Retry once
-    # against the now-existing row instead of raising.
+    # A concurrent generation created the row first; retry once against it.
     raise if attempt.positive?
     record_suggestion(language, normalized, display_name, attempt: attempt + 1)
   end

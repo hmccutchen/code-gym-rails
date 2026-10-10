@@ -3,10 +3,7 @@ require "rails_helper"
 RSpec.describe ClaudeService do
   let(:service) { described_class.new("sk-ant-test") }
 
-  # Builds a connection with the service's real retry configuration but a
-  # Faraday test adapter, so retry/backoff behavior can be exercised without
-  # a real network call. `responses` is a queue of [status, body] pairs
-  # popped one per request against API_URL.
+  # Real retry configuration on a Faraday test adapter; `responses` is a queue of [status, body] pairs.
   def stubbed_connection(responses)
     Faraday.new do |f|
       f.request :retry, ClaudeService::RETRY_OPTIONS
@@ -23,19 +20,14 @@ RSpec.describe ClaudeService do
     { "content" => [ { "type" => "text", "text" => text } ], "usage" => { "input_tokens" => 1, "output_tokens" => 1 } }.to_json
   end
 
-  # A 200 whose body is not JSON (a proxy's HTML page, a truncated body) has
-  # to reach callers as an AiService::Error, which every one of them rescues;
-  # a bare JSON::ParserError would escape those rescues.
-  it "raises InvalidResponseError when a successful response body is not JSON" do
+  it "raises InvalidResponseError rather than a bare JSON::ParserError when a successful response body is not JSON" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "<html>Bad gateway</html>" ] ]))
 
     expect { service.send(:call, system: "sys", prompt: "p") }
       .to raise_error(AiService::InvalidResponseError, /Claude returned an unreadable response/)
   end
 
-  # A body that starts like JSON is most likely a cut-off reply, which can
-  # carry an answer (a judge's blind solve), so only its size reaches the log.
-  it "withholds a cut-off JSON body from the log and still logs a non-JSON one" do
+  it "withholds a cut-off JSON body, which can carry a blind solve, from the log and still logs a non-JSON one" do
     logged = []
     allow(Rails.logger).to receive(:error) { |message| logged << message }
 
@@ -50,9 +42,7 @@ RSpec.describe ClaudeService do
     expect(logged.last).to include("Bad gateway")
   end
 
-  # Valid JSON of the wrong shape would otherwise reach a hash lookup and
-  # escape every AiService::Error rescue as a TypeError.
-  it "raises InvalidResponseError when a successful response body is not a JSON object" do
+  it "raises InvalidResponseError rather than a TypeError when a successful response body is not a JSON object" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
     expect { service.send(:call, system: "sys", prompt: "p") }
@@ -74,8 +64,6 @@ RSpec.describe ClaudeService do
   end
 
   describe "per-call read budget" do
-    # Records what each attempt actually saw, so the assertions below are about
-    # the request that reached the adapter rather than the connection default.
     def recording_connection(attempts, raise_timeout: true)
       Faraday.new do |f|
         f.request :retry, ClaudeService::RETRY_OPTIONS.merge(interval: 0, max_interval: 0)
@@ -99,11 +87,7 @@ RSpec.describe ClaudeService do
       expect(attempts).to eq([ AiService::GENERATION_READ_TIMEOUT ])
     end
 
-    # A read timeout means the provider very likely finished — and billed — the
-    # work; we just stopped listening. Retrying a generation therefore pays for
-    # the whole problem set up to three times over to produce one failure, so
-    # the long-running path takes a timeout as final.
-    it "does not retry a generation that times out" do
+    it "does not retry a generation that times out, since it was very likely finished and billed" do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
@@ -114,11 +98,7 @@ RSpec.describe ClaudeService do
       expect(attempts.size).to eq(1)
     end
 
-    # Grading has the same billed-work problem at a smaller scale: a timed-out
-    # grade has usually been produced and charged, and a retry pays for the
-    # section again. Its budget exceeds READ_TIMEOUT so the guard treats it as
-    # long_running.
-    it "does not retry a grading call that times out" do
+    it "does not retry a grading call that times out, since it was usually billed and runs past READ_TIMEOUT" do
       attempts = []
       service.instance_variable_set(:@conn, recording_connection(attempts))
 
@@ -142,8 +122,7 @@ RSpec.describe ClaudeService do
   end
 
   describe "retry/backoff" do
-    # The backoff pauses for real between attempts; these assert how many
-    # attempts run and what they raise, never how long they waited.
+    # The backoff sleeps for real; these assert attempt counts and errors, never timing.
     before { allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) }
 
     it "raises a timeout-specific error when the provider never responds" do
@@ -218,8 +197,7 @@ RSpec.describe ClaudeService do
       expect {
         service.send(:call, system: "sys", prompt: "prompt")
       }.to raise_error(AiService::AuthenticationError, "Anthropic rejected your API key or its permissions. Check it in Settings.")
-      # The 401 isn't in retry_statuses, so only one request is made — the
-      # second stubbed response is never consumed.
+      # 401 is not in retry_statuses, so the second stubbed response is never consumed.
       expect(responses.size).to eq(1)
     end
 
@@ -298,10 +276,7 @@ RSpec.describe ClaudeService do
                            http_status: 200)
     end
 
-    # input_tokens excludes cached tokens, and reads and writes are billed at
-    # different rates, so each is kept separately for a row's cost to be
-    # worked out.
-    it "reports cache reads and writes separately from input tokens" do
+    it "reports cache reads and writes separately from input tokens, since each is billed at its own rate" do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200,
         body: {
           "content" => [ { "type" => "text", "text" => "hello" } ],
@@ -342,11 +317,7 @@ RSpec.describe ClaudeService do
       service.send(:call, system: "sys", prompt: "prompt text")
     end
 
-    # A three-section review (prose arrays plus a structural improved_code
-    # block per section) overran the original 2500-token budget and came back
-    # truncated mid-string. This floor is the actual regression guard; the
-    # test above only proves the constant reaches the request.
-    it "keeps an output budget large enough for a full three-section review" do
+    it "keeps an output budget large enough for a full three-section review, which overran the old 2,500 tokens" do
       expect(ClaudeService::MAX_TOKENS).to be >= 8_000
     end
 
@@ -363,8 +334,6 @@ RSpec.describe ClaudeService do
       service.send(:call, system: "sys", prompt: "prompt text")
     end
 
-    # max_tokens caps thinking and reply together, so a capped call turns
-    # thinking off; which setting does that is a per-model fact.
     describe "thinking-off for a capped call" do
       def capped_body(model)
         body = nil
@@ -387,8 +356,6 @@ RSpec.describe ClaudeService do
         expect(capped_body("claude-haiku-4-5")["thinking"]).to eq("type" => "disabled")
       end
 
-      # An AiService::Error, so the controllers' existing rescue shows the
-      # engineer a try-again message instead of an error page.
       it "refuses a capped call on a model with no thinking-off setting, before sending, as an AiService error" do
         posts = 0
         conn = Faraday.new { |f| f.adapter(:test) { |stub| stub.post(ClaudeService::API_URL) { posts += 1; [ 200, {}, success_body ] } } }
@@ -411,16 +378,10 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      # Reported as data, not raised here: AiService#call_and_log owns the
-      # policy, so the billed usage is recorded before the failure propagates.
       expect(service.send(:call, system: "sys", prompt: "prompt text")[:truncated]).to be(true)
     end
 
-    # A refusal arrives as a 200 with no text block. Left unnamed it surfaces
-    # as an empty-response parse error pointing at the prompt, when the real
-    # cause is a safety classifier; Opus 5.5's cover more categories than
-    # Opus 5's, so generation is likelier to meet one.
-    it "reports a refusal and its category as data, with the billed usage, rather than raising" do
+    it "reports a refusal and its category as data, with the billed usage, rather than as an empty-response error" do
       body = {
         "content"      => [],
         "stop_reason"  => "refusal",
@@ -430,8 +391,6 @@ RSpec.describe ClaudeService do
       fake_response = instance_double(Faraday::Response, success?: true, status: 200, body: body)
       service.instance_variable_set(:@conn, instance_double(Faraday::Connection, post: fake_response))
 
-      # Reported as data, not raised here, for the same reason as truncation:
-      # AiService#call_and_log records the billed usage before it raises.
       result = service.send(:call, system: "sys", prompt: "prompt text")
 
       expect(result[:refusal]).to eq("cyber")
@@ -473,11 +432,7 @@ RSpec.describe ClaudeService do
       }.to raise_error(AiService::Error, "messages: at least one message is required")
     end
 
-    # platform.claude.com/docs/en/api/errors and /rate-limits: a 402 is a
-    # billing problem, a 400 beginning "You have reached your specified" is a
-    # spend limit the account set, and a 429 with enforced_spend_limit_reached
-    # is the tier's monthly cap. None is a rate limit, and the message never
-    # repeats the provider's text.
+    # Per platform.claude.com's errors and rate-limits pages, none of these is a rate limit.
     {
       "a credit-balance 400"   => [ 400, { "type" => "invalid_request_error", "message" => "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits." } ],
       "a spend-limit 400"      => [ 400, { "type" => "invalid_request_error", "message" => "You have reached your specified API usage limits. You will regain access on 2026-11-01 at 00:00 UTC." } ],

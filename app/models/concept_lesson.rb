@@ -1,11 +1,4 @@
-# The short lesson a Learn page shows for a concept: a definition, an everyday
-# comparison and where it stops, the common mix-up, where you meet it, habits
-# each with their catch, a question to carry and a quick test. Every section
-# is optional, since not every concept has a fitting comparison.
-#
-# The one authority for the lesson's shape. AiService asks for these keys,
-# .from_provider holds a reply to them at the boundary, and learn/show
-# renders them in this order. Pure.
+# The one authority for the lesson's shape: AiService asks for these keys and learn/show renders them in order.
 module ConceptLesson
   SECTIONS = %w[definition comparison comparison_limit misunderstanding situations habits carry_question quick_test].freeze
 
@@ -16,8 +9,7 @@ module ConceptLesson
   }.freeze
   TEXT_SECTIONS = (SECTIONS - LIST_SHAPES.keys).freeze
 
-  # The comparison and its limit show together or not at all, so a reader
-  # never meets an analogy without the line saying where it breaks.
+  # Shown together or not at all, so a reader never meets an analogy without where it breaks.
   PAIRED_SECTIONS = %w[comparison comparison_limit].freeze
 
   WORD_TARGET = 350
@@ -25,9 +17,7 @@ module ConceptLesson
   MAX_SITUATIONS = 4
   MAX_HABITS = 4
 
-  # The lesson as stored, or nil when the reply held nothing usable. An unusable
-  # section is dropped rather than failing the write-up, since the lesson is
-  # outside the reference's required fields, the way the guide and ladder are.
+  # Drops an unusable section rather than failing, since the lesson is outside the required fields.
   def self.from_provider(value)
     return unless value.is_a?(Hash)
 
@@ -53,8 +43,7 @@ module ConceptLesson
     value.filter_map { |entry| yield entry }.first(limit)
   end
 
-  # A habit is shown with its catch directly after it, so one without a catch
-  # is dropped rather than shown half.
+  # A habit without its catch is dropped rather than shown half.
   def self.usable_habit(entry)
     return unless entry.is_a?(Hash)
 

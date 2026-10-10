@@ -14,8 +14,7 @@ RSpec.describe LadderCoverage do
     ExerciseSection.all.each { |kind| expect(coverage.for_kind(kind)).to be_present }
   end
 
-  # code_review's selectable vocabulary depends on the day's mode; coverage
-  # answers "can this kind ever be offered it", so it spans every mode.
+  # Coverage asks whether a kind can ever be offered a concept, so it spans every code_review mode.
   it "covers code_review across every mode" do
     pairs = described_class.for(user).for_kind(ExerciseSection::CodeReview).pairs.map(&:first)
 
@@ -24,8 +23,6 @@ RSpec.describe LadderCoverage do
     end
   end
 
-  # A kind narrowed by rung offers what its target level allows, which is what
-  # generation will ask for.
   it "reads a targeted kind's pairs at its target level" do
     pairs = ->(level) do
       user.update!(section_kind_levels: { "design_comparison" => level })

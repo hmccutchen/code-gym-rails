@@ -1,7 +1,5 @@
 class AddSectionRatingsToDailyResponses < ActiveRecord::Migration[8.0]
-  # The enum conversion must ride the ALTER's USING clause: a separate UPDATE
-  # would assign text into the still-integer column, which Postgres rejects at
-  # parse time (PG::DatatypeMismatch) — even on an empty table.
+  # Convert in the ALTER's USING clause: a separate UPDATE writes text into an integer column, which Postgres rejects.
   def up
     add_column :daily_responses, :section_ratings, :jsonb, default: {}, null: false
     rename_column :daily_responses, :rating, :legacy_rating

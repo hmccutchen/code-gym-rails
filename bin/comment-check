@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+require_relative "../lib/comment_check"
+
+paths = ARGV.any? ? ARGV : `git ls-files -- '*.erb' '*.js' '*.mjs' '*.css' '*.yml' '*.yaml' '*.py'`.split.reject { |path| path.start_with?("vendor/") || path.include?("node_modules/") }
+offenses = paths.flat_map { |path| CommentCheck.offenses_for(path, File.read(path)) }
+offenses.sort_by { |offense| [ offense.path, offense.line ] }.each { |offense| puts "#{offense.path}:#{offense.line}: #{offense.message}" }
+puts "#{paths.size} files checked, #{offenses.size} offenses"
+exit(offenses.empty? ? 0 : 1)

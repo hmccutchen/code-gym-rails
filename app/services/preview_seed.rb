@@ -1,50 +1,16 @@
-# Demo content for a Railway PR app, whose database starts empty.
-#
-# railway.toml's preDeployCommand is shared with production, so this task runs
-# there too. Three rules make that safe: it does nothing unless
-# PreviewEnvironment.active? — which only a pull-request deployment can make
-# true — rows are created only when absent and never updated or deleted, and
-# nothing outside the single named account is touched.
-#
-# preDeployCommand fires on every deploy, so a preview app open across a date
-# boundary accumulates rows as the seeded dates roll forward — harmless in a
-# throwaway environment, and the price of never touching a row we already own.
-# Writes use the bang finders so a malformed fixture aborts the deploy loudly
-# rather than seeding nothing while reporting success.
 class PreviewSeed
   EMAIL_VAR     = "PREVIEW_SEED_EMAIL"
   DUMMY_API_KEY = "sk-ant-preview-not-a-real-key"
 
-  # A PR app needs no configuration at all, so the address has a default.
-  # `.invalid` is reserved by RFC 2606, so this can never collide with a real
-  # deliverable mailbox.
   DEFAULT_EMAIL = "preview-reviewer@code-gym.invalid".freeze
 
   def self.run! = new.run!
 
-  # EMAIL_VAR is an override, not a gate: PreviewEnvironment decides whether
-  # seeding runs at all, and this only decides which account it runs against.
-  # That split is what makes a leaked EMAIL_VAR harmless in production.
-  #
-  # The single authority for "which account is the preview account" — also
-  # called by PreviewAutoLogin, so the two can never disagree about which row
-  # a preview deployment treats as its demo user.
   def self.target_email
     ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
   end
 
-  # Whether a row is one this seeder created, rather than a real account that
-  # happens to sit at the configured address — find_or_create_user deliberately
-  # leaves such a row untouched, so an address match alone does not mean the
-  # account is ours. PreviewAutoLogin signs in only an account that passes here,
-  # so a miswired database (a PR environment resolving to production's
-  # DATABASE_URL, an EMAIL_VAR naming a real teammate) cannot hand an anonymous
-  # visitor someone's real account.
-  #
-  # The dummy key is the marker because it is the one attribute only the create
-  # path sets. Replacing it with a real key on a preview app therefore turns
-  # auto-login off — the right direction to fail, since a real key does not
-  # belong on an unauthenticated public URL.
+  # Only the create path sets the dummy key, so a real account at this address never gets auto-logged in.
   def self.seeded?(user)
     user.present? && user.api_key == DUMMY_API_KEY
   end
@@ -64,10 +30,7 @@ class PreviewSeed
     @target_email ||= self.class.target_email
   end
 
-  # create_with applies the demo defaults on the create path only. An existing
-  # account — a real user, or a previously-seeded one — is returned untouched,
-  # so seeding never modifies a row it did not create, including a real user who
-  # signed up but has not added an API key yet (api_keys / provider still nil).
+  # create_with applies only on create, so an existing account, real or seeded, is returned untouched.
   def find_or_create_user
     User.create_with(
       name:        "Preview Reviewer",
@@ -78,8 +41,7 @@ class PreviewSeed
     ).find_or_create_by!(email: target_email)
   end
 
-  # find_or_create_by!'s block runs only on create, which is what keeps rule 2
-  # ("never overwrite") true for every row below.
+  # find_or_create_by!'s block runs only on create, which keeps every row below from being overwritten.
   def seed_days(user)
     seed_day(user, Date.current, architecture_set) do |response|
       response.answers = { "code_review" => "Looks like an N+1 — each iteration hits the database again." }
@@ -106,9 +68,7 @@ class PreviewSeed
       e.generated_at = Time.current
     end
 
-    # Only attach a demo response to an exercise this seeder created. If a real
-    # user already has an exercise on this date (the misconfiguration case), never
-    # fabricate a response against their real problem set.
+    # Never fabricate a response against a real user's exercise on this date.
     return unless exercise.previously_new_record?
 
     DailyResponse.find_or_create_by!(user: user, daily_exercise: exercise, date: date) do |response|
@@ -233,10 +193,7 @@ class PreviewSeed
 
   def sample_review
     {
-      # The difficulty levels deliberately disagree with the grades beside them:
-      # a "strong" on a straightforward problem and a "developing" on a
-      # demanding one are exactly the pairings the note exists to explain, and
-      # a reviewer should see them rather than three rows that agree.
+      # Difficulty levels disagree with the grades on purpose, so a reviewer sees the pairings the note explains.
       "code_review" => {
         "rating" => "solid", "correct" => "You named the N+1 and the fix in one breath.",
         "missed" => "Worth saying what includes does to the query count.",

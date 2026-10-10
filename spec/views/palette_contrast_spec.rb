@@ -1,11 +1,6 @@
 require "rails_helper"
 
-# The shared colors against every background they sit on, read from the
-# stylesheets themselves so a palette edit is checked against the values that
-# actually ship. WCAG AA: 4.5:1 for text, 3:1 for a focus indicator or a
-# field's border. The dark palette is the layout's :root; the light one is
-# display_light.css layered over it, the way the browser applies it.
-# docs/accessibility-audit-2026-09-29.md has the audit the dark pairs come from.
+# WCAG AA: 4.5:1 for text, 3:1 for focus and borders; light is display_light.css layered over the layout's :root.
 RSpec.describe "palette contrast" do
   let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
   let(:rules) { ViewStyles.rules(layout) }

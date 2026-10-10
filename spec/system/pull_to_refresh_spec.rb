@@ -1,9 +1,6 @@
 require "rails_helper"
 
-# Playwright cannot emulate display-mode (see spec/requests/pwa_spec.rb), so
-# "standalone" here is the layout's rule forced on before the page's own
-# scripts run: the one thing the pull-to-refresh script reads. pwa_spec pins
-# that only the standalone media query sets that rule in a real launch.
+# Playwright can't emulate display-mode, so the layout's standalone rule is forced on (pwa_spec pins the real query).
 RSpec.describe "Pull to refresh", type: :system do
   let(:user) { create_fake_provider_user }
 
@@ -21,9 +18,7 @@ RSpec.describe "Pull to refresh", type: :system do
     page.driver.with_playwright_page { |pw| pw.add_init_script(script: FORCE_STANDALONE) }
   end
 
-  # Drives the document's touch listeners with synthetic events: a real finger
-  # needs a touch-enabled context, and these listeners only read positions.
-  # Each step is [type, y] for one finger, or [type, y, fingers].
+  # Synthetic touch events: steps are [type, y] for one finger, or [type, y, fingers].
   def touch(steps, from: "body")
     page.execute_script(<<~JS, from, steps)
       const [selector, steps] = arguments;
@@ -219,8 +214,7 @@ RSpec.describe "Pull to refresh", type: :system do
     expect(reloaded?).to be(true)
   end
 
-  # The page the spinner was drawn on is replaced by the reload, so the new
-  # page has to pick the spinner up for the refresh to read as one.
+  # The reload replaces the page the spinner was drawn on, so the new page must pick the spinner up.
   it "opens the reloaded page with the content held down and the spinner turning, then settles" do
     launch_standalone
     visit_as(user)

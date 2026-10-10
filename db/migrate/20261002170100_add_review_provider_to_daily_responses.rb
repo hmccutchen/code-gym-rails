@@ -1,15 +1,8 @@
-# Which provider wrote a response's review, so switching providers does not
-# relabel past reviews. A user could already replace their key with another
-# provider's, so the current provider is only a guess for a past review.
-# api_usages.model is the only evidence of which provider ran, and it has been
-# recorded only since AddModelAndCacheTokensToApiUsages. A user whose recorded
-# models name another provider has reviews from an unknown provider; anyone
-# else keeps the current provider, which is what the page already showed.
+# api_usages.model is the only record of which provider ran, so users with other-provider models get "unknown".
 class AddReviewProviderToDailyResponses < ActiveRecord::Migration[8.1]
   UNKNOWN = "unknown".freeze
 
-  # The model-name prefix each provider's routes have used, frozen here so a
-  # later rename in a provider class cannot change what this migration did.
+  # Frozen here so a later rename in a provider class cannot change what this migration did.
   MODEL_PREFIXES = { "anthropic" => "claude-", "gemini" => "gemini-", "openai" => "gpt-" }.freeze
 
   def up

@@ -57,8 +57,7 @@ RSpec.describe "Progress", type: :request do
     expect(legend).to eq([ "principal", "senior", "junior", "developing", "not yet", "not offered" ])
   end
 
-  # Developing toward junior means nothing is held, so the legend must not
-  # describe developing only as a step above a held rung.
+  # Developing toward junior means nothing is held, so the legend must cover that case too.
   it "describes developing for both a held rung and none held" do
     get progress_path
 

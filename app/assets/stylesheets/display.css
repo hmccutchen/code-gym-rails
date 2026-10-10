@@ -1,22 +1,13 @@
-/* Text size, line spacing and reading font, keyed off the data attributes
-   DisplayPreferences renders on <html>. Linked only for a user who has chosen
-   something, on Setup, and on signed-out pages, so nobody else downloads it.
-   The light palette lives in display_light.css. */
-
-/* A percentage of the browser's own default, so a larger browser setting
-   still counts. Everything sized in rem follows. */
+/* A percentage of the browser's default, so a larger browser setting still counts. */
 html[data-text-size="112"] { font-size: 112%; }
 html[data-text-size="125"] { font-size: 125%; }
 html[data-text-size="140"] { font-size: 140%; }
 
-/* The brand is sized in rem, so at larger text it outgrew a phone's width.
-   It stays at its default size instead; the text it sits beside grows. */
+/* Fixed size: sized in rem, the brand outgrew a phone's width at larger text. */
 html[data-text-size] nav .brand { font-size: 32px; }
 html[data-text-size] nav .brand-mark { height: 80px; width: 112px; }
 
-/* Prose only: the element types that carry running text, and the containers
-   that hold generated prose outside a <p>. Controls, labels and code keep
-   their own font and spacing. */
+/* Prose only; controls, labels and code keep their own font and spacing. */
 html[data-line-spacing="relaxed"] :is(p, li, dd, .question, .section-scenario, .why-box, .plan-excerpt,
   .problem-statement, .hint-body, .ref-body, .review-item, .alternate-item, .follow-up-turn, .duck-turn) {
   line-height: 1.9;
@@ -26,8 +17,7 @@ html[data-line-spacing="loose"] :is(p, li, dd, .question, .section-scenario, .wh
   line-height: 2.2;
 }
 
-/* A browser downloads a face only when an element on the page uses it, so
-   only someone who picked this font ever fetches these files. */
+/* A browser fetches a face only when the page uses it, so only those who pick this font download it. */
 @font-face {
   font-family: "Atkinson Hyperlegible";
   src: url("atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");

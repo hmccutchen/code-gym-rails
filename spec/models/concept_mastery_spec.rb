@@ -3,8 +3,6 @@ require "rails_helper"
 RSpec.describe ConceptMastery, type: :model do
   let(:user) { User.create!(email: "cm@example.com", name: "CM") }
 
-  # Builds a reviewed response tagging `concept` on code_review with the given
-  # self + AI ratings, then runs the mastery evaluation for it.
   def review!(concept:, self_rating:, ai_rating:, date: Date.current, section: "code_review")
     exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
       problem_set: { section => { "concept" => concept } })
@@ -40,7 +38,6 @@ RSpec.describe ConceptMastery, type: :model do
   end
 
   it "steps Reduced → Paused after 2 more stagnant attempts, with a 2-session cooldown" do
-    # 4 attempts to reach reduced, then 2 more stagnant
     6.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (6 - i)) }
     cm = user.concept_masteries.find_by(concept: "n_plus_one", language: "ruby_rails")
     expect(cm.tier).to eq("paused")
@@ -58,7 +55,7 @@ RSpec.describe ConceptMastery, type: :model do
   end
 
   it "resets to Standard on full mastery from any tier" do
-    4.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (5 - i)) } # → reduced
+    4.times { |i| review!(concept: "n_plus_one", self_rating: "too_hard", ai_rating: "developing", date: Date.current - (5 - i)) }
     cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong", date: Date.current)
     expect(cm.tier).to eq("standard")
     expect(cm.streak).to eq(0)
@@ -95,10 +92,7 @@ RSpec.describe ConceptMastery, type: :model do
     expect(user.concept_masteries.find_by(concept: "n_plus_one")).to be_nil
   end
 
-  # The membership rule has one home so a future selection query cannot filter
-  # on `language:` alone and silently reintroduce issue #97 — a row whose
-  # concept has left the vocabulary can never resolve, so it would claim a slot
-  # forever.
+  # One home for membership, so a query filtering on `language:` alone cannot reintroduce issue #97.
   describe ".in_bucket" do
     def mastery(concept:, bucket:)
       user.concept_masteries.create!(concept: concept, language: bucket, tier: :standard)
@@ -116,8 +110,6 @@ RSpec.describe ConceptMastery, type: :model do
       expect(user.concept_masteries.in_bucket("ruby_rails")).to be_empty
     end
 
-    # Scopes the bucket too, so a concept valid in another bucket's vocabulary
-    # cannot qualify here.
     it "drops a row from a different bucket" do
       mastery(concept: "closures", bucket: "javascript")
 
@@ -175,10 +167,7 @@ RSpec.describe ConceptMastery, type: :model do
 
     it "anchors the next check on today, not the reviewed response's date, for a late review" do
       cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong", date: Date.current - 10)
-      # response.date decides whether the check was due (it was, absent a prior
-      # schedule this counts as initial mastery); the NEXT check must still count
-      # forward from today, not from the 10-day-old response date, or reviewing
-      # a stale submission would schedule a check that's already overdue.
+      # The next check counts from today, or reviewing a stale submission schedules an overdue check.
       expect(cm.next_retention_check_on).to eq(Date.current + 7)
     end
 
@@ -289,8 +278,6 @@ RSpec.describe ConceptMastery, type: :model do
       expect(cm.reload).to have_attributes(tier: "standard", streak: 2, last_rating: "solid")
     end
 
-    # Before this, a skipped check counted as a failed one: the schedule was
-    # wiped and the concept dropped back into reinforcement.
     it "defers a skipped due retention check one unchanged interval without changing knowledge" do
       due_on = Date.current - 1
       mastered_at = 30.days.ago.change(usec: 0)

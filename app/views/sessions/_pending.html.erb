@@ -2,11 +2,7 @@
   <%= t("sessions.pending.message") %>
 </p>
 
-<%# The field takes focus on arrival, so a screen reader starts there and
-    skips the flash above it. Describing the field by that flash is what makes
-    a wrong-code error, or the code's expiry time, reach someone who cannot
-    see it. An alert from the "request a new code" form below says nothing
-    about the code, so only one from checking the code is tied to the field. %>
+<%# Design notes: docs/code-notes/app/views/sessions/_pending.html.md %>
 <% code_alert = flash[:alert].present? && action_name == "verify_code" %>
 <% flash_ids = [ ("flash-alert" if code_alert), ("flash-notice" if flash[:notice].present?) ].compact %>
 <%= form_with url: verify_login_code_path, method: :post do |f| %>

@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# A trial that has used its calls for the day is refused before any call is
-# made. Each surface it can hit says so in the trial's own words, with the
-# reset in the person's zone, and never with the gate's internal message.
+# Each surface names the reset in the person's zone, never the gate's internal message.
 RSpec.describe "A trial at its daily cap", type: :request do
   let(:user) { create_trial_user(provider: "fake", cap: 2, time_zone: "America/New_York") }
   let(:internal) { "Trial account cap reached" }

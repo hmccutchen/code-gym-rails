@@ -118,10 +118,7 @@ RSpec.describe "PATCH /profile learning_track", type: :request do
       end
     end
 
-    # This write lands after authentication loaded current_user, but before
-    # the save's row lock reloads it. Experienced moves no preference version.
-    # A track choice sets the preset or the choice and nothing else, so a
-    # lock, weight or target riding along with it is refused, not saved.
+    # This write lands after authentication loaded current_user but before the save's row lock reloads it.
     {
       "a lock" => { locked_section_kinds: [ "pattern" ] },
       "a weight" => { section_kind_weights: { "challenge" => 2.0 } },

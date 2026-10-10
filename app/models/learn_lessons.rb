@@ -1,17 +1,4 @@
-# Hand-written Learn lessons, for concepts that belong on the Learn tab but in
-# no vocabulary. A concept in a vocabulary can be tagged on a generated
-# section, drilled, and given mastery and retention state; these cannot,
-# because a short snippet cannot test them. reading_unfamiliar_code is about
-# moving through a change and its callers across files, which no single
-# section can host.
-#
-# Static and hand-curated, like Glossary, and never sent to a provider. Each
-# lesson names the ConceptGroup it is listed under on the Learn index, so it
-# sits beside its siblings without joining their vocabulary.
-#
-# A section is a heading and an ordered list of blocks: [:paragraph, text],
-# [:steps, [[label, text], ...]] or [:code, text]. Code blocks are not prose,
-# so .learn_text leaves them out of the plain-language checks.
+# Lessons for concepts outside every vocabulary; never sent to a provider, and code blocks skip the plain-language checks.
 module LearnLessons
   READING_UNFAMILIAR_CODE = {
     group: "meta_skill",
@@ -114,8 +101,7 @@ module LearnLessons
     LESSONS.select { |_key, lesson| lesson[:group] == group }.keys
   end
 
-  # Every piece of prose a reader sees, keyed for a failure message. A section
-  # is one text, so a rule about a run of sentences reads the section whole.
+  # A section is one text, so a rule about a run of sentences reads the whole section.
   def self.learn_text
     LESSONS.each_with_object({}) do |(key, lesson), texts|
       texts["#{key}:summary"] = lesson[:summary]

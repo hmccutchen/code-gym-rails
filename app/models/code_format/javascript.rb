@@ -1,15 +1,12 @@
 require "open3"
 
-# Prettier, run once per batch in a Node process from vendor/prettier, so a
-# whole set pays one process start rather than one per snippet.
+# One Node process per batch, so a whole set pays one process start rather than one per snippet.
 module CodeFormat
   module Javascript
     SCRIPT = Rails.root.join("vendor/prettier/format.mjs").to_s
     TIMEOUT_SECONDS = 20
 
-    # The formatted code for each snippet, or nil where Prettier could not
-    # parse it. Raises when Node or the package is missing; CodeFormat.all
-    # treats that like any other formatter failure.
+    # nil where Prettier could not parse a snippet; raises when Node or the package is missing.
     def self.all(snippets)
       output = run(JSON.generate(snippets))
       formatted = JSON.parse(output)

@@ -1,9 +1,6 @@
 require "rails_helper"
 
-# These snapshots predate the learning track: its branches must render nothing
-# for an existing account. Pin varying inputs rather than normalizing the HTML.
-# Rebaseline only for intended page changes:
-# UPDATE_PAGE_SNAPSHOTS=1 bundle exec rspec spec/requests/existing_account_pages_spec.rb
+# Rebaseline only for intended page changes: UPDATE_PAGE_SNAPSHOTS=1 bundle exec rspec spec/requests/existing_account_pages_spec.rb
 RSpec.describe "Pages for an account that predates the learning track", type: :request do
   let(:user) do
     User.create!(id: 900_001, email: "existing@example.com", name: "Existing",

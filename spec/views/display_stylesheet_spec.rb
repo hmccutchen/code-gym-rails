@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# DisplayPreferences::OPTIONS is the one list of choices. Every choice other
-# than a default has to do something in display.css, or picking it on Setup
-# would save and render an attribute that changes nothing on the page.
+# Each non-default text size, line spacing and font must change something in display.css, or picking it would do nothing.
 RSpec.describe "display stylesheet" do
   let(:css) { Rails.root.join("app/assets/stylesheets/display.css").read }
 

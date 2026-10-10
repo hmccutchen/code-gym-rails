@@ -1,19 +1,8 @@
 require "rails_helper"
 
-# The critique round is inline JavaScript talking to a JSON endpoint, so request
-# specs execute none of it. These cover the parts that only exist in the
-# browser: the round button, its one-shot disabling, and — since the translate
-# button that used to gate this section is gone — that submit is gated the
-# same way it is for every other kind: an answered section needs a rating, an
-# unanswered one doesn't, and this section has no step of its own in the way.
+# Request specs can't run this inline JavaScript; with_csrf because it reads the CSRF meta tag test config blanks.
 RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
-  # The inline script reads the CSRF meta tag before every fetch, and
-  # allow_forgery_protection off (config/environments/test.rb) blanks it.
-  # See spec/support/csrf_helper.rb.
-
-  # Created up front rather than letting the dashboard generate on demand:
-  # FakeService returns every kind at once and plan_review wins the fourth slot
-  # by precedence, so a generated day never presents this section.
+  # Created up front: plan_review wins the fourth slot by precedence, so a generated day never shows this section.
   def create_exercise_for(user)
     DailyExercise.create!(
       user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
@@ -51,11 +40,6 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
     end
   end
 
-  # The section offers nothing to press before submitting except the critique,
-  # so a written plan is submittable once it's rated, with no translate or
-  # critique step standing in the way — the translate gate this used to assert
-  # is gone with the button, and the translation happens inside the review
-  # instead.
   it "enables submit once the written plan is rated, with no translate or critique step in the way" do
     user = create_fake_provider_user
 
@@ -73,9 +57,7 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
     end
   end
 
-  # The translation is the review's job now, so this is the only place the
-  # generated code can appear — and it has to appear where the review does,
-  # captioned, rather than reading as a model answer.
+  # The review is the only place the translated code appears, captioned so it doesn't read as a model answer.
   it "shows the code the review translated the plan into" do
     user = create_fake_provider_user
 

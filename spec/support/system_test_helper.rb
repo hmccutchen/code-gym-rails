@@ -1,28 +1,6 @@
-# One-time local setup for spec/system/ (CI runs the same commands in
-# .github/workflows/ci.yml): install the pinned Playwright CLI from the
-# committed lockfile, then have it download a Chromium build.
-#
-#   npm --prefix spec/playwright ci
-#   ./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
-#
-# The npm manifests deliberately live in spec/playwright/, NOT the repo root:
-# Railway builds with Nixpacks, whose Ruby provider installs Node and runs an
-# npm install whenever it finds a root package.json. This app is importmap-only
-# and needs no Node in production, so keeping the manifests out of the root
-# leaves the production build untouched.
-#
-# `npm ci` (not `npm install`) so the lockfile is never rewritten as a side
-# effect of setup. The pinned CLI version must match what playwright-ruby-client
-# expects, so bump it deliberately alongside the gem:
-#
-#   npm --prefix spec/playwright install --save-exact \
-#     "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
-#
-# capybara-playwright-driver must NOT be registered under the name :playwright
-# — Rails 6.1+ reserves that name for its own built-in Playwright driver, which
-# would silently take over instead. Registered here as :capybara_playwright.
 PLAYWRIGHT_CLI_PATH = Rails.root.join("spec/playwright/node_modules/.bin/playwright-core")
 
+# Not :playwright, which Rails reserves for its own driver and would silently take over.
 Capybara.register_driver(:capybara_playwright) do |app|
   Capybara::Playwright::Driver.new(
     app,
@@ -32,12 +10,7 @@ Capybara.register_driver(:capybara_playwright) do |app|
   )
 end
 
-# Playwright launches Chromium with --disable-back-forward-cache among its
-# default switches, so a Back navigation always re-fetches and `pageshow`
-# never fires with `persisted` true. The dashboard's Back-restore handler
-# (dashboard/_exercise.html.erb) is unreachable under the default driver —
-# a spec written against it would pass just as well with the handler deleted.
-# Opt into this driver from the one example that needs a real bfcache restore.
+# Playwright's default --disable-back-forward-cache makes the Back-restore handler unreachable under the default driver.
 Capybara.register_driver(:capybara_playwright_bfcache) do |app|
   Capybara::Playwright::Driver.new(
     app,
@@ -48,24 +21,10 @@ Capybara.register_driver(:capybara_playwright_bfcache) do |app|
   )
 end
 
-# Capybara's 2s default wait is too short for a real browser round-tripping
-# through this app's fetch-based autosave/submit/status-poll flows.
+# Capybara's 2s default is too short for this app's fetch-based autosave, submit and status-poll flows.
 Capybara.default_max_wait_time = 10
 
-# System specs need a weekday (the dashboard only generates Mon-Fri), but
-# unlike request specs they cannot travel_to an arbitrary one: `travel_to`
-# stubs the clock in *our* process only, while Chromium stamps cookies
-# against the real wall clock. The session cookie carries
-# `expire_after: 2.days` (config/initializers/session_store.rb) measured
-# from the travelled time, so travelling more than two days into the past
-# hands the browser an already-expired cookie, which it silently drops —
-# login appears to succeed, then the next request bounces to /login.
-#
-# Picking today when it's a weekday, and otherwise the upcoming Monday,
-# keeps the travelled clock at most a day *behind* real time (midnight of
-# the current day). It can run further ahead than that — from Saturday the
-# next Monday is up to two days out — but only backward travel can expire
-# the cookie, so forward drift is harmless.
+# travel_to more than two days back would hand Chromium an already-expired session cookie.
 module SystemTimeHelper
   def a_weekday
     date = Date.current
@@ -74,11 +33,6 @@ module SystemTimeHelper
   end
 end
 
-# These read the rated fields from the page rather than hardcoding which ones
-# to rate, since the day's section count and kinds vary. What the gate itself
-# requires — an answered section needs a rating, an unanswered one doesn't —
-# lives in DailyResponse#submit_blocker and the dashboard script's
-# submitBlocker() (app/views/dashboard/_exercise.html.erb).
 module RatingHelper
   def rating_row_fields
     all(".rating-row[data-rating-for]", visible: :all).map { |row| row["data-rating-for"] }.uniq
@@ -93,11 +47,6 @@ module RatingHelper
   end
 end
 
-# Generates today's set before the first dashboard render, running the same
-# on-demand job the dashboard would enqueue. Visiting first instead renders the
-# "generating" placeholder and waits out its 3s status poll before any section
-# appears. dashboard_generation_spec.rb is the one spec that goes through that
-# poll on purpose; everything else uses this.
 module TodaysSetHelper
   def visit_with_todays_set(user)
     perform_enqueued_jobs do
@@ -112,9 +61,7 @@ RSpec.configure do |config|
     driven_by :capybara_playwright
   end
 
-  # GenerateDailyExercisesJob runs via ActiveJob's :test adapter (see
-  # config/environments/test.rb) — system specs that trigger on-demand
-  # generation need to actually run it, not just assert it was enqueued.
+  # System specs that trigger on-demand generation need to run the job, not just assert it was enqueued.
   config.include ActiveJob::TestHelper, type: :system
 
   config.include SystemTimeHelper, type: :system

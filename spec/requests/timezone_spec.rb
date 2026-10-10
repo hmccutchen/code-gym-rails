@@ -4,16 +4,11 @@ RSpec.describe "Per-user timezone", type: :request do
   include ActiveSupport::Testing::TimeHelpers
   include ActiveJob::TestHelper
 
-  # 2026-07-15 02:30 UTC == 2026-07-14 19:30 America/Los_Angeles:
-  # a UTC Wednesday whose local day is the previous day, Tuesday — a weekday
-  # in both zones, so the UTC-day dashboard branch would still try to
-  # generate (not silently no-op on a UTC weekend) if the zone fix were
-  # missing.
+  # A UTC Wednesday that is Tuesday in Los Angeles: a weekday in both zones, so a missing zone fix would still generate.
   let(:instant) { Time.utc(2026, 7, 15, 2, 30) }
   let(:pacific) { create_user_with_key(email: "pac@example.com", name: "Pac", time_zone: "America/Los_Angeles") }
 
-  # Full problem_set — the dashboard partial renders all three sections
-  # unconditionally, so a minimal fixture would blow up on nil["title"].
+  # The dashboard partial renders every section unconditionally, so a minimal fixture would fail on nil["title"].
   let(:full_problem_set) do
     {
       "code_review" => { "question" => "Find the bug", "snippet" => "def a; end" },
@@ -33,9 +28,6 @@ RSpec.describe "Per-user timezone", type: :request do
                             problem_set: full_problem_set, generated_at: Time.current)
       login_as(pacific)
 
-      # Pre-fix the request would treat "today" as the UTC day (07-15), find no
-      # exercise, and enqueue generation; the zone fix finds the local-day
-      # exercise and enqueues nothing.
       expect { get root_path }.not_to have_enqueued_job(GenerateDailyExercisesJob)
       expect(response).to have_http_status(:ok)
       expect(DailyExercise.where(user: pacific).count).to eq(1)

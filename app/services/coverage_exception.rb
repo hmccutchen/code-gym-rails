@@ -1,29 +1,14 @@
-# Whether a two-section Automatic day gains one optional section, and which.
-# At two sections no optional slot exists, so the starvation guarantee in
-# SectionRotation has nothing to act on, and a kind, or a retention check
-# only that kind can host, would otherwise wait indefinitely. Pure: plain
-# values in, an Addition or nil out.
 class CoverageException
-  # A kind unseen for more than this many weekdays (four weeks) is added.
-  # The cap below is what binds once several kinds are stale; this only
-  # decides how soon the first addition comes after a user settles at two.
+  # The cap below binds once several kinds are stale; this only sets how soon the first addition comes.
   GAP_WEEKDAYS = 20
 
-  # An addition on any of the previous four weekdays blocks another, so a
-  # day gains at most one section in any five weekdays. Counted on the
-  # calendar: weekends never count, and a paused stretch counts as the
-  # weekdays it spans.
   CAP_WEEKDAYS = 4
 
-  # How many past exercises the gaps are read from. Further back than
-  # SectionRotation::LOOKBACK, because capped staleness ties every slot once
-  # kinds have been unseen that long.
+  # Longer than SectionRotation::LOOKBACK, where capped staleness ties every slot.
   HISTORY_LIMIT = 120
 
   OPTIONAL_KINDS = ExerciseSection.all.reject(&:fixed?).freeze
 
-  # `check` is the waiting retention check a due_check addition was made
-  # for, so the plan can tell whether it landed; a gap addition has none.
   Addition = Data.define(:kind, :reason, :check) do
     def initialize(kind:, reason:, check: nil) = super
   end
@@ -32,9 +17,7 @@ class CoverageException
     fixed.nil? && count <= ExerciseSection.fixed.size && !brake
   end
 
-  # `history` is a CoverageException::History. `checks` are the day's
-  # waiting retention checks, each a hash with :concept, :bucket and
-  # :overdue_ratio. `hosts` answers which kinds can tag a check (DayHosts).
+  # checks are hashes with :concept, :bucket and :overdue_ratio.
   def self.for(today:, count:, fixed:, history:, checks:, preferences:, hosts:, brake: false)
     return nil unless applies_to_day?(count: count, fixed: fixed, brake: brake)
     return nil if capped?(history.coverage_dates, today)
@@ -70,9 +53,6 @@ class CoverageException
     coverage_dates.any? { |date| date >= cap_window_start(today) && date < today }
   end
 
-  # Weekdays after the kind was last delivered, up to and including today. A
-  # kind never delivered counts from the oldest exercise read, and a user
-  # with no exercises has no gap at all.
   def self.gap(kind, history, today)
     from = history.last_seen[kind.key] || history.first_date&.prev_day
     return 0 if from.nil?

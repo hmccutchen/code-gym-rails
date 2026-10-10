@@ -29,11 +29,7 @@ RSpec.describe "DailyExercises", type: :request do
       expect(flash[:alert]).to eq("You've already generated a new set today.")
     end
 
-    # The bug this guards: regeneration destroys today's response, and
-    # ConceptMastery.record_review! has already moved tier/streak/retention state
-    # off a review by the time one exists. Destroying the row leaves that state
-    # standing with no evidence behind it — the same invariant #start_over is
-    # blocked on, which this action predates.
+    # ConceptMastery has already moved off a review, so destroying the response leaves state without evidence.
     it "refuses once today's set has been reviewed" do
       exercise = create_exercise
       reviewed = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -63,8 +59,6 @@ RSpec.describe "DailyExercises", type: :request do
       expect(exercise.reload.regenerating_since).to be_nil
     end
 
-    # An abandoned claim must not cost the user the day's regeneration, exactly
-    # as it doesn't cost them #start_over.
     it "proceeds when an unreviewed response's review claim has gone stale" do
       exercise = create_exercise
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -114,8 +108,6 @@ RSpec.describe "DailyExercises", type: :request do
       expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
     end
 
-    # A worker that died mid-job leaves a claim behind; the user must be able to
-    # try again rather than being locked out for the rest of the day.
     it "lets a stale claim be reclaimed" do
       exercise = create_exercise
       exercise.update!(regenerating_since: DailyExercise::REGENERATION_STALE_AFTER.ago - 1.minute)
@@ -147,8 +139,7 @@ RSpec.describe "DailyExercises", type: :request do
       expect(flash[:generating]).to be true
     end
 
-    # The unit specs verify the controller's claim and the job's replacement    # separately. This walks the whole loop, so a mismatch between what the
-    # controller enqueues and what the job expects cannot pass unnoticed.
+    # Walks the whole loop so a mismatch between what the controller enqueues and the job expects cannot pass.
     it "shows the spinner until the enqueued job replaces the set" do
       exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                                        problem_set: { "code_review" => { "question" => "PREVIOUS-SET-MARKER" } })
@@ -216,10 +207,7 @@ RSpec.describe "POST /generate while paused with a held set", type: :request do
 
   before { login_as(user) }
 
-  # The dashboard's carry-forward runs on the redirect, so a generation
-  # enqueued here would lose to the moved set and be discarded as a duplicate,
-  # billed and never seen. "Today's set already exists" has to mean the same
-  # thing on both endpoints, so this one carries the held set forward first.
+  # A generation enqueued here would lose to the carried-forward set and be billed but never seen.
   it "brings the unfinished set forward instead of enqueuing a generation it would discard" do
     travel_to(Time.utc(2026, 7, 22, 12)) do
       held = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current,
