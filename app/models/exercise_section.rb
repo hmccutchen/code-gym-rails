@@ -244,7 +244,7 @@ class ExerciseSection
     end
 
     def answer_lines(answer, rating)
-      "Their answer: #{answer.presence || '(skipped)'}\n" \
+      "#{UserText.labelled('Their answer:', answer)}\n" \
       "Their self-rating: #{rating.presence || '(none given)'}"
     end
 

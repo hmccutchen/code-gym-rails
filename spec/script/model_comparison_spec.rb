@@ -303,7 +303,7 @@ RSpec.describe ModelComparison do
       comparison.review_calibration
 
       prompts = posted.map { |body| body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"] }
-      expect(prompts.join).to include("Picked: A. Reason: The scenario says carriers are added monthly")
+      expect(prompts.join).to include("Picked: A. Reason:\n<#{UserText::TAG}>\nThe scenario says carriers are added monthly")
       expect(prompts.join).not_to include("pick:a")
     end
 

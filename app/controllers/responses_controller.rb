@@ -203,7 +203,7 @@ class ResponsesController < ApplicationController
   # Both turns are written in one transaction, so a provider failure can never
   # leave an orphaned question with no answer in the thread.
   def follow_ups
-    question = params[:question].to_s.strip
+    question = UserText.clean(params[:question], limit: UserText::MAX_QUESTION_LENGTH).strip
     return render_section_error(t("errors.responses.question_blank")) if question.blank?
 
     asked = @response.review_follow_ups.where(section: @section, role: :user).count
@@ -240,7 +240,11 @@ class ResponsesController < ApplicationController
     if capped
       render_section_error(t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION))
     else
-      render json: { status: "ok", answer: answer, remaining: remaining }
+      # `question` is the cleaned, bounded string — the one the provider
+      # answered and the one stored. The client renders this rather than the
+      # text in its own box, so a question past UserText::MAX_QUESTION_LENGTH
+      # cannot leave the transcript claiming an answer to words nobody sent.
+      render json: { status: "ok", question: question, answer: answer, remaining: remaining }
     end
   rescue AiService::Error => e
     render_provider_failure(e, :follow_up)
@@ -268,7 +272,7 @@ class ResponsesController < ApplicationController
     existing = current_user.daily_responses.find_by(daily_exercise: exercise, date: Date.current)
     return render_section_error(t("errors.responses.duck_after_submit")) if existing&.submitted?
 
-    message = params[:message].to_s.strip
+    message = UserText.normalize(params[:message]).strip
     return render_section_error(t("errors.responses.message_blank")) if message.blank?
     if message.length > MAX_DUCK_MESSAGE_LENGTH
       return render_section_error(t("errors.responses.message_too_long", max: MAX_DUCK_MESSAGE_LENGTH))
@@ -447,7 +451,7 @@ class ResponsesController < ApplicationController
       role = turn[:role].to_s.downcase
       next unless %w[user assistant].include?(role)
 
-      content = turn[:content].to_s
+      content = UserText.normalize(turn[:content])
       next if content.blank?
 
       { role: role, content: content }
@@ -491,7 +495,7 @@ class ResponsesController < ApplicationController
   end
 
   def validated_pseudocode
-    value = params[:pseudocode].to_s.strip
+    value = UserText.normalize(params[:pseudocode]).strip
     return pseudocode_error(t("errors.responses.pseudocode.blank")) if value.blank?
     if value.length > ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
       return pseudocode_error(t("errors.responses.pseudocode.too_long", max: ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH))

@@ -164,7 +164,7 @@ RSpec.describe ExerciseSection::DesignComparison do
     it "decodes the answer so the raw prefix never reaches the grader" do
       context = described_class.review_context(section: section, answer: "pick:b\nMonthly carriers.", rating: "right_level")
 
-      expect(context).to include("Picked: B. Reason: Monthly carriers.")
+      expect(context).to include("Picked: B. Reason:\n<#{UserText::TAG}>\nMonthly carriers.\n</#{UserText::TAG}>")
       expect(context).not_to include("pick:b")
     end
 

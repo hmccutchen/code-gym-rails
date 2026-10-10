@@ -1279,7 +1279,7 @@ class AiService
 
     result = call_and_log(
       user, purpose: "explain_concept_differently", max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS,
-      system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.",
+      system: "You are a senior #{coach} engineer re-teaching one concept to an engineer for whom the standard reference did not land. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
       prompt: <<~PROMPT
         The concept: "#{reference.concept}"
 
@@ -1309,10 +1309,10 @@ class AiService
 
     result = call_and_log(
       user, purpose: "explain_differently",
-      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.",
+      system: "You are a senior #{coach} engineer re-explaining one point to an engineer who did not follow the first explanation. Return plain prose — no JSON, no markdown fences.\n\n#{UserText::PROMPT_RULE}",
       prompt: <<~PROMPT
         The engineer was asked: #{exercise.problem_set.dig(section, "question")}
-        Their answer: #{daily_response.answer_for(section) || "(skipped)"}
+        #{UserText.labelled("Their answer:", daily_response.answer_for(section))}
 
         What they missed:
         #{missed.any? ? missed.map { |m| "- #{m}" }.join("\n") : "- (nothing recorded)"}
@@ -1354,6 +1354,8 @@ class AiService
       system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
 
+        #{UserText::PROMPT_RULE}
+
         #{PLAIN_LANGUAGE_STANDARD}
 
         The original exercise asked: #{exercise.problem_set.dig(section, "question")}
@@ -1361,11 +1363,12 @@ class AiService
         The review you gave:
         #{review_summary.presence || "(no detail recorded)"}
       SYSTEM
-      history: thread,
+      history: UserText.tag_history(thread, limit: UserText::MAX_QUESTION_LENGTH),
       prompt: <<~PROMPT
-        Their answer was: #{daily_response.answer_for(section) || "(skipped)"}
+        #{UserText.labelled("Their answer was:", daily_response.answer_for(section))}
 
-        Their new question: #{question}
+        #{UserText.labelled("Their new question:", question, blank: "(none asked)",
+                            limit: UserText::MAX_QUESTION_LENGTH)}
 
         Answer it directly. Stay on this concept — if they drift far off topic, say
         so briefly and bring it back. Two short paragraphs at most.
@@ -1383,7 +1386,7 @@ class AiService
   def duck_response(user, exercise, section:, message:, thread: [])
     result = call_and_log(
       user, purpose: "duck_thread", max_tokens: DUCK_RESPONSE_MAX_TOKENS, allow_truncated: true,
-      system: "#{DUCK_SYSTEM_PROMPT}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
+      system: "#{DUCK_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{duck_section_context(exercise, section)}",
       # A first turn pays a write premium only a later turn recovers, so this
       # is a bet that threads continue — not a free win. CLAUDE.md's
       # "Conversational calls send real turns" holds the measured prompt sizes,
@@ -1391,9 +1394,10 @@ class AiService
       # threads the bet can absorb; they are external facts that move, so they
       # live in one place rather than three.
       cache_system: true,
-      history: thread,
+      history: UserText.tag_history(thread),
       prompt: <<~PROMPT
-        Their new message: #{message}
+        Their new message:
+        #{UserText.tagged(message, blank: "(nothing said)")}
 
         Respond as their Socratic thinking partner, following your system instructions exactly.
       PROMPT
@@ -1414,7 +1418,7 @@ class AiService
   def critique_pseudocode(user, exercise, section:, pseudocode:)
     result = call_and_log(
       user, purpose: "pseudocode_critique", max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS,
-      system: PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT,
+      system: "#{PSEUDOCODE_CRITIQUE_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}",
       prompt: build_pseudocode_critique_prompt(exercise, section, pseudocode)
     )
 
@@ -1435,11 +1439,16 @@ class AiService
   def translate_pseudocode(user, exercise, section:, pseudocode:)
     result = call_and_log(
       user, purpose: "pseudocode_translate",
-      system: PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT,
+      system: "#{PSEUDOCODE_TRANSLATE_SYSTEM_PROMPT}\n\n#{UserText::PROMPT_RULE}",
       prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
     )
 
-    code = text_or_raise(result, subject: "pseudocode translation")
+    # Normalized before it is measured, so the bound below, the page and the
+    # grading fence all count one representation. NFC can lengthen a string —
+    # U+0958 decomposes into two characters — so code measured raw here could
+    # still cross UserText.tagged's cap downstream and be clipped there, which
+    # is the one outcome the bound exists to prevent.
+    code = UserText.normalize(text_or_raise(result, subject: "pseudocode translation"))
     # Rejected, never truncated. Cutting source mid-token or mid-delimiter
     # produces code that is no longer what their plan says — which the page
     # then captions as "your plan implemented literally" and the review grades
@@ -1802,7 +1811,7 @@ class AiService
       #{data["problem_statement"]}
 
       Their pseudocode:
-      #{pseudocode}
+      #{UserText.tagged(pseudocode)}
 
       Apply your standard exactly as stated in your system instructions:
       #{ExerciseSection::PseudocodeToCode.gap_standard}
@@ -1819,7 +1828,7 @@ class AiService
       #{data["problem_statement"]}
 
       Their pseudocode, to transcribe literally:
-      #{pseudocode}
+      #{UserText.tagged(pseudocode)}
     PROMPT
   end
 
@@ -1836,11 +1845,15 @@ class AiService
   # The prior-framings block both reframing prompts open with. One rule — do
   # not reprise what you already said — stated once, since the two callers
   # differ only in what is being reframed.
+  #
+  # Each framing is fenced because it reaches the service from the page rather
+  # than from storage: the page sends back the framings it holds, so a forged
+  # one is a request away.
   def prior_framings(prior_alternates)
     return "No alternate framing has been given yet." if prior_alternates.empty?
 
     "Framings already given (do NOT reprise these angles or analogies):\n" +
-      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{a}" }.join("\n")
+      prior_alternates.map.with_index(1) { |a, i| "#{i}. #{UserText.tagged(a, blank: '')}" }.join("\n")
   end
 
   # A blank provider response is a provider bug, not a valid answer — persisting
@@ -2123,6 +2136,8 @@ class AiService
       Your goal is to push engineers toward senior-level thinking: not just "what" but "why" and "when not to."
       Focus on #{config[:focus]}
       Return ONLY valid JSON — no markdown fences, no explanation outside the JSON.
+
+      #{UserText::PROMPT_RULE}
     PROMPT
   end
 
@@ -2299,7 +2314,8 @@ class AiService
       Generate a daily Code Gym exercise set for this engineer.
 
       Engineer profile:
-      - Name: #{user.name}
+      - Name: #{UserText.tagged(user.name, blank: "(not given)", inline: true,
+                                limit: UserText::MAX_NAME_LENGTH)}
       - Skill level: #{user.skill_level} (#{User::SKILL_LEVELS.join(" → ")})
       - Priority focus areas: #{focus}
 
@@ -2686,6 +2702,8 @@ class AiService
     <<~CONTEXT
       You are a senior #{coach} engineer giving direct, specific feedback on an engineer's Code Gym answers. You will grade exactly one of the day's #{keys.size} sections in a follow-up instruction — #{others_clause} given here only as context, since each section is rated against its own pitched level. Be honest and constructive. Return JSON.
 
+      #{UserText::PROMPT_RULE}
+
       #{RATING_RUBRIC}
 
       #{PLAIN_LANGUAGE_STANDARD}
@@ -2818,13 +2836,14 @@ class AiService
   end
 
   # The bound the critique endpoint applies to its own param, applied here too:
-  # this reads a submitted answer, and ResponsesController#create length-bounds
-  # no answer of any kind, so nothing else stands between a pasted novel and
-  # this prompt. Skipped rather than truncated, for the reason
+  # this reads a submitted answer, and the general answer cap
+  # (UserText::MAX_ANSWER_LENGTH, 12_000) is twice this kind's translation
+  # bound, so a plan can be stored in full and still be too long to translate.
+  # Skipped rather than truncated, for the reason
   # #translate_pseudocode refuses to truncate its output — code translated from
   # a clipped plan is not translated from their plan, and the page would caption
   # it as though it were. The grade is unaffected: it reads the answer itself,
-  # which every other kind sends to the same provider unbounded.
+  # which every kind sends to the same provider under the general cap alone.
   def translatable_length?(pseudocode)
     return true if pseudocode.length <= ExerciseSection::PseudocodeToCode::MAX_PSEUDOCODE_LENGTH
 

@@ -34,6 +34,7 @@
     </fieldset>
     <label class="comparison-reason-label" for="comparison-reason-<%= key %>"><%= t("sections.design_comparison.reason_label") %></label>
     <textarea id="comparison-reason-<%= key %>" class="<%= kind.answer_class %>" data-comparison-reason
+              maxlength="<%= ExerciseSection::DesignComparison::MAX_REASON_LENGTH %>"
               placeholder="<%= t("sections.#{key}.placeholder") %>"><%= reason %></textarea>
     <%# The leading newline is the one HTML drops after the tag, as Rails'
         text_area emits it: without it a stored "\n" + reason, a reason with no
