@@ -6622,6 +6622,14 @@ RSpec.describe AiService, "#judge_review_prose" do
                           response_schema: ReviewProseVerdict.schema, system: AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT)
   end
 
+  # The cap is justified by its headroom over what the comparison script
+  # measured, so the justification fails here rather than going quietly false
+  # if either number moves.
+  it "keeps the measured headroom its cap is justified by" do
+    expect(AiService::REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS * 4)
+      .to be <= AiService::REVIEW_JUDGE_MAX_TOKENS
+  end
+
   it "shows the projection and never the rating, code, answer or problem" do
     prompt = captured_call[:prompt]
     expect(prompt).to include("One query per row.").and include("code_review").and include("Rails")
@@ -6649,6 +6657,13 @@ RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
     ReviewProseVerdict::ISSUE_TYPES.each { |type| expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("- #{type}:") }
     expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(AiService::PLAIN_LANGUAGE_STANDARD.strip)
       .and include("reply with only the JSON verdict")
+  end
+
+  # Both told the judge to change a claim in the 2026-10-09 comparison run.
+  it "never asks the judge to remove a hedge or cut a next step's topics" do
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).not_to match(/needless hedging|names more than one thing/)
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("Keep how sure each claim is")
+      .and include("Keep every topic a next step names")
   end
 end
 

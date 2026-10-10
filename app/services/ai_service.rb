@@ -137,18 +137,23 @@ class AiService
   # SYNC_GENERATION_READ_TIMEOUT was the reference point for magnitude: another
   # blocking, thinking-on call, so this one was sized the same order.
   #
-  # Measured on 2026-09-19 with script/calibrate_concept_references.rb on the
-  # deployed routes, which were then claude-sonnet-5; not re-measured on
-  # claude-sonnet-5-5. 36 claude-sonnet-5 calls ran 19-43 seconds, median 30,
-  # six of them concurrently. Of 17 measured gemini-3.5-flash calls, 16
-  # completed in 20-70 seconds and one hit the 90-second timeout; the median
-  # across all 17 was 25 seconds. The key's daily quota ended the run before
-  # that call could be repeated. So Claude has twice the room
-  # it needs, and Gemini's tail is the open question. The value stays until a
-  # Gemini run under the harness's --timeout shows how long a call that
-  # outlasts 90 seconds takes to finish: a value raised without that number
-  # would be sized by guess again. No ordering against REVIEW_READ_TIMEOUT is
-  # claimed; a longer visible reply is not evidence it takes longer to produce.
+  # Re-measured on 2026-10-09 with script/calibrate_concept_references.rb on
+  # the current routes. 30 sequential claude-sonnet-5-5 calls ran 18.8-34.4
+  # seconds, median 25.7, and 6 concurrent ones 23.7-36.8, median 26.5; none
+  # timed out and none came within 50 seconds of this value. So Claude has
+  # well over twice the room it needs, which is what the 2026-09-19 run on
+  # claude-sonnet-5 also found.
+  #
+  # Gemini's tail is still the open question. 16 gemini-3.5-flash calls
+  # completed in 12.7-21.6 seconds, median 17.0, but the key's per-minute
+  # quota refused the remaining 14 sequential calls and all 6 concurrent ones.
+  # In the 2026-09-19 run, completed calls took up to 70 seconds and one hit
+  # the 90-second timeout. No run since has let such a call finish, so how
+  # long it needs is still unmeasured. The value stays until a Gemini run
+  # under the harness's --timeout produces that number: a value raised
+  # without it would be sized by guess again. No ordering against
+  # REVIEW_READ_TIMEOUT is claimed; a longer visible reply is not evidence it
+  # takes longer to produce.
   #
   # The second thing this buys: RETRY_TIMEOUT_GUARD only marks a timeout final
   # (rather than retryable) when the call is tagged `long_running`, and that
@@ -537,16 +542,26 @@ class AiService
     {"status":"reject","principle":"...","evidence":"<quoted text>","reason":"<one or two sentences>"}
   PROMPT
 
-  # The 1,500 floor governs: the local sample was only 4 section reviews
-  # (largest projection 243 characters). Review output has no length bound, so
-  # a long review can hit this cap and fall back unedited as `truncated`.
-  # Re-check the value against the review_prose script's measured output
-  # tokens before the switch is turned on. Passing it turns thinking off.
+  # The largest reply script/compare_models.rb measured on the production
+  # route, across the eight fixtures and four stored reviews of the
+  # 2026-10-09 run. The cap below is justified by its headroom over this, so
+  # the number lives here rather than in the prose that reasons about it, and
+  # ai_service_spec asserts the headroom the reasoning claims.
+  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 347
+
+  # Review output has no length bound, so a much longer review could still
+  # hit this and fall back unedited as `truncated`; nothing measured has come
+  # close. The slowest measured call took 3.1 seconds of
+  # REVIEW_JUDGE_READ_TIMEOUT. Passing this turns thinking off.
   REVIEW_JUDGE_MAX_TOKENS = 1_500
 
+  # Hedging and a next step naming several topics were listed as problems
+  # until the 2026-10-09 comparison: told to fix them, the judge firmed up a
+  # vague claim and cut a next step to one topic, which changes what the
+  # review says. The rules in the prompt below now forbid both.
   REVIEW_PROSE_ISSUE_GUIDANCE = {
-    "plain_language_violation" => "jargon or buzzwords where a plainer word works, needless hedging, or a miss explained in a more complicated way than it needs.",
-    "verbosity" => "the same point made twice, the rating restated in prose, filler, or a next step that names more than one thing to study."
+    "plain_language_violation" => "jargon or buzzwords where a plainer word works, filler such as \"basically\" or \"at the end of the day\", or a miss explained in a more complicated way than it needs.",
+    "verbosity" => "the same point made twice, the rating restated in prose, or filler."
   }.freeze
 
   REVIEW_PROSE_ISSUE_LINES = ReviewProseVerdict::ISSUE_TYPES
@@ -564,6 +579,8 @@ class AiService
     Rules for any rewrite:
     - Keep what every entry claims. Keep each negation ("does not", "never"), each condition ("only when", "unless"), and every identifier (a method, column, constant or file name) exactly as written.
     - Never add a claim, a fix or an example the entry does not already make. Never touch code.
+    - Keep how sure each claim is. A word that limits a claim ("may", "often", "in some cases") stays, and a vague claim stays vague: "this could get slow with lots of rows" can become "this may get slow with lots of rows", never "this times out with lots of rows".
+    - Keep every topic a next step names. Shorten how it says them; never choose some and drop the rest.
     - A list field is rewritten as entries, each with "from": the zero-based indexes of the original entries it replaces. Cite every original index exactly once. Merge entries only when they make the same point, and then report a verbosity issue. Order entries by their first index.
     - Rewrite only the fields that have a problem and leave the others out. If nothing needs changing, return keep.
     - Each issue's evidence quotes the text it is about.
@@ -1105,7 +1122,9 @@ class AiService
 
   # Whether this provider can hold the prose judge's reply to a schema. The
   # base answers false; a provider that can opts in. Turning the judge on is
-  # the separate ReviewProseJudge switch, which waits on measurement.
+  # the separate ReviewProseJudge switch, which stays off until the activation
+  # gate in CLAUDE.md's "Review prose judge" is met: the comparison runs are
+  # done, and a person has still to read the rewrites beside their sources.
   def self.judges_review_prose? = false
 
   # plan_notes is what DailyPlan::Result#notes recorded, written onto the row.

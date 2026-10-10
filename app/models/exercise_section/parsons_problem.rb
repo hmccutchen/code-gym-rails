@@ -5,6 +5,10 @@
 class ExerciseSection::ParsonsProblem < ExerciseSection
   ANSWER_PREFIX = "order:".freeze
 
+  # Long enough that guessing one of the few block tokens on a page is not
+  # worth trying, short enough to read in a DOM inspector without scrolling.
+  TOKEN_LENGTH = 16
+
   class << self
     def improved_code?
       false
@@ -32,6 +36,71 @@ class ExerciseSection::ParsonsProblem < ExerciseSection
       return if blocks.empty?
 
       grade(submitted_order(answer, blocks.size), blocks.size)[:rating]
+    end
+
+    # The page cannot show a block's position in the correct order, or sorting
+    # by that attribute would solve the puzzle. It shows an opaque token
+    # instead, signed per exercise, section and problem so one day's tokens say
+    # nothing about another's.
+    #
+    # The problem is in the signature because the exercise id is not enough:
+    # RegenerateExerciseJob writes the new problem_set onto the same row, so
+    # without it today's replacement puzzle would reuse today's tokens, and a
+    # token sequence learned from the set it replaced would submit the correct
+    # order for blocks nobody had read.
+    def block_token(block_id, exercise:, key:, section_data:)
+      OpenSSL::HMAC.hexdigest(
+        "SHA256", Rails.application.secret_key_base,
+        "parsons:#{exercise&.id}:#{key}:#{problem_digest(section_data)}:#{block_id}"
+      ).first(TOKEN_LENGTH)
+    end
+
+    # The blocks are stored in their correct order, so this changes whenever
+    # the puzzle does — including a regeneration that happens to keep the
+    # block count. Serialized as JSON rather than joined on a separator:
+    # blocks are provider output and nothing rejects a separator inside one,
+    # so a join would give ["a\0b", "c"] and ["a", "b\0c"] the same digest
+    # and carry every token across a regeneration between them.
+    def problem_digest(section_data)
+      OpenSSL::Digest::SHA256.hexdigest(
+        Array(section_data&.dig("blocks")).map(&:to_s).to_json
+      ).first(TOKEN_LENGTH)
+    end
+
+    # Tokens back to the stored positional order. An order this page's tokens
+    # cannot account for is refused rather than stored: taking it at its word
+    # would accept the positional form the tokens exist to withhold, and
+    # "order:0,1,2" counted off the blocks on screen is the whole answer. A
+    # refusal drops the section from the payload, which the caller reads as a
+    # page out of date; the draft already stored is untouched either way,
+    # since nothing a refusal returns ever reaches the record.
+    def decode_answer(value, exercise: nil, key: nil, section_data: nil)
+      count = Array(section_data&.dig("blocks")).size
+      text  = value.to_s
+      return value if count.zero? || !text.start_with?(ANSWER_PREFIX)
+
+      tokens = token_ids(exercise: exercise, key: key, section_data: section_data)
+      ids    = text.delete_prefix(ANSWER_PREFIX).split(",").map { |t| tokens[t.strip] }
+      return if ids.any?(&:nil?)
+
+      ANSWER_PREFIX + ids.join(",")
+    end
+
+    # The draft field is re-encoded in tokens for the same reason the blocks
+    # are: rendering the stored "order:2,0,1" beside the token list pairs each
+    # visible position with its real id, which is the whole mapping. A draft
+    # that is not a complete permutation renders blank, since the page is
+    # showing the scramble rather than the learner's work.
+    def token_answer(answer:, exercise:, key:, section_data:)
+      ids = submitted_order(answer, Array(section_data&.dig("blocks")).size)
+      return "" if ids.empty?
+
+      ANSWER_PREFIX + ids.map { |id| block_token(id, exercise: exercise, key: key, section_data: section_data) }.join(",")
+    end
+
+    def token_ids(exercise:, key:, section_data:)
+      count = Array(section_data&.dig("blocks")).size
+      (0...count).to_h { |id| [ block_token(id, exercise: exercise, key: key, section_data: section_data), id ] }
     end
 
     def judge_task

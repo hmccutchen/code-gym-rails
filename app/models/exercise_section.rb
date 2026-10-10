@@ -471,6 +471,14 @@ class ExerciseSection
       value if answered?(value, section_data)
     end
 
+    # What the page posted, as the answer to store, or nil when the kind
+    # cannot read it — which drops the section from the payload rather than
+    # storing something unreadable over the draft. Only a kind whose control
+    # sends something other than the stored form overrides this.
+    def decode_answer(value, exercise: nil, key: nil, section_data: nil)
+      value
+    end
+
     # The answer with this day's scaffold labels removed, so "how much did the
     # user actually write" never counts the scaffolding we gave them. Matching
     # whole stripped lines (not substrings) is what makes partial edits degrade

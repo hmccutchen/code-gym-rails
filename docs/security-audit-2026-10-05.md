@@ -70,7 +70,7 @@ sections, and that user's duck conversation.
 | R3 | Rendering | low | CDN scripts (jsdelivr, esm.sh) load without Subresource Integrity | S |
 | R4 | Headers | low | No Permissions-Policy and no `frame-ancestors` (X-Frame-Options SAMEORIGIN is set) | XS |
 | A4 | AI inputs | low | Duck history is client-supplied, so a user can forge assistant turns and reset the six-turn cap | S |
-| A6 | Answer keys | low | Parsons `data-block-id` is each block's index in the correct order, so the page gives away the answer before submission | S |
+| A6 | Answer keys | low | Fixed 2026-10-09: the page renders a signed per-exercise token per block, decoded on save | done |
 | P1 | Push | low | Logout leaves push subscriptions in place, so a shared device keeps getting the previous user's reminders | S |
 | P2 | Push | low | A malformed `p256dh` raises an error `PushDelivery` doesn't rescue; no explicit timeouts; any port allowed on allowlisted hosts | XS |
 | L4 | Login | low | Rate limits fail open if the Solid Cache table errors | XS |
@@ -431,6 +431,24 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
 - **Fix:** render an opaque per-exercise token for each block, mapped back
   on the server when the answer is saved.
 - **Size:** S.
+- **Fixed 2026-10-09.** `ExerciseSection::ParsonsProblem.block_token` signs
+  the exercise, the section key, the block id and a digest of the section's
+  blocks with `secret_key_base`, then truncates. So the attribute sorts
+  randomly, a token from one day says nothing about another, and
+  regenerating the day invalidates every token it issued.
+  `DailyResponse.normalize_answers` decodes through the kind's new
+  `decode_answer` hook, which returns nil for an order it cannot fully
+  resolve; the section is then dropped, and `ResponsesController#create`
+  refuses the whole write with 409 rather than reporting a save that stored
+  nothing — every other answer in that post was written against the questions
+  the replaced set held, and section keys survive a regeneration, so storing
+  them would file an answer under a question nobody read. A page loaded
+  before the change posts positions and has no handler for the 409, so it is
+  refused and asks the reader to refresh; a page loaded after it reloads on
+  its own. The stale check and the save run in one transaction that
+  locks the exercise first and the response second, which is
+  `RegenerateExerciseJob`'s order, so a regeneration cannot commit between
+  the two. Storage, grading, replay and history are unchanged.
 
 ### Web push
 

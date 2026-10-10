@@ -263,7 +263,11 @@ class DailyResponse < ApplicationRecord
     answers.to_h.each_with_object({}) do |(section, value), normalized|
       cleaned = UserText.clean(value, limit: UserText::MAX_ANSWER_LENGTH)
       section_data = exercise&.problem_set&.dig(section.to_s)
-      normalized[section] = substantive_answer(section, cleaned, section_data).empty? ? "" : cleaned
+      kind         = ExerciseSection.find(section) || ExerciseSection
+      decoded      = kind.decode_answer(cleaned, exercise: exercise, key: section.to_s, section_data: section_data)
+      next if decoded.nil?
+
+      normalized[section] = substantive_answer(section, decoded, section_data).empty? ? "" : decoded
     end
   end
 

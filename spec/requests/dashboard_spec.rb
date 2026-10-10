@@ -86,6 +86,20 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include("Answer at least one section to finish up.")
   end
 
+  # The reload is what recovers a refused encoding, and it navigates over the
+  # banner the refusal just set — so every site that reloads on a 409 has to
+  # hand the sentence to the page that lands. A browser spec cannot reach both
+  # sites, since each needs a different section kind on the day.
+  it "hands the refusal's sentence to the reload at every stale save site" do
+    create_response(create_exercise, submitted: false)
+
+    get root_path
+
+    carried = response.body.scan(/CodeGymSaveStatus\.carry\("answers", STALE_RELOADED\);\s*\n\s*window\.location\.reload\(\);/)
+    expect(carried.length).to eq(response.body.scan(/status === 409 && data\?\.status === "stale"/).length)
+    expect(carried).not_to be_empty
+  end
+
   it "enables the submit button when the only answered section is rated" do
     exercise = create_exercise
     create_response(exercise, submitted: false).update!(
@@ -1044,6 +1058,18 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
   end
 
   describe "parsons_problem third section" do
+    # The page shows an opaque token per block rather than its position in the
+    # correct order, so a spec reads the arrangement back through the same
+    # mapping the server decodes a submission with.
+    def rendered_block_ids(body)
+      exercise = DailyExercise.last
+      ids = ExerciseSection::ParsonsProblem.token_ids(
+        exercise: exercise, key: "parsons_problem",
+        section_data: exercise.problem_set["parsons_problem"]
+      )
+      Nokogiri::HTML(body).css("[data-parsons-blocks] [data-block-id]").map { |block| ids[block["data-block-id"]] }
+    end
+
     it "renders the reorder list and a hidden answer field when today's third section is parsons_problem" do
       create_exercise(problem_set: {
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
@@ -1059,7 +1085,35 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("Parsons Problem: Sort names")
       expect(response.body).to include('data-field="parsons_problem"')
       expect(response.body).to include("data-parsons-blocks")
-      expect(response.body.index('data-block-id="2"')).to be < response.body.index('data-block-id="0"')
+      expect(rendered_block_ids(response.body)).to eq([ 2, 0, 1 ])
+    end
+
+    # Rendering the saved "order:2,0,1" beside the token list would pair each
+    # visible position with its real id, which is the whole mapping the tokens
+    # exist to hide.
+    it "re-encodes a saved draft order as tokens rather than positions" do
+      exercise = create_exercise(problem_set: {
+        "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
+        "pattern"     => { "title" => "P", "question" => "q", "why" => "w", "concept" => "n_plus_one" },
+        "parsons_problem" => {
+          "title" => "Sort names", "question" => "Arrange these blocks",
+          "blocks" => [ "def sorted(names)", "  names.sort", "end" ],
+          "display_order" => [ 2, 0, 1 ], "concept" => "n_plus_one"
+        }
+      })
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date,
+                            answers: { "parsons_problem" => "order:1,2,0" })
+      get root_path
+
+      field = Nokogiri::HTML(response.body).at_css('textarea[data-field="parsons_problem"]')
+      ids = ExerciseSection::ParsonsProblem.token_ids(
+        exercise: exercise, key: "parsons_problem",
+        section_data: exercise.problem_set["parsons_problem"]
+      )
+
+      expect(field.text).not_to include("order:1,2,0")
+      expect(field.text.delete_prefix("order:").split(",").map { |token| ids[token] }).to eq([ 1, 2, 0 ])
+      expect(rendered_block_ids(response.body)).to eq([ 1, 2, 0 ])
     end
 
     # Every move already records the order, so the button is only for a single
@@ -1092,9 +1146,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       })
       get root_path
 
-      expect(response.body).to include('data-block-id="0"')
-      expect(response.body).to include('data-block-id="1"')
-      expect(response.body).to include('data-block-id="2"')
+      expect(rendered_block_ids(response.body)).to eq([ 0, 1, 2 ])
     end
 
     it "renders every block once when a tampered answer order was saved" do
@@ -1112,9 +1164,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body.scan('data-block-id="0"').size).to eq(1)
-      expect(response.body).to include('data-block-id="1"')
-      expect(response.body).to include('data-block-id="2"')
+      expect(rendered_block_ids(response.body)).to match_array([ 0, 1, 2 ])
     end
 
     it "renders the blocks without server-side move controls, since drag is the primary input" do
