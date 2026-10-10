@@ -88,6 +88,12 @@ RSpec.describe "PWA", type: :request do
       expect(response.body).to include(%(<link rel="apple-touch-icon" href="/apple-touch-icon.png">))
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
+
+    # A tap leaves a touch screen in :hover, so without this the global
+    # a:hover underline stays on the logo after every trip home.
+    it "keeps the brand link free of the hover underline" do
+      expect(response.body).to include("nav .brand:hover { text-decoration: none; }")
+    end
   end
 
   # The nav's name editor is hidden in the installed app and nowhere else, so
