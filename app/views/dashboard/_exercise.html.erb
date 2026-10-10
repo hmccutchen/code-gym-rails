@@ -106,6 +106,11 @@
     const ratings = {};
     form.querySelectorAll("button.rating-btn.active").forEach(b => { ratings[b.dataset.ratingFor] = b.dataset.rating; });
 
+    // Carried across the reload a refused save triggers, so it has to be the
+    // sentence for a page that has already come back rather than the server's,
+    // which asks for the refresh this client performs on its own.
+    const STALE_RELOADED = <%= t("dashboard.exercise.stale_reloaded").to_json.html_safe %>;
+
     // The client-side half of DailyResponse#submit_blocker, read against the
     // live form so typing into a section re-locks Submit until it is rated.
     function submitBlocker() {
@@ -179,8 +184,16 @@
           // A refused encoding (see ResponsesController#stale_answer_sections)
           // stored nothing, so the page has to come back before another save
           // can land. Reloading is the whole recovery: the server re-renders
-          // the section in the encoding it now expects.
-          if (!ok && status === 409 && data?.status === "stale") { window.location.reload(); return; }
+          // the section in the encoding it now expects. The banner this save
+          // just set would be wiped by that navigation, so the explanation is
+          // carried over to the page that lands — and it is this sentence, not
+          // the server's, because the server's asks for a refresh that has
+          // already happened by the time it would be read.
+          if (!ok && status === 409 && data?.status === "stale") {
+            window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
+            window.location.reload();
+            return;
+          }
           if (ok && data?.submitted && !form.inert && !reviewRequested) window.location.reload();
         });
       }, 800);
@@ -286,7 +299,14 @@
           // more: nothing was submitted, so reloading is what lets the next
           // press reach the server. The form stays inert behind the reload:
           // restoring it would queue an autosave of the payload just refused.
-          if (res.status === 409) { reloading = true; window.location.reload(); return; }
+          // This path sets no banner of its own, so the carried sentence is
+          // the only thing that tells the reader why the page changed.
+          if (res.status === 409) {
+            window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
+            reloading = true;
+            window.location.reload();
+            return;
+          }
           alert(<%= t("dashboard.exercise.submit_failed").to_json.html_safe %>);
         }
       } catch (error) {

@@ -375,6 +375,7 @@ en:
         unanswered: "Answer at least one section to finish up."
         unrated: "Rate each section you answered to finish up."
       submit_failed: "Couldn't submit your answers — please try again."
+      stale_reloaded: "The set changed, so that last change wasn't saved. This is the current set — your saved work is still there."
       review_start_failed: "Your answers were saved, but the review couldn't start. Reloading so you can try the review again."
   learn:
     preparing_limited: "You've started several write-ups in the last hour. Try again later."

@@ -193,6 +193,22 @@ RSpec.describe "Parsons reorder controls", type: :system do
     end
   end
 
+  # The reload wipes the banner the refused save set, so without carrying the
+  # message the page would come back changed and silent, with the engineer's
+  # last move gone and nothing saying why.
+  it "explains the refusal on the page the reload lands on" do
+    travel_to(weekday) do
+      visit_seeded_dashboard(cdn: :loaded)
+      exercise = user.daily_exercises.sole
+      exercise.problem_set["parsons_problem"]["blocks"] = [ "def replaced(names)", "  names.uniq", "end" ]
+      exercise.save!
+
+      find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys(%i[control down])
+
+      expect(page).to have_css("#save-status", text: "that last change wasn't saved", wait: 10)
+    end
+  end
+
   it "moves focus between blocks with a bare arrow key" do
     travel_to(weekday) do
       visit_seeded_dashboard(cdn: :loaded)

@@ -139,6 +139,33 @@
       }).finally(() => { requests--; });
     }
 
-    return { save: save, watch: watch, pending: pending };
+    // A caller that reloads in answer to a refusal navigates before the banner
+    // it just set can be read, so the message has to reach the page replacing
+    // this one. sessionStorage rather than a query parameter: the reload is a
+    // plain window.location.reload(), and a parameter would survive in the URL
+    // and re-announce itself on every later load of it.
+    const CARRIED = "code-gym-save-status-carried";
+
+    function carry(key, message) {
+      try {
+        sessionStorage.setItem(CARRIED, JSON.stringify({ key: key, message: message }));
+      } catch (error) {
+        // Private browsing can refuse the write. The reload still happens; the
+        // page it lands on simply says nothing, which is where it started.
+      }
+    }
+
+    try {
+      const carried = sessionStorage.getItem(CARRIED);
+      if (carried) {
+        sessionStorage.removeItem(CARRIED);
+        const parsed = JSON.parse(carried);
+        if (parsed && parsed.message) fail(parsed.key || "carried", parsed.message);
+      }
+    } catch (error) {
+      try { sessionStorage.removeItem(CARRIED); } catch (ignored) {}
+    }
+
+    return { save: save, watch: watch, pending: pending, carry: carry };
   })();
 </script>
