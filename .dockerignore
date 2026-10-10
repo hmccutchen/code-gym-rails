@@ -49,3 +49,6 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Installed in the image by npm ci, never copied from a checkout.
+/vendor/prettier/node_modules
