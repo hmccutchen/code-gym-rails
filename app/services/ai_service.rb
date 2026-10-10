@@ -1991,8 +1991,7 @@ class AiService
   # delivered so a week of production entries can answer whether the loop is
   # working before changing any generation logic on a hunch. Read alongside
   # ResponsesController#log_review_diagnostics (correlated by user_id + date).
-  # Safe to remove once that question is settled. See
-  # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
+  # Safe to remove once that question is settled.
   def log_difficulty_diagnostics(user, language, plan, problem_set, history, kinds:, difficulty:, ladders:,
                                  judge: nil, unhosted: [])
     requested = {

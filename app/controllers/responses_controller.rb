@@ -637,8 +637,7 @@ class ResponsesController < ApplicationController
   # both per section so a week of entries can be read alongside
   # AiService#log_difficulty_diagnostics (correlated by user_id + date) as
   # "here's what we asked for, here's what we got, here's how it was rated."
-  # Safe to remove once that question is settled. See
-  # docs/superpowers/plans/2026-08-11-difficulty-diagnostics-logging.md.
+  # Safe to remove once that question is settled.
   def log_review_diagnostics(response, sections)
     payload = {
       event: "review",
