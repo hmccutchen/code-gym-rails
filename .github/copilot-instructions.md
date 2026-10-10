@@ -279,8 +279,9 @@ those, plus whatever `grep -rl <changed constant or method> spec/` turns up.
 For a change local to one controller, model, view, or job that is the whole
 blast radius, and a scoped run beats a full suite that nobody waits for. It is
 **not** the blast radius when the diff touches a shared authority — `AiService`,
-`ExerciseSection`, `ProblemSetIngest`, `DailyPlan`, `ConceptVocabulary`, `ConceptBucket`,
-`DailyResponse`, `RealSource`, or `DailyExercise#active_section_keys`. Those are
+`ExerciseSection`, `ProblemSetIngest`, `DailyPlan`, `ConceptVocabulary`,
+`ConceptBucket`, `DailyResponse`, `RealSource`, or
+`DailyExercise#active_section_keys`. Those are
 named under "Standards and Authorities" in `CLAUDE.md` because everything
 downstream derives from them, so a diff touching one runs the full suite.
 

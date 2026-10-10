@@ -233,6 +233,21 @@ RSpec.describe ConceptVocabulary do
   end
 
   describe ".selectable_for_section" do
+    it "excludes the data-modeling concepts on the other two modes" do
+      %i[application_code test_file].each do |mode|
+        vocabulary = described_class.selectable_for_section("code_review", "ruby_rails", mode: mode)
+        expect(vocabulary).not_to include(*ConceptVocabulary::DATA_MODELING_CONCEPTS)
+        expect(vocabulary).to include("n_plus_one")
+      end
+    end
+
+    it "leaves pattern unnarrowed on every mode" do
+      %i[application_code test_file schema_review].each do |mode|
+        expect(described_class.selectable_for_section("pattern", "ruby_rails", mode: mode))
+          .to eq(ConceptVocabulary::RAILS_CONCEPTS)
+      end
+    end
+
     it "hands the kind's own hook what the excluded groups left, with the rung" do
       after_exclusions = described_class.selectable_for_section("parsons_problem", "ruby_rails")
       allow(ExerciseSection::ParsonsProblem).to receive(:narrow_vocabulary).and_return(%w[n_plus_one])
@@ -462,26 +477,6 @@ RSpec.describe ConceptVocabulary do
     it "returns the full language vocabulary for code_review with no mode, since ingest cannot tell which mode produced a set" do
       expect(described_class.for_section("code_review", "ruby_rails"))
         .to eq(ConceptVocabulary::RAILS_CONCEPTS)
-    end
-
-    it "narrows code_review to the data-modeling concepts on a schema-review day" do
-      expect(described_class.selectable_for_section("code_review", "ruby_rails", mode: :schema_review))
-        .to eq(ConceptVocabulary::DATA_MODELING_CONCEPTS)
-    end
-
-    it "excludes the data-modeling concepts on the other two modes" do
-      %i[application_code test_file].each do |mode|
-        vocabulary = described_class.selectable_for_section("code_review", "ruby_rails", mode: mode)
-        expect(vocabulary).not_to include(*ConceptVocabulary::DATA_MODELING_CONCEPTS)
-        expect(vocabulary).to include("n_plus_one")
-      end
-    end
-
-    it "leaves pattern unnarrowed on every mode" do
-      %i[application_code test_file schema_review].each do |mode|
-        expect(described_class.selectable_for_section("pattern", "ruby_rails", mode: mode))
-          .to eq(ConceptVocabulary::RAILS_CONCEPTS)
-      end
     end
   end
 end

@@ -394,7 +394,7 @@ design principles keep it.
 ## `#code_example_description`
 
 `medium` is nil for a concept with no code of its own (see
-`LANGUAGE_AGNOSTIC_VOCABULARIES`).
+`ConceptVocabulary.language_agnostic?`).
 
 ## `#parse_provider_envelope`
 
