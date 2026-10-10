@@ -76,6 +76,23 @@ RSpec.describe CodeFormat do
       expect(described_class.all([ "function x( {", "let a=1" ], language: "javascript")).to eq([ "function x( {", "let a = 1;" ])
     end
 
+    it "kills a run that outlasts the timeout and hands the batch back unchanged" do
+      stalled = Tempfile.new([ "stalled", ".mjs" ]).tap { |file| file.write("setTimeout(() => {}, 60_000);\n") && file.close }
+      stub_const("CodeFormat::Javascript::SCRIPT", stalled.path)
+      stub_const("CodeFormat::Javascript::TIMEOUT_SECONDS", 1)
+      allow(Process).to receive(:kill).and_call_original
+      allow(Rails.logger).to receive(:warn)
+
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      expect(described_class.all([ "let a=1", "let b=2" ], language: "javascript")).to eq([ "let a=1", "let b=2" ])
+
+      expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).to be < 10
+      expect(Process).to have_received(:kill).with("KILL", kind_of(Integer))
+      expect(Rails.logger).to have_received(:warn).with("[code_format] language=javascript fallback=Timeout::Error")
+    ensure
+      stalled&.unlink
+    end
+
     it "hands back every snippet unchanged when Node cannot run" do
       allow(Open3).to receive(:popen3).and_raise(Errno::ENOENT)
       allow(Rails.logger).to receive(:warn)
