@@ -23,6 +23,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     true
   end
 
+  def self.code_fields
+    %w[snippet]
+  end
+
   def self.prose_fields
     %w[scenario question teaching_note]
   end

@@ -942,6 +942,52 @@ RSpec.describe ProblemSetIngest do
   end
 end
 
+RSpec.describe ProblemSetIngest, "formatting code" do
+  def ingested(problem_set, language: "ruby_rails")
+    described_class.call(problem_set, language: language, expected_keys: problem_set.keys).problem_set
+  end
+
+  before do
+    allow(CodeFormat).to receive(:all) { |snippets, language:| snippets.map { |code| "#{language}: #{code}" } }
+  end
+
+  it "formats each kind's code fields in the day's language and nothing else" do
+    set = FakeService::EXERCISE_PROBLEM_SET.deep_dup.slice("code_review", "challenge", "parsons_problem")
+    set["challenge"]["starter_code"] = "function start() {}"
+    original = set.deep_dup
+    result = ingested(set, language: "javascript")
+
+    expect(result["code_review"]["snippet"]).to eq("javascript: #{original['code_review']['snippet']}")
+    expect(result["challenge"]["starter_code"]).to eq("javascript: function start() {}")
+    expect(result["code_review"]["question"]).to eq(original["code_review"]["question"])
+    expect(result["parsons_problem"].to_json).not_to include("javascript: ")
+  end
+
+  it "formats a design comparison's pieces before they are arranged" do
+    pieces = FakeService::EXERCISE_PROBLEM_SET.fetch("design_comparison").values_at("better_piece", "other_piece")
+    section = ingested({ "design_comparison" => FakeService::EXERCISE_PROBLEM_SET.fetch("design_comparison").deep_dup })["design_comparison"]
+
+    expect([ section["piece_a"], section["piece_b"] ]).to contain_exactly(*pieces.map { |piece| "ruby_rails: #{piece}" })
+  end
+
+  # The piece-length bound applies to the code as the engineer will see it.
+  it "formats before the boundary checks run" do
+    allow(CodeFormat).to receive(:all) { |snippets, **| snippets.map { |code| "#{code}\n" + ("x\n" * 30) } }
+    set = { "code_review" => { "concept" => "n_plus_one", "snippet" => "a" },
+            "design_comparison" => FakeService::EXERCISE_PROBLEM_SET.fetch("design_comparison").deep_dup }
+
+    result = described_class.call(set, language: "ruby_rails", expected_keys: set.keys)
+
+    expect(result.unusable_sections.map(&:key)).to eq([ "design_comparison" ])
+  end
+
+  it "passes nothing when no section carries code" do
+    ingested({ "pattern" => FakeService::EXERCISE_PROBLEM_SET.fetch("pattern").deep_dup })
+
+    expect(CodeFormat).to have_received(:all).with([], language: "ruby_rails")
+  end
+end
+
 RSpec.describe ProblemSetIngest, "pitched rung stamps" do
   let(:problem_set) do
     { "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },

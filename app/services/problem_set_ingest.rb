@@ -183,6 +183,7 @@ class ProblemSetIngest
     warn_unrequested_sections!
     prune_retry_extras!
     prune_unplanned_slots!
+    format_code!
     reject_unusable_sections!
     enforce_fixed_concepts!
     normalize_concepts!
@@ -198,6 +199,19 @@ class ProblemSetIngest
   end
 
   private
+
+  # Before the boundary checks, so a bound such as a design comparison's
+  # piece length applies to the code as the engineer will see it. Every
+  # field goes through in one batch, which is one Prettier process a set.
+  def format_code!
+    fields = @problem_set.flat_map do |key, section|
+      next [] unless section.is_a?(Hash)
+
+      ExerciseSection.for(key).code_fields.select { |field| section[field].is_a?(String) && section[field].present? }.map { |field| [ section, field ] }
+    end
+    formatted = CodeFormat.all(fields.map { |section, field| section[field] }, language: @language)
+    fields.zip(formatted).each { |(section, field), code| section[field] = code }
+  end
 
   # A silently short set would make sections_total under-report, which feeds
   # recent_performance, which sizes tomorrow's set — the day's own provider

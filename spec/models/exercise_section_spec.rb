@@ -1,6 +1,16 @@
 require "rails_helper"
 
 RSpec.describe ExerciseSection do
+  # Ingest formats these fields, so a name that matches no field in the
+  # kind's schema would leave its code unformatted without failing anything.
+  it "names only code fields that appear in each kind's schema" do
+    described_class.all.each do |kind|
+      kind.code_fields.each do |field|
+        expect(kind.schema_fragment(label: "Ruby")).to include(%("#{field}")), "#{kind.key}: #{field}"
+      end
+    end
+  end
+
   describe ".keys" do
     it "lists every section kind in the order the app has always enumerated them" do
       expect(described_class.keys).to eq(%w[

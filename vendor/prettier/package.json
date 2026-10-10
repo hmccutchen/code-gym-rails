@@ -1,0 +1,9 @@
+{
+  "name": "code-gym-prettier",
+  "private": true,
+  "type": "module",
+  "description": "Formats JavaScript exercise code at the generation boundary (CodeFormat::Javascript).",
+  "dependencies": {
+    "prettier": "3.9.10"
+  }
+}

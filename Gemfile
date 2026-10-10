@@ -34,6 +34,10 @@ gem "rouge", "~> 5.1"
 # requires it on its own, and a Rails upgrade could drop that path silently.
 gem "prism", "~> 1.9"
 
+# Re-indents provider-written Ruby at the generation boundary with its Layout
+# cops (CodeFormat::Ruby), so it is needed in production, not only for linting.
+gem "rubocop", require: false
+
 # VAPID-signed Web Push delivery for the daily reminder (PushDelivery).
 # The reminder is best-effort: the gem is only ever reached from a background
 # job, so a push failure cannot surface on a request.

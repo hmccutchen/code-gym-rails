@@ -207,6 +207,13 @@ class ExerciseSection
       []
     end
 
+    # Fields holding code in the day's language, which ingest re-indents
+    # through CodeFormat. Parsons blocks are left out on purpose: each block's
+    # indentation is part of the arrangement being asked for.
+    def code_fields
+      []
+    end
+
     # What the server decides about one resolved section's presentation that
     # the provider must not, applied after .reject_unusable! accepts it. Most
     # kinds have nothing to arrange.
