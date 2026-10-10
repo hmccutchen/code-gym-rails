@@ -3,6 +3,15 @@ inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
 require:
   - ./lib/rubocop/cop/code_gym/single_line_comment.rb
+  - ./lib/rubocop/cop/code_gym/attached_comment.rb
+  - ./lib/rubocop/cop/code_gym/comment_limit.rb
 
 CodeGym/SingleLineComment:
   Enabled: true
+
+CodeGym/AttachedComment:
+  Enabled: true
+
+CodeGym/CommentLimit:
+  Enabled: true
+  Max: 5
