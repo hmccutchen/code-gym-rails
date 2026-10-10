@@ -534,7 +534,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   throughout. Every trial branch renders only for a trial account, so
   existing pages stay byte-identical.
   Design in `docs/trial-mode-and-provider-limits-2026-10-06.md`.
-- **Per-user API keys**: Each user provides their own Anthropic, Gemini or OpenAI key, and can keep one for each. Zero shared cost. A pasted key's prefix (`sk-ant-`, `AIza`/`AQ.`, or `sk-proj-`/`sk-svcacct-`/legacy `sk-`) decides which provider it is saved under; the OpenAI pattern requires alphanumerics straight after a bare `sk-`, so it can never claim an Anthropic key whatever order the patterns are tried in. Pasting a key replaces only that provider's key and selects it (`User#store_api_key`); Setup's "Provider in use" radios switch between saved keys without re-entering one, and list only providers with a saved key (`User#stored_providers`). `user.provider` names the one in use, `User#api_key` reads its key, and `AiService.for(user)` dispatches on it, so nothing downstream knows there is more than one. The keys are stored together in `users.api_keys`, a JSON map serialized and then encrypted with `encrypts :api_keys` (ActiveRecord Encryption); no keys stores as NULL, so `where.not(api_keys: nil)` finds the accounts that can call a provider. A map rather than a column per provider keeps adding a provider a matter of adding a class. `users.api_key`, the single-key column it replaced, is ignored for one release while the old code serves through the pre-deploy migration, and dropped afterwards; a key pasted in that window lands only in the old column and has to be pasted again. Each reviewed response records the provider that wrote it in `daily_responses.review_provider`, so History and the dashboard keep naming it after a switch; a part-reviewed day finished on another provider names the last one. A review old code wrote while the migration ran has none, so changing `provider` first records the outgoing provider on every reviewed response still missing one (`User#record_provider_on_unlabelled_reviews`), and a response with none can then only have come from the current provider. A user could already switch by pasting another provider's key, so the backfill stores `unknown` (labelled "AI") on the past reviews of a user whose `api_usages.model` rows name another provider. Models were recorded only from 2026-10-01, so a switch before that left no trace, and those reviews keep the current provider's name, as the page already showed. Deleting an account also clears the ignored `api_key` column, which still holds the copied key until it is dropped. Setup says nothing about how providers differ: the prose judge ships off, and structured output and caching change cost and reliability rather than anything an engineer does differently. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
+- **Per-user API keys**: Each user provides their own Anthropic, Gemini or OpenAI key, and can keep one for each. Zero shared cost. A pasted key's prefix (`sk-ant-`, `AIza`/`AQ.`, or `sk-proj-`/`sk-svcacct-`/legacy `sk-`) decides which provider it is saved under; the OpenAI pattern requires alphanumerics straight after a bare `sk-`, so it can never claim an Anthropic key whatever order the patterns are tried in. Pasting a key replaces only that provider's key and selects it (`User#store_api_key`); Setup's "Provider in use" radios switch between saved keys without re-entering one, and list only providers with a saved key (`User#stored_providers`). `user.provider` names the one in use, `User#api_key` reads its key, and `AiService.for(user)` dispatches on it, so nothing downstream knows there is more than one. The keys are stored together in `users.api_keys`, a JSON map serialized and then encrypted with `encrypts :api_keys` (ActiveRecord Encryption); no keys stores as NULL, so `where.not(api_keys: nil)` finds the accounts that can call a provider. A map rather than a column per provider keeps adding a provider a matter of adding a class. `users.api_key`, the single-key column it replaced, is ignored for one release while the old code serves through the pre-deploy migration, and dropped afterwards; a key pasted in that window lands only in the old column and has to be pasted again. Each reviewed response records the provider that wrote it in `daily_responses.review_provider`, so History and the dashboard keep naming it after a switch; a part-reviewed day finished on another provider names the last one. A review old code wrote while the migration ran has none, so changing `provider` first records the outgoing provider on every reviewed response still missing one (`User#record_provider_on_unlabelled_reviews`), and a response with none can then only have come from the current provider. A user could already switch by pasting another provider's key, so the backfill stores `unknown` (labelled "AI") on the past reviews of a user whose `api_usages.model` rows name another provider. Models were recorded only from 2026-10-01, so a switch before that left no trace, and those reviews keep the current provider's name, as the page already showed. Deleting an account also clears the ignored `api_key` column, which still holds the copied key until it is dropped. Setup says nothing about how providers differ: the prose judge runs on Claude only, and it, structured output and caching change the wording of a review, cost and reliability rather than anything an engineer does differently. The `ACTIVE_RECORD_ENCRYPTION_*` env vars are wired in via `config/initializers/active_record_encryption.rb` (Rails does not read them from ENV on its own); development derives throwaway keys from `secret_key_base` automatically.
 - **Provider abstraction**: `AiService` is a template-method base class owning prompts, concept vocabularies, JSON parsing, and usage logging. Subclasses implement `#call` and `#build_connection`, and own which model each purpose routes to (see "Per-purpose model routing" below). Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**: each provider picks its model from its own
   `MODEL_FOR_PURPOSE`, keyed by the same `purpose` string `ApiUsage` records,
@@ -2177,7 +2177,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   **The accepted risk is claim preservation.** Citation proves no point was
   dropped or duplicated; it cannot prove a rewrite still says the same thing.
   A negation, a condition or an identifier could change and nothing checks it.
-  That is why the judge ships off.
+  That is why the judge shipped off, and why turning it on took a person
+  reading rewrites rather than a check passing — see the activation gate
+  below for the bar that was set.
 
   **Placement and failure.** `AiService#judged_review` runs inside each
   section's grading thread, after grading and the Parsons rating override, and
@@ -2213,11 +2215,15 @@ concept-specific difficulty descriptions for future generation, not a new set.
   subclass may still record the text; that path is not the judge's.
 
   **The switch and the activation gate.** `ReviewProseJudge.enabled?` is true
-  only when `REVIEW_PROSE_JUDGE` is exactly `"1"`. It ships off. Before
-  turning it on: run both `review_prose` modes of `script/compare_models.rb`
-  (`review_prose` on stored days and `review_prose_fixtures`), read every
-  rewrite beside its sources, and confirm no claim changed, including
-  negations, conditions and identifiers. Check the measured output tokens
+  only when `REVIEW_PROSE_JUDGE` is exactly `"1"`. It shipped off and was
+  turned on on 2026-10-10. The gate it passed, which any later change to the
+  judge's prompt or route has to pass again: run both `review_prose` modes of
+  `script/compare_models.rb` (`review_prose` on stored days and
+  `review_prose_fixtures`), read every rewrite beside its sources, and
+  confirm no claim changed. A rewrite may tighten how sure a vague claim
+  sounds; adding or dropping a point, reversing a negation, changing a
+  condition or an identifier, dropping a next-step topic or losing a
+  qualifier that carries a real limit all fail. Check the measured output tokens
   against `REVIEW_JUDGE_MAX_TOKENS` at the same time, and the slowest
   measured calls against `REVIEW_JUDGE_READ_TIMEOUT` (30 seconds): the call
   has one attempt, so a timeout is billed and then falls back.
@@ -2259,7 +2265,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   what the review says.
 
   **Both modes ran again on 2026-10-10, against the corrected prompt. One
-  shape is fixed, the other is not, so the switch stays off.**
+  shape is fixed, the other is not, and the remaining one was accepted — the
+  switch is on.**
   `review_prose_fixtures` was run twice on `claude-sonnet-5-5` to tell a
   reliable shape from a stochastic one. Both runs hit the expected status on
   8 of 8 with 0 invalid replies, 6 edits and 1 merge; `review_prose` over 4
@@ -2291,12 +2298,24 @@ concept-specific difficulty descriptions for future generation, not a new set.
   paragraphs up, met in the wild: citation proves no point was dropped or
   duplicated, never that a kept one still means the same.
 
-  So the gate stays unmet on the same clause it was unmet on before, and the
-  remaining question is no longer a fix to find but a bar to set: whether
-  "a performance thing" becoming "slows the page" is a claim change worth
-  blocking on, in a review whose own `correct` field already says "You
-  noticed the page was slow." Accepting it is a change to the gate, which is
-  a decision to state here rather than a box a run ticks.
+  So the gate came down to a bar rather than a fix, and the bar was set on
+  2026-10-10: **a rewrite may tighten how sure a claim sounds, as long as it
+  adds, drops and contradicts nothing.** "A performance thing" becoming
+  "slows the page" says what the same review's `correct` field already says
+  — "You noticed the page was slow." — so the engineer is told nothing new.
+  What stays blocking is unchanged: an added or dropped point, a reversed
+  negation, a changed condition or identifier, a dropped next-step topic.
+  Hedging that carries a real limit still has to survive, which is what
+  `verbose_jargon`'s "might … may" case checks; what was accepted is the
+  vague filler phrase, not the qualifier. The accepted risk two paragraphs
+  up is the reason this is a judgment and not a check: citation proves no
+  point was dropped or duplicated, never that a kept one still means the
+  same, so no boundary can be asked to hold this line.
+
+  **The switch went on after that decision**, with `REVIEW_PROSE_JUDGE=1` on
+  the web service. Reopening the question means reading rewrites again, not
+  re-running the fixtures: both modes have now been run three times across
+  two prompts, and the shapes they surface are stable.
 
   The budget checks still pass with room, measured on the corrected prompt:
   the largest reply used a fraction of `REVIEW_JUDGE_MAX_TOKENS` and the
