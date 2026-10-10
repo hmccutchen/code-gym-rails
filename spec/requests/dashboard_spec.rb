@@ -86,6 +86,20 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include("Answer at least one section to finish up.")
   end
 
+  # The reload is what recovers a refused encoding, and it navigates over the
+  # banner the refusal just set — so every site that reloads on a 409 has to
+  # hand the sentence to the page that lands. A browser spec cannot reach both
+  # sites, since each needs a different section kind on the day.
+  it "hands the refusal's sentence to the reload at every stale save site" do
+    create_response(create_exercise, submitted: false)
+
+    get root_path
+
+    carried = response.body.scan(/CodeGymSaveStatus\.carry\("answers", STALE_RELOADED\);\s*\n\s*window\.location\.reload\(\);/)
+    expect(carried.length).to eq(response.body.scan(/status === 409 && data\?\.status === "stale"/).length)
+    expect(carried).not_to be_empty
+  end
+
   it "enables the submit button when the only answered section is rated" do
     exercise = create_exercise
     create_response(exercise, submitted: false).update!(

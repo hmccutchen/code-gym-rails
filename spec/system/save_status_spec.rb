@@ -53,6 +53,54 @@ RSpec.describe "Save status", type: :system do
     end
   end
 
+  # The banner is set and the page then reloads over it, so the only reader is
+  # the page that replaces this one. Without the hand-off an engineer watches
+  # their edit vanish and is told nothing about why.
+  it "shows a carried explanation on the page the reload lands on" do
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      page.execute_script("window.CodeGymSaveStatus.carry('answers', 'That last change wasn\\'t saved')")
+
+      page.refresh
+
+      expect(page).to have_css("#save-status", text: /that last change wasn't saved/i, wait: 10)
+    end
+  end
+
+  # Read once: a second reload is a page the message was never about, and the
+  # engineer has already been told.
+  it "shows a carried explanation only once" do
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      page.execute_script("window.CodeGymSaveStatus.carry('answers', 'That last change wasn\\'t saved')")
+
+      page.refresh
+      expect(page).to have_css("#save-status", text: /that last change wasn't saved/i, wait: 10)
+      page.refresh
+
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      expect(page).to have_no_css("#save-status", visible: true)
+    end
+  end
+
+  # A caller that carries a message and then never reloads would otherwise
+  # leave it for whatever page renders this partial next, which could be a
+  # different page days later and about nothing the reader did.
+  it "keeps a carried explanation off a page it was not about" do
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_content(/Code Review/i, wait: 10)
+      page.execute_script("window.CodeGymSaveStatus.carry('answers', 'A message about the dashboard')")
+
+      visit history_path
+
+      expect(page).to have_css("h1", wait: 10)
+      expect(page).to have_no_css("#save-status", visible: true)
+    end
+  end
+
   it "reloads a stale rated form without restoring a skipped section's discarded rating" do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
