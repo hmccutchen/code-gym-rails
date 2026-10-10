@@ -1111,7 +1111,9 @@ class AiService
 
   # Whether this provider can hold the prose judge's reply to a schema. The
   # base answers false; a provider that can opts in. Turning the judge on is
-  # the separate ReviewProseJudge switch, which waits on measurement.
+  # the separate ReviewProseJudge switch, which stays off until the activation
+  # gate in CLAUDE.md's "Review prose judge" is met: the comparison runs are
+  # done, and a person has still to read the rewrites beside their sources.
   def self.judges_review_prose? = false
 
   # plan_notes is what DailyPlan::Result#notes recorded, written onto the row.
