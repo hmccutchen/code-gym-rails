@@ -36,6 +36,7 @@
 # Playwright CLI install output — restored with `npm --prefix spec/playwright ci`
 # from the tracked lockfile; see spec/support/system_test_helper.rb.
 /spec/playwright/node_modules/
+/vendor/prettier/node_modules/
 
 # Subagent-driven-development scratch (ledger, briefs, review packages)
 .superpowers/

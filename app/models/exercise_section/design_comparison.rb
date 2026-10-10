@@ -88,6 +88,11 @@ class ExerciseSection::DesignComparison < ExerciseSection
       [ ANSWER_KEY_FIELD ]
     end
 
+    # The canonical names, since ingest formats before .arrange! renames them.
+    def code_fields
+      CANONICAL_PIECES
+    end
+
     def answer_partial
       "responses/answers/design_comparison"
     end

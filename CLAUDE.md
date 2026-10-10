@@ -202,6 +202,7 @@ advisory signal; it is not evidence that anything was verified.
 - **Solid Cable / ActionCable** — mounted but unused; the dashboard learns generation is done by polling `GET /dashboard/status`, since this app's layout never loads Turbo JS
 - **Faraday** — provider API calls (not the official SDKs)
 - **Rouge** — server-side syntax highlighting for every code block (`CodeHighlight`)
+- **RuboCop and Prettier** — re-indent provider-written exercise code once, at ingest (`CodeFormat`); Prettier runs in Node from `vendor/prettier`
 - **web-push** — VAPID-signed daily reminder notifications (`PushDelivery`)
 - **BCrypt** — login code digests
 - **ActiveRecord Encryption** — encrypts each user's provider API key at rest
@@ -2670,6 +2671,37 @@ concept-specific difficulty descriptions for future generation, not a new set.
   what needs the rendered width: whether a block wraps, which hides its
   padding. Duck, follow-up and alternate-explanation replies are built
   by page scripts as plain text and show no code blocks.
+- **Exercise code is re-indented once, at ingest**: models often write code
+  with uneven indentation, and the highlighter shows whitespace exactly as
+  written. `ProblemSetIngest#format_code!` passes each kind's
+  `.code_fields` (code review and security review snippets, challenge
+  starter code, design comparison pieces) through `CodeFormat.all` in the
+  day's language, before the boundary checks, so a bound such as
+  `MAX_PIECE_LINES` applies to the code as shown, and the page, grader,
+  judge and duck all read the same layout. Ruby goes through RuboCop's
+  `Layout` cops in process (`CodeFormat::Ruby`), which move whitespace and
+  nothing else, so a planted defect survives token for token; a spec holds
+  that. `Layout/LineLength` and `Layout/HashAlignment` are left out, since
+  one would split lines and the other undo a table the highlighter already
+  keeps readable. RuboCop's own defaults apply rather than the repository's
+  `.rubocop.yml`, and `rubocop` is a production gem for this. JavaScript
+  goes through Prettier (`CodeFormat::Javascript`), one Node process per
+  set, using its TypeScript parser so JSX and TypeScript snippets format
+  too. Prettier is not whitespace-only: it adds semicolons and parentheses
+  and can rewrap a line, which keeps behavior but can make a defect that
+  depends on how code is laid out easier to see. That is the accepted cost
+  of the readable layout. Code a formatter cannot parse, such as a Prisma
+  schema or pseudocode, comes back unchanged, and a formatter that cannot
+  run at all (no Node, a timeout) hands back the whole batch unchanged and
+  logs `[code_format] language=… fallback=<class>`, so formatting never costs
+  a section. Parsons blocks are not formatted, since their indentation is
+  part of the arrangement. Node reaches the Railway build through
+  `nixpacks.toml`, which adds `nodejs_22` and installs `vendor/prettier`
+  for both services; the package lives under `vendor/` so Nixpacks still
+  detects a Ruby app. `spec/support/code_format_default.rb` makes every
+  example hand code back unchanged, since Prettier's presence varies by
+  machine, and `spec/models/code_format_spec.rb` opts back in; CI installs
+  `vendor/prettier` so those examples run Prettier for real.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
   stalls for 3s. Because dragging is pointer-only, every block is focusable and
@@ -3049,6 +3081,9 @@ always pull in the full suite — is stated once, in
 - `app/models/rung_ledger.rb` — `RungLedger`: the rung a user holds per concept, from stored responses and the `pitched_at` stamps; pure over the rows it is given
 - `app/controllers/progress_controller.rb` — the `/progress` page: Learn's grouping, `RungLedger`'s standings, `ConceptHosts` for what is offered
 - `app/models/exercise_section.rb` (+ `app/models/exercise_section/`) — the registry of section kinds (code_review, design_comparison, pattern, challenge, architecture, security_review, parsons_problem, plan_review, ambiguity_hunt, pseudocode_to_code); one class per kind answers which are fixed (`.fixed?`, each in a slot of its own, which `.slots`, `SectionRotation::OPTIONAL_SLOTS` and `MANDATORY_SLOT_COUNT` derive from), which are thirds, which are fourths, which vocabulary they draw from and how it narrows that list for generation (`.narrow_vocabulary`, given an optional rung), which fields are answer key (`.answer_key_fields`), what the provider boundary refuses (`.reject_unusable!`), how many judge retries a rejection buys (`.judge_retries`) and any extra judge instructions (`.judge_guidance`), how a resolved section is arranged after it is accepted (`.arrange!`), whether the judge solves it blind (`.judge_solve_options`, `.solve_matches_key?`), which show improved code, which scaffold their answer, and — via `.schema_fragment` / `.generation_guidance` — what the generation prompt says about them. `AiService` assembles those fragments and owns the language config; it no longer branches on section keys — or on kind identity — to build them. `.generation_guidance` takes a uniform context (`vocabulary:, label:, mode:, artifact:, test_framework:`) that every kind receives and each reads only its own part of; kinds that read none of the optional values absorb them with `**`. Adding a kind means adding a class here, not editing `AiService`.
+- `app/models/code_format.rb` (+ `app/models/code_format/`) — `CodeFormat`: re-indents a batch of exercise code in the day's language, RuboCop's Layout cops for Ruby and Prettier for JavaScript, handing back what it cannot format unchanged
+- `vendor/prettier/` — the Prettier package and `format.mjs`, the Node script `CodeFormat::Javascript` runs
+- `nixpacks.toml` — adds Node and installs `vendor/prettier` in the Railway build
 - `app/models/code_highlight.rb` — `CodeHighlight`: Rouge highlighting for a code block, its line formatter, the lexer map and the cache key; `SyntaxHighlightingHelper#highlighted_code` is the one call site views use
 - `app/helpers/answer_scaffolds_helper.rb` — the textarea pre-fill value and the `data-scaffold-labels` attribute the dashboard script reads, so the scaffold rule is stated once rather than per textarea
 - `app/models/exercise_section/design_comparison.rb` — the second fixed kind: two working pieces, a server-rolled A/B order, the `pick:` answer encoding, its rung-aware vocabulary allowlist, and the judge's blind-solve facets

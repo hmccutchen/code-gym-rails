@@ -16,6 +16,10 @@ class ExerciseSection::Challenge < ExerciseSection
     "answer code-answer"
   end
 
+  def self.code_fields
+    %w[starter_code]
+  end
+
   def self.generation_guidance(vocabulary:, label:, **)
     <<~GUIDANCE.chomp
       - The challenge starter_code should give enough scaffold to get started without giving away the answer.

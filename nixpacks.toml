@@ -1,0 +1,11 @@
+# Node for CodeFormat::Javascript, which runs Prettier from vendor/prettier at
+# the generation boundary. Generation runs on the worker, but both services
+# build from this file, so both images carry Node. "..." keeps the Ruby
+# provider's own packages and install commands. The package.json lives under
+# vendor/ rather than at the root, so Nixpacks still detects a Ruby app and
+# adds no Node build phase of its own.
+[phases.setup]
+nixPkgs = ["...", "nodejs_22"]
+
+[phases.install]
+cmds = ["...", "npm --prefix vendor/prettier ci --omit=dev"]

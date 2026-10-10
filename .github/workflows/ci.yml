@@ -87,6 +87,11 @@ jobs:
       - name: Prepare test database
         run: bin/rails db:prepare
 
+      # CodeFormat's JavaScript specs run Prettier for real, through the same
+      # package the production build installs.
+      - name: Install Prettier
+        run: npm --prefix vendor/prettier ci
+
       - name: Run RSpec
         run: bundle exec rspec --exclude-pattern "system/**/*_spec.rb"
 
