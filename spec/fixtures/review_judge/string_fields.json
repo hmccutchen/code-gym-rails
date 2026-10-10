@@ -1,5 +1,5 @@
 { "kind": "code_review", "coach": "Rails", "expected": "edit",
-  "must_survive": ["the loop issues one query per row"],
+  "must_survive": ["the loop issues one query per row", "a performance problem, stated no more firmly than the original"],
   "review": {
     "correct": "You noticed the page was slow.",
     "missed": "Basically, at the end of the day, the loop is kind of running one query per row, which is essentially a performance thing.",
