@@ -13,9 +13,10 @@ All changes are made on a feature/dev branch, never directly on `main`. Create (
 ### Comment rules — never ignored
 
 These rules hold in every file, in every change, with no exceptions for a
-deadline or a "temporary" comment. RuboCop enforces the first three in Ruby
-files, so CI fails when one is broken there. Nothing checks ERB, JavaScript,
-CSS, YAML or Python comments mechanically yet; review holds them to the rules.
+deadline or a "temporary" comment. CI enforces the first three, so a
+broken one fails the build: RuboCop in Ruby files, and `bin/comment-check` in
+ERB (including its `<script>` and `<style>` blocks), JavaScript, CSS, YAML and
+Python. The cop names below are the Ruby side.
 
 - **Each comment is attached to the code it comments on.** It sits on the line
   directly above that code, or at the end of the same line. No blank line, no
@@ -34,8 +35,11 @@ CSS, YAML or Python comments mechanically yet; review holds them to the rules.
   it belongs in the documentation.
 - **Business decisions live in the documentation:** this file, or a doc under
   `docs/`. The reasoning behind one file's code lives in
-  `docs/code-notes/`, at the file's own path with `.md` in place of `.rb`
-  (`app/services/ai_service.rb` → `docs/code-notes/app/services/ai_service.md`).
+  `docs/code-notes/`, at the file's own path with `.md` in place of its last
+  extension (`app/services/ai_service.rb` →
+  `docs/code-notes/app/services/ai_service.md`;
+  `app/views/layouts/application.html.erb` →
+  `docs/code-notes/app/views/layouts/application.html.md`).
   A comment may point there in its one line.
 
 **Comments are extremely minimal.** Write one only for a non-obvious *why* — a
