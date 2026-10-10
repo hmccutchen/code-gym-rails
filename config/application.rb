@@ -30,7 +30,7 @@ module CodeGymRails
     # `boot` holds code that config/environments/*.rb requires directly.
     # Autoloading during Rails.application.configure raises, so that directory
     # must not be managed by Zeitwerk.
-    config.autoload_lib(ignore: %w[assets tasks boot])
+    config.autoload_lib(ignore: %w[assets tasks boot rubocop])
 
     # Configuration for the application, engines, and railties goes here.
     #
