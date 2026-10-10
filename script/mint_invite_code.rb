@@ -9,6 +9,8 @@ USAGE = <<~TEXT.freeze
   --label TEXT    a note for you; never shown to anyone
 TEXT
 
+require "optparse"
+
 options = {}
 OptionParser.new do |parser|
   parser.on("--seats N", Integer) { |n| options[:seats] = n }
