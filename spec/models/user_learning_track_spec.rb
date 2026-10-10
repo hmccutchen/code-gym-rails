@@ -88,8 +88,7 @@ RSpec.describe User, "learning track", type: :model do
       expect(user.learning_track_change_allowed?("none")).to be true
     end
 
-    # "none" is what the backfill already stored, so accepting it changes
-    # nothing; joining is what must stay closed.
+    # "none" is what the backfill stored, so accepting it changes nothing; joining must stay closed.
     it "refuses joining from a backfilled account and accepts its stored none as a no-op" do
       user = old_account
       expect(user.learning_track_change_allowed?("junior")).to be false
@@ -105,8 +104,7 @@ RSpec.describe User, "learning track", type: :model do
       expect(user.section_kind_levels).to eq(LearningTrack.preset_levels)
     end
 
-    # Setup's Leave control can outlive the track: a mix save that moves the
-    # last junior kind up ends it without re-rendering the control.
+    # A mix save that moves the last junior kind up ends the track without re-rendering Leave.
     it "accepts a repeat leave from a user already off the track" do
       user = on_track
       user.update!(learning_track: "none")

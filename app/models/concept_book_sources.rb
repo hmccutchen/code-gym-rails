@@ -1,40 +1,4 @@
-# Static, hand-curated reading pointers for concepts this app grades — the
-# single source of truth for the "Where this comes from" block on a Learn page.
-# Extend it by adding one line; nothing writes to this file automatically.
-#
-# Curated rather than generated, and NEVER sent to a provider. A generated
-# citation is a hallucinated citation, and a ConceptReference row is cached
-# forever, so a wrong one would never self-correct. That is also why the
-# citation lives here instead of in a concept_references column: the guarantee
-# is that no prompt can reach this data, not that a prompt is asked to behave.
-#
-# Three rules for an entry, none of which anything mechanical can enforce:
-#
-# - `pointer` names a term the book itself coined ("the Shotgun Surgery smell",
-#   "DRY", "Bounded Context"). Never a chapter number and never a page — a
-#   number recalled rather than checked is a fabrication that reads as
-#   authoritative. Where a book has no coined term for the idea, the field is
-#   omitted rather than invented: a source with no pointer costs a reader
-#   nothing, and a wrong one costs the whole store its credibility.
-#
-#   Only the no-digit half of that is machine-checkable, and the first draft of
-#   this file broke the rest of it twice over, so both failures are recorded
-#   here rather than left to be rediscovered. The first was writing a topic
-#   where a term was required ("clean tests", "shared state", "functions should
-#   do one thing") — the book covers it, but those are not its words for it.
-#   The second is subtler and is the one to watch for: attributing a term to
-#   the book that POPULARIZED it rather than the one that coined it. Design by
-#   contract and command-query separation are Meyer's, the Law of Demeter is
-#   Lieberherr's, the Anemic Domain Model is Fowler's — every one of those was
-#   briefly cited here to a book that merely discusses it. When in doubt about
-#   who coined a term, the pointer is omitted.
-# - Never a quotation or a close paraphrase. This is a pointer to go read the
-#   book, not a substitute for reading it.
-# - A concept's sources are listed origin-first, so the book that introduced
-#   the term precedes a book that merely also covers it.
-#
-# Values are ARRAYS from the first day rather than a single source promoted
-# later: shotgun_surgery carries two on day one.
+# Never sent to a provider; a pointer names a term the book coined, never a chapter or page. See CLAUDE.md.
 module ConceptBookSources
   APOSD      = { title: "A Philosophy of Software Design", author: "John Ousterhout" }.freeze
   CLEAN_CODE = { title: "Clean Code",                      author: "Robert C. Martin" }.freeze
@@ -174,14 +138,12 @@ module ConceptBookSources
     ]
   }.freeze
 
-  # [] rather than nil: every caller renders a list, and most concepts have no
-  # citation yet.
+  # [] rather than nil: every caller renders a list.
   def self.for(concept)
     SOURCES.fetch(concept.to_s, [])
   end
 
-  # The pointers are the only hand-written words here; titles and authors are
-  # the books' own.
+  # The pointers are the only hand-written words here; titles and authors are the books' own.
   def self.learn_text
     SOURCES.each_with_object({}) do |(concept, sources), texts|
       sources.each_with_index do |source, index|

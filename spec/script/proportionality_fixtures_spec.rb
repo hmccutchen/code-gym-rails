@@ -1,17 +1,13 @@
 require "rails_helper"
 require Rails.root.join("script/forced_concept_drafts")
 
-# The six judge fixtures for a design comparison concept that is not in any
-# vocabulary yet (docs/proportionality-concept-2026-10-07.md). They exist for
-# the judge comparison that has to run before the concept ships.
+# Fixtures for a concept in no vocabulary yet; see docs/proportionality-concept-2026-10-07.md.
 RSpec.describe "proportionality judge fixtures" do
   concept = "proportionality"
   kind    = ExerciseSection::DesignComparison
   paths   = Dir[Rails.root.join("spec/fixtures/judge/design_comparison_#{concept}_*.json")].sort
   fixtures = paths.to_h { |path| [ File.basename(path, ".json"), JSON.parse(File.read(path)) ] }
 
-  # The subjects the concept's brief rules out, and the groups design
-  # comparison already keeps out, by key and as a reader would write them.
   excluded_words = /\b(concurren\w*|race|races|racing|lock\w*|mutex\w*|threads?|atomic\w*|transactions?)\b/
   excluded_concepts = AiService::META_SKILL_CONCEPTS + AiService::SILENT_CORRECTNESS_CONCEPTS +
                       %w[concurrency transaction_safety idempotency]
@@ -77,9 +73,7 @@ RSpec.describe "proportionality judge fixtures" do
     end
   end
 
-  # The decision this PR records: the fixtures stand alone, and the concept
-  # joins no vocabulary, no hosting list and no prompt until the comparison
-  # has been read.
+  # The concept joins no vocabulary, hosting list or prompt until the judge comparison has been read.
   it "is in no vocabulary and no design comparison hosting list" do
     AiService::LANGUAGE_CONFIG.each_value { |config| expect(config[:concepts]).not_to include(concept) }
     expect(kind.hosted_concepts).not_to include(concept)

@@ -19,8 +19,7 @@ RSpec.describe PreviewEnvironment do
     expect(described_class.active?).to be(true)
   end
 
-  # The suite boots without it, which is what makes Task 4's callback-absence
-  # assertion meaningful.
+  # The suite boots without it, which makes the callback-absence assertion meaningful.
   it "is inactive by default in the test environment" do
     expect(ENV[described_class::VAR]).to be_nil
   end

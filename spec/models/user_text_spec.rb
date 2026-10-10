@@ -12,9 +12,7 @@ RSpec.describe UserText do
 
   describe ".normalize" do
     it "strips every bidi control, isolates included" do
-      # U+2066-U+2069 are the Trojan Source isolates; U+061C is the Arabic
-      # letter mark. All of them reorder the rendering and none of them changes
-      # what a model reads.
+      # U+2066-U+2069 are the Trojan Source isolates and U+061C the Arabic letter mark.
       hidden = "a\u2066\u2067\u2068\u2069\u061C\u202Eb"
 
       expect(described_class.normalize(hidden)).to eq("ab")
@@ -27,9 +25,7 @@ RSpec.describe UserText do
 
   describe ".tagged" do
     it "caps a value stored before the write boundary capped it" do
-      # Rows predate the caps, so the prompt read is the last place an
-      # over-long answer could still reach a provider whole.
-      # "a" rather than "x", which the tag name itself carries twice.
+      # Rows predate the caps, so the prompt read must cap too; "a" because the tag name contains "x".
       fenced = described_class.tagged("a" * (described_class::MAX_ANSWER_LENGTH + 500))
 
       expect(fenced.scan("a").size).to eq(described_class::MAX_ANSWER_LENGTH)
@@ -57,9 +53,7 @@ RSpec.describe UserText do
       expect(fenced).to start_with("<#{tag}>").and end_with("</#{tag}>")
     end
 
-    # Submitted work can be indentation-sensitive, and the grader has to read
-    # what the page shows. Stripping the first line's indentation changed a
-    # Python fragment's meaning before the grader ever saw it.
+    # Stripping the first line's indentation once changed a Python fragment's meaning before grading.
     it "keeps the indentation a submitted answer was stored with" do
       fenced = described_class.tagged("    if x:\n        return 1\n")
 

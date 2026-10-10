@@ -1,8 +1,7 @@
 require "rails_helper"
 
 RSpec.describe KindPreferences do
-  # A stand-in rather than a record: this object is deliberately built from
-  # plain values, and a spec that needed the database would hide that.
+  # A stand-in rather than a record: needing the database would hide that this is built from plain values.
   def stated(weights: {}, excluded: [])
     Struct.new(:section_kind_weights, :excluded_section_kinds).new(weights, excluded)
   end
@@ -27,10 +26,7 @@ RSpec.describe KindPreferences do
       expect(preferences.multiplier_for(parsons)).to eq(1.0)
     end
 
-    # Totality matters more than strictness here: a zero would make a kind
-    # unpickable below starvation, which is the failure mode this whole feature
-    # is built to avoid, and a negative would corrupt every other kind's share
-    # of the roll.
+    # A zero would make a kind unpickable and a negative would corrupt every other kind's share.
     it "falls back to the default for a value outside the stops" do
       [ 0, -1, 3.0, "0.5", nil ].each do |junk|
         preferences = described_class.new(weights: { "challenge" => junk }, excluded: [])
@@ -71,9 +67,7 @@ RSpec.describe KindPreferences do
     end
   end
 
-  # The signature is the guarantee that a curation preference can never become a
-  # readout of mastery: this object is handed stated preference and nothing
-  # else, so tier state is not merely unused here — it is unreachable.
+  # The signature keeps tier state unreachable, so a preference can never become a mastery readout.
   it "is constructed from stated preference alone" do
     expect(described_class.instance_method(:initialize).parameters)
       .to eq([ [ :keyreq, :weights ], [ :keyreq, :excluded ] ])

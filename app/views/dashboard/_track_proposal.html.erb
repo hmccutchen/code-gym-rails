@@ -49,8 +49,7 @@
       apply.disabled = busy || listed().length === 0;
     };
 
-    // The buttons that had focus are gone, so the confirmation takes it and
-    // a screen reader reads it out.
+    // The buttons that had focus are gone, so the confirmation takes it and a screen reader reads it out.
     const settle = (text, ...extra) => {
       const line = document.createElement("p");
       line.setAttribute("role", "status");
@@ -60,9 +59,7 @@
       line.focus();
     };
 
-    // A save still running at the limit is not reloaded over, but the page
-    // must not stay stuck on a proposal the server refused: the reload
-    // becomes the user's call.
+    // A hung save is not reloaded over, but a refused proposal must not stay stuck: the reload becomes the user's call.
     const stranded = () => {
       const reload = document.createElement("button");
       reload.type = "button";
@@ -72,8 +69,7 @@
       settle(box.dataset.strandedText, reload);
     };
 
-    // Only a conflict reloads, after other saves finish; a hung save must
-    // never cost an edit by forcing a reload at the time limit.
+    // Only a conflict reloads, after other saves finish; a hung save must never cost an edit to a forced reload.
     const reloadWhenSaved = (waited = 0) => {
       if (!window.CodeGymSaveStatus.pending()) return window.location.reload();
       if (waited >= SAVE_WAIT_LIMIT_MS) return stranded();

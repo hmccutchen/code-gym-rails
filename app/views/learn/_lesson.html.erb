@@ -1,6 +1,4 @@
-<%# Required locals: lesson (Hash, as ConceptLesson.from_provider stored it).
-    Sections render in ConceptLesson::SECTIONS order; a missing one renders
-    nothing. %>
+<%# Required locals: lesson (Hash, as ConceptLesson.from_provider stored it). %>
 <div class="learn-lesson">
   <% ConceptLesson::SECTIONS.each do |key| %>
     <% value = lesson[key] %>

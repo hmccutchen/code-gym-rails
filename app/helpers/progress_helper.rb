@@ -1,9 +1,7 @@
 module ProgressHelper
   DEVELOPING = "developing_".freeze
 
-  # Every standing the page can show, highest first: each rung, then
-  # developing toward it, down to developing toward the lowest; then the two
-  # non-rung states. The one order the bars and the counts share.
+  # The one order the bars and the counts share.
   STANDINGS = (KindDifficulty::LEVELS.reverse.flat_map { |rung| [ rung, :"#{DEVELOPING}#{rung}" ] } + %i[not_yet not_offered]).freeze
 
   # The legend states developing once, for every rung.

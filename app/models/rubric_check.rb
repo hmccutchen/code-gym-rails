@@ -1,7 +1,4 @@
-# Whether a graded review's rating agrees with the gaps it calls essential,
-# under AiService::RATING_RUBRIC: solid and strong list none, beginner and
-# developing list at least one. Log-only — nothing rewrites a rating from this —
-# so its job is to measure how often the grader follows the rubric. Pure.
+# Log-only: nothing rewrites a rating from this.
 class RubricCheck
   GAP_FREE_RATINGS = DailyResponse::AI_RATING_FAVORABLE
   GAPPED_RATINGS   = DailyResponse::AI_RATING_UNFAVORABLE
@@ -12,8 +9,7 @@ class RubricCheck
     @raw          = review["essential_gaps"]
   end
 
-  # Sorted, distinct positions in "missed", or nil when the grader's list
-  # cannot be read as positions in this review's missed list.
+  # Nil when the grader's list can't be read as positions in this review's missed list.
   def essential_gaps
     return @essential_gaps if defined?(@essential_gaps)
 
@@ -35,9 +31,7 @@ class RubricCheck
 
   private
 
-  # Counted as the grader returned it, blanks included, since its positions
-  # number that list and that list is what is stored. An older review's single
-  # string is one entry.
+  # Blanks are counted, since the grader's positions number the list as stored.
   def missed_entries(missed)
     case missed
     when Array  then missed.size

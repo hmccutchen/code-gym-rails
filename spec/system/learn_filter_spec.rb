@@ -1,9 +1,6 @@
 require "rails_helper"
 
-# The filter script matches against dataset attributes a request spec never
-# executes, so the mismatch between the humanized label people actually see
-# and the raw key alone in data-concept survived to manual review. This pins
-# the visible behavior: typing what is on the screen has to narrow the list.
+# The filter matches a rendered attribute request specs never execute; typing the visible label must narrow the list.
 RSpec.describe "Learn tab filter", type: :system do
   def seeded_reference(concept:, language: "ruby_rails")
     ConceptReference.create!(

@@ -1,9 +1,7 @@
 require "rails_helper"
 require Rails.root.join("script/gemini_capacity_probe")
 
-# Drives the probe against a stubbed Gemini that answers every production
-# prompt the way FakeService does, so a whole tester-day runs through the
-# real entry points, then refuses with a stored 429 body.
+# Answers every production prompt as FakeService does, then refuses with a stored 429 body.
 RSpec.describe GeminiCapacityProbe, type: :model do
   let(:user) { create_user_with_key(time_zone: "America/New_York").tap { |u| u.update!(provider: "gemini", api_keys: { "gemini" => "AIzaProbe" }) } }
   let(:out) { StringIO.new }
@@ -24,8 +22,6 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     Rails.root.join("spec/fixtures/provider_errors/gemini_429_daily.json").read
   end
 
-  # Each request is answered with FakeService's canned reply for the prompt
-  # it carries, until the refusal point.
   def stubs
     fake = FakeService.new("fake")
     Faraday::Adapter::Test::Stubs.new do |stub|
@@ -63,9 +59,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     expect(out.string).to include("Tokens per completed tester-day: {1=>1700}").and include("Largest single request: 120 input tokens")
   end
 
-  # The review sends its three calls together, so pacing once per step would
-  # land six requests in one rolling minute; the waits around a fan-out keep
-  # every minute under a 5 RPM limit.
+  # The review sends three calls at once, so pacing must wait around fan-outs to stay under 5 RPM.
   it "keeps every rolling minute within five requests at the default pace" do
     records = probe(max_days: 1).run
 
@@ -134,8 +128,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     expect(out.string).to include("Stopped before any 429: Gemini refused the key.")
   end
 
-  # With no day limit, a key that can never reach a quota would otherwise be
-  # retried forever.
+  # With no day limit, a key that can never reach a quota would be retried forever.
   it "stops at once when the key is refused outside a fan-out" do
     refusing = Faraday::Adapter::Test::Stubs.new do |stub|
       stub.post(GeminiService::API_URL) { |env| posted << env.body; [ 400, {}, key_invalid_body ] }

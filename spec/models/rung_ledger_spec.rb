@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# Pure over response objects: every example builds rows in memory and never
-# touches the database, so the holding rule is tested on its own.
+# Pure over response objects: examples build rows in memory and never touch the database.
 RSpec.describe RungLedger do
   include ActiveSupport::Testing::TimeHelpers
 
@@ -102,8 +101,7 @@ RSpec.describe RungLedger do
     expect(none.held("n_plus_one", "ruby_rails")).to be_nil
   end
 
-  # record_review! judges a concept by its least favourable section that day
-  # and needs every self-rating favourable; a rung is held on the same terms.
+  # A rung is held on record_review!'s terms: the least favourable section that day decides.
   it "judges a concept tagged on two sections of one day by the least favourable section" do
     split = ledger(response_on(Date.current, sections: {
       "code_review" => { concept: "n_plus_one", rung: "senior" },
@@ -113,8 +111,7 @@ RSpec.describe RungLedger do
     expect(split.held("n_plus_one", "ruby_rails")).to be_nil
   end
 
-  # A review that stored no rating is no signal, as record_review! treats it,
-  # not an unfavourable one; it neither holds nor releases.
+  # A review with no rating is no signal, as in record_review!; it neither holds nor releases.
   it "treats a reviewed section with no rating as no attempt, leaving an earlier verdict standing" do
     unrated = ledger(
       response_on(Date.current,     sections: { "code_review" => { concept: "n_plus_one", rung: "senior", ai: nil } }),

@@ -1,9 +1,4 @@
-# Static, hand-curated glossary of programming terms — the single source of
-# truth for GlossaryHelper's auto-hover term wrapping across every section's
-# rendered text. Drafted once with AI assistance, then hand-reviewed; nothing
-# touches this file automatically again. Extend it by adding one line — keys
-# must already be lowercase, since .lookup only downcases and strips its
-# INPUT, never the stored keys.
+# Hand-curated; keys must already be lowercase, since .lookup downcases only its input.
 module Glossary
   TERMS = {
     "abstraction" => "Hiding the messy details behind a simpler interface so callers only need to know what something does, not how.",
@@ -215,18 +210,7 @@ module Glossary
     TERMS.transform_keys { |term| "glossary:#{term}" }
   end
 
-  # One compiled alternation over every curated term, built once at load time
-  # rather than looping GlossaryHelper's word-boundary match per term per
-  # render (~170 terms × every text field on every section, on every page
-  # load — history alone renders up to 10 days' worth). Longest-key-first
-  # ordering makes the alternation itself resolve overlapping terms (e.g.
-  # "array mutation" vs. "array mutation pitfalls") in favor of the longer
-  # match: at a given start position, regex alternation tries each branch in
-  # the order listed and takes the first that matches, so a shorter term
-  # listed first would win even where a longer one also fits. Each term
-  # keeps its own \b...\b/i sub-pattern (matching GlossaryHelper's prior
-  # per-term behavior) rather than one shared /i flag, since Regexp.union
-  # preserves each argument's own compiled options.
+  # Longest term first, so the alternation prefers the longer of two overlapping terms at the same position.
   TERM_PATTERN = Regexp.union(
     TERMS.keys.sort_by { |term| -term.length }.map { |term| /\b#{Regexp.escape(term)}\b/i }
   )

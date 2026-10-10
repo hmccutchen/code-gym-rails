@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# The hint is gated on an attempt. A disclosure dimmed with CSS still opened
-# from the keyboard, so this drives the keys a keyboard user would press.
+# A CSS-dimmed disclosure still opened from the keyboard, so this drives the keys a keyboard user presses.
 RSpec.describe "Locked teaching hint", type: :system do
   let(:user) { create_fake_provider_user }
 
@@ -9,8 +8,7 @@ RSpec.describe "Locked teaching hint", type: :system do
     find('.hint-slot[data-hint-for="code_review"]')
   end
 
-  # Focuses the last focusable element before the hint, so the next Tab lands
-  # wherever the hint sits in the tab order.
+  # Focus the element before the hint, so the next Tab lands wherever the hint sits in the tab order.
   def focus_just_before_hint
     page.execute_script(<<~JS)
       const slot = document.querySelector('.hint-slot[data-hint-for="code_review"]');

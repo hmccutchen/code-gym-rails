@@ -1,17 +1,8 @@
-# One generated piece per recognition group on how to look for that kind of
-# problem, cached once for the whole team the way ConceptReference is. It
-# teaches a process for recognizing a category, never an answer, so it is shown
-# to everyone with no exposure gating (see AiService::RECOGNITION_GUIDE_SCOPE).
-#
-# A recognition group is a named ConceptGroup or a language-independent bucket,
-# whose concepts render as one flat list and so already form a single group. A
-# language bucket's core group has no shared identity to teach and gets none.
+# Teaches a process, never an answer, so it shows with no exposure gating (see AiService::RECOGNITION_GUIDE_SCOPE).
 class RecognitionGuide < ApplicationRecord
   GROUP_KEYS = (ConceptGroup::NAMED.map(&:first) + ConceptBucket::LANGUAGE_INDEPENDENT).freeze
 
-  # What each named group is about, for the prompt. A language-independent
-  # bucket already states this as its LANGUAGE_CONFIG focus, so it is read from
-  # there rather than written twice.
+  # Language-independent buckets state their subject as their LANGUAGE_CONFIG focus, so they aren't repeated here.
   NAMED_GROUP_SUBJECTS = {
     "data_modeling"      => "flaws in how data is structured and stored: tables, keys, constraints, indexes, and the migrations that change them.",
     "domain_modeling"    => "whether the model's names match the words the business uses, and which things must change together behind one entry point.",
@@ -22,8 +13,7 @@ class RecognitionGuide < ApplicationRecord
     "module_design"      => "what a module's interface costs every caller, compared with how much the module hides."
   }.freeze
 
-  # The meta-skill concepts are already process concepts, so a generic "how to
-  # recognize this category" piece would repeat their own references.
+  # Meta-skill concepts are already process concepts, so a generic recognition piece would repeat their references.
   FRAMINGS = {
     "meta_skill" => "These concepts are reasoning skills the app tracks one by one, not kinds of defect. " \
                     "Frame this piece as the one habit they exercise together, reading code carefully before " \
@@ -31,12 +21,10 @@ class RecognitionGuide < ApplicationRecord
   }.freeze
 
   validates :group_key, presence: true, uniqueness: true, inclusion: { in: GROUP_KEYS }
-  # A row's existence is what stops the backfill retrying, so a partial one
-  # would sit blank forever.
+  # A row's existence stops the backfill retrying, so a partial one would stay blank forever.
   validates(*AiService::RECOGNITION_GUIDE_FIELDS, presence: true)
 
-  # The guide shown above a group block on the Learn index, or nil for a block
-  # that has none.
+  # Nil for a block with no guide.
   def self.key_for(bucket, group)
     key = group == ConceptGroup::CORE ? bucket : group
     key if GROUP_KEYS.include?(key)

@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# A real GeminiService behind a canned HTTP reply, so the status reading in
-# GeminiService and the shared truncation handling in AiService run together.
+# A real GeminiService behind a canned reply, so its status reading and AiService's truncation run together.
 RSpec.describe "Gemini truncation through AiService" do
   include AuthHelpers
 

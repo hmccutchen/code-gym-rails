@@ -19,9 +19,7 @@ RSpec.describe ConceptBucket do
       expect(described_class.for("challenge", "ruby_rails")).to eq("ruby_rails")
     end
 
-    # A concept tagged on several sections the same day is one exposure, and it
-    # belongs to the architecture bucket if any of those sections is the
-    # architecture one — see ConceptMastery.record_review!.
+    # One concept on several sections is one exposure; see ConceptMastery.record_review!.
     it "takes the architecture bucket when any section in a list is architecture" do
       expect(described_class.for(%w[code_review architecture], "javascript")).to eq("architecture")
       expect(described_class.for(%w[architecture pattern], "ruby_rails")).to eq("architecture")
@@ -31,9 +29,7 @@ RSpec.describe ConceptBucket do
       expect(described_class.for(%w[code_review pattern], "javascript")).to eq("javascript")
     end
 
-    # User#concepts_needing_reinforcement reads the language off a response's
-    # exercise with `&.`, so a response whose exercise is missing yields no
-    # bucket rather than raising.
+    # User#concepts_needing_reinforcement reads the language with `&.`, so nil must not raise.
     it "passes a nil language through as a nil bucket" do
       expect(described_class.for("code_review", nil)).to be_nil
     end
@@ -61,10 +57,7 @@ RSpec.describe ConceptBucket do
       expect(described_class.for("ambiguity_hunt", nil)).to eq("ambiguity_hunt")
     end
 
-    # Pins design question 1: these concepts are language-independent in
-    # meaning, but ConceptBucket dispatches on section key and never on
-    # concept, so a bucket of their own would require a section kind — which
-    # this deliberately is not. Per-language mastery is the accepted cost.
+    # A bucket of a concept's own would need a section kind; per-language mastery is the accepted cost.
     it "buckets on section key alone, so no concept can claim a bucket of its own" do
       expect(described_class.for("code_review", "ruby_rails")).to eq("ruby_rails")
       expect(described_class.for("pattern", "javascript")).to eq("javascript")
@@ -81,10 +74,7 @@ RSpec.describe ConceptBucket do
       expect(described_class.vocabulary_for("pseudocode_to_code")).to eq(AiService::PSEUDOCODE_TO_CODE_CONCEPTS)
     end
 
-    # Every bucket .for can return is a LANGUAGE_CONFIG key, so a miss here is a
-    # bucket that escaped that mapping. Raise rather than hand back an empty
-    # list, which would silently filter every concept out of a retention query
-    # and read as "nothing is due" instead of as a bug.
+    # An empty list would silently read as "nothing is due" in a retention query.
     it "raises for a bucket with no vocabulary rather than returning nothing" do
       expect { described_class.vocabulary_for("not_a_bucket") }.to raise_error(KeyError)
     end

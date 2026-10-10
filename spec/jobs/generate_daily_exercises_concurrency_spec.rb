@@ -16,8 +16,7 @@ RSpec.describe GenerateDailyExercisesJob do
     expect { enqueue(user_id: 2) }.to change(SolidQueue::Job, :count).by(1)
   end
 
-  # A permit shorter than the judged generation would let a second billed
-  # generation start while the first is still running.
+  # A permit shorter than judged generation would let a second billed generation start.
   it "holds the permit for the judged generation budget and recovers an abandoned expired permit" do
     job = described_class.new(user_id: 1)
     expect(described_class.concurrency_duration).to be >= AiService::JUDGED_GENERATION_BUDGET.seconds

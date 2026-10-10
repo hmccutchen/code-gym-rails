@@ -1,8 +1,4 @@
-# GET /trial/start, POST /trial/start — a trial for someone signed out: their
-# email, an invite code and a provider. The emailed login code proves the
-# address, and the trial takes its seat once it is entered.
-#
-# GET /trial, POST /trial — the same for a signed-in account with no key.
+# /trial/start serves a signed-out visitor; /trial serves a signed-in account with no key.
 class TrialsController < ApplicationController
   include LoginCodeRequests
 
@@ -22,12 +18,14 @@ class TrialsController < ApplicationController
              with: -> { redemption_limited },
              store: RATE_LIMIT_STORE, name: "redemptions_by_ip", only: %i[create start]
 
+  # GET /trial/start
   def new
     return redirect_to trial_path if logged_in?
 
     @providers = TrialMode.providers
   end
 
+  # POST /trial/start
   def start
     return redirect_to trial_path if logged_in?
 
@@ -44,10 +42,7 @@ class TrialsController < ApplicationController
     refuse_start(t("sessions.email_not_accepted"))
   end
 
-  # GET /trial — the form, or the trial's standing for an account on one. A
-  # first-run account answers the experience question first, as on Setup;
-  # an account with a key of its own has nothing to see here. The first-run
-  # hop keeps the flash, since a trial refused at sign-in lands here first.
+  # GET /trial — the first-run hop keeps the flash, since a trial refused at sign-in lands here first.
   def show
     return redirect_to new_trial_path unless logged_in?
     return redirect_to(welcome_path).tap { flash.keep } if current_user.first_run?
@@ -56,6 +51,7 @@ class TrialsController < ApplicationController
     @status = TrialStatus.for(current_user) if current_user.on_trial?
   end
 
+  # POST /trial
   def create
     return redirect_to setup_path, alert: t("trials.has_own_key") if current_user.api_key_present?
     return redirect_to trial_path, alert: t("trials.consent_needed") unless params[:consent] == "1"

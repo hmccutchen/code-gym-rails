@@ -1,9 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ConceptBookSources do
-  # Every vocabulary a concept can be tagged from. A citation keyed on
-  # anything else is stranded — it can never render, because no Learn page
-  # will ever ask for that concept.
+  # A citation keyed on a concept outside these vocabularies can never render.
   TRACKED_CONCEPTS = (
     AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS +
     AiService::PLAN_REVIEW_CONCEPTS + AiService::AMBIGUITY_HUNT_CONCEPTS +
@@ -28,15 +26,11 @@ RSpec.describe ConceptBookSources do
     end
   end
 
-  # A concept renamed or dropped leaves its citation behind, and nothing else
-  # would notice: the Learn page simply stops asking for that key.
+  # A renamed or dropped concept strands its citation silently; the Learn page just stops asking.
   it "keys every entry on a concept that exists in a tracked vocabulary" do
     expect(described_class::SOURCES.keys - TRACKED_CONCEPTS).to be_empty
   end
 
-  # Pins the shape rather than the contents. The store was array-valued from
-  # its first commit precisely so a second book is a line rather than a
-  # migration, and shotgun_surgery needed two on day one.
   it "holds an array of sources for every concept, never a bare source" do
     expect(described_class::SOURCES.values).to all(be_an(Array))
     expect(described_class::SOURCES.values).to all(be_present)
@@ -59,9 +53,7 @@ RSpec.describe ConceptBookSources do
     end
   end
 
-  # A pointer names a term the book itself coined. A chapter or page number
-  # recalled rather than checked is a fabrication that reads as authoritative,
-  # and this is the only half of that rule a machine can check.
+  # A recalled chapter or page number is a fabrication that reads as authoritative.
   it "cites no chapter or page number" do
     numbered = described_class::SOURCES.select do |_concept, sources|
       sources.any? { |source| source[:pointer].to_s.match?(/\d/) }
@@ -75,10 +67,6 @@ RSpec.describe ConceptBookSources do
     expect(described_class.for("aggregate_boundaries")).to be_present
   end
 
-  # THE structural guarantee this store exists to provide. A generated
-  # citation is a hallucinated citation, and a ConceptReference row is cached
-  # forever — so no prompt may carry this data at all, rather than being asked
-  # to handle it correctly.
   it "never reaches a provider prompt" do
     double_class = Class.new(AiService) do
       private def build_connection = nil
@@ -86,10 +74,7 @@ RSpec.describe ConceptBookSources do
     service = double_class.new("key")
     titles  = described_class::SOURCES.values.flatten.map { |source| source[:title] }.uniq
 
-    # Every vocabulary, not just the Rails one: SOURCES also keys architecture,
-    # plan-review, ambiguity-hunt and pseudocode concepts, and a leak reached
-    # through any of their configs would be the same leak. Derived from
-    # LANGUAGE_CONFIG so a seventh bucket is covered without editing this.
+    # Derived from LANGUAGE_CONFIG so a new bucket is covered without editing this.
     AiService::LANGUAGE_CONFIG.each do |language, config|
       described_class::SOURCES.each_key do |concept|
         next unless config[:concepts].include?(concept)
@@ -104,10 +89,7 @@ RSpec.describe ConceptBookSources do
     end
   end
 
-  # What makes the loop above provably exhaustive rather than merely wide: a
-  # citation keyed on a concept no vocabulary holds would be skipped by every
-  # iteration and silently pass. Subsumes the tracked-vocabulary check above,
-  # and states the stronger property.
+  # Makes the loop above exhaustive: a key no vocabulary holds would skip every iteration and pass.
   it "keys every entry on a concept some LANGUAGE_CONFIG vocabulary holds" do
     covered = AiService::LANGUAGE_CONFIG.values.flat_map { |config| config[:concepts] }.uniq
 

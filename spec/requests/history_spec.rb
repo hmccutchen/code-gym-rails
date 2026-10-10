@@ -13,7 +13,6 @@ RSpec.describe "History", type: :request do
       },
       generated_at: Time.current
     )
-    # If a rating is provided and section_ratings is not explicitly set, use the rating for all sections
     final_section_ratings = if section_ratings.present?
       section_ratings
     elsif rating.present? || legacy_rating.present?
@@ -197,9 +196,7 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # Architecture's diagram is collapsible: false (it already lives inside
-      # its own "Reference — tradeoffs" <details class="ref">), so it must
-      # NOT get its own nested disclosure — only the outer one.
+      # Architecture's diagram already sits inside its tradeoffs <details>, so it gets no nested disclosure.
       expect(response.body.scan('<details class="ref">').size).to eq(1)
       expect(response.body).not_to include("🗺️ Structure diagram")
       expect(response.body).to include("mermaid-diagram")
@@ -207,12 +204,7 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("cdn.jsdelivr.net")
       expect(response.body).to match(/securityLevel:\s*["']strict["']/)
 
-      # collapsible: false means this partial did not create the enclosing
-      # <details> (that's architecture's own pre-existing tradeoffs box), so
-      # the div itself must carry no data-owns-details attribute — a failed
-      # parse/render must remove only the .mermaid-diagram div, never that
-      # outer, unrelated box. Scoped to the div's own tag, since the shared
-      # module script's comments legitimately mention the attribute by name.
+      # Without data-owns-details, a failed render removes only the diagram div; the module script names the attribute.
       diagram_div = response.body[/<div class="mermaid-diagram"[^>]*>/]
       expect(diagram_div).to be_present
       expect(diagram_div).not_to include("data-owns-details")
@@ -223,10 +215,7 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # The .mermaid-diagram CSS rule itself is global (defined once in the
-      # layout's <style> block, like every other section style), so it is
-      # present on every page regardless of content. What must NOT appear is
-      # an actual container element or the mermaid script.
+      # The .mermaid-diagram CSS rule is global, so assert on the container and the script instead.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
       expect(response.body).not_to include("mermaid@11.17.2")
     end
@@ -236,27 +225,19 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # The .mermaid-diagram CSS rule itself is global (defined once in the
-      # layout's <style> block, like every other section style), so it is
-      # present on every page regardless of content. What must NOT appear is
-      # an actual container element or the mermaid script.
       expect(response.body).not_to include('<div class="mermaid-diagram"')
       expect(response.body).not_to include("mermaid@11.17.2")
     end
 
     it "emits the ai_review script and the mermaid module exactly once across multiple entries" do
-      # shared/_ai_review renders once per reviewed entry, and
-      # shared/_mermaid_diagram's module renders once per architecture
-      # section with a diagram — both would otherwise ship one
-      # duplicate ~4-5 KB script per entry. Verifies they're deduped into the
-      # layout's shared :page_scripts region instead.
+      # Both scripts would otherwise ship once per entry; they must dedupe into :page_scripts.
       3.times { |i| create_session_for(user, date: (i + 5).days.ago.to_date, reviewed: true) }
       architecture_session(diagram: "flowchart TD\n  A[Client] --> B[API]")
 
       login_as(user)
       get history_path
 
-      expect(response.body.scan("This script is emitted once").size).to eq(1)
+      expect(response.body.scan("const FOLLOW_UP_FAILED").size).to eq(1)
       expect(response.body.scan("mermaid@11.17.2").size).to eq(1)
     end
 
@@ -283,9 +264,6 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("pattern_improved_marker")
     end
 
-    # A revised implementation plan is prose. Sending it through the shared
-    # code renderer syntax-highlights English as Ruby and labels it "Improved
-    # code" — see ExerciseSection::PlanReview.improved_code_prose?.
     it "renders plan_review's improved_code as a labelled prose plan, not highlighted source" do
       exercise = DailyExercise.create!(
         user: user, date: 1.day.ago.to_date, generated_at: Time.current, language: "ruby_rails",
@@ -316,8 +294,8 @@ RSpec.describe "History", type: :request do
       other = create_user_with_key(email: "other@example.com", name: "Other")
       old   = create_session_for(user, date: 3.days.ago.to_date, reviewed: true, section_ratings: {}, legacy_rating: "too_hard")
       newer = create_session_for(user, date: 1.day.ago.to_date)
-      create_session_for(user, date: Date.current, submitted: false)   # draft — excluded
-      create_session_for(other, date: 2.days.ago.to_date)              # other user — excluded
+      create_session_for(user, date: Date.current, submitted: false)
+      create_session_for(other, date: 2.days.ago.to_date)
 
       login_as(user)
       get history_path
@@ -371,9 +349,6 @@ RSpec.describe "History", type: :request do
       expect(response.body).not_to include('<details class="ref" open>')
     end
 
-    # One reference can render several times on this page. The script keys the
-    # framings it has been shown by reference id rather than by container so
-    # the cap holds across every copy — these are the copies.
     it "gives every copy of one reference the same reference id to share a cap by" do
       reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                                            tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
@@ -421,7 +396,6 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # Two entries, no open problems block, exactly one open review — the first.
       expect(response.body.scan(/<details class="answers" open>/).size).to eq(0)
       expect(response.body.scan(/<details class="answers">/).size).to eq(2)
       expect(response.body.scan(/<details class="review" open>/).size).to eq(1)
@@ -442,7 +416,6 @@ RSpec.describe "History", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("only-section")
-      # The malformed row must not take the rest of the page down with it.
       expect(response.body).to include("q-#{intact.date}")
     end
 
@@ -487,9 +460,6 @@ RSpec.describe "History", type: :request do
       login_as(user)
       get history_path
 
-      # create_session_for's challenge section has no starter_code, so the only
-      # two code blocks on this page are the code_review snippet
-      # (responses/_answered_sections) and improved_code (shared/_ai_review).
       blocks = Nokogiri::HTML(response.body).css("code.highlight")
       expect(blocks.size).to eq(2)
       improved = blocks.find { |block| code_block_text(block) == "User.includes(:posts)" }
@@ -549,7 +519,6 @@ RSpec.describe "History", type: :request do
 
     it "highlights a reviewed session with no improved_code in any section and still emits the script" do
       session = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
-      # Update to ensure NO improved_code in any section
       session.update!(ai_review: { "code_review" => { "rating" => "solid", "correct" => "Good job" } })
 
       login_as(user)
@@ -581,10 +550,7 @@ RSpec.describe "History", type: :request do
 
       get history_path
 
-      # The layout's own mobile rule also renders here, so matching the
-      # breakpoint alone would pass even with this page's block deleted. Both
-      # declarations are pinned to their selectors: the entry breaks out, and
-      # the nested cards are reset so they don't break out a second time.
+      # The layout's own mobile rule renders here too, so both declarations are pinned to their selectors.
       expect(response.body).to match(/@media \(max-width: 600px\) \{\s*\.history-entry \{[^}]*margin-inline: -1\.5rem;/)
       expect(response.body).to match(/\.history-entry \.section \{[^}]*margin-inline: 0;/)
     end

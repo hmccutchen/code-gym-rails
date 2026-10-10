@@ -31,12 +31,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     %w[scenario question teaching_note]
   end
 
-  # The only kind with a content mode. `artifact` is the day's language-
-  # specific schema artifact and `test_framework` its test-framework steer
-  # (both from AiService::LANGUAGE_CONFIG); each is read only on the matching
-  # mode. `source` is the RealSource excerpt today's snippet is grounded in,
-  # when there is one: its own instruction replaces the mode's toy line,
-  # since a grounded snippet is still that mode, just with its material given.
+  # A RealSource excerpt's own instruction replaces the mode's toy line.
   def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, **)
     <<~GUIDANCE.chomp
       #{source ? source.instruction : content_instruction(label, mode, artifact, test_framework)}
@@ -56,11 +51,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
   private_class_method :content_instruction
 
-  # `label:` stays part of the contract even though the snippet description no
-  # longer restates it here — the instruction line above is the one place a
-  # mode's snippet language is authoritative, and duplicating it here is what
-  # broke on the JS schema-review day (a Prisma schema described as "JavaScript
-  # code").
+  # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
   def self.schema_fragment(label:)
     <<~SCHEMA.chomp
       "code_review": {

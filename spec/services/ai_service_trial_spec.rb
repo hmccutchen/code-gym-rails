@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# How a trial account's calls differ from an own-key account's: the key they
-# carry, the row they write, and the gate they pass first. Nothing in the
-# request itself changes; trial_isolation_spec holds that.
+# The request itself is unchanged on a trial; trial_isolation_spec holds that.
 RSpec.describe "AiService on a trial", type: :model do
   let(:user) { create_trial_user(provider: "fake", cap: 2) }
 

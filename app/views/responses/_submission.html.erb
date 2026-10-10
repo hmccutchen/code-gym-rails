@@ -1,10 +1,4 @@
-<%# Submitted badge, the day's self-rating, the review trigger, the AI review,
-    and the email button. Rendered by the dashboard's submitted state only —
-    the history page renders responses/_answered_sections plus its own review
-    disclosure, never this partial. A submit fires the review itself (see
-    dashboard/_exercise.html.erb), so this button is what remains when that
-    attempt didn't complete: a failure, or a day left part-reviewed.
-    Local: response. %>
+<%# Local: response. Rendered only by the dashboard submitted state; history never renders it. %>
 <div class="submit-row">
   <span class="submitted-badge"><%= t("responses.submission.submitted") %></span>
   <% response.section_ratings.each do |section, value| %>
@@ -31,19 +25,8 @@
   </div>
 <% end %>
 
+<%# Design notes: docs/code-notes/app/views/responses/_submission.html.md %>
 <script>
-// The review call is synchronous — the request blocks for as long as the
-// provider takes. Disable the button and swap its label so the wait reads as
-// progress rather than a dead click. This partial renders once per page today,
-// but the querySelectorAll + :not([data-review-wired]) guard stays: Turbo
-// re-executes this inline script whenever it replaces #dashboard-content on a
-// broadcast, and the guard stops a form that's already wired from being wired
-// (and its listeners duplicated) again. Inline script, matching the gym-form
-// convention; Stimulus is not wired in this app.
-//
-// button_to (with Rails 8's button_to_generates_button_tag default) renders a
-// <button type="submit">, not an <input type="submit"> — the two need
-// different properties for their label, so read/write whichever is present.
 (() => {
   document.querySelectorAll("form.review-form:not([data-review-wired])").forEach(form => {
     form.dataset.reviewWired = "1";
@@ -51,13 +34,13 @@
     const button = form.querySelector('button[type="submit"], input[type="submit"]');
     if (!button) return;
 
+    // button_to renders a <button>, not an <input>, and the two keep their label in different properties.
     const isButtonTag = button.tagName === "BUTTON";
     const originalLabel = isButtonTag ? button.textContent : button.value;
     const setLabel = (text) => { if (isButtonTag) { button.textContent = text; } else { button.value = text; } };
 
     form.addEventListener("submit", () => {
-      // Deferred a tick: disabling synchronously inside the submit handler can
-      // cancel the submission in some browsers.
+      // Disabling synchronously inside the submit handler can cancel the submission in some browsers.
       setTimeout(() => {
         button.disabled = true;
         button.classList.add("btn-loading");
@@ -65,11 +48,7 @@
       }, 0);
     });
 
-    // Every exit from #review redirects to root_path. If the user then
-    // navigates Back, some browsers restore the page from bfcache exactly as
-    // it was — button disabled, label swapped, data-review-wired already set —
-    // and this script does not run again on its own, leaving the button dead
-    // until a manual reload. Reset it on a bfcache restore.
+    // A Back navigation can restore this page from bfcache with the button still disabled; reset it.
     window.addEventListener("pageshow", (event) => {
       if (!event.persisted) return;
       button.disabled = false;

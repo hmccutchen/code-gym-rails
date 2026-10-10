@@ -1,16 +1,9 @@
-# RuboCop's Layout cops only, which move whitespace and nothing else, so a
-# planted defect survives formatting token for token. RuboCop's own defaults
-# rather than the repository's .rubocop.yml, whose omakase gem is a
-# development dependency. Two cops are left out. Layout/LineLength would split
-# long lines, a choice about the code rather than its indentation, and
-# Layout/HashAlignment would undo a hash lined up as a table, which
-# CodeHighlight already keeps readable on a narrow screen.
+# Layout cops only, so a planted defect survives formatting token for token.
 module CodeFormat
   module Ruby
     EXCLUDED_COPS = %w[Layout/LineLength Layout/HashAlignment].freeze
 
-    # RuboCop keeps configuration and registry state in globals, and the judge
-    # fans retries out across threads, so one snippet is formatted at a time.
+    # RuboCop keeps config and registry state in globals, and the judge fans out across threads.
     LOCK = Mutex.new
 
     # The formatted code for each snippet, or nil where it does not parse.

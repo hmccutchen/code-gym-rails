@@ -5,49 +5,28 @@ class DailyExercisesController < ApplicationController
              with: -> { redirect_to root_path, alert: t("flash.daily_exercises.generate_limited") },
              store: LazyCacheStore.new, name: "generate", only: :generate, unless: :own_key?
 
-  # POST /generate — manually trigger on-demand generation for today, for the
-  # case where DashboardController#show's automatic weekday trigger didn't
-  # fire (weekends). No-ops (just redirects) if today's exercise already
-  # exists, so a duplicate click can't enqueue a second generation.
+  # POST /generate — for days the dashboard's weekday trigger skips; redirects without enqueuing if today's set exists.
   def generate
     if current_user.trial_ended?
       return redirect_to root_path, alert: trial_ended_text(:generation)
     end
 
-    # "Today's set already exists" has to mean the same thing here as on the
-    # dashboard, which carries a paused user's unfinished set forward on the
-    # very redirect this action ends in; enqueuing first would bill a
-    # generation the unique index then discards as a duplicate.
     current_user.carry_held_set_forward!
     return redirect_to root_path if current_user.daily_exercises.for_date.exists?
 
-    # Clear any stale failure from an earlier attempt today so /dashboard/status
-    # doesn't report "failed" (with yesterday's message) while this retry is
-    # still in flight — see GenerateDailyExercisesJob's status-polling comment.
     current_user.clear_generation_failure!
     GenerateDailyExercisesJob.perform_later(user_id: current_user.id)
     redirect_to root_path, flash: { generating: true }
   end
 
-  # POST /regenerate — manually re-run today's exercise generation, capped at
-  # once per day via regenerated_at. Replaces the existing DailyExercise row's
-  # contents in place; never creates a second row for the same day. The provider
-  # call runs on the worker, so this action never blocks on it.
-  #
-  # Regeneration destroys today's response (RegenerateExerciseJob), so it carries
-  # the same reviewed-state guard as ResponsesController#start_over: once a
-  # review exists, ConceptMastery.record_review! has already moved tier, streak
-  # and retention state off it, and destroying the row would leave that state
-  # standing with no evidence behind it. Guarded here rather than only in the
-  # view, since the view's button is not what makes the destroy unsafe.
+  # POST /regenerate — once a day; refused once reviewed, since destroying the response would orphan mastery state.
   def regenerate
     return redirect_to root_path, alert: trial_ended_text(:regeneration) if current_user.trial_ended?
 
     exercise = current_user.daily_exercises.for_date.first
     return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
 
-    # Named daily_response, not response: a local named `response` shadows the
-    # controller's own response object for the rest of the action.
+    # Named daily_response: a local named `response` shadows the controller's response object.
     daily_response = exercise.daily_response
     if daily_response&.reviewed?
       return redirect_to root_path, alert: t("flash.daily_exercises.already_reviewed")
@@ -61,9 +40,7 @@ class DailyExercisesController < ApplicationController
     end
 
     current_user.clear_generation_failure!
-    # The claim is already committed, so an enqueue failure would strand the
-    # user behind a spinner no worker will ever clear — release it before
-    # reporting, so a retry is possible immediately rather than in six minutes.
+    # The claim is committed, so release it on an enqueue failure or the user waits behind a spinner nobody clears.
     begin
       RegenerateExerciseJob.perform_later(user_id: current_user.id)
     rescue StandardError => e
@@ -82,10 +59,6 @@ class DailyExercisesController < ApplicationController
                             zone: current_user.effective_time_zone).full
   end
 
-  # Atomic claim against a concurrent double-submit, mirroring
-  # ResponsesController#claim_review!: a single UPDATE ... WHERE is serialized by
-  # Postgres row locking, so only one caller can win. The same statement enforces
-  # the once-per-day gate and lets an expired claim be retaken.
   def claim_regeneration!(exercise)
     current_user.daily_exercises
                 .where(id: exercise.id, regenerated_at: nil)
@@ -94,9 +67,7 @@ class DailyExercisesController < ApplicationController
                 .update_all(regenerating_since: Time.current) == 1
   end
 
-  # Written through the relation rather than the loaded record: `exercise` was
-  # read before claim_regeneration!'s update_all, so it still believes
-  # regenerating_since is nil and assigning nil would dirty nothing.
+  # Through the relation: the loaded record still thinks regenerating_since is nil, so assigning nil would dirty nothing.
   def release_regeneration!(exercise)
     current_user.daily_exercises.where(id: exercise.id).update_all(regenerating_since: nil)
   end

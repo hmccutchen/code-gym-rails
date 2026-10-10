@@ -5,9 +5,7 @@ RSpec.describe OpenaiService do
 
   let(:service) { described_class.new("sk-proj-TestKey") }
 
-  # A connection with the service's real retry configuration but a Faraday
-  # test adapter. `responses` is a queue of [status, body] pairs popped one per
-  # request.
+  # Real retry configuration on a Faraday test adapter; `responses` is a queue of [status, body] pairs.
   def stubbed_connection(responses)
     Faraday.new do |f|
       f.request :retry, OpenaiService::RETRY_OPTIONS
@@ -20,7 +18,6 @@ RSpec.describe OpenaiService do
     end
   end
 
-  # Records each posted body and answers with `reply`.
   def recording_connection(bodies, reply)
     Faraday.new do |f|
       f.adapter :test do |stub|
@@ -111,9 +108,7 @@ RSpec.describe OpenaiService do
       .to raise_error(AiService::InvalidResponseError, /OpenAI returned an unreadable response/)
   end
 
-  # A body that starts like JSON is most likely a cut-off reply, which can
-  # carry an answer (a judge's blind solve), so only its size reaches the log.
-  it "withholds a cut-off JSON body from the log and still logs a non-JSON one" do
+  it "withholds a cut-off JSON body, which can carry a blind solve, from the log and still logs a non-JSON one" do
     logged = []
     allow(Rails.logger).to receive(:error) { |message| logged << message }
 
@@ -126,9 +121,7 @@ RSpec.describe OpenaiService do
     expect(logged.last).to include("Bad gateway")
   end
 
-  # Valid JSON of the wrong shape would otherwise reach a hash lookup and
-  # escape every AiService::Error rescue as a TypeError.
-  it "raises InvalidResponseError when a successful response body is not a JSON object" do
+  it "raises InvalidResponseError rather than a TypeError when a successful response body is not a JSON object" do
     service.instance_variable_set(:@conn, stubbed_connection([ [ 200, "[]" ] ]))
 
     expect { service.send(:call, system: "sys", prompt: "p") }
@@ -250,8 +243,7 @@ RSpec.describe OpenaiService do
                            cache_read_tokens: 0, cache_write_tokens: 0, truncated: false, refusal: nil, http_status: 200)
     end
 
-    # OpenAI reports an empty balance as a 429 with error code insufficient_quota,
-    # the status a rate limit uses. It is not one, and is never read as one.
+    # OpenAI reports an empty balance as a 429, the status a rate limit uses.
     it "reads a 429 insufficient_quota as out of credit, not a rate limit" do
       allow(Rails.logger).to receive(:warn)
       body = { "error" => { "message" => "You exceeded your current quota, please check your plan and billing details.",
@@ -328,8 +320,7 @@ RSpec.describe OpenaiService do
       expect(body["text"]).to eq("format" => { "type" => "json_object" })
     end
 
-    # OpenAI refuses JSON mode with a 400 unless an input message mentions
-    # JSON, and the system prompt, which says so, goes in instructions (#253).
+    # OpenAI refuses JSON mode unless an input message mentions JSON, and instructions do not count (#253).
     it "ends the input with a request for a JSON object when JSON mode is on" do
       body, = call_with(hello, response_schema: JudgeVerdict.schema_for(ExerciseSection::Challenge))
 
@@ -352,8 +343,7 @@ RSpec.describe OpenaiService do
       expect(call_with(response).last[:text]).to eq("{\"a\":1}")
     end
 
-    # input_tokens includes the cached part, so subtracting it keeps tokens_in
-    # the uncached input on every provider and no token is priced twice.
+    # input_tokens includes the cached part, so subtracting it keeps any token from being priced twice.
     it "keeps cached tokens out of tokens_in" do
       usage = { "input_tokens" => 14_199, "input_tokens_details" => { "cached_tokens" => 8_171 },
                 "output_tokens" => 900, "output_tokens_details" => { "reasoning_tokens" => 600 } }

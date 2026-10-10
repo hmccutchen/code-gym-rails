@@ -1,55 +1,22 @@
-# Two working pieces of code that differ on one design principle. The engineer
-# picks the piece the stated system should use and says which stated fact
-# decides it. No scaffold and no teaching note: either would point at the
-# answer before the engineer has read the code.
-#
-# The provider writes the pieces as better_piece and other_piece, so it never
-# chooses a position; .arrange! rolls which one is shown as A. The correct
-# position then exists only in the stored answer key, which nothing before
-# submission may show, log or send to a model.
+# Design notes: docs/code-notes/app/models/exercise_section/design_comparison.md
 class ExerciseSection::DesignComparison < ExerciseSection
-  # Lines of code, blanks not counted: twice the prompt's lower target, the
-  # way AmbiguityHunt::MAX_PLANTED doubles PLANTED_COUNT. Exceeding it costs
-  # the section, so it stops a runaway reply, not a long piece; unequal
-  # lengths are the judge's surface-parity check.
   MAX_PIECE_LINES = 24
 
-  # About one sentence naming a fact, against prose's ten characters. A pick
-  # and a word is not an answer to "what decides it".
   MIN_REASON_LENGTH = 40
 
   PICK_PREFIX = "pick:".freeze
   PIECES = %w[a b].freeze
 
-  # The reason is typed, then encoded behind "pick:a\n" before it is stored, so
-  # its own bound is the shared answer cap less the longest prefix that can sit
-  # in front of it. Derived rather than written out: a change to either the
-  # cap or the encoding would otherwise leave the browser offering a reason the
-  # boundary would quietly clip.
+  # Derived so the browser never offers a reason the boundary would quietly clip.
   MAX_REASON_LENGTH = UserText::MAX_ANSWER_LENGTH - (PICK_PREFIX.length + 2)
 
-  # Even odds, and no "must differ from the stored order" rule like the
-  # Parsons scramble has: with two pieces that rule would always swap, which
-  # gives the answer away.
+  # No "must differ from the stored order" rule: with two pieces it would always swap and give the answer away.
   POSITION_WEIGHTS = PIECES.index_with(1).freeze
 
   CANONICAL_PIECES = %w[better_piece other_piece].freeze
   ANSWER_KEY_FIELD = "answer_key".freeze
-  # The fields the provider writes; `better` is the server's.
   PROVIDER_KEY_FIELDS = %w[deciding_fact principle why_other_fails].freeze
 
-  # Hosted concept by concept, beside the whole groups in .hosted_concepts. A
-  # concept qualifies when both pieces can meet the same stated behavior and
-  # still differ in what they cost to change or to run. Concepts whose worse
-  # piece would be incorrect (idempotency, error_handling, concurrency,
-  # transactions, security) turn the task back into a code review and stay out.
-  # A borderline concept joins only after the judge comparison keeps real
-  # drafts for it.
-  # Data-modeling concepts deferred after the 2026-10-01 real-draft check: a
-  # missing_constraint draft's two pieces behaved differently under the
-  # scenario's own concurrent writers and bulk insert, and the judge kept it.
-  # Each is eligible again only after a comparison run shows drafts whose
-  # pieces behave the same under every stated condition.
   DEFERRED_CONCEPTS = %w[missing_constraint unsafe_migration wrong_cardinality].freeze
 
   HOSTED_CONCEPTS = %w[
@@ -97,8 +64,6 @@ class ExerciseSection::DesignComparison < ExerciseSection
       "responses/answers/design_comparison"
     end
 
-    # Its reference explains the principle that decides the pick, which is
-    # the reason the grade asks for.
     def reference_opens_before_answer?
       false
     end
@@ -126,8 +91,6 @@ class ExerciseSection::DesignComparison < ExerciseSection
       PIECES
     end
 
-    # The scenario and question the judge may reword are where the deciding
-    # fact lives.
     def rejudge_edits?
       true
     end
@@ -136,16 +99,11 @@ class ExerciseSection::DesignComparison < ExerciseSection
       section.dig(ANSWER_KEY_FIELD, "better") == solve
     end
 
-    # Rung-dependent: TRADEOFF_CONCEPTS have two defensible sides, which only
-    # the principal_engineer rung allows. No rung means the caller cannot know
-    # it, so it gets the strictest list.
     def narrow_vocabulary(vocabulary, rung: nil)
       hosts = vocabulary & hosted_concepts
       rung == "principal_engineer" ? hosts : hosts - AiService::TRADEOFF_CONCEPTS
     end
 
-    # An allowlist rather than exclusions, so a concept added to a language
-    # vocabulary later is not offered here until someone decides it fits.
     def hosted_concepts
       AiService::CODE_SMELL_CONCEPTS + AiService::OO_DESIGN_CONCEPTS + AiService::MODULE_DESIGN_CONCEPTS +
         AiService::DOMAIN_MODELING_CONCEPTS + (AiService::DATA_MODELING_CONCEPTS - DEFERRED_CONCEPTS) +
@@ -173,9 +131,7 @@ class ExerciseSection::DesignComparison < ExerciseSection
       CANONICAL_PIECES.each { |field| section.delete(field) }
     end
 
-    # [pick, reason]: pick is "a", "b" or nil, and reason is the stripped text
-    # after the first line. Never raises, since the stored answer is a
-    # free-form permitted param.
+    # Never raises, since the stored answer is a free-form permitted param.
     def parse_answer(value)
       first_line, reason = value.to_s.split("\n", 2)
       pick = first_line.to_s.strip.delete_prefix(PICK_PREFIX)

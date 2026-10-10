@@ -1,6 +1,4 @@
-# One invite: how many trials it starts, by when, for how many days and at
-# how many calls a day. The raw code is shown once, by the minting script,
-# and only its digest is kept, so no page or row can give a code away.
+# Only the digest is kept; the minting script shows the raw code once.
 class InviteCode < ApplicationRecord
   CODE_LENGTH = 26
   CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".freeze
@@ -33,13 +31,10 @@ class InviteCode < ApplicationRecord
     find_by(code_digest: digest(normalized))
   end
 
-  # Whether a seat is left before the deadline now. #redeem! decides again
-  # when it takes one, since another redemption can win the last seat between.
+  # Advisory: #redeem! decides again, since another redemption can take the last seat in between.
   def available? = expires_at.future? && redeemed_count < seats
 
-  # Takes one seat, or none: a single statement decides against the seat count
-  # and the deadline together, so two redemptions racing for the last seat
-  # cannot both win.
+  # One statement checks seats and deadline together, so two racing redemptions can't both win the last seat.
   def redeem!
     taken = self.class.where(id: id).where("redeemed_count < seats AND expires_at > ?", Time.current)
                 .update_all("redeemed_count = redeemed_count + 1")

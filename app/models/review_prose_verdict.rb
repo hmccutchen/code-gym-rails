@@ -1,10 +1,4 @@
-# The prose judge's reply about one graded review, held at the boundary the
-# way JudgeVerdict holds the section judge's. It may reword the review's prose
-# fields and nothing else; every original entry must be cited exactly once,
-# so no point is dropped or duplicated. Whether a rewrite keeps an entry's
-# meaning is not checkable here and is an accepted risk. Pure; specs need no
-# database. Messages never quote provider text, since review text stays out
-# of logs.
+# Every original entry must be cited exactly once; whether a rewrite keeps the meaning is an accepted, unchecked risk.
 class ReviewProseVerdict
   Invalid = Class.new(StandardError)
 
@@ -17,7 +11,6 @@ class ReviewProseVerdict
   def self.prose_fields = DailyResponse::AI_REVIEW_FIELDS.keys
   def self.list_field?(field) = DailyResponse::AI_REVIEW_FIELDS.fetch(field)[:list]
 
-  # What the judge is shown, rendered the way the review page renders it.
   # Indexes in a verdict address these lists.
   def self.project(review)
     prose_fields.index_with do |field|
@@ -53,9 +46,7 @@ class ReviewProseVerdict
   end
   private_class_method :parse_issues
 
-  # A rewrite of a field that was empty is dropped, not refused: it has
-  # nothing to cite, so it can only be invented, and refusing the verdict
-  # would also throw away a sound rewrite of another field.
+  # A rewrite of an empty field is dropped, not refused, so a sound rewrite of another field survives.
   def self.parse_fields(raw, projection)
     raise Invalid, "fields must be a non-empty object" unless raw.is_a?(Hash) && raw.any?
 
@@ -105,9 +96,7 @@ class ReviewProseVerdict
   end
   private_class_method :merged?
 
-  # Structured-output schema from the same lists .parse checks. .parse stays
-  # the boundary: the schema cannot say "each index exactly once", bound a
-  # string's length, or require a non-empty issues, fields or from list.
+  # The schema can't require each index once, bound lengths, or require non-empty lists, so .parse stays the boundary.
   def self.schema
     VerdictSchema.one_per_status(STATUSES) { |status| shape_for(status) }
   end
@@ -140,8 +129,7 @@ class ReviewProseVerdict
     end.to_h
   end
 
-  # The rewrite in place, with the grader's prose kept under ORIGINAL_KEY
-  # exactly as returned so a later audit can compare the two.
+  # Keeps the grader's prose under ORIGINAL_KEY exactly as returned, for later audit.
   def apply(review)
     return review unless edit?
 

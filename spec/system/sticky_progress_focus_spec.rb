@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# iOS Safari scrolls a field it moves focus to up to the top edge, where the
-# dashboard's sticky progress bar would cover it. Chrome centers the field
-# instead, so this scrolls with the top-edge alignment Safari uses.
+# Chrome centers a focused field, so scroll with Safari's top-edge alignment, where the sticky bar would cover it.
 RSpec.describe "Sticky progress bar and focus", type: :system do
   it "keeps a focused answer and its focus ring below the bar at phone width" do
     travel_to(a_weekday) do

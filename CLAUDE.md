@@ -10,8 +10,37 @@ All changes are made on a feature/dev branch, never directly on `main`. Create (
 
 ## Code Style
 
-**Self-documenting.** The code says what it does; names carry the meaning. If a
-block needs a comment to be followed, extract it into a named method instead.
+### Comment rules — never ignored
+
+These rules hold in every file, in every change, with no exceptions for a
+deadline or a "temporary" comment. CI enforces the first three, so a
+broken one fails the build: RuboCop in Ruby files, and `bin/comment-check` in
+ERB (including its `<script>` and `<style>` blocks), JavaScript, CSS, YAML and
+Python. The cop names below are the Ruby side.
+
+- **Each comment is attached to the code it comments on.** It sits on the line
+  directly above that code, or at the end of the same line. No blank line, no
+  other comment and no end of file between a comment and its code
+  (`CodeGym/AttachedComment`).
+- **Each comment is one line** (`CodeGym/SingleLineComment`).
+- **A file holds at most 5 comments in total**, trailing comments included
+  (`CodeGym/CommentLimit`). Magic comments, shebangs and `rubocop:`
+  directives are tooling and don't count, and neither does a bare route
+  annotation (`# POST /responses/:id/review`, nothing else on the line), so
+  every non-RESTful action keeps its path.
+- **Code is self-documenting.** Names carry the meaning. If a block needs a
+  comment to be followed, extract it into a named method instead.
+- **Comments discuss the code in front of them.** Naming another place that
+  has to change with this line is part of that; the design or history behind
+  it belongs in the documentation.
+- **Business decisions live in the documentation:** this file, or a doc under
+  `docs/`. The reasoning behind one file's code lives in
+  `docs/code-notes/`, at the file's own path with `.md` in place of its last
+  extension (`app/services/ai_service.rb` →
+  `docs/code-notes/app/services/ai_service.md`;
+  `app/views/layouts/application.html.erb` →
+  `docs/code-notes/app/views/layouts/application.html.md`).
+  A comment may point there in its one line.
 
 **Comments are extremely minimal.** Write one only for a non-obvious *why* — a
 hidden constraint, a workaround, an invariant a future reader would otherwise
@@ -19,11 +48,13 @@ break. Never restate *what* the code does. A comment that would go stale the
 next time the line changes shouldn't be written. One that already has gone
 stale is worse than either kind — fix it or delete it, don't leave it.
 
-**Some comments must survive a cleanup.** The rule above cuts restatement, not
-explanation, and a few categories read as obvious while carrying something the
-code genuinely doesn't say. Keep: a non-RESTful route (`# GET /login` above
-`SessionsController#new` — the path isn't derivable from the controller and
-action), a partial's required locals, an abstract method's contract, and a
+**Some comments must survive a cleanup**, within the five a file may hold
+(route annotations don't count toward it). The
+rule above cuts restatement, not explanation, and a few categories read as
+obvious while carrying something the code genuinely doesn't say. Keep: a
+non-RESTful route (`# GET /login` above `SessionsController#new` — the path
+isn't derivable from the controller and action), a partial's required locals,
+an abstract method's contract, and a
 deliberately empty branch where the emptiness *is* the behavior (see
 `User#current_streak`'s weekend case). The test runs both directions: if
 deleting it would let someone reintroduce a bug, it stays; if it only repeats
@@ -107,9 +138,11 @@ treats as authoritative when "well-tested standard" would otherwise be left to
 interpretation.
 
 **Style baseline: `rubocop-rails-omakase`.** `.rubocop.yml` inherits it whole
-and overrides nothing. Where omakase has an opinion, that opinion wins — don't
-argue formatting in review. Two things it deliberately does *not* cover, so
-neither is machine-checkable here: `Metrics` and `Naming` are disabled outright
+and adds three house cops in `lib/rubocop/cop/code_gym/`, the comment rules
+above (`SingleLineComment`, `AttachedComment`, `CommentLimit`). Where omakase
+has an opinion, that opinion wins — don't argue formatting in review.
+Two things it deliberately does *not* cover, so neither is machine-checkable
+here: `Metrics` and `Naming` are disabled outright
 (no method-length, class-length, ABC, or complexity cop runs, and no naming cop
 at all), and `Lint` is off except for three re-enabled cops.
 `Lint/UselessAssignment` is not among them, so dead locals left behind by an
@@ -659,8 +692,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   input was a local section built from `FakeService`'s canned problem set;
   only the two models' output is real.
 
-  Two constraints apply before routing any of them, both noted beside
-  the table. `#call` turns thinking off whenever a caller passes `max_tokens`,
+  Two constraints apply before routing any of them, and this paragraph is
+  where they are stated. `#call` turns thinking off whenever a caller passes `max_tokens`,
   using the routed model's entry in `ClaudeService::THINKING_OFF` (`between_tools`
   on Sonnet 5.5, `disabled` on Haiku 4.5). Opus 5.5 has no thinking-off setting
   and no entry, so a capped purpose cannot move to Opus: the call raises before sending. And Haiku 4.5 caches only a
@@ -1366,8 +1399,8 @@ concept-specific difficulty descriptions for future generation, not a new set.
   making a day longer, and `DailyPlan.share_hosts` already keeps a host for
   evidence when drills outnumber the hosts. A fourth-bucket drill counts
   against the same cap while occupying only the fourth: the cap bounds how
-  many gaps are worked at once, not how many hosts they take. The reasoning
-  sits beside the constant, a spec pins the value, and
+  many gaps are worked at once, not how many hosts they take. This paragraph
+  is the reasoning, a spec pins the value, and
   `ConceptDrills#can_start?` / `#can_start_group?` are the one statement of
   what it allows, read by the start methods and by the pages that offer the
   button.
@@ -2325,8 +2358,9 @@ concept-specific difficulty descriptions for future generation, not a new set.
   the largest reply used a fraction of `REVIEW_JUDGE_MAX_TOKENS` and the
   slowest call a tenth of `REVIEW_JUDGE_READ_TIMEOUT`.
   `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS` moves to what this run measured;
-  that constant and its comment are where the number and its remaining
-  headroom are stated, so they are not restated here to go stale.
+  that constant and its section in `docs/code-notes/app/services/ai_service.md`
+  are where the number and its remaining headroom are stated, so they are not
+  restated here to go stale.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
@@ -3009,9 +3043,24 @@ A system spec that needs today's set calls `visit_with_todays_set(user)`,
 which generates it before the first page load; visiting first would wait out
 the dashboard's 3-second "generating" poll. `dashboard_generation_spec.rb` is
 the one spec that goes through that poll on purpose.
-Running them locally requires a one-time Playwright CLI install — see the
-comment block at the top of `spec/support/system_test_helper.rb` for the
-exact commands. The npm manifests live in `spec/playwright/`, not the repo
+Running them locally requires a one-time install of the pinned Playwright CLI
+and a Chromium build, the same commands CI runs:
+
+```bash
+npm --prefix spec/playwright ci
+./spec/playwright/node_modules/.bin/playwright-core install --with-deps chromium
+```
+
+`npm ci` rather than `npm install`, so setup never rewrites the lockfile. The
+CLI version must match what playwright-ruby-client expects, so bump it
+together with the gem:
+
+```bash
+npm --prefix spec/playwright install --save-exact \
+  "playwright-core@$(bundle exec ruby -e 'require "playwright/version"; puts Playwright::COMPATIBLE_PLAYWRIGHT_VERSION')"
+```
+
+The npm manifests live in `spec/playwright/`, not the repo
 root, so Nixpacks doesn't add a Node phase to the Railway production build.
 CI runs system specs in a separate `system_test` job that installs the same
 CLI (cached on `spec/playwright/package-lock.json`), while the `test` job runs

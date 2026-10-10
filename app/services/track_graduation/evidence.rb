@@ -1,7 +1,6 @@
 class TrackGraduation
   class Evidence
-    # Bounds history reads, not the results available to a rare kind: skipped
-    # and eased sections do not count, so a rare kind can still need the led path.
+    # Bounds reads only; skipped and eased sections don't count, so a rare kind may still need the lead path.
     RESPONSE_WINDOW = 60
 
     attr_reader :results, :newest_date

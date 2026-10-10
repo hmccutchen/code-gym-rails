@@ -1,11 +1,4 @@
-# How often a judge's blind solve agrees with the answer, for a person reading
-# a comparison run. Read by ModelComparison only. It prints counts and never a
-# solve or a key, so its output can be pasted anywhere.
-#
-# A row is one attempted solve: { rung:, concept:, matched:, status:,
-# false_reject: }. `matched` is true or false for a solve that came back and
-# nil when there was none; `status` is the verdict's status, or :invalid or
-# :error when the judge could not answer.
+# Prints counts only, never a solve or a key, so its output can be pasted anywhere.
 class SolveAgreement
   GROUPINGS = { "rung" => :rung, "concept" => :concept }.freeze
 

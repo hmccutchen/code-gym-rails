@@ -6,8 +6,7 @@ require migration_path.to_s
 RSpec.describe AddApiKeysToUsers do
   let(:legacy_user) { described_class::LegacyUser }
 
-  # Rolls the column back and forward inside the example's transaction, so the
-  # backfill runs against rows that only have the old column filled in.
+  # Rolls the column back and forward so the backfill runs against rows with only the old column filled in.
   def rerun_migration
     ActiveRecord::Migration.suppress_messages do
       described_class.new.migrate(:down)

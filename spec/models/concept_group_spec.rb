@@ -43,10 +43,7 @@ RSpec.describe ConceptGroup do
   end
 
   describe "coverage of the language vocabularies" do
-    # Constants that are strict subsets of a language vocabulary for reasons
-    # other than display grouping: the two security lists narrow what
-    # security_review may draw from, and TYPESCRIPT_FLAVORED_CONCEPTS switches
-    # a section's syntax. A new one has to be named here deliberately.
+    # Subsets that narrow vocabulary for reasons other than display grouping; name a new one here deliberately.
     NON_GROUPING_SUBSETS = %i[
       RAILS_SECURITY_CONCEPTS JS_SECURITY_CONCEPTS TYPESCRIPT_FLAVORED_CONCEPTS
     ].freeze
@@ -58,9 +55,7 @@ RSpec.describe ConceptGroup do
         expect(described_class.grouped(concepts).flat_map(&:last)).to match_array(concepts)
       end
 
-      # The partition test above cannot catch this: an unregistered group's
-      # concepts still come back, silently under CORE. Reflecting over
-      # AiService's own group constants is what makes the omission loud.
+      # An unregistered group's concepts still come back silently under CORE, so the partition test misses it.
       it "registers every group constant #{language} folds in" do
         vocabulary = ConceptBucket.vocabulary_for(language)
         registered = described_class::NAMED.map(&:last)

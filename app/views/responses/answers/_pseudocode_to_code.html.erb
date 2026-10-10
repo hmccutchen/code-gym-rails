@@ -1,8 +1,4 @@
-<%# Textarea plus the critique control. Both states live here, because the
-    submitted state must still show the critique and the code the plan was
-    translated into at review time — those are the artifacts the review was
-    graded against.
-    Locals: kind, key, data, exercise, response, submitted. %>
+<%# Locals: kind, key, data, exercise, response, submitted. %>
 <% round  = response.pseudocode_round(key) %>
 <% points = ExerciseSection::PseudocodeToCode.normalize_critique(round["critique"]) %>
 
@@ -35,15 +31,11 @@
     <% end %>
   </div>
 
-  <%# Written by the review, never by this page — but still rendered in both
-      states, for the rows that were translated back when translating was a
-      button here. %>
+  <%# Written by the review; rendered in both states for rows translated when this page had a translate button. %>
   <div class="pseudocode-code">
     <% if round["generated_code"].present? %>
       <pre><%= highlighted_code(round["generated_code"], exercise.language) %></pre>
-      <%# Load-bearing copy, not decoration: without it the generated code reads
-          as a model answer, which is exactly the misreading the faithfulness
-          constraint exists to prevent. %>
+      <%# Keep this caption: without it the generated code reads as a model answer. %>
       <p class="pseudocode-caption"><%= t("pseudocode.caption") %></p>
     <% end %>
   </div>
@@ -69,9 +61,7 @@
       const WORKING  = <%= t("pseudocode.working").to_json.html_safe %>;
       const CRITIQUE_FAILED = <%= t("pseudocode.critique_failed").to_json.html_safe %>;
 
-      // The button locks for the length of the call and stays locked on
-      // success: the round is one-shot. On failure it re-enables, because the
-      // server did not consume the cap either.
+      // One-shot round: stays locked on success, re-enables on failure since the cap wasn't consumed.
       critiqueBtn.addEventListener("click", async () => {
         if (critiqueBtn.disabled) return;
         critiqueBtn.disabled = true;

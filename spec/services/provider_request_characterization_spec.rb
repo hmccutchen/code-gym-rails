@@ -1,39 +1,10 @@
 require "rails_helper"
 
-# Pins the exact JSON body each provider posts, for each keyword shape the
-# single-shot purposes actually use — not every combination `#call` accepts,
-# and deliberately not `history:` itself, whose whole point here is that it
-# never reaches these callers.
-#
-# This exists to guard the addition of a `history:` keyword to the shared
-# `#call` interface. That addition must change nothing about the request any
-# non-conversational caller produces, and "nothing" includes key order: both
-# bodies are built by literal Hash construction and serialized with #to_json,
-# so a reordered or conditionally-inserted key is a visible diff here.
-#
-# Deliberately at the #call boundary rather than through AiService's public
-# methods: #generate_exercise routes through DailyPlan.for, which
-# reads the database and rolls WeightedRoll, so its body cannot be snapshotted
-# without stubbing the very decision under test. What each public method passes
-# down is covered by spec/services/ai_service_spec.rb (see the "single-shot
-# purposes" group, which pins the roster of purpose names — the single-shot
-# purposes plus "review_follow_up" and "duck_thread", asserted by name so a
-# missed one fails loudly instead of by silent subtraction — and then drives
-# every public entry point behind them to assert the history it reaches
-# #call with is empty, which is the caller-level half this file cannot state);
-# the prompt text they build is covered byte-for-byte by
-# spec/services/generation_prompt_characterization_spec.rb.
-#
-# Rebaselining: UPDATE_REQUEST_SNAPSHOTS=1 bundle exec rspec <this file>.
-# Do that only when a request-shape change is the intended deliverable.
-# Rebaselining while adding `history:` would pin the new behavior and defeat
-# the entire point of this file.
+# Rebaseline with UPDATE_REQUEST_SNAPSHOTS=1 only when a request-shape change is the intended deliverable.
 RSpec.describe "provider request characterization" do
   REQUEST_SNAPSHOT_DIR = Rails.root.join("spec/fixtures/request_snapshots").freeze
 
-  # The distinct keyword shapes the single-shot purposes actually use.
-  # Named for the purpose that motivates each, so a reader can map a failure
-  # back to a caller.
+  # Named for the purpose behind each shape, so a failure maps back to a caller.
   KEYWORD_SHAPES = {
     "plain"                 => {},
     "cache_system"          => { cache_system: true },
@@ -58,7 +29,6 @@ RSpec.describe "provider request characterization" do
     [ service, bodies ]
   end
 
-
   def snapshot_path(provider, shape)
     REQUEST_SNAPSHOT_DIR.join("#{provider}__#{shape}.json")
   end
@@ -73,8 +43,7 @@ RSpec.describe "provider request characterization" do
           service.send(:call, system: "SYSTEM TEXT", prompt: "PROMPT TEXT", **kwargs)
           raise "expected exactly one request, got #{bodies.size}" unless bodies.size == 1
 
-          # Re-serialized with indentation so a diff is readable line by line,
-          # while still failing on any key-order change.
+          # Pretty-printed so a diff reads line by line while still failing on key order.
           JSON.pretty_generate(JSON.parse(bodies.first))
         end
 

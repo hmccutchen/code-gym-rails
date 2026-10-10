@@ -12,8 +12,7 @@ RSpec.describe DayHosts do
     expect(hosts.can_tag?(ExerciseSection::Architecture, "service_boundaries", "architecture")).to be(true)
   end
 
-  # Only a schema_review code_review offers the data-modeling concepts, so
-  # the day's mode decides whether code_review can host one.
+  # Only a schema_review code_review offers the data-modeling concepts.
   it "reads code_review's vocabulary for the day's mode" do
     concept = AiService::DATA_MODELING_CONCEPTS.first
 

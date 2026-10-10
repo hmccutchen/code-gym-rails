@@ -1,5 +1,4 @@
-<%# Required locals: status (a TrialStatus). One line, since the day's set
-    is what the page is for; the trial page carries the rest. %>
+<%# Required locals: status (a TrialStatus). One line: the trial page carries the rest. %>
 <p class="trial-banner hint" style="margin:-1rem 0 1.5rem;">
   <% if status.active? %>
     <% days = t("dashboard.trial_banner.days", count: status.days_left) %>

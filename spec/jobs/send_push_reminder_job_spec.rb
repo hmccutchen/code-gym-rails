@@ -47,8 +47,7 @@ RSpec.describe SendPushReminderJob do
     described_class.new.perform(user_id: user.id)
   end
 
-  # active_section_keys is the authority for a day's section count; the body
-  # must never be built by counting problem_set.keys, which can hold more.
+  # active_section_keys is the authority for section count; problem_set.keys can hold more.
   it "counts the sections the day actually presents" do
     create_exercise
     subscribe
@@ -86,8 +85,6 @@ RSpec.describe SendPushReminderJob do
     described_class.new.perform(user_id: user.id)
   end
 
-  # Generation and delivery are separate jobs, so a fast user can finish the set
-  # before the reminder about it runs.
   it "does not remind someone who has already submitted" do
     exercise = create_exercise
     subscribe
@@ -150,9 +147,7 @@ RSpec.describe SendPushReminderJob do
       described_class.new.perform(user_id: user.id)
     end
 
-    # Pins the claim in #hours_left_today's comment that the last nudge always
-    # leaves about six hours, which is why no sub-hour branch is written.
-    # Widen NUDGE_HOURS past the early evening and this fails, as it should.
+    # Pins #hours_left_today's assumption that the last nudge leaves about six hours; widening NUDGE_HOURS fails this.
     it "leaves at least six hours in the day at its last nudge hour" do
       Time.use_zone("UTC") do
         last = Time.zone.local(2026, 9, 8, PushNudgePlan::NUDGE_HOURS.max, 59, 59)
@@ -160,8 +155,6 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
-    # The job runs asynchronously, so every fact the enqueue decided on can have
-    # moved by the time it lands. A queue backlog is the realistic case.
     it "sends nothing once the hour has left the nudge window" do
       user.update!(reminder_level: :ready_and_nudges)
 
@@ -179,9 +172,6 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
-    # The whole point of the feature: a set someone got halfway through and
-    # walked away from is what needs reaching, and telling them it is "still
-    # waiting" would read as not having noticed the half they did.
     it "names how much is left when the set was only partly answered" do
       user.update!(reminder_level: :ready_and_nudges)
 
@@ -224,8 +214,6 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
-    # Answered in full but never submitted is the state closest to done and the
-    # one a "still waiting" nudge would describe worst.
     it "asks for the submit once every section is answered and rated" do
       user.update!(reminder_level: :ready_and_nudges)
 
@@ -247,8 +235,7 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
-    # The dashboard keeps Submit disabled until every answered section is rated,
-    # so a fully answered but unrated set must not be told to press it.
+    # The dashboard disables Submit until answered sections are rated.
     it "names the ratings when they are what is left" do
       user.update!(reminder_level: :ready_and_nudges)
 
@@ -270,9 +257,6 @@ RSpec.describe SendPushReminderJob do
       end
     end
 
-    # Without this the hourly tick tells someone mid-answer that they have
-    # sections left, which is the nag the stopping rule used to prevent by
-    # going silent the moment anything was typed.
     it "holds off while the user is still saving answers" do
       user.update!(reminder_level: :ready_and_nudges)
 

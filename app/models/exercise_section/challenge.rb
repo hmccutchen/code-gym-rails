@@ -46,11 +46,7 @@ class ExerciseSection::Challenge < ExerciseSection
     SCHEMA
   end
 
-  # The scenario and starter_code are on screen while the engineer answers, and
-  # an answer routinely completes or refers to that skeleton, so grading code
-  # without them misreads correct work as incomplete. Both are omitted when
-  # blank rather than rendered empty — starter_code is optional by schema, and
-  # rows predating scenario have neither.
+  # Grading without the on-screen starter code misreads correct work as incomplete; both omitted when blank.
   def self.review_context(section:, answer:, rating:)
     [
       "Coding Challenge: #{section["question"]}",

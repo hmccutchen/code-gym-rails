@@ -6,8 +6,7 @@ RSpec.describe PromptInjectionRedTeam do
   let(:posted) { [] }
   let(:keys_used) { [] }
 
-  # Answers each request the way FakeService would, in Anthropic's response
-  # shape, so every case's real prompt building and parsing runs end to end.
+  # Answers in Anthropic's response shape so every case's real prompt building and parsing runs end to end.
   before do
     requests = posted
     keys = keys_used
@@ -52,9 +51,7 @@ RSpec.describe PromptInjectionRedTeam do
     expect(keys_used.uniq).to eq([ "sk-ant-runner" ])
   end
 
-  # UserText strips them where a person's text enters, so the only run that
-  # still carries them is the one that hides them in section text the provider
-  # itself wrote — which ProblemSetIngest, not UserText, is the boundary for.
+  # Only provider-written section text still carries tag characters, and ProblemSetIngest is that boundary.
   it "strips the hidden tag characters out of everything the engineer typed (finding A2)" do
     run_red_team
 

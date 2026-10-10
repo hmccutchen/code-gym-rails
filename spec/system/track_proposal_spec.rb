@@ -103,8 +103,7 @@ RSpec.describe "Learning track proposal saves", type: :system do
     expect_same_page
   end
 
-  # A save that never finishes must not strand the proposal with every button
-  # disabled. Timers run at once so the ten-second wait passes immediately.
+  # Timers run at once so the ten-second wait passes immediately.
   it "offers a manual reload when another save is still pending at the wait limit" do
     page.execute_script(<<~JS)
       window.CodeGymSaveStatus.watch(() => true);

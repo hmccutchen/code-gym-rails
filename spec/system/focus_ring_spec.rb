@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# Fields and sliders share one keyboard focus ring. A page rule that sets
-# `outline: none` on focus once hid it on the Setup sliders, so each kind of
-# control is focused from the keyboard here and checked for the ring.
+# A page rule with `outline: none` once hid the ring on Setup sliders, so each control kind is checked here.
 RSpec.describe "Focus ring", type: :system do
   let(:user) { create_fake_provider_user }
   let(:ring_color) { "rgb(201, 192, 255)" }
@@ -27,8 +25,7 @@ RSpec.describe "Focus ring", type: :system do
     JS
   end
 
-  # The thumb is a pseudo-element, which computed styles do not reach, so the
-  # ring is looked for in a screenshot of the slider.
+  # Computed styles can't reach the thumb pseudo-element, so look for the ring in a screenshot.
   def ring_pixels_around_focused_slider
     shot = nil
     page.driver.with_playwright_page do |pw|
@@ -76,8 +73,7 @@ RSpec.describe "Focus ring", type: :system do
     expect(ring_pixels_around_focused_slider).to be > 20
   end
 
-  # Login has no stored preference and follows the device, so each palette's
-  # ring is checked under the scheme that selects it.
+  # Login follows the device, so each palette's ring is checked under the scheme that selects it.
   it "rings the login fields in the dark palette" do
     page.driver.with_playwright_page { |pw| pw.emulate_media(colorScheme: "dark") }
     visit login_path

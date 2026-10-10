@@ -1,7 +1,4 @@
-# Reads the CSS in a view's <style> blocks as flat rules, for specs that check
-# what the stylesheet says rather than what a browser renders. Enough CSS for
-# this app's hand-written styles: comments, nested @media and @keyframes
-# blocks, and selector lists. Not a general CSS parser.
+# Enough CSS for this app's hand-written styles; not a general CSS parser.
 module ViewStyles
   Rule = Struct.new(:selectors, :declarations, :media, keyword_init: true) do
     def declaration(property)
@@ -28,8 +25,7 @@ module ViewStyles
     rules_in(File.read(path).gsub(%r{/\*.*?\*/}m, ""))
   end
 
-  # Walks the braces, keeping the enclosing at-rule preludes so a rule inside
-  # `@media (prefers-reduced-motion: reduce)` knows it is there.
+  # Keeps enclosing at-rule preludes so a rule inside a prefers-reduced-motion block knows it is there.
   def rules_in(css)
     rules = []
     preludes = []
@@ -53,8 +49,6 @@ module ViewStyles
     rules
   end
 
-  # The custom properties a :root block declares, as name => value. Takes a
-  # view's source, or rules already read from a stylesheet.
   def root_variables(source_or_rules)
     all = source_or_rules.is_a?(String) ? rules(source_or_rules) : source_or_rules
     root = all.find { |rule| rule.selectors == [ ":root" ] && rule.media.empty? }

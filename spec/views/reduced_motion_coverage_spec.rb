@@ -1,10 +1,6 @@
 require "rails_helper"
 
-# A new animation or transition should not quietly ignore the OS setting.
-# Each CSS rule that declares motion needs a matching rule under
-# prefers-reduced-motion that sets the same property to none for each of its
-# selectors, and a script's motion option has to read the setting on its own
-# line. spec/system/reduced_motion_spec.rb checks the rendered result.
+# Every motion rule needs a reduced-motion rule setting it to none; spec/system/reduced_motion_spec.rb checks the result.
 RSpec.describe "reduced motion coverage" do
   MOTION = /\b(animation|transition)\s*:(?!\s*none\b)/
   REDUCED = "prefers-reduced-motion: reduce"

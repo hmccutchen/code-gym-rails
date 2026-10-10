@@ -31,8 +31,6 @@ RSpec.describe "Concept reference alternate framings", type: :request do
     )
   end
 
-  # The whole point of this surface: it is reachable while someone is still
-  # working, before any DailyResponse row exists at all.
   it "works with no response — and no exercise — of any kind" do
     stub_alternate
     login_as(user)

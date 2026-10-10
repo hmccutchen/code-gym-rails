@@ -1,6 +1,4 @@
-<%# Required locals: awaiting ("guide", "ladder" or "lesson"), message
-    (String), button (String), generation_version (Integer or nil — the
-    completed generation counter when awaiting "ladder" or "lesson"). %>
+<%# Required locals: awaiting ("guide", "ladder" or "lesson"), message, button, generation_version (Integer or nil) %>
 <div id="learn-guide"
      data-url="<%= prepare_learn_concept_path(bucket: @bucket, concept: @concept) %>"
      data-status-url="<%= learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, generation_version: generation_version) %>">
@@ -9,15 +7,7 @@
   <span class="learn-status" aria-live="polite"></span>
 </div>
 
-<%# Inline script, matching the working convention here: the layout emits no
-    importmap tags, so nothing else would run. Polls rather than holding the
-    request, since this generation runs with extended thinking on. %>
-<%# The 2s interval is the one place that number lives; MAX_ATTEMPTS derives
-    from it and from AiService.call_budget_seconds(CONCEPT_REFERENCE_READ_TIMEOUT)
-    — the worst-case time a concept-reference call can take across every
-    retry it's allowed — matching dashboard/_generating.html.erb's pattern: a
-    hardcoded attempt count bore no relationship to how long the job could
-    actually run. %>
+<%# Design notes: docs/code-notes/app/views/learn/_write_up_control.html.md %>
 <% poll_interval_s = 2.0 %>
 <script>
   (function () {
@@ -29,12 +19,6 @@
     const MAX_ATTEMPTS = <%= (AiService.call_budget_seconds(AiService::CONCEPT_REFERENCE_READ_TIMEOUT) / poll_interval_s).ceil %>;
     let attempts = 0;
 
-    <%# The bulk actions and this per-concept job share the default queue
-        against 3 worker threads, so a slow batch can leave this one still
-        queued when the budget above runs out — the likeliest state, not a
-        dead job. A rewrite that landed without its ladder is different: the
-        job has finished, so the page reloads to show the new text and says
-        what happened. %>
     function poll() {
       attempts++;
       if (attempts > MAX_ATTEMPTS) {

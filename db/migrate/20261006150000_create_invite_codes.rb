@@ -1,8 +1,4 @@
-# An invite code starts trials on a house key: how many accounts it admits,
-# by when, for how many days and at how many calls a day. The person picks
-# the provider when they redeem it. Only a digest is stored: a 26-character
-# base32 code carries 130 bits, so a SHA-256 lookup is enough and no slow
-# hash is needed.
+# Only a SHA-256 digest is stored: a 130-bit random code needs no slow hash.
 class CreateInviteCodes < ActiveRecord::Migration[8.1]
   def change
     create_table :invite_codes do |t|

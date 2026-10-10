@@ -93,8 +93,7 @@ RSpec.describe "Learning track proposals", type: :request do
     expect(proposal_text).to include("Your Pattern of the Month sections are now set to senior.")
   end
 
-  # A lead set above senior by hand in Setup still leads, and the heading
-  # names the level it is at rather than claiming a proposal moved it.
+  # A lead set to principal engineer by hand still leads, and the heading names its actual level.
   it "names the lead's actual level when it was set to principal engineer by hand" do
     user = track_user(LearningTrack.preset_levels.merge("code_review" => "principal_engineer"))
     reviewed_day(user, Date.current, { "code_review" => "principal_engineer" })

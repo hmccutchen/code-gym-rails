@@ -1,5 +1,4 @@
-# Which request parameters the app's own filter_parameters masks in request
-# logs and which it lets through, for one sample of every param a user can send.
+# Which params filter_parameters masks in request logs, for one sample of every param a user can send.
 class ParameterFilterReport
   SAMPLE = {
     "email" => "someone@example.com",

@@ -1,7 +1,5 @@
 require "rails_helper"
 
-# What a screen reader navigates by: the main landmark and the link to it,
-# headings that never skip a level, and a name on every text field.
 RSpec.describe "Page structure for assistive technology", type: :request do
   let(:user) { create_user_with_key }
 
@@ -69,9 +67,7 @@ RSpec.describe "Page structure for assistive technology", type: :request do
     expect(skipped_levels).to be_empty
   end
 
-  # VoiceOver's heading rotor is how someone jumps between sections, so each
-  # fold's title is a real heading, and nothing turns the summary into a
-  # button, which would strip it.
+  # VoiceOver's heading rotor needs a real heading; giving the summary role="button" would strip it.
   it "gives each answer-form section a level-2 heading inside its summary" do
     travel_to(Date.new(2026, 7, 15)) do
       reviewed_day(date: Date.current, submitted_at: nil)

@@ -62,8 +62,7 @@ RSpec.describe CompetencyGate::Evidence do
       .to eq([ [ "code_review", false, "right_level" ], [ "pattern", true, "too_hard" ] ])
   end
 
-  # The gate runs on every plan, so a row an older worker or a hand edit left
-  # malformed must not stop the day from being built.
+  # The gate runs on every plan, so a malformed row must not stop the day being built.
   it "skips a stamped row whose answers or problem set are not objects" do
     day(0)
     day(1).update_columns(answers: [])
@@ -104,9 +103,7 @@ RSpec.describe CompetencyGate::Evidence do
     expect(queries.size).to eq(6)
   end
 
-  # The regression the full replay exists for: three was earned, a level
-  # change followed, and more than sixty later days earned nothing either
-  # way. Replaying only the latest sixty would forget the earned size.
+  # Replaying only the latest sixty responses would forget a size earned before them.
   it "keeps a size earned more than sixty responses ago across batch boundaries" do
     5.times { |n| day(n) }
     (5..70).each { |n| day(n, { "code_review" => { rung: "principal_engineer", ai: "developing" } }) }

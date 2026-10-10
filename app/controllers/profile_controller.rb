@@ -1,11 +1,10 @@
+# Design notes: docs/code-notes/app/controllers/profile_controller.md
 class ProfileController < ApplicationController
   include ExerciseMixLadders
 
-  # Name editing needs a logged-in user but not an API key, so this endpoint
-  # stays a clean JSON surface regardless of key state.
   skip_before_action :require_provider
 
-  # PATCH /profile — inline profile autosave (JSON)
+  # PATCH /profile
   def update
     return render_invalid_daily_section_count if invalid_daily_section_count?
     return render_invalid_weight    if invalid_section_kind_weights?
@@ -30,11 +29,6 @@ class ProfileController < ApplicationController
 
   private
 
-  # Active Record's integer cast is too forgiving for a request boundary: ""
-  # and null become nil, which means Automatic, "abc" becomes 0 and "2.5"
-  # becomes 2, so a malformed request would save a choice it never made. Only the Automatic
-  # sentinel or a listed count, as an Integer or its exact string, is accepted;
-  # a JSON 2.0 equals 2 but is not one.
   DAILY_SECTION_COUNT_STRINGS = User::DAILY_SECTION_COUNTS.map(&:to_s).freeze
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
 
@@ -56,18 +50,7 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # A weight arrives from a range input indexing a server-rendered list, so a
-  # non-numeric or off-stop value means a malformed request rather than a user
-  # action. jsonb stores whatever it is handed, so a stray string would persist
-  # as a string rather than being coerced — the model validation would also
-  # catch it, but this boundary guard is deliberate defence-in-depth, and it
-  # fails with a message naming the allowed stops rather than a generic
-  # object-shape error.
-  # Only an ABSENT key skips the check. A present-but-wrong-shaped value (an
-  # array, a bare null) would otherwise pass as blank, be dropped by
-  # strong parameters, and return 200 having applied nothing the request asked
-  # for — a success status for a write that did not happen. An empty object is
-  # a real instruction (clear every weight) and still passes.
+  # Only an absent key skips: a wrong-shaped value would be dropped by strong params and return 200 having saved nothing.
   def invalid_section_kind_weights?
     user_params = params.require(:user)
     return false unless user_params.key?(:section_kind_weights)
@@ -91,11 +74,7 @@ class ProfileController < ApplicationController
     invalid_string_list?(:locked_section_kinds)
   end
 
-  # permit(key: []) silently drops any non-scalar entry rather than rejecting the
-  # request, so a malformed payload like [{"a":1}] would otherwise arrive as []
-  # and clear the stored list with a 200. Checked against the raw param, before
-  # permit has thrown the bad entries away. Absent skips; an empty array is a
-  # real instruction to clear.
+  # Checked on the raw param: permit(key: []) drops non-scalar entries, so [{"a":1}] would clear the list with a 200.
   def invalid_string_list?(key)
     user_params = params.require(:user)
     return false unless user_params.key?(key)
@@ -111,8 +90,6 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # Same reasoning as the weights guard: a present-but-wrong-shaped value must
-  # fail rather than be dropped by strong parameters and reported as a success.
   def invalid_section_kind_levels?
     user_params = params.require(:user)
     return false unless user_params.key?(:section_kind_levels)
@@ -133,8 +110,6 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # Same reasoning as the weights guard, checked against the raw param before
-  # strong parameters can drop a bad entry and report the request a success.
   def invalid_display_preferences?
     user_params = params.require(:user)
     return false unless user_params.key?(:display_preferences)
@@ -150,9 +125,6 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # Checked against the raw param for the same reason as the others: an array
-  # or object would otherwise be dropped by strong parameters and reported as
-  # a successful save.
   def invalid_skill_level?
     user_params = params.require(:user)
 
@@ -164,19 +136,7 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # The mix controls post the version they last saw, so a tab whose DOM predates
-  # another tab's save is refused instead of overwriting it. Absent version
-  # means no precondition except when joining the learning track — the other
-  # autosaves on this page send none and are unaffected.
-  #
-  # Read and write sit inside one row lock, the same shape User#anonymize! uses:
-  # unlocked they are two statements a second request can interleave with, and
-  # both requests would pass a check against the version neither had bumped yet.
-  #
-  # A learning track choice takes the same lock, and is checked after the
-  # reload rather than before: "Experienced" bumps no version, so a Junior
-  # request that passed its check before another tab recorded Experienced
-  # would otherwise still pass the version check and join.
+  # Check and write under one row lock; the track choice is checked after reload, since Experienced bumps no version.
   def save_with_preference_precondition
     user_params = params.require(:user)
     posted = user_params[:section_kind_preferences_version]
@@ -195,8 +155,6 @@ class ProfileController < ApplicationController
     outcome
   end
 
-  # A track choice writes the preset or the choice and nothing else, so a lock,
-  # weight or target sent with it is refused rather than saved alongside it.
   TRACK_CHOICE_KEYS = {
     LearningTrack::ON  => %w[learning_track section_kind_levels skill_level section_kind_preferences_version],
     LearningTrack::OFF => %w[learning_track]
@@ -219,9 +177,6 @@ class ProfileController < ApplicationController
            status: :unprocessable_content
   end
 
-  # Carries the state the refused tab does not have, so it can show what is
-  # actually stored rather than retrying against a version that will never
-  # match again.
   def render_stale_preferences
     render json: {
       errors: [ t("exercise_mix.conflict") ],
@@ -236,8 +191,6 @@ class ProfileController < ApplicationController
     }, status: :conflict
   end
 
-  # The version rides along only when the request touched the preferences, so
-  # the body every other caller sees is byte-identical to before.
   def saved_body
     body = { name: current_user.name, time_zone: current_user.time_zone,
              daily_section_count: current_user.daily_section_count }

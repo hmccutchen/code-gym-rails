@@ -12,9 +12,7 @@ RSpec.describe PushSubscription, type: :model do
       expect { described_class.register!(**attributes) }.to change(described_class, :count).by(1)
     end
 
-    # The client re-subscribes on every launch, so the common case is an
-    # endpoint that already has a row. A second row for the same browser would
-    # mean the same device notified twice every morning.
+    # The client re-subscribes on every launch; a second row would notify the same device twice.
     it "refreshes the existing row rather than adding a second one" do
       described_class.register!(**attributes)
 
@@ -25,9 +23,7 @@ RSpec.describe PushSubscription, type: :model do
       expect(described_class.sole.p256dh_key).to eq("rotated")
     end
 
-    # The caller wraps this in a transaction. A bare RecordNotUnique there
-    # aborts it, so without the SAVEPOINT the retry's own query raises
-    # PG::InFailedSqlTransaction rather than recovering.
+    # Without the SAVEPOINT, the retry query raises PG::InFailedSqlTransaction in the caller's transaction.
     it "recovers inside a surrounding transaction when the insert loses a race" do
       raised = false
       allow(described_class).to receive(:find_or_initialize_by).and_wrap_original do |original, *args|
@@ -43,8 +39,7 @@ RSpec.describe PushSubscription, type: :model do
       expect { described_class.count }.not_to raise_error
     end
 
-    # Uniqueness is enforced twice and the validation fires first, so the loser
-    # of the race sees RecordInvalid at least as often as RecordNotUnique.
+    # The validation fires before the index, so the race loser often sees RecordInvalid.
     it "recovers when the uniqueness validation raises rather than the index" do
       described_class.register!(**attributes.merge(p256dh_key: "stale"))
 

@@ -1,28 +1,10 @@
-# Enrolling and un-enrolling this browser from the daily reminder.
-#
-# #create is JSON because it can only ever be called from script: the browser
-# hands back an endpoint that has to be granted asynchronously first. #destroy
-# is an ordinary form post, so turning reminders off never depends on the same
-# machinery that turning them on does.
 class PushSubscriptionsController < ApplicationController
-  # The toggle lives on the Account page, which is reachable without an API key
-  # on purpose. Without this skip a keyless user could see the control and not
-  # be able to work it — and the layout's re-subscribe script would 302 to
-  # /setup on every launch.
+  # Account is reachable without a key, and the layout's re-subscribe script would otherwise 302 to /setup on every launch.
   skip_before_action :require_provider
 
   MAX_ENDPOINT_LENGTH = 2048
 
-  # A push endpoint is minted by the browser's own push service, so it can only
-  # come from a known handful of hosts. Without this the endpoint is an
-  # arbitrary URL chosen by whoever is logged in, which the worker then POSTs
-  # to on every reminder from inside the deployment's network — a blind, authenticated
-  # SSRF primitive. Matched by domain suffix, so per-region and per-tenant
-  # subdomains are covered without enumerating them.
-  #
-  # Add a host here if a teammate's browser uses a push service this list
-  # doesn't name; a rejection is logged with the host so that is diagnosable
-  # rather than a silent failure to enrol.
+  # Allowlist against SSRF: the worker POSTs to this URL. Add a host here if a refused enrolment is logged for one.
   ALLOWED_ENDPOINT_HOSTS = %w[
     fcm.googleapis.com
     android.googleapis.com
@@ -43,20 +25,14 @@ class PushSubscriptionsController < ApplicationController
         p256dh_key: params[:p256dh],
         auth_key:   params[:auth]
       )
-      # Enrolment turns reminders on; it must not turn nudges off. A browser
-      # re-registering (the layout re-subscribes on every page load) would
-      # otherwise silently walk a ready_and_nudges user back down to ready.
+      # Enrolment must not walk a ready_and_nudges user back to ready; the layout re-subscribes on every page load.
       current_user.update!(reminder_level: :ready) if current_user.reminders_none?
     end
 
     head :created
   end
 
-  # PATCH /push_subscription
-  # The dial, not the enrolment. Turning reminders on has to happen inside a
-  # click handler so iOS will grant permission; this is an ordinary form post,
-  # so it deliberately refuses to enrol and only moves an already-enrolled
-  # user between ready and ready_and_nudges.
+  # PATCH /push_subscription — only moves an enrolled user between levels; enrolment needs a click handler for iOS.
   def update
     return head :not_found unless WebPushCredentials.configured?
     return redirect_to account_path unless current_user.push_reminders_enabled?
@@ -67,8 +43,6 @@ class PushSubscriptionsController < ApplicationController
   end
 
   # DELETE /push_subscription
-  # Drops the endpoints as well as the intent. Leaving rows behind would keep
-  # tomorrow's job pushing at a browser whose owner just asked it to stop.
   def destroy
     User.transaction do
       current_user.push_subscriptions.destroy_all
@@ -80,8 +54,6 @@ class PushSubscriptionsController < ApplicationController
 
   private
 
-  # Provider-shaped input from the browser, validated where it enters so
-  # PushDelivery can assume an endpoint it can actually sign for.
   def valid_subscription?
     params[:p256dh].present? && params[:auth].present? && allowed_endpoint?
   end

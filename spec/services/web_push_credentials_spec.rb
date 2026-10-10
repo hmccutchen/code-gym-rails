@@ -24,8 +24,7 @@ RSpec.describe WebPushCredentials do
       expect(described_class).not_to be_configured
     end
 
-    # A Railway variable set to an empty string is the likeliest way to half-
-    # configure this, and it must read as "not configured" rather than as a key.
+    # A Railway variable set to an empty string is the likeliest half-configuration.
     it "treats a blank value as absent" do
       ENV["VAPID_PUBLIC_KEY"] = "  "
       ENV["VAPID_PRIVATE_KEY"] = "private"

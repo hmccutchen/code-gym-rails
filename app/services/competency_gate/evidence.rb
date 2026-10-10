@@ -1,16 +1,11 @@
 class CompetencyGate
-  # A user's reviewed days as the gate reads them, oldest first: every
-  # submitted response graded under the current rubric, with no cap. The fold
-  # keeps an earned size for as long as nothing undoes it, so a window over
-  # recent days would forget a size whose earning days had aged out. Batches
-  # bound memory, not history.
+  # No cap: the fold keeps an earned size until something undoes it, so a recent window would forget it. Batches bound memory.
   class Evidence
     include Enumerable
 
     BATCH_SIZE = 100
 
-    # A review graded before the rubric existed, or by a worker still running
-    # older code, carries no stamp; its ratings had no shared definition.
+    # Reviews graded before the rubric, or by older code, carry no stamp; their ratings had no shared definition.
     RUBRIC_STAMPED = "jsonb_path_exists(ai_review, '$.*.rubric ? (@ == $version)', jsonb_build_object('version', CAST(:version AS integer)))"
 
     def initialize(user, batch_size: BATCH_SIZE)
@@ -38,8 +33,7 @@ class CompetencyGate
       Day.new(results: ReviewedSectionResults.for(response, require_rubric: true, include_eased: true), optional: optional_state(response))
     end
 
-    # Reads section_keys and answered_sections, which assume the row's JSON is
-    # well formed; the readable? check above is what lets it.
+    # Assumes well-formed JSON; the readable? check above guarantees it.
     def optional_state(response)
       optional = response.section_keys - @fixed_kinds
       return :none if optional.empty?

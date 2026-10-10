@@ -33,8 +33,7 @@ RSpec.describe PushDelivery do
     expect(subscription.reload.last_delivered_at).to be_present
   end
 
-  # The pruning is what keeps the job honest over time: iOS drops subscriptions
-  # on its own, and a dropped endpoint answers 404/410 forever afterwards.
+  # iOS drops subscriptions on its own, and a dropped endpoint answers 404/410 forever.
   [ WebPush::ExpiredSubscription, WebPush::InvalidSubscription ].each do |error|
     it "deletes the endpoint when the push service reports it gone (#{error})" do
       allow(WebPush).to receive(:payload_send).and_raise(error.new(double(body: "gone"), "host"))
@@ -51,9 +50,7 @@ RSpec.describe PushDelivery do
     expect(PushSubscription.exists?(subscription.id)).to be(true)
   end
 
-  # web-push drives Net::HTTP directly and rescues nothing, and
-  # SendPushReminderJob fans out over a user's endpoints in a plain loop — so
-  # anything escaping here takes that user's other devices down with it.
+  # SendPushReminderJob loops over endpoints, so an escaping error takes the user's other devices down.
   [
     [ "a reset connection",       Errno::ECONNRESET ],
     [ "an unreachable host",      Errno::EHOSTUNREACH ],

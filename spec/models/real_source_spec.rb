@@ -1,10 +1,7 @@
 require "rails_helper"
 
 RSpec.describe RealSource do
-  # The drift guard. A method renamed or a migration deleted fails here, in
-  # CI, before it can start being skipped at generation time — and the size
-  # bound is what keeps "a focused method or small chunk" a rule rather than a
-  # hope.
+  # Fails in CI when a method is renamed or a migration deleted, before generation starts skipping it.
   describe "every curated entry" do
     it "resolves against the deployed source" do
       RealSource.all.each do |excerpt|
@@ -24,8 +21,7 @@ RSpec.describe RealSource do
       expect(ids.uniq.size).to eq(ids.size)
     end
 
-    # The model writes a next migration against the table as it stands, so an
-    # entry whose table has left the schema has nothing to write against.
+    # The model writes a next migration against the table as it stands, so the table must still exist.
     it "shows every migration's tables as they stand today, and no method any schema" do
       RealSource::SCHEMA_REVIEW.each do |excerpt|
         expect(excerpt.current_schema).to be_present, "#{excerpt.id} has no current schema"
@@ -41,12 +37,7 @@ RSpec.describe RealSource do
     end
   end
 
-  # In this process Prism is always already loaded — irb, debug and the lint
-  # tooling all require it — which is exactly how the missing require in this
-  # file went unnoticed until a production boot. So the check has to happen
-  # in a process with none of that: a production-only bundle, no Rails, just
-  # this one file. The class references Rails only inside method bodies, so
-  # the bare require succeeds either way; only Prism's presence differs.
+  # Tooling always loads Prism in this process, which hid a missing require until a production boot.
   it "loads Prism itself rather than relying on tooling to have done so" do
     output = Bundler.with_unbundled_env do
       `cd #{Rails.root} && BUNDLE_WITHOUT=development:test bundle exec ruby -e 'require "./app/models/real_source"; print defined?(Prism)' 2>&1`
@@ -128,11 +119,7 @@ RSpec.describe RealSource do
       expect(instruction).not_to include("modified copy")
     end
 
-    # The migration never names the index `t.references` gives it, and the
-    # grader never saw the migration at all. The live run that found this
-    # planted `add_index :push_subscriptions, :user_id`, which the table
-    # already had, so the snippet failed on the index name before its flaw
-    # mattered.
+    # The grader never sees the migration, and a live run once re-added an index the table already had.
     describe "#current_schema" do
       it "is the table as db/schema.rb has it today, indexes and foreign keys included" do
         schema = excerpt.current_schema

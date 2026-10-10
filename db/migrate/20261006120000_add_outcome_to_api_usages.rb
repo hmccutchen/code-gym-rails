@@ -1,9 +1,4 @@
-# A usage row now records the call's outcome as well as its tokens: the
-# provider, the HTTP status, a failure code for a call that returned nothing
-# usable, the provider's quota identifier on a 429, and whether the call was
-# billed to a house key. Nullable because rows written before this did not
-# record them; the provider is backfilled because every model name names its
-# provider, so that one is known rather than guessed.
+# Nullable because older rows never recorded these; provider is backfilled since each model name implies it.
 class AddOutcomeToApiUsages < ActiveRecord::Migration[8.1]
   def up
     add_column :api_usages, :provider, :string

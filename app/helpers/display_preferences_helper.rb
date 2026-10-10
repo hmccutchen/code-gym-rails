@@ -3,8 +3,7 @@ module DisplayPreferencesHelper
     @display_preferences ||= logged_in? ? DisplayPreferences.for(current_user) : DisplayPreferences.signed_out
   end
 
-  # Setup always links the optional stylesheets so a choice applies before
-  # it is saved. The default-on pattern's base styles live in the layout.
+  # Setup always links the optional stylesheets so a choice applies before it is saved.
   def display_stylesheets?
     display_preferences.any? || content_for?(:display_controls)
   end
@@ -14,9 +13,7 @@ module DisplayPreferencesHelper
     attributes.any? ? " #{tag.attributes(attributes)}".html_safe : ""
   end
 
-  # The outlined logo was drawn for dark backgrounds. The plain one takes over
-  # wherever the light palette applies, through the same media value as the
-  # palette's own <link>, so the two can never disagree.
+  # Uses the light palette's own media value, so the logo and palette can never disagree.
   def brand_mark
     outlined = image_tag("logo-outlined.png", alt: t("app_name"), class: "brand-mark", width: 930, height: 654)
     return outlined unless display_stylesheets?

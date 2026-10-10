@@ -1,9 +1,6 @@
 require "rails_helper"
 
-# The code path is now the only way in, and it is the one flow a unit spec
-# cannot fully vouch for: it spans two requests in one browser, and its
-# security rests on the second one reading the email from the session rather
-# than the page.
+# Spans two requests in one browser, and its security rests on the second reading the email from the session.
 RSpec.describe "Logging in with an emailed code", type: :system do
   let(:user) { create_fake_provider_user }
 
@@ -38,8 +35,7 @@ RSpec.describe "Logging in with an emailed code", type: :system do
     fill_in "6-digit code from the email", with: wrong_code_for(user.generate_login_code!)
     click_button "Verify code"
 
-    # The email carries no link to point a locked-out user at, so the
-    # rejection has to send them back to the form instead.
+    # The email carries no link, so a rejection must send the user back to the form.
     expect(page).to have_content("Incorrect or expired code. Try again, or request a new one below.")
     expect(page).to have_field("6-digit code from the email")
   end

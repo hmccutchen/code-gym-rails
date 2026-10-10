@@ -1,10 +1,6 @@
 require "rails_helper"
 
-# Two accounts throughout: `owner` holds the data, `intruder` is logged in and
-# tries to read or change it. Covers the routes the 2026-10-05 security audit
-# found with no cross-user spec; the routes that already had one (email_review,
-# explain_differently, follow_ups, start_over, duck_thread, history, track
-# dismissals) are listed in docs/security-audit-2026-10-05.md.
+# `owner` holds the data and `intruder` tries to reach it; see docs/security-audit-2026-10-05.md.
 RSpec.describe "Cross-user access", type: :request do
   let(:owner)    { create_user_with_key(email: "owner@example.com", name: "Owner") }
   let(:intruder) { create_user_with_key(email: "intruder@example.com", name: "Intruder") }

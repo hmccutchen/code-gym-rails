@@ -1,6 +1,4 @@
-# A trial asked for on the signed-out trial page, kept in this browser's
-# session until the emailed code proves the address. The seat is taken only
-# then, so nobody can spend a seat on an address they cannot read.
+# The seat is taken only once the emailed code proves the address, so nobody spends one on an address they can't read.
 class PendingTrial
   KEY = :pending_trial
 
@@ -26,8 +24,7 @@ class PendingTrial
     @consented_at = nil
   end
 
-  # :started, :has_own_key, or :rejected for a code that ran out of seats or
-  # time since the form was sent.
+  # :started, :has_own_key, or :rejected when the code ran out of seats or time since the form was sent.
   def start_for(user)
     return :rejected unless user.email == @email && @consented_at
     return :has_own_key if user.api_key_present?

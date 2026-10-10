@@ -126,9 +126,7 @@ RSpec.describe DailyExercise, type: :model do
       expect(exercise.active_section_keys).to eq(%w[code_review pattern challenge])
     end
 
-    # The count the user sees is the count of sections on screen, not of raw
-    # payload keys — FakeService answers with every kind deliberately, and a
-    # real provider can return an extra alternate third or fourth.
+    # FakeService answers with every kind, and a real provider can return an extra third or fourth.
     it "counts only the precedence-resolved third and fourth when a payload holds several" do
       exercise = DailyExercise.new(problem_set: {
         "code_review"     => {}, "pattern"        => {},
@@ -223,15 +221,13 @@ RSpec.describe DailyExercise, type: :model do
       expect(exercise(regenerating_since: 10.seconds.ago)).to be_regenerating
     end
 
-    # A worker that dies mid-job would otherwise leave the claim set forever and
-    # strand the user on a spinner, so the claim expires rather than latching.
+    # A dead worker would otherwise strand the user on a spinner forever.
     it "is false once the claim is older than the stale window" do
       stale = DailyExercise::REGENERATION_STALE_AFTER.ago - 1.second
       expect(exercise(regenerating_since: stale)).not_to be_regenerating
     end
 
-    # A claim must outlive the longest generation the worker can legitimately
-    # run, or a still-running job looks abandoned and a second one piles on.
+    # A shorter claim lets a still-running job look abandoned, so a second one piles on.
     it "outlasts the worker's generation budget" do
       expect(DailyExercise::REGENERATION_STALE_AFTER.to_i).to be > AiService::GENERATION_READ_TIMEOUT
     end

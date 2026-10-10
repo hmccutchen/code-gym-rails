@@ -1,12 +1,4 @@
-# The checks a house-key call passes before it is sent, from the one funnel
-# every provider call takes. First the trial must still be active: the
-# service was built when the trial was, and a fan-out or a long job keeps
-# using it after the trial ends or the kill switch is set. Then the invite's
-# cap on this account's calls today, counted on the user's own day, and the
-# deployment's guard on every trial's calls on that provider, counted in the
-# provider's quota day. Both caps count attempts, since a refused call still
-# counted against the key, and both overshoot by at most the width of one
-# fan-out.
+# Re-checks the trial is active, since a service built during it keeps the house key through fan-outs and long jobs.
 class TrialAllowance
   def self.check!(user, provider:, now: Time.current)
     new(user, provider, now).check!

@@ -1,11 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "PWA", type: :request do
-  # The palette the layout renders with. The manifest has to restate these
-  # values as literals — a JSON file cannot read a CSS custom property — so the
-  # assertions below read them back out of the layout, and drift in either
-  # place fails here rather than shipping a home-screen app whose launch screen
-  # doesn't match the app it launches.
+  # The manifest restates the layout's palette as literals, so read them from the layout to catch drift.
   def layout_color(token)
     layout = Rails.root.join("app/views/layouts/application.html.erb").read
     layout[/--#{token}:\s*(#[0-9a-f]{3,8})/i, 1]
@@ -16,9 +12,7 @@ RSpec.describe "PWA", type: :request do
 
     before { get "/manifest.json" }
 
-    # Served by Rails' own PwaController, which does not inherit
-    # ApplicationController. The manifest is fetched before any session exists,
-    # so a login redirect here would leave the app uninstallable.
+    # The manifest is fetched before any session exists, so a login redirect would make the app uninstallable.
     it "is reachable without a session" do
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq("application/json")
@@ -40,10 +34,7 @@ RSpec.describe "PWA", type: :request do
       expect(manifest["theme_color"]).to eq(layout_color("surface"))
     end
 
-    # The route pins format: false. Without it the pattern carries an optional
-    # (.:format) that a request can override, and the JSON template is then
-    # asked for as HTML — MissingTemplate, i.e. a 500 on a path that needs no
-    # session and that any crawler appending an extension will find.
+    # Without format: false, a request for .html asks for a missing template and gets a 500.
     it "serves no format but JSON" do
       get "/manifest.json.html"
 
@@ -67,18 +58,14 @@ RSpec.describe "PWA", type: :request do
   describe "the layout's install tags" do
     before { get login_path }
 
-    # apple-mobile-web-app-capable, not the manifest, is what drops Safari's
-    # address bar, reload and text-size buttons on iOS before 17.4.
-    it "declares the app installable and standalone-capable" do
+    it "declares the app installable and standalone-capable, including on iOS before 17.4" do
       expect(response.body).to include(%(<link rel="manifest" href="/manifest.json">))
       expect(response.body).to include(%(<meta name="apple-mobile-web-app-capable" content="yes">))
       expect(response.body).to include(%(<meta name="mobile-web-app-capable" content="yes">))
       expect(response.body).to include(%(<meta name="apple-mobile-web-app-status-bar-style" content="black">))
     end
 
-    # The third copy of --surface, after the custom property and the manifest.
-    # Without this the manifest assertion above can be brought back into line
-    # on its own and leave the browser-chrome tint on the old value.
+    # The third copy of --surface; without this the manifest can be fixed alone and leave the tint stale.
     it "tints the browser chrome from the same palette as the manifest" do
       expect(response.body).to include(%(<meta name="theme-color" content="#{layout_color("surface")}">))
     end
@@ -89,22 +76,11 @@ RSpec.describe "PWA", type: :request do
       expect(Rails.public_path.join("apple-touch-icon.png")).to exist
     end
 
-    # A tap leaves a touch screen in :hover, so without this the global
-    # a:hover underline stays on the logo after every trip home.
-    it "keeps the brand link free of the hover underline" do
+    it "keeps the brand link free of the hover underline, which a tap would leave stuck on a touch screen" do
       expect(response.body).to include("nav .brand:hover { text-decoration: none; }")
     end
   end
 
-  # The nav's name editor is hidden in the installed app and nowhere else, so
-  # renaming yourself is a browser-tab-only control by design. The control is
-  # still rendered for every signed-in user (dashboard_spec's "editable nav
-  # name" covers that) — only this rule decides who can see it.
-  #
-  # Asserted against the stylesheet rather than in a browser because Playwright
-  # cannot emulate display-mode (neither #emulate_media nor a CDP override
-  # reaches it), so no system spec can put the page in the state this rule
-  # fires in.
   describe "the name editor in standalone mode" do
     let(:standalone_block) do
       Rails.root.join("app/views/layouts/application.html.erb").read[
@@ -116,19 +92,12 @@ RSpec.describe "PWA", type: :request do
       expect(standalone_block).to include("name-editor { display: none; }")
     end
 
-    # The base rule sets a display of its own further down the sheet, and a
-    # media query adds no specificity — so the hide has to outrank it rather
-    # than rely on order. Two class selectors under `nav` against the base
-    # rule's one is what does it.
+    # A media query adds no specificity, so the hide needs two class selectors to beat the later base rule.
     it "outranks the base rule that comes after it" do
       expect(standalone_block).to include("nav .nav-links .name-editor")
     end
   end
 
-  # Same limit as above: the indicator's visibility is what tells the
-  # pull-to-refresh script it is in the installed app, so the rule that shows
-  # it is asserted against the stylesheet. spec/system/pull_to_refresh_spec.rb
-  # covers the gesture itself.
   describe "the pull-to-refresh indicator" do
     let(:layout) { Rails.root.join("app/views/layouts/application.html.erb").read }
     let(:standalone_block) { layout[/@media \(display-mode: standalone\) \{(.*?)\n    \}/m, 1] }

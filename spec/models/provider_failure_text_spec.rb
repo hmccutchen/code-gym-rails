@@ -90,9 +90,6 @@ RSpec.describe ProviderFailureText, type: :model do
     expect(sentence).to start_with("Gemini sent back something Code Gym couldn't use, so the critique didn't run.")
   end
 
-  # Nothing in the table can carry provider text, a status code or a key,
-  # since the only inputs are a kind, a label and times. This holds every
-  # sentence the table can produce to that.
   it "never shows provider text, a status code or a key, on any surface for any kind" do
     forbidden = [ /\b[45]\d\d\b/, /AIza/, /sk-/, /quota, please/, /TCPSocket/, /Net::/, /API error/ ]
     ProviderFailure::KINDS.each do |kind|

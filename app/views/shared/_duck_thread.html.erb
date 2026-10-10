@@ -1,23 +1,12 @@
-<%# Pre-submission "rubber duck" Socratic thinking partner for one section.
-    Fully unpersisted: the conversation lives only in this tab's memory (see
-    the script below) and is sent back in full on every request purely as
-    prompt context — nothing is ever written server-side. Only ever rendered
-    from an unsubmitted section; once submitted this partial simply isn't
-    rendered again, so there's nothing to clean up.
-    Local: field (section key, e.g. "code_review"). %>
+<%# Local: field (section key, e.g. "code_review"). Design notes: docs/code-notes/app/views/shared/_duck_thread.html.md %>
 <div class="duck-thread" data-duck-thread data-section="<%= field %>">
   <button type="button" class="btn btn-ghost btn-sm duck-toggle" aria-expanded="false" aria-controls="duck-body-<%= field %>"><%= t("duck.toggle") %></button>
   <div class="duck-body" id="duck-body-<%= field %>" hidden>
     <div class="duck-turns" aria-live="polite"></div>
     <div class="duck-form">
-      <%# A placeholder is not a label: it disappears once typing starts, and
-          some screen readers skip it. %>
       <label class="visually-hidden" for="duck-input-<%= field %>"><%= t("duck.prompt") %></label>
       <input type="text" class="duck-input" id="duck-input-<%= field %>" placeholder="<%= t("duck.prompt") %>">
       <button type="button" class="btn btn-ghost btn-sm duck-send"><%= t("duck.send") %></button>
-      <%# Sends a fixed message on the user's behalf so getting an explanation
-          doesn't depend on knowing how to phrase one. It goes through the same
-          endpoint as any other turn and counts against the same cap. %>
       <button type="button" class="btn btn-ghost btn-sm duck-explain" data-message="<%= AiService::DUCK_EXPLAIN_REQUEST %>"><%= t("duck.explain") %></button>
       <button type="button" class="btn btn-ghost btn-sm duck-clear"><%= t("duck.clear") %></button>
     </div>
@@ -25,12 +14,6 @@
   </div>
 </div>
 
-<%# This partial can render up to three times per page (code_review, pattern,
-    and whichever third section is present), so the script is emitted once
-    into the layout's shared :page_scripts region rather than inline here —
-    same reasoning and guard pattern as shared/_ai_review's script. The
-    [data-duck-thread]:not([data-duck-wired]) guard is what lets this single
-    copy wire up every instance regardless of which render emitted it. %>
 <% unless @duck_thread_script_emitted %>
   <% @duck_thread_script_emitted = true %>
   <% content_for :page_scripts do %>
@@ -49,9 +32,7 @@
       const p = document.createElement("p");
       p.className = "duck-turn duck-" + turn.role;
 
-      // The speaker is otherwise conveyed only by CSS colour, which assistive
-      // tech and anyone not perceiving colour never receives; visually hidden
-      // so the styled transcript is unchanged.
+      // Without this the speaker shows only as CSS colour, which assistive tech never receives.
       const who = document.createElement("span");
       who.className = "visually-hidden";
       who.textContent = (SPEAKER[turn.role] || turn.role) + ": ";
@@ -64,15 +45,7 @@
 
   const userTurnCount = (box) => box.duckThread.filter((t) => t.role === "user").length;
 
-  // Called after every send attempt (success or failure) and after Clear —
-  // the single place that decides whether the input stays usable, so the
-  // in-flight lock set before a fetch and the cap reached after one always
-  // resolve to the same correct resting state.
-  //
-  // It only ever *writes* the status when capped. It used to clear it
-  // otherwise, which — because it runs in sendMessage's finally — wiped every
-  // error message microseconds after the catch set it, making failures
-  // silent. Callers that want the status cleared do so explicitly.
+  // Writes the status only when capped: clearing it here, in sendMessage's finally, would wipe every error message.
   const refreshCap = (box) => {
     const input = box.querySelector(".duck-input");
     const send = box.querySelector(".duck-send");
@@ -108,8 +81,6 @@
     box.duckGeneration = 0;
 
     const sendMessage = async (explicitMessage) => {
-      // An explicit message (the Explain button's) bypasses the input entirely:
-      // the empty box is the normal case for it, not a reason to do nothing.
       const message = explicitMessage || input.value.trim();
       if (!message || send.disabled) return;
 
@@ -130,9 +101,7 @@
           body: JSON.stringify({ section: box.dataset.section, message: message, thread: priorThread })
         });
         const data = await CodeGymServerMessage.read(res);
-        // Clear ran while this was in flight: the reply belongs to a
-        // conversation the user has discarded, so dropping it (rather than
-        // pushing it) is what keeps a cleared thread cleared.
+        // Clear ran while this was in flight; dropping the reply keeps a cleared thread cleared.
         if (generation !== box.duckGeneration) return;
         if (!res.ok || res.redirected || !data) throw CodeGymServerMessage.failure(res, data, SEND_FAILED);
 
@@ -157,9 +126,7 @@
     clear.addEventListener("click", () => {
       box.duckGeneration += 1;
       box.duckThread = [];
-      // input.value is deliberately left alone: after a failed send it still
-      // holds text the user may want to retry, and Clear names the
-      // conversation, not the draft.
+      // input.value is left alone: after a failed send it holds text to retry, and Clear names the conversation.
       status.textContent = "";
       renderTurns(box);
       refreshCap(box);

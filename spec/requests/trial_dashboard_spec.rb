@@ -1,7 +1,5 @@
 require "rails_helper"
 
-# What a trial account sees on the dashboard, Setup and the provider-calling
-# paths while the trial runs and once it has ended.
 RSpec.describe "Trial accounts on the dashboard", type: :request do
   let(:user) { create_trial_user(provider: "fake", days: 7, cap: 12, time_zone: "America/New_York") }
 
@@ -41,8 +39,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
   end
 
   describe "once the trial has ended" do
-    # Logged in after the jump, since a session from the trial's first week
-    # would have expired by then.
+    # A session from the trial's first week would have expired by then.
     before do
       travel_to(user.trial_ends_at + 1.hour)
       login_as(user)

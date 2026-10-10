@@ -21,11 +21,7 @@ RSpec.describe ConceptReferenceCalibration do
                  "usage" => { "total_input_tokens" => 70, "total_output_tokens" => 30 } }.to_json ]
   end
 
-  # The real connection, with only its adapter swapped: headers, timeouts and
-  # the retry policy are the provider's own, so retried attempts and the auth
-  # header are observable. Each build_connection call yields a fresh
-  # connection, since Faraday locks a stack after its first request and the
-  # harness adds its attempt counter to the connection it is handed.
+  # Real connection with only the adapter swapped; Faraday locks a stack after its first request, so build fresh.
   def stub_provider(provider_class, &reply)
     allow_any_instance_of(provider_class).to receive(:build_connection).and_wrap_original do |original|
       original.call.tap do |conn|
@@ -234,9 +230,7 @@ RSpec.describe ConceptReferenceCalibration do
       expect { calibration(provider: "openai") }.to raise_error(ArgumentError, /claude, gemini/)
     end
 
-    # At or under READ_TIMEOUT the providers stop marking the request
-    # long_running, so a timeout would retry into billed attempts the deployed
-    # call never makes; the run would measure a different policy.
+    # At or under READ_TIMEOUT a timeout would retry into billed attempts the deployed call never makes.
     it "refuses a timeout the retry guard would not treat as final" do
       expect { calibration(timeout: AiService::READ_TIMEOUT) }.to raise_error(ArgumentError, /READ_TIMEOUT.*final/)
       expect { calibration(timeout: AiService::READ_TIMEOUT + 1) }.not_to raise_error
@@ -256,8 +250,7 @@ RSpec.describe ConceptReferenceCalibration do
                                   tokens_in: 1, tokens_out: 1, attempts: 1)
     end
 
-    # A refused call returns in well under a second, so counting its time in
-    # the spread would pull the minimum and median toward zero.
+    # A refused call returns almost at once, so counting it would pull the minimum and median toward zero.
     it "reports the spread over the calls the provider worked on, and counts failures beside it" do
       over = AiService::CONCEPT_REFERENCE_READ_TIMEOUT + 1
       records = [ record(10, :ok), record(20, :ok), record(over, :ok), record(40, :timeout), record(50, :ok),

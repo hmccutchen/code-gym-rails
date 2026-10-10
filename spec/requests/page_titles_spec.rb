@@ -1,7 +1,5 @@
 require "rails_helper"
 
-# Each page names itself in <title>, which is what a screen reader announces
-# on arrival and what the iOS app switcher shows.
 RSpec.describe "Page titles", type: :request do
   def title
     Nokogiri::HTML(response.body).at_css("title").text

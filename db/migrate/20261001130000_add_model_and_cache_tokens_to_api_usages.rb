@@ -1,6 +1,4 @@
-# Nullable with no default on purpose: rows written before these columns
-# existed did not record them, and null says unknown where a zero would read
-# as an uncached call.
+# Nullable, no default: null means unknown on older rows, where zero would read as an uncached call.
 class AddModelAndCacheTokensToApiUsages < ActiveRecord::Migration[8.1]
   def change
     add_column :api_usages, :model, :string

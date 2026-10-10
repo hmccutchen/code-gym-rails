@@ -14,8 +14,6 @@ RSpec.describe UserMailer, type: :mailer do
       expect(mail.body.encoded).to include("123456")
     end
 
-    # The code only works in the browser that asked for it, so an email that
-    # did not say so would send people to whichever device opened the mail.
     it "says where the code has to be entered" do
       expect(mail.body.encoded).to match(/browser where you requested it/i)
     end

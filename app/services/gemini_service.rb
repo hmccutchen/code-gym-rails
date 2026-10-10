@@ -1,53 +1,26 @@
 require "faraday"
 require "faraday/retry"
 
+# Design notes: docs/code-notes/app/services/gemini_service.md
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
   def self.provider_key = "gemini"
 
-  # Google's daily quotas reset at midnight Pacific, whatever the user's zone.
   def self.quota_day_zone = "America/Los_Angeles"
 
   def self.daily_quota_reset_at(failed_at) = quota_day(failed_at).end
   def self.key_pattern = /\A(AIza|AQ\.)/
 
-  # Keyed by the ApiUsage purpose string, like ClaudeService's. Generation and
-  # its single-section retry share the default route explicitly so route
-  # coverage can pin both usage labels.
   DEFAULT_ROUTE = { model: "gemini-3.5-flash" }.freeze
   MODEL_FOR_PURPOSE = {
     "generate_exercise" => DEFAULT_ROUTE,
     "retry_section"     => DEFAULT_ROUTE
   }.freeze
 
-  # The default model thinks at "medium" effort unless told otherwise, and
-  # thinking tokens are generated into — and billed as — the same output budget
-  # max_output_tokens caps. So a tight cap shared with default-effort thinking risks the model
-  # spending the budget reasoning and returning little or no reply text, which
-  # surfaces here as a truncated response rather than as anything diagnosable.
-  # Every capped caller asks for a short, shape-constrained answer, so minimal
-  # is the right effort for all of them.
-  #
-  # This is the closest analogue to ClaudeService's `thinking: disabled`, but it
-  # is NOT the same thing: Gemini 3 Flash models have no full off switch, and
-  # "minimal" is documented as the least thinking the model can do while still
-  # producing thought signatures. So a capped Gemini call still spends some
-  # budget before it answers, where the equivalent Claude call spends none —
-  # which is why the caps stay sized with headroom rather than trimmed to the
-  # reply alone.
   MINIMAL_THINKING_LEVEL = "minimal".freeze
 
-  # 3 total attempts, exponential backoff capped at 8s. `methods: []` forces
-  # every retry decision through `retry_if` — faraday-retry treats a method on
-  # its `methods` list as retryable outright and never consults `retry_if`, and
-  # POST (which every call here uses) has to be on one list or the other or no
-  # retry ever fires. 429 matters most here: the
-  # Gemini free tier's ~15 req/min limit means teammates generating around
-  # the same time can collide. Retry-After / RateLimit-Reset response
-  # headers are honored automatically by faraday-retry when present, taking
-  # precedence over the computed backoff. Exposed as a constant so specs can
-  # build an equivalent test connection instead of duplicating these values.
+  # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
   RETRY_OPTIONS = {
     max:                 AiService::RETRY_MAX,
     interval:            0.5,
@@ -68,16 +41,7 @@ class GeminiService < AiService
       input:              flatten_history(history, prompt),
       store:              false
     }
-    # No default output cap is sent otherwise — existing callers rely on the
-    # provider's own default ceiling, and on the model's default thinking
-    # effort with it. Only a call that explicitly asks for a tighter cap (e.g.
-    # AiService::DUCK_RESPONSE_MAX_TOKENS) sets this.
-    #
-    # The cap and the thinking level travel together deliberately: asking for a
-    # tight budget without also asking for minimal thinking is what lets the
-    # model spend that budget reasoning (see MINIMAL_THINKING_LEVEL). Both must
-    # be nested under generation_config — the Interactions API ignores a
-    # top-level max_output_tokens, which would silently drop the cap.
+    # The cap and minimal thinking go together under generation_config; the API ignores a top-level max_output_tokens.
     if max_tokens
       body[:generation_config] = { max_output_tokens: max_tokens, thinking_level: MINIMAL_THINKING_LEVEL }
     end
@@ -99,20 +63,11 @@ class GeminiService < AiService
 
     {
       text:          text_parts.join,
-      # total_input_tokens includes the cached part, unlike Claude's
-      # input_tokens; subtracting it keeps tokens_in the uncached input on
-      # every provider, so a cached token is never priced twice.
       input_tokens:  usage["total_input_tokens"].to_i - cached_tokens,
-      # Thinking is billed as output but reported apart from it: a live
-      # response gave total_tokens = input + output + thought.
       output_tokens: output_tokens.to_i + usage["total_thought_tokens"].to_i,
       model:         body[:model],
       cache_read_tokens:  cached_tokens,
       cache_write_tokens: 0,
-      # The API documents "incomplete" as completed with incomplete results,
-      # hitting max_tokens being one cause, so the status decides and token
-      # counts are not consulted: a live call capped at 60 stopped at 56
-      # output tokens with this status.
       truncated: parsed["status"] == "incomplete",
       http_status: resp.status
     }
@@ -121,10 +76,7 @@ class GeminiService < AiService
     raise error_class, "Network error calling Gemini: #{e.message}"
   end
 
-  # Gemini reports an invalid key as a 400 whose details carry reason
-  # API_KEY_INVALID, not as a 401, so that body is read for the reason and
-  # never logged: it can echo the key. A 429's body names the quota in
-  # QuotaFailure and the wait in RetryInfo; neither is logged either.
+  # An invalid key arrives as a 400 with API_KEY_INVALID; never log these bodies, since they can echo the key.
   def raise_for_status(resp)
     raise_if_key_rejected("Google", resp.status)
     error = error_envelope(resp.body)
@@ -156,16 +108,13 @@ class GeminiService < AiService
     error_details(error, "ErrorInfo").map { |detail| detail["reason"] }
   end
 
-  # A 429 can list several violations; the daily one is the one that decides
-  # how long the wait is, so it wins over a per-minute limit beside it.
+  # The daily violation decides the wait, so it wins over a per-minute one beside it.
   def quota_id_from(error)
     ids = error_details(error, "QuotaFailure").flat_map { |detail| Array(detail["violations"]) }
                                               .filter_map { |violation| violation["quotaId"] if violation.is_a?(Hash) }
     ids.find { |id| id.match?(ProviderFailure::DAILY_QUOTA_PATTERN) } || ids.first
   end
 
-  # RetryInfo's delay is a duration string such as "39s"; the header, when
-  # sent, is whole seconds.
   def retry_delay_from(resp, error)
     delay = error_details(error, "RetryInfo").filter_map { |detail| detail["retryDelay"] }.first.to_s
     return delay.to_f.ceil if delay.match?(/\A\d+(\.\d+)?s\z/)
@@ -175,8 +124,6 @@ class GeminiService < AiService
 
   def routed_model(purpose) = MODEL_FOR_PURPOSE.fetch(purpose, DEFAULT_ROUTE)[:model]
 
-  # The schema holds the reply's shape, not its string lengths, so the
-  # caller's parse stays the boundary.
   def json_format(schema)
     { type: "text", mime_type: "application/json", schema: schema }
   end

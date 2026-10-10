@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# Chromium honours an emulated prefers-reduced-motion, so these read the
-# computed styles a person with that OS setting would get.
+# Chromium honours an emulated prefers-reduced-motion, so these read the styles that OS setting produces.
 RSpec.describe "Reduced motion", type: :system do
   let(:user) { create_fake_provider_user }
 

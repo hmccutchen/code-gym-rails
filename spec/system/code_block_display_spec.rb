@@ -1,11 +1,8 @@
 require "rails_helper"
 
-# Code blocks on a phone with the display preferences applied: the page never
-# scrolls sideways at the largest text size, and code takes its background
-# and token colors from the theme.
+# At the largest text size the page never scrolls sideways, and code takes its colors from the theme.
 RSpec.describe "Code blocks under display preferences", type: :system do
-  # Lines as long as the longest in the judge fixtures, in the code example
-  # and in the worked example, which renders as a paragraph.
+  # As long as the longest judge-fixture lines, in the code example and in the worked example's paragraph.
   LONG_CODE = <<~RUBY.chomp.freeze
     class StatementExport
       def call

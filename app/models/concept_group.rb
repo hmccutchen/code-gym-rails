@@ -1,17 +1,8 @@
-# Which display group a concept renders under on the Learn tab, and the order
-# the groups appear in. Display only: this has nothing to do with
-# ConceptBucket, which decides where a concept's mastery history records, and
-# must never acquire a relationship to it.
-#
-# Membership is derived from the vocabulary constants rather than restated, so
-# a concept that moves between named groups moves in exactly one place.
+# Display only: must never acquire a relationship to ConceptBucket, which decides where mastery records.
 class ConceptGroup
   CORE = "core".freeze
 
-  # Ordered as a reader meets them: the base vocabulary first, then the named
-  # groups from most concrete to most evaluative. A concept in two groups takes
-  # the first match — impossible with today's disjoint constants, but the
-  # lookup stays total rather than depending on that staying true.
+  # A concept in two groups takes the first match, so the lookup stays total if the constants ever overlap.
   NAMED = [
     [ "data_modeling",      AiService::DATA_MODELING_CONCEPTS ],
     [ "domain_modeling",    AiService::DOMAIN_MODELING_CONCEPTS ],
@@ -33,9 +24,7 @@ class ConceptGroup
     match ? match.first : CORE
   end
 
-  # A bucket's concepts grouped for display. Empty groups are dropped, which is
-  # what makes the four language-independent buckets render as a single flat
-  # list without a special case: every one of their concepts falls in CORE.
+  # Dropping empty groups is what renders the language-independent buckets as one flat list.
   def self.grouped(concepts)
     concepts.group_by { |concept| self.for(concept) }
             .sort_by { |key, _concepts| ORDER.index(key) }

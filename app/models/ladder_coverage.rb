@@ -1,13 +1,9 @@
-# Which concepts can ground each section kind's difficulty target, and which of
-# them already have a ladder. Every kind gets an entry whether or not it is
-# targeted; callers that act only on targets filter for themselves.
+# Every kind gets an entry whether or not it is targeted; callers filter for targets themselves.
 class LadderCoverage
   Entry = Data.define(:kind, :pairs, :grounded) do
     def gaps = pairs - grounded
   end
 
-  # Which pairs each kind can offer is ConceptHosts' answer, at each targeted
-  # kind's own level; this adds only which of them already carry a ladder.
   def self.for(user)
     pairs_by_kind = ConceptHosts.for(user, difficulty: KindDifficulty.for(user)).pairs_by_kind
     grounded = laddered_pairs(pairs_by_kind.values.flatten(1).uniq)

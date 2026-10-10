@@ -1,10 +1,6 @@
 require "rails_helper"
 
-# A failed request may only put a sentence the app wrote on the page, or the
-# page's own wording. The three replies below are the ones that used to leak
-# through: a dropped connection rejects with the browser's own text, an
-# unhandled exception answers JSON whose `error` is Rails' status phrase, and
-# an HTML error page makes JSON parsing throw.
+# The three replies that used to leak: the browser's dropped-connection text, Rails' status phrase, an HTML error page.
 RSpec.describe "Failed requests on the page", type: :system, with_csrf: true do
   FAILED_REPLIES = {
     "a dropped connection" => <<~JS,

@@ -1,11 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
-  # The exercise is built here rather than generated through FakeService because
-  # this bug only reproduces when the term sits away from the left edge: the old
-  # panel was anchored at the term and ran off screen only once the term was far
-  # enough right. FakeService's own wording happens to wrap "memoization" to the
-  # start of a line, where no overflow is possible.
+  # Built by hand, not via FakeService: the overflow only reproduces with the term away from the left edge.
   let(:phone_width) { 320 }
 
   def start_dashboard(user, question:)
@@ -19,10 +15,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     expect(page).to have_content(/Code Review/i, wait: 10)
   end
 
-  # Opens the panel and reports how far the page can scroll horizontally before
-  # and after. The document already overflows slightly at this width because of
-  # the code snippet, so the meaningful assertion is that opening a panel adds
-  # nothing to it — not that the total is zero.
+  # The page already overflows slightly from the snippet, so assert opening a panel adds nothing, not a zero total.
   def open_panel_and_measure
     page.evaluate_script(<<~JS)
       (() => {
@@ -53,17 +46,13 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
 
       expect(box["found"]).to be(true)
       expect(box["display"]).to eq("block")
-      # Guards the fixture itself: if the text ever reflows so the term starts at
-      # the left edge, the panel could not overflow and the assertion below would
-      # pass without testing anything.
+      # Guards the fixture: a term at the left edge could not overflow, so the assertion below would test nothing.
       expect(box["termLeft"]).to be > phone_width * 0.25
       expect(box["scrollAfter"]).to be <= box["scrollBefore"]
     end
   end
 
-  # The panel is also revealed by :focus-visible and by hover on hover-capable
-  # pointers, neither of which runs the positioning script. Those paths get no
-  # custom properties, so the fallbacks alone have to keep the panel capped.
+  # :focus-visible and hover skip the positioning script, so the CSS fallbacks alone must cap the panel.
   it "keeps the desktop width cap when the positioning script has not measured a term" do
     user = create_fake_provider_user
 
@@ -85,10 +74,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     end
   end
 
-  # Keyboard users reach the panel through :focus-visible and never fire a
-  # click, so the panel has to be measured on focus as well. Capping the width
-  # is not enough on its own: a 16rem panel anchored at a term sitting 120px in
-  # still runs past a 320px screen.
+  # Keyboard focus fires no click, so the panel must be measured on focus too; a width cap alone still overflows.
   it "keeps the panel on screen when it is revealed by keyboard focus" do
     user = create_fake_provider_user
 
@@ -119,13 +105,11 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     end
   end
 
-  it "re-fits an already-open panel after the device is rotated" do
+  it "re-fits an already-open panel after the device rotates from landscape to portrait" do
     user = create_fake_provider_user
     landscape_width = 568
 
     travel_to(a_weekday) do
-      # Rotated landscape → portrait, not the reverse: a panel sized for the
-      # wider screen is the one that no longer fits after the rotation.
       page.current_window.resize_to(landscape_width, 320)
       start_dashboard(user, question: "The customer memoization")
       open_panel_and_measure

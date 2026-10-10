@@ -4,21 +4,13 @@
   <p style="font-size:.85rem;color:var(--muted);" id="generating-hint" aria-live="polite"><%= t("dashboard.generating.hint") %></p>
 </div>
 
-<%# Wrapped in an IIFE: this partial can be rendered by more than one full
-    page load in a row (e.g. a "Try again" retry landing back here), and
-    top-level const/let would redeclare on a second execution — same hazard
-    the answer-autosave script in dashboard/_exercise.html.erb documents. %>
+<%# IIFE: a retry can run this script again, and top-level const/let would redeclare %>
 <script>
 (() => {
   const hint = document.getElementById("generating-hint");
   const statusUrl = "<%= dashboard_status_path %>";
   let attempts = 0;
-  <%# The spinner covers two different generation windows: a background
-      first-time generation (bound by JUDGED_GENERATION_BUDGET, the longer of
-      the judged and single-stage paths) and a
-      regeneration in flight (the claim goes stale after REGENERATION_STALE_AFTER,
-      at which point the page falls through on its own). The poller must outlast
-      whichever window is longer. %>
+  <%# Outlasts both first-time generation and a regeneration claim going stale, whichever is longer %>
   <% poll_interval_s = 3.0 %>
   const POLL_INTERVAL_MS = <%= (poll_interval_s * 1000).to_i %>;
   const MAX_ATTEMPTS = <%= ([AiService::JUDGED_GENERATION_BUDGET, DailyExercise::REGENERATION_STALE_AFTER.to_i].max / poll_interval_s).ceil + 1 %>;

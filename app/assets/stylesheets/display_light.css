@@ -1,13 +1,4 @@
-/* The light theme. Its <link> carries the media attribute that decides where
-   it applies (DisplayPreferences#light_palette_media): "all" for Light, the
-   prefers-color-scheme query for Match my device, "not all" otherwise. So the
-   rules here are unscoped and stated once for both.
-
-   The same variables as the layout's :root, then the layout's hardcoded dark
-   colors by selector. Those overrides are prefixed with `html` so they also
-   beat the per-page <style> blocks, which come later in the document.
-   spec/views/palette_contrast_spec.rb holds every text color here to WCAG AA
-   on the backgrounds it sits on. */
+/* Design notes: docs/code-notes/app/assets/stylesheets/display_light.md */
 :root {
   color-scheme: light;
   --bg: #f5f5fa; --surface: #ffffff; --border: #d6d6e4;

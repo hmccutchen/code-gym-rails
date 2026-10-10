@@ -33,8 +33,7 @@ RSpec.describe PushNudgePlan do
     expect(due(submitted: true)).to be(false)
   end
 
-  # The point of the feature: a day someone started and walked away from is
-  # exactly what needs reaching, so having touched it is no longer an answer.
+  # A day started and walked away from is exactly what a nudge is for.
   it "still nudges a day that was started long enough ago" do
     expect(due(last_activity_at: (described_class::QUIET_PERIOD + 1.minute).ago)).to be(true)
   end
@@ -48,9 +47,7 @@ RSpec.describe PushNudgePlan do
     expect(due(last_activity_at: described_class::QUIET_PERIOD.ago)).to be(true)
   end
 
-  # The quiet period only delays; it never silences a day for good. Nothing
-  # here holds a per-day dedupe, so a set abandoned at noon qualifies on every
-  # tick of the window.
+  # No per-day dedupe exists, so the quiet period delays a nudge and never silences the day.
   it "keeps nudging an abandoned day for the rest of the window" do
     abandoned_at = 3.hours.ago
 
@@ -70,9 +67,7 @@ RSpec.describe PushNudgePlan do
       expect(described_class.possible?(level: "ready_and_nudges", hour: 9)).to be(false)
     end
 
-    # due? is defined in terms of possible?, so the two can never disagree
-    # about the level or the window — which is why the cron may use the cheap
-    # one as a precheck without restating the rule.
+    # due? is built on possible?, so the cron can use the cheap one as a precheck.
     it "never lets due? through where possible? is false" do
       [ "none", "ready", "ready_and_nudges" ].product((0..23).to_a).each do |level, hour|
         next if described_class.possible?(level: level, hour: hour)
@@ -82,12 +77,7 @@ RSpec.describe PushNudgePlan do
     end
   end
 
-  # QUIET_PERIOD is justified by the production schedule — it covers one whole
-  # tick, so a save always silences the next nudge. Reading the schedule here is
-  # what keeps that true: shorten the cron and this fails, which is a decision
-  # to make rather than a number to raise. Development ticks every five minutes
-  # and is deliberately not pinned, since a quiet period that covers several of
-  # its ticks breaks nothing.
+  # Shortening the cron fails this: QUIET_PERIOD must cover one whole production tick.
   it "covers one whole tick of the production cron schedule" do
     minute, hour = production_schedule.split
 

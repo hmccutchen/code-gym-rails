@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# The house key changes which credential a request carries and nothing in the
-# request: a trial account and an own-key account with equal settings send
-# byte-identical generation and judge calls.
+# A trial and an own-key account with equal settings must send byte-identical requests.
 RSpec.describe "Trial isolation", type: :model do
   around { |example| travel_to(Time.utc(2026, 10, 14, 15)) { example.run } }
 

@@ -9,8 +9,7 @@ RSpec.describe "Request log parameter filtering" do
     expect(outcome("code" => "123456")).to eq("code" => "[FILTERED]")
   end
 
-  # Entries match as substrings, so the code entry is anchored: a bare :code
-  # would also hide these keys and their values.
+  # Entries match as substrings, so a bare :code would also hide these keys.
   it "matches the login code exactly, not every key that contains it" do
     expect(outcome("section" => "code_review", "code_review_mode" => "x"))
       .to eq("section" => "code_review", "code_review_mode" => "x")

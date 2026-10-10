@@ -1,28 +1,10 @@
-# Deterministic, zero-cost AiService provider for tests. Supplies provider
-# metadata and the two transport hooks (#call, #build_connection) —
-# exercise processing (DailyPlan, log_usage, normalize_concepts,
-# log_retention, ParsonsProblem.arrange!, ParsonsProblem.fixed_rating)
-# runs unmodified against this fake's output, so tests exercise the same
-# control flow a real provider triggers. #call dispatches on the literal
-# `system:` string each AiService caller passes; the review path further
-# reads which section to grade out of `prompt:`, since #review_sections
-# sends the same shared system context to every section's call.
+# Only transport is faked; #call dispatches on the literal system: string, and reviews read the section from prompt:.
 class FakeService < AiService
   def self.provider_key = "fake"
   def self.available? = Rails.env.local?
 
-  # So specs can drive the judged review path; the fake always keeps.
   def self.judges_review_prose? = true
 
-  # Every ExerciseSection kind populated at once. DailyExercise#third_key
-  # resolves by precedence over whichever keys are present hashes
-  # (ExerciseSection.thirds: architecture, security_review, challenge,
-  # parsons_problem) — architecture wins here every time, regardless of
-  # which third DailyPlan actually asked for, since resolution reads only
-  # which keys are present. Same precedence
-  # story for the fourth slot (ExerciseSection.fourths): plan_review wins over
-  # ambiguity_hunt and pseudocode_to_code whenever more than one is present,
-  # via DailyExercise#fourth_key.
   EXERCISE_PROBLEM_SET = {
     "code_review" => {
       "question" => "This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?",
@@ -221,9 +203,6 @@ class FakeService < AiService
     "essential_gaps" => []
   }.freeze
 
-  # One sentence, reused for every section: the fake's job is to make the note
-  # render, not to be interesting. The LEVEL varies (see #difficulty_assessment)
-  # so a spec or a preview can see the range rather than one word forever.
   DIFFICULTY_REASON = "Rated from the problem text alone, with no sight of anyone's answer."
 
   CONCEPT_REFERENCE = {
@@ -273,9 +252,7 @@ class FakeService < AiService
     "misfires" => "This way of looking flags guarantees that a caller already enforces, and it misses ones enforced nowhere at all."
   }.freeze
 
-  # The concept-reference reframing. Deliberately a different angle from
-  # EXPLAIN_DIFFERENTLY_TEXT below rather than a copy of it, so a spec that
-  # confused the two surfaces fails instead of passing on the same string.
+  # Differs from EXPLAIN_DIFFERENTLY_TEXT so a spec that confuses the two surfaces fails.
   CONCEPT_ALTERNATE_TEXT =
     "Picture a library where every book you request is fetched by a separate courier trip. One trip for one book is " \
     "fine; a hundred trips for a hundred books is the whole afternoon gone. The fix is always the same shape — ask " \
@@ -295,10 +272,7 @@ class FakeService < AiService
     "gaps" => [ "Your plan never says what happens when the input list is empty — the first step reads a first element that will not be there." ]
   }.freeze
 
-  # Deliberately preserves the gap the canned critique names: it indexes the
-  # first element with no empty-list check, exactly as the canned plan does. A
-  # fixture that "helpfully" added a guard would let the faithfulness specs pass
-  # while testing nothing.
+  # Keeps the canned plan's missing empty-list check; adding a guard would let the faithfulness specs test nothing.
   PSEUDOCODE_TRANSLATION = <<~RUBY.strip
     def merge_ranges(ranges)
       sorted = ranges.sort_by(&:first)
@@ -320,18 +294,7 @@ class FakeService < AiService
 
   private
 
-  # All three raises below are deliberately bare RuntimeErrors, not
-  # AiService::Error: GenerateDailyExercisesJob rescues the AiService hierarchy
-  # and turns it into a persisted, user-facing failure message, which would bury
-  # a broken fake as "generation failed" instead of failing the spec that caused
-  # it.
-  #
-  # The difficulty one is the exception that proves the rule — it can only ever
-  # run inside AiService#safe_difficulty_assessment, whose whole job is to
-  # swallow everything so a note never costs a review, so it is a development
-  # aid rather than a guarantee. What actually catches a broken section scan is
-  # fake_service_spec's "returns a difficulty for every section it was asked
-  # about"; keep that spec if this raise is ever removed.
+  # Raises bare RuntimeErrors because the job turns AiService::Error into a user-facing message that hides the bug.
   def call(system:, prompt:, cache_system: false, read_timeout: READ_TIMEOUT, max_tokens: nil, history: [], purpose: nil, response_schema: nil, single_attempt: false)
     text =
       case system
@@ -371,25 +334,14 @@ class FakeService < AiService
     { text: text, input_tokens: 0, output_tokens: 0, model: "fake", cache_read_tokens: 0, cache_write_tokens: 0 }
   end
 
-  # A kind the judge solves blind must carry its solve, or the verdict is
-  # invalid output and every judged design comparison would fall back.
   def judge_verdict(prompt)
     kind = ExerciseSection.find(prompt[/^Section kind: (\w+)$/, 1])
     solve = kind&.judge_solve_options&.last
     { "status" => "keep", "better" => solve }.compact
   end
 
-  # Unlike REVIEW_SECTION, which is one flat hash reused for every section, the
-  # difficulty pass is a single call answering about several sections at once,
-  # so the response has to be keyed by the sections actually asked about.
-  # Levels rotate through the vocabulary by position: deterministic, and it
-  # keeps a multi-section day from showing the same word three times.
   def difficulty_assessment(prompt)
-    # Intersected with the registry rather than trusted raw: the prompt embeds
-    # each section's own material, and a snippet containing its own "## Heading"
-    # line would otherwise be read as a section, shifting every level assigned
-    # after it. ExerciseSection is the authority on what a section key is, so a
-    # fake meant to be deterministic does not quietly become content-dependent.
+    # Intersected with the registry so a snippet's own "## Heading" line can't shift the levels.
     sections = prompt.scan(/^## (\w+)$/).flatten & ExerciseSection.keys
     raise "FakeService could not extract any section key from the difficulty prompt" if sections.empty?
 

@@ -1,16 +1,11 @@
+<%# Design notes: docs/code-notes/app/views/learn/show.html.md %>
 <% page_title "#{@concept.humanize} – #{t("learn.title")}" %>
 <p><%= link_to t("learn.back"), learn_path, class: "learn-back" %></p>
 <h1><%= @concept.humanize %></h1>
 <p class="learn-bucket-label"><%= t("learn.buckets.#{@bucket}") %></p>
 
 <% if @reference %>
-  <%# tagline/explanation/code_example/senior_lens render for ANY present
-      reference, guide or not — a legacy row (every row generated before
-      guides existed) still has to show its full reference rather than half
-      of it. Only the three guide fields and their headings are gated on
-      guide?, and only the single if/else below decides guide content vs the
-      write-guide control. A row with a lesson shows the lesson in place of
-      the explanation and the guide's prose, which it covers in less space. %>
+  <%# Reference fields render for any row, guide or not; only the three guide fields check guide?. %>
   <p><strong><%= @reference.tagline %></strong></p>
   <% if @reference.lesson? %>
     <%= render "learn/lesson", lesson: @reference.lesson %>
@@ -20,15 +15,10 @@
 <% end %>
 
 <% if @reference&.guide? && !@reference.lesson? %>
-  <%# The reference fields render INSIDE the guide rather than beside it: one
-      account of the concept, deepened, not two competing ones. That ordering is
-      the visible half of generating both in a single response. %>
   <p><%= @reference.guide_plain_language %></p>
 <% end %>
 
 <% if @reference %>
-  <%# Folded so the page reads short on a phone; the code is there for
-      whoever wants to see it. %>
   <details class="ref learn-code-examples">
     <summary><%= t("learn.code_examples") %></summary>
     <pre class="snippet"><%= highlighted_code(@reference.code_example, @bucket) %></pre>
@@ -53,10 +43,7 @@
 
 <%= render "learn/drill_control" %>
 
-<%# Outside the @reference gate on purpose: a citation is hand-curated static
-    data, so it is worth showing on a concept whose reference has never been
-    generated. ConceptBookSources is never sent to a provider — that is the
-    guarantee that a citation here cannot be a hallucinated one. %>
+<%# Outside the @reference gate: citations are static data, worth showing before any reference exists. %>
 <% if (sources = ConceptBookSources.for(@concept)).any? %>
   <h2><%= t("learn.sources") %></h2>
   <ul class="learn-sources">
@@ -72,8 +59,6 @@
 <% end %>
 
 <% if !@reference&.guide? %>
-  <%# Neither state is an error: the library is browsable from the first page
-      load, before anything has been generated. %>
   <%= render "learn/write_up_control", awaiting: "guide", generation_version: nil,
              message: t("learn.no_guide"), button: t("learn.write_guide") %>
 <% elsif @ladder_targets.any? %>

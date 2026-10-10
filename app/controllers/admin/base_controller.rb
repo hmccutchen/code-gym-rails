@@ -1,6 +1,5 @@
 module Admin
-  # User, avoiding a migration for what's currently a single-purpose
-  # internal tool.
+  # Admins come from ADMIN_EMAILS rather than a column on User, avoiding a migration for a single-purpose tool.
   class BaseController < ApplicationController
     before_action :require_admin!
 

@@ -1,12 +1,3 @@
-# The daily reminders, fanned out over one user's push endpoints.
-#
-# Two kinds, one job. :ready is enqueued by GenerateDailyExercisesJob's cron
-# branch on the tick that generates the set — "it is this user's 8am on a
-# weekday" is a rule that already has an owner, and a second cron entry would
-# be a second place for it to drift. :nudge is enqueued from that same branch
-# on later ticks, gated by PushNudgePlan. The on-demand branch sends neither:
-# someone who triggered generation by opening the dashboard is already looking
-# at the set this would tell them about.
 class SendPushReminderJob < ApplicationJob
   queue_as :default
 
@@ -20,10 +11,7 @@ class SendPushReminderJob < ApplicationJob
       exercise = user.daily_exercises.for_date(Date.current).first
       return unless exercise
 
-      # Nothing to remind someone about if they have already finished it — the
-      # set can exist and be done before this runs, since generation and
-      # delivery are separate jobs and the second can be queued behind a slow
-      # first.
+      # Generation and delivery are separate jobs, so the set can be finished before this runs.
       response = user.daily_responses.find_by(daily_exercise: exercise)
       return if response&.submitted?
       return unless still_wanted?(user, response, kind)
@@ -34,13 +22,7 @@ class SendPushReminderJob < ApplicationJob
 
   private
 
-  # Decided here at run time rather than trusted from the enqueue, because
-  # every fact behind it can move in between: the level, how much of the day
-  # has been answered, and — under a queue backlog — the hour itself. Without
-  # this a nudge queued at five could arrive near midnight telling someone who
-  # was still working at six that they have sections left. Inside
-  # Time.use_zone, so the hour is the user's own. An unknown kind falls through
-  # to nil and sends nothing.
+  # Re-decided at run time because a queue backlog can move the level, the answers and the hour.
   def still_wanted?(user, response, kind)
     case kind.to_sym
     when :ready then !user.reminders_none?
@@ -48,8 +30,6 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
-  # PushNudgePlan stays the only place the nudge rule lives; this re-asks it
-  # with what is true now instead of what was true at enqueue.
   def nudge_still_due?(user, response)
     PushNudgePlan.due?(
       level:            user.reminder_level,
@@ -69,14 +49,7 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
-  # Which unfinished state a nudge addresses; each has its own title under
-  # push_reminder.nudge.titles. The copy has to be right for someone
-  # two-thirds through, not only for someone who never opened the set —
-  # telling them it is "still waiting" is how a reminder starts reading as
-  # something that hasn't noticed the work. :unrated is its own state rather
-  # than part of :unsubmitted because the dashboard keeps Submit disabled until
-  # every answered section is rated (DailyResponse#submittable?), so calling
-  # that set ready to submit would name a button the user cannot press.
+  # :unrated is its own stage because Submit stays disabled until every answered section is rated.
   def stage_for(exercise, response)
     answered = answered_count(response)
 
@@ -111,17 +84,10 @@ class SendPushReminderJob < ApplicationJob
     end
   end
 
-  # active_section_keys is the authority for how many sections a day has; the
-  # count is never recomputed from problem_set.keys here or anywhere else.
-  # #answered_sections counts against those same keys, so the two can't
-  # disagree and the remainder can never come out negative.
   def section_count(exercise) = exercise.active_section_keys.size
   def answered_count(response) = response ? response.answered_sections.size : 0
 
-  # Whole hours to local midnight — the boundary that actually breaks a streak,
-  # unlike "time until the next set", which reads as two days every Friday.
-  # No sub-hour branch: NUDGE_HOURS ends at 17, so the minimum is about six
-  # hours, and a spec pins that relationship rather than a comment asserting it.
+  # Hours to local midnight, which is what breaks a streak; a spec pins that NUDGE_HOURS leaves several.
   def hours_left_today
     ((Time.current.end_of_day - Time.current) / 1.hour).floor
   end

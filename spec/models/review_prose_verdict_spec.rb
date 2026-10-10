@@ -68,9 +68,7 @@ RSpec.describe ReviewProseVerdict do
       end
     end
 
-    # An empty field has nothing to cite, so anything written into it is
-    # invented. Dropping that rewrite blocks the invention without throwing
-    # away a sound rewrite of another field in the same verdict.
+    # An empty field has nothing to cite, so a rewrite of it is invented.
     it "drops a rewrite of an empty field and keeps the rest of the edit" do
       verdict = parse(edit("better_questions" => [ { "from" => [ 0 ], "text" => "invented" } ],
                            "next_step" => "Read about includes."))

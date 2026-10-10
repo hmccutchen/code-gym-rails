@@ -1,10 +1,6 @@
 require "rails_helper"
 
-# Each example states behavior the 2026-10-05 security audit recommends. An
-# example for behavior the app does not have yet is pending. RSpec fails a
-# pending example that starts passing, which is the reminder to drop `pending`
-# in the PR that fixes it. Finding numbers refer to
-# docs/security-audit-2026-10-05.md.
+# Pending examples fail once they pass, which is the reminder to drop `pending`; see docs/security-audit-2026-10-05.md.
 RSpec.describe "Security hardening targets", type: :request do
   let(:user) { create_user_with_key }
 
@@ -46,20 +42,13 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(user.daily_responses.first&.answers.to_h.fetch("code_review", "").length).to be < 100_000
     end
 
-    # The server-side cap above is silent: it clips the tail of a stored answer
-    # while the page goes on showing the whole thing and reports "Auto-saved".
-    # Declaring the same bound on the input is what makes it visible, at the
-    # moment the text is typed or pasted rather than after a save.
-    it "declares the same cap on the answer input (finding A1)" do
+    it "declares the same cap on the answer input, so the server's silent clip is visible while typing (finding A1)" do
       get root_path
 
       expect(response.body).to include(%(maxlength="#{UserText::MAX_ANSWER_LENGTH}"))
     end
 
-    # The two kinds with answer inputs of their own are the ones a shared
-    # assertion cannot reach. The design comparison's bound is the tighter of
-    # the two, since its reason is stored behind the "pick:a\n" prefix and a
-    # flat cap would let a maximal reason be clipped after encoding.
+    # The design comparison's bound is tighter because the reason is stored behind the "pick:a\n" prefix.
     it "declares the cap on every kind's own answer input (finding A1)" do
       exercise.update!(problem_set: exercise.problem_set.merge(
         "design_comparison" => { "question" => "Which?", "piece_a" => "a", "piece_b" => "b", "concept" => "n_plus_one",
@@ -93,18 +82,13 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(context).to include("[/#{UserText::TAG}]")
     end
 
-    # The generation prompt is where the tagged name arrives, so the rule that
-    # says what a tag means has to travel with it. Nothing else asserts this,
-    # and dropping the line would leave the fence without its meaning while
-    # every other example still passed.
+    # Nothing else asserts that the tag rule travels with the tagged name in the generation prompt.
     it "states the rule in the generation system prompt, which carries the tagged name (finding A3)" do
       expect(FakeService.new(user).send(:build_system_prompt, "ruby_rails"))
         .to include(UserText::PROMPT_RULE)
     end
 
-    # The write boundary cleans a name only when it changes, so a row stored
-    # before the cap shipped keeps its length. Nothing backfills it, which
-    # leaves the prompt read as the only place it is bounded.
+    # Nothing backfills names stored before the cap, so the prompt read is the only bound on them.
     it "caps a name stored before the cap shipped when the generation prompt reads it (finding A1)" do
       user.update_column(:name, "N" * 5_000)
 
@@ -114,8 +98,6 @@ RSpec.describe "Security hardening targets", type: :request do
       expect(prompt).not_to include("N" * (UserText::MAX_NAME_LENGTH + 1))
     end
 
-    # Same gap on the other side of a follow-up thread: turn one was stored
-    # before the cap, and every later turn sends it back.
     it "caps a follow-up turn stored before the cap shipped when the thread is replayed (finding A1)" do
       exercise = DailyExercise.new(language: "ruby_rails", problem_set: { "code_review" => { "question" => "q" } })
       resp = DailyResponse.new(answers: {}, ai_review: { "code_review" => { "missed" => [] } })
@@ -168,9 +150,7 @@ RSpec.describe "Security hardening targets", type: :request do
     draft = page.css("textarea[data-field='parsons_problem']").text
     ids = page.css("[data-parsons-blocks] [data-block-id]").map { |block| block["data-block-id"] }
 
-    # Pairing each visible position with its draft entry is what would
-    # reconstruct the mapping, so the draft has to speak the same opaque
-    # language the blocks do.
+    # The draft must use the same opaque tokens, or pairing positions with entries reveals the mapping.
     expect(draft).not_to include("order:2,0,1")
     expect(draft.delete_prefix("order:").split(",")).to match_array(ids)
   end

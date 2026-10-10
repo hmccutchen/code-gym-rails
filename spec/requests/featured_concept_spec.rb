@@ -5,9 +5,7 @@ RSpec.describe "Weekly featured concept", type: :request do
 
   before { login_as(user) }
 
-  # Escaped the way the page renders it, derived from the same string the view
-  # reads — the label carries an apostrophe, so a raw comparison silently never
-  # matches and every "renders no callout" example would pass vacuously.
+  # The label carries an apostrophe, so a raw comparison would never match and pass vacuously.
   def featured_label
     ERB::Util.html_escape(I18n.t("learn.featured.label")).to_s
   end
@@ -56,15 +54,10 @@ RSpec.describe "Weekly featured concept", type: :request do
       )
     end
 
-    # The point of picking on visit rather than on a schedule: a weekend
-    # dashboard has no set on it and is exactly where this has something to
-    # offer.
     it "surfaces it on a weekend, when the page has no set to show" do
       write_up("idempotency_at_scale")
 
-      # Midday Saturday in the team's own zone, not a bare Date: the pick
-      # resolves its day there, so a date pinned in some other zone could land
-      # on the Friday and quietly stop testing a weekend at all.
+      # Midday Saturday in the team's zone, so the pick cannot resolve to Friday.
       travel_to Time.utc(2026, 9, 12, 16, 0, 0) do
         expect(ConceptReference.team_today).to be_on_weekend
 
@@ -93,8 +86,7 @@ RSpec.describe "Weekly featured concept", type: :request do
     expect(response.body).to include(learn_concept_path(bucket: "architecture", concept: mine))
   end
 
-  # A user assigned one language must never be pointed at the other's
-  # vocabulary: LearnController#show would 404 on the link.
+  # LearnController#show would 404 on a concept outside the user's language.
   it "never features a concept outside a single-language user's own slice" do
     user.update!(language: "ruby_rails")
     write_up("prototype_chain", language: "javascript")
@@ -103,9 +95,7 @@ RSpec.describe "Weekly featured concept", type: :request do
     expect(response.body).not_to include(featured_label)
   end
 
-  # The featured row is picked for staleness, not for having a guide, so a
-  # backfill that stopped short can put an un-guided concept in the slot.
-  # Nothing new catches that — its own page already offers to write it.
+  # The pick ignores whether a guide exists, so a concept without one can be featured.
   it "sends a concept with no guide to the page that offers to write one" do
     write_up("idempotency_at_scale")
     get learn_path

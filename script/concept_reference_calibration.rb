@@ -1,25 +1,16 @@
-# Times AiService#generate_concept_reference against a live provider, so
-# CONCEPT_REFERENCE_READ_TIMEOUT can be sized from measurement rather than by
-# analogy. Nothing in app/ loads this.
-#
-# Calls are billed to the key passed in, never a stored user key, and usage is
-# kept in memory rather than written as ApiUsage rows, since those rows would
-# charge a teammate's history for a calibration they never ran. Nothing from a
-# reply is printed beyond its token counts: the text is not what is measured.
+# Design notes: docs/code-notes/script/concept_reference_calibration.md
 class ConceptReferenceCalibration
   PROVIDERS = {
     "claude" => { service: ClaudeService, key: "ANTHROPIC_API_KEY" },
     "gemini" => { service: GeminiService, key: "GEMINI_API_KEY" }
   }.freeze
   PURPOSE = "generate_concept_reference".freeze
-  # Every bucket a user can hold: both languages, since "mixed" means both.
   BUCKETS = (ConceptBucket.language_buckets_for("mixed") + ConceptBucket::LANGUAGE_INDEPENDENT).freeze
   CONCEPTS_PER_BUCKET = 2
 
   Record = Data.define(:provider, :model, :bucket, :concept, :mode, :seconds, :outcome, :measured, :tokens_in, :tokens_out, :attempts)
 
-  # What one call's requests looked like on the wire. The counter sits inside
-  # faraday-retry, so a retried call reports every attempt the provider saw.
+  # The counter sits inside faraday-retry, so a retried call reports every attempt the provider saw.
   class RequestProbe
     attr_reader :attempts, :model
 
@@ -45,9 +36,7 @@ class ConceptReferenceCalibration
     end
   end
 
-  # The first two concepts of every bucket, plus the first tradeoff concept a
-  # bucket holds, since a tradeoff reference asks for a different worked
-  # example. Fixed rather than random so two runs measure the same prompts.
+  # Fixed rather than random so two runs measure the same prompts; tradeoff concepts get a different worked example.
   def self.default_sample
     BUCKETS.flat_map do |bucket|
       vocabulary = ConceptBucket.vocabulary_for(bucket)
@@ -90,9 +79,6 @@ class ConceptReferenceCalibration
 
   private
 
-  # At or under READ_TIMEOUT both providers stop marking the request
-  # long_running, so RETRY_TIMEOUT_GUARD would retry a timeout into up to
-  # RETRY_MAX extra billed attempts the deployed call never makes.
   def validate_options!(timeout, repeats, concurrency)
     unless timeout > AiService::READ_TIMEOUT
       raise ArgumentError, "timeout must exceed AiService::READ_TIMEOUT (#{AiService::READ_TIMEOUT}s), " \
@@ -111,14 +97,10 @@ class ConceptReferenceCalibration
     end
   end
 
-  # The whole list is repeated rather than each sample back to back, so a
-  # concept's repeats are spread out in time instead of landing seconds apart.
   def sequential_phase(sample)
     (sample * @repeats).map { |bucket, concept| measure(bucket, concept, :sequential) }
   end
 
-  # Mirrors the Learn tab's backfill, which fans one job per concept onto the
-  # worker: the calls share the provider's rate limit and this machine's CPU.
   def concurrent_phase(sample)
     return [] if @concurrency.zero?
 
@@ -150,9 +132,7 @@ class ConceptReferenceCalibration
     [ e.class.name, false ]
   end
 
-  # One subclass per call, like ModelComparison#pinned_service, with the route
-  # left alone: the deployed route is what is being measured. Only the read
-  # timeout is replaceable, and by default it is the deployed constant.
+  # Leaves the route alone, since the deployed route is what is measured; only the read timeout is replaceable.
   def pinned_service(probe, usage)
     timeout = @timeout
 
@@ -188,9 +168,7 @@ class ConceptReferenceCalibration
     end
   end
 
-  # Refusal and transport failures do not measure generation time.
-  # An invalid reply still took time to generate,
-  # so it belongs in both the spread and the failure count.
+  # Refusals and transport failures don't measure generation time; an invalid reply does, and also counts as a failure.
   def mode_summary(records)
     measured = records.select(&:measured)
     seconds  = measured.map(&:seconds).sort

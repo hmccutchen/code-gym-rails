@@ -365,9 +365,6 @@ RSpec.describe User, type: :model do
       expect(entry[:ai_ratings]).to eq("code_review" => "developing")
     end
 
-    # A self-rating is the engineer's own statement about a section they saw,
-    # not a grade on their answer, so a skipped section's self-rating still
-    # surfaces — unlike ai_ratings, which reads answered_concept_tags.
     it "keeps a skipped section's self-rating in self_ratings" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current,
@@ -445,14 +442,7 @@ RSpec.describe User, type: :model do
       expect(user.concepts_needing_reinforcement).to eq([ { concept: "n_plus_one", bucket: "ruby_rails", tier: "standard" } ])
     end
 
-    # concept_tags is persisted provider output, so it keeps the name a section
-    # was tagged with even after that concept leaves the vocabulary. Left
-    # unfiltered, a renamed concept keeps being reinforced for the whole
-    # 10-session window: the model can no longer tag it, and because DailyPlan
-    # sizes retention as the day's hostable sections minus the reinforcement
-    # entries claiming them, the dead entry suppresses a retention check that
-    # could have used the slot.
-    it "skips a tagged concept that is no longer in its bucket's vocabulary" do
+    it "skips a tagged concept that is no longer in its bucket's vocabulary, so it can't reinforce forever and block a retention check" do
       user = create_user
       exercise = DailyExercise.create!(user: user, date: Date.current, problem_set: { "code_review" => {} }, generated_at: Time.current)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
@@ -462,12 +452,6 @@ RSpec.describe User, type: :model do
       expect(user.concepts_needing_reinforcement).to eq([])
     end
 
-    # The membership filter applies to language buckets, unlike bucket:/
-    # exclude_buckets:, so it must run before the dedup marker. RAILS_CONCEPTS
-    # and JS_CONCEPTS overlap only partially: n_plus_one is Rails-only, so a
-    # JavaScript-day tag naming it is exactly the post-rename orphan this
-    # filters. Filtering after the dedup marker would let that dead newer
-    # occurrence consume the slot and hide the live Rails-day one.
     it "does not let an out-of-vocabulary occurrence hide an older one in a bucket where the name is still valid" do
       user = create_user
       older = DailyExercise.create!(user: user, date: Date.current - 1, language: "ruby_rails",
@@ -567,8 +551,6 @@ RSpec.describe User, type: :model do
       expect(user.concepts_needing_reinforcement).to eq([])
     end
 
-    # Resolution is on each concept's most recent occurrence, so a skipped
-    # newer one must not claim that slot and hide the real attempt behind it.
     it "lets an older answered occurrence decide when the newer one was skipped" do
       user = create_user
       older = DailyExercise.create!(user: user, date: Date.current - 2, problem_set: { "code_review" => {} }, generated_at: Time.current)
@@ -606,7 +588,7 @@ RSpec.describe User, type: :model do
 
       result = user.concepts_needing_reinforcement
       expect(result).to include(concept: "n_plus_one", bucket: "ruby_rails", tier: "standard")
-      expect(result.map { |h| h[:concept] }).not_to include("memoization") # mastered
+      expect(result.map { |h| h[:concept] }).not_to include("memoization")
     end
 
     it "excludes paused concepts entirely" do
@@ -621,9 +603,7 @@ RSpec.describe User, type: :model do
     let(:user) { User.create!(email: "bucket-filter@example.com", name: "Bucket") }
 
     def submit_response(concept:, section:, language: "ruby_rails", self_rating: "too_hard", ai_rating: "developing")
-      # Distinct, strictly-decreasing dates per call — random dates within a small
-      # range risked colliding on DailyExercise's date-uniqueness validation
-      # (scoped to user_id) when a test submits more than one response.
+      # Strictly decreasing dates, since DailyExercise dates are unique per user.
       @next_response_date ||= Date.current
       @next_response_date -= 1
       exercise = DailyExercise.create!(
@@ -717,12 +697,10 @@ RSpec.describe User, type: :model do
       expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails").map(&:concept)).to eq(%w[memoization])
     end
 
-    # Named from the real vocabulary rather than "short_interval"/"long_interval":
-    # the query filters by vocabulary membership, so an invented name would pass
-    # this test for the wrong reason. The intervals carry the meaning here.
+    # Real vocabulary names: the query filters on membership, so invented names would pass for the wrong reason.
     it "scales the threshold with each concept's own interval, not a flat number" do
-      mastery(concept: "memoization", due_on: Date.current - 8, interval: 7)   # 8 > 7: crossed
-      mastery(concept: "n_plus_one",  due_on: Date.current - 8, interval: 28)  # 8 < 28: not crossed
+      mastery(concept: "memoization", due_on: Date.current - 8, interval: 7)
+      mastery(concept: "n_plus_one",  due_on: Date.current - 8, interval: 28)
       expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails").map(&:concept)).to eq(%w[memoization])
     end
 
@@ -734,12 +712,6 @@ RSpec.describe User, type: :model do
       expect(user.concepts_overdue_for_retention_check(bucket: "ruby_rails")).to be_empty
     end
 
-    # A concept dropped or renamed out of a vocabulary leaves its mastery row
-    # behind, and that row can never resolve: the generator is only ever offered
-    # vocabulary concepts, anything else ingest normalizes to "other", and
-    # record_review! skips "other". Unfiltered it is therefore permanently
-    # overdue, so overdue_retention_check_pending? would return true every day
-    # forever and take a reinforcement slot back each time (issue #97).
     it "excludes a concept no longer in the bucket's vocabulary, however overdue" do
       mastery(concept: "retired_concept", due_on: Date.current - 90, interval: 7)
 
@@ -942,10 +914,7 @@ RSpec.describe User, type: :model do
       expect(user.provider_label).to eq("AI")
     end
 
-    it "falls back to AI for an unexpected provider value (e.g. legacy data)" do
-      # Validations block writing this normally, but rows can reach the DB via
-      # update_column/insert_all/raw SQL — the label must stay stable, never a
-      # user-visible "translation missing".
+    it "falls back to AI, never a missing translation, for an unexpected provider value (e.g. legacy data)" do
       user = create_user
       user.provider = "mistral"
       expect(user.provider_label).to eq("AI")
@@ -980,9 +949,6 @@ RSpec.describe User, type: :model do
       expect(user).to be_anonymized
     end
 
-    # Reminders have to stop at the device. A home-screen install keeps its
-    # browser-side subscription after the account is gone, so deleting the
-    # endpoints is what actually silences it.
     it "stops push reminders and drops the endpoints they would reach" do
       user = create_user
       user.update!(reminder_level: :ready)
@@ -1063,16 +1029,10 @@ RSpec.describe User, type: :model do
   describe "#resume_generation!" do
     include ActiveSupport::Testing::TimeHelpers
 
-    # A Wednesday, so the pause day and "today" are both weekdays in one week.
     let(:wednesday) { Time.utc(2026, 7, 22, 12) }
 
-    # A UTC user, so `Date.current` and the pause's local date agree without
-    # every example having to reason about the offset. The zone resolution
-    # itself gets its own example below.
     let(:user) { User.create!(email: "resumer@example.com", name: "Resumer", time_zone: "UTC") }
 
-    # Paused mid-morning on `date` in the user's own zone, the way
-    # AccountsController#toggle_generation writes it under use_time_zone.
     def pause_on(date)
       user.update!(paused_generation_at: date.in_time_zone(user.effective_time_zone) + 9.hours)
     end
@@ -1143,12 +1103,6 @@ RSpec.describe User, type: :model do
       end
     end
 
-    # regenerated_at means "this row's day has spent its regeneration". Carrying
-    # it onto a new day would hide the Generate-new-set button behind a false
-    # claim ("You've already generated a new set today").
-    # RegenerateExerciseJob gates only on `exercise&.regenerating_since` after
-    # resolving for_date, so a claim left over from the pause day would let a
-    # stranded retry replace the carried-forward set and destroy its draft.
     it "clears a leftover regeneration claim, so a stranded job cannot adopt the set" do
       travel_to(wednesday) do
         held = exercise_on(Date.current - 1, regenerating_since: Time.current - 2.days)
@@ -1171,9 +1125,6 @@ RSpec.describe User, type: :model do
       end
     end
 
-    # `date` uniqueness is enforced twice, and the model validation fires first,
-    # so RecordInvalid is the likelier of the two — a rescue for only
-    # RecordNotUnique would 500 and roll the pause clearing back with it.
     [ ActiveRecord::RecordNotUnique.new("duplicate key"),
       :record_invalid ].each do |failure|
       it "keeps the pause cleared when the move loses to #{failure.is_a?(Symbol) ? 'a date validation' : 'the unique index'}" do
@@ -1210,11 +1161,6 @@ RSpec.describe User, type: :model do
       end
     end
 
-    # /generate is not pause-gated, so a paused user can trigger a failing
-    # generation while the held set sits at an earlier date — nothing for
-    # persist_failure to suppress the report against. Recovering that set makes
-    # the error stale, and the dashboard would otherwise render "Couldn't
-    # generate a new set" above it.
     it "clears a same-day generation error the recovered set makes stale" do
       travel_to(wednesday) do
         held = exercise_on(Date.current - 1)
@@ -1241,12 +1187,6 @@ RSpec.describe User, type: :model do
       end
     end
 
-    # Reading the pause day in the user's zone but "today" in the caller's is
-    # not merely untidy — the two can name the same date and collapse the
-    # search range to empty. Tokyo is far enough ahead of an ambient-UTC caller
-    # to show it: at 20:00 UTC on the 22nd it is already the 23rd in Tokyo, so
-    # the user's today is the 23rd while the caller's is the 22nd — the same
-    # 22nd the pause began on locally.
     it "resolves both today and the pause day in the user's zone, not the caller's" do
       tokyoite = User.create!(email: "tokyo@example.com", name: "Tokyo", time_zone: "Asia/Tokyo")
       tokyoite.update!(paused_generation_at: Time.utc(2026, 7, 21, 23)) # 08:00 on the 22nd in Tokyo
@@ -1373,8 +1313,6 @@ RSpec.describe User, type: :model do
       expect(user.concept_exposure_count("n_plus_one", "ruby_rails", on_or_before: date)).to eq(1)
     end
 
-    # A skipped section was still shown, so exposure counts it: exposure reads
-    # the full concept_tags, deliberately not answered_concept_tags.
     it "counts a submitted response's skipped section as an exposure" do
       date = Date.current
       exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, language: "ruby_rails",
@@ -1398,7 +1336,7 @@ RSpec.describe User, type: :model do
       ActiveSupport::Notifications.unsubscribe(sub)
     end
 
-    it "renders improved_code visibility for many responses with a single index query" do
+    it "renders improved_code visibility for many responses with a single index query shared through inverse_of" do
       user = User.create!(email: "budget@example.com", name: "B")
       3.times do |i|
         ex = user.daily_exercises.create!(date: Date.current - i, generated_at: Time.current, language: "ruby_rails",
@@ -1408,10 +1346,10 @@ RSpec.describe User, type: :model do
       end
 
       reloaded  = User.find(user.id)
-      responses = reloaded.daily_responses.includes(:daily_exercise).to_a # exercises + user preloaded
+      responses = reloaded.daily_responses.includes(:daily_exercise).to_a
 
       queries = count_queries { responses.each { |r| r.improved_code_visible?("code_review") } }
-      expect(queries).to eq(1) # the exposure index, built once and shared (inverse_of)
+      expect(queries).to eq(1)
     end
   end
 
@@ -1420,7 +1358,6 @@ RSpec.describe User, type: :model do
 
     let(:user) { create_user }
 
-    # A Wednesday, so "today" and the two prior weekdays sit inside one week.
     let(:wednesday) { Time.utc(2026, 7, 22, 12) }
 
     def exercise_on(date)
@@ -1439,63 +1376,62 @@ RSpec.describe User, type: :model do
 
     it "counts consecutive submitted weekdays ending today" do
       travel_to(wednesday) do
-        submit_on(Date.current)     # Wed
-        submit_on(Date.current - 1) # Tue
-        submit_on(Date.current - 2) # Mon
+        submit_on(Date.current)
+        submit_on(Date.current - 1)
+        submit_on(Date.current - 2)
         expect(user.current_streak).to eq(3)
       end
     end
 
     it "bridges weekends: Friday to Monday is continuous" do
       travel_to(wednesday) do
-        submit_on(Date.current)     # Wed
-        submit_on(Date.current - 1) # Tue
-        submit_on(Date.current - 2) # Mon
-        submit_on(Date.current - 5) # previous Fri
+        submit_on(Date.current)
+        submit_on(Date.current - 1)
+        submit_on(Date.current - 2)
+        submit_on(Date.current - 5)
         expect(user.current_streak).to eq(4)
       end
     end
 
     it "resets at a weekday whose exercise went unsubmitted" do
       travel_to(wednesday) do
-        submit_on(Date.current)          # Wed
-        exercise_on(Date.current - 1)    # Tue: exercise existed, never submitted
-        submit_on(Date.current - 2)      # Mon
+        submit_on(Date.current)
+        exercise_on(Date.current - 1)
+        submit_on(Date.current - 2)
         expect(user.current_streak).to eq(1)
       end
     end
 
     it "does not break on today while it is still unsubmitted" do
       travel_to(wednesday) do
-        exercise_on(Date.current)   # Wed: in progress
-        submit_on(Date.current - 1) # Tue
-        submit_on(Date.current - 2) # Mon
+        exercise_on(Date.current)
+        submit_on(Date.current - 1)
+        submit_on(Date.current - 2)
         expect(user.current_streak).to eq(2)
       end
     end
 
     it "skips a weekday where no exercise existed at all" do
       travel_to(wednesday) do
-        submit_on(Date.current)     # Wed
-        submit_on(Date.current - 2) # Mon; Tue has no exercise (generation failed)
+        submit_on(Date.current)
+        submit_on(Date.current - 2)
         expect(user.current_streak).to eq(2)
       end
     end
 
     it "gives no credit for weekend submissions (streak counts weekdays only)" do
       travel_to(wednesday) do
-        submit_on(Date.current - 3) # Sunday, via the manual weekend generate
+        submit_on(Date.current - 3)
         expect(user.current_streak).to eq(0)
       end
     end
 
     it "computes 'today' in the caller's zone" do
-      # 02:30 UTC Wednesday is Tuesday evening in Los Angeles: the local
-      # streak ends on local-today (Tue), not the UTC day.
+      # 02:30 UTC Wednesday is Tuesday evening in Los Angeles, so the streak ends on local Tuesday.
       travel_to(Time.utc(2026, 7, 22, 2, 30)) do
         Time.use_zone("America/Los_Angeles") do
-          submit_on(Date.current)     # local Tue
-          submit_on(Date.current - 1) # local Mon
+          submit_on(Date.current)
+          submit_on(Date.current - 1)
           expect(user.current_streak).to eq(2)
         end
       end
@@ -1622,13 +1558,7 @@ RSpec.describe User, type: :model do
       expect(user).to be_valid
     end
 
-    # Excluding is per-kind curation, never a way to delete a whole slot: an
-    # empty slot would render fewer sections than SectionCount asked for, which
-    # lowers the completion mean, which shrinks the set again.
-    # The registry moves — pseudocode_to_code was added to it recently. If a
-    # kind is ever retired, every user still naming it must stay saveable, or
-    # generate_login_code!'s update! raises and login breaks for them.
-    it "still saves unrelated attributes when a stored kind has left the registry" do
+    it "still saves unrelated attributes when a stored kind has left the registry, so login keeps working" do
       user = create_user_with_key
       user.update!(excluded_section_kinds: [ "parsons_problem" ])
 
@@ -1712,8 +1642,6 @@ RSpec.describe User, type: :model do
         expect(user.errors[:locked_section_kinds].join).to include("challenge")
       end
 
-      # Clearing the level strands the lock as surely as adding a lock alone,
-      # which is why the check runs when either column changes.
       it "rejects clearing a level that a lock still depends on" do
         user = create_user_with_key
         user.update!(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ])
@@ -1918,9 +1846,6 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
     end
   end
 
-  # #held_exercise reads outside the row locks the move takes, so a submit can
-  # commit between that read and the move. The move re-checks under the
-  # response lock, else a finished session would leave its history day.
   it "leaves a set alone whose response was submitted after it was read as held" do
     travel_to(wednesday) do
       held = exercise_on(Date.current - 1)
@@ -1935,8 +1860,6 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
     end
   end
 
-  # RegenerateExerciseJob locks the exercise before its response; the move
-  # writes in the same order so the two cannot deadlock.
   it "writes the exercise before its response" do
     travel_to(wednesday) do
       held = exercise_on(Date.current - 1)
@@ -1956,9 +1879,6 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
     end
   end
 
-  # This runs on every paused dashboard load, so a held row that cannot be
-  # saved must not turn every page into a 500 with no way out; it is logged
-  # and left where it is.
   it "leaves a held set that fails validation in place instead of raising" do
     travel_to(wednesday) do
       held = exercise_on(Date.current - 1)
@@ -2052,14 +1972,12 @@ RSpec.describe User, "trials", type: :model do
     expect(user.trial_ends_at.in_time_zone("Asia/Tokyo").strftime("%F %T")).to eq("2026-10-08 23:59:59")
   end
 
-  # Consent on the signed-out page comes before the emailed code; a code
-  # entered after the user's midnight must not cost the first day.
-  it "counts the trial from when the seat is taken, keeping consent as its own time" do
+  it "counts the trial from when the seat is taken after Tokyo midnight, keeping consent before it as its own time" do
     invite, = mint_trial_code(days: 3)
     stub_env("HOUSE_FAKE_API_KEY" => "fake-house-key")
     user = User.create!(email: "z@example.com", name: "Z", time_zone: "Asia/Tokyo")
-    consented = Time.utc(2026, 10, 6, 14, 55)  # 23:55 in Tokyo
-    redeemed  = Time.utc(2026, 10, 6, 15, 5)   # 00:05 the next day
+    consented = Time.utc(2026, 10, 6, 14, 55)
+    redeemed  = Time.utc(2026, 10, 6, 15, 5)
 
     expect(user.start_trial!(invite: invite, provider: "fake", consented_at: consented, now: redeemed)).to be(true)
 

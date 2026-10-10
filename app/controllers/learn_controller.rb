@@ -3,16 +3,12 @@ class LearnController < ApplicationController
 
   helper_method :encountered?
 
-  # Each press queues one billed job per missing concept, so the count is per
-  # press rather than per job: enough to retry a partial run, not to loop.
   PREPARE_PER_HOUR = 10
 
   rate_limit to: PREPARE_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { preparing_limited },
              store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ],
              unless: :own_key?
 
-  # GET /learn — every concept in this user's vocabularies, grouped, whether or
-  # not they have ever been assigned one.
   def index
     @featured   = ConceptReference.featured
     @references = references_by_key
@@ -37,24 +33,11 @@ class LearnController < ApplicationController
     @paused = current_user.concept_masteries.tier_paused.exists?(concept: @concept, language: @bucket)
   end
 
-  # Which check the polling page is waiting on. The page states it because the
-  # row's current state cannot: once a no-guide page's guide lands, the row looks
-  # like a ladder candidate, and a flubbed ladder would then never read ready.
-  # Absent reads as guide, the only value pages sent before this existed.
   AWAITING = { "guide" => :guide?, "ladder" => :complete?, "lesson" => :lesson? }.freeze
-  # A rewrite can land without the part the page asked for, which the row's
-  # state alone never reads as ready; these name the version the page saw, so
-  # the poll can tell a finished rewrite from queued work.
   AWAITING_REWRITE = %w[ladder lesson].freeze
   GENERATION_VERSION_FORMAT = /\A\d+\z/
 
-  # GET /learn/:bucket/:concept/status — is the write-up the page asked for done?
-  #
-  # Same shape and same reason as DashboardController#status. A fixed client
-  # timeout would have to guess how long a provider call takes, and this one
-  # runs with extended thinking on, so the guess would be wrong in both
-  # directions — reloading onto an unfinished page, or waiting long after it
-  # finished.
+  # GET /learn/:bucket/:concept/status
   def status
     bucket    = validated_bucket
     concept   = validated_concept(bucket)
@@ -73,19 +56,11 @@ class LearnController < ApplicationController
     render json: body
   end
 
-  # POST /learn/:bucket/:concept/prepare — write up this one concept now.
-  #
-  # `refresh: true` permits a whole-row rewrite for this concept. The backfill
-  # keeps existing rows; #prepare_ladders is the scoped bulk exception.
-  #
-  # JSON, since only script calls it: the page posts and polls rather than
-  # holding a request open for a provider call that runs with thinking on.
+  # POST /learn/:bucket/:concept/prepare
   def prepare_concept
     bucket  = validated_bucket
     concept = validated_concept(bucket)
 
-    # A note from an earlier failed attempt would answer the first poll of
-    # this one before the job has run.
     ConceptReferenceFailures.clear(user_id: current_user.id, concept: concept, language: bucket)
     GenerateConceptReferenceJob.perform_later(
       concept: concept, language: bucket, user_id: current_user.id, refresh: true
@@ -94,13 +69,7 @@ class LearnController < ApplicationController
     render json: { status: "queued" }
   end
 
-  # POST /learn/prepare — write up every concept in this user's slice that has
-  # no row at all, and every recognition group on the page with no guide.
-  #
-  # Idempotent and resumable: each job re-checks before calling, so pressing
-  # this again after a partial run enqueues only what is still missing and
-  # there is no run record to reconcile. Rows are shared team-wide, so the
-  # second person to press it finds almost everything done.
+  # POST /learn/prepare
   def prepare
     references = references_by_key
 
@@ -115,13 +84,7 @@ class LearnController < ApplicationController
     redirect_to learn_path, notice: t("learn.preparing")
   end
 
-  # POST /learn/prepare_ladders — ground every targeted kind's concepts.
-  #
-  # Unlike #prepare, this rewrites existing rows, which is the scoped exception
-  # to the no-bulk-rewrite rule: only concepts behind a target this user set, and
-  # only from a click whose copy says wording may change. Rows are shared, so
-  # the rewrite reaches every teammate. Gaps are re-derived each press; the
-  # job's queue permit discards overlaps and complete? skips finished rows.
+  # POST /learn/prepare_ladders
   def prepare_ladders
     gaps = LadderCoverage.for(current_user).gaps_for(KindDifficulty.for(current_user).targeted_kinds)
 
@@ -134,8 +97,6 @@ class LearnController < ApplicationController
 
   private
 
-  # Why this user's last write-up of the concept stopped, if the job said so
-  # within ConceptReferenceFailures::EXPIRY: the page stops polling on it.
   def write_up_failure(concept, bucket)
     failure = ConceptReferenceFailures.read(user_id: current_user.id, concept: concept, language: bucket)
     return {} if failure.nil?
@@ -153,8 +114,6 @@ class LearnController < ApplicationController
     redirect_back fallback_location: learn_path, alert: message
   end
 
-  # Names of the targeted kinds a guided, ladderless row would ground. Empty
-  # means no rewrite is offered: the ladder would ground nothing for this user.
   def ladder_targets_for(reference)
     return [] unless reference&.guide? && !reference.ladder?
 
@@ -165,18 +124,11 @@ class LearnController < ApplicationController
                   .map { |kind| t("sections.#{kind.key}.name") }
   end
 
-  # One query for every reference the page can render, keyed the way the views
-  # look them up. The per-concept finder would be seventy queries.
   def references_by_key
     ConceptReference.where(language: learn_buckets)
                     .index_by { |reference| [ reference.concept, reference.language ] }
   end
 
-  # Concepts with no row at all — exactly what the backfill will generate, and
-  # therefore the number its button is allowed to quote. A row that exists
-  # without a guide is deliberately NOT counted here: rewriting it in bulk
-  # would change inline reference text for concepts nobody asked about, so it
-  # is left to the on-demand path.
   def ungenerated_concepts(references)
     learn_buckets.flat_map do |bucket|
       ConceptBucket.vocabulary_for(bucket)
@@ -185,7 +137,6 @@ class LearnController < ApplicationController
     end
   end
 
-  # The recognition groups whose blocks this user's index renders.
   def recognition_group_keys
     @recognition_group_keys ||= learn_buckets.flat_map do |bucket|
       ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)).map { |group, _concepts| RecognitionGuide.key_for(bucket, group) }
@@ -196,13 +147,6 @@ class LearnController < ApplicationController
     recognition_group_keys - RecognitionGuide.where(group_key: recognition_group_keys).pluck(:group_key)
   end
 
-  # Has this user actually met the concept in a submitted set? Reads the
-  # existing memoized exposure index, which counts submitted responses only.
-  #
-  # Deliberately NOT sourced from ConceptMastery: that holds tier, streak and
-  # retention state, which this app keeps invisible everywhere so it cannot
-  # shape engagement. "You have seen this" and "how well you did" are different
-  # facts, and only the first is shown here.
   def encountered?(concept, bucket)
     current_user.concept_exposure_count(concept, bucket, on_or_before: Date.current).positive?
   end

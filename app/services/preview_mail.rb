@@ -1,7 +1,4 @@
-# A preview app may run web-only. The emailed login code is the only way in and
-# ships via deliver_later, so mail must not depend on a worker draining the queue.
-# Mail only: every other job class keeps the configured adapter, so the app
-# under review behaves like production everywhere the reviewer is looking.
+# Delivers mail inline (mail only) because a preview app may run without a worker and login needs the code.
 class PreviewMail
   def self.apply!
     return false unless PreviewEnvironment.active?

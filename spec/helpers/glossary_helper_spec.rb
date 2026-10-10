@@ -1,13 +1,7 @@
 require "rails_helper"
 
 RSpec.describe GlossaryHelper, type: :helper do
-  # Most examples stub a small, controlled glossary rather than exercising the
-  # real ~170-entry Glossary::TERMS list, so the fixtures stay readable and can
-  # cover edge cases (overlapping terms, a malicious definition) that will
-  # never actually appear in the real curated data. This only replaces the
-  # DATA Glossary exposes — Glossary.lookup/TERM_PATTERN itself is untouched,
-  # and one test below runs against the real, unstubbed Glossary::TERMS to
-  # confirm the two are actually wired together correctly.
+  # Stubs a small glossary for readable edge cases; one example below runs against the real Glossary::TERMS.
   def stub_glossary(terms)
     stub_const("Glossary::TERMS", terms)
     stub_const("Glossary::TERM_PATTERN",
@@ -104,9 +98,7 @@ RSpec.describe GlossaryHelper, type: :helper do
     end
 
     it "still escapes dangerous text even when called with an html_safe (SafeBuffer) input" do
-      # ERB::Util.html_escape is a documented no-op on ActiveSupport::SafeBuffer input, so if
-      # `text` ever arrived pre-marked html_safe, every escape call in the assembly loop would
-      # silently skip unless the helper strips that wrapper first.
+      # html_escape skips SafeBuffer input, so the helper must strip html_safe before escaping.
       stub_glossary("closure" => "def")
       unsafe_text = "<img src=x onerror=alert(1)> closure here".html_safe
       result = helper.glossary_wrap(unsafe_text)
@@ -153,9 +145,6 @@ RSpec.describe GlossaryHelper, type: :helper do
       expect(result).to be_html_safe
     end
 
-    # Runs against the real, unstubbed Glossary::TERMS/TERM_PATTERN — confirms
-    # the helper actually wires up to the production curated glossary, not
-    # just to whatever a test stubs in.
     it "wraps a real curated term from the production Glossary::TERMS list" do
       result = helper.glossary_wrap("Explain the concept of idempotency here.")
 

@@ -43,8 +43,7 @@ RSpec.describe CompetencyGate do
     expect(described_class::BRAKE).to eq(CompetencyGate::Threshold.new(at_least: 2, of: 4))
   end
 
-  # The rules name a growth to four; a day that could hold more, or fewer,
-  # would leave a rule that reaches past the ceiling or a size no rule earns.
+  # Otherwise a rule would reach past the ceiling or leave a size no rule earns.
   it "grows no further than the most sections one day holds" do
     expect(described_class::FLOOR + described_class::GROWTH.size).to eq(ExerciseSection::MAX_SECTIONS)
   end
@@ -76,8 +75,7 @@ RSpec.describe CompetencyGate do
       expect(counts(Array.new(5) { day(good("pattern"), good("challenge")) })).to all(eq(2))
     end
 
-    # An eased section answered an easier question than its rung, so its AI
-    # rating says nothing about the rung.
+    # An eased section answered an easier question, so its AI rating says nothing about the rung.
     it "takes no growth evidence from eased sections" do
       eased = Array.new(5) { day(result(eased: true)) }
 
@@ -162,8 +160,7 @@ RSpec.describe CompetencyGate do
       expect(described_class.plan(days, fixed_kinds: fixed)).to have_attributes(count: 2, reason: :brake)
     end
 
-    # Struggling only on optional sections must not swing the day 3, 2, 3:
-    # the fixed window that earned three was earned before the brake.
+    # Otherwise struggling only on optional sections would swing the day 3, 2, 3.
     it "needs a fresh fixed-kind window before growing again" do
       both = -> { day(good, good("design_comparison")) }
       days = earned_three + [ day(too_hard("pattern"), too_hard("challenge")) ] + Array.new(4) { both.call }
@@ -263,8 +260,6 @@ RSpec.describe CompetencyGate do
     expect { day(good, optional: true) }.to raise_error(ArgumentError, /optional/)
   end
 
-  # Only the plan a caller reads needs its evidence; the fold does not build
-  # it for every day it passes.
   it "builds evidence only for the plans asked for" do
     days = Array.new(6) { day(good) }
 

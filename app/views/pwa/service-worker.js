@@ -1,10 +1,4 @@
-// Receives the daily reminder and shows it. Registered from the layout; served
-// from the root path so its scope covers the whole app.
-
-// Safari revokes a site's push permission outright if the worker takes a push
-// and displays nothing, so every path through here ends in showNotification —
-// a malformed or empty payload falls back to a generic notification rather
-// than returning quietly and costing the user their subscription.
+// Safari revokes push permission if a push displays nothing, so a bad payload still ends in showNotification.
 function readPayload(event) {
   try {
     return event.data ? event.data.json() : {}
@@ -26,8 +20,7 @@ function notificationFor(event) {
   })
 }
 
-// includeUncontrolled, because a tab opened before this worker took control is
-// still the window the user means — without it a second one opens alongside.
+// includeUncontrolled finds a tab opened before this worker took control; without it a second one opens.
 function focusOrOpen(path) {
   return clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
     for (const client of clientList) {

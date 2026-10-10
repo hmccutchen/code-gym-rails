@@ -1,8 +1,6 @@
 require "rails_helper"
 
-# A job queued before an account was deleted still loads the row by id. For a
-# trial account that row keeps its provider and dates, so these jobs must not
-# reach the house key once the account is anonymized.
+# A queued job still loads a deleted trial's row by id, so it must not reach the house key.
 RSpec.describe "Jobs queued for a deleted trial account", type: :job do
   let(:user) { create_trial_user(provider: "fake") }
 

@@ -1,7 +1,6 @@
 require "rails_helper"
 
-# The pick and the reason are two controls writing one stored answer through
-# an inline script, which only a real browser runs.
+# The pick and reason write one stored answer through an inline script, which only a real browser runs.
 RSpec.describe "Answering a design comparison on a phone", type: :system do
   let(:reason) { "A new carrier is added every month, so the registry means no edit to working code." }
 
@@ -59,9 +58,7 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
     end
   end
 
-  # HTML drops a newline straight after a <textarea> tag, so a reason saved
-  # with no pick would lose its separator on reload, and the next autosave of
-  # any other section would store the reason as the pick line.
+  # HTML drops a newline right after <textarea>, which once let a pick-less reason be re-saved as the pick line.
   it "keeps a reason saved without a pick through a reload and another section's autosave" do
     travel_to(a_weekday) do
       user = create_fake_provider_user
@@ -84,8 +81,7 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
     end
   end
 
-  # The server counts the reason in code points, so the browser must too: an
-  # emoji is one code point but two UTF-16 units.
+  # The server counts code points, so the browser must too: an emoji is one code point but two UTF-16 units.
   it "marks a reason complete at the same length the server does, counting code points" do
     travel_to(a_weekday) do
       user = create_fake_provider_user

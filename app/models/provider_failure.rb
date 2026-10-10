@@ -1,11 +1,4 @@
-# The kind of provider failure a page can explain, read from the error at the
-# boundary that rescues it. Pure: an error in, one of KINDS out. The text for
-# each kind is ProviderFailureText's; the reset time ResetClock's.
-#
-# A 429 is a daily limit when the provider named a per-day quota or asked for
-# a wait of an hour or more, and a short limit otherwise. A spend limit or an
-# empty balance is never a limit of either kind, whatever status carried it:
-# the providers raise BillingError for those before this is asked.
+# Billing failures never reach here as limits: providers raise BillingError before a 429 is classified.
 class ProviderFailure
   TRIAL_KINDS = %w[trial_allowance_used trial_ended].freeze
   KINDS = (%w[daily_limit short_rate_limit bad_key out_of_credit outage timeout other] + TRIAL_KINDS).freeze
@@ -26,8 +19,7 @@ class ProviderFailure
     end
   end
 
-  # A 5xx raised as a rate limit (Claude's 529, "overloaded") is the provider
-  # being down for everyone, not this key's limit.
+  # A 5xx rate limit (Claude's 529, "overloaded") is a provider outage, not this key's limit.
   def self.rate_limit_kind(error)
     return "outage" if error.http_status.to_i >= 500
     daily?(error) ? "daily_limit" : "short_rate_limit"

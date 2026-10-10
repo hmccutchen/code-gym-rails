@@ -16,12 +16,7 @@
   <% if pending_login_email.present? %>
     <%= render "sessions/pending" %>
 
-    <%# Never a branch away from the form: the pending state is a banner above
-        it, not a replacement for it. A login that cannot complete in this
-        browser — a code requested in a different browser than the one being
-        used, a code already consumed or dead after five wrong guesses — used
-        to leave this page with no way to request a new one, recoverable only
-        by clearing cookies. %>
+    <%# Keep the form below the pending banner: see docs/code-notes/app/views/sessions/new.html.md %>
     <p class="pending-divider"><%= t("sessions.new.resend_prompt") %></p>
   <% else %>
     <p><%= t("sessions.new.intro_html") %></p>

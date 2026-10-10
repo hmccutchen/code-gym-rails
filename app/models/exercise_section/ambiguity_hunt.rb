@@ -1,27 +1,9 @@
-# Given a vague feature request, the engineer lists what they'd need
-# clarified before writing a spec. Unscaffolded deliberately: a labeled
-# scaffold would hint at the shape or count of the planted ambiguities (see
-# PLANTED_COUNT). improved_code? is false — there's no "corrected code" for a
-# clarifying-questions exercise.
-#
-# The one kind that opts out of the day's scenario flavor
-# (AiService::SCENARIO_POOLS): its scenario stays a Code Gym-style feature
-# request, stated in its own schema fragment. Reasoning about what a request
-# leaves unsaid is the whole exercise, and an unfamiliar business setting
-# would add a second thing to work out first — the burden this kind removes.
+# Unscaffolded on purpose: labels would hint at the planted ambiguities. Ignores the day's scenario flavor.
 class ExerciseSection::AmbiguityHunt < ExerciseSection
-  # The generator's target, not a bound: 4 sits at the midpoint of the 3-5
-  # range considered — few enough to find in one sitting, enough to force
-  # real coverage judgment.
+  # The generator's target, not a bound: nothing downstream reads it.
   PLANTED_COUNT = 4
 
-  # What the planted list is bounded to on ingest, as opposed to what the
-  # prompt asks for. PLANTED_COUNT is the generator's target; nothing
-  # downstream reads it, since the review prompt lists the ambiguities rather
-  # than counting them (see .review_context below). So a provider
-  # that lands on 3 or 5 has still produced a gradable section, and only the
-  # runaway case needs bounding — this is provider text going into another
-  # prompt.
+  # Only the runaway case needs bounding: a list of 3 or 5 still grades.
   MAX_PLANTED = PLANTED_COUNT * 2
 
   PLANTED_FIELD = "planted_ambiguities".freeze
@@ -34,22 +16,7 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     [ PLANTED_FIELD ]
   end
 
-  # Unlike most boundary checks, this one rejects rather than repairs. The
-  # planted list is the ambiguity hunt's entire grading ground truth — the
-  # review prompt grades coverage against it and nothing else — so an empty or
-  # unusable list doesn't degrade the section, it silently turns coverage
-  # grading back into the freehand judgement the kind exists to replace, and
-  # there is no fallback to fall back to. Refusing costs only this section:
-  # ingest leaves it out, and the caller retries or drops it.
-  #
-  # A WRONG COUNT IS NOT A FAILURE, though. Nothing downstream reads
-  # PLANTED_COUNT, so a list of 3 or 5 grades exactly as well — and refusing
-  # it would cost the section over the likeliest deviation an LLM makes on a
-  # counted list. Only the empty case is refused; the long case is truncated.
-  #
-  # Shape is held to the schema even though count isn't: a bare string here
-  # is not four ambiguities, it's a provider that ignored the field's type,
-  # and Array() would quietly launder it into a single-entry answer key.
+  # Refuses an empty list, the only grading ground truth; a wrong count is fine and a long list is truncated.
   def self.reject_unusable!(section)
     raw     = section[PLANTED_FIELD]
     planted = raw.is_a?(Array) ? raw.grep(String).filter_map { |entry| entry.strip.presence } : []

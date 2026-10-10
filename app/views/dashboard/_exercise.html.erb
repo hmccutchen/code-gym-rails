@@ -1,3 +1,4 @@
+<%# Design notes: docs/code-notes/app/views/dashboard/_exercise.html.md %>
 <% if @regeneration_failed %>
   <div class="flash alert" style="margin-bottom:1.5rem;">
     <%= regeneration_failure_line(current_user) %>
@@ -8,24 +9,16 @@
 <div class="regenerate-row" style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
   <div>
     <% if response.persisted? && response.reviewed? %>
-      <%# Mirrors the controller guard, which is the one that holds — the review
-          is already part of concept tracking and a new set would discard it. %>
       <p class="hint"><%= t("dashboard.exercise.reviewed") %></p>
     <% elsif exercise.regenerated_at.present? %>
       <p class="hint"><%= t("dashboard.exercise.already_regenerated") %></p>
     <% elsif current_user.trial_ended? %>
-      <%# Nothing: an ended trial has no provider to regenerate with, and the
-          banner above already says so. DailyExercisesController#regenerate
-          refuses it too. %>
+      <%# Nothing: an ended trial cannot regenerate, the banner says so, and #regenerate refuses it too. %>
     <% else %>
       <% has_progress = response.persisted? && (response.submitted? || response.answers.values.any?(&:present?)) %>
       <% confirm_msg = has_progress ?
            t("dashboard.exercise.regenerate_confirm_with_progress") :
            t("dashboard.exercise.regenerate_confirm") %>
-      <%# turbo_confirm would be inert here — Turbo JS is not loaded. The
-          layout's loading-form script provides the confirm and the in-flight
-          spinner; the request then blocks synchronously on the provider
-          (10–30s) until the redirect lands. %>
       <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
             class: "btn btn-ghost btn-sm",
             form: { data: { loading_form: true, loading_label: t("dashboard.generating_label"),
@@ -53,8 +46,6 @@
     <%= render "dashboard/track_proposal", proposal: @track_proposal %>
   <% end %>
 <% else %>
-  <%# Progress bar (sticky so progress stays visible while scrolling the three
-      sections on small screens) %>
   <div class="progress-sticky">
     <div class="progress-bar">
       <div class="progress-fill" id="progress-fill" style="width:0%"></div>
@@ -62,8 +53,6 @@
     <div class="progress-label" id="progress-label"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
   </div>
 
-  <%# Always POST, never PATCH — ResponsesController#create serializes saves
-      and repeated submits under the response lock. The script uses fetch. %>
   <%= form_with url: responses_path, method: :post, id: "gym-form", data: { turbo: false } do |f| %>
     <%= render "responses/sections", exercise: exercise, response: response, submitted: false %>
 
@@ -90,9 +79,6 @@
   <% end %>
 
   <script>
-  // Wrapped in an IIFE: Turbo re-executes <script> tags whenever this partial is
-  // replaced (regenerate broadcast, or a later day's cron firing while the tab
-  // stays open). Top-level const/let would redeclare on the second run.
   (() => {
     const form = document.getElementById("gym-form");
     const textareas = form.querySelectorAll("textarea[data-field]");
@@ -106,13 +92,9 @@
     const ratings = {};
     form.querySelectorAll("button.rating-btn.active").forEach(b => { ratings[b.dataset.ratingFor] = b.dataset.rating; });
 
-    // Carried across the reload a refused save triggers, so it has to be the
-    // sentence for a page that has already come back rather than the server's,
-    // which asks for the refresh this client performs on its own.
     const STALE_RELOADED = <%= t("dashboard.exercise.stale_reloaded").to_json.html_safe %>;
 
-    // The client-side half of DailyResponse#submit_blocker, read against the
-    // live form so typing into a section re-locks Submit until it is rated.
+    // Client half of DailyResponse#submit_blocker; change both together.
     function submitBlocker() {
       const answeredFields = [...textareas].filter(answered).map(t => t.dataset.field);
       if (answeredFields.length === 0) return "unanswered";
@@ -127,8 +109,6 @@
       if (blocker) ratingNudge.textContent = ratingNudge.dataset[blocker];
     }
 
-    // Non-prose controls supply their own completion state. Prose shares the
-    // server's threshold and scaffold labels rather than restating either.
     const ANSWER_MIN_LENGTH = <%= DailyResponse::ANSWER_MIN_LENGTH %>;
 
     function substantive(textarea) {
@@ -170,25 +150,14 @@
     }
 
     let saveTimer = null;
-    // After load: this inline script runs before the layout defines CodeGymSaveStatus.
     document.addEventListener("DOMContentLoaded", () => window.CodeGymSaveStatus.watch(() => saveTimer !== null));
     function autoSave() {
       clearTimeout(saveTimer);
       saveTimer = null;
       if (form.inert) return;
-      // Through CodeGymSaveStatus so a refused or dropped save is reported
-      // rather than lost — these are the engineer's answers.
       saveTimer = setTimeout(() => {
         saveTimer = null;
         window.CodeGymSaveStatus.save("POST", form.action, payload(), "answers").then(({ ok, status, data }) => {
-          // A refused encoding (see ResponsesController#stale_answer_sections)
-          // stored nothing, so the page has to come back before another save
-          // can land. Reloading is the whole recovery: the server re-renders
-          // the section in the encoding it now expects. The banner this save
-          // just set would be wiped by that navigation, so the explanation is
-          // carried over to the page that lands — and it is this sentence, not
-          // the server's, because the server's asks for a refresh that has
-          // already happened by the time it would be read.
           if (!ok && status === 409 && data?.status === "stale") {
             window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
             window.location.reload();
@@ -199,8 +168,6 @@
       }, 800);
     }
 
-    // The client half of SectionStatusHelper#section_status, read against the
-    // live form so a folded section's summary never shows a stale state.
     const RATING_LABELS = <%= DailyResponse.self_rating_labels.to_json.html_safe %>;
     const IN_PROGRESS   = <%= t("responses.section_status.in_progress").to_json.html_safe %>;
 
@@ -212,9 +179,6 @@
       else status.textContent = ratings[section] ? `✓ ${RATING_LABELS[ratings[section]]}` : IN_PROGRESS;
     }
 
-    // A folded section claims "this is settled". Editing its answer after
-    // rating it breaks that claim, so the fold opens rather than keep a
-    // stale rating beside changed text. Folding itself is only ever manual.
     function reopenIfRated(section) {
       const fold = form.querySelector(`details.section[data-section-fold="${section}"]`);
       if (fold && !fold.open && ratings[section]) fold.open = true;
@@ -241,13 +205,6 @@
       });
     });
 
-    // Submit goes through fetch with the page's CSRF meta tag. On success it
-    // chains straight into the review, which the user asks for every time
-    // anyway — a real form POST to the URL the server returned, so #review's
-    // redirects and flashes land exactly as they do from the manual button in
-    // responses/_submission. A fetch would follow the redirect itself and
-    // swallow the flash. The two stay separate requests, in the same order as
-    // two clicks: submit is saved and confirmed before review is asked for.
     const GENERATING_REVIEW = <%= t("review.generating_label").to_json.html_safe %>;
     let reviewRequested = false;
 
@@ -295,12 +252,7 @@
           requestReview(data.review_url);
           reviewRequested = true;
         } else {
-          // The same refusal the autosave handles, on the path that matters
-          // more: nothing was submitted, so reloading is what lets the next
-          // press reach the server. The form stays inert behind the reload:
-          // restoring it would queue an autosave of the payload just refused.
-          // This path sets no banner of its own, so the carried sentence is
-          // the only thing that tells the reader why the page changed.
+          // Stays inert behind the reload: restoring the form would queue an autosave of the refused payload.
           if (res.status === 409) {
             window.CodeGymSaveStatus.carry("answers", STALE_RELOADED);
             reloading = true;
@@ -327,14 +279,7 @@
       }
     });
 
-    // Second half of the guard DashboardController's no-store header starts:
-    // that stops the browser replaying this response on Back, but Safari
-    // bfcaches a no-store page anyway and would restore this form live for a
-    // day that is submitted and reviewed by then — which this app meets on
-    // every iOS home-screen launch. Reload rather than resetting the button
-    // the way the review and loading-form scripts do: there only the button
-    // went stale, here the whole form has. Answers are auto-saved, so the
-    // reload loses nothing.
+    // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
     window.addEventListener("pageshow", (event) => {
       if (event.persisted && reviewRequested) window.location.reload();
     });

@@ -1,13 +1,10 @@
+<%# Design notes: docs/code-notes/app/views/shared/_ai_review.html.md %>
 <% exercise_language = response.daily_exercise.language %>
 <% response.ai_review.each do |section, fb| %>
   <% next unless fb.is_a?(Hash) %>
   <div class="review-block">
     <h3><%= section.humanize %><% if fb["rating"].present? %><span class="review-rating"><%= fb["rating"] %></span><% end %></h3>
-    <%# Directly under the grade badge, because it is context for reading that
-        grade and nothing else. Never a badge of its own: a second pill beside
-        the first would read as a second score about the engineer, which is the
-        one thing this must not be. Read through #difficulty_for, which drops a
-        level this app has no vocabulary for. %>
+    <%# Context under the grade badge, never a badge of its own: a second pill would read as a second score. %>
     <% if (difficulty = response.difficulty_for(section)) %>
       <p class="difficulty-note">
         <%= t("review.difficulty_note", level: difficulty["level"]) %>
@@ -79,24 +76,11 @@
   </div>
 <% end %>
 
-
-<%# This partial can render once per history entry (up to one per reviewed
-    session on the page), so the script below is emitted into the layout's
-    shared :page_scripts region — and only on the FIRST render of this
-    partial per request — rather than inline here, where it would otherwise
-    ship one identical copy per entry. The :not([data-alt-wired]) and
-    :not([data-fu-wired]) guards inside the script still matter: they're what
-    let this single copy wire up controls that keep appearing across every
-    entry's markup. %>
+<%# Emitted once per request; the :not([data-*-wired]) guards stop a control being wired twice. %>
 <% unless @ai_review_script_emitted %>
   <% @ai_review_script_emitted = true %>
   <% content_for :page_scripts do %>
     <script>
-// This script is emitted once (see the guard above) but wires controls
-// across every review-block on the page, so the :not([data-*-wired]) guards
-// are what keep a control from being wired — and its listener duplicated —
-// when new matching elements appear.
-// Inline script matching the app's convention; Stimulus is not wired here.
 (() => {
   const ALTERNATE_FAILED = <%= t("review.alternate_failed").to_json.html_safe %>;
   const FOLLOW_UP_FAILED = <%= t("review.follow_up_failed").to_json.html_safe %>;
@@ -125,8 +109,7 @@
         p.className = "alternate-item";
         p.textContent = data.alternate;
         container.insertBefore(p, button);
-        // Set, never cleared: the explanation lands outside this live region,
-        // the same pattern the concept reference's alternates use.
+        // Set, never cleared: the explanation lands outside this live region.
         status.textContent = data.remaining > 0
           ? <%= t("review.alternate_added").to_json.html_safe %>
           : <%= t("review.alternate_added_last").to_json.html_safe %>;

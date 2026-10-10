@@ -1,8 +1,7 @@
 require "rails_helper"
 
 RSpec.describe TrialAllowance, type: :model do
-  # Tuesday 2026-10-06, 23:30 in New York: the user's day ends in half an
-  # hour, Gemini's Pacific day in three and a half.
+  # 23:30 Tuesday in New York: the user's day ends in half an hour, Gemini's Pacific day in three and a half.
   let(:now) { Time.utc(2026, 10, 7, 3, 30) }
   let(:user) { create_trial_user(provider: "gemini", cap: 3, time_zone: "America/New_York", house_key: "AIzaHouse") }
 
@@ -62,8 +61,7 @@ RSpec.describe TrialAllowance, type: :model do
     end
   end
 
-  # The service keeps the house key it was built with, so a fan-out or a long
-  # job would otherwise go on calling after the trial stopped.
+  # The service keeps the house key it was built with, so a fan-out could otherwise outlive the trial.
   it "stops a house-key service built during the trial from calling once it ends" do
     trial = create_trial_user(provider: "fake", email: "built@example.com")
     service = AiService.for(trial)

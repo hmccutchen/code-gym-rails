@@ -53,8 +53,7 @@ RSpec.describe RubricCheck do
     expect(described_class.new(review(rating: "great", gaps: [])).agrees?).to be_nil
   end
 
-  # The grader numbers the list it returned, so a blank entry still holds a
-  # position; skipping it would shift every later one.
+  # The grader numbers the list as returned, so skipping a blank would shift every later position.
   it "numbers missed entries as returned, blanks included" do
     check = described_class.new(review(rating: "developing", missed: [ "a", "", "b" ], gaps: [ 2 ]))
 

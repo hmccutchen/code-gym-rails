@@ -1,13 +1,6 @@
-<%# Locals: note, field, submitted, response. The lock uses DailyResponse#answered?
-    rather than its own length check, so the hint unlocks on exactly the rule the
-    progress bar and history use — scaffold labels the user didn't type don't
-    count toward it.
-
-    A locked hint is a plain line, and the disclosure is not in the document at
-    all: it waits in the <template>, so no key, click or assistive technology can
-    open it before the section is attempted. The dashboard script swaps the two
-    whenever the answer crosses the threshold, in either direction. %>
+<%# Locals: note, field, submitted, response. %>
 <% if note.present? %>
+  <%# Design notes: docs/code-notes/app/views/dashboard/_teaching_hint.html.md %>
   <% locked = !submitted && !response.answered?(field) %>
   <% disclosure = capture do %>
     <details class="hint">

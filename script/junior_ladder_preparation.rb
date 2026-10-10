@@ -1,5 +1,4 @@
-# Coverage uses an unsaved mixed user so operator preferences cannot narrow
-# the pool. Refreshing a gap rewrites the shared reference and guide too.
+# Coverage uses an unsaved mixed user so the operator's preferences cannot narrow the pool.
 class JuniorLadderPreparation
   def initialize(operator_id:, out: $stdout)
     @operator_id = operator_id

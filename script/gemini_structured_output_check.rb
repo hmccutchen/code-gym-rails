@@ -1,12 +1,8 @@
-# Sends stored judge fixtures through GeminiService on its production route,
-# with the verdict schema the judge sends, and prints whether Gemini accepted
-# the schema and whether the reply parsed. Billed to the key it is given;
-# writes no ApiUsage rows.
+# Billed to the key it is given; writes no ApiUsage rows.
 class GeminiStructuredOutputCheck
   FIXTURE_DIR = Rails.root.join("spec/fixtures/judge")
 
-  # A kind the judge solves blind and one it does not, so both schema
-  # variants are sent: two requests against the free tier's 20 a day.
+  # One blind-solve kind and one not, so both schema variants are sent in two requests.
   DEFAULT_FIXTURES = %w[design_comparison_senior_valid code_review_underdetermined].freeze
 
   Row = Data.define(:name, :outcome, :detail, :tokens_out) do
@@ -47,8 +43,7 @@ class GeminiStructuredOutputCheck
     Row.new(name: name, outcome: outcome, detail: "#{e.class} #{e.http_status}: #{e.message}", tokens_out: usage.sum)
   end
 
-  # One attempt per fixture: a retried request would spend the free tier's
-  # daily budget on the same fixture.
+  # One attempt per fixture: a retry would spend the free tier's daily budget on the same fixture.
   def service(usage)
     Class.new(GeminiService) do
       define_method(:call) { |**kwargs| super(**kwargs.merge(single_attempt: true)) }

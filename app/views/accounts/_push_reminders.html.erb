@@ -31,8 +31,7 @@
             status.hidden = false;
           }
 
-          // iPadOS reports itself as a Mac, so touch points are what separate
-          // it from a desktop Safari that has no Home Screen to be added to.
+          // iPadOS reports itself as a Mac; touch points separate it from desktop Safari, which has no Home Screen.
           function isApplePortable() {
             return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
@@ -47,12 +46,7 @@
           }
 
           button.addEventListener("click", function () {
-            // This call MUST be the first statement in the handler. iOS grants
-            // a permission prompt only to a request made synchronously inside a
-            // user gesture, and it fails silently — no prompt, no error — if
-            // anything awaits ahead of it. That is why the VAPID key is
-            // rendered into the page rather than fetched, and why the service
-            // worker is registered inside the .then() below rather than here.
+            // Must stay the first statement: iOS silently refuses a permission request not made synchronously in the gesture.
             const permission = Notification.requestPermission();
 
             button.disabled = true;

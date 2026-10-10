@@ -1,6 +1,4 @@
-<%# The Display disclosure. Asking for :display_controls makes the layout link
-    the display stylesheets on this page even for a user who has chosen
-    nothing, so a choice made here applies before it is saved. %>
+<%# Makes the layout link the display stylesheets here even with nothing stored, so a choice applies before it saves. %>
 <% content_for :display_controls, "1" %>
 <% preferences = DisplayPreferences.for(current_user) %>
 <details class="form-field" id="display-preferences">
@@ -40,8 +38,7 @@
       return values;
     };
 
-    // The same attributes the layout renders from what is stored, so the page
-    // looks now the way it will after a reload.
+    // Mirrors the attributes the layout renders from stored values; change both together.
     const apply = (values) => {
       Object.entries(values).forEach(([setting, value]) => {
         const attribute = "data-" + setting.replace(/_/g, "-");
@@ -60,9 +57,7 @@
       }
     };
 
-    // One save in flight at a time, each sending what is chosen when it goes
-    // out. Every request carries the whole object, so two in parallel could
-    // reach the server out of order and leave the earlier choice stored.
+    // One save at a time: each carries the whole object, so parallel saves could land out of order.
     let inFlight = Promise.resolve();
     let queued = 0;
     // After load: this inline script runs before the layout defines CodeGymSaveStatus.

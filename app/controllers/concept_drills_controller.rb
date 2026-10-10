@@ -1,6 +1,4 @@
-# Start and stop drills from the Learn tab. Persists nothing itself:
-# ConceptDrills owns the rows and the cap, and this only turns its answers
-# into a redirect and a flash.
+# Persists nothing: ConceptDrills owns the rows and the cap.
 class ConceptDrillsController < ApplicationController
   include LearnScope
 
