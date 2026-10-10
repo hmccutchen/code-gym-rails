@@ -2220,15 +2220,18 @@ concept-specific difficulty descriptions for future generation, not a new set.
   judge's prompt or route has to pass again: run both `review_prose` modes of
   `script/compare_models.rb` (`review_prose` on stored days and
   `review_prose_fixtures`), read every rewrite beside its sources, and
-  confirm no claim changed. A rewrite may tighten how sure a vague claim
-  sounds; adding or dropping a point, reversing a negation, changing a
-  condition or an identifier, dropping a next-step topic or losing a
-  qualifier that carries a real limit all fail. Check the measured output tokens
+  confirm every claim survived. Surviving does not mean word for word: a
+  rewrite may tighten how sure a vague claim sounds, which the 2026-10-10
+  decision below accepted and bounded. What fails is adding or dropping a
+  point, reversing a negation, changing a condition or an identifier,
+  dropping a next-step topic, and losing a qualifier that carries a real
+  limit — the difference being whether the hedge was filler or was doing
+  work. Check the measured output tokens
   against `REVIEW_JUDGE_MAX_TOKENS` at the same time, and the slowest
   measured calls against `REVIEW_JUDGE_READ_TIMEOUT` (30 seconds): the call
   has one attempt, so a timeout is billed and then falls back.
 
-  **Both modes ran on 2026-10-09; the switch is still the user's call.** On
+  **Both modes ran on 2026-10-09, and that run left the switch off.** On
   `claude-sonnet-5-5`, `review_prose_fixtures` hit the expected status on
   8 of 8 with 0 invalid replies, producing 6 edits and 1 merge; `review_prose`
   over 4 stored reviews kept every one unedited, which is what stored
