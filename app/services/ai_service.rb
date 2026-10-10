@@ -544,10 +544,13 @@ class AiService
 
   # The largest reply script/compare_models.rb measured on the production
   # route, across the eight fixtures and four stored reviews of the
-  # 2026-10-09 run. The cap below is justified by its headroom over this, so
-  # the number lives here rather than in the prose that reasons about it, and
-  # ai_service_spec asserts the headroom the reasoning claims.
-  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 347
+  # 2026-10-10 run against the corrected prompt. The cap below is justified
+  # by its headroom over this, so the number lives here rather than in the
+  # prose that reasons about it, and ai_service_spec asserts the headroom the
+  # reasoning claims. The slack left is small enough that a later run
+  # measuring past REVIEW_JUDGE_MAX_TOKENS / 4 makes the cap a decision
+  # rather than a passing check.
+  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 371
 
   # Review output has no length bound, so a much longer review could still
   # hit this and fall back unedited as `truncated`; nothing measured has come
@@ -1121,10 +1124,10 @@ class AiService
   def self.provider_key = nil
 
   # Whether this provider can hold the prose judge's reply to a schema. The
-  # base answers false; a provider that can opts in. Turning the judge on is
-  # the separate ReviewProseJudge switch, which stays off until the activation
-  # gate in CLAUDE.md's "Review prose judge" is met: the comparison runs are
-  # done, and a person has still to read the rewrites beside their sources.
+  # base answers false; a provider that can opts in. Whether the judge runs at
+  # all is the separate ReviewProseJudge switch, off in code and turned on per
+  # deployment only once the activation gate in CLAUDE.md's "Review prose
+  # judge" has been met for the prompt and route in question.
   def self.judges_review_prose? = false
 
   # plan_notes is what DailyPlan::Result#notes recorded, written onto the row.

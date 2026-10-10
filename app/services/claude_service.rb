@@ -7,8 +7,8 @@ class ClaudeService < AiService
   def self.provider_key = "anthropic"
   def self.key_pattern = /\Ask-ant-/
 
-  # Still gated by REVIEW_PROSE_JUDGE, which stays off until the activation
-  # gate in CLAUDE.md's "Review prose judge" is met.
+  # Still gated by REVIEW_PROSE_JUDGE, which a deployment sets only once the
+  # activation gate in CLAUDE.md's "Review prose judge" has been met.
   def self.judges_review_prose? = true
 
   # Keyed by the ApiUsage purpose string, so usage rows and routes name calls
