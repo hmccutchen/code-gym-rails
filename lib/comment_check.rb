@@ -1,4 +1,5 @@
 require_relative "comment_check/scanners"
+require_relative "comment_check/route_annotation"
 
 module CommentCheck
   MAX_PER_FILE = 5
@@ -33,6 +34,7 @@ module CommentCheck
   end
 
   def over_limit(path, comments)
+    comments = comments.reject { |comment| comment.body.match?(ROUTE_ANNOTATION) }
     comments.drop(MAX_PER_FILE).map do |comment|
       Offense.new(path, comment.first_line, "This file has #{comments.size} comments; the limit is #{MAX_PER_FILE}.")
     end

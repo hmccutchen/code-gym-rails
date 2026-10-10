@@ -1,6 +1,6 @@
 require "rails_helper"
 
-# Every non-default choice must change something in display.css, or picking it would change nothing.
+# Each non-default text size, line spacing and font must change something in display.css, or picking it would do nothing.
 RSpec.describe "display stylesheet" do
   let(:css) { Rails.root.join("app/assets/stylesheets/display.css").read }
 

@@ -56,6 +56,47 @@ RSpec.describe CommentCheck do
     )
   end
 
+  it "does not count a bare route annotation toward the limit" do
+    text = (1..5).map { |n| "key#{n}: #{n} # note #{n}\n" }.join + "# POST /responses/:id/review\nroute: 1\n"
+
+    expect(messages("config/a.yml", text)).to be_empty
+  end
+
+  it "reads a Python or JavaScript comment marker with no space before it" do
+    python = (1..6).map { |n| "value#{n} = #{n}# note\n" }.join
+    javascript = (1..6).map { |n| "run#{n}();// note\n" }.join
+
+    expect(messages("script/a.py", python)).to eq([ [ 6, "This file has 6 comments; the limit is 5." ] ])
+    expect(messages("app/a.js", javascript)).to eq([ [ 6, "This file has 6 comments; the limit is 5." ] ])
+  end
+
+  it "requires a space before a YAML comment marker" do
+    expect(messages("config/a.yml", "anchor: a#b\n")).to be_empty
+  end
+
+  it "does not read comment markers inside JavaScript or CSS strings" do
+    javascript = (1..6).map { |n| "const s#{n} = \"/* not a comment */\";\n" }.join +
+                 "const apostrophe = 1; // don't stop scanning\nrun();\n"
+    css = "a::before { content: \"/* not a comment */\"; }\n"
+
+    expect(messages("app/a.js", javascript)).to be_empty
+    expect(messages("app/a.css", css)).to be_empty
+  end
+
+  it "keeps reading ERB comments after an apostrophe in page text" do
+    text = "<p>Don't panic.</p>\n<%# One\n    two %>\n<p>Hi</p>\n"
+
+    expect(messages("app/a.html.erb", text)).to eq([ [ 2, "Keep each comment to a single line." ] ])
+  end
+
+  it "treats a Python encoding line in either form as tooling" do
+    expect(messages("script/a.py", "# coding: utf-8\n\nprint(1)\n")).to be_empty
+  end
+
+  it "treats an encoding-like YAML comment as prose" do
+    expect(messages("config/a.yml", "# coding: utf-8\n\nkey: 1\n")).to eq([ [ 1, "Put the comment directly above the code it discusses." ] ])
+  end
+
   it "skips file types it has no scanner for" do
     expect(messages("README.md", "# Heading\n\n# Another\n")).to be_empty
   end

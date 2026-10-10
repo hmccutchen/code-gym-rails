@@ -1,0 +1,3 @@
+module CommentCheck
+  ROUTE_ANNOTATION = %r{\A(GET|POST|PUT|PATCH|DELETE)(/(GET|POST|PUT|PATCH|DELETE))* /\S*\z}
+end

@@ -1,4 +1,5 @@
 require_relative "prose_comments"
+require_relative "../../../comment_check/route_annotation"
 
 module RuboCop
   module Cop
@@ -8,16 +9,18 @@ module RuboCop
 
         MSG = "This file has %<count>d comments; the limit is %<max>d. Move the reasoning into docs.".freeze
 
-        ROUTE_ANNOTATION = %r{\A# (GET|POST|PUT|PATCH|DELETE)(/(GET|POST|PUT|PATCH|DELETE))* /\S*\z}
-
         def on_new_investigation
-          comments = prose_comments.reject { |comment| comment.text.match?(ROUTE_ANNOTATION) }
+          comments = prose_comments.reject { |comment| route_annotation?(comment) }
           return if comments.size <= max
 
           comments.drop(max).each { |comment| add_offense(comment, message: format(MSG, count: comments.size, max: max)) }
         end
 
         private
+
+        def route_annotation?(comment)
+          comment.text.delete_prefix("#").strip.match?(::CommentCheck::ROUTE_ANNOTATION)
+        end
 
         def max
           cop_config.fetch("Max", 5)
