@@ -2256,8 +2256,51 @@ concept-specific difficulty descriptions for future generation, not a new set.
   claim is and every topic a next step names, and a spec holds the prompt
   to that. The grader still asks for one topic per next step; when it names
   several, the judge keeps them all, because choosing which to drop changes
-  what the review says. Nothing has been re-run since this change, so the
-  gate is still unmet until both modes are read again.
+  what the review says.
+
+  **Both modes ran again on 2026-10-10, against the corrected prompt. One
+  shape is fixed, the other is not, so the switch stays off.**
+  `review_prose_fixtures` was run twice on `claude-sonnet-5-5` to tell a
+  reliable shape from a stochastic one. Both runs hit the expected status on
+  8 of 8 with 0 invalid replies, 6 edits and 1 merge; `review_prose` over 4
+  stored reviews kept every one unedited again. Haiku is still not a
+  candidate: it returned 1 invalid reply of 8 on the fixtures and 2 of 4 on
+  the stored reviews.
+
+  The next-step shape is fixed. `verbose_jargon`'s four topics survived both
+  runs ("preloading, association loading, query optimization, and database
+  performance tuning"), and the hedges survived with them: "might arguably
+  be issuing … may potentially impact" became "might be issuing … may slow
+  things down", which keeps both limiting words.
+
+  The certainty shape is not fixed, and it resists the prompt.
+  `string_fields`' "which is essentially a performance thing" became "which
+  slows the page" on the first run and "which slows the page down" on the
+  second — the same claim change the 2026-10-09 run refused, reproduced twice
+  against a rule that forbids it in as many words. The rule's own example was
+  rewritten in `67c8fa93` and no longer contains that phrasing, so the model
+  is not echoing the prompt; it reaches for the sharper sentence on its own.
+  Two rounds of prompt wording have now failed to hold this one, which is
+  evidence about what a prompt can bound rather than a wording still to be
+  found. The mechanical boundary cannot take over: `parse_entries` enforces
+  cite-every-entry for list fields, and the sharpened clause is one sentence
+  inside `next_step`'s sibling string field, where splitting on sentences
+  yields a single entry and catches nothing.
+
+  So the gate stays unmet on the same clause it was unmet on before, and the
+  remaining question is no longer a fix to find but a bar to set: whether
+  "a performance thing" becoming "slows the page" is a claim change worth
+  blocking on, in a review whose own `correct` field already says "You
+  noticed the page was slow." Accepting it is a change to the gate, which is
+  a decision to state here rather than a box a run ticks.
+
+  The budget checks still pass with room, measured on the corrected prompt:
+  the largest reply was **371 output tokens of the 1,500-token
+  `REVIEW_JUDGE_MAX_TOKENS`**, and the slowest call **3,075 ms of the 30,000
+  ms `REVIEW_JUDGE_READ_TIMEOUT`**. `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
+  moves to that 371, which leaves the ×4 headroom spec 16 tokens of slack, so
+  the next run measuring above 375 turns the cap into a decision rather than
+  a passing check.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a

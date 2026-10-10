@@ -544,10 +544,12 @@ class AiService
 
   # The largest reply script/compare_models.rb measured on the production
   # route, across the eight fixtures and four stored reviews of the
-  # 2026-10-09 run. The cap below is justified by its headroom over this, so
-  # the number lives here rather than in the prose that reasons about it, and
-  # ai_service_spec asserts the headroom the reasoning claims.
-  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 347
+  # 2026-10-10 run against the corrected prompt. The cap below is justified
+  # by its headroom over this, so the number lives here rather than in the
+  # prose that reasons about it, and ai_service_spec asserts the headroom the
+  # reasoning claims. At 371 that spec has 16 tokens of slack, so a later run
+  # measuring above 375 makes the cap a decision rather than a passing check.
+  REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 371
 
   # Review output has no length bound, so a much longer review could still
   # hit this and fall back unedited as `truncated`; nothing measured has come
