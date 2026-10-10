@@ -4161,6 +4161,21 @@ RSpec.describe AiService do
         expect(code.length).to eq(AiService::MAX_GENERATED_CODE_LENGTH)
       end
 
+      # NFC can lengthen a string, so measuring the raw reply would accept code
+      # that UserText.tagged then clips when the grading prompt fences it — the
+      # truncation this bound exists to prevent, arriving one step later. These
+      # 6,500 characters are under the bound raw and 13,000 once normalized.
+      it "rejects a translation that only crosses the limit once normalized" do
+        expect { translate_with("\u0958" * 6_500) }
+          .to raise_error(AiService::InvalidResponseError, /too long/i)
+      end
+
+      it "returns the same representation the grading fence will quote" do
+        code = translate_with("\u0958" * 3_000)
+
+        expect(UserText.tagged(code)).to include(code)
+      end
+
       it "sends the pseudocode and the day's language, never a request to improve it" do
         svc = spy_class.new(canned_text: "def f; end")
         svc.translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")

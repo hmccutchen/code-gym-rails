@@ -252,9 +252,13 @@ class DailyResponse < ApplicationRecord
   # intact; #answered? decides whether it counts.
   #
   # UserText runs first, so what is stored, shown and quoted into every later
-  # prompt is the same cleaned, bounded string. Every typed answer input
-  # carries MAX_ANSWER_LENGTH as its own maxlength, so the cap is declared
-  # where the text is written rather than discovered after a save.
+  # prompt is the same cleaned, bounded string. Each typed answer input
+  # declares its own cap as a maxlength — this one, or the room a kind's
+  # encoding leaves in front of it — so the limit is visible where the text is
+  # written rather than discovered after a save. It is the cap as typed: a
+  # browser counts the characters it was handed and this cap counts them after
+  # NFC, which can add one, so the attribute makes the bound visible without
+  # promising the tail is never clipped.
   def self.normalize_answers(answers, exercise)
     answers.to_h.each_with_object({}) do |(section, value), normalized|
       cleaned = UserText.clean(value, limit: UserText::MAX_ANSWER_LENGTH)

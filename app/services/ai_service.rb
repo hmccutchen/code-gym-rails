@@ -1424,7 +1424,12 @@ class AiService
       prompt: build_pseudocode_translate_prompt(exercise, section, pseudocode)
     )
 
-    code = text_or_raise(result, subject: "pseudocode translation")
+    # Normalized before it is measured, so the bound below, the page and the
+    # grading fence all count one representation. NFC can lengthen a string —
+    # U+0958 decomposes into two characters — so code measured raw here could
+    # still cross UserText.tagged's cap downstream and be clipped there, which
+    # is the one outcome the bound exists to prevent.
+    code = UserText.normalize(text_or_raise(result, subject: "pseudocode translation"))
     # Rejected, never truncated. Cutting source mid-token or mid-delimiter
     # produces code that is no longer what their plan says — which the page
     # then captions as "your plan implemented literally" and the review grades
