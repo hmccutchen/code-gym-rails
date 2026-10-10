@@ -83,7 +83,7 @@ Checked against the code on 2026-10-07. Adding `proportionality` to
 `RAILS_CONCEPTS` and `JS_CONCEPTS`, with design comparison not hosting it,
 still reaches:
 
-- **Other kinds' prompts.** `ConceptVocabulary.selectable_for_section` hands
+- **Other kinds' prompts.** `ProblemSetIngest.selectable_vocabulary_for` (now `ConceptVocabulary.selectable_for_section`) hands
   the language vocabulary to code_review (application_code and test_file
   modes), pattern and challenge, so their vocabulary lines change in every
   prompt snapshot. Parsons gets it too unless it joins a group in

@@ -121,8 +121,6 @@ module ConceptVocabulary
 
   def self.for_language(language) = language_entry(language).fetch(:concepts)
 
-  def self.security_for_language(language) = language_entry(language).fetch(:security_concepts)
-
   def self.language_agnostic?(language) = LANGUAGE_AGNOSTIC_VOCABULARIES.include?(for_language(language))
 
   # Never narrowed: a concept the provider tagged is history, and rewriting it to "other" would destroy the record.
@@ -152,6 +150,9 @@ module ConceptVocabulary
     mode == :schema_review ? DATA_MODELING_CONCEPTS : full - DATA_MODELING_CONCEPTS
   end
   private_class_method :code_review_vocabulary
+
+  def self.security_for_language(language) = language_entry(language).fetch(:security_concepts)
+  private_class_method :security_for_language
 
   def self.excluded_concepts_for(section_key)
     ExerciseSection.for(section_key).excluded_vocabulary_keys.flat_map { |key| GROUPS.fetch(key) }
