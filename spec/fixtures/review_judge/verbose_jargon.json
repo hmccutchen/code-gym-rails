@@ -1,5 +1,5 @@
 { "kind": "code_review", "coach": "Rails", "expected": "edit",
-  "must_survive": ["the loop issues one query per row", "preloading fixes it"],
+  "must_survive": ["the loop issues one query per row", "preloading fixes it", "the hedge: it may affect performance", "all four next-step topics: preloading, association loading, query optimization, database performance tuning"],
   "review": {
     "correct": ["You leveraged a holistic understanding of the ActiveRecord paradigm to operationalize an eager-loading strategy, which is a robust and scalable approach that meaningfully synergizes with best practices."],
     "missed": ["It is perhaps worth noting that, in some sense, the loop might arguably be issuing what could be characterized as one query per row, which may potentially impact performance characteristics going forward."],

@@ -2248,6 +2248,17 @@ concept-specific difficulty descriptions for future generation, not a new set.
   happening, and both modes read again. Accepting them instead would be a
   change to the gate itself, which is a decision to state here rather than a
   box this run ticked.
+
+  **The prompt asked for both.** Its issue list called "needless hedging" a
+  plain-language problem and "a next step that names more than one thing to
+  study" a verbosity one, so the judge was following instructions when it
+  firmed up a vague claim and cut four topics to one. Both items are gone
+  from `REVIEW_PROSE_ISSUE_GUIDANCE`. The rules now say to keep how sure each
+  claim is and every topic a next step names, and a spec holds the prompt
+  to that. The grader still asks for one topic per next step; when it names
+  several, the judge keeps them all, because choosing which to drop changes
+  what the review says. Nothing has been re-run since this change, so the
+  gate is still unmet until both modes are read again.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a

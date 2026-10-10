@@ -6622,6 +6622,13 @@ RSpec.describe AiService, "REVIEW_PROSE_JUDGE_SYSTEM_PROMPT" do
     expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include(AiService::PLAIN_LANGUAGE_STANDARD.strip)
       .and include("reply with only the JSON verdict")
   end
+
+  # Both told the judge to change a claim in the 2026-10-09 comparison run.
+  it "never asks the judge to remove a hedge or cut a next step's topics" do
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).not_to match(/needless hedging|names more than one thing/)
+    expect(AiService::REVIEW_PROSE_JUDGE_SYSTEM_PROMPT).to include("Keep how sure each claim is")
+      .and include("Keep every topic a next step names")
+  end
 end
 
 RSpec.describe AiService, "judging graded reviews" do
