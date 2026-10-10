@@ -547,8 +547,9 @@ class AiService
   # 2026-10-10 run against the corrected prompt. The cap below is justified
   # by its headroom over this, so the number lives here rather than in the
   # prose that reasons about it, and ai_service_spec asserts the headroom the
-  # reasoning claims. At 371 that spec has 16 tokens of slack, so a later run
-  # measuring above 375 makes the cap a decision rather than a passing check.
+  # reasoning claims. The slack left is small enough that a later run
+  # measuring past REVIEW_JUDGE_MAX_TOKENS / 4 makes the cap a decision
+  # rather than a passing check.
   REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 371
 
   # Review output has no length bound, so a much longer review could still

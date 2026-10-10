@@ -2282,10 +2282,14 @@ concept-specific difficulty descriptions for future generation, not a new set.
   is not echoing the prompt; it reaches for the sharper sentence on its own.
   Two rounds of prompt wording have now failed to hold this one, which is
   evidence about what a prompt can bound rather than a wording still to be
-  found. The mechanical boundary cannot take over: `parse_entries` enforces
-  cite-every-entry for list fields, and the sharpened clause is one sentence
-  inside `next_step`'s sibling string field, where splitting on sentences
-  yields a single entry and catches nothing.
+  found. The mechanical boundary cannot take over, and not for the reason it
+  first looks: `missed` is a list field, so the rewrite did go through
+  `parse_entries` and did cite its source. The fixture's `missed` is one
+  sentence, which `review_points` projects to a single entry, so citing it is
+  the only thing a rewrite of that field can do and the citation rule is
+  satisfied whatever the sentence now says. This is the accepted risk two
+  paragraphs up, met in the wild: citation proves no point was dropped or
+  duplicated, never that a kept one still means the same.
 
   So the gate stays unmet on the same clause it was unmet on before, and the
   remaining question is no longer a fix to find but a bar to set: whether
@@ -2295,12 +2299,11 @@ concept-specific difficulty descriptions for future generation, not a new set.
   a decision to state here rather than a box a run ticks.
 
   The budget checks still pass with room, measured on the corrected prompt:
-  the largest reply was **371 output tokens of the 1,500-token
-  `REVIEW_JUDGE_MAX_TOKENS`**, and the slowest call **3,075 ms of the 30,000
-  ms `REVIEW_JUDGE_READ_TIMEOUT`**. `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
-  moves to that 371, which leaves the ×4 headroom spec 16 tokens of slack, so
-  the next run measuring above 375 turns the cap into a decision rather than
-  a passing check.
+  the largest reply used a fraction of `REVIEW_JUDGE_MAX_TOKENS` and the
+  slowest call a tenth of `REVIEW_JUDGE_READ_TIMEOUT`.
+  `REVIEW_JUDGE_MEASURED_MAX_OUTPUT_TOKENS` moves to what this run measured;
+  that constant and its comment are where the number and its remaining
+  headroom are stated, so they are not restated here to go stale.
 - **One reviewed-response invariant**: once `DailyResponse#reviewed?` is true,
   `ConceptMastery.record_review!` has already moved tier, streak and retention
   state off that review, and nothing can undo it. So no action destroys a
