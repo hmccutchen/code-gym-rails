@@ -574,7 +574,7 @@ class AiService
     Rules for any rewrite:
     - Keep what every entry claims. Keep each negation ("does not", "never"), each condition ("only when", "unless"), and every identifier (a method, column, constant or file name) exactly as written.
     - Never add a claim, a fix or an example the entry does not already make. Never touch code.
-    - Keep how sure each claim is. A word that limits a claim ("may", "often", "in some cases") stays, and a vague claim stays vague: "essentially a performance thing" can become "a performance problem", never "slows the page down".
+    - Keep how sure each claim is. A word that limits a claim ("may", "often", "in some cases") stays, and a vague claim stays vague: "this could get slow with lots of rows" can become "this may be slow on large tables", never "this times out".
     - Keep every topic a next step names. Shorten how it says them; never choose some and drop the rest.
     - A list field is rewritten as entries, each with "from": the zero-based indexes of the original entries it replaces. Cite every original index exactly once. Merge entries only when they make the same point, and then report a verbosity issue. Order entries by their first index.
     - Rewrite only the fields that have a problem and leave the others out. If nothing needs changing, return keep.
