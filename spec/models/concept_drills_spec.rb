@@ -96,7 +96,7 @@ RSpec.describe ConceptDrills do
     it "drills every concept in the group that the bucket holds, labelled with the group" do
       described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
 
-      AiService::MODULE_DESIGN_CONCEPTS.each do |concept|
+      ConceptVocabulary::MODULE_DESIGN_CONCEPTS.each do |concept|
         expect(row(concept).drill_group).to eq("module_design")
         expect(row(concept).drilled_at).to be_present
       end
@@ -221,18 +221,18 @@ RSpec.describe ConceptDrills do
     it "lists a group once with the concepts still under it, and a lone concept by itself" do
       described_class.start_group!(user, group: "module_design", bucket: "ruby_rails")
       described_class.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
-      row(AiService::MODULE_DESIGN_CONCEPTS.first).update!(drilled_at: nil, drill_group: nil)
+      row(ConceptVocabulary::MODULE_DESIGN_CONCEPTS.first).update!(drilled_at: nil, drill_group: nil)
 
       drills = described_class.for(user)
 
       expect(drills.count).to eq(2)
       expect(drills).to be_full
       group = drills.entries.find { |entry| entry.group == "module_design" }
-      expect(group.concepts).to match_array(AiService::MODULE_DESIGN_CONCEPTS.drop(1))
+      expect(group.concepts).to match_array(ConceptVocabulary::MODULE_DESIGN_CONCEPTS.drop(1))
       expect(group.bucket).to eq("ruby_rails")
       expect(drills.drilling?("n_plus_one", "ruby_rails")).to be(true)
       expect(drills.group_for("n_plus_one", "ruby_rails")).to be_nil
-      expect(drills.group_for(AiService::MODULE_DESIGN_CONCEPTS.last, "ruby_rails")).to eq("module_design")
+      expect(drills.group_for(ConceptVocabulary::MODULE_DESIGN_CONCEPTS.last, "ruby_rails")).to eq("module_design")
       expect(drills.group_drilling?("module_design", "ruby_rails")).to be(true)
       expect(drills.group_drilling?("oo_design", "ruby_rails")).to be(false)
     end

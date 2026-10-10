@@ -66,17 +66,17 @@ RSpec.describe ConceptBucket do
 
   describe ".vocabulary_for" do
     it "answers with the vocabulary each bucket draws from" do
-      expect(described_class.vocabulary_for("ruby_rails")).to eq(AiService::RAILS_CONCEPTS)
-      expect(described_class.vocabulary_for("javascript")).to eq(AiService::JS_CONCEPTS)
-      expect(described_class.vocabulary_for("architecture")).to eq(AiService::ARCHITECTURE_CONCEPTS)
-      expect(described_class.vocabulary_for("plan_review")).to eq(AiService::PLAN_REVIEW_CONCEPTS)
-      expect(described_class.vocabulary_for("ambiguity_hunt")).to eq(AiService::AMBIGUITY_HUNT_CONCEPTS)
-      expect(described_class.vocabulary_for("pseudocode_to_code")).to eq(AiService::PSEUDOCODE_TO_CODE_CONCEPTS)
+      expect(described_class.vocabulary_for("ruby_rails")).to eq(ConceptVocabulary::RAILS_CONCEPTS)
+      expect(described_class.vocabulary_for("javascript")).to eq(ConceptVocabulary::JS_CONCEPTS)
+      expect(described_class.vocabulary_for("architecture")).to eq(ConceptVocabulary::ARCHITECTURE_CONCEPTS)
+      expect(described_class.vocabulary_for("plan_review")).to eq(ConceptVocabulary::PLAN_REVIEW_CONCEPTS)
+      expect(described_class.vocabulary_for("ambiguity_hunt")).to eq(ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS)
+      expect(described_class.vocabulary_for("pseudocode_to_code")).to eq(ConceptVocabulary::PSEUDOCODE_TO_CODE_CONCEPTS)
     end
 
     # An empty list would silently read as "nothing is due" in a retention query.
     it "raises for a bucket with no vocabulary rather than returning nothing" do
-      expect { described_class.vocabulary_for("not_a_bucket") }.to raise_error(KeyError)
+      expect { described_class.vocabulary_for("not_a_bucket") }.to raise_error(ConceptVocabulary::UnknownLanguage)
     end
   end
 

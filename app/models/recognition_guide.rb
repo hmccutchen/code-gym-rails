@@ -2,7 +2,7 @@
 class RecognitionGuide < ApplicationRecord
   GROUP_KEYS = (ConceptGroup::NAMED.map(&:first) + ConceptBucket::LANGUAGE_INDEPENDENT).freeze
 
-  # Language-independent buckets state their subject as their LANGUAGE_CONFIG focus, so they aren't repeated here.
+  # Language-independent buckets state their subject as their AiService::LANGUAGE_PROMPTS focus, so they aren't repeated here.
   NAMED_GROUP_SUBJECTS = {
     "data_modeling"      => "flaws in how data is structured and stored: tables, keys, constraints, indexes, and the migrations that change them.",
     "domain_modeling"    => "whether the model's names match the words the business uses, and which things must change together behind one entry point.",
@@ -37,7 +37,7 @@ class RecognitionGuide < ApplicationRecord
   end
 
   def self.subject_for(group_key)
-    NAMED_GROUP_SUBJECTS.fetch(group_key) { AiService::LANGUAGE_CONFIG.fetch(group_key).fetch(:focus) }
+    NAMED_GROUP_SUBJECTS.fetch(group_key) { AiService::LANGUAGE_PROMPTS.fetch(group_key).fetch(:focus) }
   end
 
   def self.framing_for(group_key)

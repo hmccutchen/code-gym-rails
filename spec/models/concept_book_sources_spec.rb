@@ -3,9 +3,9 @@ require "rails_helper"
 RSpec.describe ConceptBookSources do
   # A citation keyed on a concept outside these vocabularies can never render.
   TRACKED_CONCEPTS = (
-    AiService::RAILS_CONCEPTS + AiService::JS_CONCEPTS + AiService::ARCHITECTURE_CONCEPTS +
-    AiService::PLAN_REVIEW_CONCEPTS + AiService::AMBIGUITY_HUNT_CONCEPTS +
-    AiService::PSEUDOCODE_TO_CODE_CONCEPTS
+    ConceptVocabulary::RAILS_CONCEPTS + ConceptVocabulary::JS_CONCEPTS + ConceptVocabulary::ARCHITECTURE_CONCEPTS +
+    ConceptVocabulary::PLAN_REVIEW_CONCEPTS + ConceptVocabulary::AMBIGUITY_HUNT_CONCEPTS +
+    ConceptVocabulary::PSEUDOCODE_TO_CODE_CONCEPTS
   ).uniq.freeze
 
   describe ".for" do
@@ -74,12 +74,12 @@ RSpec.describe ConceptBookSources do
     service = double_class.new("key")
     titles  = described_class::SOURCES.values.flatten.map { |source| source[:title] }.uniq
 
-    # Derived from LANGUAGE_CONFIG so a new bucket is covered without editing this.
-    AiService::LANGUAGE_CONFIG.each do |language, config|
+    # Derived from ConceptVocabulary::LANGUAGES so a new bucket is covered without editing this.
+    ConceptVocabulary.languages.each do |language|
       described_class::SOURCES.each_key do |concept|
-        next unless config[:concepts].include?(concept)
+        next unless ConceptVocabulary.for_language(language).include?(concept)
 
-        prompt = service.send(:build_concept_reference_prompt, concept, config)
+        prompt = service.send(:build_concept_reference_prompt, concept, language)
 
         titles.each do |title|
           expect(prompt).not_to include(title),
@@ -90,8 +90,8 @@ RSpec.describe ConceptBookSources do
   end
 
   # Makes the loop above exhaustive: a key no vocabulary holds would skip every iteration and pass.
-  it "keys every entry on a concept some LANGUAGE_CONFIG vocabulary holds" do
-    covered = AiService::LANGUAGE_CONFIG.values.flat_map { |config| config[:concepts] }.uniq
+  it "keys every entry on a concept some ConceptVocabulary language holds" do
+    covered = ConceptVocabulary.languages.flat_map { |language| ConceptVocabulary.for_language(language) }.uniq
 
     expect(described_class::SOURCES.keys - covered).to be_empty
   end

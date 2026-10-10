@@ -14,7 +14,7 @@ RSpec.describe DayHosts do
 
   # Only a schema_review code_review offers the data-modeling concepts.
   it "reads code_review's vocabulary for the day's mode" do
-    concept = AiService::DATA_MODELING_CONCEPTS.first
+    concept = ConceptVocabulary::DATA_MODELING_CONCEPTS.first
 
     expect(hosts.can_tag?(ExerciseSection::CodeReview, concept, "ruby_rails")).to be(false)
     expect(described_class.new("ruby_rails", mode: :schema_review).can_tag?(ExerciseSection::CodeReview, concept, "ruby_rails")).to be(true)

@@ -126,57 +126,6 @@ number here.
 Review output is unbounded, so a long review can still fall back as
 `truncated`. Passing this cap turns thinking off.
 
-## `DATA_MODELING_CONCEPTS`
-
-These sit in both language vocabularies because `ConceptBucket` dispatches on
-section key, and a schema-review day's key is still `code_review`.
-
-## `CODE_SMELL_CONCEPTS`
-
-Named smells, not remedies. They are shared across languages because each one
-means the same in a Rails class and in a React component.
-
-## `OO_DESIGN_CONCEPTS`
-
-Kept small on purpose: candidates that would generate the same section as an
-existing concept were cut.
-
-## `MODULE_DESIGN_CONCEPTS`
-
-What an interface costs its callers. Candidates that duplicated
-`shotgun_surgery` or `open_closed` were cut.
-
-## `SILENT_CORRECTNESS_CONCEPTS`
-
-Code that runs cleanly and is still wrong. These are remedies to reach for, so
-they stay off `ANTI_SHAPE_CONCEPTS`.
-
-## `DOMAIN_MODELING_CONCEPTS`
-
-What a thing is called, and which writes change together. These are
-disciplines, so they stay off both `ANTI_SHAPE_CONCEPTS` and
-`TRADEOFF_CONCEPTS`.
-
-## `COMPLEXITY_CAUSE_CONCEPTS`
-
-Its own constant because `ANTI_SHAPE_CONCEPTS` names it before
-`ARCHITECTURE_CONCEPTS` is defined.
-
-## `ANTI_SHAPE_CONCEPTS`
-
-Things to find, not to choose between. References are cached forever, so a
-remedy framing applied to one of these would never correct itself.
-
-## `RAILS_SECURITY_CONCEPTS`
-
-`security_review` draws only from these, so each concept is practised both as
-"is this correct" and as "is this exploitable".
-
-## `TYPESCRIPT_FLAVORED_CONCEPTS`
-
-TypeScript syntax is asked for only in a section tagged with one of these.
-Other JavaScript concepts stay plain JavaScript.
-
 ## `SCENARIO_DOMAINS`
 
 Scenario dressing only, never tagged as a concept.
@@ -187,7 +136,7 @@ Scenario dressing only, never tagged as a concept.
 A spec holds these keys equal to `DailyPlan::SCENARIO_FLAVOR_WEIGHTS`' keys, so
 every flavor that can be rolled has a pool.
 
-## `LANGUAGE_CONFIG` (javascript `schema_artifact`)
+## `LANGUAGE_PROMPTS` (javascript `schema_artifact`)
 
 The JavaScript artifact is a Prisma schema change together with its migration,
 because `unsafe_migration` cannot be planted in a `schema.prisma`, which has no
@@ -315,6 +264,12 @@ one request away.
 A blank response would fail a validation outside `rescue AiService::Error` and
 give the user a raw 500.
 
+## `#require_supported_language!`
+
+Planning reads `ConceptVocabulary`, whose unknown-language error is not an
+`AiService::Error`. Checking first keeps an unsupported language failing the
+way the generation jobs rescue and record.
+
 ## `#config_for`
 
 Fails loudly on "mixed" or a typo instead of silently falling back to
@@ -329,8 +284,8 @@ can host the concept, and `build_exercise_prompt` drops it from the prompt
 
 ## `#can_host?`
 
-Uses the day's language, not `cm.language`: `LANGUAGE_CONFIG`'s "architecture"
-entry would report false hosts.
+Uses the day's language, not `cm.language`: `ConceptVocabulary::LANGUAGES`'
+"architecture" entry would report false hosts.
 
 ## `#log_difficulty_diagnostics`
 
@@ -439,7 +394,7 @@ design principles keep it.
 ## `#code_example_description`
 
 `medium` is nil for a concept with no code of its own (see
-`LANGUAGE_AGNOSTIC_VOCABULARIES`).
+`ConceptVocabulary.language_agnostic?`).
 
 ## `#parse_provider_envelope`
 

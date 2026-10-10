@@ -63,7 +63,8 @@ matter of taste.
 shared code?** BLOCKING. The stated invariant is that adding a kind means
 adding a class, not editing shared code. `ExerciseSection` and its subclasses
 own per-kind facts; `AiService` subclasses own per-provider facts;
-`ConceptBucket` owns which vocabulary a concept records under. A `case`/`if` on
+`ConceptVocabulary` owns the concept lists; `ConceptBucket` owns which
+vocabulary a concept records under. A `case`/`if` on
 `section_key`, `kind`, `provider`, or a bucket name inside `AiService`,
 `DailyPlan`, a controller, or a shared partial is a violation — call it out as
 blocking, not as a passing note. The fix is a method on the kind/provider
@@ -278,8 +279,9 @@ those, plus whatever `grep -rl <changed constant or method> spec/` turns up.
 For a change local to one controller, model, view, or job that is the whole
 blast radius, and a scoped run beats a full suite that nobody waits for. It is
 **not** the blast radius when the diff touches a shared authority — `AiService`,
-`ExerciseSection`, `ProblemSetIngest`, `DailyPlan`, `ConceptBucket`,
-`DailyResponse`, `RealSource`, or `DailyExercise#active_section_keys`. Those are
+`ExerciseSection`, `ProblemSetIngest`, `DailyPlan`, `ConceptVocabulary`,
+`ConceptBucket`, `DailyResponse`, `RealSource`, or
+`DailyExercise#active_section_keys`. Those are
 named under "Standards and Authorities" in `CLAUDE.md` because everything
 downstream derives from them, so a diff touching one runs the full suite.
 

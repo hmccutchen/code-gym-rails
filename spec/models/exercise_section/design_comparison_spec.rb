@@ -188,8 +188,8 @@ RSpec.describe ExerciseSection::DesignComparison do
   end
 
   describe ".narrow_vocabulary" do
-    let(:rails) { AiService::RAILS_CONCEPTS }
-    let(:js)    { AiService::JS_CONCEPTS }
+    let(:rails) { ConceptVocabulary::RAILS_CONCEPTS }
+    let(:js)    { ConceptVocabulary::JS_CONCEPTS }
 
     it "offers only its own hosts, intersected with the language vocabulary" do
       offered = described_class.narrow_vocabulary(rails, rung: "senior")
@@ -208,7 +208,7 @@ RSpec.describe ExerciseSection::DesignComparison do
     end
 
     it "offers a tradeoff concept only at principal_engineer, and the strictest list with no rung" do
-      tradeoffs = rails & AiService::TRADEOFF_CONCEPTS & described_class.hosted_concepts
+      tradeoffs = rails & ConceptVocabulary::TRADEOFF_CONCEPTS & described_class.hosted_concepts
       expect(tradeoffs).not_to be_empty
 
       expect(described_class.narrow_vocabulary(rails, rung: "principal_engineer")).to include(*tradeoffs)
@@ -221,7 +221,7 @@ RSpec.describe ExerciseSection::DesignComparison do
       KindDifficulty::LEVELS.each do |rung|
         expect(described_class.narrow_vocabulary(rails, rung: rung) & described_class::DEFERRED_CONCEPTS).to be_empty
       end
-      expect(described_class::DEFERRED_CONCEPTS - AiService::DATA_MODELING_CONCEPTS).to be_empty
+      expect(described_class::DEFERRED_CONCEPTS - ConceptVocabulary::DATA_MODELING_CONCEPTS).to be_empty
     end
 
     it "names only concepts some language vocabulary holds, so a rename fails here" do
@@ -229,7 +229,7 @@ RSpec.describe ExerciseSection::DesignComparison do
     end
 
     it "is what generation offers it" do
-      expect(ProblemSetIngest.selectable_vocabulary_for("design_comparison", "ruby_rails", rung: "junior"))
+      expect(ConceptVocabulary.selectable_for_section("design_comparison", "ruby_rails", rung: "junior"))
         .to eq(described_class.narrow_vocabulary(rails, rung: "junior"))
     end
   end

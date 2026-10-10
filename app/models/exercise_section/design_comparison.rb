@@ -101,13 +101,13 @@ class ExerciseSection::DesignComparison < ExerciseSection
 
     def narrow_vocabulary(vocabulary, rung: nil)
       hosts = vocabulary & hosted_concepts
-      rung == "principal_engineer" ? hosts : hosts - AiService::TRADEOFF_CONCEPTS
+      rung == "principal_engineer" ? hosts : hosts - ConceptVocabulary::TRADEOFF_CONCEPTS
     end
 
     def hosted_concepts
-      AiService::CODE_SMELL_CONCEPTS + AiService::OO_DESIGN_CONCEPTS + AiService::MODULE_DESIGN_CONCEPTS +
-        AiService::DOMAIN_MODELING_CONCEPTS + (AiService::DATA_MODELING_CONCEPTS - DEFERRED_CONCEPTS) +
-        AiService::TYPESCRIPT_FLAVORED_CONCEPTS + HOSTED_CONCEPTS
+      ConceptVocabulary::CODE_SMELL_CONCEPTS + ConceptVocabulary::OO_DESIGN_CONCEPTS + ConceptVocabulary::MODULE_DESIGN_CONCEPTS +
+        ConceptVocabulary::DOMAIN_MODELING_CONCEPTS + (ConceptVocabulary::DATA_MODELING_CONCEPTS - DEFERRED_CONCEPTS) +
+        ConceptVocabulary::TYPESCRIPT_FLAVORED_CONCEPTS + HOSTED_CONCEPTS
     end
 
     def reject_unusable!(section)
