@@ -826,8 +826,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   does not enforce it, and nothing checks the output. A stale entry, including a
   migration whose table has left the schema, is skipped with a warning rather
   than failing generation; a spec holds every entry resolvable and inside
-  `MIN_LINES..MAX_LINES`. Design:
-  `docs/superpowers/specs/2026-09-11-real-source-code-review-design.md`.
+  `MIN_LINES..MAX_LINES`.
 
   **Self-reference here is deliberate, and the pool leans into it.** Code Gym
   is a working learning app, so its own pause-and-resume, spaced-repetition,
@@ -2398,8 +2397,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   gets a line saying those are choices, and meta skill is framed as the habit
   its tracked concepts exercise together (`RecognitionGuide::FRAMINGS`),
   since its concepts are already process concepts. Nothing else reads a
-  guide. Design:
-  `docs/superpowers/specs/2026-09-29-recognition-guides-design.md`.
+  guide.
 - **Book citations**: `ConceptBookSources` maps a concept to an ARRAY of
   reading pointers — title, author, and where the book has one, the term the
   book itself coined — rendered as "Where this comes from" at the bottom of a
@@ -2417,8 +2415,6 @@ concept-specific difficulty descriptions for future generation, not a new set.
   grading criteria. The rule nothing mechanical can enforce: a pointer names a
   term the book coined, never a chapter or page number, because a number
   recalled rather than checked is a fabrication that reads as authoritative.
-  Audit behind the current entries:
-  `docs/superpowers/specs/2026-09-12-four-book-concept-audit.md`.
 - **Hand-written lessons**: `LearnLessons` holds lessons for concepts that
   belong on the Learn tab but in no vocabulary, because a generated section
   cannot test them. `reading_unfamiliar_code` is the first: moving through a
@@ -2709,8 +2705,7 @@ concept-specific difficulty descriptions for future generation, not a new set.
   code-colored panels take `--code-bg`, and highlighting takes the palette
   plus `--code-symbol` and `--code-builtin`, so each palette states them once;
   code is sized in rem, so text size scales it. `palette_contrast_spec`
-  holds both palettes to WCAG AA, every highlighting color on code included. Design:
-  `docs/superpowers/specs/2026-09-30-display-preferences-design.md`.
+  holds both palettes to WCAG AA, every highlighting color on code included.
 - **Push reminders**: an optional notification each weekday when the day's set
   is ready, and an optional afternoon nudge on days it is left unfinished,
   turned on and off on the Account page.

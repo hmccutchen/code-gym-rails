@@ -19,8 +19,7 @@ require "prism"
 # education-app scenario cannot. The safeguards are the ones below: a curated
 # list, exactly one planted flaw — in a modified copy of a method, or in a new
 # migration modelled on a real one — a scenario that says so, and never the
-# unmodified original. Design:
-# docs/superpowers/specs/2026-09-11-real-source-code-review-design.md
+# unmodified original.
 class RealSource
   # Code Gym is written in Ruby, so the pool can only serve a day generating
   # in that language — a javascript day asks for JS/React code or a Prisma
