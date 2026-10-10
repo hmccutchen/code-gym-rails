@@ -125,6 +125,9 @@
        broken. min-width: 0 all the way down is what lets it: a flex item will
        not shrink below its content otherwise. */
     nav .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 2rem; color: var(--accent-text); white-space: nowrap; flex-shrink: 0; }
+    /* A tap leaves a touch screen in :hover, so the global underline would
+       stay on the logo after every trip home. */
+    nav .brand:hover { text-decoration: none; }
     /* The alt text names the link, which is why the wordmark beside it is
        hidden from screen readers. */
     nav .brand-mark { height: 5rem; width: 7rem; }
