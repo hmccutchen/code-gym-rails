@@ -29,57 +29,57 @@ RSpec.describe RuboCop::Cop::CodeGym::SingleLineComment, :config do
     RUBY
   end
 
-it "accepts an own-line comment that starts a new comment for the next line" do
-  expect_no_offenses(<<~RUBY)
-    x = 1 # one
-    # Why y is two.
-    y = 2
-  RUBY
-end
-
-it "accepts trailing comments on consecutive code lines" do
+  it "accepts an own-line comment that starts a new comment for the next line" do
     expect_no_offenses(<<~RUBY)
-      first = 1 # one
-      second = 2 # two
+      x = 1 # one
+      # Why y is two.
+      y = 2
     RUBY
   end
 
-  it "accepts one-line comments separated by a blank line" do
-    expect_no_offenses(<<~RUBY)
-      # One reason.
+  it "accepts trailing comments on consecutive code lines" do
+      expect_no_offenses(<<~RUBY)
+        first = 1 # one
+        second = 2 # two
+      RUBY
+    end
 
-      # Another reason.
-      call
-    RUBY
-  end
+    it "accepts one-line comments separated by a blank line" do
+      expect_no_offenses(<<~RUBY)
+        # One reason.
 
-  it "flags a =begin block" do
-    expect_offense(<<~RUBY)
-      =begin
-      ^^^^^^ Keep each comment to a single line.
-      notes
-      =end
-      call
-    RUBY
-  end
+        # Another reason.
+        call
+      RUBY
+    end
 
-  it "ignores a shebang, magic comments and directives beside a comment" do
-    expect_no_offenses(<<~RUBY)
-      #!/usr/bin/env ruby
-      # frozen_string_literal: true
-      # rubocop:disable Style/Foo
-      # One reason.
-      call
-      # rubocop:enable Style/Foo
-    RUBY
-  end
+    it "flags a =begin block" do
+      expect_offense(<<~RUBY)
+        =begin
+        ^^^^^^ Keep each comment to a single line.
+        notes
+        =end
+        call
+      RUBY
+    end
 
-  it "does not treat # lines inside a heredoc as comments" do
-    expect_no_offenses(<<~'RUBY')
-      PROMPT = <<~TEXT
-        # Heading
-        # Subheading
-      TEXT
-    RUBY
+    it "ignores a shebang, magic comments and directives beside a comment" do
+      expect_no_offenses(<<~RUBY)
+        #!/usr/bin/env ruby
+        # frozen_string_literal: true
+        # rubocop:disable Style/Foo
+        # One reason.
+        call
+        # rubocop:enable Style/Foo
+      RUBY
+    end
+
+    it "does not treat # lines inside a heredoc as comments" do
+      expect_no_offenses(<<~'RUBY')
+        PROMPT = <<~TEXT
+          # Heading
+          # Subheading
+        TEXT
+      RUBY
+    end
   end
-end

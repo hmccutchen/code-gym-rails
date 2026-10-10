@@ -17,8 +17,13 @@ module RuboCop
         private
 
         def code_follows?(comment)
-          next_line = processed_source.lines.drop(last_line_of(comment)).find { |line| !directive?(line) }
-          !next_line.nil? && !next_line.strip.empty? && !next_line.lstrip.start_with?("#")
+          index = processed_source.lines.each_index.drop(last_line_of(comment)).find { |i| !directive?(processed_source.lines[i]) }
+          !index.nil? && !processed_source.lines[index].strip.empty? && !comment_line_numbers.include?(index + 1)
+        end
+
+        def comment_line_numbers
+          processed_source.comments.select { |comment| own_line?(comment) }
+            .flat_map { |comment| (comment.loc.line..last_line_of(comment)).to_a }
         end
       end
     end

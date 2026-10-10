@@ -46,24 +46,35 @@ RSpec.describe RuboCop::Cop::CodeGym::AttachedComment, :config do
     RUBY
   end
 
-it "accepts a reason directly above a rubocop directive and its code" do
-  expect_no_offenses(<<~RUBY)
-    # The provider SDK reads this global.
-    # rubocop:disable Style/GlobalVars
-    $client = build
-  RUBY
-end
+  it "accepts a reason directly above a rubocop directive and its code" do
+    expect_no_offenses(<<~RUBY)
+      # The provider SDK reads this global.
+      # rubocop:disable Style/GlobalVars
+      $client = build
+    RUBY
+  end
 
-it "does not flag a =begin block that code directly follows" do
-  expect_no_offenses(<<~RUBY)
-    =begin
-    notes
-    =end
-    call
-  RUBY
-end
+  it "does not flag a =begin block that code directly follows" do
+    expect_no_offenses(<<~RUBY)
+      =begin
+      notes
+      =end
+      call
+    RUBY
+  end
 
-it "ignores a magic comment followed by a blank line" do
+  it "flags a comment followed by a =begin block" do
+    expect_offense(<<~RUBY)
+      # Reason.
+      ^^^^^^^^^ Put the comment directly above the code it discusses.
+      =begin
+      notes
+      =end
+      call
+    RUBY
+  end
+
+  it "ignores a magic comment followed by a blank line" do
     expect_no_offenses(<<~RUBY)
       # frozen_string_literal: true
 
